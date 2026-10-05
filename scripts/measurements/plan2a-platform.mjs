@@ -6,12 +6,12 @@ import { arch, platform, release } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { installedCommand, packageRoot } from './common.mjs';
 import { runCommand } from './plan2a-fixtures.mjs';
-import { writeMaterializeFixture, materializeFixtureFiles } from '../reference-harness/plan2a-materialize-fixture.ts';
+import { writeMaterializeFixture, materializeFixtureFiles } from './plan2a-materialize-fixture.ts';
 
 /**
  * Plan 2A (`I2A-12:linux-macos-bytes`) platform evidence: the same
  * checked-in, real, small filesystem/process fixture
- * (`scripts/reference-harness/plan2a-materialize-fixture.ts`, already used by
+ * (`scripts/measurements/plan2a-materialize-fixture.ts`, also used by
  * the I2A-09/10 reference-harness cases) materialized through the real
  * installed CLI and production daemon, producing a relative-tree/bytes
  * manifest (one sha256 per relative path) plus real symlink, rollback and
@@ -62,7 +62,7 @@ async function withOwnedDaemon(run) {
 const report = {
   schemaVersion: 'ramify.plan2a-platform/1', phase: 'plan2a-platform', measuredAt: new Date().toISOString(),
   evidenceKind: 'platform',
-  fixture: { source: 'scripts/reference-harness/plan2a-materialize-fixture.ts', files: Object.keys(materializeFixtureFiles).sort() },
+  fixture: { source: 'scripts/measurements/plan2a-materialize-fixture.ts', files: Object.keys(materializeFixtureFiles).sort() },
   environment: { node: process.version, platform: platform(), release: release(), arch: arch() },
   cases: {}, manifest: [], passed: false, failures: [],
 };

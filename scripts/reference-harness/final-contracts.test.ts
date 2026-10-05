@@ -15,9 +15,9 @@ describe('Plan 2 final contract validator', () => {
   it('requires eleven owners and expands every abbreviation from the archived review', async () => {
     const owners = reviewedOwners(...await reviews('owners.md'));
     expect([...owners.keys()].sort()).toEqual(['analysis', 'cli', 'contexts', 'daemon', 'descriptions', 'layout', 'model', 'presentation', 'project', 'ramify', 'typescript']);
-    const names = owners.get('ramify')!.document.statements.flatMap(statement => statement.selection.kind === 'named' ? statement.selection.names.map(item => item.name) : []);
+    const names = owners.get('ramify')!.document.statements.flatMap(statement => 'selection' in statement && statement.selection.kind === 'named' ? statement.selection.names.map(item => item.name) : []);
     for (const name of ['explainImport', 'LinkedDescriptions', 'SourceAnalysis', 'shopFocusDiagram', 'ProjectResolution', 'IncrementRun', 'ServiceConnector', 'createQuickEnvironment']) expect(names).toContain(name);
-    expect(owners.get('analysis')!.document.statements.some(statement => statement.from.value === 'increment.ts')).toBe(true);
+    expect(owners.get('analysis')!.document.statements.some(statement => 'from' in statement && statement.from.value === 'increment.ts')).toBe(true);
     const [baseline, plan2] = await reviews('owners.md');
     expect(() => reviewedOwners(baseline.replace('TextSpan, DescriptionToken', 'ChangedSpan, DescriptionToken'), plan2)).toThrow('Abbreviation must match');
   });
@@ -31,8 +31,22 @@ describe('Plan 2 final contract validator', () => {
     // selection arrives as a layer that names the plan which reviewed it.
     for (const [name, owner] of archived) expect(layered.get(name)!.document).toBe(owner.document);
     expect(layered.get('daemon')!.layers!.map(layer => layer.plan))
-      .toEqual(['Plan 6 (project explorer)', 'Plan 6D (behavioral dependency diagram)', 'Plan 8 (signature companions)']);
+      .toEqual(['Plan 6 (project explorer)', 'Plan 6D (behavioral dependency diagram)', 'Plan 8 (signature companions)',
+        'Plan 7 (affected modules)', 'Phase 1 project boundaries (root tooling access)',
+        // Phase 1 project boundaries, iteration 15: the relay of `PathCheckDisposition` beside `CheckOutcome`.
+        'Phase 1 project boundaries (path dispositions)',
+        // Phase 1 project boundaries, iteration 16: the watch scope and registrations relayed beside
+        // `WatcherPort` and `ContextStatus`, and the strict check-reply decoder exposed to the root.
+        'Phase 1 project boundaries (watch registrations and strict replies)']);
     for (const owner of layered.values()) for (const layer of owner.layers ?? []) expect(layer.plan.trim()).not.toBe('');
+    // Each archived purpose is carried through unchanged; a later purpose
+    // change arrives as a layer that names the plan which reviewed it.
+    for (const [name, owner] of archived) expect(layered.get(name)!.purpose).toBe(owner.purpose);
+    expect(Object.fromEntries([...layered].filter(([, owner]) => owner.purposeLayers?.length)
+      .map(([name, owner]) => [name, owner.purposeLayers!.map(layer => layer.plan)])))
+      .toEqual({ ramify: ['Plan 7 (affected modules)'], analysis: ['Plan 7 (affected modules)'], cli: ['Plan 7 (affected modules)'],
+        daemon: ['Plan 7 (affected modules)'], contexts: ['Plan 7 (affected modules)'],
+        project: ['Phase 1 project boundaries (auxiliary source)'] });
   });
 
   it('accepts reviewed exposures and purpose while rejecting independent declaration and prose drift', async () => {

@@ -2,8 +2,12 @@
 
 **Status:** Active
 
-Whole-tree ownership and project-boundary vocabulary adopted 2026-10-01;
-the corresponding tooling changes are not yet implemented.
+Whole-tree ownership and project-boundary vocabulary adopted 2026-10-01,
+and the root marker adopted 2026-10-03; discovery implements the root marker
+and the declared nested trees, auxiliary source is analyzed and its originals
+are never exposed, imports into declared nested trees are enforced, and
+containment decides affected selection and the hook check's path
+dispositions.
 
 ## Purpose
 
@@ -59,9 +63,29 @@ directories or a module's scratch directory, excluded from Ramify analysis.
 A **scratch directory** is the module-owned directory `tmp` directly beneath
 its `src/`, for throwaway files excluded from Ramify analysis.
 
+## Compiler source
+
+**Compiler source** is a file with a `.ts`, `.tsx`, `.mts` or `.cts`
+extension, including declaration files, or with a `.js`, `.jsx`, `.mjs` or
+`.cjs` extension when it lies beneath a module's `src/` or the root compiler
+configuration admits JavaScript, whether or not the compiler configuration
+selects it.
+
 ## Auxiliary source
 
-**Auxiliary source** is compiler source a module owns outside its `src/`.
+**Auxiliary source** is compiler source a module owns outside its `src/` and
+outside its owned-ignored trees.
+
+## Inert file
+
+An **inert file** is a file a module owns outside its `src/` and outside its
+owned-ignored trees that is neither compiler source, a `module.ramify` nor the
+module's `README.md`; Ramify does not inventory or classify it.
+
+## Captured input
+
+A **captured input** is a file whose content or absence an analysis revision
+read and fingerprinted, so that a change to it invalidates the revision.
 
 ## Containment
 
@@ -246,8 +270,14 @@ that S's declared signature names.
 ## Module header
 
 The **module header** is the `module` statement of `module.ramify`: the
-module's declared name and its optional `tagged` clause. Its tag set is the
-module's declared tag set and classifies the module's ordinary source.
+optional root marker, the module's declared name and its optional `tagged`
+clause. Its tag set is the module's declared tag set and classifies the
+module's ordinary source.
+
+## Root marker
+
+The **root marker** is the keyword `root` before `module` in a module header,
+declaring that module the root of its own project.
 
 ## Module tagging
 

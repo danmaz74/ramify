@@ -5,9 +5,11 @@ import { runBatch } from '../../src/batch.js';
 import type { BatchOperation } from '../../src/interfaces/batch.js';
 import { runCli } from '../../subs/cli/src/index.js';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
+import { expectedGitAdviceLaunches, isGitAdviceLaunch } from '../../src/tests/entry-boundary-cases.js';
 import { cliProcess, compiledEntry } from '../../src/tests/process.js';
 import type { TraceEvent } from '../../src/tests/process.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
+import { providerValueNote } from './fixtures/plan2/project.js';
 import { replaceExactlyOnce } from './mutation.js';
 import { repositoryRoot } from './plan.js';
 import type { Assertions, InstanceHandler, ProjectContext } from './runner.js';
@@ -26,7 +28,7 @@ function add(id: string, fixture: 'R' | 'F', mutate: Handler['mutate'], run: Han
   baseline: async ({ root, assertions }) => {
     await compilerValid(root, assertions);
     const report = await sessionReport(root);
-    clean(report, assertions);
+    clean(report, assertions, fixture === 'F' ? [providerValueNote] : []);
     assertions.equal('baseline owner count', report.summary.owners, fixture === 'R' ? 15 : 3);
   }, mutate, run });
 }
@@ -45,7 +47,7 @@ function processResult(context: ProjectContext, result: Awaited<ReturnType<typeo
   recordObservation('compiled-cli', { code: result.code, signal: result.signal, stderr: result.stderr, durationMs: result.durationMs });
   if (result.stdout.startsWith('{')) {
     const report = JSON.parse(result.stdout);
-    recordObservation('compiled-report', report.schemaVersion === 'ramify.analysis/1' ? analysisEvidence(report) : report);
+    recordObservation('compiled-report', report.schemaVersion === 'ramify.analysis/2' ? analysisEvidence(report) : report);
   }
   context.assertions.equal('actual subprocess exit and streams', [result.code, result.signal, result.stderr], [exit, null, '']);
   context.assertions.ok('finite subprocess completion', result.durationMs < 30_000);
@@ -63,7 +65,12 @@ function humanEvidence(context: ProjectContext, text: string, report: AnalysisRe
   a.ok('human outcomes from the same report', text.includes(`Execution: ${report.outcome.execution}; check: ${report.outcome.check}; coverage: ${report.outcome.coverage}`));
   for (const [index, issue] of report.diagnostics.entries()) a.ok(`human diagnostic ${index + 1} code, message and location`, text.includes(`[${issue.code}]`)
     && text.includes(issue.message) && (!issue.location || text.includes(`${issue.location.file}:${issue.location.line}:${issue.location.column}`)));
-  for (const [index, warning] of report.warnings.entries()) a.ok(`human warning ${index + 1} and count`, text.includes(`Warning [${warning.code}] ${warning.entry}: ${warning.count} compiler-selected`));
+  // A warning line names its code, path and message, then its listed files and how many more its count states.
+  for (const [index, warning] of report.warnings.entries()) {
+    const more = (warning.count ?? 0) - (warning.files?.length ?? 0);
+    const files = warning.files?.length ? ` (${warning.files.join(', ')}${more > 0 ? `, and ${more} more` : ''})` : '';
+    a.ok(`human warning ${index + 1} and count`, text.includes(`Warning [${warning.code}] ${warning.path}: ${warning.message}${files}\n`));
+  }
   for (const [index, limit] of report.coverage.entries()) a.ok(`human analysis limit ${index + 1}`, text.includes(`[${limit.code}]`) && text.includes(limit.message));
   a.ok('human completed scope matches API counts', text.includes(`${report.summary.complete ? 'Completed' : 'Incomplete'} scope: ${report.summary.owners} owners, ${report.summary.sourceFiles} source files, ${report.summary.resources} resources, ${report.summary.accesses} accesses`));
 }
@@ -147,7 +154,8 @@ for (const kind of ['clean', 'denied', 'invalid'] as const) for (const format of
     else humanEvidence(context, result.stdout, expected);
     if (kind === 'clean') {
       context.assertions.equal('completed unchanged reference', [expected.outcome.check, expected.summary.owners, expected.diagnostics.length, expected.coverage.length], ['passed', 15, 0, 0]);
-      context.assertions.equal('both reference configuration warnings remain visible', expected.warnings.map(warning => [warning.entry, warning.count]), [['vite.config.ts', 1], ['vitest.config.ts', 1]]);
+      // Project-boundary iteration 8C: both configuration files are root auxiliary source, so no warning remains.
+      context.assertions.equal('no reference configuration warning', expected.warnings.map(warning => [warning.path, warning.count]), []);
     } else if (kind === 'denied') {
       context.assertions.equal('one independently expected located original denial', expected.diagnostics.map(issue => [issue.code, issue.location?.file, issue.original, issue.importer?.owner, issue.importer?.kind]),
         [['not-visible', 'src/assembly.ts', { kind: 'code', owner: 'collection-review/workspace/catalog', file: 'router.ts', binding: 'createCatalogRouter' }, 'collection-review', 'ordinary']]);
@@ -198,8 +206,14 @@ for (const stray of [false, true]) for (const format of ['human', 'json'] as con
   processResult(context, result, stray ? 1 : 0);
   if (format === 'json') context.assertions.equal('structured output matches API warning/layout evidence', semantic(JSON.parse(result.stdout)), semantic(expected));
   else humanEvidence(context, result.stdout, expected);
-  context.assertions.equal('selected loose file warning aggregated independently', expected.warnings, [{ code: 'outside-module-source', entry: 'tests', count: 1, files: ['tests/helper.ts'] }]);
-  context.assertions.ok('loose file is never classified as owned testing source', !expected.snapshot?.inventory.files.some(file => file.path === 'tests/helper.ts')
+  // Re-reasoned in project-boundary iteration 8C: the selected loose file is root
+  // auxiliary source (beneath the stray marker it has no owner), so no
+  // outside-source warning remains; the reviewed rows name the retired warning.
+  context.assertions.equal('no outside-source warning', expected.warnings, []);
+  const helper = expected.snapshot?.inventory.files.find(file => file.path === 'tests/helper.ts');
+  if (stray) context.assertions.equal('loose file beneath the stray marker has no owner', helper, undefined);
+  else context.assertions.equal('loose file is root auxiliary source', helper && [helper.owner, helper.area, helper.placement], ['fixture', 'ordinary', 'auxiliary']);
+  context.assertions.ok('loose file is never classified as owned testing source', helper?.area !== 'tests'
     && !expected.snapshot?.areas.some(area => area.root === 'tests'));
   if (stray) context.assertions.ok('valid stray marker is still a located layout error', expected.diagnostics.some(issue => issue.category === 'layout' && issue.code === 'stray-description' && issue.location?.file === 'tests/module.ramify'));
   else context.assertions.equal('warning does not create a layout failure', expected.diagnostics, []);
@@ -208,7 +222,14 @@ add('I1-28:no-servers', 'R', unchanged, async context => {
   const result = await cliProcess(context.root, ['check', '--batch', '--root', context.root, '--format', 'json']);
   processResult(context, result, 0);
   context.assertions.equal('no socket listen/bind or alternate process launcher', result.events.filter(event => ['listen', 'bind', 'other-launch'].includes(event.event)), []);
-  const children = result.events.filter(event => event.event === 'spawn');
+  // Re-reasoned in project-boundary iteration 17: inside a Git repository, as the run copy in the
+  // checkout's work area is, the CLI also runs the advisory Git command once for the
+  // ignored-but-walked warnings (contracts, "Git advisory warning"). It is a finite child of the
+  // CLI process, never a server or a daemon; it is reaped like the compiler helpers. Its count
+  // follows from the copy's location (iteration 17 fix), so a copy outside a repository runs none.
+  context.assertions.equal('one advisory Git command exactly when a .git entry is at or above the root',
+    result.events.filter(event => isGitAdviceLaunch(event, result.pid)).length, await expectedGitAdviceLaunches(context.root));
+  const children = result.events.filter(event => event.event === 'spawn' && !isGitAdviceLaunch(event, result.pid));
   context.assertions.ok('trace observes actual finite compiler integration', children.length >= 2);
   for (const [index, child] of children.entries()) {
     context.assertions.ok(`child ${index + 1} belongs to the reviewed compiler integration`, /configuration-helper\.js|compiler-helper\.js|\/@typescript\/typescript-(?:linux|darwin)-[^/]+\/lib\/tsc --api /.test([child.command, ...child.args ?? []].join(' ')));

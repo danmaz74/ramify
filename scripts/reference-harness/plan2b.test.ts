@@ -28,8 +28,9 @@ describe('Plan 2B real runs (AV29, AV31)', () => {
       expect(run.first, label).toMatchObject({ code: 0, stderr: '', targets: 1, unchanged: 0, modules: 15, dependencies: 'measured' });
       expect(run.first.bytesWritten, label).toBe(run.bytes);
       expect(run.first.records, label).toBe(run.first.entries);
-      expect(run.meta, label).toMatchObject({ schema: 'ramify.architect-view/1', revision: run.revision, input: run.inputId, modules: 15,
-        dependencies: 'measured', dependencyScope: 'production', testReferences: 'measured', metrics: 'unavailable' });
+      expect(run.meta, label).toMatchObject({ schema: 'ramify.architect-view/2', revision: run.revision, input: run.inputId, modules: 15,
+        // Plan 2C fixed the architect metrics policy as `measure`; a valid inventory is measured.
+        dependencies: 'measured', dependencyScope: 'production', testReferences: 'measured', metrics: 'measured' });
       expect(run.structural.mismatches, label).toEqual([]);
       // An unchanged repeat writes nothing and touches no file.
       expect(run.repeat, label).toMatchObject({ code: 0, stderr: '', revision: run.first.revision, targets: 1, bytesWritten: 0, unchanged: 1,

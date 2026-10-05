@@ -185,7 +185,7 @@ function completeReport(report: AnalysisReport): report is AnalysisReport & {
 }
 
 function accessStatus(access: SourceAccess, result: AccessResult): 'allowed' | 'denied' | 'limited' {
-  if (result.decisions.some(decision => decision.status === 'denied')) return 'denied';
+  if (result.outcome === 'denied' || result.decisions.some(decision => decision.status === 'denied')) return 'denied';
   return result.outcome === 'unverifiable' || result.outcome === 'mixed' || access.coverageIds.length
     ? 'limited' : 'allowed';
 }

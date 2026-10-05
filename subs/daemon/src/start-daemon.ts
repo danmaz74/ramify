@@ -34,7 +34,7 @@ async function startUnderGate(options: StartDaemonOptions): Promise<StartDaemonO
     }
     if (previous) await unlink(endpoint.socket).catch(error => { if (error.code !== 'ENOENT') throw error; });
     record = Object.freeze({ schemaVersion: 'ramify.daemon-record/1', ...service.instance,
-      protocol: 'ramify.ipc/1', socket: endpoint.socket, startedAt: clock.now(), state: 'starting', stopped: null });
+      protocol: 'ramify.ipc/2', socket: endpoint.socket, startedAt: clock.now(), state: 'starting', stopped: null });
     if (service.instance.buildKey !== endpoint.buildKey) throw new Error('Daemon instance differs from its endpoint build');
     await writeDaemonRecord(endpoint, record);
   } catch (error) { return { status: 'failed', message: error instanceof Error ? error.message : String(error) }; }

@@ -3,11 +3,11 @@ import { readFile, readdir } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 import { parseDescription } from '../parse.js';
-import type { DescriptionStatement } from '../interfaces/syntax.js';
+import type { ExposureStatement } from '../interfaces/syntax.js';
 
 const root = new URL('../../../../../../', import.meta.url);
 type Names = '*' | readonly (string | readonly [string, string])[];
-function statement(kind: DescriptionStatement['kind'], names: Names, from: string,
+function statement(kind: ExposureStatement['kind'], names: Names, from: string,
   destinations: readonly ('parent' | 'descendants')[] = ['parent'], tags: readonly string[] | null = null) {
   return { kind, names: names === '*' ? '*' : names.map((name) => typeof name === 'string' ? [name, name] : name), from, tags, destinations };
 }
@@ -15,6 +15,7 @@ const src = (names: Names, from: string, tags: readonly string[] | null = null, 
   statement('expose-src', names, from, destinations, tags);
 const sub = (names: Names, from: string, destinations: readonly ('parent' | 'descendants')[] = ['parent']) =>
   statement('expose-sub', names, from, destinations);
+const tree = (kind: 'owned-ignored' | 'external', directory: string) => ({ kind, directory });
 const descendants = ['descendants'] as const;
 const both = ['parent', 'descendants'] as const;
 const browser = ['browser'];
@@ -52,10 +53,13 @@ const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 
   'SessionChange', 'RevisionPath', 'CheckedSet', 'FindingDelta', 'RevisionTimings', 'OperationTimings', 'SessionRevision',
   'SessionUpdate', 'VerifyOutcome', 'SessionExplorerDetailsOutcome', 'SessionStatus', 'RetainedSession', 'SessionOpen'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
-  'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
+  'DescriptionSelection', 'ExposureStatement', 'NestedTreeStatement', 'DescriptionStatement', 'DescriptionDocument',
+  'ParsedDescription', 'DescriptionParser', 'RootMarkerReader'];
 
-const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
-  'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
+// Phase 1 project boundaries, iteration 8: `ProjectWarning` replaces the
+// relayed `OutsideSourceWarning` in the same position.
+const projectNames = ['ProjectRequest', 'ProjectScope', 'PathOwner', 'ProjectExclusion', 'ProjectOwnership', 'PathOwnership', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
+  'InventoryModule', 'InventoryFile', 'ExactReference', 'ProjectWarning', 'ProjectInventory',
   'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead', 'ProjectResolution', 'RetainedConfiguration'];
 // Plan 8: the observer's signature companions travel with it, so the root relays the sink too.
 const observerNames = ['ObservationSink', 'ObservationRetirement', 'InputChangeKind', 'ObservedChange', 'InventoryUpdate', 'ProjectObserver', 'ProjectObserve'];
@@ -64,7 +68,8 @@ const observerNames = ['ObservationSink', 'ObservationRetirement', 'InputChangeK
 const contextNames = ['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
   'ContextSelection', 'InputFingerprints', 'RevisionCause', 'ContextRevision', 'ContextState', 'SynchronizationState',
   'ContextStatus', 'ExpectedContent', 'Freshness', 'FreshnessRecord', 'CheckRequest', 'CheckDelta', 'UnavailableReason', 'Unavailable',
-  'CheckOutcome', 'ExplorerDetailsRequest', 'ContextExplorerDetailsOutcome', 'DependencyDiagramRequest', 'ContextDependencyDiagramOutcome', 'ReplyTimings', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
+  // Phase 1 project boundaries (path dispositions): `PathCheckDisposition` travels with `CheckOutcome`.
+  'CheckOutcome', 'PathCheckDisposition', 'ExplorerDetailsRequest', 'ContextExplorerDetailsOutcome', 'DependencyDiagramRequest', 'ContextDependencyDiagramOutcome', 'ReplyTimings', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
   'ClockPort', 'ContextBudgets'];
 const controlledNames = ['createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'];
 const residentNames = ['DaemonInstance', 'LogEntry', 'DaemonBudgets', 'EndpointSelection', 'DaemonRecord',
@@ -138,14 +143,18 @@ interface Fixture {
   path: string;
   name: string;
   tags: readonly string[];
-  statements: readonly ReturnType<typeof statement>[];
+  statements: readonly (ReturnType<typeof statement> | ReturnType<typeof tree>)[];
 }
 const toolkit: readonly Fixture[] = [
   { path: '', name: 'ramify', tags: ['dispatch'], statements: [
+    // The toolkit's nested trees, decided by the user on 2026-10-03.
+    ...['docs', 'examples/collection-review', 'scripts/probes/fixtures/compiler-api', 'scripts/probes/fixtures/plan2a-symbol-details',
+      'scripts/reference-harness', 'site'].map((directory) => tree('owned-ignored', directory)),
+    ...['.cucumber-viz', '.history', '.playwright-mcp', '.reference-work', 'ramify-agent'].map((directory) => tree('external', directory)),
     src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants),
     statement('expose-test', ['createQuickEnvironment', 'QuickEnvironment'], 'quick-environment.ts', descendants),
     sub([...modelNames, ...availabilityNames], 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
-    sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'analysis', descendants),
+    sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath', 'classifyProjectPath'], 'analysis', descendants),
     sub([...sourceNames, ...symbolDetailNames], 'analysis', descendants),
     sub([...analysisNames, ...apiViewNames], 'analysis', descendants),
     sub(measurementNames, 'analysis', descendants),
@@ -176,10 +185,11 @@ const toolkit: readonly Fixture[] = [
       'ProjectExplorerBrowserApp', 'ExplorerClient', 'ProjectViewResult'], 'explorer', descendants),
     sub([...contextNames, ...residentNames, ...controlledNames, 'MaterializedTarget', 'MaterializedViewId', 'DaemonService',
       'ServiceLease', 'ApiViewPublisher', 'PublishInput', 'RenderedApiViewArea', 'RenderedApiViewDocument', 'PublishApiViewOutcome',
-      'AnalysisDriver', 'WatchBatch', 'CaptureTimings', 'CaptureWork', 'AffectedRequest', 'ContextAffectedOutcome'], 'daemon', descendants),
+      // Phase 1 project boundaries (watch registrations): `WatchScope` and `WatchRegistrations` travel with `WatcherPort` and `ContextStatus`.
+      'AnalysisDriver', 'WatchBatch', 'WatchScope', 'WatchRegistrations', 'CaptureTimings', 'CaptureWork', 'AffectedRequest', 'ContextAffectedOutcome'], 'daemon', descendants),
     sub(['connectDaemon', 'selectEndpoint', 'readDaemonRecord'], 'daemon', descendants),
   ] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'),
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath', 'classifyProjectPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'),
     src('*', 'interfaces/measurements.ts'),
     src('*', 'interfaces/affected.ts'),
     src('*', 'interfaces/architect-view.ts'), sub(['ExportKind', 'ExportBehavior', 'TestTitleLimits'], 'typescript'),
@@ -187,8 +197,9 @@ const toolkit: readonly Fixture[] = [
     src(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome', 'TestFileReferences', 'TestReferenceFacts',
       'TestReferenceOutcome'], 'interfaces/dependency-diagram.ts'),
     src(['BehavioralDependencyMetrics'], 'interfaces/modularity.ts'),
-    src(['analyzeDependencyDiagram'], 'dependency-analyzer.ts'), src('*', 'interfaces/dependency-analyzer.ts')] },
-  { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
+    src(['analyzeDependencyDiagram'], 'dependency-analyzer.ts'), src('*', 'interfaces/dependency-analyzer.ts'),
+    sub(['parseDescription'], 'descriptions'), sub(['readPurpose'], 'project')] },
+  { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['readRootMarker'], 'parse.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
     src(['deriveSourceAreas', 'assignOriginalTags'], 'profiles.ts', browser), src(['originalKey'], 'identity.ts', browser),
@@ -196,7 +207,7 @@ const toolkit: readonly Fixture[] = [
     src(['listAvailableOriginals'], 'availability.ts', browser),
     src(['listCompanionViolations'], 'companions.ts', browser),
   ] },
-  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts')] },
+  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts'), src(['classifyProjectPath'], 'ownership.ts'), src(['readPurpose'], 'purpose.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts'),
       src(['describeFiles', 'assembleCatalog'], 'descriptions.ts'), src(['createRetainedSourceAnalysis'], 'retained-source-analysis.ts'),
       src(['describeSymbolDetails', 'DeclarationInputs'], 'symbol-details.ts'), src('*', 'interfaces/dependency-behavior.ts')] },
@@ -208,13 +219,15 @@ const toolkit: readonly Fixture[] = [
     src(['createFilesystemApiViewPublisher'], 'api-view-publisher.ts'),
     src(['createSystemClock'], 'system-clock.ts'),
     src(['connectDaemon'], 'connect-daemon.ts'),
-    src(['encodeMessage', 'decodeMessage'], 'codec.ts'),
+    src(['encodeMessage', 'decodeMessage', 'validateServiceReply'], 'codec.ts'),
     src(['selectEndpoint', 'readDaemonRecord'], 'discovery.ts'),
     src(['startDaemon'], 'start-daemon.ts'),
     src('*', 'interfaces/daemon.ts'),
     sub(['AnalysisDriver', ...contextNames, 'ContextManagerOptions', 'ContextManager', 'ApiViewQueryLimits', 'WatchBatch',
-      'ApiViewRequest', 'ContextApiViewOutcome', 'ContextDependencyFactsOutcome', 'CaptureTimings', 'CaptureWork', 'AffectedRequest',
+      'WatchScope', 'WatchRegistrations', 'ApiViewRequest', 'ContextApiViewOutcome', 'ContextDependencyFactsOutcome', 'CaptureTimings', 'CaptureWork', 'AffectedRequest',
       'ContextAffectedOutcome', ...controlledNames], 'contexts'),
+    src(['describeRuntime', 'runtimeIdentityPath', 'RuntimeIdentity'], 'discovery.ts'),
+    src(['dependencyWait'], 'service.ts'),
   ] },
   { path: 'subs/daemon/subs/contexts/', name: 'contexts', tags: [], statements: [
     src(['createContextManager'], 'context-manager.ts'),
@@ -271,6 +284,8 @@ const reference: readonly Fixture[] = [
     src(['AppRouter', 'assembleRouter', 'ProtocolRouter'], 'interfaces/protocol.ts', null, descendants), // R3
     sub(['CatalogProcedures', 'ReviewsProcedures', 'RecordId', 'recordIdSchema', 'revisionScopeSchema', 'ReviewStatus',
       'reviewStatusSchema', 'Finding', 'findingSchema', 'Observation', 'observationSchema'], 'workspace', descendants), // R4
+    // The reference harness's work directory inside the example, declared external (iteration 8A).
+    tree('external', '.reference-work'),
   ] },
   { path: 'subs/integration-tests/', name: 'integration-tests', tags: ['testing', 'dispatch'], statements: [] },
   { path: workspace, name: 'workspace', tags: ['ui', 'browser', 'dispatch'], statements: [
@@ -319,10 +334,15 @@ describe('all current project descriptions as exact-text parser fixtures', () =>
         if (result.status !== 'valid') throw new Error('Invalid authored description');
         const document = result.document;
         expect([document.file, document.version, document.module.name, document.module.tags]).toEqual([file, 1, fixture.name, fixture.tags]);
-        expect(document.statements.map((item) => ({
+        // Exactly the two project roots carry the marker, and the header span begins at it.
+        const { root: marker, span } = document.module;
+        expect(marker && text.slice(marker.start, marker.end)).toBe(fixture.path === '' ? 'root' : null);
+        expect(text.slice(span.start, span.end)).toMatch(fixture.path === '' ? /^root module / : /^module /);
+        // A nested-tree statement compares by its kind and decoded directory.
+        expect(document.statements.map((item) => 'directory' in item ? { kind: item.kind, directory: item.directory.value } : {
           kind: item.kind, names: item.selection.kind === 'wildcard' ? '*' : item.selection.names.map(({ name, alias }) => [name, alias]),
           from: item.from.value, tags: item.tags?.values ?? null, destinations: item.destinations,
-        }))).toEqual(fixture.statements);
+        })).toEqual(fixture.statements);
         expect(document.statements.map(({ index }) => index)).toEqual(fixture.statements.map((_, index) => index));
         for (const token of document.tokens) expect(text.slice(token.span.start, token.span.end)).toBe(token.raw);
       });

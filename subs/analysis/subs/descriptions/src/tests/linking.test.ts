@@ -4,6 +4,7 @@ import { parseDescription } from '../parse.js';
 import { buildModel, createDefaultTagRegistry, deriveSourceAreas } from '../../../model/src/index.js';
 import type { OriginalId } from '../../../model/src/interfaces/model.js';
 import type { LinkInputs } from '../interfaces/linking.js';
+import type { ExposureStatement } from '../interfaces/syntax.js';
 
 function fixture(child: string, root = 'expose-sub * from child to descendants', tags = ''): LinkInputs {
   const registry = createDefaultTagRegistry();
@@ -24,12 +25,12 @@ function fixture(child: string, root = 'expose-sub * from child to descendants',
   if (area.status !== 'valid') throw new Error('Fixture area invalid');
   const id: OriginalId = { kind: 'code', owner: 'fixture/child', file: 'interfaces/api.ts', binding: 'value' };
   const location = { file, start: 13, end: 18, line: 1, column: 14 };
-  return { registry, inventory: { scope: { root: '/fixture', invokedFrom: '/fixture', selection: 'given', configuration: 'tsconfig.json', walkedAreas: ['src', 'subs/child/src'], independentScopes: [] },
-    modules, files: [{ path: file, owner: 'fixture/child', area: 'ordinary', kind: 'source', sha256: 'fixture', bytes: 23 }],
-    references: modules.flatMap(module => module.description.document.statements.filter(statement => statement.kind !== 'expose-sub').map(statement => ({
+  return { registry, inventory: { scope: { root: '/fixture', invokedFrom: '/fixture', selection: 'given', configuration: 'tsconfig.json', walkedAreas: ['src', 'subs/child/src'], ownership: { modules: [], exclusions: [] } },
+    modules, files: [{ path: file, owner: 'fixture/child', area: 'ordinary', kind: 'source', placement: 'src', sha256: 'fixture', bytes: 23 }],
+    references: modules.flatMap(module => module.description.document.statements.filter((statement): statement is ExposureStatement => 'from' in statement && statement.kind !== 'expose-sub').map(statement => ({
       description: module.description.document.file, statement: statement.index, decoded: statement.from.value, normalized: file, status: 'file' as const, interfaceEligible: true,
-    }))), outsideModuleFiles: [], warnings: [] },
-  catalog: { originals: [{ id, origin: { file, area: area.value[0]! }, declarations: [location], hasValue: true, hasType: false,
+    }))), warnings: [] },
+  catalog: { originals: [{ id, origin: { file, area: area.value[0]!, auxiliary: false }, declarations: [location], hasValue: true, hasType: false,
     companions: { named: [], evidence: [], inferred: false, unresolved: 0 } }],
     files: [{ file, state: 'complete', exports: [{ name: 'value', original: id, namespace: null, forwarding: [] }], issueIds: [], descriptionFiles: [] }], coverage: [] } };
 }
@@ -99,6 +100,24 @@ describe('pure description linking', () => {
     const catalog = { ...inputs.catalog, files: [{ ...inputs.catalog.files[0]!, state }] };
     expect(linkDescriptions({ ...inputs, catalog })).toMatchObject({ status: 'invalid', issues: [{ code: state === 'ambiguous' ? 'ambiguous-expansion' : 'incomplete-expansion' }] });
     expect(linkDescriptions({ ...fixture(`${owned} to parent`), catalog }).status).toBe('valid');
+  });
+
+  it('links interleaved nested-tree statements as no exposure, keeping exposures and their reference indices', () => {
+    const child = ['owned-ignored "fixtures/sample"', `${owned} to parent`, 'external "cache"'];
+    const root = ['external "external-project"', 'expose-sub * from child to descendants', 'owned-ignored "fixture-project"'];
+    // The control replaces each nested-tree line with a comment of equal length, so every location is unchanged.
+    const comment = (line: string) => line.includes('expose-') ? line : '//'.padEnd(line.length, '-');
+    const plain = linkDescriptions(fixture(child.map(comment).join('\n'), root.map(comment).join('\n')));
+    const inputs = fixture(child.join('\n'), root.join('\n'));
+    // The child's exposure is its second statement, so its exact reference carries index 1.
+    expect(inputs.inventory.references.map(item => item.statement)).toEqual([1]);
+    const result = linkDescriptions(inputs);
+    expect(result.status).toBe('valid');
+    expect(plain.status).toBe('valid');
+    expect(result).toEqual(plain);
+    if (result.status !== 'valid') throw new Error(JSON.stringify(result));
+    expect(result.selections.map(item => [item.module, item.statement.line, item.pairs.length]).sort())
+      .toEqual([['fixture', 4, 1], ['fixture/child', 4, 1]]);
   });
 
   it('rejects missing catalog prerequisites even when no statement selects the file', () => {

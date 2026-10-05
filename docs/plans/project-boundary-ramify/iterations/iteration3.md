@@ -2,7 +2,7 @@
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
 **Prerequisites:** [Iteration 2](iteration2.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** Project plus mechanical public ownership vocabulary relays through analysis/root. No changes beneath `ramify-agent/` or
+**Owners and write scope:** Project plus mechanical public ownership vocabulary relays through analysis/root; the identifiers this slice advances (`ramify.affected/2`, `ramify.affected-cli/2`, `ramify.watch/2`, `ramify.daemon-status/2`, `ramify.ipc/2`), their toolkit readers and the reference harness's expected values for them. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -16,7 +16,7 @@ Implement classifyProjectPath over one immutable ProjectOwnership table; normali
 
 ## Read first
 
-- [Contracts](../contracts.md): Canonical path ownership and inventory.
+- [Contracts](../contracts.md): Canonical path ownership and inventory; Schema versions.
 - [Alignment](../alignment.md), the relevant owning specifications it names,
   and [source state](../source-state.md); verify the active checkout and revision.
 - [Acceptance](../acceptance.md): PB1-03, PB1-04, PB1-08, PB1-09, PB1-17, PB1-18, PB1-19 and the independent
@@ -31,6 +31,7 @@ Current source entry points, relative to the toolkit root:
 - `subs/analysis/subs/project/src/inventory.ts`.
 - `subs/analysis/subs/project/src/generated-path.ts`.
 - `subs/analysis/src/inventory.ts`.
+- `subs/daemon/src/codec.ts`, for the strict scope shape.
 
 Expand this read list only to answer a specific contract/implementation question.
 Do not load the complete reference harness or generated catalogs into one context.
@@ -40,6 +41,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 1. Implement classifyProjectPath over one immutable ProjectOwnership table; normalized paths, nested boundaries, nearest module, scratch and reserved exclusions are handled by one provider.
 2. Prepare scope metadata and declaration evidence without broadening inventory until iteration 8. Never read path contents or require named inert/deleted files to exist.
 3. Add path-ownership.test.ts covering written topology, absent/deleted seeds, outside/invalid paths and exact scratch position; propagate legal type/API relays.
+4. `ProjectScope` gains `ownership`; `independentScopes` stays until iteration 8. Per [schema versions](../contracts.md#schema-versions), advance `ramify.affected/2`, `ramify.affected-cli/2`, `ramify.watch/2`, `ramify.daemon-status/2` and `ramify.ipc/2`, and extend `ramify.analysis/2`. Update every toolkit reader in this candidate: the affected query and batch process, the CLI affected, watch and daemon commands, the daemon codec's strict scope validator, handshake, records and status, toolkit tests, `scripts/measurements/resident-workloads.mjs` and the reference harness's expected values under [iteration gates](../execution.md#iteration-gates). Replace the toolkit tests' incompatible-peer literal `ramify.ipc/2` with one no build produces.
 
 ## Matrix rows executed here
 
@@ -67,7 +69,7 @@ required gate without changed inputs or unresolved failures.
 
 ## Exit criteria
 
-Classifier-level expectations pass. Full acquisition and affected cases close in their later producers; unused preparation is not runtime whole-tree delivery.
+Classifier-level expectations pass and the five identifiers above name version 2. Full acquisition and affected cases close in their later producers; unused preparation is not runtime whole-tree delivery.
 
 Record `iteration3-results.md` through supported workflow tooling when executing,
 with changed behavior, tested case instances, commands, primary artifact links,

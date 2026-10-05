@@ -46,7 +46,7 @@ export const architectPaths = {
 
 const paths = architectPaths;
 export const architectFixture: Readonly<Record<string, string>> = {
-  'module.ramify': 'ramify 1\nmodule fixture\n'
+  'module.ramify': 'ramify 1\nroot module fixture\n'
     + 'expose-src Config from "interfaces/config.ts" to descendants\n'
     + 'expose-sub Engine, launch, loose, run, settings from core to descendants\n',
   'README.md': '# Fixture\n\nA three-level project for the architect view.\n',

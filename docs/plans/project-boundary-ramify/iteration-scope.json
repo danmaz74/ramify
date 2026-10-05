@@ -25,13 +25,15 @@
     },
     {
       "index": 2,
-      "scope": "Descriptions plus mechanical syntax type/exposure relays and affected test producers.",
+      "scope": "Descriptions plus mechanical syntax type/exposure relays and affected test producers; the `ramify.analysis/2` identifier, its toolkit readers and the reference harness's expected values for it.",
       "sourceReads": [
         "subs/analysis/subs/descriptions/src/parse.ts",
         "subs/analysis/subs/descriptions/src/tokenize.ts",
         "subs/analysis/subs/descriptions/src/interfaces/syntax.ts",
         "subs/analysis/subs/descriptions/src/link.ts",
-        "subs/analysis/subs/project/src/references.ts"
+        "subs/analysis/subs/project/src/references.ts",
+        "subs/analysis/src/interfaces/analysis.ts",
+        "subs/analysis/src/report.ts"
       ],
       "exercisedCases": [
         "PB1-01",
@@ -44,12 +46,13 @@
     },
     {
       "index": 3,
-      "scope": "Project plus mechanical public ownership vocabulary relays through analysis/root.",
+      "scope": "Project plus mechanical public ownership vocabulary relays through analysis/root; the identifiers this slice advances (`ramify.affected/2`, `ramify.affected-cli/2`, `ramify.watch/2`, `ramify.daemon-status/2`, `ramify.ipc/2`), their toolkit readers and the reference harness's expected values for them.",
       "sourceReads": [
         "subs/analysis/subs/project/src/interfaces/project.ts",
         "subs/analysis/subs/project/src/inventory.ts",
         "subs/analysis/subs/project/src/generated-path.ts",
-        "subs/analysis/src/inventory.ts"
+        "subs/analysis/src/inventory.ts",
+        "subs/daemon/src/codec.ts"
       ],
       "exercisedCases": [
         "PB1-03",
@@ -63,8 +66,51 @@
       "producerCases": []
     },
     {
+      "index": "3A",
+      "scope": "Descriptions plus mechanical relays of the extended header type through analysis/root; the toolkit's two committed root descriptions; every toolkit generator, fixture, test double and header reader that writes or reads a root description, including the reference harness's fixtures and its expected values for outputs this slice changes; the quoted root header in `docs/architecture/daemon.md`. Extends `ramify.analysis/2`.",
+      "sourceReads": [
+        "subs/analysis/subs/descriptions/src/tokenize.ts",
+        "subs/analysis/subs/descriptions/src/parse.ts",
+        "subs/analysis/subs/descriptions/src/interfaces/syntax.ts",
+        "module.ramify",
+        "examples/collection-review/module.ramify"
+      ],
+      "exercisedCases": [
+        "PB1-41",
+        "PB1-44"
+      ],
+      "producerCases": [
+        "PB1-41"
+      ]
+    },
+    {
+      "index": "3B",
+      "scope": "Project selection, resolution reuse and acquisition validity, plus mechanical issue-code relays and layout categories through analysis/root; CLI help or failure text only where it describes the old climb; fixture and expectation corrections that enforcement exposes, including root-selection tests and the reference harness's expected values for selection and layout outputs. Extends `ramify.analysis/2`. Specification changes only as proposed patches.",
+      "sourceReads": [
+        "subs/analysis/subs/project/src/selection.ts",
+        "subs/analysis/subs/project/src/resolve-root.ts",
+        "subs/analysis/subs/project/src/read-project.ts",
+        "subs/analysis/subs/project/src/inventory.ts",
+        "subs/analysis/subs/project/src/interfaces/project.ts",
+        "subs/analysis/src/report.ts",
+        "subs/analysis/src/report-data.ts",
+        "subs/analysis/src/session-engine.ts"
+      ],
+      "exercisedCases": [
+        "PB1-30",
+        "PB1-42",
+        "PB1-43",
+        "PB1-44"
+      ],
+      "producerCases": [
+        "PB1-42",
+        "PB1-43",
+        "PB1-44"
+      ]
+    },
+    {
       "index": 4,
-      "scope": "One toolkit-wide provenance type migration; behavioral implementations stay in their named owners.",
+      "scope": "One toolkit-wide provenance type migration; behavioral implementations stay in their named owners. The reference harness's expected values for the renamed target kind.",
       "sourceReads": [
         "subs/analysis/subs/model/src/interfaces/model.ts",
         "subs/analysis/subs/typescript/src/interfaces/source.ts",
@@ -136,12 +182,13 @@
     },
     {
       "index": 8,
-      "scope": "Project acquisition and scope contracts; toolkit fixture/declaration corrections are limited to the new model.",
+      "scope": "Project acquisition and scope contracts, and the modularity producer; toolkit fixture/declaration corrections are limited to the new model. The identifiers this slice advances (`ramify.check/2`, `ramify.measure/2`, `ramify.modularity/3`), their toolkit readers and the reference harness's expected values for every output this slice changes.",
       "sourceReads": [
         "subs/analysis/subs/project/src/inventory.ts",
         "subs/analysis/subs/project/src/references.ts",
         "subs/analysis/subs/project/src/configuration.ts",
-        "subs/analysis/subs/project/src/capture.ts"
+        "subs/analysis/subs/project/src/capture.ts",
+        "subs/analysis/src/modularity.ts"
       ],
       "exercisedCases": [
         "PB1-03",
@@ -168,7 +215,7 @@
     },
     {
       "index": 9,
-      "scope": "TypeScript adapter and its captured-resolution interfaces.",
+      "scope": "TypeScript adapter and its captured-resolution interfaces; the reference harness's expected values for targets this slice changes.",
       "sourceReads": [
         "subs/analysis/subs/typescript/src/resolution.ts",
         "subs/analysis/subs/typescript/src/catalog.ts",
@@ -200,7 +247,7 @@
     },
     {
       "index": 11,
-      "scope": "Analysis decisions/report capability plus required strict serialization consumers.",
+      "scope": "Analysis decisions/report capability plus required strict serialization consumers and the reference harness's expected values for findings and report fields this slice changes.",
       "sourceReads": [
         "subs/analysis/src/analyze-project.ts",
         "subs/analysis/src/report.ts",
@@ -261,7 +308,7 @@
     },
     {
       "index": 14,
-      "scope": "Analysis affected selection plus mechanical root/daemon request-result relays.",
+      "scope": "Analysis affected selection plus mechanical root/daemon request-result relays and the reference harness's expected values for affected outputs this slice changes.",
       "sourceReads": [
         "subs/analysis/src/affected-query.ts",
         "subs/analysis/src/interfaces/affected.ts",
@@ -283,7 +330,7 @@
     },
     {
       "index": 15,
-      "scope": "Contexts through neutral AnalysisDriver/ownership ports, plus required type relays.",
+      "scope": "Contexts through neutral AnalysisDriver/ownership ports, plus required type relays and the reference harness's expected values for check outputs this slice changes.",
       "sourceReads": [
         "subs/daemon/subs/contexts/src/interfaces/contexts.ts",
         "subs/daemon/subs/contexts/src/context.ts",
@@ -298,7 +345,7 @@
     },
     {
       "index": 16,
-      "scope": "Daemon/root dispatch capability, neutral watcher ports and all mechanical schema consumers.",
+      "scope": "Daemon/root dispatch capability, neutral watcher ports, all mechanical schema consumers and the reference harness's expected values for wire, watch and status outputs this slice changes.",
       "sourceReads": [
         "subs/daemon/src/codec.ts",
         "subs/daemon/src/interfaces/daemon.ts",
@@ -317,7 +364,7 @@
     },
     {
       "index": 17,
-      "scope": "CLI plus root entry tests; Git advice stays outside analysis inputs.",
+      "scope": "CLI plus root entry tests and the reference harness's expected values for CLI outputs this slice changes; Git advice stays outside analysis inputs. Specification changes only as proposed patches.",
       "sourceReads": [
         "subs/cli/src/changed-command.ts",
         "subs/cli/src/affected-command.ts",
@@ -341,7 +388,7 @@
     },
     {
       "index": 18,
-      "scope": "One revision-projection capability across analysis rendering, daemon publication and service-api DTO mapping.",
+      "scope": "One revision-projection capability across analysis rendering, daemon publication and service-api DTO mapping, the architect schema identifiers it advances, plus the reference harness's expected values for view outputs this slice changes.",
       "sourceReads": [
         "subs/analysis/src/architect-view.ts",
         "subs/analysis/src/architect-render.ts",
@@ -362,7 +409,7 @@
     },
     {
       "index": 19,
-      "scope": "Toolkit-owned site/scripts/teaching documents and package dependencies only.",
+      "scope": "Toolkit-owned site/scripts/teaching documents and package dependencies only; protected specifications only as proposed patches.",
       "sourceReads": [
         "site/docusaurus.config.ts",
         "site/package.json",

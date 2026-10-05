@@ -3,24 +3,34 @@ import { performance } from 'node:perf_hooks';
 import { Capture } from './capture.js';
 import { AcquisitionError, freeze } from './data.js';
 import { selectRoot, findConfiguration } from './selection.js';
+import type { MarkerAnswer } from './selection.js';
+import { descriptionMarker } from './marker.js';
 import { readConfiguration } from './configuration.js';
+import type { RootMarkerReader } from '../../descriptions/src/interfaces/syntax.js';
 import type { AcquisitionLimits, ProjectRequest, ProjectResolution } from './interfaces/project.js';
 
 type Resolved = Extract<ProjectResolution, { status: 'resolved' }>;
 
-/** Queries to replay and the digest of what they answered. */
+/**
+ * Queries to replay, the digest of what they answered and the marker
+ * determination of every description selection read. The digest leaves out
+ * those descriptions' bytes: only their determinations are compared.
+ */
 export interface AnsweredQueries {
   readonly observations: ReturnType<Capture['observations']>;
   readonly answers: string;
+  readonly markers: readonly MarkerAnswer[];
 }
 /**
  * What one resolution queried and what the filesystem answered. `replay` is
  * normally the discovery snapshot: the selection and configuration-discovery
- * probes and the root description's symlink probe. Their kinds, canonical
- * paths and exact-name memberships answering the same make the same selection
- * and find the same configuration. Directory listings and file bytes are not
- * part of it: acquisition reads the configuration again and verifies its
- * content and the readability of what it enumerates. A configuration with
+ * probes, the marker of every description the climb read and the root
+ * description's symlink probe. Their kinds, canonical paths, exact-name
+ * memberships and marker determinations answering the same make the same
+ * selection and find the same configuration. Directory listings and other
+ * file bytes are not part of it: acquisition reads the configuration again
+ * and verifies its content and the readability of what it enumerates, and
+ * checks the marker of the root description it parses. A configuration with
  * references keeps every query, including the configuration's own.
  */
 interface ResolutionEvidence {
@@ -36,18 +46,26 @@ const limits: AcquisitionLimits = { attempts: 3, maxFiles: 50_000, maxApplicatio
 const requestKey = (request: ProjectRequest): string =>
   JSON.stringify([request.cwd, request.root ?? null, request.scope, request.configuration]);
 
+/** The capture's queries as replayable evidence; the bytes of the read descriptions count only through their markers. */
+function answered(capture: Capture, markers: readonly MarkerAnswer[]): AnsweredQueries {
+  const described = new Set(markers.map(marker => marker.path));
+  return { observations: capture.observations().map(entry => described.has(entry.path) ? { ...entry, read: false } : entry),
+    answers: capture.answers(described), markers };
+}
+
 /**
- * Shared selection within the caller's capture; no description contents read.
- * `discovery` is taken after the root description's symlink probe and before
- * any configuration query, so both call sites record the same query set.
+ * Shared selection within the caller's capture. Selection reads the
+ * descriptions on its climb only to decide their markers. `discovery` is
+ * taken after the root description's symlink probe and before any
+ * configuration query, so both call sites record the same query set.
  */
-export async function resolveCapturedRoot(capture: Capture, request: ProjectRequest): Promise<{ resolution: Resolved; discovery: AnsweredQueries }> {
-  const selected = await selectRoot(capture, request);
+export async function resolveCapturedRoot(capture: Capture, request: ProjectRequest, read: RootMarkerReader): Promise<{ resolution: Resolved; discovery: AnsweredQueries }> {
+  const { markers, ...selected } = await selectRoot(capture, request, read);
   capture.root = selected.root;
   const configuration = await findConfiguration(capture);
-  // Selection has already observed the root marker; the probe adds no path.
+  // Selection has already observed the root description; the probe adds no path.
   await capture.kind('module.ramify');
-  return { resolution: { status: 'resolved', ...selected, configuration }, discovery: { observations: capture.observations(), answers: capture.answers } };
+  return { resolution: { status: 'resolved', ...selected, configuration }, discovery: answered(capture, markers) };
 }
 
 /**
@@ -60,22 +78,30 @@ export function recordResolution(capture: Capture, request: ProjectRequest, reso
   discovery: AnsweredQueries, references: boolean): Resolved {
   const frozen = freeze(resolution);
   evidence.set(frozen, { request: requestKey(request),
-    replay: references ? { observations: capture.observations(), answers: capture.answers } : discovery });
+    replay: references ? answered(capture, discovery.markers) : discovery });
   return frozen;
 }
 
 /** Concurrent replays of one validation. Answers are compared by path, so order is immaterial. */
 const replayWidth = 16;
 
-/** Replay the recorded queries on a fresh capture; any failure counts as a change. */
-async function unchanged(recorded: ResolutionEvidence, request: ProjectRequest, signal?: AbortSignal): Promise<boolean> {
+/**
+ * Replay the recorded queries on a fresh capture and decide each recorded
+ * description's marker again; any failure counts as a change.
+ */
+async function unchanged(recorded: ResolutionEvidence, request: ProjectRequest, read: RootMarkerReader, signal?: AbortSignal): Promise<boolean> {
   const capture = new Capture(resolve(request.cwd), limits, performance.now() + limits.deadlineMs, signal);
-  const { observations, answers } = recorded.replay;
+  const { observations, answers, markers } = recorded.replay;
   let next = 0;
   const replay = async (): Promise<void> => { while (next < observations.length) await capture.replay([observations[next++]!]); };
   try {
     await Promise.all(Array.from({ length: Math.min(replayWidth, observations.length) }, replay));
-    return capture.answers === answers;
+    for (const { path, marked } of markers) {
+      if (await capture.kind(path) !== 'file') return false;
+      const bytes = await capture.bytes(path, 'description');
+      if (bytes === undefined || (descriptionMarker(path, bytes, read) !== null) !== marked) return false;
+    }
+    return capture.answers(new Set(markers.map(marker => marker.path))) === answers;
   } catch (error) {
     if (signal?.aborted) throw signal.reason ?? error;
     return false;
@@ -83,27 +109,30 @@ async function unchanged(recorded: ResolutionEvidence, request: ProjectRequest, 
 }
 
 /**
- * Resolve the project root and its compiler configuration. `known` holds
- * earlier resolutions, most recent first: the first recorded for an equal
- * request is returned unchanged, with no configuration helper, when its
- * discovery queries still answer the same on disk, or every query when its
- * configuration has references. Otherwise it resolves again. A reused
- * resolution does not re-read the configuration: a solution-style rewrite or
- * an unreadable enumerated directory is refused by acquisition, with the same code.
+ * Resolve the project root and its compiler configuration. `read` decides a
+ * description's root marker; the caller supplies the Descriptions owner's
+ * reader, as acquisition receives its parser. `known` holds earlier
+ * resolutions, most recent first: the first recorded for an equal request is
+ * returned unchanged, with no configuration helper, when its discovery
+ * queries and marker determinations still answer the same on disk, or every
+ * query when its configuration has references. Otherwise it resolves again.
+ * A reused resolution does not re-read the configuration: a solution-style
+ * rewrite or an unreadable enumerated directory is refused by acquisition,
+ * with the same code.
  */
-export async function resolveProjectRoot(request: ProjectRequest, signal?: AbortSignal,
+export async function resolveProjectRoot(request: ProjectRequest, read: RootMarkerReader, signal?: AbortSignal,
   known: readonly ProjectResolution[] = []): Promise<ProjectResolution> {
   signal?.throwIfAborted();
   const key = requestKey(request);
   for (const candidate of known) {
     const recorded = candidate.status === 'resolved' ? evidence.get(candidate) : undefined;
     if (recorded?.request !== key) continue;
-    if (await unchanged(recorded, request, signal)) return candidate;
+    if (await unchanged(recorded, request, read, signal)) return candidate;
     break;
   }
   const capture = new Capture(resolve(request.cwd), limits, performance.now() + limits.deadlineMs, signal);
   try {
-    const { resolution: selected, discovery } = await resolveCapturedRoot(capture, request);
+    const { resolution: selected, discovery } = await resolveCapturedRoot(capture, request, read);
     if (await capture.kind('module.ramify') === 'symlink') throw new AcquisitionError('symlink-description', 'module.ramify', 'Invalid module boundary: symlink-description');
     const config = await readConfiguration(capture, selected.configuration);
     if (config.references.length && !config.files.length) throw new AcquisitionError('references-only-configuration', selected.configuration,
@@ -112,7 +141,7 @@ export async function resolveProjectRoot(request: ProjectRequest, signal?: Abort
   } catch (error) {
     if (signal?.aborted) throw signal.reason ?? error;
     const issue = error instanceof AcquisitionError ? error : new AcquisitionError('read-failure', capture.root, String(error));
-    return freeze({ status: ['missing-root-description', 'symlink-root', 'symlink-description'].includes(issue.code) ? 'invalid' : 'unavailable',
+    return freeze({ status: ['missing-root-description', 'unmarked-root-description', 'symlink-root', 'symlink-description'].includes(issue.code) ? 'invalid' : 'unavailable',
       issues: [{ code: issue.code, path: capture.label(capture.path(issue.path)), message: issue.message }] });
   } finally { await capture.dispose(); }
 }

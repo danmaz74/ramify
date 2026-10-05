@@ -1,13 +1,12 @@
-import { execFile } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
-import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { connectDaemon } from '../../subs/daemon/src/connect-daemon.js';
 import { readDaemonRecord, selectEndpoint } from '../../subs/daemon/src/discovery.js';
 import type { ExplorerRouter } from '../../subs/service-api/src/router.js';
+import { checkoutFiles } from './checkout-files.js';
 import type { TraceEvent } from './process.js';
 import { packageEngine as engine, packageVersion as version, repositoryRoot } from './process.js';
 import { processAlive, waitForProcessCondition, withProcessScope } from './lifecycle-process.js';
@@ -19,9 +18,7 @@ const analysisRuntime = /\/subs\/analysis\/|\/node_modules\/typescript\/|\/node_
 /** A copy of the reference project's tracked inputs, so the daemon writes nothing into this checkout. */
 async function copyReference(): Promise<string> {
   const target = await realpath(await mkdtemp('/tmp/rd28-'));
-  const { stdout } = await promisify(execFile)('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', example],
-    { cwd: repositoryRoot, maxBuffer: 64 * 1024 ** 2 });
-  for (const file of stdout.split('\0').filter(Boolean)) {
+  for (const file of await checkoutFiles(repositoryRoot, [example])) {
     const relative = file.slice(example.length + 1);
     await mkdir(dirname(join(target, relative)), { recursive: true });
     await copyFile(join(repositoryRoot, file), join(target, relative));

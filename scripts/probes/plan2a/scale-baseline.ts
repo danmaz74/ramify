@@ -92,7 +92,7 @@ async function availableOriginals(model: RamifyModel, consumerId: string, area: 
   const modulesById = new Map(model.modules.map((m) => [m.id, m] as const));
   const ordinaryRoot = model.modules.find((m) => m.id === consumerId)!.areas.find((candidate) => candidate.kind === 'ordinary')!.root;
   const importerFile = area.kind === 'tests' ? `${ordinaryRoot}/tests/__plan2a_probe__.ts` : `${ordinaryRoot}/__plan2a_probe__.ts`;
-  const importer: SourceOrigin = { file: importerFile, area };
+  const importer: SourceOrigin = { file: importerFile, area, auxiliary: false };
   const location = { file: importerFile, start: 0, end: 0, line: 1, column: 1 };
   const results: { readonly original: Original; readonly form: 'value' | 'type-only' }[] = [];
   for (const original of model.originals) {

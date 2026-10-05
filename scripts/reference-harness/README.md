@@ -51,6 +51,30 @@ verification arguments exit 2. Earlier `--iteration N` commands retain their
 reviewed transitive prerequisite sets. The full gate's required membership
 always comes from the reviewed plan, never available handlers.
 
+## Project boundary
+
+This directory is an owned-ignored tree of the toolkit root: the root owns it,
+and Ramify does not inventory, analyze or view its files. The root description
+declares it with `owned-ignored "scripts/reference-harness"` from iteration 7
+of the project-boundary plan, and the checker honors the declaration from
+iteration 8. Its imports into toolkit internals, such as another owner's `src/`
+or `src/tests/` and the root's scripts, are a declared, unverified convention:
+no exposure makes them available and no check verifies them. The reverse
+direction is a rule: no analyzed toolkit source imports from this tree, and
+`tsconfig.scripts.json` does not select it. Helpers it shares with root scripts
+are root-owned and live outside it: `scripts/validation-inputs.ts`,
+`scripts/measurements/plan2a-materialize-fixture.ts` and
+`scripts/measurements/plan2b-views.ts`.
+
+The tree keeps its location, its own `tsconfig.json` (checked by
+`npm run type-check`) and `vitest.config.ts`, and the `reference:cases`,
+`reference:verify` and `reference:report` commands.
+
+`modularity-markdown.test.ts` tests the modularity probe's Markdown renderer,
+`subs/analysis/scripts/probes/modularity/markdown.ts`, here because it uses
+analysis's testing fixture, which the probe, analysis's auxiliary source with
+its ordinary profile, cannot import.
+
 ## Activating an assigned instance
 
 The [reviewed subcase list](../../docs/plans/done/iteration-1-project-verifier/subcases.md)
@@ -121,10 +145,11 @@ independent and adds no matrix instances. The unfiltered plan gate still fails
 for the instances assigned to later capabilities.
 
 The no-project ancestry case necessarily uses an owned OS temporary directory:
-a directory under the ramified harness checkout would discover that enclosing
-project. It creates a described project below the unmarked working directory,
-asserts that discovery never searches downwards, and deletes the temporary tree
-in `finally`. All other mutations use the ordinary isolated harness copy.
+from a directory under the harness checkout, the climb reaches the checkout's
+description, which carries the root marker. It creates a project whose
+description carries the marker below a working directory with no description
+at or above it, asserts that discovery never searches downwards, and deletes
+the temporary tree in `finally`. All other mutations use the ordinary isolated harness copy.
 
 Iteration 10 registers all 36 tag/origin instances and syntax/owner variants.
 The shared source driver calls the analysis-owned `evaluateAccesses` stage,
@@ -189,7 +214,8 @@ exercise denied imports, invalid declarations, selected outside-source warnings,
 stray descriptions and unavailable invocation/configuration. Help/version trace
 loaded modules. Process probes record socket and process operations, captured
 handle counts and child termination; only the reviewed finite compiler helpers
-are permitted. Root-owned process tests additionally cover installed bin use,
+are permitted. Inside a Git repository a complete check also starts its one finite Git advice
+command, which the handlers count exactly. Root-owned process tests additionally cover installed bin use,
 SIGINT during acquisition/catalog work and broken stdout pipes.
 
 After `npm run build`, `npm run reference:verify -- --plan 1 --iteration 13`
@@ -513,13 +539,19 @@ iterations 2 to 5; `--iteration 6` requires the 42 of iterations 2 to 6;
 `--iteration 9` requires the 74 of iterations 2 to 9. The unfiltered `--plan 5` gate requires
 all 103 and is expected to fail until iteration 13.
 
-`plan5-engine-cases.ts` compares the current batch engine with the recorded
-pre-change engine on the same fixture copies: `plan5-baseline-loader.mjs`
-replays the pinned commit's `model` and `typescript` sources over the built
-`dist/` through a module load hook, and `plan5-report-worker.mjs` runs
-`analyzeProject` in a separate process for each engine. The reports must be
-equal except `runId`; the toolkit fixture is a `git archive` of the pinned
-commit so the recorded 229-file, 2,744-access baseline stays fixed.
+`plan5-engine-cases.ts` compares the two builds iteration 2 was reviewed
+against on the same fixture copies: the pre-change commit `e0be049` and the
+iteration 2 commit `2c4ae04c`. Each side is a `git archive` of that commit's
+whole `analysis` owner, and `plan5-report-worker.mjs` runs its
+`analyzeProject` from source under tsx in a separate process, so neither the
+current engine nor a stale `dist/` takes part. The candidate side was re-pinned
+from the working tree on 2026-10-04 because later engine changes cannot match
+the pre-change bytes. The reports must be equal except `runId`; the toolkit
+and reference fixtures are `git archive` copies of `e0be049`, so the recorded
+229-file, 2,744-access and 294-access baselines stay fixed. Both pinned builds
+predate the root marker, so these copies stay unmarked; other instances that
+run the current engine over the pinned toolkit use the marked
+`toolkitFixture`.
 `plan5-engine-fixture.ts` instruments the owner's synchronous
 `AccessInterpretation` inside a real compiler snapshot for the query-count and
 setup-count instances. No Plan 5 engine instance starts a daemon.

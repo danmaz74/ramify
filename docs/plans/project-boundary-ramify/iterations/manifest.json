@@ -21,6 +21,18 @@
       "parallelGroup": null
     },
     {
+      "index": "3A",
+      "file": "iteration3a.md",
+      "title": "Root marker syntax and root migration",
+      "parallelGroup": null
+    },
+    {
+      "index": "3B",
+      "file": "iteration3b.md",
+      "title": "Root selection and root-marker validity",
+      "parallelGroup": null
+    },
+    {
       "index": 4,
       "file": "iteration4.md",
       "title": "Auxiliary provenance vocabulary",

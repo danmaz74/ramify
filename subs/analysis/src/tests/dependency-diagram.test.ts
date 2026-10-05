@@ -169,7 +169,7 @@ describe('dependency diagram facts: dependency-report', () => {
     expect(JSON.stringify(diagramOf(shuffled))).toBe(JSON.stringify(diagram));
 
     const projected = modularity(report);
-    expect(projected.schemaVersion).toBe('ramify.modularity/2');
+    expect(projected.schemaVersion).toBe('ramify.modularity/3');
     const production = projected.views[0]!;
     expect(production.dependencyDiagram).toEqual({ state: 'partial', observed: diagram,
       coverage: production.behavior.state === 'partial' ? production.behavior.coverage : null });

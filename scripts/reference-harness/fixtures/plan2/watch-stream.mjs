@@ -6,7 +6,7 @@ import { writeFileSync } from 'node:fs';
 if (process.env.RAMIFY_WATCH_CONTROL_PID) writeFileSync(process.env.RAMIFY_WATCH_CONTROL_PID, String(process.pid));
 process.on('SIGINT', () => process.exit(130));
 async function put(text) { if (!process.stdout.write(text)) await once(process.stdout, 'drain'); }
-const status = index => JSON.stringify({ schemaVersion: 'ramify.watch/1', event: 'status', index });
+const status = index => JSON.stringify({ schemaVersion: 'ramify.watch/2', event: 'status', index });
 const mode = process.env.RAMIFY_WATCH_CONTROL;
 if (mode === 'fragmented') {
   const line = status(1);
@@ -17,7 +17,7 @@ if (mode === 'fragmented') {
   await put(status(1) + '\n' + status(2) + '\n');
 } else if (mode === 'exact-boundary' || mode === 'oversized') {
   const limit = 32 * 1024 ** 2 + 65536;
-  const prefix = '{"schemaVersion":"ramify.watch/1","event":"status","index":1,"padding":"';
+  const prefix = '{"schemaVersion":"ramify.watch/2","event":"status","index":1,"padding":"';
   const suffix = '"}';
   await put(prefix);
   for (let left = limit - Buffer.byteLength(prefix + suffix); left > 0;) {

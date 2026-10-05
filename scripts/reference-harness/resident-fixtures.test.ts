@@ -1,7 +1,7 @@
 import { lstat, readFile, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createEditFixture, consumerProbe, laterFile, providerApi } from './fixtures/plan2/project.js';
+import { createEditFixture, consumerProbe, laterFile, providerApi, providerValueNote, signatureNoteKey } from './fixtures/plan2/project.js';
 import type { EditFixtureVariant } from './fixtures/plan2/project.js';
 import { coreDescription, coreDirectory, cssShim, prepareReferenceEdits, referenceEditFixture, referenceRoot,
   vocabulary, workspaceDescription } from './fixtures/plan2/reference.js';
@@ -72,7 +72,8 @@ describe('resident edit fixture variants', () => {
       await applyTextMutation(root, edits['config-change'], true);
       expect(await fileMap(root)).toEqual(initial);
       const restored = await sessionReport(root);
-      expect(restored.coverage).toEqual([]);
+      // Only the recipe's own nonblocking note on the exposed literal `value` remains.
+      expect(restored.coverage.map(signatureNoteKey)).toEqual([providerValueNote]);
       expect(decisions(restored)).toEqual(decisions(before));
     });
   }, 60_000);
@@ -84,7 +85,7 @@ describe('resident edit fixture variants', () => {
       expect(decisions(before)).toEqual([]);
       expect(await createLaterFile(root)).toEqual([laterFile]);
       const after = await sessionReport(root);
-      expect(after.coverage).toEqual([]);
+      expect(after.coverage.map(signatureNoteKey)).toEqual([providerValueNote]);
       expect(decisions(after).map(d => [d.status, d.reason, d.original?.id])).toEqual([
         ['allowed', 'same-owner', { kind: 'code', owner: 'fixture/consumer', file: 'later.ts', binding: 'later' }],
       ]);

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
+import { providerValueNote, signatureNoteKey } from './fixtures/plan2/project.js';
 import { ownerId, sourcePath } from './linking-expectations.js';
 import { repositoryRoot } from './plan.js';
 import type { AssertionEvidence, InstanceHandler, ProjectContext } from './runner.js';
@@ -36,7 +37,8 @@ function add(id: string, fixture: 'R' | 'F', mutate: Handler['mutate'], run: Han
   }, baseline: async context => {
     await compilerValid(context.root, context.assertions);
     const report = await sessionReport(context.root);
-    if (options.partialBaseline) completed(report, context.assertions, 'partial'); else clean(report, context.assertions);
+    if (options.partialBaseline) completed(report, context.assertions, 'partial');
+    else clean(report, context.assertions, fixture === 'F' ? [providerValueNote] : []);
     context.assertions.equal('baseline exact owner count', report.summary.owners, fixture === 'R' ? 15 : 3);
   }, mutate, run });
 }
@@ -184,13 +186,23 @@ add('I1-29:outside-module-target', 'F', async ({ root }) => {
 }, async context => {
   await compilerValid(context.root, context.assertions);
   const report = await sessionReport(context.root);
-  completed(report, context.assertions, 'partial'); knownValue(context, report);
-  locatedCoverage(context, report, 'outside-module-target', probe);
-  context.assertions.equal('outside-source warning remains distinct from failures', report.warnings,
-    [{ code: 'outside-module-source', entry: 'loose.ts', count: 1, files: ['loose.ts'] }]);
-  context.assertions.equal('outside-module application target has no invented permission or external scope',
-    accessResult(report, probe, '../../../loose.js').map(item => [item.access.target, item.result.outcome, item.result.decisions]),
-    [[{ kind: 'outside-module', file: 'loose.ts' }, 'outside-scope', []]]);
+  // Re-reasoned in project-boundary iteration 8C (the reviewed row above
+  // describes the retired outside-source handling): the selected loose root
+  // file is the root's auxiliary source, an application target whose original
+  // no exposure can make visible, so the child's import is a definite denial;
+  // there is no warning, no note beyond the fixture's own inferred-signature
+  // note, and still no external scope.
+  completed(report, context.assertions, 'partial', 'failed'); knownValue(context, report);
+  context.assertions.equal('only the fixture\'s own signature note', report.coverage.map(signatureNoteKey), [providerValueNote]);
+  context.assertions.equal('auxiliary source carries no outside-source warning', report.warnings, []);
+  context.assertions.equal('auxiliary target is application source with its owner\'s ordinary area and no allowed verdict',
+    accessResult(report, probe, '../../../loose.js').map(item => [item.access.target, item.result.outcome,
+      item.result.decisions.map(decision => [decision.status, decision.reason, decision.original?.id])]),
+    [[{ kind: 'application', origin: { file: 'loose.ts', area: { owner: 'fixture', kind: 'ordinary', root: 'src', profile: [] }, auxiliary: true } },
+      'checked', [['denied', 'not-visible', { kind: 'code', owner: 'fixture', file: '../loose.ts', binding: 'loose' }]]]]);
+  context.assertions.equal('one located not-visible denial of the auxiliary original',
+    report.diagnostics.filter(issue => issue.original?.file === '../loose.ts').map(issue => [issue.code, issue.location?.file, issue.importer?.owner]),
+    [['not-visible', probe, 'fixture/consumer']]);
 });
 
 for (const id of ['I1-27:cancel/acquisition', 'I1-27:cancel/catalog', 'I1-27:read-failure',

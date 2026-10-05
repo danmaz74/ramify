@@ -2,7 +2,7 @@
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
 **Prerequisites:** [Iteration 1](iteration1.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** Descriptions plus mechanical syntax type/exposure relays and affected test producers. No changes beneath `ramify-agent/` or
+**Owners and write scope:** Descriptions plus mechanical syntax type/exposure relays and affected test producers; the `ramify.analysis/2` identifier, its toolkit readers and the reference harness's expected values for it. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -16,7 +16,7 @@ Implement both statements with all reviewed syntax/encoding/span rules; keep exi
 
 ## Read first
 
-- [Contracts](../contracts.md): Description language and validation.
+- [Contracts](../contracts.md): Description language and validation; Schema versions.
 - [Alignment](../alignment.md), the relevant owning specifications it names,
   and [source state](../source-state.md); verify the active checkout and revision.
 - [Acceptance](../acceptance.md): PB1-01, PB1-02 and the independent
@@ -32,6 +32,7 @@ Current source entry points, relative to the toolkit root:
 - `subs/analysis/subs/descriptions/src/interfaces/syntax.ts`.
 - `subs/analysis/subs/descriptions/src/link.ts`.
 - `subs/analysis/subs/project/src/references.ts`.
+- `subs/analysis/src/interfaces/analysis.ts` and `subs/analysis/src/report.ts`, for the report identifier.
 
 Expand this read list only to answer a specific contract/implementation question.
 Do not load the complete reference harness or generated catalogs into one context.
@@ -41,6 +42,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 1. Implement both statements with all reviewed syntax/encoding/span rules; keep existing exposure records exact.
 2. Partition tree statements from link and source-reference processing; relay new types with signature companions through analysis/root.
 3. Add project-boundary-grammar.test.ts with independent expected AST locations and malformed-input codes, plus positive exposure controls.
+4. Advance the analysis report to `ramify.analysis/2`: its snapshot's parsed descriptions now admit the nested-tree statement member, per [schema versions](../contracts.md#schema-versions). Update every toolkit reader in this candidate, including toolkit tests and `scripts/measurements/resident-driver.mjs` and `resident-failure.test.mjs`, and the reference harness's expected values under [iteration gates](../execution.md#iteration-gates).
 
 ## Matrix rows executed here
 
@@ -68,7 +70,7 @@ required gate without changed inputs or unresolved failures.
 
 ## Exit criteria
 
-PB1-01/02 pass; tree validation/discovery is not claimed yet. No client-specific ownership parser is added.
+PB1-01/02 pass and the report is `ramify.analysis/2`; tree validation/discovery is not claimed yet. No client-specific ownership parser is added.
 
 Record `iteration2-results.md` through supported workflow tooling when executing,
 with changed behavior, tested case instances, commands, primary artifact links,

@@ -68,7 +68,8 @@ export function verifyFastEvidence(report, id, expectedInputs = fastInputs(), de
   assert.deepEqual(report.deferrals, deferrals, 'Saved deferral outcomes differ from the current raw measurements');
 
   const row = report.workloads.find(value => value.id === id);
-  assert.equal(row.status, 'measured', `${id} has not completed the real workload`);
+  assert.equal(row.status, 'measured', `${id} has not completed the real workload`
+    + (row.failures?.length ? `: ${row.failures.map(value => String(value).split('\n')[0]).join('; ')}` : ''));
   assert.equal(row.passed, true, 'A failed workload cannot be reused');
   assert.deepEqual(row.failures, []);
   assert.equal(row.interrupted, false);

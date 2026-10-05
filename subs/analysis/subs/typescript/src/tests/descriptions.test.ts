@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { API } from 'typescript/unstable/sync';
@@ -29,7 +29,9 @@ async function describe(root: string, set: DescriptionSet, files?: readonly stri
     snapshot = api.updateSnapshot({ openProjects: [configuration] });
     const project = snapshot.getProject(configuration);
     if (!project) throw new Error('The compiler could not create the fixture project');
-    const host = { resourceWitness: '', fileExists: existsSync, readFile: (path: string) => {
+    const host = { resourceWitness: '', fileExists: existsSync,
+      realpath: (path: string) => existsSync(path) ? realpathSync(path) : path,
+      directoryExists: (path: string) => existsSync(path) && statSync(path).isDirectory(), readFile: (path: string) => {
       try { return readFileSync(path, 'utf8'); }
       catch (error) { if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null; throw error; }
     } };

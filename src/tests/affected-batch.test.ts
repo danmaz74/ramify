@@ -29,11 +29,11 @@ describe('affected batch form (A7-11)', () => {
     expect([result.exitCode, result.stderr, result.writes]).toEqual([0, '', 1]);
     const document = JSON.parse(result.stdout) as AffectedDocument;
     expect(Object.keys(document)).toEqual(['schemaVersion', 'root', 'mode', 'revision', 'ramifyVersion', 'selection']);
-    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/1', root, mode: 'batch', ramifyVersion: '1.2.3' });
+    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/2', root, mode: 'batch', ramifyVersion: '1.2.3' });
     expect(document.revision.sequence).toBeNull();
     expect(document.revision.inputId).toMatch(/.+/);
-    expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/1', inputId: document.revision.inputId,
-      paths: [{ path: 'subs/core/src/interfaces/api.ts', module: 'example/core', basis: 'inventory' }],
+    expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/2', inputId: document.revision.inputId,
+      paths: [{ path: 'subs/core/src/interfaces/api.ts', status: 'owned', module: 'example/core', basis: 'inventory', exclusion: null }],
       changedModules: [core], affectedModules: [app, mid], testModules: [app, core, mid],
       selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
       scope: { root, selection: 'found' } });
@@ -84,6 +84,11 @@ describe('affected batch form (A7-11)', () => {
         expect([resident.exitCode, resident.stderr]).toEqual([1, '']);
         expect(JSON.parse(resident.stdout)).toMatchObject({ exitCode: 1, diagnostics: [{ code: 'invalid-project' }] });
       } finally { await quick.dispose(); }
+      // A root description without the root marker is invalid the same way (R7).
+      await put(empty, 'module.ramify', 'ramify 1\nmodule empty\n');
+      await put(empty, 'tsconfig.json', '{"compilerOptions":{"types":[]},"include":["src"]}\n');
+      expect(await runAffectedBatch({ cwd: empty, root: empty, modules: ['x'], paths: [] }))
+        .toMatchObject({ status: 'unavailable', reason: 'invalid-project', unknownModules: [], exitCode: 1 });
     } finally { await rm(empty, { recursive: true, force: true }); }
   }, 30_000);
 

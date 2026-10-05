@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { observeProject } from '../observer.js';
 import { readProject } from '../read-project.js';
 import type { CapturedInput, ProjectInventory, ProjectObserver } from '../interfaces/project.js';
-import { declaration, fixture, limits, put } from './fixtures.js';
+import { declaration, fixture, limits, marker, put } from './fixtures.js';
 
 const registry = 'registry/1:test';
 let work: string, root: string;
@@ -28,7 +28,7 @@ afterEach(async () => {
 
 const request = () => ({ cwd: root, root, configuration: 'discover' as const, scope: 'whole-project' as const });
 async function observe(): Promise<ProjectObserver> {
-  const result = await observeProject({ request: request(), parse: declaration, limits, registry });
+  const result = await observeProject({ request: request(), parse: declaration, marker, limits, registry });
   if (result.status !== 'observing') throw new Error(`Expected an observing project: ${JSON.stringify(result)}`);
   observers.push(result.observer);
   return result.observer;
@@ -50,7 +50,7 @@ function batchIdentity(inventory: ProjectInventory, inputs: readonly CapturedInp
 }
 /** One acquisition-only batch capture of the same disk state. */
 async function batch(): Promise<string> {
-  const acquired = await readProject({ request: request(), parse: declaration, limits, registry });
+  const acquired = await readProject({ request: request(), parse: declaration, marker, limits, registry });
   if (acquired.status !== 'acquired') throw new Error(`Expected an acquired project: ${JSON.stringify(acquired)}`);
   try { return batchIdentity(acquired.view.inventory, acquired.view.inputs); }
   finally { await acquired.view.dispose(); }

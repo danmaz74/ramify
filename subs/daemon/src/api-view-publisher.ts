@@ -38,7 +38,10 @@ const META_NAME = '_meta.json';
 const TARGET_NAME = '.ramify';
 /** The architect view's directory name, at the project root. */
 const ARCHITECT_NAME = '.ramify-architect';
-const ARCHITECT_SCHEMA = 'ramify.architect-view/1';
+/** The schema this build renders; a published view must name exactly it. */
+const ARCHITECT_SCHEMA = 'ramify.architect-view/2';
+/** The schemas an existing view may name to be replaced: the architect view of any Ramify version. */
+const ANY_ARCHITECT_SCHEMA = /^ramify\.architect-view\/[0-9]+$/;
 
 /** The exact marker file names of each target name's stage and rollback siblings. */
 const MARKER_PATTERNS: ReadonlyMap<string, { readonly tmp: RegExp; readonly old: RegExp }> = new Map([
@@ -199,12 +202,21 @@ function collectApiTargets(projection: ApiViewProjection, revision: string): Tar
   return collectRenderedApiTargets(renderApiView(projection, revision));
 }
 
-/** True when `bytes` parse as a JSON object whose `schema` is the architect view's. */
-function namesArchitectSchema(bytes: Buffer): boolean {
+/** The `schema` member of `bytes` parsed as a JSON object, or null. */
+function schemaOf(bytes: Buffer): unknown {
   try {
     const parsed: unknown = JSON.parse(bytes.toString('utf8'));
-    return typeof parsed === 'object' && parsed !== null && (parsed as { schema?: unknown }).schema === ARCHITECT_SCHEMA;
-  } catch { return false; }
+    return typeof parsed === 'object' && parsed !== null ? (parsed as { schema?: unknown }).schema ?? null : null;
+  } catch { return null; }
+}
+/** True when `bytes` name exactly the architect schema this build renders. */
+function namesArchitectSchema(bytes: Buffer): boolean {
+  return schemaOf(bytes) === ARCHITECT_SCHEMA;
+}
+/** True when `bytes` name `ramify.architect-view/<number>`, as a view written by any Ramify version does. */
+function namesAnyArchitectSchema(bytes: Buffer): boolean {
+  const schema = schemaOf(bytes);
+  return typeof schema === 'string' && ANY_ARCHITECT_SCHEMA.test(schema);
 }
 
 /** Pure: validates the rendered architect view defensively. Every path must
@@ -370,7 +382,8 @@ function impliedDirectories(files: readonly RenderedDocument[]): Set<string> {
 
 /** The architect view's rule (Plan 2B C6): an existing `.ramify-architect` is
  * replaced only when it is a real directory holding only regular files and
- * directories, with a `_meta.json` that names the architect schema. A
+ * directories, with a `_meta.json` that names `ramify.architect-view/<number>`,
+ * so a view written by any Ramify version is replaced. A
  * symbolic link at or in it refuses with `symlink`; anything else refuses
  * with `invalid-path`, so a directory the user owns is never replaced. Sizes
  * are compared before any content is read. */
@@ -386,7 +399,9 @@ async function inspectArchitectTarget(fs: ApiViewFilesystemPort, targetAbs: stri
   if (listing.status === 'symlink') return listing;
   if (listing.status === 'other') return refuse(`contains "${listing.path}", which is neither a regular file nor a directory`);
   if (!listing.sizes.has(META_NAME)) return refuse(`has no ${META_NAME}`);
-  if (!namesArchitectSchema(await fs.readFile(join(targetAbs, META_NAME)))) return refuse(`has a ${META_NAME} that does not name ${ARCHITECT_SCHEMA}`);
+  if (!namesAnyArchitectSchema(await fs.readFile(join(targetAbs, META_NAME)))) {
+    return refuse(`has a ${META_NAME} that does not name a ramify.architect-view/<number> schema`);
+  }
   const directories = impliedDirectories(files);
   if (listing.sizes.size !== files.length || files.some(file => listing.sizes.get(file.relativePath) !== file.bytes.byteLength)
     || listing.directories.size !== directories.size || [...listing.directories].some(path => !directories.has(path))) {

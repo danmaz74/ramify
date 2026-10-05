@@ -34,7 +34,9 @@ it('keeps all four identity fields distinct and validates requested identities',
     expect(explainImport(model, question(importer, symbol)).original).toEqual(symbol);
     expect(explainVisibility(model, importer.id, { ...symbol.id }).original).toEqual(symbol.id);
   }
-  expect(() => explainVisibility(model, owner.id, { ...symbols[0].id, file: '../api.ts' })).toThrow('Invalid canonical');
+  // One leading `../` is the canonical auxiliary form (an absent original here); two leave the owner.
+  expect(() => explainVisibility(model, owner.id, { ...symbols[0].id, file: '../../api.ts' })).toThrow('Invalid canonical');
+  expect(() => explainVisibility(model, owner.id, { ...symbols[0].id, file: '../api.ts' })).toThrow('Unknown original');
   expect(() => explainVisibility(model, owner.id, { ...symbols[0].id, binding: 'absent' })).toThrow('Unknown original');
 });
 

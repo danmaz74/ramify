@@ -45,7 +45,7 @@ export async function runCli(argv: readonly string[], environment: CliEnvironmen
     if (json && !outputFailed) {
       try {
         environment.stdout(JSON.stringify(args?.command === 'watch'
-          ? { schemaVersion: 'ramify.watch/1', event: code === 'stopped' ? 'stopped' : 'unavailable', reason: message }
+          ? { schemaVersion: 'ramify.watch/2', event: code === 'stopped' ? 'stopped' : 'unavailable', reason: message }
           : { schemaVersion: 'ramify.cli/1', status: 'unavailable', diagnostics: [{ category: phase, code, message }], exitCode: 2 }) + '\n');
       } catch { stderr('Error [output-failure]: Cannot write the invocation result.\n'); }
     } else stderr(`Error [${code}]: ${message}\n`);

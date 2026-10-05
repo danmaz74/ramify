@@ -1,8 +1,14 @@
 # TypeScript Source Interpretation Specification
 
 **Status:** Active specification. Whole-tree ownership, auxiliary-source and
-package-boundary interpretation were adopted on 2026-10-01 and are not yet
-implemented. Specification status does not establish implementation support.
+package-boundary interpretation were adopted on 2026-10-01. Auxiliary source is
+analyzed with its owner's ordinary profile. Resolution retains the package route
+and classifies nested-tree, always-excluded and outside-project targets.
+Linking rejects auxiliary originals selected through exposure, including through
+forwarding aliases. Analysis reports an import into a declared nested tree
+without package resolution as the definite `project-boundary-import` finding,
+and an import into an always-excluded path as the `excluded-target` limit.
+Specification status does not establish implementation support.
 
 ## Purpose
 
@@ -491,6 +497,7 @@ directories named `testing` or `ui` do not establish a source area.
 | Established package resolution, built-ins, and standard-library declarations | Outside the application symbol-exposure model, including installed links whose real targets lie within the project. Report that scope explicitly; do not fabricate an owning Ramify module. Browser-safety verification may still inspect runtime dependencies. |
 | An import into a declared nested tree without package resolution | A definite project-boundary violation, including type-only and symbol-free imports. |
 | An import outside the project root without package resolution | An outside-scope analysis limit, not an allowed import or an established package import. |
+| An import into an always-excluded path inside the root without package resolution | An excluded-target analysis limit, distinct from the outside-scope limit; not an allowed import or a definite violation. Excluded files are not interpreted. |
 | Stylesheets, JSON, and other non-code resources | Bindings belong to the resolved resource's owner and source area, with identities specific to that resource and names from its effective TypeScript export description. Ordinary exposure, tag, and testing-origin rules apply. A shim alone proves neither resource existence nor external status. Unestablished targets, source areas, or export descriptions are unverifiable. Symbol-free loads retain testing-source isolation without a general load ban. See the [resource principle](#resource-bindings-belong-to-the-resolved-resource). |
 | Tool-specific loaders or macros, including Jiti calls and Vite globs | Use a supported adapter to resolve actual targets and selections, or report the unsupported portion as unverifiable. Do not interpret an arbitrary `.import()` method as native ESM import. |
 | Unresolved specifier or original binding | Unverifiable, even when the compiler accepts it through an uninformative declaration or an `any` type. |
@@ -535,6 +542,9 @@ harness requiring that stage must fail its capability check; this differs from
 a supported checker completing with documented analysis limits. Diagnostics
 do not create exposure declarations or dependency allowlists.
 
-The adopted auxiliary-source and project-boundary changes are not yet
-implemented. Adopting these rules does not establish runtime support; report
-unsupported or unrun analysis explicitly.
+Auxiliary source is analyzed, and resolution classifies the project-boundary
+targets. An import into a declared nested tree without package resolution is
+reported as the definite `project-boundary-import` finding and an import into
+an always-excluded path as the `excluded-target` limit. Adopting these rules
+does not establish runtime support; report unsupported or unrun analysis
+explicitly.

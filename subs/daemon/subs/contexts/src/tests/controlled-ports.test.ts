@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { WatchEvent } from '../interfaces/contexts.js';
+import type { WatchEvent, WatchScope } from '../interfaces/contexts.js';
 import { createControlledClock, createControlledWatcher } from './controlled-ports.js';
+
+/** The controlled port registers nothing, so any scope serves its tests. */
+const scope: WatchScope = { sequence: null, exclusions: [], excluded: () => null };
 
 describe('controlled clock', () => {
   it('runs only due callbacks, orders equal deadlines by scheduling order and releases completed timers', () => {
@@ -83,9 +86,9 @@ describe('controlled watcher', () => {
     const a: (readonly WatchEvent[])[] = [];
     const b: (readonly WatchEvent[])[] = [];
     try {
-      const first = await watcher.watch('/a', events => a.push(events));
-      const second = await watcher.watch('/a', events => a.push(events));
-      const other = await watcher.watch('/b', events => b.push(events));
+      const first = await watcher.watch('/a', scope, events => a.push(events));
+      const second = await watcher.watch('/a', scope, events => a.push(events));
+      const other = await watcher.watch('/b', scope, events => b.push(events));
       const batch: WatchEvent[] = [{ path: 'src/x.ts', kind: 'changed' }, { path: 'src/y.ts', kind: 'created' }];
       watcher.emit('/a', batch);
       expect(a).toEqual([batch, batch]);
@@ -110,14 +113,14 @@ describe('controlled watcher', () => {
     try {
       const failure = new Error('watch unavailable');
       watcher.failNextWatch(failure);
-      await expect(watcher.watch('/a', () => {})).rejects.toBe(failure);
+      await expect(watcher.watch('/a', scope, () => {})).rejects.toBe(failure);
       expect(watcher.active).toBe(0);
-      const handle = await watcher.watch('/a', events => batches.push(events));
+      const handle = await watcher.watch('/a', scope, events => batches.push(events));
       const batch = [{ path: '', kind: 'overflow' }, { path: '', kind: 'error' }] as const;
       watcher.emit('/a', batch);
       expect(batches).toEqual([batch]);
       await handle.close();
-      await watcher.watch('/a', events => batches.push(events));
+      await watcher.watch('/a', scope, events => batches.push(events));
       watcher.emit('/a', [{ path: 'recovered.ts', kind: 'renamed' }]);
       expect(batches).toHaveLength(2);
     } finally { await watcher.dispose(); expect(watcher.active).toBe(0); expect(watcher.roots).toEqual([]); }
@@ -127,13 +130,13 @@ describe('controlled watcher', () => {
     const watcher = createControlledWatcher();
     let later = false;
     try {
-      await watcher.watch('/a', () => { void watcher.dispose(); });
-      const handle = await watcher.watch('/a', () => { later = true; });
+      await watcher.watch('/a', scope, () => { void watcher.dispose(); });
+      const handle = await watcher.watch('/a', scope, () => { later = true; });
       watcher.emit('/a', [{ path: 'x.ts', kind: 'changed' }]);
       watcher.emit('/a', [{ path: 'x.ts', kind: 'changed' }]);
       expect(later).toBe(false);
       expect(watcher.active).toBe(0);
-      await expect(watcher.watch('/a', () => {})).rejects.toThrow('disposed');
+      await expect(watcher.watch('/a', scope, () => {})).rejects.toThrow('disposed');
       expect(() => watcher.failNextWatch(new Error('unused'))).toThrow('disposed');
       await handle.close();
     } finally { await watcher.dispose(); expect(watcher.active).toBe(0); expect(watcher.roots).toEqual([]); }
@@ -143,7 +146,7 @@ describe('controlled watcher', () => {
     const watcher = createControlledWatcher();
     let later = 0;
     try {
-      await watcher.watch('/a', () => { void watcher.watch('/a', () => { later++; }); });
+      await watcher.watch('/a', scope, () => { void watcher.watch('/a', scope, () => { later++; }); });
       watcher.emit('/a', [{ path: 'one.ts', kind: 'changed' }]);
       expect(later).toBe(0);
       watcher.emit('/a', [{ path: 'two.ts', kind: 'changed' }]);

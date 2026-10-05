@@ -6,7 +6,9 @@ import { test } from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { archiveMeasurement } from './archive.mjs';
 import { sha256 } from './common.mjs';
-import { assertFastWorkload, deriveFastMeasurements, fastDeferrals, publishedHookAttributed, racingHookAttributed } from './fast-assertions.mjs';
+import { assertFastWorkload, deriveFastMeasurements, derivedSourceFailure, fastDeferrals, publishedHookAttributed,
+  racingHookAttributed } from './fast-assertions.mjs';
+import { analysisStop, failurePoint } from './fast-workloads.mjs';
 import { fastBudgets, fastFixtures, fastWorkloads } from './fast-plan.mjs';
 import { findFastEvidence, readFastEvidence, verifyFastEvidence } from './verify-fast-evidence.mjs';
 
@@ -47,6 +49,10 @@ function report() {
 
 const verify = value => verifyFastEvidence(value, id, inputs, dependencies);
 
+/** A `ramify.check/2` path the covering revision checked: its content, or its deletion when absent. */
+const checkedPath = item => ({ path: item.path, disposition: 'checked', module: 'fixture', exclusion: null,
+  reason: item.sha256 === null ? 'deleted' : 'content', sha256: item.sha256 });
+
 function cycle(index, kind = 'body') {
   const sequence = index + 2, path = kind === 'body' ? 'src/body.ts' : 'src/api.ts';
   const expected = [{ path, sha256: (index % 2 ? 'a' : 'b').repeat(64) }];
@@ -60,8 +66,8 @@ function cycle(index, kind = 'body') {
   return { kind, index, expected, beforeSequence: sequence - 1, revision,
     hookStartedAt: index * 1000 + 1, countersBeforeSave: { coveredRequests: 0 },
     hook: { failure: null, signal: null, stderr: '', code: 0, durationMs: 1,
-      document: { schemaVersion: 'ramify.check/1', outcome: 'checked', execution: 'completed', exitCode: 0,
-        revision: { id: revision.revision, sequence }, changed: expected.map(item => ({ ...item, covered: true })),
+      document: { schemaVersion: 'ramify.check/2', outcome: 'checked', execution: 'completed', exitCode: 0,
+        revision: { id: revision.revision, sequence }, paths: expected.map(checkedPath),
         findings: [], coverage: [], timings: { daemon: timings } } },
   };
 }
@@ -79,7 +85,7 @@ function editData(name, kind, duration = 1) {
   const cycles = Array.from({ length: 20 }, (_, index) => {
     const row = cycle(index, kind);
     row.expected[0].path = path;
-    row.hook.document.changed[0].path = path;
+    row.hook.document.paths[0].path = path;
     row.revision.checked.path = { body: 'unchanged-surface', description: 'description', created: 'membership' }[kind];
     row.revision.checked.files = [path];
     row.revision.timings.accesses = duration;
@@ -139,8 +145,8 @@ test('checked-set evidence requires covering advancing revisions for every recor
   passing(assertFastWorkload('I5-13:checked-set-bounded', measurements));
   for (const mutate of [
     item => { item.beforeSequence = item.revision.sequence; },
-    item => { item.hook.document.changed[0].covered = false; },
-    item => { item.hook.document.changed[0].sha256 = 'wrong-content'; },
+    item => { item.hook.document.paths[0].disposition = 'not-checked'; },
+    item => { item.hook.document.paths[0].sha256 = 'wrong-content'; },
     item => { item.hook.code = 2; item.hook.document.outcome = 'not-checked'; },
     item => { item.revision.outcome.execution = 'incomplete'; },
   ]) {
@@ -184,8 +190,9 @@ test('racing evidence accepts a hook covered on publication or answered by its o
     ['a covered answer from the revision before the save', row => {
       row.revision.sequence = row.beforeSequence; row.hook.document.revision.sequence = row.beforeSequence; }],
     ['a covered answer naming another revision', row => { row.hook.document.revision.id = 'rev/stale'; }],
-    ['a covered entry with the wrong content', row => { row.hook.document.changed[0].sha256 = 'wrong-content'; }],
-    ['an uncovered changed entry', row => { row.hook.document.changed[0].covered = false; }],
+    ['a covered entry with the wrong content', row => { row.hook.document.paths[0].sha256 = 'wrong-content'; }],
+    ['an uncovered changed entry', row => { row.hook.document.paths[0].disposition = 'not-checked'; }],
+    ['an outdated check document version', row => { row.hook.document.schemaVersion = 'ramify.check/1'; }],
     ['a not-checked reply', row => { row.hook.code = 2; row.hook.document.outcome = 'not-checked'; row.hook.document.exitCode = 2; }],
     ['two covered requests', row => { row.settled.counters.coveredRequests++; }],
     ['a covered reply reporting session work', row => { row.hook.document.timings.reply = { ...worked }; }],
@@ -218,7 +225,7 @@ test('filtered extraction requires twenty covering one-file revisions and cannot
       value => { value.cycles.body[19].revision.checked.accesses = 1; },
       value => { value.cycles.body[19].revision.checked.modelRebuilt = true; },
       value => { value.cycles.body[19].revision.checked.files[0] = 'src/wrong.ts'; },
-      value => { value.cycles.body[19].hook.document.changed[0].covered = false; },
+      value => { value.cycles.body[19].hook.document.paths[0].disposition = 'not-checked'; },
       value => { value.cycles.body[19].beforeSequence = value.cycles.body[19].revision.sequence; },
       value => { value.cycles.body[19].revision.outcome.coverage = 'partial'; },
       value => { value.cycles.body[19].revision.timings.accesses = null; },
@@ -252,15 +259,45 @@ test('description and created-file deferrals require complete correctly scoped e
       rows => { rows.pop(); },
       rows => { rows[0].revision.checked.path = 'source'; },
       rows => { rows[0].revision.outcome.execution = 'incomplete'; },
-      rows => { rows[0].hook.document.changed[0].covered = false; },
+      rows => { rows[0].hook.document.paths[0].disposition = 'not-checked'; },
       rows => { rows[0].beforeSequence = rows[0].revision.sequence; },
-      rows => { rows[0].expected[0].path = 'src/unrelated.ts'; rows[0].hook.document.changed[0].path = 'src/unrelated.ts'; },
-      rows => { rows[0].expected[0].sha256 = null; rows[0].hook.document.changed[0].sha256 = null; },
+      rows => { rows[0].expected[0].path = 'src/unrelated.ts'; rows[0].hook.document.paths[0].path = 'src/unrelated.ts'; },
+      rows => { rows[0].expected[0].sha256 = null; rows[0].hook.document.paths[0] = checkedPath(rows[0].expected[0]); },
       rows => { rows[0].revision.summary.denied++; },
     ]) {
       const altered = structuredClone(projectData); mutate(altered.get(name).cycles[kind]);
       assert.equal(deferrals(altered)[key].status, 'not-evaluated');
     }
+  }
+});
+
+test('description deferrals on a companion-enforcing build expect the setup note only while `value` is exposed', () => {
+  const note = { id: 'companion-limit/1:value', code: 'signature-inferred',
+    location: { file: 'subs/m001/src/interfaces/api.ts', start: 63, end: 72, line: 2, column: 14 },
+    message: '`value` is exposed and its declared signature leaves a type to inference; the companions of an inferred type are not verified',
+    related: [] };
+  const enforcing = name => {
+    const data = editData(name, 'description', 1);
+    data.name = name;
+    for (const row of data.cycles.description) {
+      row.revision.timings.companions = 0;
+      row.hook.document.timings.daemon = row.revision.timings;
+      // An even cycle removes the setup exposure, so `value` is exposed nowhere.
+      const exposed = row.index % 2 === 1;
+      row.hook.document.coverage = exposed ? [structuredClone(note)] : [];
+      row.revision.outcome.coverage = exposed ? 'partial' : 'complete';
+    }
+    return data;
+  };
+  const relink = data => fastDeferrals(['S500', 'S1000'].map(name => measured(name, data(name)))).proportionalRelink.status;
+  assert.equal(relink(enforcing), 'not-triggered');
+  for (const mutate of [
+    rows => { rows[0].hook.document.coverage = [structuredClone(note)]; rows[0].revision.outcome.coverage = 'partial'; },
+    rows => { rows[1].hook.document.coverage = []; rows[1].revision.outcome.coverage = 'complete'; },
+    rows => { rows[1].revision.outcome.coverage = 'complete'; },
+    rows => { rows[1].hook.document.coverage.push({ ...structuredClone(note), code: 'signature-unresolved' }); },
+  ]) {
+    assert.equal(relink(name => { const data = enforcing(name); if (name === 'S500') mutate(data.cycles.description); return data; }), 'not-evaluated');
   }
 });
 
@@ -291,7 +328,7 @@ test('only deletion accepts the exact unresolved-target note for its stable impo
   for (const name of fastFixtures) {
     const definition = fixture(name), row = cycle(0, 'deleted');
     row.expected = [{ path: definition.created, sha256: null }];
-    row.hook.document.changed = row.expected.map(item => ({ ...item, covered: true }));
+    row.hook.document.paths = row.expected.map(checkedPath);
     row.revision.checked.path = 'broad'; row.revision.outcome.coverage = 'partial';
     row.hook.document.coverage = [{
       id: name === 'reference' ? 'access-limit/1:69a7528da599c0bb91ecdf8acdbb521e4c05fc19dd2c35a1433baa447e559f4f'
@@ -334,9 +371,10 @@ function configurationCycle(index) {
   row.expected = [{ path: 'tsconfig.json', sha256: (index % 2 ? 'a' : 'b').repeat(64) }];
   row.revision.checked = { path: 'broad', accesses: 1, files: ['src/body.ts'], modelRebuilt: true };
   row.hook.code = 2;
-  row.hook.document = { schemaVersion: 'ramify.check/1', outcome: 'not-checked', reason: 'configuration-changed',
+  row.hook.document = { schemaVersion: 'ramify.check/2', outcome: 'not-checked', reason: 'configuration-changed',
     execution: null, exitCode: 2, revision: null, checked: null, findings: [], coverage: [],
-    changed: row.expected.map(item => ({ ...item, covered: false })), timings: { daemon: null } };
+    paths: row.expected.map(item => ({ path: item.path, disposition: 'not-checked', module: 'fixture', exclusion: null,
+      reason: 'configuration-changed' })), timings: { daemon: null } };
   return row;
 }
 
@@ -354,7 +392,7 @@ test('the configuration row requires an immediate not-checked reply and the revi
       [row => { row.hook.document.outcome = 'checked'; }, 'real immediate not-checked CLI result'],
       [row => { row.hook.document.reason = 'deadline-exceeded'; }, 'real immediate not-checked CLI result'],
       [row => { row.hook.document.exitCode = 0; }, 'real immediate not-checked CLI result'],
-      [row => { row.hook.document.changed[0].covered = true; }, 'real immediate not-checked CLI result'],
+      [row => { row.hook.document.paths[0].disposition = 'checked'; }, 'real immediate not-checked CLI result'],
       [row => { row.hook.document.revision = { id: 'rev/6', sequence: 6 }; }, 'real immediate not-checked CLI result'],
       [row => { row.hook.document.findings.push({ id: 'test-control-only' }); }, 'independent outcome'],
       [row => { row.hook.document.coverage.push({ id: 'test-control-only' }); }, 'independent outcome'],
@@ -542,8 +580,8 @@ test('published hooks are judged by the counters sampled when the hook returns',
     ['covered request while settling', row => { row.settled.counters.coveredRequests++; }],
     ['before revision differs from the hook', row => { row.beforeHook.contexts[0].published.sequence--; }],
     ['nonzero exit', row => { row.hook.code = 1; row.hook.document.exitCode = 1; }],
-    ['uncovered changed entry', row => { row.hook.document.changed[0].covered = false; }],
-    ['no changed entries', row => { row.hook.document.changed = []; }],
+    ['uncovered changed entry', row => { row.hook.document.paths[0].disposition = 'not-checked'; }],
+    ['no changed entries', row => { row.hook.document.paths = []; }],
     ['missing after sample', row => { row.afterHook = null; }],
     ['missing sweep counter', row => { delete row.afterHook.counters.sweeps; }],
   ]) {
@@ -707,4 +745,149 @@ test('archive selection uses newest matching inputs and preserves incomplete row
     writeFileSync(indexPath, JSON.stringify(index));
     assert.throws(() => findFastEvidence(directory, inputs), /owned directory/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+// Retained-limit retries: the shape S500's created and deleted saves recorded on
+// a5b377e8 (history reset to one revision while the analysis ran, then a broad
+// publication), scaled to whole MiB. Invented controls, never evidence.
+const MiB = 1024 ** 2;
+const contextToken = { context: 'ctx/test-control-only', generation: 'gen/test-control-only' };
+
+/** A telemetry sample of the one context, at the given publication, history and retained bytes. */
+function contextSample(at, sequence, retained, retainedBytes, analysisRunning = true, level = 'hot') {
+  return { at, budgets: { maxRetainedBytesPerContext: fastBudgets.runtime.factBytes },
+    contexts: [{ token: contextToken, level, published: { sequence }, history: { retained, bytes: 1 }, retainedBytes,
+      pending: { requests: 1, changedPaths: 1, analysisRunning } }] };
+}
+
+/**
+ * Four created saves: three membership revisions growing by 7 MiB to 94 MiB, then
+ * one refused at the 96 MiB limit and retried broad. `reset` shapes its telemetry.
+ */
+function retainedLimitData(kind = 'created', reset = sample => sample) {
+  const cycles = Array.from({ length: 4 }, (_, index) => {
+    const row = cycle(index, kind);
+    row.writtenAt = (index + 1) * 100_000; row.revision.publishedAt = row.writtenAt + 20_000;
+    row.revision.token = contextToken;
+    row.revision.checked.path = index === 3 ? 'broad' : kind === 'body' ? 'unchanged-surface' : 'membership';
+    row.settled = { contexts: [{ token: contextToken, retainedBytes: (index === 3 ? 70 : 80 + 7 * index) * MiB }] };
+    return row;
+  });
+  const broad = cycles[3], before = broad.beforeSequence;
+  const telemetry = [contextSample(broad.writtenAt + 100, before, 4, 94 * MiB),
+    reset(contextSample(broad.writtenAt + 2_500, before, 1, 60 * MiB)),
+    contextSample(broad.revision.publishedAt + 50, before + 1, 2, 70 * MiB, false)];
+  return { cycles: { [kind]: cycles }, telemetry };
+}
+
+const named = (assertions, name) => assertions.find(value => value.name === name);
+
+test('a broad membership revision passes only with the retained-limit refusal and history reset recorded for it', () => {
+  for (const name of fastFixtures) {
+    const id = `I5-13:hook-latency-${name.toLowerCase()}`, assertions = assertFastWorkload(id, retainedLimitData());
+    const path = named(assertions, 'created 4: revision path');
+    assert.equal(path.passed, true, name);
+    assert.deepEqual(path.observed, { path: 'broad', retainedLimitRetry: { limitBytes: 96 * MiB, retainedBytesBefore: 94 * MiB,
+      historyBefore: 4, headroomBytes: 2 * MiB, resetObservedMs: 2_500, retryMs: 17_500, retryEnd: 'window-end',
+      membershipGrowthBytes: 7 * MiB } });
+    for (const index of [1, 2, 3]) assert.equal(named(assertions, `created ${index}: revision path`).observed, 'membership');
+    // The row states every accepted retry instead of hiding it.
+    assert.deepEqual(named(assertions, 'membership revisions retried broad at the retained-fact limit'),
+      { name: 'membership revisions retried broad at the retained-fact limit', passed: true,
+        observed: { count: 1, created: [4], deleted: [], membershipGrowthBytes: 7 * MiB } });
+    const deleted = assertFastWorkload(id, retainedLimitData('deleted'));
+    assert.equal(named(deleted, 'deleted 4: revision path').passed, true);
+    assert.deepEqual(named(deleted, 'membership revisions retried broad at the retained-fact limit').observed.deleted, [4]);
+  }
+});
+
+test('a broad membership revision without its own refusal evidence fails the revision path', () => {
+  const id = 'I5-13:hook-latency-s500';
+  const failed = (data, label = 'created 4') => {
+    const assertions = assertFastWorkload(id, data);
+    assert.equal(named(assertions, `${label}: revision path`).passed, false, label);
+    return assertions;
+  };
+  // No reset sample between the write and the publication.
+  const absent = retainedLimitData(); absent.telemetry.splice(1, 1); failed(absent);
+  for (const reset of [
+    sample => { sample.contexts[0].history.retained = 2; }, // the history was not reset
+    sample => { sample.contexts[0].pending.analysisRunning = false; }, // not during the analysis
+    sample => { sample.contexts[0].published.sequence += 1; }, // after the publication
+    sample => { sample.contexts[0].token = { context: 'ctx/other' }; }, // another context
+    sample => { sample.at = 1; }, // before the write
+    sample => { delete sample.budgets; }, // no reported limit
+  ]) failed(retainedLimitData('created', reset));
+  // Retained bytes with more headroom under the limit than a membership revision adds.
+  const roomy = retainedLimitData(); roomy.telemetry[0].contexts[0].retainedBytes = 88 * MiB; failed(roomy);
+  // No membership growth recorded in the workload.
+  const flat = retainedLimitData(); flat.cycles.created.forEach(row => { row.settled.contexts[0].retainedBytes = 80 * MiB; }); failed(flat);
+  // Only the created and deleted kinds can be retried broad; a body edit still fails.
+  const body = assertFastWorkload(id, retainedLimitData('body'));
+  assert.equal(named(body, 'body 4: revision path').passed, false);
+  const summary = named(assertFastWorkload(id, absent), 'membership revisions retried broad at the retained-fact limit');
+  assert.deepEqual(summary.observed, { count: 0, created: [], deleted: [], membershipGrowthBytes: 7 * MiB });
+});
+
+/** A racing body save whose hook got `analysis-failed` after its session worker exited, as S1000's body 5 did. */
+function workerExitCycle() {
+  const row = cycle(4);
+  row.position = 'racing'; row.writtenAt = 500_000; row.hookStartedAt = 500_000;
+  row.revision.token = contextToken; row.revision.sequence = row.beforeSequence;
+  row.countersBeforeSave = counters(10, 0, 0, 0, 5);
+  row.settled = { counters: counters(13, 0, 0, 0, 5) };
+  row.hook = { failure: null, signal: null, stderr: '', code: 2, durationMs: 29_000,
+    document: { schemaVersion: 'ramify.check/2', outcome: 'not-checked', reason: 'unavailable', execution: 'unavailable',
+      exitCode: 2, revision: null, checked: null, coverage: [], paths: [{ path: 'src/body.ts', disposition: 'not-checked', reason: 'unavailable' }],
+      findings: [{ code: 'internal-error', category: 'unavailable', message: 'analysis-failed: Session worker exited (1)' }],
+      timings: { daemon: null } } };
+  return row;
+}
+
+test('a save after which the daemon cannot publish stops the workload with its measured failure point', () => {
+  const stopped = workerExitCycle(), sequence = stopped.beforeSequence;
+  const before = { published: { sequence }, retainedBytes: 91 * MiB, history: { retained: 5 } };
+  assert.equal(analysisStop(stopped, before, { published: { sequence } }), 'unavailable');
+  // Analyses that settle without a new revision stop it too; a published save or a configuration reply does not.
+  const silent = cycle(4); silent.countersBeforeSave = counters(10, 0, 0, 0, 5); silent.settled = { counters: counters(12, 0, 1, 0, 5) };
+  assert.equal(analysisStop(silent, before, { published: { sequence } }), 'no-revision');
+  assert.equal(analysisStop(silent, before, { published: { sequence: sequence + 1 } }), null);
+  const swept = structuredClone(silent); swept.settled.counters = counters(11, 0, 1, 0, 5);
+  assert.equal(analysisStop(swept, before, { published: { sequence } }), null, 'a sweep alone is maintenance');
+  const configuration = configurationCycle(4); configuration.countersBeforeSave = silent.countersBeforeSave;
+  configuration.settled = { counters: silent.settled.counters };
+  assert.equal(analysisStop(configuration, before, { published: { sequence: sequence + 1 } }), null);
+
+  const telemetry = [contextSample(500_100, sequence, 5, 95 * MiB), contextSample(501_250, sequence, 1, 60 * MiB),
+    contextSample(528_900, sequence, 1, 50 * MiB), contextSample(529_050, sequence, 1, 0, true, 'warm')];
+  const point = failurePoint(stopped, telemetry, 'unavailable', before);
+  assert.deepEqual(point, { phase: 'body', kind: 'body', position: 'racing', cycle: 5, trigger: 'unavailable',
+    beforeSequence: sequence, publishedSequence: sequence,
+    hook: { code: 2, durationMs: 29_000, outcome: 'not-checked', reason: 'unavailable', execution: 'unavailable' },
+    message: 'analysis-failed: Session worker exited (1)',
+    contextBefore: { retainedBytes: 91 * MiB, historyRetained: 5 },
+    retainedLimit: { limitBytes: 96 * MiB, retainedBytesBefore: 95 * MiB, historyBefore: 5, headroomBytes: MiB,
+      resetObservedMs: 1_250, retryMs: 27_750, retryEnd: 'window-end' } });
+
+  // The stopped workload fails with its point recorded, and so does each derived row that needs it.
+  const data = { failurePoint: point, cycles: { body: [cycle(0), cycle(1), cycle(2), cycle(3), stopped] } };
+  const assertions = assertFastWorkload('I5-13:hook-latency-s1000', data);
+  assert.deepEqual(named(assertions, 'workload stopped at its measured failure point'),
+    { name: 'workload stopped at its measured failure point', passed: false, observed: point });
+  assert.equal(named(assertions, 'body: twenty cycles').passed, false);
+  assert.equal(named(assertFastWorkload('I5-13:repeated-edit-plateau', { reference: { failurePoint: point } }),
+    'reference: workload stopped at its measured failure point').passed, false);
+  const source = { id: 'I5-13:hook-latency-s1000', status: 'failed', interrupted: false, measurements: data,
+    failures: ['Error: Stopped at body 5 (racing): …\n    at keep'] };
+  const text = 'Source process I5-13:hook-latency-s1000 stopped at body 5 (racing): analysis-failed: Session worker exited (1);'
+    + ' this row has no complete evidence from it.';
+  assert.equal(derivedSourceFailure(source), text);
+  assert.equal(derivedSourceFailure({ ...source, measurements: {} }),
+    'Source process I5-13:hook-latency-s1000 failed: Error: Stopped at body 5 (racing): …; this row has no complete evidence from it.');
+  // The reader names the recorded cause of a derived row's gap.
+  const value = report(), index = value.workloads.findIndex(row => row.id === 'I5-13:cold-open');
+  value.workloads[index] = { ...value.workloads[index], status: 'failed', failures: [text] };
+  value.deferrals = fastDeferrals(value.workloads);
+  assert.throws(() => verifyFastEvidence(value, 'I5-13:cold-open', inputs, dependencies),
+    /I5-13:cold-open has not completed the real workload: Source process I5-13:hook-latency-s1000 stopped at body 5/);
 });

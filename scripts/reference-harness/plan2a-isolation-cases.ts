@@ -3,16 +3,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { createDefaultTagRegistry } from '../../subs/analysis/subs/model/src/index.js';
 import { isRamifyGeneratedPath } from '../../subs/analysis/subs/project/src/generated-path.js';
+import { classifyProjectPath } from '../../subs/analysis/subs/project/src/ownership.js';
 import { observeProject } from '../../subs/analysis/subs/project/src/observer.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
 import type { AcquisitionLimits, ProjectReadOptions } from '../../subs/analysis/subs/project/src/interfaces/project.js';
 import { openRetainedSession } from '../../subs/analysis/src/retained-session.js';
 import type { RetainedSession, SessionInputs } from '../../subs/analysis/src/interfaces/session.js';
 import { createFilesystemWatcher } from '../../subs/daemon/src/filesystem-watcher.js';
-import type { WatchEvent } from '../../subs/daemon/subs/contexts/src/interfaces/contexts.js';
+import type { WatchEvent, WatchScope } from '../../subs/daemon/subs/contexts/src/interfaces/contexts.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
 import { sessionInputs } from './session-expectations.js';
 import type { InstanceHandler } from './runner.js';
@@ -28,7 +29,7 @@ async function withTemp<T>(prefix: string, run: (root: string) => Promise<T>): P
   try { return await run(root); } finally { await rm(root, { recursive: true, force: true }); }
 }
 function options(root: string): ProjectReadOptions {
-  return { request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: parseDescription, limits, registry };
+  return { request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: parseDescription, marker: readRootMarker, limits, registry };
 }
 async function batch(root: string) {
   const acquired = await readProject(options(root));
@@ -61,7 +62,8 @@ handlers.set('I2A-02:ordinary-inventory-excluded', { kind: 'memory', run: async 
     try {
       const owned = view.inventory.files.map(file => file.path);
       assertions.equal('no generated file entered the owned inventory', owned.filter(path => isRamifyGeneratedPath(path)), []);
-      assertions.equal('no generated path entered outsideModuleFiles', view.inventory.outsideModuleFiles.filter(path => isRamifyGeneratedPath(path)), []);
+      // Project-boundary iteration 8C retired outsideModuleFiles; generated paths never become auxiliary source either.
+      assertions.equal('no generated path entered the auxiliary inventory', view.inventory.files.filter(file => file.placement === 'auxiliary' && isRamifyGeneratedPath(file.path)), []);
       assertions.equal('no generated path was captured as an input', view.inputs.filter(input => isRamifyGeneratedPath(input.path)), []);
       assertions.ok('a real neighboring source file is still inventoried', owned.includes('subs/provider/src/interfaces/api.ts'));
     } finally { await view.dispose(); }
@@ -88,7 +90,7 @@ handlers.set('I2A-02:tests-inventory-excluded', { kind: 'memory', run: async ({ 
 
 handlers.set('I2A-02:explicit-config-excluded', { kind: 'memory', run: async ({ assertions }) => {
   await withTemp('ramify-i2a02-cfg-', async root => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
     await put(root, 'README.md', '# fixture\n\nPurpose.\n');
     await put(root, 'package.json', '{"private":true,"type":"module"}\n');
     // The explicit `files` entry names a project-root path outside every
@@ -99,7 +101,8 @@ handlers.set('I2A-02:explicit-config-excluded', { kind: 'memory', run: async ({ 
     await put(root, '.ramify/explicit.ts', 'export const generated = 1;\n');
     const view = await batch(root);
     try {
-      assertions.equal('the explicitly selected generated path is not outside-module source', view.inventory.outsideModuleFiles, []);
+      // Project-boundary iteration 8C: owned source outside src/ is auxiliary, but a generated path never is.
+      assertions.equal('the explicitly selected generated path is not auxiliary source', view.inventory.files.filter(file => file.path === '.ramify/explicit.ts'), []);
       assertions.equal('the explicitly selected generated path was not captured as an input', view.inputs.filter(input => isRamifyGeneratedPath(input.path)), []);
       assertions.ok('the explicitly selected real file is still owned', view.inventory.files.some(file => file.path === 'src/value.ts'));
     } finally { await view.dispose(); }
@@ -108,7 +111,7 @@ handlers.set('I2A-02:explicit-config-excluded', { kind: 'memory', run: async ({ 
 
 handlers.set('I2A-02:exposure-rejected', { kind: 'memory', run: async ({ assertions }) => {
   await withTemp('ramify-i2a02-exp-', async root => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src thing from ".ramify/thing.ts" to parent\nexpose-test other from ".ramify/other.ts" to parent\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src thing from ".ramify/thing.ts" to parent\nexpose-test other from ".ramify/other.ts" to parent\n');
     await put(root, 'README.md', '# fixture\n\nPurpose.\n');
     await put(root, 'package.json', '{"private":true,"type":"module"}\n');
     await put(root, 'tsconfig.json', '{"include":["src"]}\n');
@@ -155,13 +158,22 @@ handlers.set('I2A-02:observer-input-stable', { kind: 'memory', run: async ({ ass
   });
 } });
 
+/** The watch scope before a project's first completed revision: Project's classifier over an
+ * empty ownership table, where only the canonical reserved-path rules, generated names among
+ * them, exclude (Phase 1 project boundaries, iteration 16). */
+const reservedScope: WatchScope = { sequence: null, exclusions: [], excluded(path) {
+  const owner = classifyProjectPath({ root: '/', selection: 'given', invokedFrom: '/', configuration: '', walkedAreas: [],
+    ownership: { modules: [], exclusions: [] } }, path);
+  return owner.status === 'excluded' ? owner.exclusion : null;
+} };
+
 handlers.set('I2A-02:watcher-silent', { kind: 'memory', run: async ({ assertions }) => {
   const root = await mkdtemp(join(tmpdir(), 'ramify-i2a02-watch-'));
   const handles: { close(): Promise<void> }[] = [];
   try {
     await put(root, 'src/value.ts', 'export const value = 1;\n');
     const batches: (readonly WatchEvent[])[] = [];
-    const handle = await createFilesystemWatcher().watch(root, events => { batches.push(events); });
+    const handle = await createFilesystemWatcher().watch(root, reservedScope, events => { batches.push(events); });
     handles.push(handle);
     await put(root, 'src/.ramify/final.ts.md', '# final\n');
     await put(root, 'src/.ramify.tmp-cafef00d/stage.ts', 'export const staged = 1;\n');
@@ -252,7 +264,7 @@ handlers.set('I2A-02:transient-names-excluded', { kind: 'memory', run: async ({ 
   try {
     await put(root, 'src/value.ts', 'export const value = 1;\n');
     await put(root, 'src/.ramify.tmp-99999999/stage.ts', 'export const staged = 1;\n');
-    const handle = await createFilesystemWatcher().watch(root, () => {});
+    const handle = await createFilesystemWatcher().watch(root, reservedScope, () => {});
     handles.push(handle);
     assertions.ok('the watcher attaches no handle beneath the transient stage sibling', !paths.some(path => path.includes('.ramify.tmp-99999999')));
   } finally {

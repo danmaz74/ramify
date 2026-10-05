@@ -23,7 +23,7 @@ export type ProjectAcquire =
   | { readonly status: 'acquired'; readonly acquired: AcquiredProject }
   | Exclude<ProjectRead, { readonly status: 'acquired' }>;
 
-const invalidCodes = new Set<ProjectIssue['code']>(['missing-root-description', 'symlink-root', 'symlink-description', 'invalid-description']);
+const invalidCodes = new Set<ProjectIssue['code']>(['missing-root-description', 'unmarked-root-description', 'symlink-root', 'symlink-description', 'invalid-description']);
 const unavailableCodes = new Set<ProjectIssue['code']>(['root-not-found', 'configuration-not-found', 'references-only-configuration']);
 const issueOrder = (a: ProjectIssue, b: ProjectIssue): number => byteOrder(a.path, b.path) || byteOrder(a.code, b.code) || byteOrder(a.message, b.message);
 
@@ -58,7 +58,7 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
     let inventory: ProjectInventory | null = null;
     let issues: ProjectIssue[] = [];
     try {
-      const { resolution: { configuration, status: _status, ...selected }, discovery } = await resolveCapturedRoot(capture, request);
+      const { resolution: { configuration, status: _status, ...selected }, discovery } = await resolveCapturedRoot(capture, request, options.marker);
       const acquiredConfiguration = await acquireConfiguration(capture, configuration, previousConfiguration);
       const config = acquiredConfiguration.data;
       if (config.references.length && !config.files.length) throw new AcquisitionError('references-only-configuration', configuration,
@@ -66,7 +66,7 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
       // The capture holds only selection and configuration queries here, as a
       // standalone resolution's capture does when it succeeds.
       const resolution = recordResolution(capture, request, { status: 'resolved', ...selected, configuration }, discovery, config.references.length > 0);
-      const acquired = await inventoryProject(capture, { ...selected, configuration }, config, options.parse, options.retained?.product.metadata as Parameters<typeof inventoryProject>[4]);
+      const acquired = await inventoryProject(capture, { ...selected, configuration }, config, options.parse, options.marker, options.retained?.product.metadata as Parameters<typeof inventoryProject>[5]);
       inventory = acquired.inventory;
       issues = acquired.issues;
       if (acquired.status === 'failed') throw acquired.error;

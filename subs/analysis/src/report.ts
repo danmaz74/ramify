@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { SourceLocation } from '../subs/model/src/interfaces/model.js';
-import type { ProjectInventory, ProjectIssue, ProjectScope, OutsideSourceWarning } from '../subs/project/src/interfaces/project.js';
+import type { ProjectInventory, ProjectIssue, ProjectScope, ProjectWarning } from '../subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../subs/typescript/src/interfaces/source.js';
 import type { AnalysisCode, AnalysisInputs, AnalysisDiagnostic, AnalysisReport, AnalysisSnapshot, Capability, StageExecution, StageId } from './interfaces/analysis.js';
 import { diagnostic } from './report-data.js';
@@ -50,6 +50,8 @@ function scalar(text: string, index: number): number {
 export const locatedOrder = (a: { location: SourceLocation | null; code: string; id: string }, b: typeof a): number =>
   byteOrder(a.location?.file ?? '', b.location?.file ?? '') || (a.location?.start ?? 0) - (b.location?.start ?? 0)
   || byteOrder(a.code, b.code) || byteOrder(a.id, b.id);
+/** The order a report lists its warnings: by path, then code. */
+const warningOrder = (a: ProjectWarning, b: ProjectWarning): number => byteOrder(a.path, b.path) || byteOrder(a.code, b.code);
 
 /** Summary counts a snapshot yields. A publication draft records them without building the snapshot. */
 export interface SnapshotCounts {
@@ -70,7 +72,9 @@ function snapshotCounts(snapshot: AnalysisSnapshot | null): SnapshotCounts {
     resources: snapshot?.inventory.files.filter(file => file.kind === 'resource').length ?? 0,
     originals: snapshot?.catalog?.originals.length ?? 0, accesses: snapshot?.accesses.length ?? 0,
     allowed: decisions.filter(decision => decision.status === 'allowed').length,
-    denied: decisions.filter(decision => decision.status === 'denied').length,
+    // A boundary denial has no symbol decision; its access result is denied.
+    denied: decisions.filter(decision => decision.status === 'denied').length
+      + (snapshot?.results.filter(result => result.outcome === 'denied').length ?? 0),
     external: snapshot?.results.filter(result => result.outcome === 'external').length ?? 0 };
 }
 /** Space kept for the mandatory report envelope when evidence is admitted. */
@@ -127,16 +131,17 @@ const acquisitionFailure: Readonly<Record<CarriedCode, AnalysisDiagnostic['categ
   'references-only-configuration': 'acquisition', 'symlink-reference': 'acquisition',
   'case-mismatch': 'acquisition', 'missing-file': 'acquisition', 'invalid-path': 'acquisition',
   'read-failure': 'acquisition', 'changed-input': 'acquisition',
-  'missing-root-description': 'layout', 'invalid-layout': 'layout', 'duplicate-name': 'layout',
+  'missing-root-description': 'layout', 'unmarked-root-description': 'layout', 'invalid-layout': 'layout', 'duplicate-name': 'layout',
   'description-in-src': 'layout', 'stray-description': 'layout', 'reserved-container': 'layout',
-  'symlink-root': 'layout', 'symlink-description': 'layout',
+  'undeclared-project-boundary': 'layout', 'invalid-nested-tree': 'layout', 'missing-owned-ignored': 'layout',
+  'overlapping-nested-tree': 'layout', 'symlink-root': 'layout', 'symlink-description': 'layout',
 };
 
 /** Invocation-local plain evidence. This object never stores a provider or a callback. */
 export class ReportDraft {
   inputId: string | null = null;
   scope: ProjectScope | null = null;
-  readonly warnings: OutsideSourceWarning[] = [];
+  readonly warnings: ProjectWarning[] = [];
   registry: AnalysisReport['registry'] = null;
   snapshot: AnalysisSnapshot | null = null;
   /** Counts recorded instead of a snapshot by a publication draft. */
@@ -219,10 +224,10 @@ export class ReportDraft {
   build(): AnalysisReport {
     this.blockDependents();
     const complete = this.isComplete();
-    const warnings = [...this.warnings].sort((a, b) => byteOrder(a.entry, b.entry));
+    const warnings = [...this.warnings].sort(warningOrder);
     const diagnosticIds = new Set(this.diagnostics.map(item => item.id));
     return {
-      schemaVersion: 'ramify.analysis/1', runId: this.runId, inputId: this.inputId, request: this.echo,
+      schemaVersion: 'ramify.analysis/2', runId: this.runId, inputId: this.inputId, request: this.echo,
       scope: this.scope, registry: this.registry,
       capabilities: [...availableCapabilities, 'browser-verification' as const].map(capability => ({ capability,
         available: availableCapabilities.includes(capability), requested: this.request.capabilities.includes(capability),
@@ -248,7 +253,7 @@ export class ReportDraft {
     if (this.stages.find(stage => stage.stage === 'report')!.status !== 'failed') this.stage('report', 'completed');
     this.blockDependents();
     const complete = this.isComplete();
-    const warnings = [...this.warnings].sort((a, b) => byteOrder(a.entry, b.entry));
+    const warnings = [...this.warnings].sort(warningOrder);
     const diagnostics = [...this.diagnostics].sort(locatedOrder), coverage = [...this.coverage].sort(locatedOrder);
     const kept: PublishedReport = { outcome: this.outcomeOf(complete),
       summary: this.summaryOf(complete, this.counts ?? snapshotCounts(this.snapshot), warnings.length), diagnostics, warnings, coverage };
@@ -318,7 +323,8 @@ export class ReportDraft {
             registry: { ...this.echo.registry, id: prefix(this.echo.registry.id), definitions: [] },
             capabilities: [...new Set(this.echo.capabilities)].slice(0, 15) };
             if (this.scope) this.scope = { ...this.scope, root: prefix(this.scope.root), invokedFrom: prefix(this.scope.invokedFrom),
-              configuration: prefix(this.scope.configuration), walkedAreas: [], independentScopes: [] };
+              configuration: prefix(this.scope.configuration), walkedAreas: [],
+              ownership: { modules: [], exclusions: [] } };
             // For a caller-supplied limit smaller than the mandatory JSON
             // envelope itself, only the fixed control reserve can be returned.
             this.diagnostics.splice(0, this.diagnostics.length, { ...limitDiagnostic, location: null, related: [],

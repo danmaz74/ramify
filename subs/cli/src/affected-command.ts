@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
-import type { AffectedModule, AffectedSelection } from '../../analysis/src/interfaces/affected.js';
+import type { AffectedModule, AffectedPathSeed, AffectedSelection } from '../../analysis/src/interfaces/affected.js';
 import type { ContextToken } from '../../daemon/src/context-types.js';
 import type { AffectedOutcome } from '../../../src/interfaces/service.js';
 import type { AffectedDocument, CliEnvironment, CliExitCode } from './interfaces/cli.js';
@@ -19,6 +19,13 @@ function moduleList(label: string, modules: readonly AffectedModule[]): string {
   return `${label} (${modules.length}):\n` + modules.map(module => `  ${module.id} (${module.directory})\n`).join('');
 }
 
+/** Whether a path seed is owned, excluded or outside the project, with its basis and exclusion. */
+function seedLine(seed: AffectedPathSeed): string {
+  if (seed.status === 'outside-project') return `${seed.path}: outside the project`;
+  if (seed.status === 'excluded') return `${seed.path}: excluded (${seed.exclusion.kind} ${seed.exclusion.directory})`;
+  return `${seed.path}: owned by ${seed.module} (${seed.basis}${seed.exclusion ? `, ${seed.exclusion.kind} ${seed.exclusion.directory}` : ''})`;
+}
+
 /** Root, mode, revision and selection, then one line per path seed and the three module lists. */
 export function formatAffected(document: AffectedDocument): string {
   const { selection } = document;
@@ -26,7 +33,7 @@ export function formatAffected(document: AffectedDocument): string {
   const notes = selection.coverage.notes.length;
   return `Root: ${document.root}\nMode: ${document.mode}\nRevision: ${sequence}, input ${document.revision.inputId}\n`
     + `Selection: ${selection.selection}${selection.widening.length ? ` (widened: ${selection.widening.join(', ')})` : ''}\n`
-    + selection.paths.map(seed => `Path ${seed.path}: ${seed.module ?? 'no module'} (${seed.basis})\n`).join('')
+    + selection.paths.map(seed => `Path ${seedLine(seed)}\n`).join('')
     + moduleList('Changed modules', selection.changedModules)
     + moduleList('Affected modules', selection.affectedModules)
     + moduleList('Test modules', selection.testModules)
@@ -36,7 +43,7 @@ export function formatAffected(document: AffectedDocument): string {
 
 function print(environment: CliEnvironment, format: 'human' | 'json', mode: 'resident' | 'batch', sequence: number | null,
   selection: AffectedSelection): CliExitCode {
-  const document: AffectedDocument = { schemaVersion: 'ramify.affected-cli/1', root: selection.scope.root, mode,
+  const document: AffectedDocument = { schemaVersion: 'ramify.affected-cli/2', root: selection.scope.root, mode,
     revision: { sequence, inputId: selection.inputId }, ramifyVersion: environment.version, selection };
   environment.stdout(format === 'json' ? JSON.stringify(document) + '\n' : formatAffected(document));
   // An all-modules answer is complete and conservative; consumers read `selection` and `widening`.

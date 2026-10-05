@@ -4,6 +4,7 @@ import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import type { ProductionFiles } from '../production-selection.js';
 import { plan1Instances } from './cases.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
+import { providerValueNote } from './fixtures/plan2/project.js';
 import { verificationCapabilities } from './instances.js';
 import { modelHandlers } from './model-cases.js';
 import { recordObservation } from './observations.js';
@@ -54,7 +55,9 @@ const ownerPaths = ['', 'subs/analysis', 'subs/analysis/subs/model', 'subs/analy
   'subs/presentation/subs/layout', 'subs/cli'];
 async function toolkitTests(root: string, assertions: Assertions): Promise<string[]> {
   const all = (await Promise.all(['src', 'subs'].map(path => filesBelow(root, path)))).flat().sort();
-  const expected = all.filter(file => /\.test\.tsx?$/.test(file));
+  // Owner tests lie beneath a module's src/; a test-shaped file outside src/, such as analysis's
+  // modularity probe test with its own Vitest configuration, is auxiliary source, not a toolkit test.
+  const expected = all.filter(file => /(?:^|\/)src\/(?:.*\/)?[^/]*\.test\.tsx?$/.test(file));
   const listed = await listedTests(root);
   assertions.equal('all current owner tests discovered exactly once', listed, expected);
   assertions.equal('no duplicate test registration', new Set(listed).size, listed.length);
@@ -78,7 +81,7 @@ const toolkitFixture: Pick<ProjectHandler, 'kind' | 'fixture' | 'prepare' | 'bas
     await symlink(join(repositoryRoot, 'node_modules'), join(root, 'node_modules'));
     await symlink(join(referenceRoot, 'node_modules'), join(root, 'examples/collection-review/node_modules'));
   }, baseline: async ({ root, assertions }) => {
-    assertions.equal('toolkit copy keeps its declared root', (await readFile(join(root, 'module.ramify'), 'utf8')).split('\n').find(line => line.startsWith('module ')), 'module "ramify" tagged [dispatch]');
+    assertions.equal('toolkit copy keeps its declared root', (await readFile(join(root, 'module.ramify'), 'utf8')).split('\n').find(line => /^(?:root\s+)?module\s/.test(line)), 'root module "ramify" tagged [dispatch]');
     await compilerValid(root, assertions);
   }, mutate: unchanged,
 };
@@ -103,7 +106,8 @@ async function addTestingOwner({ root }: { root: string }): Promise<void> {
 }
 const testingProject: Pick<ProjectHandler, 'kind' | 'fixture' | 'baseline' | 'mutate'> = {
   kind: 'project', fixture: { kind: 'create', create: testingFixture },
-  baseline: async ({ root, assertions }) => { await compilerValid(root, assertions); clean(await sessionReport(root), assertions); },
+  // The baseline is F before the testing owner is added, with F's one recipe note.
+  baseline: async ({ root, assertions }) => { await compilerValid(root, assertions); clean(await sessionReport(root), assertions, [providerValueNote]); },
   mutate: addTestingOwner,
 };
 async function assertTestingDiscovery(root: string, assertions: Assertions): Promise<void> {
@@ -147,10 +151,22 @@ handlers.set('I1-30:production-selection/toolkit', { ...toolkitFixture, run: asy
   recordObservation('toolkit-production-build', build);
   assertions.equal('actual clean toolkit production build succeeds', [build.code, build.error], [0, null]);
   const emitted = await filesBelow(join(root, 'dist'));
+  // The compiler never emits a declaration input; the build copies one only when a
+  // declared package type reaches it by import or reference. The toolkit's one
+  // selected declaration input is the ambient `declare module '*.css'`, which no
+  // specifier or reference names, so it is selected but never emitted.
+  const declarations = selection.files.filter(file => /\.d\.ts$/.test(file));
+  assertions.equal('the only selected declaration input is the ambient stylesheet declaration', declarations,
+    ['subs/presentation/subs/project-view/src/styles.d.ts']);
   // Beside the selected files, the toolkit build adds its runtime identity and the host's compiled client.
-  const expected = [...selection.files.flatMap(file => /\.d\.ts$/.test(file) || !/\.tsx?$/.test(file) ? [file]
+  const expected = [...selection.files.flatMap(file => declarations.includes(file) ? [] : !/\.tsx?$/.test(file) ? [file]
     : [file.replace(/\.tsx?$/, '.js'), file.replace(/\.tsx?$/, '.d.ts')]), 'runtime-identity.json', `src/${compiledClientName}`].sort();
-  assertions.equal('toolkit build emits precisely the actual selector file set', emitted, expected);
+  assertions.equal('toolkit build emits precisely the actual selector file set', emitted.filter(file => !file.startsWith('explorer/')), expected);
+  // `npm run build` then runs the explorer's Vite build into dist/explorer: its page,
+  // its public icon, and one stylesheet and one script named by a content hash.
+  assertions.equal('explorer build emits its page, icon, one stylesheet and one script', emitted.filter(file => file.startsWith('explorer/'))
+    .map(file => file.replace(/^(explorer\/assets\/index-)[\w-]{8}(\.(?:css|js))$/, '$1<hash>$2')).sort(),
+  ['explorer/assets/index-<hash>.css', 'explorer/assets/index-<hash>.js', 'explorer/favicon.svg', 'explorer/index.html']);
   assertions.equal('production build leaves test discovery complete', await listedTests(root), before);
   const types = await command(root, 'npm', ['run', 'type-check']);
   recordObservation('toolkit-whole-type-check', types);

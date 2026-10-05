@@ -67,7 +67,9 @@ the compiler is discarded rather than answering from a stale snapshot.
 
 The supervised helper uses the pinned TypeScript 7.0.2 native API. Its in-memory
 configuration extends the project's configuration and includes every owned
-compiler source, including tests omitted by ordinary compiler selection. A
+compiler source, including tests omitted by ordinary compiler selection, and
+every other configuration-selected file except those in a declared nested tree
+or a module scratch directory, which it never roots. A
 synthetic, unexecuted import witness obtains effective descriptions for resources
 that application source does not import. Neither synthetic file is written into
 the project. All native filesystem callbacks use the same captured view.
@@ -105,7 +107,31 @@ selections use the existing target-origin check without invented symbols.
 These limits do not suppress resolved selections.
 
 Iteration 12 records proven package and builtin scope separately from unresolved
-targets and project files outside modules. Vite globs, loader import methods,
+targets. Resolution retains how a specifier resolved before its real target is
+classified. A package route needs a bare, unaliased specifier whose
+compiler-resolved file lies in an installed package directory that the
+`node_modules` lookup reaches from the importer: as spelled, through a link, or
+in an identical installed copy (same name and version), to which the compiler
+resolves every copy. Such a target is external even when its real location is a
+declared tree. Retracing the lookup uses only the observations the compiler's
+own lookup made. A relative path, a `paths` alias, a package import map entry,
+the importer's own package name, a path segment named `node_modules` or the
+compiler's external-library flag never establishes one.
+Every other compiler-resolved file that is not inventoried is classified at its
+physical location, through every link, by Project's `classifyProjectPath`: a
+`nested-tree` target in a declared owned-ignored or external tree, an
+`excluded` target in a scratch, output, installed-package, repository or
+generated directory, each with its exclusion, and an `outside-project` target
+outside the root. An owned location the inventory does not hold is unresolved.
+Excluded files are never described. An `outside-project` target carries the
+nonblocking `outside-module-target` limit and an `excluded` target the
+nonblocking `excluded-target` limit. A `nested-tree` target carries no limit:
+analysis decides it as a definite `project-boundary-import` finding, and a star
+or namespace export into the tree needs no enumeration of its exports. A
+forwarding export into a declared tree leaves its file's description incomplete
+(`unresolved-original`, or `incomplete-exports` for a star export), so a
+consumer never receives a false missing export. Every origin takes its `auxiliary` flag from the
+inventory file's placement. Vite globs, loader import methods,
 direct Jiti calls and CommonJS access/export patterns retain explicit coverage.
 They never become native ESM selections. Known CommonJS targets retain their source areas for
 analysis to apply testing-origin isolation.

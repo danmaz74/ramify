@@ -121,7 +121,7 @@ export function createSocketHost(options: StartDaemonOptions, activityChanged: (
       if (!ready) {
         if (message.type !== 'hello') throw new Error('First client frame must be hello');
         const handshake = message.handshake;
-        const incompatible = handshake.protocol !== 'ramify.ipc/1' || handshake.buildKey !== service.instance.buildKey || handshake.engine !== service.instance.engine;
+        const incompatible = handshake.protocol !== 'ramify.ipc/2' || handshake.buildKey !== service.instance.buildKey || handshake.engine !== service.instance.engine;
         if (incompatible || peers.size > budgets.maxConnections || stopping) {
           counters.rejectedRequests++;
           socket.end(encodeMessage({ type: 'reject', daemon: service.instance, error: {
@@ -131,7 +131,7 @@ export function createSocketHost(options: StartDaemonOptions, activityChanged: (
           } })); release(); return;
         }
         ready = true; lease = service.lease(handshake.client.name);
-        send({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1', instance: service.instance,
+        send({ type: 'welcome', welcome: { protocol: 'ramify.ipc/2', instance: service.instance,
           capabilities: options.capabilities ?? ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'measure', 'explorerDetails', 'dependencyDiagram', 'materialize-views', 'affected'], limits: {
             maxRequestBytes: budgets.maxRequestBytes, maxResponseBytes: budgets.maxResponseBytes, leaseMs: budgets.leaseMs, pingMs: budgets.pingMs,
           } } });

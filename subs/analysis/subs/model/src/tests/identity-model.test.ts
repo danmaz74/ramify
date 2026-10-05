@@ -23,8 +23,22 @@ describe('canonical identities', () => {
     expect(originalKey({ ...id, file: 'caf\u00e9.ts' })).not.toBe(originalKey({ ...id, file: 'cafe\u0301.ts' }));
   });
 
-  it.each(['../escape.ts', './file.ts', '/absolute.ts', 'a//b.ts', 'a\\b.ts', 'C:/a.ts', 'file.ts/', 'tests/../api.ts', 'bad\u0000.ts'])('rejects noncanonical paths %s', (file) => {
+  // `../escape.ts` is now the auxiliary form, accepted below; two leading
+  // segments leave the owner's directory.
+  it.each(['../../escape.ts', './file.ts', '/absolute.ts', 'a//b.ts', 'a\\b.ts', 'C:/a.ts', 'file.ts/', 'tests/../api.ts', 'bad\u0000.ts'])('rejects noncanonical paths %s', (file) => {
     expect(() => originalKey({ kind: 'code', owner: 'app', file, binding: 'api' })).toThrow('Invalid canonical');
+  });
+
+  // An original defined in auxiliary source keeps the src/-relative form with
+  // exactly one leading `../` (user decision 7); a path back into src/ would be
+  // a second spelling of a src original, so it is refused.
+  it('accepts the auxiliary form with one leading ../ and refuses spellings back into src/', () => {
+    expect(originalKey({ kind: 'code', owner: 'app', file: '../escape.ts', binding: 'api' })).toBe('["code","app","../escape.ts","api"]');
+    expect(originalKey({ kind: 'code', owner: 'app', file: '../scripts/build-production.ts', binding: 'main' }))
+      .toBe('["code","app","../scripts/build-production.ts","main"]');
+    for (const file of ['../src/api.ts', '../src', '../', '../a/../b.ts', '.././a.ts']) {
+      expect(() => originalKey({ kind: 'code', owner: 'app', file, binding: 'api' }), file).toThrow('Invalid canonical');
+    }
   });
 });
 
@@ -106,7 +120,75 @@ describe('complete model validation', () => {
     expect(() => explainVisibility(model, 'app/typo', symbol.id)).toThrow('Unknown module');
     expect(() => explainVisibility(model, root.id, { ...symbol.id, binding: 'absent' })).toThrow('Unknown original');
     expect(() => explainImport(model, question({ ...root.areas[0], profile: ['testing'] }, symbol))).toThrow('established source origin');
-    expect(() => explainImport(model, question(root, symbol, { target: { file: 'outside.ts', area: child.areas[0] } }))).toThrow('established source origin');
+    expect(() => explainImport(model, question(root, symbol, { target: { file: 'outside.ts', area: child.areas[0], auxiliary: false } }))).toThrow('established source origin');
+  });
+
+  // An origin beneath its owner's `src/` is not auxiliary source, so the flag
+  // must be false there; auxiliary origins lie outside `src/` (below).
+  it('keeps an origin beneath src non-auxiliary and rejects one flagged auxiliary', () => {
+    const model = valid(buildModel(input));
+    const decision = explainImport(model, question(root, symbol));
+    expect(decision.status).toBe('allowed');
+    expect([decision.question.importer, decision.question.target].map(item => item.auxiliary)).toEqual([false, false]);
+    const flagged = { ...question(root, symbol).importer, auxiliary: true };
+    expect(() => explainImport(model, question(root, symbol, { importer: flagged }))).toThrow('established source origin');
+    expect(() => explainImport(model, question(root, symbol, { forwarding: [{ ...symbol.origin, auxiliary: true }] }))).toThrow('established source origin');
+    const result = buildModel({ ...input, originals: [{ ...symbol, origin: { ...symbol.origin, auxiliary: true } }] });
+    expect(result.status === 'invalid' && result.issues.map(issue => issue.code)).toContain('invalid-original');
+  });
+});
+
+// PB1-33 at the model: auxiliary source is owned, outside `src/`, with its
+// owner's ordinary profile. Same-owner and received imports are decided by the
+// ordinary rules, testing isolation holds, and an auxiliary original is never
+// exposed. Expected decisions follow the module description specification.
+describe('auxiliary origins', () => {
+  const root = moduleRecord('app');
+  const child = moduleRecord('app/child');
+  const ordinary = root.areas.find(area => area.kind === 'ordinary')!;
+  const tool = { ...original(root, 'tool'), id: { kind: 'code' as const, owner: 'app', file: '../scripts/tool.ts', binding: 'tool' },
+    origin: { file: 'scripts/tool.ts', area: ordinary, auxiliary: true }, declarations: [location('scripts/tool.ts')] };
+  const helper = original(root, 'helper', { file: 'tests/helper.ts' });
+  const internal = original(root, 'internal');
+  const childApi = original(child);
+  const input: ModelInput = { registry: createDefaultTagRegistry(), modules: [root, child], originals: [tool, helper, internal, childApi],
+    exposures: [exposure(child, childApi, ['parent'])] };
+  const script = { file: 'scripts/check.ts', area: ordinary, auxiliary: true };
+
+  it('builds a model with an auxiliary original and keeps its owner, identity and ordinary area', () => {
+    const model = valid(buildModel(input));
+    expect(model.originals.find(item => item.id.binding === 'tool')).toMatchObject({ id: tool.id, origin: { file: 'scripts/tool.ts', auxiliary: true,
+      area: { owner: 'app', kind: 'ordinary', root: 'src' } } });
+  });
+
+  it('decides an auxiliary importer by the ordinary rules: same-owner and received allowed, testing denied', () => {
+    const model = valid(buildModel(input));
+    expect(explainImport(model, question(root, internal, { importer: script }))).toMatchObject({ status: 'allowed', reason: 'same-owner' });
+    expect(explainImport(model, question(root, tool, { importer: script }))).toMatchObject({ status: 'allowed', reason: 'same-owner' });
+    expect(explainImport(model, question(root, childApi, { importer: script }))).toMatchObject({ status: 'allowed', reason: 'exposed' });
+    // A test-shaped name outside src/tests/ creates no testing classification.
+    const shaped = { ...script, file: 'scripts/check.test.ts' };
+    expect(explainImport(model, question(root, helper, { importer: shaped }))).toMatchObject({ status: 'denied', reason: 'testing-origin' });
+    expect(explainImport(model, question(root, helper, { importer: script }))).toMatchObject({ status: 'denied', reason: 'testing-origin' });
+  });
+
+  it('never makes an auxiliary original visible to another owner', () => {
+    const model = valid(buildModel(input));
+    expect(explainImport(model, question(child, tool))).toMatchObject({ status: 'denied', reason: 'not-visible' });
+    const forged = buildModel({ ...input, exposures: [...input.exposures, exposure(root, tool, ['descendants'])] });
+    expect(forged.status === 'invalid' && forged.issues.map(issue => issue.code)).toEqual(['ungrounded-exposure']);
+  });
+
+  it('rejects an auxiliary origin beneath src/, in a nearer module\'s directory, or with a mismatched identity', () => {
+    for (const origin of [{ file: 'src/tool.ts', area: ordinary, auxiliary: true }, { file: 'subs/child/tool.ts', area: ordinary, auxiliary: true },
+      { file: 'scripts/tool.ts', area: root.areas[1], auxiliary: true }]) {
+      const result = buildModel({ ...input, originals: [{ ...tool, origin }] });
+      expect(result.status === 'invalid' && result.issues.map(issue => issue.code), origin.file).toContain('invalid-original');
+    }
+    const mismatched = buildModel({ ...input, originals: [{ ...tool, id: { ...tool.id, file: '../tools/tool.ts' } }] });
+    expect(mismatched.status === 'invalid' && mismatched.issues.map(issue => issue.code)).toContain('invalid-original');
+    expect(() => explainImport(valid(buildModel(input)), question(root, internal, { importer: { ...script, file: 'subs/child/x.ts' } })))
+      .toThrow('established source origin');
   });
 });
 

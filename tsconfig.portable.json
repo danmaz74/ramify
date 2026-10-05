@@ -10,5 +10,7 @@
     "subs/presentation/subs/layout/src/**/*",
     "subs/presentation/subs/project-view/src/**/*"
   ],
-  "exclude": ["node_modules", "dist", "subs/**/src/tests/**/*"]
+  "exclude": ["node_modules", "dist", "subs/**/src/tests/**/*",
+    // Each module's scratch directory, `tmp` directly beneath its `src/`.
+    "subs/**/src/tmp"]
 }

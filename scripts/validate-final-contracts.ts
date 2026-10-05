@@ -8,13 +8,15 @@ import { validateProject } from '../subs/analysis/src/validation-entry.js';
 import { parseDescription } from '../subs/analysis/subs/descriptions/src/parse.js';
 import type { DescriptionDocument } from '../subs/analysis/subs/descriptions/src/interfaces/syntax.js';
 import { readPurpose } from '../subs/analysis/subs/project/src/purpose.js';
-import { validationInputs } from './reference-harness/linking-expectations.js';
+import { validationInputs } from './validation-inputs.js';
 
 interface SelectionManifest { readonly name: string; readonly tags: readonly string[]; readonly selections: readonly string[] }
 /** Compare atomic selections so grouping named statements creates no false drift. */
 function manifest(document: DescriptionDocument): SelectionManifest {
   return { name: document.module.name, tags: [...document.module.tags].sort(),
-    selections: document.statements.flatMap(statement => statement.destinations.flatMap(destination =>
+    selections: document.statements.flatMap(statement => 'directory' in statement
+      ? [JSON.stringify({ kind: statement.kind, directory: statement.directory.value })]
+      : statement.destinations.flatMap(destination =>
       (statement.selection.kind === 'wildcard' ? [{ name: '*', alias: '*', wildcard: true }]
         : statement.selection.names.map(({ name, alias }) => ({ name, alias, wildcard: false })))
         .map(selection => JSON.stringify({ kind: statement.kind, from: statement.from.value, destination,
@@ -28,8 +30,11 @@ const plan2a = 'docs/plans/iteration-2a-materialized-api-view';
  * and the selections it added or withdrew. Layers are applied in the order
  * their plans landed, and never edit an archived list. */
 interface ReviewedLayer { readonly plan: string; readonly added?: DescriptionDocument; readonly withdrawn?: DescriptionDocument }
+/** One named layer over an archived README purpose: the plan that reviewed the
+ * change, and the sentence it appended or the exact phrase it replaced. */
+interface ReviewedPurposeLayer { readonly plan: string; readonly appended?: string; readonly replaced?: readonly [string, string] }
 interface ReviewedOwner { readonly directory: string; readonly purpose: string; readonly document: DescriptionDocument;
-  readonly layers?: readonly ReviewedLayer[] }
+  readonly layers?: readonly ReviewedLayer[]; readonly purposeLayers?: readonly ReviewedPurposeLayer[] }
 /** An entry target is a runtime and type pair, or a string naming one packed
  * file, such as a stylesheet, that is resolved and read but never imported. */
 type EntryPair = { readonly types: string; readonly import: string };
@@ -362,7 +367,214 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Plan 7's reviewed manifest additions (`docs/plans/iteration-7-affected-modules/owners.md`,
+  // "Manifest additions"): analysis exposes its affected-module vocabulary by
+  // an interface wildcard, the root relays it with the R3 analysis vocabulary,
+  // and daemon and the root relay the two context types beside the N5 and R7
+  // context vocabulary. Contexts' own wildcard already selects those two.
+  { plan: 'Plan 7 (affected modules)',
+    added: {
+      './': [
+        'expose-sub AffectedQuery, AffectedModule, AffectedPathBasis, AffectedPathSeed, AffectedWideningReason, AffectedSelection, AffectedUnavailableReason, SessionAffectedOutcome from analysis to descendants',
+        'expose-sub AffectedRequest, ContextAffectedOutcome from daemon to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-src * from "interfaces/affected.ts" to parent',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-sub AffectedRequest, ContextAffectedOutcome from contexts to parent',
+      ].join('\n'),
+    },
+  },
+  // Phase 1 project boundaries, iteration 2: the description statement union
+  // names its two members, which travel with it as signature companions.
+  { plan: 'Phase 1 project boundaries (nested-tree statements)',
+    added: {
+      './': [
+        'expose-sub ExposureStatement, NestedTreeStatement from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub ExposureStatement, NestedTreeStatement from descriptions to parent, descendants',
+      ].join('\n'),
+    },
+  },
+  // Phase 1 project boundaries, iteration 3: the scope's ownership table names
+  // its module, exclusion and result types, which travel with `ProjectScope`
+  // as signature companions, beside the one classifier over that table.
+  { plan: 'Phase 1 project boundaries (path ownership)',
+    added: {
+      './': [
+        'expose-sub PathOwner, ProjectExclusion, ProjectOwnership, PathOwnership, classifyProjectPath from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub PathOwner, ProjectExclusion, ProjectOwnership, PathOwnership, classifyProjectPath from project to parent, descendants',
+      ].join('\n'),
+      'subs/analysis/subs/project/': [
+        'expose-src classifyProjectPath from "ownership.ts" to parent',
+      ].join('\n'),
+    },
+  },
+  // Phase 1 project boundaries, iteration 3B: the root-marker reader that
+  // analysis supplies to project selection, and its type, which travels with
+  // `ProjectReadOptions` as a signature companion.
+  { plan: 'Phase 1 project boundaries (root marker)',
+    added: {
+      './': [
+        'expose-sub RootMarkerReader from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub RootMarkerReader from descriptions to parent, descendants',
+      ].join('\n'),
+      'subs/analysis/subs/descriptions/': [
+        'expose-src readRootMarker from "parse.ts" to parent',
+      ].join('\n'),
+    },
+  },
+  // Phase 1 project boundaries, iteration 5: what the root's scripts import
+  // from other owners. Daemon exposes the runtime identity the production
+  // build writes and the dependency wait the Plan 2B measurement records;
+  // analysis re-exposes this script's description parser and README purpose
+  // reader to the root. Root re-exposes none of them.
+  { plan: 'Phase 1 project boundaries (root tooling access)',
+    added: {
+      'subs/analysis/': [
+        'expose-sub parseDescription from descriptions to parent',
+        'expose-sub readPurpose from project to parent',
+      ].join('\n'),
+      'subs/analysis/subs/project/': [
+        'expose-src readPurpose from "purpose.ts" to parent',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-src describeRuntime, runtimeIdentityPath, RuntimeIdentity from "discovery.ts" to parent',
+        'expose-src dependencyWait from "service.ts" to parent',
+      ].join('\n'),
+    },
+  },
+  // Phase 1 project boundaries, iteration 7: the toolkit's nested trees, as
+  // the user decided them on 2026-10-03.
+  { plan: 'Phase 1 project boundaries (toolkit nested trees)',
+    added: {
+      './': [
+        'owned-ignored "docs"',
+        'owned-ignored "examples/collection-review"',
+        'owned-ignored "scripts/probes/fixtures/compiler-api"',
+        'owned-ignored "scripts/probes/fixtures/plan2a-symbol-details"',
+        'owned-ignored "scripts/reference-harness"',
+        'owned-ignored "site"',
+        'external ".cucumber-viz"',
+        'external ".history"',
+        'external ".playwright-mcp"',
+        'external ".reference-work"',
+        'external "ramify-agent"',
+      ].join('\n'),
+    },
+  },
+  // Phase 1 project boundaries, iteration 8: `ProjectWarning` replaces
+  // `OutsideSourceWarning` as the inventory's and the reports' warning type,
+  // so the relays that carried the old type carry the new one. Project's
+  // wildcard interface exposure already selects it.
+  { plan: 'Phase 1 project boundaries (project warnings)',
+    added: {
+      './': [
+        'expose-sub ProjectWarning from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub ProjectWarning from project to parent, descendants',
+      ].join('\n'),
+    },
+    withdrawn: {
+      './': [
+        'expose-sub OutsideSourceWarning from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub OutsideSourceWarning from project to parent, descendants',
+      ].join('\n'),
+    },
+  },
+  // Phase 1 project boundaries, iteration 15: a changed check's reply gives each
+  // named path a `PathCheckDisposition`, which travels with `CheckOutcome` as a
+  // signature companion, so the relays that carry the outcome carry it too.
+  // Contexts' wildcard interface exposure already selects it.
+  { plan: 'Phase 1 project boundaries (path dispositions)',
+    added: {
+      './': [
+        'expose-sub PathCheckDisposition from daemon to descendants',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-sub PathCheckDisposition from contexts to parent',
+      ].join('\n'),
+    },
+  },
+  // Phase 1 project boundaries, iteration 16: a watcher port receives a `WatchScope` and
+  // its handle reports `WatchRegistrations`, which the context status carries, so both
+  // travel with `WatcherPort`, `WatcherHandle` and `ContextStatus` as signature companions.
+  // The strict check-reply decoder is exposed to the root, whose quick environment
+  // decodes replies as the socket client does. Contexts' wildcard interface exposure
+  // already selects both types.
+  { plan: 'Phase 1 project boundaries (watch registrations and strict replies)',
+    added: {
+      './': [
+        'expose-sub WatchScope, WatchRegistrations from daemon to descendants',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-src validateServiceReply from "codec.ts" to parent',
+        'expose-sub WatchScope, WatchRegistrations from contexts to parent',
+      ].join('\n'),
+    },
+  },
 ];
+
+/** A named layer over the archived README purposes, keyed by owner directory:
+ * a sentence a plan appended, or one exact phrase it replaced. */
+interface PurposeLayer {
+  readonly plan: string;
+  readonly appended?: Readonly<Record<string, string>>;
+  readonly replaced?: Readonly<Record<string, readonly [string, string]>>;
+}
+
+const purposeLayers: readonly PurposeLayer[] = [
+  // Plan 7's reviewed purpose additions (`docs/plans/iteration-7-affected-modules/owners.md`,
+  // "Purpose paragraph additions"), each appended to the existing paragraph.
+  // The user accepted the CLI and contexts paragraphs with these sentences as
+  // their reviewed purposes on 2026-10-04.
+  { plan: 'Plan 7 (affected modules)',
+    appended: {
+      './': 'It assembles the affected-module service and its batch form.',
+      'subs/analysis/': 'It also selects the modules affected by changed paths or modules on demand from one revision\'s retained dependency facts.',
+      'subs/cli/': 'Its affected command prints module test selections from the resident service or a fresh batch session.',
+      'subs/daemon/': 'It exposes the affected-module query through the same bounded service and lightweight client connection.',
+      'subs/daemon/subs/contexts/': 'It schedules affected-module queries against the covering revision with explicit freshness and unavailable outcomes.',
+    },
+  },
+  // Phase 1 project boundaries, iteration 8: owned compiler source outside
+  // `src/` is its owner's auxiliary source, and the outside-module warnings it
+  // replaced are retired; Project records the compiler-selection warnings.
+  { plan: 'Phase 1 project boundaries (auxiliary source)',
+    replaced: {
+      'subs/analysis/subs/project/': ['records raw source areas, configuration selection, outside-module warnings and README purpose metadata',
+        'records raw source areas, auxiliary source, configuration selection, project warnings and README purpose metadata'],
+    },
+  },
+];
+
+/** The expected purpose: the archived paragraph, then each named layer in turn.
+ * A layer that restates an appended sentence, or whose replaced phrase does not
+ * occur exactly once, is itself an error, so a layer cannot hide archived drift. */
+function expectedPurpose(owner: ReviewedOwner): string {
+  let purpose = owner.purpose;
+  for (const layer of owner.purposeLayers ?? []) {
+    if (layer.appended !== undefined) {
+      assert.ok(!purpose.includes(layer.appended), `${layer.plan} restates a reviewed purpose sentence: ${owner.directory}`);
+      purpose = `${purpose} ${layer.appended}`;
+    }
+    if (layer.replaced !== undefined) {
+      const [before, after] = layer.replaced;
+      assert.equal(purpose.split(before).length, 2, `${layer.plan} replaces a phrase the reviewed purpose does not hold once: ${owner.directory}`);
+      purpose = purpose.replace(before, () => after);
+    }
+  }
+  return purpose;
+}
 
 /** The expected selections: the archived list, then each named layer in turn.
  * A layer that restates or withdraws a selection the reviewed declaration does
@@ -388,12 +600,13 @@ function expectedManifest(owner: ReviewedOwner): SelectionManifest {
  * as their plans reviewed them; every later change is attached as a layer that
  * names its plan. */
 export function layeredOwners(archived: ReadonlyMap<string, ReviewedOwner>): ReadonlyMap<string, ReviewedOwner> {
-  const header = (name: string, tags: readonly string[]) =>
-    `ramify 1\nmodule "${name}"${tags.length ? ` tagged [${[...tags].join(', ')}]` : ''}\n`;
+  // Only the project root, at `./`, carries the root marker; manifests compare names, tags and selections.
+  const header = (name: string, tags: readonly string[], directory: string) =>
+    `ramify 1\n${directory === './' ? 'root ' : ''}module "${name}"${tags.length ? ` tagged [${[...tags].join(', ')}]` : ''}\n`;
   const owners = new Map(archived);
   for (const owner of addedOwners) {
     assert.ok(!owners.has(owner.name), `${owner.plan} adds an owner the archived review already holds: ${owner.name}`);
-    owners.set(owner.name, { directory: owner.directory, purpose: owner.purpose, document: description(header(owner.name, owner.tags)) });
+    owners.set(owner.name, { directory: owner.directory, purpose: owner.purpose, document: description(header(owner.name, owner.tags, owner.directory)) });
   }
   const byDirectory = new Map([...owners].map(([name, owner]) => [owner.directory, name]));
   for (const layer of declarationLayers) {
@@ -402,9 +615,18 @@ export function layeredOwners(archived: ReadonlyMap<string, ReviewedOwner>): Rea
       assert.ok(name, `${layer.plan} layers onto an owner no review declares: ${directory}`);
       const owner = owners.get(name)!;
       const statements = (text: string | undefined) => text === undefined ? undefined
-        : description(header(owner.document.module.name, [...owner.document.module.tags]) + '\n' + text + '\n');
+        : description(header(owner.document.module.name, [...owner.document.module.tags], owner.directory) + '\n' + text + '\n');
       owners.set(name, { ...owner, layers: [...owner.layers ?? [],
         { plan: layer.plan, added: statements(layer.added?.[directory]), withdrawn: statements(layer.withdrawn?.[directory]) }] });
+    }
+  }
+  for (const layer of purposeLayers) {
+    for (const directory of new Set([...Object.keys(layer.appended ?? {}), ...Object.keys(layer.replaced ?? {})])) {
+      const name = byDirectory.get(directory);
+      assert.ok(name, `${layer.plan} layers a purpose onto an owner no review declares: ${directory}`);
+      const owner = owners.get(name)!;
+      owners.set(name, { ...owner, purposeLayers: [...owner.purposeLayers ?? [],
+        { plan: layer.plan, appended: layer.appended?.[directory], replaced: layer.replaced?.[directory] }] });
     }
   }
   assert.equal(owners.size, 15, 'All fifteen final owners must be present');
@@ -433,7 +655,7 @@ export function assertOwner(actual: string, readme: string, expected: ReviewedOw
   assert.deepEqual(manifest(description(actual)), expectedManifest(expected), `Final selections differ: ${expected.directory}module.ramify`);
   const purpose = readPurpose(`${expected.directory}README.md`, readme);
   assert.equal(purpose.state, 'present', `Missing README prose paragraph: ${expected.directory}`);
-  if (purpose.state === 'present') assert.equal(purpose.paragraph, expected.purpose, `Final README purpose differs: ${expected.directory}`);
+  if (purpose.state === 'present') assert.equal(purpose.paragraph, expectedPurpose(expected), `Final README purpose differs: ${expected.directory}`);
 }
 
 export async function validatePackageEntries(root: string, expected: ExpectedPackage): Promise<number> {

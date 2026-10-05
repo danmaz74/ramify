@@ -78,6 +78,13 @@ const commandFiles = ['dist/src/ramify', `dist/src/${compiledClientName}`, 'dist
 async function assertCommandFiles(context: ProjectContext, root: string, label: string): Promise<void> {
   for (const file of commandFiles) context.assertions.equal(`${label}: ${file} is executable`, await executable(join(root, file)), true);
 }
+/** Release 0.1.0's `files` list excludes `dist/src/ramify-client-*`: the package
+ * carries the launcher and the Node entry it falls back to, and no compiled client. */
+async function assertPackedCommandFiles(context: ProjectContext, root: string, label: string): Promise<void> {
+  for (const file of ['dist/src/ramify', 'dist/src/cli-entry.js']) context.assertions.equal(`${label}: ${file} is executable`, await executable(join(root, file)), true);
+  context.assertions.equal(`${label}: no compiled client is packed`,
+    (await readdir(join(root, 'dist/src'))).filter(name => name.startsWith('ramify-client-')), []);
+}
 
 async function assertLocalLinks(context: ProjectContext, root: string, label: string): Promise<void> {
   const canonical = await realpath(root);
@@ -105,9 +112,9 @@ function semantic(report: AnalysisReport) {
 function assertClean(context: ProjectContext, report: AnalysisReport, label: string): void {
   context.assertions.equal(`${label}: real reference completed cleanly`, [report.schemaVersion, report.outcome.execution,
     report.outcome.check, report.outcome.coverage, report.summary.complete, report.summary.owners,
-    report.summary.denied, report.summary.errors, report.coverage], ['ramify.analysis/1', 'completed', 'passed', 'complete', true, 15, 0, 0, []]);
-  context.assertions.equal(`${label}: original configuration warnings retained`, report.warnings,
-    ['vite.config.ts', 'vitest.config.ts'].map(file => ({ code: 'outside-module-source', entry: file, count: 1, files: [file] })));
+    report.summary.denied, report.summary.errors, report.coverage], ['ramify.analysis/2', 'completed', 'passed', 'complete', true, 15, 0, 0, []]);
+  // Project-boundary iteration 8C: vite.config.ts and vitest.config.ts are the root's auxiliary source (no warning); cucumber.js is inert, as the example does not admit JavaScript.
+  context.assertions.equal(`${label}: no configuration warnings`, report.warnings, []);
   observe(context, 'relocation-analysis', { label, report: analysisEvidence(report) });
 }
 
@@ -190,7 +197,8 @@ export async function prepareRelocatedPackage(context: ProjectContext,
   const installed = join(consumer, 'node_modules/ramify.ts');
   assertions.equal('installed package is an unpacked copy', (await lstat(installed)).isSymbolicLink(), false);
   assertions.equal('installed bin resolves to the unpacked launcher', await realpath(installedBin(context)), join(await realpath(installed), 'dist/src/ramify'));
-  await assertCommandFiles(context, installed, 'installed package keeps the command');
+  // The installed reference checks below run this launcher through its Node entry.
+  await assertPackedCommandFiles(context, installed, 'installed package keeps the command');
   for (const name of ['vitest', 'tsx', 'jsdom']) assertions.equal(`${name}: dev dependency absent from consumer`, await exists(join(consumer, 'node_modules', name)), false);
   await assertLocalLinks(context, join(consumer, 'node_modules'), 'consumer');
   const consumerLock = await readFile(join(consumer, 'package-lock.json'));

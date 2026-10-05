@@ -2,7 +2,7 @@
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
 **Prerequisites:** [Iteration 10](iteration10.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** Analysis decisions/report capability plus required strict serialization consumers. No changes beneath `ramify-agent/` or
+**Owners and write scope:** Analysis decisions/report capability plus required strict serialization consumers and the reference harness's expected values for findings and report fields this slice changes. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -40,7 +40,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 ## Deliverables
 
 1. Apply definite tree-boundary diagnostics before symbol selection/same-owner exemptions; include value/type/symbol-free/re-export/lazy forms and preserve resolution coverage limits.
-2. Assign auxiliary ordinary profiles and provenance; source targets and report counts reflect actual interpreted inputs. Migrate changed report shapes and mechanical strict consumers together.
+2. Assign auxiliary ordinary profiles and provenance; source targets and report counts reflect actual interpreted inputs. Migrate changed report shapes and mechanical strict consumers together. These extend `ramify.analysis/2` and `ramify.check/2` without a new version, per [schema versions](../contracts.md#schema-versions); update the harness's expected values under [iteration gates](../execution.md#iteration-gates).
 3. Add project-boundary-analysis.test.ts through public analyzeProject with independently expected denials, allowed same-owner/legal foreign controls and linked-package external answers.
 
 ## Matrix rows executed here

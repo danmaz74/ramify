@@ -1,13 +1,16 @@
 # Execution, gates and evidence
 
-**Status:** proposed execution policy. No Phase 1 implementation gate has run.
+**Status:** execution policy. Iteration 1's baseline gate ran at `33d8a739`
+and was red; see [its results](iterations/iteration1-results.md#baseline-gate).
 
 ## Checkout and preparation
 
-Execute iterations directly in an isolated toolkit worktree created from the
-reviewed plan/specification revision. Preserve unrelated dirty work in the
-original checkout. Record source commit, source tree, configuration blobs,
-dependency lock digest, tool versions and plan review revision before work.
+Execute iterations directly in the isolated toolkit worktree
+`/home/app/ramify-pb1`, created from the reviewed plan/specification revision.
+Preserve unrelated dirty work in the original checkout. Record source commit,
+source tree, configuration blobs, dependency lock digest, tool versions and
+plan review revision before work. Keep the checkout and evidence outside
+`/tmp`, which does not survive a container restart.
 
 Do not run today's `npm run worktree:prepare`: it installs `ramify-agent`
 dependencies, outside this phase's scope. Prepare the checkout with:
@@ -18,8 +21,10 @@ npm --prefix examples/collection-review ci
 npm --prefix site ci
 ```
 
-Install the example and site packages only when a check of the iteration
-requires them. Do not launch toolkit-targeted harness runs. Studio may manage
+The example install is always required: the audit links the example's
+dependencies from the checkout and fails without them. Install the site
+packages only when a check of the iteration requires them. Do not launch
+toolkit-targeted harness runs. Studio may manage
 plan artifacts, but execution must use preparation/checks that respect this
 scope; the existing agent-installing preparation is not an acceptable shortcut.
 
@@ -73,10 +78,14 @@ kind, rather than treating the plan's desired outcome as general permission
 to edit an authority. Approval is bound to the baseline and exact patch; changes
 beyond it require renewed review.
 
-Iteration 1 takes the user's accepted R1–R6 decisions, then obtains authorization for the exact
-specification-adoption patches before writing them. Keep implementation status
-pending. No principle edit is expected; a need discovered during adoption uses
-the same change-request procedure. Later status or wording changes to protected
+Iteration 1 took the user's accepted R1–R6 decisions and obtained authorization
+for the exact specification-adoption patches before applying them (commit
+`6d0c66f0`). Implementation status stays pending. No principle edit is expected; a need discovered during adoption uses
+the same change-request procedure. The user decided R7, the root marker, on
+2026-10-03 and authorized its specification changes; the coordinator reviews
+and adopts the exact patches before iteration 3A, records their baseline,
+approval and diff identity in that iteration's handoff, and supplies the new
+authoritative revision to later briefs. Later status or wording changes to protected
 documents also require a documented reason and specific authorization.
 
 At every handoff, compare against the iteration's baseline across committed
@@ -100,22 +109,33 @@ reads the baseline, approvals and review record before accepting further work.
 
 ## Before the first implementation iteration
 
-Iteration 1 adopts the reviewed contracts and qualifies verification readiness.
-The [planning probe](evidence/full-audit-preflight.json) already establishes a
-minimal executable full-mode path for audit 0.3.2. Recheck the actual executable,
-then run the toolkit's current committed full audit and explicit reference
-command in the execution checkout. This baseline determines which existing
-failures must be fixed or reported before the producing slice can be accepted.
+Iteration 1 adopted the reviewed contracts and qualified verification readiness.
+The [planning probe](evidence/full-audit-preflight.json) established a
+minimal executable full-mode path for audit 0.3.2. Iteration 1 rechecked the
+actual executable, then ran the toolkit's committed full audit and explicit
+reference command in the execution checkout.
 
-Run from the toolkit checkout, retaining stdout, stderr and exit code externally:
+That baseline at `33d8a739` was red, as
+[iteration 1 results](iterations/iteration1-results.md#baseline-gate) record:
+the toolkit test in `subs/analysis/src/tests/evaluate-accesses.test.ts` fails
+when the environment sets `FORCE_COLOR`, and nine reference instances assert
+expectations that predate current behavior. A baseline-repair slice, outside
+the numbered iterations and the manifest, repairs these failures before
+iteration 2 and passes the gate below on its committed candidate.
+
+Every gate runs from the toolkit checkout, retaining stdout, stderr and exit
+code externally:
 
 ```sh
-PB1_CHECKOUT="$PWD"
+PB1_CHECKOUT=/home/app/ramify-pb1
 PB1_AUDIT_BIN=/ramify/ramify-agent/node_modules/.bin/ramify-audit
 "$PB1_AUDIT_BIN" audit --cwd "$PB1_CHECKOUT" --full --force --json
+npm run build
 flock /tmp/ramify-audit-tests.lock npm run reference:cases
 ```
 
+`reference:cases` reads the built `dist/`, so `npm run build` runs in the
+checkout first; an unbuilt checkout fails instances for that reason alone.
 The reference command is not part of the audit definition, so it takes the
 audit's machine test lock explicitly. Every `reference:cases` run in this
 plan uses that form; a bare run can overlap another session's suite.
@@ -133,24 +153,25 @@ current definition omits the reference harness.
 
 ## Iteration gates
 
-Every iteration gate audits the clean committed candidate and runs the locked
-`reference:cases` command on the same inputs. Run a gate once per slice; repeat only after changed inputs,
-failures or an invalidated receipt justify it.
+Every iteration gate audits the clean committed candidate with
+`ramify-audit audit --cwd <checkout> --full --force --json` and runs the locked
+`reference:cases` command on the same inputs, after `npm run build`, as above.
+Run a gate once per slice; repeat only after changed inputs, failures or an
+invalidated receipt justify it.
 
-The audit mode depends on whether the candidate still answers the affected
-query in the form the installed audit reads:
+No gate uses the partial audit. Iteration 1 found that the installed audit
+decodes the candidate's affected answer strictly, requiring version 1, and
+stops reading it by iteration 8 at the latest; with the
+[schema versions](contracts.md#schema-versions) placed as they are, it stops at
+iteration 3. A full audit takes about four minutes.
 
-- Iteration 1's baseline and the final gate of iterations 20–21 are `--full`.
-- Until the first iteration that changes the affected output, a gate uses the
-  ordinary audit without `--full`, which selects by affected modules as today.
-  The plan expects that iteration to be 14; iteration 1 confirms the exact
-  switch point from the schema inventory and records it in its receipt.
-- From that iteration on, every gate is `--full --force`, as above.
-
-A partial audit that widens or falls back to full is accepted as executed. A
-partial audit that fails because it cannot read the affected answer earlier
-than expected moves the switch point to that iteration; it is not a toolkit
-defect and not a reason to change the audit.
+R6 fixes the reference harness's location, commands and test inventory, not
+its expected values. A slice that changes an output the harness asserts
+updates the harness's expected values for that output in the same slice,
+including schema identifiers, warning codes and report fields. Each new
+expectation is reasoned independently from the contracts, never copied from
+the candidate's output, and no case is deleted or skipped. Such a slice's
+write scope includes those expectation files beneath `scripts/reference-harness/`.
 
 An iteration is accepted only when every required check of its gate passes.
 If a slice cannot pass because a later slice supplies the behavior it needs,
@@ -198,7 +219,7 @@ This is the only place a full suite runs outside the audit, and only under
 the conditions above. Both test commands hold the machine test lock. The
 reference command remains additional. Execute commands serially and retain
 each result even after failure. Gate receipts live under the external directory
-`/tmp/ramify-pb1-evidence/<candidate-sha>/<iteration-or-final>/` during execution,
+`/home/app/ramify-pb1-evidence/<candidate-sha>/<iteration-or-final>/` during execution,
 then are copied into a durable content-addressed handoff archive. Do not rely on
 temporary files as the final delivery. Record a direct gate as `verificationKind:
 direct`; never report it as an audit pass. The receipt includes exact config
@@ -220,6 +241,20 @@ npm run reference:verify -- --plan 2a --format json
 npm run diagrams
 npm run site:build
 ```
+
+Run the four verifications in this order on one frozen build. Plan 1 runs
+first, because Plans 2, 5 and 2A nest its gate report for the same source, and
+Plan 2A runs last, because `I2A-13:predecessor-regressions` reads the Plan 2
+and Plan 5 reports of the same source.
+
+The earlier measurement evidence is produced once, in iteration 20, as the
+user decided on 2026-10-04: the resident (`npm run measure:resident`), fast
+(`npm run measure:fast`) and Plan 2A materialization
+(`npm run measure:plan2a`) recipes run on the final candidate, on
+Linux only, with samples of 30–50, and the expected runtime is announced to
+the user before they start. `I2A-12:linux-macos-bytes` needs a macOS
+counterpart report; that platform gap is known, the instance is reported
+failed, and it does not fail the final gate.
 
 Existing gates' instance counts and correctness results stay binding. Their
 timing predicates follow the [budget policy](budgets.md#policy): run the

@@ -353,33 +353,108 @@ describe('description, metadata and broad session revisions', () => {
       await audited(handle);
       await equalToBatch(handle, inputs);
 
+      // The invalid branch description leaves its directory a layout-invalid
+      // boundary whose files are neither inventoried nor read, so a byte edit of
+      // its source or README changes no input (iteration 12: an unread
+      // observation answers only its kind): the invalid revision stands, and a
+      // batch evaluation of the edited tree reports the same.
       await put(root, paths.provider, `${fixtureFiles[paths.provider]}export const recoveredValue = 9;\n`);
-      const sourceOnly = await revised(handle, [paths.provider]);
-      expect(sourceOnly.outcome.execution).toBe('invalid');
-      expect(sourceOnly.sequence).toBe(invalid.sequence + 1);
-      expect(sourceOnly.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
+      const sourceOnly = await handle.update([{ path: paths.provider, kind: 'changed' }]);
+      expect(sourceOnly).toMatchObject({ status: 'revised', identical: true, revision: { sequence: invalid.sequence, outcome: { execution: 'invalid' } } });
+      expect(handle.current!.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
       await audited(handle);
       await equalToBatch(handle, inputs);
 
       const purpose = 'A purpose changed while the description remained invalid.';
       await put(root, paths.readme, `# Branch\n\n${purpose}\n`);
-      const readmeOnly = await revised(handle, [paths.readme]);
-      expect(readmeOnly.outcome.execution).toBe('invalid');
-      expect(readmeOnly.sequence).toBe(sourceOnly.sequence + 1);
-      expect(readmeOnly.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
+      const readmeOnly = await handle.update([{ path: paths.readme, kind: 'changed' }]);
+      expect(readmeOnly).toMatchObject({ status: 'revised', identical: true, revision: { sequence: invalid.sequence, outcome: { execution: 'invalid' } } });
+      expect(handle.current!.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
       await audited(handle);
       await equalToBatch(handle, inputs);
       expect(comparable(await handle.report(undefined, valid.sequence))).toEqual(comparable(validReport));
 
       await put(root, paths.description, fixtureFiles[paths.description]!);
       const recovered = await revised(handle, [paths.description]);
-      expect(recovered.sequence).toBe(readmeOnly.sequence + 1);
+      expect(recovered.sequence).toBe(invalid.sequence + 1);
       expect(recovered.outcome.execution).toBe('completed');
       expect(recovered.outcome.check).toBe('passed');
       expect(recovered.checked.path).toBe('broad');
       const report = await equalToBatch(handle, inputs);
       expect(report.snapshot!.catalog!.files.find(file => file.file === paths.provider)?.exports.map(entry => entry.name)).toContain('recoveredValue');
       expect(report.snapshot!.inventory.modules.find(module => module.name === 'branch')?.purpose).toEqual({ state: 'present', readme: paths.readme, paragraph: purpose });
+      await audited(handle);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  // The root-marker contract: an unmarked selected root is `unmarked-root-description`,
+  // status invalid like the other invalid descriptions, including a change between
+  // selection and reading. An observed update publishes what a batch read reports.
+  it('publishes an unmarked or missing root description as invalid, as a batch read reports it, and recovers when the marker returns', () => fixture(async (root, inputs) => {
+    const { handle, revision: valid } = await opened(inputs);
+    try {
+      const validReport = await handle.report();
+      const unmarkedMessage = `${join(root, 'module.ramify')} does not carry the root marker: add root before module on its module line to declare the project root`;
+      await put(root, 'module.ramify', fixtureFiles['module.ramify']!.replace('root module fixture', 'module fixture'));
+      const unmarked = await revised(handle, ['module.ramify']);
+      expect(unmarked.sequence).toBe(valid.sequence + 1);
+      expect(unmarked.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+      expect(unmarked.diagnostics.map(item => [item.code, item.category, item.message]))
+        .toEqual([['unmarked-root-description', 'layout', unmarkedMessage]]);
+      expect((await equalToBatch(handle, inputs)).snapshot?.results ?? []).toEqual([]);
+      expect(comparable(await handle.report(undefined, valid.sequence))).toEqual(comparable(validReport));
+      await audited(handle);
+
+      // A module line that cannot be read does not carry the marker either. A resident
+      // check passes its invocation, the opening request here, with every update.
+      const invocation = { project: inputs.project, capabilities: inputs.capabilities };
+      await put(root, 'module.ramify', 'invalid declaration\n');
+      for (const changes of [[{ path: 'module.ramify', kind: 'changed' as const }], []]) {
+        const unreadable = await handle.update(changes, {}, invocation);
+        expect(unreadable.status).toBe('revised');
+        expect(handle.current!.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+        expect(handle.current!.diagnostics.map(item => [item.code, item.category, item.message]))
+          .toEqual([['unmarked-root-description', 'layout', unmarkedMessage]]);
+      }
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+
+      await rm(join(root, 'module.ramify'));
+      const missing = await handle.update([{ path: 'module.ramify', kind: 'deleted' }], {}, invocation);
+      if (missing.status !== 'revised') throw new Error(`Expected a revision: ${JSON.stringify(missing)}`);
+      expect(missing.revision.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+      expect(missing.revision.diagnostics.map(item => item.code)).toEqual(['missing-root-description']);
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+
+      await put(root, 'module.ramify', fixtureFiles['module.ramify']!);
+      const restored = await handle.update([{ path: 'module.ramify', kind: 'created' }], {}, invocation);
+      if (restored.status !== 'revised') throw new Error(`Expected a revision: ${JSON.stringify(restored)}`);
+      const recovered = restored.revision;
+      expect(recovered.outcome).toEqual(valid.outcome);
+      expect(recovered.diagnostics).toEqual(valid.diagnostics);
+      expect(recovered.checked.path).toBe('broad');
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('publishes a child that gains the root marker as an undeclared project boundary and recovers when it loses it', () => fixture(async (root, inputs) => {
+    const { handle, revision: valid } = await opened(inputs);
+    try {
+      await put(root, 'subs/sibling/module.ramify', 'ramify 1\nroot module sibling\n');
+      const marked = await revised(handle, ['subs/sibling/module.ramify']);
+      expect(marked.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+      expect(marked.diagnostics.map(item => [item.code, item.category, item.location?.file]))
+        .toEqual([['undeclared-project-boundary', 'layout', 'subs/sibling/module.ramify']]);
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+
+      await put(root, 'subs/sibling/module.ramify', fixtureFiles['subs/sibling/module.ramify']!);
+      const recovered = await revised(handle, ['subs/sibling/module.ramify']);
+      expect(recovered.outcome).toEqual(valid.outcome);
+      expect(recovered.diagnostics).toEqual(valid.diagnostics);
+      await equalToBatch(handle, inputs);
       await audited(handle);
     } finally { await handle.dispose(); }
   }), timeout);
@@ -935,20 +1010,24 @@ describe('membership path', () => {
       const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
       configuration.compilerOptions.strict = true;
       await put(root, 'tsconfig.json', JSON.stringify(configuration));
-      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', []);
+      // Every whole invalidation retires the compiler observations reported before it, once.
+      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', ['all']);
       await replace(root, 'node_modules/fixture-dependency/index.d.ts', 'readonly n: number', 'readonly n: string');
-      await expectBroad(handle, state, retire, inputs, ['node_modules/fixture-dependency/index.d.ts'], 'changed', []);
+      await expectBroad(handle, state, retire, inputs, ['node_modules/fixture-dependency/index.d.ts'], 'changed', ['all']);
       // A compiler report still pending at the update is promoted by it: a change no created file explains.
       await put(root, `${branch}/explained.ts`, 'export const explained = 1;\n');
       observer.sink.absent(join(root, 'node_modules/unexplained.d.ts'));
       await expectBroad(handle, state, retire, inputs, [`${branch}/explained.ts`], 'created', ['all']);
-      // The first owned test file makes `src/tests/` appear.
+      // The first owned test file makes `src/tests/` appear. The derived source areas follow the module header,
+      // not the directory, so the compiler is kept.
       await put(root, `${branch}/tests/branch.test.ts`, 'export const spec = 1;\n');
       await expectBroad(handle, state, retire, inputs, [`${branch}/tests/branch.test.ts`], 'created', ['all']);
+      // A new child module derives new areas: the compiler is replaced after the whole invalidation, so the
+      // observations the old one reported are retired again before the new one reads.
       await put(root, 'subs/branch/subs/twig/module.ramify', 'ramify 1\nmodule twig\n');
       await put(root, 'subs/branch/subs/twig/README.md', '# Twig\n\nA new child.\n');
       await put(root, 'subs/branch/subs/twig/src/twig.ts', 'export const twig = 1;\n');
-      await expectBroad(handle, state, retire, inputs, ['subs/branch/subs/twig/module.ramify'], 'created', []);
+      await expectBroad(handle, state, retire, inputs, ['subs/branch/subs/twig/module.ramify'], 'created', ['all', 'all']);
     } finally { await handle.dispose(); }
   }, {
     ...membershipFiles,
@@ -994,7 +1073,7 @@ describe('membership path', () => {
       const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
       configuration.compilerOptions.baseUrl = '.';
       await put(root, 'tsconfig.json', JSON.stringify(configuration));
-      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', []);
+      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', ['all']);
       await put(root, `${branch}/based.ts`, 'export const based = 1;\n');
       await refused([`${branch}/based.ts`], 'created', ['probes', 'all']);
     } finally { await handle.dispose(); }

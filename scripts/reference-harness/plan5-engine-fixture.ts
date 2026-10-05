@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { API } from 'typescript/unstable/sync';
-import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { createDefaultTagRegistry, deriveSourceAreas } from '../../subs/analysis/subs/model/src/index.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
 import type { SourceAnalysisInputs } from '../../subs/analysis/subs/typescript/src/interfaces/source.js';
@@ -13,7 +13,7 @@ import { sessionInputs } from './session-expectations.js';
 
 export async function withSourceInputs<T>(root: string, operation: (inputs: SourceAnalysisInputs) => Promise<T>): Promise<T> {
   const configured = sessionInputs(root);
-  const acquired = await readProject({ request: configured.project, parse: parseDescription,
+  const acquired = await readProject({ request: configured.project, parse: parseDescription, marker: readRootMarker,
     limits: { ...configured.limits.acquisition, maxOwners: 1100, maxInputBytes: 512 * 1024 ** 2, deadlineMs: 120_000 } });
   assert.equal(acquired.status, 'acquired');
   if (acquired.status !== 'acquired') throw new Error(JSON.stringify(acquired));
@@ -43,7 +43,9 @@ export async function withNativeInterpreter<T>(root: string, operation: (context
       snapshot = api.updateSnapshot({ openProjects: [configuration] });
       const project = snapshot.getProject(configuration);
       assert.ok(project);
-      const host = { resourceWitness: '', fileExists: existsSync, readFile: (path: string) => {
+      const host = { resourceWitness: '', fileExists: existsSync,
+        realpath: (path: string) => existsSync(path) ? realpathSync(path) : path,
+        directoryExists: (path: string) => existsSync(path) && statSync(path).isDirectory(), readFile: (path: string) => {
         try { return readFileSync(path, 'utf8'); }
         catch (error) { if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null; throw error; }
       } };

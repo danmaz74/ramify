@@ -9,7 +9,7 @@ function sha256(bytes: string | Uint8Array): string { return createHash('sha256'
 const byteOrder = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
 
 /** The build-time runtime identity, written beside the runtime files it describes. */
-export const runtimeIdentityPath = 'dist/runtime-identity.json';
+export const runtimeIdentityPath: string = 'dist/runtime-identity.json';
 const maximumIdentityBytes = 4 * 1024 ** 2;
 const digest = /^[0-9a-f]{64}$/;
 

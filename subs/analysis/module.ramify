@@ -4,10 +4,10 @@ module analysis
 expose-sub * from model to parent, descendants
 
 // A6: syntax vocabulary available to assembly and acquisition.
-expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser, LinkInputs, ExpandedSelection, LinkIssue, LinkedDescriptions from descriptions to parent, descendants
+expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, ExposureStatement, NestedTreeStatement, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser, RootMarkerReader, LinkInputs, ExpandedSelection, LinkIssue, LinkedDescriptions from descriptions to parent, descendants
 
 // A7: project vocabulary supplied to assembly and children.
-expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead, ProjectResolution, RetainedConfiguration, ObservationSink, ObservationRetirement, InputChangeKind, ObservedChange, InventoryUpdate, ProjectObserver, ProjectObserve, isRamifyGeneratedPath from project to parent, descendants
+expose-sub ProjectRequest, ProjectScope, PathOwner, ProjectExclusion, ProjectOwnership, PathOwnership, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, ProjectWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead, ProjectResolution, RetainedConfiguration, ObservationSink, ObservationRetirement, InputChangeKind, ObservedChange, InventoryUpdate, ProjectObserver, ProjectObserve, isRamifyGeneratedPath, classifyProjectPath from project to parent, descendants
 
 // A8: current source catalog vocabulary.
 expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceTarget, WrittenForm, AccessSelection, SourceAccess, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SuppliedAccesses, SourceAnalysis, DependencyBehaviorFacts, DependencyBehaviorFact, DependencyBehaviorAccessFact, BehaviorClassification, BehaviorEvidence, BehaviorLimit, SymbolDetailLimits, SymbolDetailRequest, SymbolDetail from typescript to parent, descendants
@@ -57,3 +57,8 @@ expose-src BehavioralDependencyMetrics from "interfaces/modularity.ts" to parent
 // process runner that root implements.
 expose-src analyzeDependencyDiagram from "dependency-analyzer.ts" to parent
 expose-src * from "interfaces/dependency-analyzer.ts" to parent
+
+// A20: the description parser and the README purpose reader, received from
+// descriptions and project, for the root's final-contract validation.
+expose-sub parseDescription from descriptions to parent
+expose-sub readPurpose from project to parent

@@ -43,7 +43,7 @@ process.stdin.on('end', () => {
     let document;
     try { document = JSON.parse(result.stdout); }
     catch { finish('unavailable: invalid check output'); return; }
-    if (document?.schemaVersion !== 'ramify.check/1' || !['checked', 'not-checked'].includes(document.outcome)
+    if (document?.schemaVersion !== 'ramify.check/2' || !['checked', 'not-checked'].includes(document.outcome)
       || !Array.isArray(document.findings)) { finish('unavailable: invalid check document'); return; }
     if (document.outcome === 'not-checked') {
       finish(typeof document.reason === 'string' ? document.reason.replace(/[\r\n]+/g, ' ') : 'unavailable'); return;

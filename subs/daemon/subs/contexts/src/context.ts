@@ -1,7 +1,7 @@
-import type { RetainedSession } from '../../../../analysis/src/interfaces/session.js';
+import type { RetainedSession, SessionRevision } from '../../../../analysis/src/interfaces/session.js';
 import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../analysis/src/interfaces/dependency-diagram.js';
 import type { ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
-import type { ContextEvent, ContextExplorerDetailsOutcome, ContextRevision, ContextSelection, ContextState, ContextToken, ExplorerDetailsRequest, RevisionId, SynchronizationState, WatchBatch, WatcherHandle } from './interfaces/contexts.js';
+import type { ContextEvent, ContextExplorerDetailsOutcome, ContextRevision, ContextSelection, ContextState, ContextToken, ExplorerDetailsRequest, RevisionId, SynchronizationState, WatchBatch, WatcherHandle, WatchScope } from './interfaces/contexts.js';
 import type { RevisionHistory } from './history.js';
 import type { Invocation, PendingEntry, RunningCapture } from './queue.js';
 
@@ -49,7 +49,16 @@ export interface LiveContext {
   watched: WatchBatch | null;
   lastActivityAt: number;
   hadLease: boolean;
+  /** The ownership scope of the latest published revision whose analysis completed; it
+   * classifies a changed check's paths at that revision and at any later invalid one. */
   scope: ProjectScope | null;
+  /** The session revision behind the published revision while the session lives; the
+   * next publication compares its analysis inputs with it to record removals. */
+  publishedData: SessionRevision | null;
+  /** Analysis inputs a later published revision no longer holds, by path, with the
+   * sequence that removed them: a named absent path among them is checked by its
+   * deletion. Bounded by `maxQueuedPaths`, oldest first. */
+  readonly removed: Map<string, number>;
   state: ContextState;
   synchronization: SynchronizationState;
   lastValid: ContextRevision | null;
@@ -85,6 +94,16 @@ export interface LiveContext {
   watcher: WatcherHandle | null;
   watcherState: 'active' | 'unavailable' | 'disposed';
   attaching: boolean;
+  /** The selection's scope with an empty ownership table: before a completed revision the
+   * classifier applies only the canonical reserved-path rules over it. */
+  readonly reserved: ProjectScope;
+  /** The sequence of the published revision that last supplied `scope`. */
+  scopeSequence: number | null;
+  /** The watch scope last given to the watcher, null without one. */
+  registered: WatchScope | null;
+  /** Reconfigurations in flight that register directories an exclusion held back: until
+   * each ends and a conservative sweep follows, nothing is covered or synchronized. */
+  registering: number;
   conservative: boolean;
   /** Pending non-periodic work; a due periodic sweep is `periodicSweepDue`. */
   background: 'open' | 'request' | 'watch' | 'verify' | 'conservative' | null;

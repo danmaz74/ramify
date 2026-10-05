@@ -110,6 +110,7 @@ export function createFrameDecoder(maximumBytes: number, receive: (value: unknow
   };
 }
 
+import { posix } from 'node:path';
 import type { WireMessage } from './interfaces/daemon.js';
 
 // A bounded codec ceiling; negotiated response and outbound limits remain stricter.
@@ -155,10 +156,22 @@ function selection(value: unknown): boolean {
   return shape(value, ['root', 'scope', 'configuration', 'setup']) && string(value.root) && value.scope === 'whole-project'
     && value.configuration === 'discover' && shape(value.setup, ['registry', 'capabilities']) && string(value.setup.registry) && strings(value.setup.capabilities);
 }
+// Owned-ignored and scratch exclusions carry their owner; every other kind is unowned.
+const ownedExclusions = ['owned-ignored', 'scratch'];
+const unownedExclusions = ['external', 'repository', 'packages', 'output', 'generated'];
+function exclusion(value: unknown): value is { readonly kind: string; readonly directory: string; readonly owner: string | null } {
+  return shape(value, ['kind', 'directory', 'owner']) && string(value.directory)
+    && (ownedExclusions.includes(value.kind as string) ? string(value.owner) : unownedExclusions.includes(value.kind as string) && value.owner === null);
+}
+function ownership(value: unknown): boolean {
+  return shape(value, ['modules', 'exclusions']) && Array.isArray(value.modules) && value.modules.every(module =>
+    shape(module, ['id', 'parent', 'directory']) && string(module.id) && (module.parent === null || string(module.parent)) && string(module.directory))
+    && Array.isArray(value.exclusions) && value.exclusions.every(exclusion);
+}
 function scope(value: unknown): boolean {
-  return value === null || shape(value, ['root', 'selection', 'invokedFrom', 'configuration', 'walkedAreas', 'independentScopes'])
+  return value === null || shape(value, ['root', 'selection', 'invokedFrom', 'configuration', 'walkedAreas', 'ownership'])
     && string(value.root) && ['given', 'found'].includes(value.selection as string) && string(value.invokedFrom) && string(value.configuration)
-    && strings(value.walkedAreas) && strings(value.independentScopes);
+    && strings(value.walkedAreas) && ownership(value.ownership);
 }
 function outcome(value: unknown): boolean {
   return shape(value, ['execution', 'check', 'coverage']) && ['completed', 'invalid', 'incomplete', 'unavailable'].includes(value.execution as string)
@@ -196,9 +209,19 @@ function sessionStatus(value: unknown): boolean {
     && shape(value.compiler, ['pid', 'rss']) && (value.compiler.pid === null || integer(value.compiler.pid))
     && (value.compiler.rss === null || integer(value.compiler.rss)) && (value.lastSweepAt === null || integer(value.lastSweepAt));
 }
+/** The active watcher's registrations: at most 20 distinct byte-ordered pruned directories. */
+function registrations(value: unknown): boolean {
+  if (value === null) return true;
+  if (!shape(value, ['sequence', 'directories', 'pruned', 'prunedCount']) || !(value.sequence === null || integer(value.sequence) && value.sequence > 0)
+    || !integer(value.directories) || !integer(value.prunedCount) || !strings(value.pruned) || value.pruned.length > 20
+    || value.pruned.length > value.prunedCount || (value.pruned.length < 20 && value.pruned.length !== value.prunedCount)) return false;
+  const pruned = value.pruned as readonly string[];
+  return pruned.every((path, index) => path.length > 0 && (index === 0 || Buffer.compare(Buffer.from(pruned[index - 1]!), Buffer.from(path)) < 0));
+}
 function status(value: unknown): boolean {
   return shape(value, ['token', 'selection', 'scope', 'state', 'synchronization', 'published', 'lastValid', 'pending', 'history',
-    'retainedBytes', 'leases', 'watcher', 'openedAt', 'lastActivityAt', 'level', 'session', 'demoting', 'unresponsiveSince']) && token(value.token) && selection(value.selection) && scope(value.scope)
+    'retainedBytes', 'leases', 'watcher', 'registrations', 'openedAt', 'lastActivityAt', 'level', 'session', 'demoting', 'unresponsiveSince'])
+    && token(value.token) && selection(value.selection) && scope(value.scope)
     && ['opening', 'warm', 'cold', 'evicted'].includes(value.state as string)
     && ['hot', 'warm', 'cold'].includes(value.level as string) && sessionStatus(value.session)
     && ['initializing', 'synchronized', 'reconciling', 'conservative', 'watcher-unavailable'].includes(value.synchronization as string)
@@ -209,7 +232,8 @@ function status(value: unknown): boolean {
     && shape(value.leases, ['subscriptions', 'requests']) && Object.values(value.leases).every(integer)
     && shape(value.history, ['retained', 'bytes', 'oldest']) && integer(value.history.retained) && integer(value.history.bytes)
     && (value.history.oldest === null || string(value.history.oldest))
-    && ['active', 'unavailable', 'disposed'].includes(value.watcher as string)
+    && ['active', 'unavailable', 'disposed'].includes(value.watcher as string) && registrations(value.registrations)
+    && (value.registrations === null) === (value.watcher !== 'active')
     && typeof value.demoting === 'boolean' && (value.unresponsiveSince === null || integer(value.unresponsiveSince));
 }
 function event(input: unknown): boolean {
@@ -225,6 +249,102 @@ function event(input: unknown): boolean {
     default: return false;
   }
 }
+function members(value: unknown, required: readonly string[], optional: readonly string[]): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) && required.every(key => Object.hasOwn(value, key))
+    && Object.keys(value).every(key => required.includes(key) || optional.includes(key));
+}
+function duration(value: unknown): boolean { return typeof value === 'number' && Number.isFinite(value) && value >= 0; }
+function plain(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value); }
+const sha256 = /^[0-9a-f]{64}$/;
+const revisionId = /^rev\/1:[0-9a-f-]{36}:[1-9][0-9]*$/;
+/** A named path of a changed check: project-relative, `/`-separated, normalized, inside the root. */
+function requestPath(value: unknown): value is string {
+  return string(value) && value.length > 0 && !value.includes('\\') && !value.includes('\0') && !posix.isAbsolute(value)
+    && posix.normalize(value) === value && value !== '.' && value !== '..' && !value.startsWith('../');
+}
+const notAnalyzedReasons: Readonly<Record<string, readonly string[]>> = {
+  'owned-ignored': ['owned-ignored'], external: ['external'], scratch: ['scratch'], reserved: ['repository', 'packages', 'output', 'generated'],
+};
+/** One `PathCheckDisposition`: only a checked path carries an identity; a not-analyzed path's
+ * reason agrees with its exclusion, whose owned kinds name a module and unowned kinds none. */
+function disposition(input: unknown, classification: boolean): boolean {
+  if (!plain(input)) return false;
+  const value = input;
+  if (!requestPath(value.path)) return false;
+  switch (value.disposition) {
+    case 'checked': return !classification && shape(value, ['path', 'disposition', 'module', 'exclusion', 'reason', 'sha256'])
+      && string(value.module) && value.exclusion === null
+      && (value.reason === 'content' ? string(value.sha256) && sha256.test(value.sha256) : value.reason === 'deleted' && value.sha256 === null);
+    case 'not-analyzed': {
+      if (!shape(value, ['path', 'disposition', 'module', 'exclusion', 'reason'])) return false;
+      if (value.reason === 'owned-non-source') return string(value.module) && value.exclusion === null;
+      const kinds = notAnalyzedReasons[value.reason as string];
+      return !!kinds && exclusion(value.exclusion) && kinds.includes(value.exclusion.kind)
+        && (value.exclusion.owner === null ? value.module === null : string(value.module));
+    }
+    case 'not-checked': return shape(value, ['path', 'disposition', 'module', 'exclusion', 'reason'])
+      && (value.module === null || string(value.module)) && (value.exclusion === null || exclusion(value.exclusion))
+      && (classification ? ['classification-changed', 'unobserved-input'] : ['superseded', 'unobserved-input', 'classification-changed']).includes(value.reason as string);
+    default: return false;
+  }
+}
+function dispositions(value: unknown, classification: boolean): boolean {
+  if (!Array.isArray(value) || !value.every(item => disposition(item, classification))) return false;
+  return new Set(value.map(item => (item as { path: string }).path)).size === value.length;
+}
+function freshnessRecord(value: unknown): boolean {
+  return shape(value, ['mode', 'acknowledged', 'captureStarted', 'verified', 'reusedRevision'])
+    && ['published', 'synchronized'].includes(value.mode as string) && integer(value.acknowledged)
+    && (value.captureStarted === null || integer(value.captureStarted)) && typeof value.verified === 'boolean' && typeof value.reusedRevision === 'boolean';
+}
+function replyTimings(value: unknown): boolean {
+  return members(value, ['invocationCheck', 'promotion', 'workerStatus', 'workerRoundTrip', 'sweep', 'publication'], ['service', 'clientTransport'])
+    && Object.values(value).every(duration);
+}
+function delta(value: unknown): boolean {
+  return shape(value, ['since', 'findings', 'removed', 'warnings', 'coverage']) && (value.since === null || string(value.since) && revisionId.test(value.since))
+    && Array.isArray(value.findings) && value.findings.every(item => plain(item) && typeof item.new === 'boolean')
+    && strings(value.removed) && Array.isArray(value.warnings) && value.warnings.every(plain) && Array.isArray(value.coverage) && value.coverage.every(plain);
+}
+/** An embedded analysis report carries its own schema identifier, which must be this build's. */
+function report(value: unknown): boolean { return plain(value) && value.schemaVersion === 'ramify.analysis/2'; }
+const unavailableReasons = ['unknown-context', 'expired-generation', 'evicted-revision', 'unobserved-input', 'resource-unavailable',
+  'analysis-failed', 'unsupported-setup', 'disposed', 'configuration-changed'];
+/** One `CheckOutcome`: a closed status with exactly its variant's members. */
+function checkOutcome(input: unknown): boolean {
+  if (!plain(input) || !id(input.requestId)) return false;
+  const value = input;
+  const timed = !Object.hasOwn(value, 'timings') || replyTimings(value.timings);
+  switch (value.status) {
+    case 'reported':
+      if (value.published === true) return members(value, ['status', 'requestId', 'published', 'revision', 'freshness', 'delta', 'report', 'paths'], ['timings'])
+        && timed && revision(value.revision) && freshnessRecord(value.freshness) && delta(value.delta)
+        && (value.report === null || report(value.report)) && dispositions(value.paths, false);
+      return value.published === false && members(value, ['status', 'requestId', 'published', 'revision', 'freshness', 'delta', 'report'], ['timings'])
+        && timed && value.revision === null && value.delta === null && freshnessRecord(value.freshness) && report(value.report);
+    case 'pending': return shape(value, ['status', 'requestId', 'current']) && status(value.current);
+    case 'superseded': return shape(value, ['status', 'requestId', 'revision', 'mismatches']) && (value.revision === null || revision(value.revision))
+      && Array.isArray(value.mismatches) && value.mismatches.every(item => shape(item, ['path', 'expected', 'observed']) && string(item.path)
+        && [item.expected, item.observed].every(hash => hash === null || string(hash) && sha256.test(hash)));
+    case 'cold': return shape(value, ['status', 'requestId', 'elapsedMs', 'current']) && duration(value.elapsedMs) && status(value.current);
+    case 'deadline-exceeded': return shape(value, ['status', 'requestId', 'elapsedMs', 'revision']) && duration(value.elapsedMs)
+      && (value.revision === null || revision(value.revision));
+    case 'classification-changed': return shape(value, ['status', 'requestId', 'revision', 'paths']) && revision(value.revision)
+      && dispositions(value.paths, true) && (value.paths as readonly unknown[]).length > 0;
+    case 'cancelled': return shape(value, ['status', 'requestId']);
+    case 'unavailable': return shape(value, ['status', 'requestId', 'reason', 'message']) && unavailableReasons.includes(value.reason as string)
+      && string(value.message);
+    default: return false;
+  }
+}
+/** The strict reply decoder: a successful `check` reply must be one well-formed `CheckOutcome`,
+ * its path dispositions and `classification-changed` variant included; other operations'
+ * values keep their unknown shape. A malformed reply throws, failing the connection. */
+export function validateServiceReply(operation: string, result: unknown): void {
+  if (operation !== 'check' || !plain(result) || result.ok !== true) return;
+  if (!checkOutcome(result.value)) throw new Error('Invalid check reply schema');
+}
+
 /** The message boundary validates envelopes; service parameters retain their
  * unknown shape until the shared in-process service validates the operation. */
 export function validateWireMessage(input: unknown): WireMessage {
@@ -235,7 +355,7 @@ export function validateWireMessage(input: unknown): WireMessage {
       && string(value.handshake.protocol) && string(value.handshake.buildKey) && string(value.handshake.engine)
       && shape(value.handshake.client, ['name', 'version']) && string(value.handshake.client.name) && string(value.handshake.client.version); break;
     case 'welcome': valid = shape(value, ['type', 'welcome']) && shape(value.welcome, ['protocol', 'instance', 'capabilities', 'limits'])
-      && value.welcome.protocol === 'ramify.ipc/1' && instance(value.welcome.instance)
+      && value.welcome.protocol === 'ramify.ipc/2' && instance(value.welcome.instance)
       && Array.isArray(value.welcome.capabilities) && value.welcome.capabilities.every(item => ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'measure', 'explorerDetails', 'dependencyDiagram', 'materialize-views', 'affected'].includes(item))
       && shape(value.welcome.limits, ['maxRequestBytes', 'maxResponseBytes', 'leaseMs', 'pingMs'])
       && Object.values(value.welcome.limits).every(item => integer(item) && item > 0); break;

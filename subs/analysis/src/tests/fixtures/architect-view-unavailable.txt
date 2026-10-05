@@ -36,20 +36,21 @@ Revision rev/1:architect · input input/1:architect
     exposed 0 · internal 0 · supporting 1 · tests 0 · uses ? · used by ?
 
 ==> _meta.json <==
-{"schema":"ramify.architect-view/1","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"unavailable","dependencyReason":"wait-limit","dependencyScope":"production","testReferences":"unavailable","metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}
+{"schema":"ramify.architect-view/2","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"unavailable","dependencyReason":"wait-limit","dependencyScope":"production","testReferences":"unavailable","metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}
 
 ==> alpha/behavior.jsonl <==
 {"module":"fixture/alpha","name":"build","role":"internal","shape":"callable","sig":"function build(): Engine;","file":"subs/alpha/src/alpha.ts"}
 
 ==> alpha/module.json <==
 {
-  "schema": "ramify.architect-module/1",
+  "schema": "ramify.architect-module/2",
   "module": "fixture/alpha",
   "dir": "subs/alpha",
   "parent": "fixture",
   "children": [],
   "tags": [],
   "areas": ["src"],
+  "boundaries": [],
   "purpose": {
     "state": "present",
     "path": "subs/alpha/README.md",
@@ -78,13 +79,14 @@ Revision rev/1:architect · input input/1:architect
 
 ==> beta/module.json <==
 {
-  "schema": "ramify.architect-module/1",
+  "schema": "ramify.architect-module/2",
   "module": "fixture/beta",
   "dir": "subs/beta",
   "parent": "fixture",
   "children": [],
   "tags": ["ui"],
   "areas": ["src"],
+  "boundaries": [],
   "purpose": {
     "state": "present",
     "path": "subs/beta/README.md",
@@ -109,13 +111,14 @@ Revision rev/1:architect · input input/1:architect
 
 ==> checks/module.json <==
 {
-  "schema": "ramify.architect-module/1",
+  "schema": "ramify.architect-module/2",
   "module": "fixture/checks",
   "dir": "subs/checks",
   "parent": "fixture",
   "children": [],
   "tags": ["testing"],
   "areas": ["src"],
+  "boundaries": [],
   "purpose": {
     "state": "present",
     "path": "subs/checks/README.md",
@@ -149,13 +152,14 @@ Revision rev/1:architect · input input/1:architect
 
 ==> core/engine/module.json <==
 {
-  "schema": "ramify.architect-module/1",
+  "schema": "ramify.architect-module/2",
   "module": "fixture/core/engine",
   "dir": "subs/core/subs/engine",
   "parent": "fixture/core",
   "children": [],
   "tags": [],
   "areas": ["src", "src/tests"],
+  "boundaries": [],
   "purpose": { "state": "missing" },
   "docs": [],
   "files": { "own": 3, "subtree": 3 },
@@ -173,13 +177,14 @@ Revision rev/1:architect · input input/1:architect
 
 ==> core/module.json <==
 {
-  "schema": "ramify.architect-module/1",
+  "schema": "ramify.architect-module/2",
   "module": "fixture/core",
   "dir": "subs/core",
   "parent": "fixture",
   "children": ["fixture/core/engine"],
   "tags": [],
   "areas": ["src", "src/tests"],
+  "boundaries": [],
   "purpose": {
     "state": "present",
     "path": "subs/core/README.md",
@@ -206,13 +211,14 @@ Revision rev/1:architect · input input/1:architect
 
 ==> gamma/module.json <==
 {
-  "schema": "ramify.architect-module/1",
+  "schema": "ramify.architect-module/2",
   "module": "fixture/gamma",
   "dir": "subs/gamma",
   "parent": "fixture",
   "children": [],
   "tags": [],
   "areas": ["src"],
+  "boundaries": [],
   "purpose": {
     "state": "present",
     "path": "subs/gamma/README.md",
@@ -234,13 +240,14 @@ Revision rev/1:architect · input input/1:architect
 
 ==> module.json <==
 {
-  "schema": "ramify.architect-module/1",
+  "schema": "ramify.architect-module/2",
   "module": "fixture",
   "dir": "",
   "parent": null,
   "children": ["fixture/alpha", "fixture/beta", "fixture/checks", "fixture/core", "fixture/gamma"],
   "tags": [],
   "areas": ["src"],
+  "boundaries": [],
   "purpose": {
     "state": "present",
     "path": "README.md",
@@ -250,7 +257,7 @@ Revision rev/1:architect · input input/1:architect
   "files": { "own": 2, "subtree": 17 },
   "symbols": { "exposed": 0, "internal": 1, "supporting": 1, "unknown": 0 },
   "tests": { "suites": 0, "titles": 0 },
-  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":2,"sourceBytes":175,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":215}},"subtree":{"production":{"sourceFiles":11,"sourceBytes":1713,"resourceFiles":4,"resourceBytes":110},"tests":{"sourceFiles":6,"sourceBytes":1017,"resourceFiles":1,"resourceBytes":175},"documentation":{"files":13,"bytes":850}}}},
+  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":2,"sourceBytes":175,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":220}},"subtree":{"production":{"sourceFiles":11,"sourceBytes":1713,"resourceFiles":4,"resourceBytes":110},"tests":{"sourceFiles":6,"sourceBytes":1017,"resourceFiles":1,"resourceBytes":175},"documentation":{"files":13,"bytes":855}}}},
   "revision": "rev/1:architect"
 }
 

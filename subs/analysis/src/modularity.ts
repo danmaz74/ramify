@@ -78,7 +78,7 @@ function project(revision: string, report: CompleteReport, ownership: OwnershipR
     unknownDependencies: views.reduce((sum, view) => sum + (metricCoverage(view.behavior)?.unknownDependencies ?? 0), 0),
   };
   return {
-    schemaVersion: 'ramify.modularity/2',
+    schemaVersion: 'ramify.modularity/3',
     provenance: provenance(revision, report, ownership),
     coverage: { state: partial ? 'partial' : 'complete', detail },
     modules: ownership.modules,
@@ -103,7 +103,10 @@ function provenance(revision: string, report: CompleteReport, ownership: Ownersh
     analysisCoverage: report.outcome.coverage,
     capabilities: report.capabilities.filter(item => item.requested && item.executed)
       .map(item => item.capability).sort(byteOrder),
-    omittedScopes: sorted((report.scope ?? report.snapshot.inventory.scope).independentScopes),
+    // The declared nested trees: their contents are neither inventoried nor
+    // analyzed, so consumers inside them are absent from the measures.
+    omittedScopes: sorted((report.scope ?? report.snapshot.inventory.scope).ownership.exclusions
+      .filter(exclusion => exclusion.kind === 'owned-ignored' || exclusion.kind === 'external').map(exclusion => exclusion.directory)),
     ownership: ownership.mode,
     candidateId: ownership.candidateId,
   };

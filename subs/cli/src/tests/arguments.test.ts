@@ -51,7 +51,7 @@ describe('lightweight CLI arguments', () => {
       batch: async () => { throw new Error('Unexpected batch'); },
     });
     expect([exit, calls, stdout.length, stderr]).toEqual([0, 1, 1, []]);
-    expect(JSON.parse(stdout[0])).toEqual({ schemaVersion: 'ramify.daemon-status/1', running: false, record: null });
+    expect(JSON.parse(stdout[0])).toEqual({ schemaVersion: 'ramify.daemon-status/2', running: false, record: null });
   });
 });
 
@@ -339,7 +339,7 @@ describe('affected command grammar', () => {
     expect(exit).toBe(0);
     const text = stdout.join('');
     expect(text).toContain('ramify affected [<module-id>...] [--path <path>]... [--root <dir>] [--batch]\n                       [--format human|json]');
-    expect(text).toContain('ramify.affected-cli/1');
+    expect(text).toContain('ramify.affected-cli/2');
     expect(text).toContain('affected: 0 one complete answer, including an all-modules answer, 1 the project');
     expect(text).toContain('2 unavailable (including\na project that cannot be found), pending, cold, supersession or incompatible\nservice');
     expect(help).toContain('--changed, --since and --deadline do not apply');

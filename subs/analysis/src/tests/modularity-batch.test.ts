@@ -60,7 +60,7 @@ describe('modularity projection of a real batch analysis', () => {
     expect(measured(production!.behavior)).toEqual({ behavioralDependencies: 1, nonBehavioralDependencies: 4 });
     // The diagram facts come from the same per-access facts and equal the headline.
     const diagram = measured(production!.dependencyDiagram);
-    expect(modularity.schemaVersion).toBe('ramify.modularity/2');
+    expect(modularity.schemaVersion).toBe('ramify.modularity/3');
     expect(diagram.headline).toEqual(measured(production!.behavior));
     expect(diagram.inputId).toBe(report.inputId);
     expect(diagram.modules).toEqual(modularity.modules.map(module => module.id));

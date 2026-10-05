@@ -5,10 +5,10 @@ import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
 export const measurementOwnershipRule = [
   'Normalize the path within root; malformed paths and escapes are not attributable.',
   '1. A reserved generated segment is generated before area or owner lookup: .ramify, .ramify-architect, and their .tmp-<suffix>/.old-<suffix> siblings at any depth, including sibling marker files. Similar names are not reserved.',
-  '2. A path in files is inventoried with exactly its recorded owner, area, kind, and bytes. A path in outsideModuleFiles is outside the owned inventory and has no owner.',
+  '2. A path in files is inventoried with exactly its recorded owner, area, kind, and bytes; owned compiler source outside every src/ is listed with its owner\'s ordinary area.',
   '3. An unlisted path beneath .git, node_modules, bower_components, or jspm_packages is excluded.',
   '4. Every other unlisted path is unobserved. Its nearest listed module supplies only a provisional owner/area beneath that module\'s src/ (src/tests/ first) or at its root README.md/module.ramify; never climb to an ancestor source area when the nearest module does not own the location.',
-  'Configured output exclusions, independent compiler scopes, invalid boundaries, and symlink observations are not fully encoded. Unobserved spelling proves neither inventory membership, ownership, area, emptiness, nor project exclusion; no symlink following is implied. Refreshing the inventory can establish a new file.',
+  'Configured output exclusions, declared nested trees, scratch directories, invalid boundaries, and symlink observations are not fully encoded. Unobserved spelling proves neither inventory membership, ownership, area, emptiness, nor project exclusion; no symlink following is implied. Refreshing the inventory can establish a new file.',
 ].join('\n');
 
 export type JsonByteCount =

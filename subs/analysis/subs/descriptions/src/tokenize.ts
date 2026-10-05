@@ -1,8 +1,9 @@
 import type { DescriptionIssue, DescriptionToken, TextSpan } from './interfaces/syntax.js';
 
 const keywords = new Set([
-  'ramify', 'module', 'expose-src', 'expose-test', 'expose-sub', 'from', 'as',
-  'tagged', 'to', 'parent', 'descendants', 'testing', 'browser', 'ui',
+  'ramify', 'module', 'expose-src', 'expose-test', 'expose-sub', 'owned-ignored',
+  'external', 'root', 'from', 'as', 'tagged', 'to', 'parent', 'descendants', 'testing',
+  'browser', 'ui',
 ]);
 const wordCharacter = /^[A-Za-z0-9_$-]$/;
 const hexQuad = /^[0-9a-fA-F]{4}$/;

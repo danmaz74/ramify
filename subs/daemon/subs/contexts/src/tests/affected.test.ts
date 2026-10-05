@@ -9,11 +9,11 @@ const inputIdOf = (content: string) => `input/1:${hash(JSON.stringify([{ path: '
 const observed = (content: string) => [{ path: 'src/index.ts', sha256: hash(content) }];
 /** The scripted session's fixed answer: the named seeds changed and nothing depends on them. */
 const selection = (inputId: string, modules: readonly string[]): AffectedSelection => ({
-  schemaVersion: 'ramify.affected/1', inputId, paths: [],
+  schemaVersion: 'ramify.affected/2', inputId, paths: [],
   changedModules: modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` })), affectedModules: [],
   testModules: modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` })),
   selection: 'dependency-closure', widening: [],
-  scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [] },
+  scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], ownership: { modules: [], exclusions: [] } },
   coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
 });
 const cooling = { warmIdleMs: 100, coldRetainMs: 200, sweepIntervalMs: 1_000 };

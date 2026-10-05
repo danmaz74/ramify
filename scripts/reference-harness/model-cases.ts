@@ -31,7 +31,7 @@ function evaluate(registry: ResolvedTagRegistry, importerTags: readonly string[]
   const tags = valid(assignOriginalTags(registry, provider.areas[0], [{ tags: symbolTags, location: declaration }]));
   const symbol: Original = {
     id: { kind: 'code', owner: provider.id, file: 'api.ts', binding: 'api' },
-    origin: { file: 'subs/provider/src/api.ts', area: provider.areas[0] },
+    origin: { file: 'subs/provider/src/api.ts', area: provider.areas[0], auxiliary: false },
     hasValue: true, hasType: true, tags: tags.tags, tagEvidence: tags.evidence,
     companions: { named: [], evidence: [], inferred: false, unresolved: 0 },
     declarations: [{ file: 'subs/provider/src/api.ts', start: 0, end: 24, line: 1, column: 1 }],
@@ -42,7 +42,7 @@ function evaluate(registry: ResolvedTagRegistry, importerTags: readonly string[]
     { module: root.id, original: symbol.id, names: ['api'], destinations: ['descendants'],
       provider: provider.id, effective: true, evidence: [{ file: 'module.ramify', start: 25, end: 80, line: 3, column: 1 }] },
   ] }));
-  const question = { importer: { file: 'subs/consumer/src/use.ts', area: importer.areas[0] },
+  const question = { importer: { file: 'subs/consumer/src/use.ts', area: importer.areas[0], auxiliary: false },
     target: symbol.origin, forwarding: [], selection: { original: symbol.id, request },
     location: { file: 'subs/consumer/src/use.ts', start: 0, end: 35, line: 1, column: 1 } };
   return { model, question, decision: explainImport(model, question) };

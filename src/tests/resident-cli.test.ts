@@ -52,7 +52,7 @@ function checkDocument(result: Awaited<ReturnType<typeof invokeResident>>): Chec
   expect(result.stderr).toBe('');
   expect(result.batchCalls).toBe(0);
   const document = JSON.parse(result.stdout) as CheckDocument;
-  expect(document.schemaVersion).toBe('ramify.check/1');
+  expect(document.schemaVersion).toBe('ramify.check/2');
   expect(document.exitCode).toBe(result.exitCode);
   return document;
 }
@@ -79,24 +79,31 @@ describe('changed-file CLI through the real resident service', () => {
       const cwd = join(root, 'subs/consumer/src');
       const first = await invokeResident(quick, cwd, args), document = checkDocument(first);
       expect(first.exitCode).toBe(0);
-      expect(first.requests).toHaveLength(1);
-      expect(first.requests[0]).toMatchObject({ scope: 'delta', deadlineMs: 10_000,
+      // The first request obtains the daemon's classification of both paths; both are
+      // analyzed source, so the second carries the CLI's hashes of both.
+      expect(first.requests).toHaveLength(2);
+      expect(first.requests[0]).toMatchObject({ scope: 'delta', deadlineMs: 10_000, paths, classification: null,
+        freshness: { mode: 'synchronized', expect: [] } });
+      expect(first.requests[1]).toMatchObject({ scope: 'delta', paths, classification: 1,
         freshness: { mode: 'synchronized', expect: expected } });
+      const modules = ['fixture', 'fixture/consumer'];
       expect(document).toMatchObject({ root, outcome: 'checked', reason: null, execution: 'completed',
-        changed: expected.map(content => ({ ...content, covered: true })), findings: [], removed: [],
-        revision: { path: 'cold' }, checked: { path: 'cold' } });
+        paths: expected.map((content, index) => ({ ...content, disposition: 'checked', module: modules[index], exclusion: null, reason: 'content' })),
+        findings: [], removed: [], revision: { path: 'cold' }, checked: { path: 'cold' } });
       expect(document.revision?.id).toMatch(/^rev\/1:/);
       expect(document.timings.daemon?.total).toBeGreaterThanOrEqual(0);
       expect(document.timings.waitedMs).toBeGreaterThanOrEqual(0);
       expect(document.timings.totalMs).toBeGreaterThanOrEqual(document.timings.waitedMs);
-      expect(first.outcomes).toEqual([expect.objectContaining({ status: 'reported', published: true, report: null })]);
+      expect(first.outcomes).toEqual([expect.objectContaining({ status: 'classification-changed' }),
+        expect.objectContaining({ status: 'reported', published: true, report: null })]);
 
       const before = await quick.service.daemonStatus();
       const second = await invokeResident(quick, cwd, args), reused = checkDocument(second);
       const after = await quick.service.daemonStatus();
       expect(reused.revision).toEqual(document.revision);
-      expect(second.outcomes).toEqual([expect.objectContaining({ status: 'reported', published: true, report: null,
-        freshness: expect.objectContaining({ verified: true, reusedRevision: true, captureStarted: null }) })]);
+      expect(second.outcomes).toEqual([expect.objectContaining({ status: 'classification-changed' }),
+        expect.objectContaining({ status: 'reported', published: true, report: null,
+          freshness: expect.objectContaining({ verified: true, reusedRevision: true, captureStarted: null }) })]);
       if (!before.ok || !after.ok) throw new Error('Expected daemon counters');
       expect(after.value.counters.analyses).toBe(before.value.counters.analyses);
       expect(after.value.counters.coveredRequests).toBe(before.value.counters.coveredRequests + 1);
@@ -114,16 +121,17 @@ describe('changed-file CLI through the real resident service', () => {
       expect(initial.exitCode).toBe(0);
       if (!initial.revision) throw new Error('Expected initial covering revision');
       const originalDescription = await readFile(join(root, 'module.ramify'), 'utf8');
-      await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+      await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
       const deniedResult = await invokeResident(quick, root, [...args, '--since', initial.revision.id]);
       const denied = checkDocument(deniedResult);
-      expect(denied).toMatchObject({ outcome: 'checked', execution: 'completed', exitCode: 1,
-        since: initial.revision.id, changed: [{ path: 'module.ramify', covered: true }] });
+      expect(denied).toMatchObject({ outcome: 'checked', execution: 'completed', exitCode: 1, since: initial.revision.id,
+        paths: [{ path: 'module.ramify', disposition: 'checked', module: 'fixture', exclusion: null, reason: 'content',
+          sha256: createHash('sha256').update('ramify 1\nroot module fixture\n').digest('hex') }] });
       expect(denied.findings).toEqual([expect.objectContaining({ code: 'not-visible', new: true,
         location: expect.objectContaining({ file: 'subs/consumer/src/use.ts' }) })]);
       if (!denied.revision) throw new Error('Expected denial covering revision');
       expect(denied.revision.sequence).toBeGreaterThan(initial.revision.sequence);
-      const outcome = deniedResult.outcomes[0];
+      const outcome = deniedResult.outcomes.at(-1);
       if (outcome?.status !== 'reported' || !outcome.published) throw new Error('Expected published daemon outcome');
       expect(denied.revision.path).toBe(outcome.revision.checked.path);
       expect(denied.checked).toEqual(outcome.revision.checked);
@@ -139,7 +147,7 @@ describe('changed-file CLI through the real resident service', () => {
       expect(plain.stderr).toBe('');
       expect(plain.batchCalls).toBe(0);
       const report = JSON.parse(plain.stdout);
-      expect(report.schemaVersion).toBe('ramify.analysis/1');
+      expect(report.schemaVersion).toBe('ramify.analysis/2');
       expect(report).not.toHaveProperty('revision');
       expect(report).not.toHaveProperty('mode');
       expect(report).not.toHaveProperty('findings');
@@ -157,7 +165,7 @@ describe('changed-file CLI through the real resident service', () => {
     } finally { await quick.dispose(); }
   }), 30_000);
 
-  it('covers an observed deletion as absent and refuses unobserved or outside paths', () => fixture(async root => {
+  it('covers an observed deletion as absent, leaves a never-observed owned path not analyzed and refuses an outside path', () => fixture(async root => {
     const quick = await createQuickEnvironment();
     try {
       const path = 'subs/consumer/src/use.ts';
@@ -168,18 +176,20 @@ describe('changed-file CLI through the real resident service', () => {
       expect(checkDocument(await invokeResident(quick, root, args)).exitCode).toBe(0);
       await rm(join(root, path));
       const result = await invokeResident(quick, root, args), deleted = checkDocument(result);
-      expect(result.requests[0]?.freshness).toEqual({ mode: 'synchronized', expect: [{ path, sha256: null }] });
+      expect(result.requests[1]?.freshness).toEqual({ mode: 'synchronized', expect: [{ path, sha256: null }] });
       expect(deleted).toMatchObject({ outcome: 'checked', exitCode: 0, findings: [],
-        changed: [{ path, sha256: null, covered: true }] });
+        paths: [{ path, disposition: 'checked', module: 'fixture/consumer', exclusion: null, reason: 'deleted', sha256: null }] });
       expect(deleted.coverage).toEqual([expect.objectContaining({ code: 'unresolved-target',
         location: expect.objectContaining({ file: 'subs/consumer/src/keep.ts' }) })]);
 
-      for (const unobserved of ['never-observed.txt', '../outside.ts']) {
-        const unchecked = checkDocument(await invokeResident(quick, root,
-          ['check', '--changed', unobserved, '--format', 'json']));
-        expect(unchecked).toMatchObject({ outcome: 'not-checked', reason: 'unobserved-input', exitCode: 2,
-          changed: [{ covered: false }] });
-      }
+      // An owned path that is no file and no analysis input is one the complete check does
+      // not analyze: not analyzed, and the healthy project's exit 0 stands.
+      const inert = checkDocument(await invokeResident(quick, root, ['check', '--changed', 'never-observed.txt', '--format', 'json']));
+      expect(inert).toMatchObject({ outcome: 'checked', reason: null, exitCode: 0,
+        paths: [{ path: 'never-observed.txt', disposition: 'not-analyzed', module: 'fixture', exclusion: null, reason: 'owned-non-source' }] });
+      const outside = checkDocument(await invokeResident(quick, root, ['check', '--changed', '../outside.ts', '--format', 'json']));
+      expect(outside).toMatchObject({ outcome: 'not-checked', reason: 'unobserved-input', exitCode: 2,
+        paths: [{ disposition: 'not-checked', reason: 'unobserved-input' }] });
       await expectReleased(quick);
     } finally { await quick.dispose(); }
   }), 30_000);
@@ -201,6 +211,56 @@ describe('changed-file CLI through the real resident service', () => {
       await expectReleased(quick);
     } finally { await quick.dispose(); }
   }), 30_000);
+});
+
+describe('changed-path dispositions through the real resident service', () => {
+  it('gives the complete check\'s verdict with each named path classified by the project\'s ownership', () => fixture(async root => {
+    // An owned-ignored tree with its own manifest, inert prose, a scratch file and an
+    // unreferenced source; the session's observer and Project's classifier are real.
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nowned-ignored "vendor"\nexpose-src value from "interfaces/api.ts" to descendants\n');
+    await put(root, 'vendor/package.json', '{"name":"vendor"}');
+    await put(root, 'vendor/src/broken.ts', "import { nothing } from './missing.js';\n");
+    await put(root, 'docs/guide.md', '# Guide\n');
+    await put(root, 'src/tmp/scratch.ts', 'export const scratch = 1;\n');
+    await put(root, 'src/extra.ts', 'export const extra = 1;\n');
+    const quick = await createQuickEnvironment();
+    const changed = async (...named: string[]) => {
+      const result = await invokeResident(quick, root, ['check', '--changed', ...named, '--deadline', '10000', '--format', 'json']);
+      return { document: checkDocument(result), requests: result.requests };
+    };
+    const brief = (document: CheckDocument) => document.paths.map(item => [item.path, item.disposition, item.module, item.reason]);
+    try {
+      const clean = await changed('src/extra.ts');
+      expect([clean.document.exitCode, brief(clean.document)]).toEqual([0, [['src/extra.ts', 'checked', 'fixture', 'content']]]);
+      // A manifest inside the owned-ignored tree is not analyzed and no configuration change.
+      const manifest = await changed('vendor/package.json', 'docs/guide.md', 'src/tmp/scratch.ts');
+      expect([manifest.document.exitCode, manifest.document.outcome, manifest.document.reason]).toEqual([0, 'checked', null]);
+      expect(brief(manifest.document)).toEqual([['vendor/package.json', 'not-analyzed', 'fixture', 'owned-ignored'],
+        ['docs/guide.md', 'not-analyzed', 'fixture', 'owned-non-source'], ['src/tmp/scratch.ts', 'not-analyzed', 'fixture', 'scratch']]);
+      // Neither the ignored tree's nor the scratch file's bytes were sent; the inert file's were.
+      expect(manifest.requests.map(request => request.freshness.mode === 'synchronized' ? request.freshness.expect.map(item => item.path) : null))
+        .toEqual([[], ['docs/guide.md']]);
+      expect(manifest.document.paths.filter(item => item.disposition !== 'checked').every(item => !('sha256' in item))).toBe(true);
+      // Deleting the unreferenced source is checked by its removal.
+      await rm(join(root, 'src/extra.ts'));
+      const deleted = await changed('src/extra.ts');
+      expect([deleted.document.exitCode, deleted.document.paths]).toEqual([0,
+        [{ path: 'src/extra.ts', disposition: 'checked', module: 'fixture', exclusion: null, reason: 'deleted', sha256: null }]]);
+      // With a definite violation in the project, naming only not-analyzed paths gives the
+      // complete check's exit 1 and its findings.
+      await put(root, 'subs/consumer/src/use.ts', "import { privateValue } from '../../../src/interfaces/api.js'; void privateValue;\n");
+      const denied = await changed('subs/consumer/src/use.ts');
+      expect(denied.document.exitCode).toBe(1);
+      const ignored = await changed('vendor/package.json', 'vendor/src/broken.ts');
+      expect([ignored.document.exitCode, ignored.document.outcome, brief(ignored.document)]).toEqual([1, 'checked',
+        [['vendor/package.json', 'not-analyzed', 'fixture', 'owned-ignored'], ['vendor/src/broken.ts', 'not-analyzed', 'fixture', 'owned-ignored']]]);
+      expect(ignored.document.findings.map(finding => [finding.code, finding.location?.file])).toEqual([['not-visible', 'subs/consumer/src/use.ts']]);
+      const complete = await invokeResident(quick, root, ['check', '--format', 'json', '--no-snapshot']);
+      expect(complete.exitCode).toBe(ignored.document.exitCode);
+      expect((JSON.parse(complete.stdout) as AnalysisReport).diagnostics.map(item => item.id)).toEqual(ignored.document.findings.map(item => item.id));
+      await expectReleased(quick);
+    } finally { await quick.dispose(); }
+  }), 60_000);
 });
 
 describe('resident CLI status and eviction stream', () => {
@@ -230,7 +290,7 @@ describe('resident CLI status and eviction stream', () => {
         deliver!({ type: 'context-evicted', token: { ...first.current.token, generation: `gen/1:${randomUUID()}` }, reason: 'pressure' });
         await until(() => lines.some(line => line.event === 'evicted'));
         const index = lines.findIndex(line => line.event === 'evicted');
-        expect(lines[index]).toEqual({ schemaVersion: 'ramify.watch/1', event: 'evicted', reason: 'pressure' });
+        expect(lines[index]).toEqual({ schemaVersion: 'ramify.watch/2', event: 'evicted', reason: 'pressure' });
         await until(() => lines.slice(index + 1).some(line => line.event === 'status'));
         controller.abort(); expect(await running).toBe(130);
         const status = await quick.service.daemonStatus();
@@ -243,7 +303,7 @@ describe('resident CLI status and eviction stream', () => {
 describe('resident materialize with views (AV28)', () => {
   it('publishes the API and architect views in one transaction from one revision and prints the architect line', () => fixture(async root => {
     // A function the consumer calls in production and in its test, so dependencies and test references are both measured.
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
     await put(root, 'src/interfaces/api.ts', 'export const value: number = 1; export const privateValue = 2;\nexport function run(): number { return value; }\n');
     await put(root, 'subs/consumer/src/use.ts', "import { run } from '../../../src/interfaces/api.js'; run();\n");
     await put(root, 'subs/consumer/src/tests/use.test.ts',
@@ -286,7 +346,7 @@ describe('resident materialize with views (AV28)', () => {
 
       const meta = JSON.parse(await readFile(join(root, '.ramify-architect/_meta.json'), 'utf8')) as Record<string, unknown>;
       const apiMeta = JSON.parse(await readFile(join(root, 'src/.ramify/_meta.json'), 'utf8')) as Record<string, unknown>;
-      expect(meta).toMatchObject({ schema: 'ramify.architect-view/1', revision: publish!.revision, modules: 2, dependencies: 'measured',
+      expect(meta).toMatchObject({ schema: 'ramify.architect-view/2', revision: publish!.revision, modules: 2, dependencies: 'measured',
         testReferences: 'measured' });
       expect(apiMeta).toMatchObject({ schema: 'ramify.api-view/1', revision: publish!.revision });
       // The consumer's production call and its test's call, from the same analyzer run.
@@ -304,7 +364,7 @@ describe('resident materialize after another invocation form reached the context
     ['check from the root, then materialize naming the root from another directory', false, true],
     ['check --root ., then materialize from the root without --root', true, false],
   ] as const)('%s: the analyzer verifies the captured request and the view has measured dependencies', (_name, given, elsewhere) => fixture(async root => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
     await put(root, 'src/interfaces/api.ts', 'export const value: number = 1; export const privateValue = 2;\nexport function run(): number { return value; }\n');
     await put(root, 'subs/consumer/src/use.ts', "import { run } from '../../../src/interfaces/api.js'; run();\n");
     const runs: { readonly project: ProjectRequest; readonly report: AnalysisReport; readonly outcome: DependencyAnalyzerOutcome }[] = [];

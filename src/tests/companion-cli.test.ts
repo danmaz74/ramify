@@ -23,7 +23,7 @@ const api = 'export const value: number = 1; export const privateValue = 2;\n'
 
 describe('signature-companion forms of the batch and resident CLI', () => {
   it('pins the finding and the inference note in text and JSON, and passes once the companion is exposed', async () => fixture(async root => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, area, label from "interfaces/api.ts" to descendants\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value, area, label from "interfaces/api.ts" to descendants\n');
     await put(root, 'src/interfaces/api.ts', api);
     const message = '`area` is exposed to descendants without `Shape`, which its signature names (src/interfaces/api.ts:3:29). '
       + 'Expose `Shape` to descendants, or remove it from the signature.';
@@ -48,7 +48,7 @@ describe('signature-companion forms of the batch and resident CLI', () => {
     const report = JSON.parse(json.stdout) as AnalysisReport;
     expect(report.diagnostics).toEqual([{ id: expect.stringMatching(/^companion-diagnostic\/1:[0-9a-f]{64}$/), category: 'exposure',
       code: 'exposed-without-companion', message,
-      location: { file: 'module.ramify', start: 24, end: 93, line: 3, column: 1 },
+      location: { file: 'module.ramify', start: 29, end: 98, line: 3, column: 1 },
       related: [{ file: 'src/interfaces/api.ts', start: 137, end: 142, line: 3, column: 29 }],
       importer: null, original: { kind: 'code', owner: 'fixture', file: 'interfaces/api.ts', binding: 'area' }, accessId: null }]);
     expect(report.coverage).toEqual([{ id: expect.stringMatching(/^companion-limit\/1:[0-9a-f]{64}$/), code: 'signature-inferred',
@@ -56,7 +56,7 @@ describe('signature-companion forms of the batch and resident CLI', () => {
     expect(report.stages.find(stage => stage.stage === 'decide')).toEqual({ stage: 'decide', status: 'completed', blockedBy: [],
       diagnosticIds: [report.diagnostics[0]!.id] });
 
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, area, label, Shape from "interfaces/api.ts" to descendants\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value, area, label, Shape from "interfaces/api.ts" to descendants\n');
     const fixed = await invoke(root, ['check', '--batch', '--format', 'json']);
     expect(fixed.exitCode).toBe(0);
     const passed = JSON.parse(fixed.stdout) as AnalysisReport;
@@ -70,7 +70,7 @@ describe('signature-companion forms of the batch and resident CLI', () => {
     try {
       const source = 'src/interfaces/api.ts';
       const header = 'export const value: number = 1; export const privateValue = 2;\nexport interface Shape { readonly n: number }\n';
-      await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, area from "interfaces/api.ts" to descendants\n');
+      await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value, area from "interfaces/api.ts" to descendants\n');
       await put(root, source, `${header}export function area(n: number): number { return n; }\n`);
       const changed = ['check', '--changed', source, '--deadline', '30000'];
       expect((await resident(quick, root, changed)).exitCode).toBe(0);
@@ -101,7 +101,7 @@ describe('signature-companion forms of the batch and resident CLI', () => {
       const text = await resident(quick, root, changed);
       expect(text.stdout.split('\n').filter(line => line.startsWith('Error'))).toEqual([`Error [new] [exposed-without-companion] module.ramify:3:1: ${message(4)}`]);
 
-      await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, area, Shape from "interfaces/api.ts" to descendants\n');
+      await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value, area, Shape from "interfaces/api.ts" to descendants\n');
       const fixed = await resident(quick, root, ['check', '--changed', 'module.ramify', '--deadline', '30000', '--format', 'json']);
       const passed = JSON.parse(fixed.stdout) as CheckDocument;
       expect([fixed.exitCode, passed.revision?.path, passed.findings]).toEqual([0, 'description', []]);

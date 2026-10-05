@@ -154,7 +154,7 @@ function classify(revision: SessionRevision, before: SessionState['facts'], stat
   const inventory = state.facts?.inventory;
   if (!before || !inventory) return 'broad:unknown';
   const refusal = membershipRefusal(before, inventory, { kind: 'local', inventory, descriptions: [], readmes: [],
-    created, deleted, changed: [] });
+    created, deleted, changed: [] }, state.observer?.inputs ?? []);
   return `refusal:${refusal ?? 'other-broad'}`;
 }
 

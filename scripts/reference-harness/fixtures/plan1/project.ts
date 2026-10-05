@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 
 /** The reviewed F recipe. Outcomes are asserted separately by the handlers. */
 export const projectFixtureFiles: Readonly<Record<string, string>> = {
-  'module.ramify': 'ramify 1\nmodule fixture\nexpose-sub * from provider to descendants\n',
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-sub * from provider to descendants\n',
   'README.md': '# fixture\n\nPurpose of fixture.\n',
   'package.json': '{"private":true,"type":"module"}\n',
   'tsconfig.json': JSON.stringify({ compilerOptions: {

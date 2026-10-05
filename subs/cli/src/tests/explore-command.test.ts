@@ -5,7 +5,7 @@ import { runCli } from '../run-cli.js';
 function connection(open: ServiceConnection['openContext'], closed: string[]): ServiceConnection {
   return {
     state: 'connected', reason: null,
-    daemon: { protocol: 'ramify.ipc/1', instance: { instanceId: 'daemon', pid: 1, version: '1', engine: 'engine', buildKey: '0123456789abcdef' },
+    daemon: { protocol: 'ramify.ipc/2', instance: { instanceId: 'daemon', pid: 1, version: '1', engine: 'engine', buildKey: '0123456789abcdef' },
       capabilities: ['contexts'], limits: { maxRequestBytes: 1, maxResponseBytes: 1, leaseMs: 1, pingMs: 1 } },
     openContext: open,
     closeContext: async (params: { readonly token: { readonly context: string } }) => {

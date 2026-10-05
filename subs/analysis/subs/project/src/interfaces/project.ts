@@ -1,4 +1,4 @@
-import type { ParsedDescription, DescriptionParser } from '../../../descriptions/src/interfaces/syntax.js';
+import type { ParsedDescription, DescriptionParser, RootMarkerReader, TextSpan } from '../../../descriptions/src/interfaces/syntax.js';
 
 export interface ProjectRequest {
   readonly cwd: string;
@@ -12,8 +12,46 @@ export interface ProjectScope {
   readonly invokedFrom: string;
   readonly configuration: string;
   readonly walkedAreas: readonly string[];
-  readonly independentScopes: readonly string[];
+  /** The revision's containment and exclusion facts; `classifyProjectPath` reads them. */
+  readonly ownership: ProjectOwnership;
 }
+/** One module of the ownership table. Directories are project-relative, `'.'` for the root. */
+export interface PathOwner {
+  readonly id: string;
+  readonly parent: string | null;
+  readonly directory: string;
+}
+/**
+ * A directory Ramify does not enter. Only `owned-ignored` and `scratch`
+ * exclusions keep an owner; every other kind is unowned.
+ */
+export interface ProjectExclusion {
+  readonly kind: 'owned-ignored' | 'external' | 'scratch' | 'repository' | 'packages' | 'output' | 'generated';
+  readonly directory: string;
+  readonly owner: string | null;
+}
+/**
+ * Immutable, revision-bound path ownership: the modules and the rooted
+ * exclusions (declared trees, module scratch directories and configured
+ * output directories), each byte-ordered by directory. Repository, package
+ * and generated exclusions are canonical segment rules of the classifier,
+ * so they apply wherever such a segment occurs, present or not.
+ */
+export interface ProjectOwnership {
+  readonly modules: readonly PathOwner[];
+  readonly exclusions: readonly ProjectExclusion[];
+}
+/**
+ * The ownership of one canonical project-relative path. An owned path may lie
+ * in an owned-ignored tree or a scratch directory, named by `exclusion`;
+ * ownership alone never states that a path was inventoried or checked.
+ */
+export type PathOwnership =
+  | { readonly status: 'owned'; readonly module: string; readonly directory: string;
+      readonly exclusion: ProjectExclusion | null }
+  | { readonly status: 'excluded'; readonly module: null; readonly exclusion: ProjectExclusion }
+  | { readonly status: 'outside-project'; readonly module: null }
+  | { readonly status: 'invalid-path'; readonly message: string };
 export interface CapturedInput {
   readonly path: string;
   readonly role: 'description' | 'readme' | 'source' | 'resource'
@@ -45,6 +83,11 @@ export interface InventoryFile {
   readonly owner: string;
   readonly area: 'ordinary' | 'tests';
   readonly kind: 'source' | 'resource';
+  /**
+   * `src` beneath the owner's `src/`; `auxiliary` for owned compiler source
+   * outside it, classified as ordinary.
+   */
+  readonly placement: 'src' | 'auxiliary';
   readonly sha256: string;
   readonly bytes: number;
 }
@@ -57,29 +100,41 @@ export interface ExactReference {
     | 'case-mismatch' | 'excluded' | 'invalid-path';
   readonly interfaceEligible: boolean;
 }
-export interface OutsideSourceWarning {
-  readonly code: 'outside-module-source';
-  readonly entry: string;
-  readonly count: number;
-  readonly files: readonly string[];
+/**
+ * A nonblocking project warning, located at a project-relative `path`. Codes
+ * are an open set: a reader tolerates a code it does not know.
+ * `compiler-selected-owned-ignored` and `compiler-selected-scratch` name, at the
+ * tree or scratch directory, compiler-selected source Ramify does not analyze.
+ * `ignored-but-walked`, which only the CLI adds from Git's output and never the
+ * analysis, names a repository-ignored directory Ramify still walks; it lists no files.
+ */
+export interface ProjectWarning {
+  readonly code: 'compiler-selected-owned-ignored' | 'compiler-selected-scratch' | 'ignored-but-walked';
+  readonly path: string;
+  readonly message: string;
+  /** Where file evidence is needed: a bounded, byte-ordered prefix of the files, with `count` the total. */
+  readonly files?: readonly string[];
+  readonly count?: number;
 }
 export interface ProjectInventory {
   readonly scope: ProjectScope;
   readonly modules: readonly InventoryModule[];
   readonly files: readonly InventoryFile[];
   readonly references: readonly ExactReference[];
-  readonly outsideModuleFiles: readonly string[];
-  readonly warnings: readonly OutsideSourceWarning[];
+  readonly warnings: readonly ProjectWarning[];
 }
 export interface ProjectIssue {
-  readonly code: 'root-not-found' | 'missing-root-description' | 'configuration-not-found'
-    | 'references-only-configuration' | 'invalid-layout' | 'invalid-description'
-    | 'duplicate-name' | 'description-in-src' | 'stray-description'
-    | 'reserved-container' | 'symlink-root' | 'symlink-description'
+  readonly code: 'root-not-found' | 'missing-root-description' | 'unmarked-root-description'
+    | 'configuration-not-found' | 'references-only-configuration' | 'invalid-layout'
+    | 'invalid-description' | 'duplicate-name' | 'description-in-src' | 'stray-description'
+    | 'reserved-container' | 'undeclared-project-boundary' | 'invalid-nested-tree' | 'missing-owned-ignored'
+    | 'overlapping-nested-tree' | 'symlink-root' | 'symlink-description'
     | 'symlink-reference' | 'case-mismatch' | 'missing-file' | 'invalid-path'
     | 'resource-limit' | 'read-failure' | 'changed-input';
   readonly path: string;
   readonly message: string;
+  /** The located evidence within `path`, when the issue has one, such as a root marker or a declared directory. */
+  readonly span?: TextSpan;
 }
 export interface AcquisitionLimits {
   readonly attempts: number;
@@ -107,6 +162,8 @@ export interface ProjectInputView {
 export interface ProjectReadOptions {
   readonly request: ProjectRequest;
   readonly parse: DescriptionParser;
+  /** Decides a description's root marker from its module line, for selection and acquisition validity. */
+  readonly marker: RootMarkerReader;
   readonly limits: AcquisitionLimits;
   readonly signal?: AbortSignal;
   readonly retained?: RetainedConfiguration | null;

@@ -19,5 +19,7 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*", "subs/**/src/**/*"],
-  "exclude": ["node_modules", "dist", "site", "examples", "scripts", "ramify-agent", "**/.reference-work"]
+  "exclude": ["node_modules", "dist", "site", "examples", "scripts", "ramify-agent", "**/.reference-work",
+    // Each module's scratch directory, `tmp` directly beneath its `src/`.
+    "src/tmp", "subs/**/src/tmp"]
 }

@@ -10,8 +10,9 @@ const core = `${workspace}/catalog/core`;
 const vocabularyNames = ['Finding', 'InspectionReport', 'Observation', 'ObservationCallback', 'RecordId',
   'Revision', 'RevisionChain', 'RevisionScope', 'ReviewStatus', 'findingSchema', 'inspectionReportSchema',
   'observationSchema', 'recordIdSchema', 'reviewStatusSchema', 'revisionChainSchema', 'revisionSchema', 'revisionScopeSchema'].sort();
-const baselineSummary = { complete: true, owners: 15, sourceFiles: 54, resources: 5, originals: 95,
-  accesses: 313, allowed: 179, denied: 0, errors: 0, warnings: 2, coverageNotes: 0, external: 134 };
+// Project-boundary iteration 8C: vite.config.ts and vitest.config.ts are the root's auxiliary source (no warning); cucumber.js is inert, as the example does not admit JavaScript.
+const baselineSummary = { complete: true, owners: 15, sourceFiles: 56, resources: 5, originals: 97,
+  accesses: 318, allowed: 179, denied: 0, errors: 0, warnings: 0, coverageNotes: 0, external: 139 };
 
 function wildcardPairs(report: AnalysisReport, owner: string) {
   const linked = report.snapshot?.linked;

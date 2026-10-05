@@ -4,6 +4,8 @@ module descriptions tagged [browser]
 // D1-D2: standalone syntax contract.
 expose-src parseDescription from "parse.ts" tagged [browser] to parent
 expose-src * from "interfaces/syntax.ts" to parent
+// The root marker, decided from the module line alone and supplied to project selection.
+expose-src readRootMarker from "parse.ts" to parent
 
 // D3-D4: grounded linking over supplied inventory and catalog facts.
 expose-src linkDescriptions from "link.ts" tagged [browser] to parent

@@ -21,6 +21,8 @@ evidence when no suitable facility is available.
 Keep fixtures and resource lifetimes isolated, and run required regressions
 according to the changed scope. If a failure appears, retain the original result
 and use a focused reproduction instead of retrying a whole suite until it passes.
+A test that fails in a full run but passes alone three times is flaky: record it
+and move on under the guide's [flaky-test rules](../../../docs/development/testing.md#flaky-tests).
 
 Report exact commands, outcomes and coverage limits. Catalogue validation,
 example application tests and a successful report command do not by themselves

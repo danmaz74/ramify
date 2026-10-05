@@ -40,6 +40,8 @@ export class Capture {
   #enumerations = 0;
   #application = new Set<string>();
   #applicationBytes = 0;
+  /** Observations holding read bytes, counted by canonical path, so a file read through a link is known at its real path. */
+  #readCanonical = new Map<string, number>();
   #acquisition: Map<string, ObservationRecipe> | undefined;
   /** Compiler-reported observations awaiting confirmation by the next promotion. */
   #marked: Set<string> | undefined;
@@ -79,9 +81,19 @@ export class Capture {
     entry.sha256 = undefined; entry.input = undefined;
     this.#changed();
   }
+  /**
+   * What an observation's identity depends on besides read bytes, membership
+   * and exact names. A directory and a file whose bytes were read keep the full
+   * stat signature. An unread file, link, other entry or absence answers only
+   * its kind and canonical path: no stage read its bytes, so an edit that
+   * leaves both unchanged, as a byte edit does, changes nothing a stage used.
+   */
+  static #answer(entry: Pick<Observation, 'kind' | 'signature' | 'canonical'>, read: boolean): string {
+    return read || entry.kind === 'directory' ? entry.signature : JSON.stringify([entry.kind, entry.canonical ?? null]);
+  }
   /** The hash `inputs` reports for one observation, computed once per mutation. */
   #hash(entry: Observation): string {
-    return entry.sha256 ??= hash(entry.bytes ?? JSON.stringify([entry.signature, entry.link, entry.entries, entry.exactName]));
+    return entry.sha256 ??= hash(entry.bytes ?? JSON.stringify([Capture.#answer(entry, false), entry.link, entry.entries, entry.exactName]));
   }
   check(): void {
     if (this.#signal?.aborted) throw new Cancelled();
@@ -259,6 +271,7 @@ export class Capture {
           }
           this.check();
           this.#assign(entry, 'bytes', buffer);
+          if (entry.canonical !== undefined) this.#readCanonical.set(entry.canonical, (this.#readCanonical.get(entry.canonical) ?? 0) + 1);
           return buffer;
         } finally { await handle.close(); }
       } finally { this.#reads.delete(entry.path); }
@@ -346,12 +359,13 @@ export class Capture {
   /**
    * What every recorded query answered: kind, canonical path, exact name,
    * enumerated members and read bytes. Stat metadata such as size and times is
-   * left out, so an edited file that was only probed answers the same.
+   * left out, so an edited file that was only probed answers the same. The
+   * read bytes of `unread` are left out too, as if those paths were only probed.
    */
-  get answers(): string {
+  answers(unread: ReadonlySet<string> = new Set()): string {
     const entries = [...this.#observations.values()].sort((a, b) => byteOrder(a.path, b.path));
     return hash(JSON.stringify(entries.map(entry => [entry.path, entry.kind, entry.canonical ?? null, entry.exactName ?? null,
-      entry.entries ?? null, entry.bytes === undefined ? null : this.#hash(entry)])));
+      entry.entries ?? null, entry.bytes === undefined || unread.has(entry.path) ? null : this.#hash(entry)])));
   }
   /** Enumerations actually performed; a cached listing costs none. */
   get enumerations(): number { return this.#enumerations; }
@@ -366,6 +380,16 @@ export class Capture {
     const entry = this.#observations.get(this.path(input));
     return entry?.bytes === undefined ? undefined : this.#hash(entry);
   }
+  /** The identity `inputs` reports for one recorded path, without observing it. */
+  identity(input: string): string | undefined {
+    const entry = this.#observations.get(this.path(input));
+    return entry && this.#hash(entry);
+  }
+  /** Whether some observation holding read bytes resolves to this path's canonical location, such as a read through a link. */
+  readThrough(input: string): boolean {
+    const canonical = this.#observations.get(this.path(input))?.canonical;
+    return canonical !== undefined && this.#readCanonical.has(canonical);
+  }
   async #settle(path: string): Promise<void> {
     await Promise.allSettled([this.#pending.get(path), this.#reads.get(path), this.#directories.get(path)]);
   }
@@ -376,7 +400,11 @@ export class Capture {
     this.#observations.delete(path);
     this.#changed();
     if (old.kind === 'file') this.#files--;
-    this.#bytes -= Buffer.byteLength(path) + Buffer.byteLength(old.signature) + (old.bytes?.length ?? 0)
+    if (old.bytes !== undefined && old.canonical !== undefined) {
+      const count = (this.#readCanonical.get(old.canonical) ?? 0) - 1;
+      if (count > 0) this.#readCanonical.set(old.canonical, count); else this.#readCanonical.delete(old.canonical);
+    }
+    this.#bytes -=Buffer.byteLength(path) + Buffer.byteLength(old.signature) + (old.bytes?.length ?? 0)
       + (old.entries?.reduce((total, entry) => total + Buffer.byteLength(entry) * 2 + 4, 0) ?? 0);
     if (this.#application.delete(path)) this.#applicationBytes -= old.bytes?.length ?? 0;
     return old;
@@ -421,7 +449,8 @@ export class Capture {
     for (const entry of this.#observations.values()) {
       check();
       const current = await this.#disk(entry.path);
-      let different = current.signature !== entry.signature || current.link !== entry.link;
+      const read = entry.bytes !== undefined;
+      let different = Capture.#answer(current, read) !== Capture.#answer(entry, read) || current.link !== entry.link;
       if (!different && entry.exactName !== undefined) {
         different = (await readdir(dirname(entry.path))).includes(basename(entry.path)) !== entry.exactName;
       }
@@ -459,6 +488,7 @@ export class Capture {
     this.#disposed = true;
     await Promise.allSettled([...this.#pending.values(), ...this.#reads.values(), ...this.#directories.values()]);
     this.#observations.clear(); this.#changed(); this.#pending.clear(); this.#reads.clear(); this.#directories.clear(); this.#application.clear();
+    this.#readCanonical.clear();
     this.#acquisition?.clear(); this.#marked = undefined;
     this.#bytes = 0;
   }

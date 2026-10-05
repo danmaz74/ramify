@@ -38,7 +38,7 @@ export function original(module: ModuleRecord, binding = 'api', options: {
   const sourceFile = `${module.areas[0].root}/${file}`;
   const assignment = valid(assignOriginalTags(options.registry ?? createDefaultTagRegistry(), area,
     options.tags === undefined ? [] : [{ tags: options.tags, location: location(module.areas[0].root.replace(/src$/, 'module.ramify'), 2) }]));
-  return { id: { kind: options.kind ?? 'code', owner: module.id, file, binding }, origin: { file: sourceFile, area },
+  return { id: { kind: options.kind ?? 'code', owner: module.id, file, binding }, origin: { file: sourceFile, area, auxiliary: false },
     declarations: [location(sourceFile)], hasValue: options.hasValue ?? true, hasType: options.hasType ?? true,
     tags: assignment.tags, tagEvidence: assignment.evidence, companions: options.companions ?? noCompanions };
 }
@@ -52,8 +52,8 @@ export function exposure(module: ModuleRecord, symbol: Original, destinations: r
 
 export function question(importer: ModuleRecord | SourceArea, symbol: Original | null, options: Partial<ImportQuestion> = {}): ImportQuestion {
   const area = 'areas' in importer ? importer.areas[0] : importer;
-  return { importer: { file: `${area.root}/consumer.ts`, area }, location: location(`${area.root}/consumer.ts`),
-    target: symbol?.origin ?? { file: `${area.root}/init.ts`, area }, forwarding: [],
+  return { importer: { file: `${area.root}/consumer.ts`, area, auxiliary: false }, location: location(`${area.root}/consumer.ts`),
+    target: symbol?.origin ?? { file: `${area.root}/init.ts`, area, auxiliary: false }, forwarding: [],
     selection: symbol ? { original: symbol.id, request: 'value' } : null, ...options };
 }
 

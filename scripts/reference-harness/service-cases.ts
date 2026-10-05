@@ -108,7 +108,7 @@ for (const instance of plan2Instances.filter(item => item.iteration === 5)) {
             const batch = await quick.batch({ cwd: root, root, capabilities }); if (batch.status !== 'reported') throw new Error('Batch cancelled');
             a.equal('cold context publishes revision one from open', [initial.revision?.sequence, initial.revision?.cause], [1, 'open']);
             a.equal('entire report equals independently run batch', normalize(initial.report), normalize(batch.report));
-            a.equal('reference owner/warning/coverage expectations', [initial.report.summary.owners, initial.report.warnings.length, initial.report.outcome.coverage], [15, 2, 'complete']); break;
+            a.equal('reference owner/warning/coverage expectations', [initial.report.summary.owners, initial.report.warnings.length, initial.report.outcome.coverage], [15, 0, 'complete']); break; // 8C: no configuration warnings
           }
           case 'unknown-context': {
             const unknown = value(await check({ ...token, context: `ctx/1:${'f'.repeat(64)}` }));

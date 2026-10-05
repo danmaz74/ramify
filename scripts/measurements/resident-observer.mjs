@@ -1,5 +1,17 @@
 import { processRows } from './process-observer.mjs';
 
+/** Records one short-lived entry's footprint from its external samples and
+ * measured wall time. When no sample holds resident bytes and the process
+ * exited before one sampler interval elapsed, the record says it completed
+ * below sampling resolution and reports no RSS instead of zero bytes. A
+ * process that ran at least one interval keeps its sampled peak, even zero. */
+export function entryFootprint(samples, durationMs, intervalMs) {
+  const peak = Math.max(0, ...samples.map(sample => sample.combinedRssBytes));
+  const belowSamplingResolution = peak === 0 && Number.isFinite(durationMs) && durationMs > 0 && durationMs < intervalMs;
+  return { rssBytes: belowSamplingResolution ? null : peak, durationMs, samplerIntervalMs: intervalMs,
+    belowSamplingResolution, samples };
+}
+
 /** The measurement controller is outside every observed process. Descendants
  * remain observed after a daemon or native helper changes parent/process group. */
 export function observeResidentProcesses(intervalMs = 50) {
@@ -21,7 +33,7 @@ export function observeResidentProcesses(intervalMs = 50) {
     } catch (error) { failure ??= error.stack ?? String(error); }
   }
   const timer = setInterval(sample, intervalMs);
-  return { samples,
+  return { intervalMs, samples,
     add(pid) { observed.add(pid); groups.add(pid); sample(); },
     mark() { sample(); return samples.length - 1; },
     since(mark, exclude = []) {

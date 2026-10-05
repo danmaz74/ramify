@@ -1,8 +1,8 @@
 # Iteration 4: Auxiliary provenance vocabulary
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
-**Prerequisites:** [Iteration 3](iteration3.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** One toolkit-wide provenance type migration; behavioral implementations stay in their named owners. No changes beneath `ramify-agent/` or
+**Prerequisites:** [Iteration 3B](iteration3b.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
+**Owners and write scope:** One toolkit-wide provenance type migration; behavioral implementations stay in their named owners. The reference harness's expected values for the renamed target kind. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -38,7 +38,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 ## Deliverables
 
 1. Add reviewed auxiliary origin, inventory placement and boundary-target vocabulary, retaining original binding identity and source profiles.
-2. Update every existing origin/target builder, serializer/type fixture and legal exposure relay for explicit defaults. New targets are not produced until resolver activation.
+2. Update every existing origin/target builder, serializer/type fixture and legal exposure relay for explicit defaults. New targets are not produced until resolver activation. Renaming `outside-module` to `outside-project` extends `ramify.analysis/2` without a new version and also applies to the modularity producer's internal target kinds, per [schema versions](../contracts.md#schema-versions); update the harness's expected target kind, as in `I1-29:outside-module-target`, under [iteration gates](../execution.md#iteration-gates).
 3. Type-check public positive/negative fixtures; record the complete schema/type producer list without falsely asserting source behavior.
 
 ## Matrix rows executed here

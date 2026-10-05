@@ -21,7 +21,7 @@ afterEach(async () => { for (const environment of environments.splice(0)) await 
 async function fixture(dependencyDiagrams?: DependencyDiagramRunner) {
   const root = await mkdtemp(join(tmpdir(), 'ramify-service-test-')); roots.push(root);
   await mkdir(join(root, 'src'));
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
   await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}');
   await writeFile(join(root, 'src/index.ts'), 'export const value = 1;\n');
   const environment = await createQuickEnvironment({}, dependencyDiagrams ? { dependencyDiagrams } : {}); environments.push(environment);
@@ -35,7 +35,7 @@ describe('validated daemon service', () => {
     if (!opened.ok || opened.value.status !== 'opened') throw new Error('Expected opened context');
     const token = opened.value.token;
     const plain = await environment.service.check({ token, requestId: 'plain', freshness: { mode: 'synchronized', expect: [] } });
-    expect(plain).toMatchObject({ ok: true, value: { status: 'reported', published: true, report: { schemaVersion: 'ramify.analysis/1' } } });
+    expect(plain).toMatchObject({ ok: true, value: { status: 'reported', published: true, report: { schemaVersion: 'ramify.analysis/2' } } });
     if (!plain.ok || plain.value.status !== 'reported' || !plain.value.published) throw new Error('Expected publication');
     const since = plain.value.revision.revision;
     const sha256 = createHash('sha256').update('export const value = 1;\n').digest('hex');
@@ -239,7 +239,7 @@ async function until(condition: () => boolean, what: string): Promise<void> {
 async function architectFixture(architectMetricsPolicy: 'measure' | 'omit' = 'measure', withChild = false) {
   const root = await mkdtemp(join(tmpdir(), 'ramify-materialize-views-')); roots.push(root);
   await mkdir(join(root, 'src/tests'), { recursive: true });
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
   await writeFile(join(root, 'README.md'), '# Fixture\n\nThe fixture project.\n');
   await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src","subs"]}');
   await writeFile(join(root, 'src/index.ts'), 'export function run(input: string): string { return input; }\nexport const value = 1;\n');
@@ -310,7 +310,7 @@ describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
     expect(f.inputs[0]!.api).toBeNull();
     expect(f.inputs[0]!.renderedApi).toEqual([]);
     expect(f.inputs[0]!.architect).toMatchObject({ modules: 1, dependencies: 'measured' });
-    expect(await f.meta()).toMatchObject({ schema: 'ramify.architect-view/1', revision: revision.revision, input: revision.fingerprints.inputId,
+    expect(await f.meta()).toMatchObject({ schema: 'ramify.architect-view/2', revision: revision.revision, input: revision.fingerprints.inputId,
       dependencies: 'measured', dependencyScope: 'production', testReferences: 'measured', metrics: 'measured' });
     expect(JSON.parse(await f.view('module.json'))).toMatchObject({ metrics: { state: 'measured', views: 'measured',
       contextSize: { exact: { production: { sourceFiles: 1 }, tests: { sourceFiles: 1 },
@@ -416,7 +416,7 @@ describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
       views: { state: 'unavailable', reason: 'not-requested' }, contextSize: { exact: { production: { sourceFiles: 1 } } } } });
     const query = await f.measure();
     if (!query.ok || query.value.status !== 'measured') throw new Error(JSON.stringify(query));
-    expect(query.value.document).toMatchObject({ schema: 'ramify.measure/1', revision: result.value.revision.revision,
+    expect(query.value.document).toMatchObject({ schema: 'ramify.measure/2', revision: result.value.revision.revision,
       views: 'measured', modules: [{ id: 'fixture', exact: { production: { sourceFiles: 1 },
         views: { ordinaryBytes: expect.any(Number), testsBytes: expect.any(Number) } } }] });
     const architect = (JSON.parse(await f.view('module.json')) as { metrics: { contextSize: { exact: Record<string, unknown> } } }).metrics;

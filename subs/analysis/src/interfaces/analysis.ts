@@ -1,7 +1,7 @@
 import type { ImportDecision, ImportReason, Model, ModelIssue, OriginalId, ResolvedTagRegistry, SourceArea, SourceLocation } from '../../subs/model/src/interfaces/model.js';
 import type { DescriptionIssue } from '../../subs/descriptions/src/interfaces/syntax.js';
 import type { LinkedDescriptions, LinkIssue } from '../../subs/descriptions/src/interfaces/linking.js';
-import type { AcquisitionLimits, CapturedInput, ProjectInventory, ProjectIssue, ProjectRequest, ProjectScope, OutsideSourceWarning } from '../../subs/project/src/interfaces/project.js';
+import type { AcquisitionLimits, CapturedInput, ProjectInventory, ProjectIssue, ProjectRequest, ProjectScope, ProjectWarning } from '../../subs/project/src/interfaces/project.js';
 import type { SourceAccess, SourceCatalog, SourceLimit, SourceWorkLimits } from '../../subs/typescript/src/interfaces/source.js';
 import type { DependencyBehaviorFacts } from '../../subs/typescript/src/interfaces/dependency-behavior.js';
 
@@ -54,7 +54,7 @@ export type AnalysisCode = ModelIssue['code'] | DescriptionIssue['code']
   | ProjectIssue['code'] | LinkIssue['code'] | ImportReason
   | 'missing-export' | 'invalid-invocation' | 'unavailable-capability'
   | 'missing-stage' | 'session-used' | 'session-disposed' | 'output-failure'
-  | 'resource-limit' | 'internal-error' | 'exposed-without-companion';
+  | 'resource-limit' | 'internal-error' | 'exposed-without-companion' | 'project-boundary-import';
 export interface AnalysisDiagnostic {
   readonly id: string;
   readonly category: 'invocation' | 'registry' | 'layout' | 'description'
@@ -87,7 +87,9 @@ export interface StageExecution {
 export interface AccessResult {
   readonly accessId: string;
   readonly decisions: readonly ImportDecision[];
-  readonly outcome: 'checked' | 'external' | 'outside-scope' | 'unverifiable' | 'mixed';
+  /** `denied`: an import into a declared nested tree without package resolution,
+   * one located `project-boundary-import` diagnostic and no symbol decision. */
+  readonly outcome: 'checked' | 'external' | 'outside-scope' | 'unverifiable' | 'mixed' | 'denied';
   readonly diagnostics: readonly string[];
   readonly coverage: readonly string[];
 }
@@ -118,7 +120,7 @@ export interface AnalysisSummary {
   readonly external: number;
 }
 export interface AnalysisReport {
-  readonly schemaVersion: 'ramify.analysis/1';
+  readonly schemaVersion: 'ramify.analysis/2';
   readonly runId: string;
   readonly inputId: string | null;
   readonly request: AnalysisInputs;
@@ -131,7 +133,7 @@ export interface AnalysisReport {
     readonly coverage: 'complete' | 'partial' | 'not-run' };
   readonly snapshot: AnalysisSnapshot | null;
   readonly diagnostics: readonly AnalysisDiagnostic[];
-  readonly warnings: readonly OutsideSourceWarning[];
+  readonly warnings: readonly ProjectWarning[];
   readonly coverage: readonly SourceLimit[];
   readonly summary: AnalysisSummary;
 }

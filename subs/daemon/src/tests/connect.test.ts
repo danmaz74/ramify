@@ -45,14 +45,14 @@ describe('public lightweight connector lifecycle', () => {
       sockets.add(socket); socket.on('error', () => {}); socket.once('close', () => sockets.delete(socket));
       const decoder = createFrameDecoder(4096, value => {
         if ((value as { type: string }).type === 'hello') socket.write(encodeMessage({ type: 'welcome', welcome: {
-          protocol: 'ramify.ipc/1', instance, capabilities: ['daemon-control'], limits: { maxRequestBytes: 4096, maxResponseBytes: 4096, leaseMs: 1000, pingMs: 20 },
+          protocol: 'ramify.ipc/2', instance, capabilities: ['daemon-control'], limits: { maxRequestBytes: 4096, maxResponseBytes: 4096, leaseMs: 1000, pingMs: 20 },
         } }));
       });
       socket.on('data', bytes => decoder.push(typeof bytes === 'string' ? Buffer.from(bytes) : bytes));
     });
     dispose.push(async () => { for (const socket of sockets) socket.destroy(); if (server.listening) await new Promise<void>(resolve => server.close(() => resolve())); });
     await new Promise<void>(resolve => server.listen(endpoint.socket, resolve));
-    await writeDaemonRecord(endpoint, { schemaVersion: 'ramify.daemon-record/1', ...instance, protocol: 'ramify.ipc/1', socket: endpoint.socket,
+    await writeDaemonRecord(endpoint, { schemaVersion: 'ramify.daemon-record/1', ...instance, protocol: 'ramify.ipc/2', socket: endpoint.socket,
       startedAt: Date.now(), state: 'running', stopped: null });
     const result = await connectDaemon({ ...options, endpointDirectory: directory, timeouts: { reconnectAttempts: 2, reconnectBackoffMs: [5, 10], totalRecoveryMs: 100, restartAttempts: 0 } });
     if (result.status !== 'connected') throw new Error('Scripted peer did not connect');

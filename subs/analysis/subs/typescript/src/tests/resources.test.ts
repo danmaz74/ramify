@@ -85,7 +85,7 @@ describe('resource-specific effective exports', () => {
     expect(testing).toEqual(resource('tests/testing.module.css'));
     expect(original(catalog, testing).origin).toEqual({ file: 'src/tests/testing.module.css', area: {
       owner: 'fixture', kind: 'tests', root: 'src/tests', profile: ['testing'],
-    } });
+    }, auxiliary: false });
   });
 
   it('does not invent absent resource export names from a broad class index signature', () => {
@@ -125,8 +125,12 @@ describe('resource descriptions and existence', () => {
       expect(file(catalog, 'src/style.css').exports.map(entry => entry.name)).toEqual(['default']);
       expect(exported(catalog, 'src/forward.ts', 'selected').original).toBeNull();
       expect(catalog.originals.some(entry => entry.id.kind === 'resource' && entry.id.binding === 'externalName')).toBe(false);
-      expect(catalog.coverage).toContainEqual(expect.objectContaining({ location: expect.objectContaining({ file: 'src/forward.ts' }),
-        message: expect.stringContaining('compiler-resolved external') }));
+      // A paths alias is never package resolution: its declaration in the
+      // installed package directory is an always-excluded target, not external,
+      // and its forwarding export records the excluded-target limit.
+      expect(catalog.coverage).toContainEqual(expect.objectContaining({ code: 'excluded-target',
+        location: expect.objectContaining({ file: 'src/forward.ts' }), message: expect.stringContaining('always-excluded packages directory node_modules') }));
+      expect(catalog.coverage.some(limit => limit.message.includes('compiler-resolved external'))).toBe(false);
     });
   }, 30_000);
 
@@ -140,7 +144,7 @@ describe('resource descriptions and existence', () => {
       expect(catalog.originals.some(entry => entry.id.kind === 'resource')).toBe(false);
       expect(catalog.coverage).toContainEqual(expect.objectContaining({ code: 'resource-target',
         location: expect.objectContaining({ file: 'src/forward.ts' }) }));
-      expect(catalog.coverage.some(limit => limit.code === 'outside-module-target')).toBe(false);
+      expect(catalog.coverage.some(limit => limit.code === 'outside-module-target' || limit.code === 'excluded-target')).toBe(false);
     });
   }, 30_000);
 

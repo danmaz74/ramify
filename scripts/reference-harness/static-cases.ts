@@ -36,9 +36,10 @@ function add(id: string, fixture: 'R' | 'F', mutate: Extract<InstanceHandler, { 
       const result = await staticProject(context.root);
       cleanStatic(result, context.assertions);
       context.assertions.equal('baseline owners', result.inventory.modules.length, fixture === 'R' ? 15 : 3);
-      context.assertions.equal('baseline static occurrence inventory', result.accesses.filter(access => staticForms.has(access.form)).length, fixture === 'R' ? 311 : 1);
+      // Project-boundary iteration 8C: R's two root configuration files are auxiliary source with five static external imports.
+      context.assertions.equal('baseline static occurrence inventory', result.accesses.filter(access => staticForms.has(access.form)).length, fixture === 'R' ? 316 : 1);
       context.assertions.equal('baseline application decisions', result.decisions.length, fixture === 'R' ? 177 : 1);
-      context.assertions.equal('baseline static external scope', result.accesses.filter(access => staticForms.has(access.form) && access.target.kind === 'external').length, fixture === 'R' ? 134 : 0);
+      context.assertions.equal('baseline static external scope', result.accesses.filter(access => staticForms.has(access.form) && access.target.kind === 'external').length, fixture === 'R' ? 139 : 0);
     }, mutate,
     run: async context => {
       await compilerValid(context.root, context.assertions);

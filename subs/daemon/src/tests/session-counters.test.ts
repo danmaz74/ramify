@@ -4,6 +4,7 @@ import type { AnalysisDriver, ContextBudgets } from '../../subs/contexts/src/int
 import { createControlledClock, createControlledWatcher } from '../../subs/contexts/src/tests/controlled-ports.js';
 import type { ApiViewPublisher, LogEntry } from '../interfaces/daemon.js';
 import { createDaemonService } from '../service.js';
+import { classifyProjectPath } from '../../../analysis/subs/project/src/ownership.js';
 
 /** None of these tests exercise `materialize`; a call would be a real defect. */
 const publisher: ApiViewPublisher = { async publish() { throw new Error('Unexpected ApiViewPublisher.publish call'); } };
@@ -16,7 +17,7 @@ const budgets: ContextBudgets = {
 };
 async function flush(): Promise<void> { for (let index = 0; index < 100; index++) await Promise.resolve(); }
 function revision(sequence: number): SessionRevision {
-  return { sequence, inputId: `input/1:scripted-${sequence}`, inputs: [], changed: [],
+  return { sequence, inputId: `input/1:scripted-${sequence}`, inputs: [], scope: null, changed: [],
     checked: { path: sequence === 1 ? 'cold' : 'source', files: [], accesses: 0, modelRebuilt: false },
     outcome: { execution: 'completed', check: 'passed', coverage: 'complete' },
     summary: { complete: true, owners: 0, sourceFiles: 0, resources: 0, originals: 0, accesses: 0,
@@ -46,6 +47,7 @@ describe('daemon session audit accounting', () => {
       async explorerDetails() { return { status: 'cancelled' }; }, async dispose() { sessionDisposed = true; },
     };
     const driver: AnalysisDriver = {
+      classify: classifyProjectPath,
       async resolve(request) { return { status: 'resolved', root: '/fixture', selection: 'given', invokedFrom: request.cwd, configuration: 'tsconfig.json' }; },
       async open() { return { status: 'opened', session, revision: current }; },
       async dispose() { driverDisposed = true; },
@@ -98,6 +100,7 @@ describe('daemon racing-hook attribution', () => {
       async explorerDetails() { return { status: 'cancelled' }; }, async dispose() {},
     };
     const driver: AnalysisDriver = {
+      classify: classifyProjectPath,
       async resolve(request) { return { status: 'resolved', root: '/fixture', selection: 'given', invokedFrom: request.cwd, configuration: 'tsconfig.json' }; },
       async open() { return { status: 'opened', session, revision: current }; },
       async dispose() {},
@@ -153,6 +156,7 @@ describe('daemon sweep accounting after reacquisition', () => {
       async explorerDetails() { return { status: 'cancelled' }; }, async dispose() {},
     };
     const driver: AnalysisDriver = {
+      classify: classifyProjectPath,
       async resolve(request) { return { status: 'resolved', root: '/fixture', selection: 'given', invokedFrom: request.cwd, configuration: 'tsconfig.json' }; },
       async open() { return { status: 'opened', session, revision: current }; },
       async dispose() {},

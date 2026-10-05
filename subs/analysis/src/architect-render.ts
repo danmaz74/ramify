@@ -241,8 +241,9 @@ const titleCount = (summary: ModuleSummary): number =>
 
 /**
  * `module.json`: two-space indentation and the specification's key order.
- * Lists of strings and small objects stay on one line, and `uses` and `usedBy`
- * hold one pair per line; both are absent when dependencies are unavailable.
+ * Lists of strings and small objects stay on one line; `boundaries` holds one
+ * declared tree per line, and `uses` and `usedBy` one pair per line, both
+ * absent when dependencies are unavailable.
  */
 function moduleDocument(summary: ModuleSummary, revision: string, measurements: ArchitectMeasurements,
   measurement: ModuleMeasurement | undefined): string {
@@ -255,19 +256,25 @@ function moduleDocument(summary: ModuleSummary, revision: string, measurements: 
     ? `[\n${entries.map(([module, counts]) => `    ${inlineObject([['module', module], ['behavioral', counts.behavioral],
       ['nonBehavioral', counts.nonBehavioral], ...counts.unknown ? [['unknown', counts.unknown] as const] : []])}`).join(',\n')}\n  ]`
     : '[]';
+  // Each declared tree on its own line, like `uses`; `[]` when the module declares none.
+  const boundaries = facts.boundaries.length
+    ? `[\n${facts.boundaries.map(boundary => `    ${inlineObject([['kind', boundary.kind], ['dir', boundary.dir],
+      ['description', boundary.description], ['line', boundary.line], ['column', boundary.column]])}`).join(',\n')}\n  ]`
+    : '[]';
   const symbols = symbolCounts(summary);
   const metrics = measurements.state === 'unavailable'
     ? { state: 'unavailable', reason: measurements.reason }
     : { state: 'measured', views: measurements.views,
       contextSize: { exact: measurement!.exact, subtree: measurement!.subtree } };
   const fields = [
-    field('schema', str('ramify.architect-module/1')),
+    field('schema', str('ramify.architect-module/2')),
     field('module', str(facts.module)),
     field('dir', str(facts.dir)),
     field('parent', facts.parent === null ? 'null' : str(facts.parent)),
     field('children', inlineList(facts.children)),
     field('tags', inlineList(sorted(facts.tags))),
     field('areas', inlineList(facts.areas)),
+    field('boundaries', boundaries),
     field('purpose', purpose),
     field('docs', inlineList(facts.docs)),
     field('files', inlineObject([['own', facts.files.own], ['subtree', facts.files.subtree]])),
@@ -316,7 +323,7 @@ function readme(revision: string, projection: ArchitectViewProjection, summaries
  */
 function metadata(revision: string, projection: ArchitectViewProjection, dependencies: ArchitectDependencies,
   exercises: Exercises | null, purposesCut: number, measurements: ArchitectMeasurements): string {
-  const meta: Record<string, unknown> = { schema: 'ramify.architect-view/1', revision, input: projection.inputId,
+  const meta: Record<string, unknown> = { schema: 'ramify.architect-view/2', revision, input: projection.inputId,
     modules: projection.modules.length, dependencies: dependencies.state };
   if (dependencies.state === 'unavailable') meta.dependencyReason = dependencies.reason;
   meta.dependencyScope = 'production';

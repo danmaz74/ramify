@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runBatch } from '../batch.js';
 import { cliProcess, repositoryRoot } from './process.js';
@@ -16,6 +16,26 @@ const loads = (events: readonly TraceEvent[]) => events.flatMap(event => [event.
 const engine = /\/dist\/(?:subs\/analysis\/|src\/batch\.js)|\/(?:typescript|@typescript)\//;
 const serversAndUI = /\/dist\/subs\/(?:presentation|mcp|web)\/|\/(?:react|react-dom|d3-[^/]+|@modelcontextprotocol|@trpc|express)\//;
 const daemonHost = /\/dist\/(?:src\/(?:daemon-entry|resident-assembly)\.js|subs\/daemon\/(?:subs\/contexts\/|src\/(?:service|host|start-daemon|filesystem-watcher|system-clock)\.js))/;
+
+/**
+ * A complete CLI check inside a Git repository also runs the advisory Git command once, in the
+ * selected root (project-boundary contracts, "Git advisory warning"); outside one it starts no
+ * Git process. The expected count follows from the root's location, a `.git` entry (directory or
+ * worktree link file) at or above it, so a boundary holds wherever the project copy lives.
+ */
+export async function expectedGitAdviceLaunches(root: string): Promise<0 | 1> {
+  for (let directory = root; ; directory = dirname(directory)) {
+    try { await lstat(join(directory, '.git')); return 1; }
+    catch (error) { if (!['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return 0; }
+    if (dirname(directory) === directory) return 0;
+  }
+}
+
+/** A launch of exactly the advisory Git command by the CLI process itself. */
+export function isGitAdviceLaunch(event: TraceEvent, cliPid: number | undefined): boolean {
+  return event.event === 'spawn' && event.pid === cliPid && event.command === 'git'
+    && (event.args ?? []).join(' ') === 'ls-files --others --ignored --exclude-standard --directory -z';
+}
 
 function released(result: ProcessResult, a: BoundaryAssertions, label: string): void {
   a.equal(`${label}: successful exit and empty stderr`, [result.code, result.signal, result.stderr], [0, null, '']);
@@ -55,6 +75,7 @@ export async function batchBoundary(root: string, a: BoundaryAssertions): Promis
     if (expected.status !== 'reported') throw new Error('Batch API did not report');
     a.equal('batch: independently clean project', [expected.exitCode, expected.report.outcome.execution, expected.report.summary.errors,
       expected.report.summary.denied, expected.report.summary.coverageNotes], [0, 'completed', 0, 0, 0]);
+    const gitAdvice = await expectedGitAdviceLaunches(root);
     for (const format of ['human', 'json']) {
       const result = await cliProcess(root, ['check', '--batch', '--root', root, ...(format === 'json' ? ['--format', 'json'] : [])],
         { env: { RAMIFY_ENDPOINT_DIR: endpoint } });
@@ -66,7 +87,11 @@ export async function batchBoundary(root: string, a: BoundaryAssertions): Promis
       a.equal(`${format}: compiler package stays out of CLI`, parentLoads.filter(path => /\/node_modules\/(?:typescript|@typescript)\//.test(path)), []);
       a.equal(`${format}: no daemon host, contexts or UI module`, loads(result.events).filter(path => serversAndUI.test(path) || daemonHost.test(path)), []);
       a.equal(`${format}: no connection or listener`, result.events.filter(event => ['connect', 'listen', 'bind', 'other-launch'].includes(event.event)), []);
-      const children = result.events.filter(event => event.event === 'spawn');
+      // Re-reasoned in the project-boundary iteration 17 fix: the advisory Git command is a finite
+      // child of the CLI, never a daemon or server, and is reaped like the helpers (released above).
+      a.equal(`${format}: advisory Git command runs once exactly when a .git entry is at or above the root`,
+        result.events.filter(event => isGitAdviceLaunch(event, result.pid)).length, gitAdvice);
+      const children = result.events.filter(event => event.event === 'spawn' && !isGitAdviceLaunch(event, result.pid));
       a.ok(`${format}: finite compiler helpers observed`, children.length > 0);
       for (const [index, child] of children.entries()) a.ok(`${format}: child ${index + 1} is a finite compiler helper`,
         /\/(?:configuration|compiler)-helper\.js(?: |$)|\/@typescript\/typescript-(?:linux|darwin)-[^/]+\/lib\/tsc --api /.test([child.command, ...child.args ?? []].join(' ')));

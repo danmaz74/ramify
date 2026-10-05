@@ -10,6 +10,7 @@ import { packageRoot, median } from './common.mjs';
 import { treeIdentity } from './identities.mjs';
 import { measuredPath } from './resident-reuse.mjs';
 import { coldCommand, withResident } from './resident-failure.mjs';
+import { entryFootprint } from './resident-observer.mjs';
 
 const peak = samples => Math.max(0, ...samples.map(sample => sample.combinedRssBytes));
 function compactCli(sample, report) { return { pid: sample.pid, durationMs: sample.durationMs, code: sample.code, report,
@@ -44,7 +45,9 @@ export async function executeResidentWorkload(suffix, options, measurements, che
     const beforeRevision = before.contexts.find(context => context.selection.root === project.root)?.published?.revision;
     const expected = await project.edit(kind, index);
     const sample = await host.cli(project);
-    const report = reportCommand(sample, project.owners, kind === 'exposure' && index % 2 === 0 ? 1 : 0, expected);
+    // An even exposure edit removes the setup exposure the fixture's caller imports through.
+    const removed = kind === 'exposure' && index % 2 === 0;
+    const report = reportCommand(sample, project, { denied: removed ? 1 : 0, expected, setupExposureRemoved: removed });
     if (host.lastInput) {
       if (kind === 'unchanged') assert.equal(report.inputId, host.lastInput, 'Unchanged check must preserve captured identity');
       else assert.notEqual(report.inputId, host.lastInput, 'Edit must change captured identity');
@@ -60,8 +63,7 @@ export async function executeResidentWorkload(suffix, options, measurements, che
       const mark = short.observer.mark();
       const help = await command(executable, ['--help'], { env: short.environment, observer: short.observer });
       assert.equal(help.code, 0); assert.equal(help.stderr, ''); assert.match(help.stdout, /ramify/);
-      const samples = short.observer.since(mark);
-      measurements.help = { rssBytes: peak(samples), durationMs: help.durationMs, samples };
+      measurements.help = entryFootprint(short.observer.since(mark), help.durationMs, short.observer.intervalMs);
       const clientMark = short.observer.mark();
       const client = await command(process.execPath, ['--input-type=module', '--eval', "await import('ramify.ts/client'); await new Promise(resolve => setTimeout(resolve, 100));"], { observer: short.observer });
       assert.equal(client.code, 0); assert.equal(client.stderr, '');
@@ -76,11 +78,11 @@ export async function executeResidentWorkload(suffix, options, measurements, che
       const token = await short.open(project); await short.check(project, token);
       const warm = await short.settled();
       measurements.daemonReference = { rssBytes: warm.memory.rss, settled: sampleMetrics(warm) };
-      const cli = await short.cli(project); const report = reportCommand(cli, project.owners);
+      const cli = await short.cli(project); const report = reportCommand(cli, project);
       measurements.cliReference = { rssBytes: cli.peakCliRssBytes, ...compactCli(cli, report) };
     } finally { await short.close(); }
     const hundred = await prepared('S100'), { host } = await warmed(hundred);
-    try { const cli = await host.cli(hundred); measurements.cliS100 = { rssBytes: cli.peakCliRssBytes, ...compactCli(cli, reportCommand(cli, 100)) }; }
+    try { const cli = await host.cli(hundred); measurements.cliS100 = { rssBytes: cli.peakCliRssBytes, ...compactCli(cli, reportCommand(cli, hundred)) }; }
     finally { await host.close(); }
   } else if (suffix.startsWith('cold-warm-broad-')) {
     const project = await prepared(suffix.endsWith('reference') ? 'reference' : 'S100');
@@ -104,8 +106,8 @@ export async function executeResidentWorkload(suffix, options, measurements, che
       try {
         for (let index = 0; index < budgets.plateau.cycles; index++) {
           const expected = await project.edit('source', index), mark = host.observer.mark();
+          // Resident.check requires the passed outcome and the fixture's pinned coverage.
           const run = await host.check(project, token, expected);
-          assert.equal(run.report.summary.denied, 0); assert.equal(run.report.outcome.coverage, 'complete');
           const settled = sampleMetrics(await host.settled());
           cycles.push({ cycle: index + 1, ...run, expected, settled, samples: host.observer.since(mark) });
           checkpoint(`${name}: alternating source`, index + 1, budgets.plateau.cycles);
@@ -190,7 +192,7 @@ async function slowSubscriber(host, token) {
   try {
     const greeted = new Promise((resolve, reject) => { welcome = { resolve, reject }; });
     await new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
-    send({ type: 'hello', handshake: { protocol: 'ramify.ipc/1', client: { name: 'measurement-slow-reader', version: host.instance.version },
+    send({ type: 'hello', handshake: { protocol: 'ramify.ipc/2', client: { name: 'measurement-slow-reader', version: host.instance.version },
       buildKey: host.instance.buildKey, engine } });
     await wait(greeted);
     const request = (op, params) => {

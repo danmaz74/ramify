@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { evaluateAccesses, evaluateAccessesAsync } from '../evaluate-accesses.js';
-import { parseDescription } from '../../subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/descriptions/src/parse.js';
 import { linkDescriptions } from '../../subs/descriptions/src/link.js';
 import { buildModel, createDefaultTagRegistry, deriveSourceAreas } from '../../subs/model/src/index.js';
 import type { ModelResult } from '../../subs/model/src/index.js';
@@ -21,7 +21,7 @@ function valid<T>(result: ModelResult<T>): T {
 const files = {
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', types: [] }, include: ['src', 'subs'] }),
-  'module.ramify': 'ramify 1\nmodule fixture\nexpose-src safe from "interfaces/api.ts" tagged [browser] to descendants\nexpose-src unsafe, Contract from "interfaces/api.ts" to descendants\n',
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src safe from "interfaces/api.ts" tagged [browser] to descendants\nexpose-src unsafe, Contract from "interfaces/api.ts" to descendants\n',
   'src/interfaces/api.ts': 'export const safe = 1; export const unsafe = 2; export interface Contract {} export const privateValue = 3;',
   'src/init.ts': 'globalThis.console.log(1);',
   'src/tests/init.ts': 'globalThis.console.log(2);',
@@ -40,7 +40,7 @@ async function stage(probe: string, overrides: Readonly<Record<string, string>> 
       await mkdir(dirname(join(root, path)), { recursive: true }); await writeFile(join(root, path), text);
     }
     await inspect?.(root);
-    const acquired = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse: parseDescription,
+    const acquired = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse: parseDescription, marker: readRootMarker,
       limits: { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000, maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2,
         maxApplicationBytes: 64 * 1024 ** 2, maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 } });
     if (acquired.status !== 'acquired') throw new Error(JSON.stringify(acquired));
@@ -68,7 +68,7 @@ describe('cancellable real-source decision batches', () => {
     const names = Array.from({ length: 256 }, (_, index) => `value${index}`);
     const probe = "import * as api from '../../../src/interfaces/api.js';\n" + names.map(name => `void api.${name};`).join('\n');
     const result = await stage(probe, {
-      'module.ramify': 'ramify 1\nmodule fixture\nexpose-src * from "interfaces/api.ts" tagged [browser] to descendants\n',
+      'module.ramify': 'ramify 1\nroot module fixture\nexpose-src * from "interfaces/api.ts" tagged [browser] to descendants\n',
       'src/interfaces/api.ts': files['src/interfaces/api.ts'] + '\n' + names.map(name => `export const ${name} = 1;`).join('\n'),
     }, compilerClean);
     const members = result.accesses.filter(access => access.importer.file === 'subs/consumer/src/probe.ts');
@@ -252,7 +252,7 @@ describe('analysis mapping of located static source requests', () => {
       'subs/consumer/src/tests/init.ts': 'globalThis.console.log(1);',
     }, async root => {
       const run = promisify(execFile)(process.execPath, [fileURLToPath(new URL('../../../../node_modules/typescript/lib/tsc.js', import.meta.url)),
-        '--noEmit', '--project', join(root, 'tsconfig.json')], { cwd: root, timeout: 10_000 });
+        '--noEmit', '--pretty', 'false', '--project', join(root, 'tsconfig.json')], { cwd: root, timeout: 10_000 });
       if (relative) await expect(run).rejects.toMatchObject({ code: 1,
         stdout: expect.stringContaining("error TS2882: Cannot find module or type declarations for side-effect import of './init.js'") });
       else await expect(run).resolves.toMatchObject({ stdout: '', stderr: '' });

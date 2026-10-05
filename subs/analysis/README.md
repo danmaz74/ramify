@@ -3,9 +3,12 @@
 Analysis composes one captured project view, source facts, descriptions and model decisions into disposable batch work, immutable reports and a retained session whose revisions recompute only the facts a change reaches. It owns stage outcomes, input identity and computational invalidation so every client consumes the same completed analysis. It also selects the modules affected by changed paths or modules on demand from one revision's retained dependency facts.
 
 `analyzeProject` runs the disposable batch pipeline over a fresh capture.
-`resolveProject` selects the canonical root and configuration without reading
-module descriptions. Resident contexts keep one `openRetainedSession` handle
-for their successive revisions.
+`resolveProject` selects the canonical root by the root marker, and its
+configuration, supplying the Descriptions owner's marker reader; it reads only
+the descriptions its climb passes, to decide their markers. Batch, validation,
+inventory and session acquisitions receive the same reader beside the parser.
+Resident contexts keep one `openRetainedSession` handle for their successive
+revisions.
 
 `openRetainedSession(inputs, control?)` observes one project, keeps a warm
 compiler behind the retained adapter with the observer's sink, and publishes
@@ -22,9 +25,16 @@ compiler update, then only the files whose resolution those paths can change are
 described and interpreted. A membership change whose reach the retained facts or
 the compiler cannot bound takes the broad path instead. Every revision
 carries its checked set, finding delta and timings; `report` materializes the
-`ramify.analysis/1` document of a retained revision on request, equal to
+`ramify.analysis/2` document of a retained revision on request, equal to
 `analyzeProject` over the same inputs except `runId`, and `verify` recomputes
 everything from the warm compiler and compares it with the retained facts.
+A broad revision retires the compiler's earlier observations immediately before
+the compiler reads the whole program again, so source a declaration excludes or
+a removed target leaves no observation behind and the revision's inputs are
+those a batch capture records. A sweep of a session whose published revision is
+an invalid acquisition, or is stale after a failed or cancelled update,
+acquires the project again instead of trusting its observer, since neither
+observer state describes that revision.
 
 The decide stage also evaluates the signature-companion rule over the model, in
 batch and on every revision path, as its own `companions` timing. Each violation
@@ -86,7 +96,18 @@ with located coverage notes; definite import violations and missing resource
 exports fail it. A missing resource import is unverifiable, while an exposure
 naming that missing resource is invalid.
 
-`ramify.analysis/1` reports retain inventory and purpose metadata, captured
+Project boundaries are decided before symbol selection and the same-owner
+exemption. An access whose target lies in a declared owned-ignored or external
+tree without package resolution has the `denied` outcome, one located
+`project-boundary-import` finding and no symbol decision, whatever its form:
+value, type-only, symbol-free, namespace or lazy member selection, or
+re-export. Each counts in the summary's denials and fails the check. An
+installed package whose real location lies in such a tree stays external. An
+always-excluded target is unverifiable with the nonblocking `excluded-target`
+limit; a target outside the root is outside scope with `outside-module-target`;
+neither is allowed or external.
+
+`ramify.analysis/2` reports retain inventory and purpose metadata, captured
 input identity, expanded declarations, original and accessed source locations,
 source selections, decisions and provenance. The batch UUID identifies a call;
 the input digest identifies its sealed root/configuration/registry and captured
@@ -107,9 +128,14 @@ including selections within one large namespace occurrence.
 Plan 2B's architect view is projected here and rendered here. `planArchitectView`
 lists the symbol details, export shapes, test files and `.feature` files a
 revision needs, and `projectArchitectView` builds the `ArchitectViewProjection`:
-module facts in tree order, every owned exported original once with its role,
-destinations, tags and the ancestors that re-expose it, and the test records of
-every area whose profile includes `testing`. `RetainedSession.architectView`
+module facts in tree order, each with the owned-ignored and external trees its
+description declares, joined to the revision's ownership exclusions, every
+owned exported original once with its role, destinations, tags and the
+ancestors that re-expose it, an auxiliary original outside `src/` always as an
+internal one, and the test records of every area whose profile includes
+`testing`. The API view's `--from` path selects the module that owns it by
+Project's `classifyProjectPath`; a path in a declared tree, a scratch
+directory or another excluded path is an invalid location. `RetainedSession.architectView`
 answers it for the current sequence only, through the worker like `apiView`,
 and reads a `.feature` file only while its bytes equal the revision's captured
 input (`readFeatureTitles`, English keywords). `renderArchitectView` is pure: it
@@ -119,3 +145,10 @@ the facts name another input. `projectTestReferences` projects, from the same
 dependency analyzer run as the diagram, the originals each testing-profile file
 references behaviorally; the analyzer's `ready` outcome carries them as
 `testReferences`, `null` when only they were refused.
+
+The modularity probe (`npm run probe:modularity`) and the dependency-analyzer
+measurement probe live under `scripts/probes/` beside this owner's `src/`. They
+are this owner's auxiliary source with its ordinary profile: they import its
+source by relative path as same-owner source, cannot import its testing source,
+and nothing exposes them. The modularity probe's Git adapter reads repository
+history there, outside `src/`.

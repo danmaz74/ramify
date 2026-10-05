@@ -1,6 +1,6 @@
 import type { OriginalId, SourceOrigin, SourceLocation, SourceArea, BindingRequest, SignatureCompanions } from '../../../model/src/interfaces/model.js';
 import type { DependencyBehaviorFacts } from './dependency-behavior.js';
-import type { ObservationSink, ProjectInputView, ProjectInventory } from '../../../project/src/interfaces/project.js';
+import type { ObservationSink, ProjectExclusion, ProjectInputView, ProjectInventory } from '../../../project/src/interfaces/project.js';
 
 export interface CatalogOriginal {
   readonly id: OriginalId;
@@ -53,9 +53,17 @@ export interface CatalogDelta {
 }
 export type SourceTarget =
   | { readonly kind: 'application'; readonly origin: SourceOrigin }
+  /** An established package route, even to a real location inside the project; a builtin; or a standard-library declaration. */
   | { readonly kind: 'external'; readonly resolution: 'package' | 'builtin' | 'standard-library';
       readonly name: string; readonly resolvedFile: string | null }
-  | { readonly kind: 'outside-module'; readonly file: string }
+  /** A physical target outside the project root without package resolution. */
+  | { readonly kind: 'outside-project'; readonly file: string }
+  /** A physical project-relative target inside a declared nested tree, with its declaration. */
+  | { readonly kind: 'nested-tree'; readonly file: string;
+      readonly exclusion: ProjectExclusion & { readonly kind: 'owned-ignored' | 'external' } }
+  /** A non-package target inside an always-excluded path; its contents are not interpreted. */
+  | { readonly kind: 'excluded'; readonly file: string;
+      readonly exclusion: ProjectExclusion & { readonly kind: 'scratch' | 'repository' | 'packages' | 'output' | 'generated' } }
   | { readonly kind: 'unresolved' };
 export type WrittenForm = 'import' | 'import-type' | 'inline-type-import'
   | 'named-export' | 'type-export' | 'inline-type-export'
@@ -94,7 +102,7 @@ export interface SourceLimit {
     | 'ambiguous-original' | 'unknown-key' | 'namespace-escape' | 'nonliteral-target'
     | 'unsupported-loader' | 'unsupported-commonjs' | 'shared-global'
     | 'resource-target' | 'resource-description' | 'compiled-source'
-    | 'outside-module-target' | 'compiler-blocked'
+    | 'outside-module-target' | 'excluded-target' | 'compiler-blocked'
     /** Reported by analysis for an exposed original from its companion facts. */
     | 'signature-inferred' | 'signature-unresolved';
   readonly location: SourceLocation;

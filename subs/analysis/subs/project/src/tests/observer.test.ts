@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { observeProject } from '../observer.js';
 import type { InventoryUpdate, ProjectObserver, ProjectReadOptions } from '../interfaces/project.js';
-import { declaration, fixture, limits, put } from './fixtures.js';
+import { declaration, fixture, limits, marker, put } from './fixtures.js';
 
 let work: string, root: string;
 const observers: ProjectObserver[] = [];
@@ -24,7 +24,7 @@ afterEach(async () => {
 
 async function observe(changes: Partial<ProjectReadOptions> = {}): Promise<ProjectObserver> {
   const result = await observeProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' },
-    parse: declaration, limits, registry: 'registry/1:test', ...changes });
+    parse: declaration, marker, limits, registry: 'registry/1:test', ...changes });
   expect(result.status, JSON.stringify(result.status === 'observing' ? {} : result)).toBe('observing');
   if (result.status !== 'observing') throw new Error('Expected an observing project');
   observers.push(result.observer);

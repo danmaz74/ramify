@@ -10,7 +10,7 @@ import type { Assertions, InstanceHandler } from './runner.js';
 const referenceRoot = join(repositoryRoot, 'examples/collection-review');
 
 function importerFor(area: SourceArea) {
-  return { file: `${area.root}/__plan2a_availability_probe__.ts`, area };
+  return { file: `${area.root}/__plan2a_availability_probe__.ts`, area, auxiliary: false };
 }
 const LOCATION = { start: 0, end: 0, line: 1, column: 1 };
 

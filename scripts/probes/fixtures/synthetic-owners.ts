@@ -53,7 +53,7 @@ export function syntheticOwnerFiles(ownerCount: number, options: SyntheticOwnerO
     const name = nameOf(index);
     const prefix = index === 0 ? '' : `subs/${name}/`;
     const tags = index === 0 ? 'dispatch' : testingOwner(index) ? 'testing' : '';
-    let description = `ramify 1\nmodule "${name}" tagged [${tags}]\n`;
+    let description = `ramify 1\n${index === 0 ? 'root ' : ''}module "${name}" tagged [${tags}]\n`;
     if (exposing && index === 0) {
       // Exposed names must be unique in the root, so each re-exposure is aliased
       // with its owner's name; visibility follows the original, not the name.

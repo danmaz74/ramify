@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { API } from 'typescript/unstable/sync';
 import { createDescriptionSet } from '../../subs/analysis/subs/typescript/src/descriptions.js';
@@ -23,7 +23,9 @@ export interface DescriptionStates {
  * descriptions carry over, as they will across the session's own updates. */
 export async function withDescriptions<T>(root: string, operation: (states: DescriptionStates) => Promise<T>): Promise<T> {
   const set = createDescriptionSet();
-  const host = { resourceWitness: '', fileExists: existsSync, readFile: (path: string) => {
+  const host = { resourceWitness: '', fileExists: existsSync,
+    realpath: (path: string) => existsSync(path) ? realpathSync(path) : path,
+    directoryExists: (path: string) => existsSync(path) && statSync(path).isDirectory(), readFile: (path: string) => {
     try { return readFileSync(path, 'utf8'); }
     catch (error) { if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null; throw error; }
   } };

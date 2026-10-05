@@ -1,16 +1,19 @@
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile, lstat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { analyzeDependencyDiagram } from '../../subs/analysis/src/dependency-analyzer.js';
 import { renderArchitectView } from '../../subs/analysis/src/architect-render.js';
+import { architectMeasurements, measureApiViewBytes } from '../../subs/daemon/src/measurements.js';
 import { openRetainedSession } from '../../subs/analysis/src/retained-session.js';
 import type { SessionInputs } from '../../subs/analysis/src/interfaces/session.js';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { limits as batchLimits } from '../../src/batch.js';
 import { dependencyAnalyzerCapacity } from '../../src/dependency-analyzer-process.js';
+import { copyProject, generatedName, git, readViewTree, specifiedArchitectLimits, viewName, withoutRevision } from '../measurements/plan2b-views.js';
+import type { ProjectKind } from '../measurements/plan2b-views.js';
 import { reviewedPackage, validatePackageEntries } from '../validate-final-contracts.js';
 import { assertClientClosure } from './completion-cases.js';
 import { parseAnalysisDocument } from './equivalence-comparison.js';
@@ -36,60 +39,15 @@ import { sessionInputs } from './session-expectations.js';
  */
 
 const currentLauncher = join(repositoryRoot, 'dist/src/ramify');
-const viewName = '.ramify-architect';
-/** Generated names never copied into an isolated project: Plan 2A's and Plan 2B's reserved directories. */
-const generatedName = /^\.ramify(?:-architect)?(?:\.(?:tmp|old)-.+)?$/;
-/** Top-level toolkit paths that are not the toolkit project, as Plan 2A's isolated copies exclude them. */
-const toolkitExcluded = new Set(['examples', 'site', '.cucumber-viz', '.claude', '.agents', '.devcontainer', '.github', '.reference-work']);
-
-/** The architect limits the specification and contracts C2 and C3 fix, transcribed independently of the daemon. */
-export const specifiedArchitectLimits = {
-  details: { maxSignatureBytes: 240, maxDocumentationBytes: 280, maxOverloads: 4, maxResultBytes: 32 * 1024 ** 2 },
-  tests: { maxTitleBytes: 240, maxTitlesPerRecord: 40, maxResultBytes: 16 * 1024 ** 2 },
-  maxProjectionBytes: 64 * 1024 ** 2,
+/** Plan 2A's frozen API-view bounds (contracts.md, iteration 1), which Plan 2C's
+ * architect metrics measure view bytes under, transcribed independently of the daemon. */
+export const specifiedApiViewLimits = {
+  details: { maxSignatureBytes: 2048, maxDocumentationBytes: 512, maxOverloads: 8, maxResultBytes: 32 * 1024 ** 2 },
+  maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2,
 } as const;
 
-export type ProjectKind = 'reference' | 'toolkit';
-
 // ---------------------------------------------------------------------------
-// Isolated copies and owned daemons
-
-function git(cwd: string, args: readonly string[]): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
-    const out: Buffer[] = [], err: Buffer[] = [];
-    child.stdout.on('data', chunk => out.push(chunk));
-    child.stderr.on('data', chunk => err.push(chunk));
-    child.once('error', reject);
-    child.once('close', code => code === 0 ? resolve(Buffer.concat(out)) : reject(new Error(`git ${args.join(' ')}: ${Buffer.concat(err).toString()}`)));
-  });
-}
-
-/**
- * An isolated copy of the reference project or the toolkit: its tracked and
- * untracked unignored files, with `node_modules` linked to the source's own.
- * Generated view directories are never copied, so every copy starts without a view.
- */
-export async function copyProject(kind: ProjectKind, destination: string): Promise<string> {
-  const source = kind === 'reference' ? join(repositoryRoot, 'examples/collection-review') : repositoryRoot;
-  const listed = (await git(source, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])).toString('utf8').split('\0').filter(Boolean);
-  const files = [...new Set(listed)].filter(path => {
-    const segments = path.split('/');
-    if (segments.some(segment => generatedName.test(segment))) return false;
-    return kind === 'reference' || !toolkitExcluded.has(segments[0]!);
-  });
-  await mkdir(destination, { recursive: true });
-  for (const path of files) {
-    const from = join(source, path);
-    let info;
-    try { info = await lstat(from); } catch { continue; } // deleted in the working tree
-    if (!info.isFile()) continue;
-    await mkdir(dirname(join(destination, path)), { recursive: true });
-    await writeFile(join(destination, path), await readFile(from));
-  }
-  await symlink(join(source, 'node_modules'), join(destination, 'node_modules'));
-  return realpath(destination);
-}
+// Owned daemons (isolated copies and view trees are in ../measurements/plan2b-views.ts)
 
 export interface DaemonCounters { readonly [name: string]: number }
 export interface DaemonStatusSample {
@@ -200,28 +158,6 @@ export async function withOwnedDaemon<T>(operation: (daemon: OwnedDaemon) => Pro
 // ---------------------------------------------------------------------------
 // View trees
 
-export interface ViewFileStat { readonly bytes: number; readonly mtimeMs: number; readonly ino: number }
-
-/** Every file of a view directory by its path relative to the view root; refuses anything but files and directories. */
-export async function readViewTree(root: string): Promise<{ readonly files: Map<string, string>; readonly stats: Map<string, ViewFileStat> }> {
-  const base = join(root, viewName);
-  const files = new Map<string, string>(), stats = new Map<string, ViewFileStat>();
-  async function walk(directory: string): Promise<void> {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) await walk(path);
-      else if (entry.isFile()) {
-        const key = relative(base, path).split('\\').join('/');
-        const info = await stat(path);
-        files.set(key, await readFile(path, 'utf8'));
-        stats.set(key, { bytes: info.size, mtimeMs: info.mtimeMs, ino: info.ino });
-      } else throw new Error(`A view entry is neither a file nor a directory: ${path}`);
-    }
-  }
-  await walk(base);
-  return { files: new Map([...files].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)), stats };
-}
-
 /** The first difference between two trees, or null. */
 export function treeDifference(left: ReadonlyMap<string, string>, right: ReadonlyMap<string, string>): string | null {
   const paths = [...new Set([...left.keys(), ...right.keys()])].sort();
@@ -236,17 +172,6 @@ export function treeDifference(left: ReadonlyMap<string, string>, right: Readonl
     }
   }
   return null;
-}
-
-/** The tree with one revision identifier replaced, and where it occurred. */
-export function withoutRevision(files: ReadonlyMap<string, string>, revision: string): { readonly files: Map<string, string>; readonly occurrences: Map<string, number> } {
-  const out = new Map<string, string>(), occurrences = new Map<string, number>();
-  for (const [path, text] of files) {
-    const parts = text.split(revision);
-    if (parts.length > 1) occurrences.set(path, parts.length - 1);
-    out.set(path, parts.join('<revision>'));
-  }
-  return { files: out, occurrences };
 }
 
 export function viewBytes(files: ReadonlyMap<string, string>): number {
@@ -272,6 +197,8 @@ export interface DeclaredModule {
   readonly tags: readonly string[];
   readonly readme: boolean;
   readonly statements: readonly DeclaredStatement[];
+  /** The `owned-ignored` and `external` statements, as `module.json` lists them: project-relative directory and 1-based line and column. */
+  readonly trees: readonly { readonly kind: 'owned-ignored' | 'external'; readonly dir: string; readonly line: number; readonly column: number }[];
   /** Child directory name to child module identifier. */
   readonly childByDirectory: Map<string, string>;
 }
@@ -300,7 +227,7 @@ export async function declaredModules(root: string): Promise<DeclaredModule[]> {
   async function visit(dir: string, parent: DeclaredModule | null): Promise<void> {
     const text = await readFile(join(root, dir, 'module.ramify'), 'utf8');
     const lines = text.split('\n').map(line => line.replace(/\/\/.*$/, '').trim()).filter(Boolean);
-    const header = lines.map(line => /^module\s+(?:"([^"]+)"|([a-z0-9-]+))(?:\s+tagged\s+\[([^\]]*)\])?$/.exec(line)).find(Boolean);
+    const header = lines.map(line => /^(?:root\s+)?module\s+(?:"([^"]+)"|([a-z0-9-]+))(?:\s+tagged\s+\[([^\]]*)\])?$/.exec(line)).find(Boolean);
     if (!header) throw new Error(`No module header in ${dir || '.'}/module.ramify`);
     const name = header[1] ?? header[2]!;
     const tags = (header[3] ?? '').split(',').map(tag => tag.trim()).filter(Boolean);
@@ -311,10 +238,15 @@ export async function declaredModules(root: string): Promise<DeclaredModule[]> {
       const relay = /^expose-sub\s+(.+?)\s+from\s+(?:"([^"]+)"|([a-z0-9-]+))\s+to\s+(.+)$/.exec(line);
       if (relay) statements.push({ form: 'expose-sub', names: parseNames(relay[1]!), from: relay[2] ?? relay[3]!, to: parseDestinations(relay[4]!) });
     }
+    // Nested-tree statements keep their physical line; the toolkit and the reference project name plain relative directories.
+    const trees = text.split('\n').flatMap((line, index) => {
+      const tree = /^(\s*)(owned-ignored|external)\s+"([^"]+)"\s*(?:\/\/.*)?$/.exec(line);
+      return tree ? [{ kind: tree[2] as 'owned-ignored' | 'external', dir: joinView(dir, tree[3]!), line: index + 1, column: tree[1]!.length + 1 }] : [];
+    }).sort((a, b) => a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0);
     let readme = true;
     try { await stat(join(root, dir, 'README.md')); } catch { readme = false; }
     const module: DeclaredModule = { id: parent ? `${parent.id}/${name}` : name, dir, parent: parent?.id ?? null, children: [], tags,
-      readme, statements, childByDirectory: new Map() };
+      readme, statements, trees, childByDirectory: new Map() };
     modules.push(module);
     parent?.children.push(module.id);
     let entries: string[] = [];
@@ -389,8 +321,10 @@ export async function structuralExpectation(root: string, modules: readonly Decl
     mismatches.push(`file set: missing ${expectedPaths.filter(path => !files.has(path)).join(', ') || 'none'}; unexpected ${actualPaths.filter(path => !expected.has(path)).join(', ') || 'none'}`);
   }
   const meta = JSON.parse(files.get('_meta.json') ?? '{}') as Record<string, unknown>;
-  for (const [key, value] of [['schema', 'ramify.architect-view/1'], ['revision', revision], ['input', inputId], ['modules', modules.length],
-    ['dependencies', 'measured'], ['dependencyScope', 'production'], ['testReferences', 'measured'], ['metrics', 'unavailable']] as const) {
+  // Plan 2C fixed the architect metrics policy as `measure`, and a materialized
+  // tree comes from a valid inventory, so its metrics are measured.
+  for (const [key, value] of [['schema', 'ramify.architect-view/2'], ['revision', revision], ['input', inputId], ['modules', modules.length],
+    ['dependencies', 'measured'], ['dependencyScope', 'production'], ['testReferences', 'measured'], ['metrics', 'measured']] as const) {
     if (meta[key] !== value) mismatches.push(`_meta.json ${key}: ${JSON.stringify(meta[key])}, expected ${JSON.stringify(value)}`);
   }
   if (!(files.get('README.md') ?? '').includes(`Revision ${revision} · input ${inputId}`)) mismatches.push('README.md does not name the revision and input');
@@ -405,6 +339,10 @@ export async function structuralExpectation(root: string, modules: readonly Decl
       ['children', document.children, module.children], ['revision', document.revision, revision],
       ['tags', [...(document.tags as string[] ?? [])].sort(), [...module.tags].sort()],
       ['purpose.state', (document.purpose as { state?: string } | undefined)?.state, module.readme ? 'present' : 'missing'],
+      ['schema', document.schema, 'ramify.architect-module/2'],
+      // Project boundaries: each declared tree with its kind, directory and declaring statement, nothing beneath it.
+      ['boundaries', document.boundaries, module.trees.map(tree => ({ kind: tree.kind, dir: tree.dir,
+        description: joinView(module.dir, 'module.ramify'), line: tree.line, column: tree.column }))],
     ];
     if (module.readme) expectations.push(['purpose.path', (document.purpose as { path?: string }).path, joinView(module.dir, 'README.md')]);
     for (const [field, actual, wanted] of expectations) {
@@ -510,14 +448,17 @@ export interface InProcessFacts {
   readonly projectionBytes: number;
   readonly timings: { readonly openMs: number; readonly queryMs: number; readonly analyzerMs: number };
   /** Renders the view for a revision identifier, which only the daemon's context names. */
-  render(revision: string): { readonly files: Map<string, string>; readonly modules: number; readonly records: number; readonly bytes: number };
+  render(revision: string): Promise<{ readonly files: Map<string, string>; readonly modules: number; readonly records: number; readonly bytes: number }>;
 }
 
 /**
  * The architect view's facts for `root` computed without the daemon: a
  * retained session opened in this process with the CLI's project request, the
- * architect query at its revision with the specified limits, and the
- * dependency analyzer called in process on that revision's report. Run it
+ * architect query at its revision with the specified limits, the dependency
+ * analyzer called in process on that revision's report, and Plan 2C's module
+ * metrics under the delivered `measure` policy: the revision's inventory
+ * measurements joined with the encoded bytes of the whole API view, rendered
+ * for the daemon's revision identifier under Plan 2A's frozen bounds. Run it
  * before any view exists under `root`: a resident compiler opened beside
  * generated directories records them as inputs (see iteration 8's results).
  */
@@ -543,13 +484,21 @@ export async function inProcessArchitectFacts(root: string): Promise<InProcessFa
       limits: { source: batchLimits.source, maxResultBytes: dependencyAnalyzerCapacity.maxResultBytes, deadlineMs: dependencyAnalyzerCapacity.analysisDeadlineMs } });
     const analyzerMs = performance.now() - analyzed;
     if (outcome.status !== 'ready') throw new Error(`The in-process analyzer answered ${JSON.stringify(outcome).slice(0, 400)}`);
+    const measured = await opened.session.measurements(sequence);
+    if (measured.status !== 'measured') throw new Error(`The in-process measurements answered ${JSON.stringify(measured).slice(0, 400)}`);
+    const apiView = await opened.session.apiView({ sequence, selection: { scope: 'all' }, ...specifiedApiViewLimits });
+    if (apiView.status !== 'projected') throw new Error(`The in-process API view query answered ${JSON.stringify(apiView).slice(0, 400)}`);
     const projection = query.projection;
     return {
       inputId: query.inputId, projectionBytes: projection.bytes, timings: { openMs, queryMs, analyzerMs },
-      render(revision) {
+      async render(revision) {
+        // The encoded API-view bytes name the revision, so they are measured for the daemon's identifier.
+        const views = await measureApiViewBytes(apiView.projection, revision,
+          { maxAreaBytes: specifiedApiViewLimits.maxAreaBytes, maxInvocationBytes: specifiedApiViewLimits.maxInvocationBytes });
+        if (views.status !== 'rendered') throw new Error(`The in-process API view measurement answered ${JSON.stringify(views).slice(0, 400)}`);
         const view = renderArchitectView({ revision, projection,
           dependencies: { state: 'measured', facts: outcome.diagram, testReferences: outcome.testReferences },
-          measurements: { state: 'unavailable', reason: 'analysis-failed' } });
+          measurements: architectMeasurements(measured.measurements, 'measured', views.views) });
         return { files: new Map(view.files.map(file => [file.path, file.text])), modules: view.modules, records: view.records, bytes: view.bytes };
       },
     };
@@ -650,7 +599,7 @@ export async function projectRun(daemon: OwnedDaemon, kind: ProjectKind, root: s
 
   let inProcess: ProjectRunEvidence['inProcess'] = null;
   if (facts) {
-    const expected = facts.render(revision);
+    const expected = await facts.render(revision);
     inProcess = { inputId: facts.inputId, difference: treeDifference(expected.files, tree.files), records: expected.records,
       bytes: expected.bytes, projectionBytes: facts.projectionBytes, timings: facts.timings };
   }
@@ -923,7 +872,17 @@ export async function apiViewIdentity(): Promise<ApiIdentityEvidence> {
           entries: number(3), bytesWritten: number(4), unchanged: number(5), modules: null, records: null, dependencies: null };
         return { outcome, stdout: result.stdout, files: await readApiViews(root) };
       }, stops, launcher);
+      // The baseline build predates the root marker and nested-tree statements, so
+      // it reads the copy with the marker removed from the root's module line and
+      // without the root's nested-tree statements; this build reads it as written.
+      // API views carry no description bytes and cover module source only, which
+      // no declared tree contains, so the comparison stays exact.
+      const description = join(root, 'module.ramify');
+      const marked = await readFile(description, 'utf8');
+      if ((marked.match(/^root module /gm) ?? []).length !== 1) throw new Error(`Expected one marked root module line in the ${kind} copy`);
+      await writeFile(description, marked.replace(/^root module /m, 'module ').replace(/^(?:owned-ignored|external) "[^"\n]*"\n/gm, ''));
       const before = await run(join(base, 'dist/src/ramify'));
+      await writeFile(description, marked);
       await removeGenerated(root);
       const after = await run(currentLauncher);
       await rm(root, { recursive: true, force: true });
@@ -1014,8 +973,8 @@ export async function entryClosures(): Promise<EntryEvidence> {
 
 /** The instruction block the renderer places at the top of every view's `README.md`. */
 export async function renderedInstructionBlock(): Promise<string> {
-  const projection = { schema: 'ramify.architect-projection/1' as const, sequence: 1, inputId: 'input/1:0', root: 'm',
-    modules: [{ module: 'm', dir: '', parent: null, children: [], tags: [], areas: [], purpose: { state: 'missing' as const }, docs: [],
+  const projection = { schema: 'ramify.architect-projection/2' as const, sequence: 1, inputId: 'input/1:0', root: 'm',
+    modules: [{ module: 'm', dir: '', parent: null, children: [], tags: [], areas: [], boundaries: [], purpose: { state: 'missing' as const }, docs: [],
       files: { own: 0, subtree: 0 } }], symbols: [], tests: [],
     counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0 };
   const view = renderArchitectView({ revision: 'rev/1:0:1', projection,

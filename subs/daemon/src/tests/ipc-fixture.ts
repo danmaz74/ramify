@@ -23,7 +23,7 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
   const directory = await mkdtemp('/tmp/ri-');
   const project = join(directory, 'project');
   await mkdir(join(project, 'src'), { recursive: true });
-  await writeFile(join(project, 'module.ramify'), 'ramify 1\nmodule example\n');
+  await writeFile(join(project, 'module.ramify'), 'ramify 1\nroot module example\n');
   await writeFile(join(project, 'README.md'), '# Example\n\nAn isolated IPC fixture.\n');
   await writeFile(join(project, 'tsconfig.json'), JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022', types: [] }, include: ['src/**/*.ts'] }));
   await writeFile(join(project, 'src/index.ts'), 'export const value = 1;\n');
@@ -48,7 +48,7 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
     socket.on('data', bytes => decoder.push(typeof bytes === 'string' ? Buffer.from(bytes) : bytes));
     const closed = new Promise<void>(resolve => socket.once('close', () => { decoder.dispose(); sockets.delete(socket); resolve(); }));
     await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
-    if (hello) socket.write(encodeMessage({ type: 'hello', handshake: { protocol: 'ramify.ipc/1', buildKey,
+    if (hello) socket.write(encodeMessage({ type: 'hello', handshake: { protocol: 'ramify.ipc/2', buildKey,
       engine: environment.service.instance.engine, client: { name: 'ipc-test', version: packageVersion } } }));
     return { socket, messages, closed, send(message: WireMessage) { socket.write(encodeMessage(message)); } };
   }

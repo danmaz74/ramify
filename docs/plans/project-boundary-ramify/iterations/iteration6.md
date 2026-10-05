@@ -61,6 +61,7 @@ From the toolkit checkout:
 
 ```sh
 npm run type-check
+npm run build
 flock /tmp/ramify-audit-tests.lock npm run reference:cases
 ```
 

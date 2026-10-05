@@ -8,7 +8,7 @@ version, the resident daemon with its service, IPC host and lightweight client,
 implemented, as are the explorer's on-demand behavioral dependency diagram and
 the daemon-started dependency analyzer process
 ([Plan 6D](../plans/iteration-6d-behavioral-dependency-diagram/main-plan.md)).
-The daemon's synchronized `measure` service operation, `ramify.measure/1`
+The daemon's synchronized `measure` service operation, `ramify.measure/2`
 document and `ramify measure` CLI command are implemented by
 [Plan 2C](../plans/iteration-2c-module-measurements/main-plan.md).
 The MCP adapter and unsaved-content overlays are not implemented;
@@ -122,7 +122,13 @@ The implemented discovery and launcher helpers use Unix domain sockets in a
 private endpoint directory, grouped by package path, version and production
 runtime bytes. Discovery requires a compiled daemon entry, so it rejects the
 incomplete build. The codec frames UTF-8 JSON with a four-byte big-endian
-length, and the daemon validates each decoded request before dispatch.
+length, and the daemon validates each decoded request before dispatch,
+including a changed check's named paths and classification sequence. Under
+`ramify.ipc/2` the client decodes each check reply strictly, its
+`classification-changed` status and path dispositions included, as it decodes
+context statuses with their watcher registrations; a malformed reply fails the
+connection like any invalid frame, and a peer with another protocol, build key
+or engine is rejected at the handshake.
 Their source and limits are described in the
 [daemon owner](../../subs/daemon/README.md). The web/daemon split is fixed
 independently of those details. Selecting tRPC for the browser does not require
@@ -150,12 +156,12 @@ configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.
 
 | Command | Required behavior |
 | --- | --- |
-| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize every current input, obtain the whole report, print it and exit. This is the complete check; human output names the revision's path on its `Mode:` line and `--format json` writes the unchanged `ramify.analysis/1` report. |
-| `ramify check --changed <path>... [--since <revision>] [--deadline <ms>] [--format json]` | The bounded hook check agent post-write hooks run, on the [fast incremental check](daemon.md#fast-incremental-checks) path. The CLI hashes each named file relative to the selected root and asks for the first revision covering those identities, waiting at most the deadline (default 2,000 ms). It prints every project finding, marking those new since `--since` or the previous revision; `--format json` writes one `ramify.check/1` document. It never runs a batch analysis. See [hook and complete checks](cli-invocation.spec.md#hook-and-complete-checks). |
+| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize every current input, obtain the whole report, print it and exit. This is the complete check; human output names the revision's path on its `Mode:` line and `--format json` writes the `ramify.analysis/2` report unchanged apart from the CLI's Git advice. Inside a Git repository, the CLI runs one bounded `git ls-files` in the selected root and adds an `ignored-but-walked` warning for each ignored directory Ramify still walks, also after `--batch` and batch fallback; no repository, missing Git or a failed command give none, and the advice never changes the result. |
+| `ramify check --changed <path>... [--since <revision>] [--deadline <ms>] [--format json]` | The bounded hook check agent post-write hooks run, on the [fast incremental check](daemon.md#fast-incremental-checks) path. The CLI names each path relative to the selected root, hashes the ones the daemon's classification analyzes and asks for the first revision covering those identities, waiting at most the deadline (default 2,000 ms). Each named path is reported checked, not analyzed or not checked. It prints every project finding, marking those new since `--since` or the previous revision; `--format json` writes one `ramify.check/2` document. It never runs a batch analysis. See [hook and complete checks](cli-invocation.spec.md#hook-and-complete-checks). |
 | `ramify inspect ...`, `ramify explain ...` | Query the selected project's analysis with explicit freshness/revision semantics, print the result and exit. |
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |
 | `ramify materialize [--view <api\|architect>]... [--from <path> \| --all] [--root <dir>]` | Synchronize one revision and publish every requested generated view from it in one transaction: the [API discovery view](materialized-api-view.spec.md) of one module or of all modules, and the project's [architect view](architect-view.spec.md), which waits for the daemon's dependency facts for that revision. Without `--view`, the API view alone. It never runs a batch analysis. |
-| `ramify measure [--format json] [--root <dir>]` | Require the daemon's advertised `measure` capability, synchronize one current whole-project revision, and print exact and subtree module buckets as a short table or the returned `ramify.measure/1` document verbatim. It writes nothing, adds no selectors or path query, never runs batch analysis, and maps cold, pending, deadline, superseded, unavailable and resource-refusal outcomes to a non-success exit without a partial document. |
+| `ramify measure [--format json] [--root <dir>]` | Require the daemon's advertised `measure` capability, synchronize one current whole-project revision, and print exact and subtree module buckets as a short table or the returned `ramify.measure/2` document verbatim. It writes nothing, adds no selectors or path query, never runs batch analysis, and maps cold, pending, deadline, superseded, unavailable and resource-refusal outcomes to a non-success exit without a partial document. |
 | `ramify check --batch` | Load the engine only for this mode, in the CLI process or its Node child, create a fresh session, run the check and dispose it on exit. CI uses this independent mode. |
 | `ramify explore` | Ensure a compatible daemon and open the selected project's context, then reuse that project's ready explorer server, whoever started it, or start one detached. Print `<origin>/analysis/latest`, open it in the platform browser and exit 0. If the browser cannot be opened, the URL is still printed, the command still exits 0 and the server keeps running. |
 | `ramify mcp` | Lazily load the MCP adapter and serve the host's stdio connection in this process. Resolve a compatible daemon for analysis requests; no web server or per-call CLI subprocess is required. |
@@ -169,9 +175,9 @@ it broke.
 
 | Exit | `ramify check --changed` |
 | --- | --- |
-| 0 | A covering revision completed with no finding in the project. |
+| 0 | A covering revision completed with no finding in the project, and no named path is not checked; a path not analyzed changes nothing. |
 | 1 | A covering revision has findings, or it is invalid; the output marks which findings are new. |
-| 2 | Not checked: `cold`, `deadline-exceeded`, `unobserved-input`, `superseded`, `configuration-changed`, `evicted-revision`, an incomplete or unavailable engine outcome, or an unavailable, stopped or incompatible daemon. |
+| 2 | Not checked: `cold`, `deadline-exceeded`, `unobserved-input`, `superseded`, `configuration-changed`, `classification-changed` after its one retry, `evicted-revision`, a named path not checked, an incomplete or unavailable engine outcome, or an unavailable, stopped or incompatible daemon. |
 | 130 | Interrupted. |
 
 `examples/hooks/claude-code-post-write.mjs` is an example host adapter outside

@@ -22,14 +22,14 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
   const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
   const controller = new AbortController();
   const stdout: string[] = [], stderr: string[] = [], events: string[] = [];
-  const description = 'ramify 1\nmodule "InvalidName"\n';
+  const description = 'ramify 1\nroot module "InvalidName"\n';
   let connection: ServiceConnection | undefined;
   let received: Extract<CheckOutcome, { status: 'reported'; published: true }> | undefined;
-  let closeCalls = 0, closeContextCalls = 0, openCalls = 0, checkCalls = 0, recoveries = 0, batchCalls = 0;
+  let closeCalls = 0, closeContextCalls = 0, openCalls = 0, checkCalls = 0, classificationCalls = 0, recoveries = 0, batchCalls = 0;
   let lost = false;
   try {
     await mkdir(join(root, 'src'));
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
     await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
       target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' } }));
     await writeFile(join(root, 'src/main.ts'), 'export const value = 1;\n');
@@ -58,10 +58,12 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
         },
         async openContext(params, control) { openCalls++; return actual.openContext(params, control); },
         async check(params, control) {
-          checkCalls++;
+          // The client's first request carries no content and is answered with the daemon's classification.
+          const classifying = params.freshness.mode === 'synchronized' && !params.freshness.expect.length;
+          if (classifying) classificationCalls++; else checkCalls++;
           const response = await actual.check(params, control);
           if (response.ok && response.value.status === 'reported' && response.value.published) received = response.value;
-          events.push('check-received');
+          events.push(classifying ? 'classification-received' : 'check-received');
           return response;
         },
         async recover(authorization) { recoveries++; return actual.recover(authorization); },
@@ -99,9 +101,9 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
       equal('cancellation during cleanup exits 130 without stdout or a batch', [exitCode, stdout, batchCalls], [130, [], 0]);
       equal('interruption remains explicit', stderr, ['Interrupted; no result claimed.\n']);
       equal('cleanup finishes once without another check or recovery',
-        [openCalls, checkCalls, recoveries, closeContextCalls, closeCalls, connection?.state], [1, 1, 0, 1, 1, 'closed']);
+        [openCalls, classificationCalls, checkCalls, recoveries, closeContextCalls, closeCalls, connection?.state], [1, 1, 1, 0, 1, 1, 'closed']);
       equal('both cleanup operations finish without delivering the received result', events,
-        ['check-received', 'context-closed', 'connection-closed']);
+        ['classification-received', 'check-received', 'context-closed', 'connection-closed']);
     } else {
       equal('real service supplied an invalid covering revision', received
         ? [received.revision.outcome.execution, received.freshness.verified, received.delta.findings.map(item => item.code)] : null,
@@ -110,19 +112,21 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
       equal('cleanup failure exits 2 with exactly one document and no stderr or batch', [exitCode, stdout.length, stderr, batchCalls], [2, 1, [], 0]);
       const document = JSON.parse(stdout[0]) as CheckDocument;
       equal('cleanup failure remains explicit', [document.schemaVersion, document.outcome, document.reason, document.exitCode],
-        ['ramify.check/1', 'not-checked', 'unavailable', 2]);
+        ['ramify.check/2', 'not-checked', 'unavailable', 2]);
       equal('received diagnostics and new marks survive cleanup failure', document.findings, received.delta.findings);
       equal('the independently expected invalid name is marked new', document.findings.map(item => [item.code, item.new]), [['invalid-name', true]]);
       equal('received revision and execution evidence is preserved', [document.revision, document.execution, document.checked],
         [{ id: received.revision.revision, sequence: received.revision.sequence, path: received.revision.checked.path },
           'invalid', received.revision.checked]);
-      equal('the received content coverage remains tied to the original hash', document.changed,
-        [{ path: 'module.ramify', sha256: createHash('sha256').update(description).digest('hex'), covered: true }]);
+      equal('the received checked disposition remains tied to the original hash', document.paths.map(item =>
+        [item.path, item.disposition, item.reason, item.disposition === 'checked' ? item.sha256 : undefined]),
+      [['module.ramify', 'checked', 'content', createHash('sha256').update(description).digest('hex')]]);
       equal('remaining result metadata is preserved', [document.since, document.removed, document.warnings, document.coverage, document.timings.daemon],
         [received.delta.since, received.delta.removed, received.delta.warnings, received.delta.coverage, received.revision.timings]);
-      equal('cleanup does not repeat the check or recover', [openCalls, checkCalls, recoveries, closeContextCalls, closeCalls, connection?.state],
-        [1, 1, 0, 1, 1, 'closed']);
-      equal('both cleanup steps run before the single output', events, ['check-received', 'context-closed', 'connection-closed', 'stdout']);
+      equal('cleanup does not repeat the check or recover', [openCalls, classificationCalls, checkCalls, recoveries, closeContextCalls, closeCalls, connection?.state],
+        [1, 1, 1, 0, 1, 1, 'closed']);
+      equal('both cleanup steps run before the single output', events,
+        ['classification-received', 'check-received', 'context-closed', 'connection-closed', 'stdout']);
     }
     const status = await quick.service.daemonStatus();
     equal('real service status remains available', status.ok, true);

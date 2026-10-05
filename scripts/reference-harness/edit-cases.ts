@@ -8,7 +8,7 @@ import type { AnalysisReport, Capability } from '../../subs/analysis/src/interfa
 import type { AnalysisDriver, CheckOutcome, ContextRevision, ExpectedContent, ContextEvent } from '../../subs/daemon/subs/contexts/src/interfaces/contexts.js';
 import { runIsolatedProject } from './mutation.js';
 import { referenceEditFixture, prepareReferenceEdits, workspaceDescription, coreDirectory } from './fixtures/plan2/reference.js';
-import { createEditFixture, consumerProbe } from './fixtures/plan2/project.js';
+import { createEditFixture, consumerProbe, providerValueNote, signatureNoteKey } from './fixtures/plan2/project.js';
 import type { EditFixtureVariant } from './fixtures/plan2/project.js';
 import { applyTextMutation, moveHistoryToTesting, createLaterFile, residentTextMutations as edits } from './resident-mutations.js';
 import { assertReferenceEditReport, assertRestoredReferenceReport } from './resident-expectations.js';
@@ -175,7 +175,8 @@ for (const instance of plan2Instances.filter(item => item.iteration === 6)) {
             a.ok('configuration fingerprint reflects edit', changed.revision?.fingerprints.configuration !== baseline.revision?.fingerprints.configuration);
             await applyTextMutation(root, edits['config-change'], true); const restored = await sync();
             a.equal('restored configuration restores independently allowed decision', decisions(restored.report), decisions(baseline.report));
-            a.equal('restored configuration clears coverage', restored.report.coverage, []); break;
+            // The configured import's limit is gone; F's recipe note on the exposed `value` remains.
+            a.equal('restored configuration leaves only the recipe\'s value signature note', restored.report.coverage.map(signatureNoteKey), [providerValueNote]); break;
           }
           case 'shim-change': {
             await applyTextMutation(root, edits['shim-change']); const changed = await sync();
@@ -192,7 +193,8 @@ for (const instance of plan2Instances.filter(item => item.iteration === 6)) {
             await createLaterFile(root); const changed = await sync();
             a.equal('new file creates independently expected same-owner decision', decisions(changed.report).map(item => [item.status, item.reason, item.original?.id]),
               [['allowed', 'same-owner', { kind: 'code', owner: 'fixture/consumer', file: 'later.ts', binding: 'later' }]]);
-            a.equal('new file clears unresolved coverage', changed.report.coverage, []); break;
+            // The unresolved-target limit is gone; F's recipe note on the exposed `value` remains.
+            a.equal('new file leaves only the recipe\'s value signature note', changed.report.coverage.map(signatureNoteKey), [providerValueNote]); break;
           }
           case 'resolver-failure': {
             injectReadFailure = true;

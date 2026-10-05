@@ -2,6 +2,7 @@ import { fastBudgets as budgets, fastFixtures, fixtureForId, editKindsFor } from
 import { assertResidentWorkload } from './resident-assertions.mjs';
 import { median } from './common.mjs';
 import { isDeepStrictEqual } from 'node:util';
+import { coverageEquals, fixtureSignatureNotes } from './signature-notes.mjs';
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const sorted = values => [...(values ?? [])].sort();
@@ -9,21 +10,24 @@ const finite = value => Number.isFinite(value) && value >= 0;
 const med = values => values?.length && values.every(finite) ? median(values) : null;
 const timing = cycle => cycle?.revision?.timings?.total;
 
-/** `fixture` names the pinned signature notes a build enforcing Plan 8's rule adds; see `coverageMatches`. */
-function coveringEdit(cycle, fixture = null) {
+/**
+ * `fixture` names the pinned signature notes a build enforcing Plan 8's rule adds,
+ * and `state` the measurement state; see `coverageMatches`.
+ */
+function coveringEdit(cycle, fixture = null, state = {}) {
   const revision = cycle?.revision, hook = cycle?.hook, document = hook?.document;
-  const notes = expectedSignatureNotes(fixture, revision?.timings).length;
+  const notes = expectedSignatureNotes(fixture, revision?.timings, state).length;
   return hook?.failure === null && hook.signal === null && hook.stderr === '' && [0, 1].includes(hook.code)
-    && document?.schemaVersion === 'ramify.check/1' && document.outcome === 'checked'
+    && document?.schemaVersion === 'ramify.check/2' && document.outcome === 'checked'
     && document.execution === 'completed' && document.exitCode === hook.code
     && revision?.outcome?.execution === 'completed' && revision.outcome.coverage === (notes ? 'partial' : 'complete')
-    && coverageMatches(fixture, revision.timings, document.coverage, [])
+    && coverageMatches(fixture, revision.timings, document.coverage, [], state)
     && Number.isSafeInteger(cycle.beforeSequence) && cycle.beforeSequence >= 0
     && Number.isSafeInteger(revision.sequence) && revision.sequence > cycle.beforeSequence
     && document.revision?.sequence === revision.sequence && document.revision.id === revision.revision
     && Array.isArray(cycle.expected) && cycle.expected.length > 0
-    && Array.isArray(document.changed) && document.changed.length === cycle.expected.length
-    && document.changed.every((item, index) => item.covered === true
+    && Array.isArray(document.paths) && document.paths.length === cycle.expected.length
+    && document.paths.every((item, index) => item.disposition === 'checked'
       && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256)
     && same(document.timings?.daemon, revision.timings);
 }
@@ -32,7 +36,9 @@ function scopedEdits(data, kind, path) {
   const rows = data?.cycles?.[kind];
   return rows?.length === budgets.editCycles && rows.every((cycle, index) => {
     const denied = kind === 'description' && index % 2 === 0 ? 1 : 0;
-    return cycle.kind === kind && cycle.revision?.checked?.path === path && coveringEdit(cycle, data?.name ?? null)
+    // A description removal is the edit that removes the setup's exposure of `value`.
+    return cycle.kind === kind && cycle.revision?.checked?.path === path
+      && coveringEdit(cycle, data?.name ?? null, { setupExposureRemoved: denied === 1 })
       && cycle.revision.summary?.denied === denied && cycle.hook.code === (denied ? 1 : 0)
       && cycle.hook.document.findings?.length === denied && finite(timing(cycle))
       && (index === 0 || cycle.beforeSequence >= rows[index - 1].revision.sequence
@@ -88,26 +94,89 @@ export function revisionTimingsValid(timings) {
 
 /**
  * The `signature-inferred` notes a build that enforces the rule reports on each
- * fixture, by original. The reference example declares every exposed signature
- * (Plan 8 iteration 7) and has none. The measurement setup of S100, S500 and
- * S1000 exposes m001's literal-initialized `value`, which sets `inferred`; X100
- * annotates every exposed signature and has none.
+ * fixture state, by original: `signature-notes.mjs` pins them for every
+ * measurement recipe. A build that does not enforce the rule reports none.
  */
-const signatureNotes = {
-  reference: [],
-  ...Object.fromEntries(['S100', 'S500', 'S1000'].map(name => [name, ['signature-inferred:value']])),
-};
-const signatureNote = item => typeof item?.code === 'string' && item.code.startsWith('signature-');
-const noteKey = item => `${item.code}:${/^`([^`]+)`/.exec(item.message ?? '')?.[1] ?? ''}`;
-export function expectedSignatureNotes(fixture, timings) {
-  return enforcesCompanions(timings) ? signatureNotes[fixture] ?? [] : [];
+export function expectedSignatureNotes(fixture, timings, state = {}) {
+  return enforcesCompanions(timings) ? fixtureSignatureNotes(fixture, state) : [];
 }
-/** Other coverage entries equal `expected`; signature notes equal the fixture's pinned set, once each. */
-export function coverageMatches(fixture, timings, coverage, expected) {
-  if (!Array.isArray(coverage) || !Array.isArray(expected)) return false;
-  const notes = coverage.filter(signatureNote).map(noteKey).sort();
-  return isDeepStrictEqual(coverage.filter(item => !signatureNote(item)), expected)
-    && same(notes, [...expectedSignatureNotes(fixture, timings)].sort());
+/** Other coverage entries equal `expected`; signature notes equal the fixture state's pinned set, once each. */
+export function coverageMatches(fixture, timings, coverage, expected, state = {}) {
+  return coverageEquals(coverage, expectedSignatureNotes(fixture, timings, state), expected);
+}
+
+/**
+ * The edit kinds whose update the measured runs show refused at the per-context
+ * retained-fact limit (`maxRetainedBytesPerContext`) and then retried broad.
+ */
+export const retainedLimitKinds = ['created', 'deleted'];
+
+/** The sample's row for the context `token` names; the only row when no token is known. */
+function contextOf(sample, token) {
+  const contexts = sample?.contexts;
+  if (!Array.isArray(contexts)) return null;
+  if (typeof token?.context !== 'string') return contexts.length === 1 ? contexts[0] : null;
+  return contexts.find(context => context?.token?.context === token.context) ?? null;
+}
+
+/**
+ * Reads the history reset that follows a refusal at the per-context retained-fact
+ * limit from the workload's own daemon telemetry, between `from` (the write) and
+ * `until` (the publication, or the hook's return). When a revision would exceed
+ * the limit, the session refuses it and marks itself stale; the daemon then
+ * discards every historical revision it can and retries once. Telemetry shows
+ * that as a sample of the context, still at the previous publication, with more
+ * than one retained revision and retained bytes within the daemon's reported
+ * limit, followed by one whose history holds a single revision while the
+ * analysis is still running. Returns null when the samples do not show that.
+ */
+export function retainedLimitReset(telemetry, token, beforeSequence, from, until) {
+  if (!Array.isArray(telemetry) || !Number.isSafeInteger(beforeSequence) || !finite(from) || !finite(until)) return null;
+  const samples = telemetry.filter(sample => finite(sample?.at) && sample.at >= from && sample.at <= until)
+    .map(sample => ({ at: sample.at, limit: sample.budgets?.maxRetainedBytesPerContext, context: contextOf(sample, token) }))
+    .filter(sample => sample.context?.published?.sequence === beforeSequence);
+  const reset = samples.findIndex(sample => sample.context.history?.retained === 1 && sample.context.pending?.analysisRunning === true);
+  if (reset < 1) return null;
+  const before = samples.slice(0, reset).findLast(sample => Number.isSafeInteger(sample.context.history?.retained) && sample.context.history.retained > 1);
+  const limit = samples[reset].limit;
+  if (!before || !Number.isSafeInteger(limit) || limit <= 0 || before.limit !== limit
+    || !finite(before.context.retainedBytes) || before.context.retainedBytes > limit) return null;
+  // The retry ends at the publication (`until`), or at the first sample that no longer shows it running.
+  const end = samples.slice(reset + 1).find(sample => !(sample.context.history?.retained === 1
+    && sample.context.level === 'hot' && sample.context.pending?.analysisRunning === true));
+  return { limitBytes: limit, retainedBytesBefore: before.context.retainedBytes, historyBefore: before.context.history.retained,
+    headroomBytes: limit - before.context.retainedBytes, resetObservedMs: samples[reset].at - from,
+    retryMs: (end?.at ?? until) - samples[reset].at, retryEnd: end ? 'analysis-stopped' : 'window-end' };
+}
+
+/**
+ * The largest retained-fact growth one membership revision added in this
+ * workload's created and deleted saves, from consecutive settled samples in
+ * write order; null when no such pair was recorded.
+ */
+export function membershipGrowth(data) {
+  const rows = retainedLimitKinds.flatMap(kind => data?.cycles?.[kind] ?? [])
+    .filter(cycle => finite(cycle?.writtenAt)).sort((a, b) => a.writtenAt - b.writtenAt);
+  let growth = null;
+  for (let index = 1; index < rows.length; index++) {
+    if (rows[index].revision?.checked?.path !== 'membership') continue;
+    const previous = contextOf(rows[index - 1].settled, rows[index - 1].revision?.token)?.retainedBytes;
+    const current = contextOf(rows[index].settled, rows[index].revision?.token)?.retainedBytes;
+    if (finite(previous) && finite(current) && current > previous) growth = Math.max(growth ?? 0, current - previous);
+  }
+  return growth;
+}
+
+/**
+ * A broad created or deleted revision is the daemon's retry after a refusal at
+ * the retained-fact limit only when telemetry shows the history reset before its
+ * publication, and the headroom left under the limit was smaller than the growth
+ * a membership revision of the same workload added. Otherwise null.
+ */
+export function retainedLimitRetry(data, kind, cycle, growth = membershipGrowth(data)) {
+  if (!retainedLimitKinds.includes(kind) || cycle?.revision?.checked?.path !== 'broad') return null;
+  const reset = retainedLimitReset(data?.telemetry, cycle.revision.token, cycle.beforeSequence, cycle.writtenAt, cycle.revision.publishedAt);
+  return reset && finite(growth) && growth > reset.headroomBytes ? { ...reset, membershipGrowthBytes: growth } : null;
 }
 
 const counterFields = ['analyses', 'revisions', 'coveredRequests', 'sweeps', 'audits'];
@@ -127,7 +196,7 @@ export function publishedHookAttributed(cycle) {
   return Number.isSafeInteger(document?.revision?.sequence)
     && cycle.beforeHook.contexts?.[0]?.published?.sequence === document.revision.sequence
     && cycle.hook.code === 0 && document.exitCode === 0
-    && Array.isArray(document.changed) && document.changed.length > 0 && document.changed.every(item => item.covered === true)
+    && Array.isArray(document.paths) && document.paths.length > 0 && document.paths.every(item => item.disposition === 'checked')
     && a.coveredRequests === b.coveredRequests + 1
     && a.analyses - b.analyses === maintenance(a) - maintenance(b)
     && s.revisions === b.revisions && s.coveredRequests === a.coveredRequests
@@ -201,22 +270,22 @@ export function assertFastWorkload(id, measurements) {
     processes(name, data?.processSamples);
     check(`${name}: observed cleanup`, data?.cleanup?.stopped === true && same(data.cleanup.liveProcesses, []), data?.cleanup ?? null);
   }
-  function completed(label, cycle, denied = 0, expectedCoverage = [], { fixture = null, findings = denied } = {}) {
+  function completed(label, cycle, denied = 0, expectedCoverage = [], { fixture = null, findings = denied, setupExposureRemoved = false } = {}) {
     const hook = cycle?.hook, doc = hook?.document;
-    const timings = cycle?.revision?.timings;
-    const notes = expectedSignatureNotes(fixture, timings).length;
+    const timings = cycle?.revision?.timings, state = { setupExposureRemoved };
+    const notes = expectedSignatureNotes(fixture, timings, state).length;
     check(`${label}: real covering CLI result`, hook?.failure === null && hook.signal === null && hook.stderr === ''
-      && hook.code === (findings ? 1 : 0) && doc?.schemaVersion === 'ramify.check/1'
+      && hook.code === (findings ? 1 : 0) && doc?.schemaVersion === 'ramify.check/2'
       && doc.outcome === 'checked' && doc.execution === 'completed' && doc.exitCode === hook.code
       && natural(cycle.beforeSequence) && doc.revision?.sequence > cycle.beforeSequence
       && cycle.revision?.revision === doc.revision.id && cycle.revision.sequence === doc.revision.sequence
       && Array.isArray(cycle.expected) && cycle.expected.length > 0
-      && doc.changed?.length === cycle.expected.length && doc.changed.every((item, index) =>
-        item.covered && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256),
+      && doc.paths?.length === cycle.expected.length && doc.paths.every((item, index) => item.disposition === 'checked'
+        && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256),
     { code: hook?.code ?? null, reason: doc?.reason ?? null, sequence: doc?.revision?.sequence ?? null });
     check(`${label}: independent outcome`, cycle?.revision?.outcome?.execution === 'completed'
       && cycle.revision.summary?.denied === denied && doc?.findings?.length === findings
-      && coverageMatches(fixture, timings, doc?.coverage, expectedCoverage)
+      && coverageMatches(fixture, timings, doc?.coverage, expectedCoverage, state)
       && cycle.revision.outcome.coverage === (expectedCoverage.length + notes ? 'partial' : 'complete'),
     { denied: cycle?.revision?.summary?.denied ?? null, findings: doc?.findings?.length ?? null,
       coverage: doc?.coverage?.length ?? null });
@@ -232,12 +301,12 @@ export function assertFastWorkload(id, measurements) {
     const hook = cycle?.hook, doc = hook?.document;
     const notes = expectedSignatureNotes(fixture, cycle?.revision?.timings).length;
     check(`${label}: real immediate not-checked CLI result`, hook?.failure === null && hook.signal === null && hook.stderr === ''
-      && hook.code === 2 && doc?.schemaVersion === 'ramify.check/1' && doc.outcome === 'not-checked'
+      && hook.code === 2 && doc?.schemaVersion === 'ramify.check/2' && doc.outcome === 'not-checked'
       && doc.reason === 'configuration-changed' && doc.exitCode === 2 && doc.revision === null
       && doc.checked === null && doc.execution === null && doc.timings?.daemon === null
       && Array.isArray(cycle.expected) && cycle.expected.length > 0
-      && doc.changed?.length === cycle.expected.length && doc.changed.every((item, index) =>
-        item.covered === false && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256),
+      && doc.paths?.length === cycle.expected.length && doc.paths.every((item, index) => item.disposition === 'not-checked'
+        && item.reason === 'configuration-changed' && item.path === cycle.expected[index].path && !('sha256' in item)),
     { code: hook?.code ?? null, reason: doc?.reason ?? null, revision: doc?.revision ?? null });
     check(`${label}: independent outcome`, cycle?.revision?.outcome?.execution === 'completed'
       && cycle.revision.summary?.denied === 0 && doc?.findings?.length === 0
@@ -308,7 +377,7 @@ export function assertFastWorkload(id, measurements) {
     count('zero-work client samples', data.zeroWork, 20);
     check('zero-work clients cover the revision without analysis', data.zeroWork?.every(row =>
       row.hook?.document?.outcome === 'checked' && row.hook.code === 0
-      && row.hook.document.changed.every(item => item.covered)
+      && row.hook.document.paths.every(item => item.disposition === 'checked')
       && row.before.counters.analyses === row.after.counters.analyses
       && row.before.counters.revisions === row.after.counters.revisions
       && row.after.counters.coveredRequests > row.before.counters.coveredRequests),
@@ -316,13 +385,18 @@ export function assertFastWorkload(id, measurements) {
     const paths = { body: 'unchanged-surface', source: 'source', description: 'description', readme: 'metadata',
       created: 'membership', deleted: 'membership', configuration: 'broad', signature: 'source', companion: 'description' };
     const definition = data.fixtures?.find(item => item.name === name);
+    // A workload the recipe stopped at a failed analysis records where; it is a measured gap, never a pass.
+    if (data.failurePoint !== undefined) check('workload stopped at its measured failure point', false, data.failurePoint);
+    const growth = membershipGrowth(data), retries = Object.fromEntries(retainedLimitKinds.map(kind => [kind, []]));
     for (const kind of editKindsFor(name)) {
       const cycles = data.cycles?.[kind]; count(`${kind}: twenty cycles`, cycles, 20);
       for (const [index, cycle] of (cycles ?? []).entries()) {
         const removal = index % 2 === 0;
         if (kind === 'configuration') notChecked(`${kind} ${index + 1}`, cycle, name);
         // X100's wildcard still exposes the value whose extra named exposure the description edit removes.
-        else if (kind === 'description') completed(`${kind} ${index + 1}`, cycle, removal && name !== 'X100' ? 1 : 0, [], { fixture: name });
+        // The removal leaves no fixture a signature note; see `signature-notes.mjs`.
+        else if (kind === 'description') completed(`${kind} ${index + 1}`, cycle, removal && name !== 'X100' ? 1 : 0, [],
+          { fixture: name, setupExposureRemoved: removal });
         // A companion removal fails the check with its pinned findings, and no denied import, only where the rule is enforced.
         else if (kind === 'companion') completed(`${kind} ${index + 1}`, cycle, 0, [], { fixture: name,
           findings: removal && enforcesCompanions(cycle?.revision?.timings) ? definition?.companionFindings ?? -1 : 0 });
@@ -332,11 +406,18 @@ export function assertFastWorkload(id, measurements) {
             finding.code === 'exposed-without-companion' && finding.location?.file === definition?.companion),
           cycle.hook?.document?.findings?.map(finding => finding.code) ?? null);
         }
-        check(`${kind} ${index + 1}: revision path`, cycle.revision?.checked?.path === paths[kind], cycle.revision?.checked?.path ?? null);
+        // A broad membership revision passes only as the recorded retry after a retained-limit refusal.
+        const retry = retainedLimitRetry(data, kind, cycle, growth);
+        if (retry) retries[kind].push(index + 1);
+        check(`${kind} ${index + 1}: revision path`, cycle.revision?.checked?.path === paths[kind] || retry !== null,
+          retry ? { path: cycle.revision.checked.path, retainedLimitRetry: retry } : cycle.revision?.checked?.path ?? null);
         retained(`${kind} ${index + 1}`, cycle.settled);
       }
       target(`${kind}: median session work (ms)`, med(cycles?.map(timing)), limit[kind]);
     }
+    // States, rather than hides, every broad membership revision accepted as a retained-limit retry.
+    check('membership revisions retried broad at the retained-fact limit', true,
+      { count: retainedLimitKinds.reduce((sum, kind) => sum + retries[kind].length, 0), ...retries, membershipGrowthBytes: growth });
     const racing = data.cycles?.body;
     check('racing hooks launched before publication', racing?.length > 0 && racing.every(cycle => cycle.hookStartedAt <= cycle.revision?.publishedAt),
       racing?.map(cycle => ({ started: cycle.hookStartedAt, published: cycle.revision?.publishedAt })) ?? null);
@@ -372,6 +453,7 @@ export function assertFastWorkload(id, measurements) {
   } else if (id === 'I5-13:repeated-edit-plateau') {
     for (const name of ['reference', 'S100']) {
       const data = measurements[name], cycles = data?.cycles;
+      if (data?.failurePoint !== undefined) check(`${name}: workload stopped at its measured failure point`, false, data.failurePoint);
       count(`${name}: alternating cycles`, cycles, budgets.repeatedCycles);
       for (const [index, cycle] of (cycles ?? []).entries()) { completed(`${name} ${index + 1}`, cycle, 0, [], { fixture: name }); retained(`${name} ${index + 1}`, cycle.settled); }
       check(`${name}: exactly two alternating identities`, new Set(cycles?.map(cycle => cycle.revision?.fingerprints?.inputId)).size === 2
@@ -494,6 +576,17 @@ export function fastDeferrals(workloads) {
       observed: { ready, clone },
       reason: 'Actual effective worker heap preflight plus twenty real structured-clone echo round trips separately for S1000 revision input and diagnostic arrays, with byte bounds and auxiliary thread cleanup. Includes both copies and scheduling; excludes analysis, JSON sizing and integrity hashing.' },
   };
+}
+
+/**
+ * The failure a derived row records for one source process workload that did
+ * not collect complete evidence: the point where it stopped, when recorded.
+ */
+export function derivedSourceFailure(row) {
+  const point = row?.measurements?.failurePoint;
+  const cause = point ? `stopped at ${point.phase} ${point.cycle} (${point.position}): ${point.message ?? point.hook?.reason ?? point.trigger}`
+    : row?.interrupted ? 'was interrupted' : `failed: ${String(row?.failures?.[0] ?? 'no complete evidence').split('\n')[0]}`;
+  return `Source process ${row?.id} ${cause}; this row has no complete evidence from it.`;
 }
 
 /** Derived instances reuse the same measured saves with their own predicates. */

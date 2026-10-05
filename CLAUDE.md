@@ -42,7 +42,12 @@ The concrete representation is defined separately in
 [Directory Structure And Module Description Specification](docs/model/module-description.spec.md).
 It specifies the required `src/` and `subs/` layout, with optional same-owner
 `src/tests/` and `src/interfaces/`, and the formal `module.ramify` version 1
-language. Modules may occur only beneath `subs/`. The module header classifies
+language. Modules may occur only beneath `subs/`. The project root's description
+is marked `root module <name>`, and `ramify check` climbs to the nearest marked
+description. A description may declare nested trees as `owned-ignored` or
+`external`; Ramify does not inventory or analyze them, and an analyzed file
+that imports from one violates the boundary unless the import resolves through
+a package, which makes it external. The module header classifies
 ordinary `src/`, including interfaces; the nested `src/tests/` area uses its
 fixed testing profile: `testing` plus all required-importer tags in the module
 header, without inheriting required-symbol tags. There is no `tests tagged [...]`
@@ -110,7 +115,7 @@ agent ascribes, from behavioral evidence, which Ramify derives. Ramify's
 outputs use behavioral terms only. Read both before designing agent-facing surfaces.
 
 The evaluator, teaching diagrams and toolkit source have migrated to the resolved
-tag registry and module-owned `src/tests/`. `npm run check:self` checks all eleven
+tag registry and module-owned `src/tests/`. `npm run check:self` checks all fifteen
 toolkit owners, including owned tests. The independent scripts, site and example
 have separate compiler scopes. The [iteration 15 completion report](docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records acceptance evidence and remaining limitations.
@@ -139,16 +144,22 @@ The daemon excludes MCP/web/development dependencies and follows explicit memory
 retention, queue and client-lifecycle limits. Quick tests run real services through
 direct adapters, supplemented by actual transport and process tests. The
 [CLI invocation contract](docs/architecture/cli-invocation.spec.md) fixes how
-`ramify check` selects the project, finds the compiler configuration, warns
-about files outside modules and exits.
-Compiler-selected files outside every module's `src/`, including sibling
-`tests/` or `interfaces/` and loose `subs/` source, produce warnings without
-failing the check. An owned import targeting them is an outside-scope analysis
-limit, never an allowed import or an external package. Discovered stray
+`ramify check` selects the project, finds the compiler configuration, reports
+project warnings and exits.
+Owned compiler source outside every module's `src/` and its owned-ignored trees,
+including `scripts/`, sibling `tests/` or `interfaces/` and loose `subs/` source,
+is its nearest module's auxiliary source: it is analyzed under that owner's
+ordinary classification even when the compiler configuration does not select
+it, and its originals can never be exposed. Other owned files there, apart from
+`module.ramify` files and module READMEs, are inert files: Ramify never
+classifies them, though one the compiler reads, such as `tsconfig.json` or an
+imported data file, is a captured input whose change is rechecked.
+Compiler-selected source inside an owned-ignored tree or a module's scratch
+directory produces a warning without failing the check. Discovered stray
 `module.ramify` files are layout errors even with valid contents. Other invalid
 declarations and invalid exposure paths remain errors. A future
-strict project configuration might make the outside-source warnings fail a
-check; its syntax and scope are undecided and it is not part of Plan 1.
+strict project configuration might make project warnings fail a check; its
+syntax and scope are undecided.
 
 [Daemon and analysis architecture](docs/architecture/daemon.md) owns the proposed
 module tree, engine contracts, isolated contexts and revisioned source analysis.

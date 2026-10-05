@@ -11,9 +11,12 @@ import type { ExplorerClient } from '../published-project-view.js';
 
 const flowNodes: { current: string[] } = { current: [] };
 const flowProps: { current: Record<string, any> } = { current: {} };
+/** Milliseconds each diagram render takes; see `clickOnFirstRender`. */
+const flowRenderMs: { current: number } = { current: 0 };
 
 vi.mock('@xyflow/react', () => ({
   ReactFlow(props: Record<string, any>) {
+    for (const until = performance.now() + flowRenderMs.current; performance.now() < until;) { /* render cost */ }
     flowNodes.current = props.nodes.map((node: Record<string, any>) => node.id);
     flowProps.current = props;
     return <div>
@@ -34,8 +37,10 @@ vi.mock('@xyflow/react', () => ({
   BackgroundVariant: { Dots: 'dots' },
 }));
 
-beforeEach(() => { flowNodes.current = []; });
-afterEach(() => { cleanup(); });
+const observers: MutationObserver[] = [];
+
+beforeEach(() => { flowNodes.current = []; flowRenderMs.current = 0; });
+afterEach(() => { for (const observer of observers.splice(0)) observer.disconnect(); cleanup(); });
 
 const generation = '00000000-0000-0000-0000-000000000001';
 const revisionId = (sequence: number) => `rev/1:${generation}:${sequence}`;
@@ -176,6 +181,51 @@ describe('MT09: connected module tree page', () => {
     fireEvent.doubleClick(screen.getByTestId('node-root/a/leaf0'));
     expect(openModule).toHaveBeenCalledWith('root/a/leaf0');
     expect(importExplorerUrl('root/a/leaf0')).toBe('/analysis/latest?module=root%2Fa%2Fleaf0');
+  });
+});
+
+/**
+ * Clicks the element `target` returns in the microtask after the commit that first renders it.
+ * A diagram render longer than React's 5 ms scheduler frame makes React yield before that
+ * commit's passive effects, so the click lands before they run, as a user's click can.
+ */
+function clickOnFirstRender(target: () => Element | null): { readonly clicked: () => boolean } {
+  let clicked = false;
+  const observer = new MutationObserver(() => {
+    const element = target();
+    if (!element) return;
+    observer.disconnect();
+    clicked = true;
+    fireEvent.click(element);
+  });
+  observers.push(observer);
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  return { clicked: () => clicked };
+}
+
+describe('MT09: interactions before a newly rendered model settles', () => {
+  it('keeps a collapse toggled right after the first model renders', async () => {
+    flowRenderMs.current = 20;
+    const click = clickOnFirstRender(() => document.querySelector('[aria-label="Collapse a"]'));
+    render(<ModuleTreePage client={client(() => ({ sequence: 1, view: model(1, ['a', 'b'], 2) }), () => status(1))} pollIntervalMs={60_000} />);
+    await screen.findByText(`Revision ${revisionId(1)}`);
+    expect(click.clicked()).toBe(true);
+    // Time for the first model's pending effects to overwrite the click, as they did before the fix.
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(screen.getByRole('button', { name: 'Expand a' })).toBeInTheDocument();
+    expect(flowNodes.current).toEqual(['root', 'root/a', 'root/b', 'root/b/leaf0', 'root/b/leaf1']);
+  });
+
+  it('keeps a selection made right after a first model without the focus target renders', async () => {
+    flowRenderMs.current = 20;
+    const click = clickOnFirstRender(() => document.querySelector('[data-testid="node-root/a"]'));
+    render(<ModuleTreePage client={client(() => ({ sequence: 1, view: model(1, ['a'], 1) }), () => status(1))}
+      pollIntervalMs={60_000} initialModuleId="root/missing" />);
+    expect(await screen.findByRole('status')).toHaveTextContent('Module root/missing is not in this revision');
+    expect(click.clicked()).toBe(true);
+    // Time for the first model's pending effects to overwrite the click, as they did before the fix.
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(screen.getByRole('heading', { name: 'a' })).toBeInTheDocument();
   });
 });
 

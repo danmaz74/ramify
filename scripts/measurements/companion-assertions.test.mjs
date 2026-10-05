@@ -49,3 +49,12 @@ test('coverage: the S fixtures pin the one inferred note of their exposed litera
     assert.equal(coverageMatches(name, nine, [], []), true, 'a pre-plan build reports none');
   }
 });
+
+test('coverage: removing the setup exposure of `value` leaves every fixture without a note', () => {
+  const removed = { setupExposureRemoved: true };
+  for (const name of ['reference', 'S100', 'S500', 'S1000', 'X100']) {
+    assert.deepEqual(expectedSignatureNotes(name, ten, removed), []);
+    assert.equal(coverageMatches(name, ten, [], [], removed), true);
+    assert.equal(coverageMatches(name, ten, [note('value')], [], removed), false, 'an unexposed value has no note');
+  }
+});

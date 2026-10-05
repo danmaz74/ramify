@@ -22,7 +22,7 @@ function measurementFacts(count = 700): SessionMeasurements {
   files.push({ path: 'module.ramify', owner: 'fixture', area: 'documentation', kind: 'documentation', bytes: 22 });
   return { sequence: 1, inputId: 'input-scripted', modules: [{ id: 'fixture', dir: '', parent: null,
     exact: size(count, count * (count + 1) / 2), subtree: size(count, count * (count + 1) / 2) }],
-  files, outsideModuleFiles: ['loose/外部-\"quoted\"-\\path.ts'] };
+  files };
 }
 
 async function scriptedFixture(maxResponseBytes: number, apiFailure = false) {
@@ -46,10 +46,11 @@ describe('measure service (MM08-MM09, MM16-MM17)', { timeout: 60_000 }, () => {
     const second = await f.environment.service.measure(f.request('measure-repeat'));
     for (const result of [first, second]) {
       if (!result.ok || result.value.status !== 'measured') throw new Error(JSON.stringify(result));
-      expect(result.value.document).toMatchObject({ schema: 'ramify.measure/1', root: '/fixture', views: 'measured',
+      expect(result.value.document).toMatchObject({ schema: 'ramify.measure/2', root: '/fixture', views: 'measured',
         modules: [{ id: 'fixture', parent: null, exact: { production: { sourceFiles: 700 },
-          views: { ordinaryBytes: expect.any(Number), testsBytes: 0 } } }],
-        outsideModuleFiles: ['loose/外部-"quoted"-\\path.ts'] });
+          views: { ordinaryBytes: expect.any(Number), testsBytes: 0 } } }] });
+      // ramify.measure/2 retired outsideModuleFiles: owned source outside src/ is listed in files.
+      expect(result.value.document).not.toHaveProperty('outsideModuleFiles');
       expect(result.value.document.ownershipRule).toBe(measurementOwnershipRule);
       expect(result.value.document.files).toHaveLength(702);
       expect(result.value.document.files[0]!.path).toContain('深い-"quoted"-\\backslash');

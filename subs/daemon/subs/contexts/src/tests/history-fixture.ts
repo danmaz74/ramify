@@ -3,7 +3,7 @@ import type { AnalysisReport } from '../../../../../analysis/src/interfaces/anal
 /** A plain report for storage tests; it claims no analysis execution. */
 export function historyReport(runId = 'run/1:history'): AnalysisReport {
   return {
-    schemaVersion: 'ramify.analysis/1', runId, inputId: null,
+    schemaVersion: 'ramify.analysis/2', runId, inputId: null,
     request: {
       project: { cwd: '/fixture', scope: 'whole-project', configuration: 'discover' },
       registry: { id: 'registry/1:history-fixture', definitions: [], isDefault: false }, capabilities: [],
