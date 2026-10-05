@@ -5,8 +5,10 @@ principles, specifications and glossaries on 2026-10-01; the nested-tree
 statement syntax and the Ramify contracts the user accepted on 2026-10-03 were
 adopted in the owning specifications in commit `6d0c66f0`. Ramify's part is
 implemented by the [Phase 1 plan](../plans/project-boundary-ramify/main-plan.md),
-whose final qualification and handoff are pending; the audit and agent parts
-remain for Phases 2 and 3. This document records
+qualified on commit `7df84ea2` and handed off as a local, unpublished
+`ramify.ts` 0.2.0 artifact on 2026-10-05 (see its
+[handoff](../plans/project-boundary-ramify/handoff.md#phase-1-handoff)); the
+audit and agent parts remain for Phases 2 and 3. This document records
 the design decisions, implementation recipes and migration guidance. Section 13
 links to the authoritative principles, specifications and vocabulary. The CLI and
 runtime contracts describe current behavior; Ramify's were migrated in Phase 1,
