@@ -1,11 +1,12 @@
 import type * as Preset from '@docusaurus/preset-classic';
-import type { Config, Plugin } from '@docusaurus/types';
-import path from 'node:path';
+import type { Config } from '@docusaurus/types';
 
 /**
  * Portability discipline (plan Design decision 3): this directory is a thin
- * shell. Diagrams and model data come from the declared presentation, model
- * and layout entries. Nothing here is
+ * shell. Diagrams and model data come from the toolkit's `ramify.ts/presentation`
+ * package export, resolved from the packed candidate that `npm run site:prepare`
+ * (run by `npm run site:build`) installs into this package's `node_modules`
+ * without saving it; the site never reads toolkit source. Nothing here is
  * swizzled, and page bodies avoid framework-specific syntax wherever plain
  * MDX works.
  *
@@ -14,39 +15,6 @@ import path from 'node:path';
  * `ramify/docs/model/glossary.md`. The site teaches that model and references
  * the internal documents; its glossary reproduces the canonical definitions.
  */
-
-const RAMIFY_ROOT = path.resolve(__dirname, '..');
-
-/**
- * Teach webpack to read ramify's source directly.
- *
- * Two adjustments, both purely about resolution - no transform is added, and
- * no code lives here:
- *
- * - Exact `@ramify/presentation`, `@ramify/model` and `@ramify/layout` aliases
- *   select the portable package surfaces used by the teaching pages.
- * - `extensionAlias` maps the ESM-mandated `.js` specifiers used throughout
- *   those owners onto the `.ts`/`.tsx` files that actually implement them.
- *
- * Docusaurus already transpiles any non-`node_modules` file it is asked to
- * bundle, and already aliases `react`/`react-dom` to this package's copies, so
- * the source compiles and shares one React instance without further help.
- */
-function ramifySourcePlugin(): Plugin {
-  return {
-    name: 'ramify-source',
-    configureWebpack: () => ({
-      resolve: {
-        alias: {
-          '@ramify/presentation$': path.join(RAMIFY_ROOT, 'subs/presentation/src/index.ts'),
-          '@ramify/model$': path.join(RAMIFY_ROOT, 'subs/analysis/subs/model/src/index.ts'),
-          '@ramify/layout$': path.join(RAMIFY_ROOT, 'subs/presentation/subs/layout/src/index.ts'),
-        },
-        extensionAlias: { '.js': ['.ts', '.tsx', '.js'] },
-      },
-    }),
-  };
-}
 
 const config: Config = {
   title: 'ramify.ts',
@@ -69,8 +37,6 @@ const config: Config = {
     // switch has to reproduce.
     format: 'detect',
   },
-
-  plugins: [ramifySourcePlugin],
 
   // Keeps the CSS anchor-target highlight working across the SPA router's
   // client-side navigations - see the comment in the module itself.

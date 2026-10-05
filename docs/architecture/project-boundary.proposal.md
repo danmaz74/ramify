@@ -3,12 +3,14 @@
 **Date:** 2026-09-30, revised 2026-10-01. **Status:** adopted in the owning
 principles, specifications and glossaries on 2026-10-01; the nested-tree
 statement syntax and the Ramify contracts the user accepted on 2026-10-03 were
-adopted in the owning specifications in commit `6d0c66f0`. Not implemented.
-This document records
+adopted in the owning specifications in commit `6d0c66f0`. Ramify's part is
+implemented by the [Phase 1 plan](../plans/project-boundary-ramify/main-plan.md),
+whose final qualification and handoff are pending; the audit and agent parts
+remain for Phases 2 and 3. This document records
 the design decisions, implementation recipes and migration guidance. Section 13
-links to the authoritative principles, specifications and vocabulary. The existing CLI and
-runtime contracts describe current behavior until their implementations and
-contracts are migrated. The
+links to the authoritative principles, specifications and vocabulary. The CLI and
+runtime contracts describe current behavior; Ramify's were migrated in Phase 1,
+and the audit's and agent's are migrated in Phases 2 and 3. The
 [implementation plan](../plans/project-boundary-sequential/main-plan.md) contains the
 toolkit, audit and harness work packages and their acceptance gates, ordered
 Ramify first, then ramify-audit, then ramify-agent.

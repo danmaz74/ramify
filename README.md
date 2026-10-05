@@ -141,9 +141,16 @@ npm run check:self
 npm run reference:verify -- --plan 1
 ```
 
-`check` discovers the whole project and its compiler configuration from the
-working directory unless `--root` is given. It includes owned tests and
-resources. `--batch` uses and disposes a fresh
+`check` checks the whole project beneath one root description, which declares
+itself with the root marker, `root module <name>`. Without `--root` it selects
+the nearest marked description at or above the working directory; `--root` must
+name a directory whose description carries the marker. The compiler
+configuration is found from the root as TypeScript finds it. The check includes
+owned tests and resources. Owned compiler source outside every module's `src/`
+is that module's auxiliary source, checked under its ordinary rules; trees a
+description declares `owned-ignored` or `external` are not analyzed, and
+compiler-selected source inside an owned-ignored tree or a module's scratch
+directory `src/tmp/` produces a warning. `--batch` uses and disposes a fresh
 session. Human output is the default; JSON output is one versioned report on
 stdout. Inside a Git repository a complete check also warns about each
 directory Git ignores that Ramify still walks; that advice never changes the
@@ -198,13 +205,22 @@ usage, production selection, gate evidence and measurement commands.
 - `subs/cli/` - argument parsing, report formatting and injected command handling.
 - `examples/` - the [Collection Review reference project](examples/collection-review/README.md):
   a small runnable application whose fifteen owners carry the module
-  descriptions, with its own package, lockfile and toolchain.
+  descriptions, with its own package, lockfile and toolchain; the root declares
+  `examples/collection-review` owned-ignored, and the example is its own
+  project. The [post-write hook adapter](examples/hooks/README.md) beside it is
+  root auxiliary source.
 - `scripts/reference-harness/` - the reference harness: one record per case
   family from the [case catalogue](docs/plans/reference-project/cases.md), and
   `npm run reference:report`, which runs the example's own tiers and reports
   what has and has not been established. `npm run reference:cases` runs the
-  harness's own tests.
-- `site/` - the documentation website (its own npm package).
+  harness's own tests. The root declares it owned-ignored, as it does two
+  probe fixture projects under `scripts/probes/fixtures/`; other compiler source
+  beneath `scripts/` is root auxiliary source.
+- `site/` - the documentation website (its own npm package), declared
+  owned-ignored.
+
+The root description also declares `docs/` owned-ignored, and `ramify-agent/`
+and the work directories tools write into the checkout external.
 
 ## Documentation site
 
@@ -212,13 +228,21 @@ The site is a separate npm package under `site/`, so its framework never
 enters this package's dependencies. Run it from here:
 
 ```bash
-npm run site:dev      # dev server with live reload on port 4300
-npm run site:build    # static build into site/build/
+npm run site:prepare  # pack the built toolkit and install it into the site
+npm run site:dev      # site:prepare, then a dev server with live reload on port 4300
+npm run site:build    # site:prepare, then a static build into site/build/
 npm run site:serve    # serve a previously built site on port 4301
 ```
 
-The first run installs the site's own dependencies: `npm --prefix site install`.
-Build output (`site/build/`, `site/.docusaurus/`) is git-ignored.
+The site consumes the toolkit as a package, never as source. `site:prepare`
+packs the current toolkit build with `npm pack` and installs that tarball into
+`site/node_modules` with `npm install --no-save`, so the site's manifest and
+lockfile never name it and nothing local is committed. `npm --prefix site ci`
+removes the candidate again, which is why `site:build` and `site:dev` run
+`site:prepare` first. Without a toolkit build it runs `npm run build` first, and
+without installed site dependencies `npm ci` in `site/`. It packs the build as
+it is, so rebuild the toolkit after changing it. Build output (`site/build/`,
+`site/.docusaurus/`) is git-ignored.
 
 ### URL map
 
@@ -238,11 +262,11 @@ point readers to these documents in `docs/model/`.
 
 ### Portability discipline
 
-`site/` consumes the presentation, model and layout entries through exact
-`@ramify/presentation`, `@ramify/model` and `@ramify/layout` aliases in
-`site/docusaurus.config.ts`. Diagrams and their model data remain with their
-declared owners. Nothing is swizzled and no page body depends on theme-specific
-CSS class names, so switching site frameworks stays mechanical config work.
+`site/` imports diagrams and their model data from the `ramify.ts/presentation`
+package export of the installed candidate; it reads no toolkit source and has
+no aliases. Diagrams and their model data remain with their declared owners.
+Nothing is swizzled and no page body depends on theme-specific CSS class names,
+so switching site frameworks stays mechanical config work.
 
 ## Conventions
 

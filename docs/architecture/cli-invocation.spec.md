@@ -1,9 +1,12 @@
 # CLI invocation
 
-**Date:** 2026-09-08. **Status:** Decided invocation contract for `ramify check`.
-The delivery plans reference this document; they do not restate it. Command
-names other than `check` are listed in [processes and clients](processes-and-clients.md)
-and get their invocation contracts when their plans are written.
+**Date:** 2026-09-08. **Status:** Decided and implemented invocation contract for
+`ramify check` and `ramify affected`. Ramify's project-boundary phase implemented
+root selection by the root marker, auxiliary source, declared nested trees, the
+project warnings and the hook check's path dispositions described here. The
+delivery plans reference this document; they do not restate it. Other command
+names are listed in [processes and clients](processes-and-clients.md) and get
+their invocation contracts when their plans are written.
 
 ## The one rule
 
@@ -115,8 +118,10 @@ module's auxiliary source. It is analyzed with that owner's ordinary
 classification whether or not the configuration selects it, and it produces no
 warning. A `.js`, `.jsx`, `.mjs` or `.cjs` file there is compiler source only
 when the configuration admits JavaScript; any other owned file outside `src/`
-is inert and silent. Only declared nested trees and always-excluded paths are
-left out; a nested `tsconfig.json` and repository ignore rules exclude nothing.
+is inert and silent, apart from the descriptions, READMEs and configuration the
+analysis reads as inputs. Only declared nested trees and always-excluded paths
+are left out; a nested `tsconfig.json` and repository ignore rules exclude
+nothing.
 Three nonblocking warnings remain: compiler-selected source inside an
 owned-ignored tree, compiler-selected source inside a module's scratch
 directory, and, when the root lies in a Git repository and `git` is available,

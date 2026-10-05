@@ -145,10 +145,11 @@ independent and adds no matrix instances. The unfiltered plan gate still fails
 for the instances assigned to later capabilities.
 
 The no-project ancestry case necessarily uses an owned OS temporary directory:
-a directory under the ramified harness checkout would discover that enclosing
-project. It creates a described project below the unmarked working directory,
-asserts that discovery never searches downwards, and deletes the temporary tree
-in `finally`. All other mutations use the ordinary isolated harness copy.
+from a directory under the harness checkout, the climb reaches the checkout's
+description, which carries the root marker. It creates a project whose
+description carries the marker below a working directory with no description
+at or above it, asserts that discovery never searches downwards, and deletes
+the temporary tree in `finally`. All other mutations use the ordinary isolated harness copy.
 
 Iteration 10 registers all 36 tag/origin instances and syntax/owner variants.
 The shared source driver calls the analysis-owned `evaluateAccesses` stage,

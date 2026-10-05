@@ -110,7 +110,7 @@ agent ascribes, from behavioral evidence, which Ramify derives. Ramify's
 outputs use behavioral terms only. Read both before designing agent-facing surfaces.
 
 The evaluator, teaching diagrams and toolkit source have migrated to the resolved
-tag registry and module-owned `src/tests/`. `npm run check:self` checks all eleven
+tag registry and module-owned `src/tests/`. `npm run check:self` checks all fifteen
 toolkit owners, including owned tests. The independent scripts, site and example
 have separate compiler scopes. The [iteration 15 completion report](docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records acceptance evidence and remaining limitations.
@@ -139,8 +139,8 @@ The daemon excludes MCP/web/development dependencies and follows explicit memory
 retention, queue and client-lifecycle limits. Quick tests run real services through
 direct adapters, supplemented by actual transport and process tests. The
 [CLI invocation contract](docs/architecture/cli-invocation.spec.md) fixes how
-`ramify check` selects the project, finds the compiler configuration, warns
-about files outside modules and exits.
+`ramify check` selects the project, finds the compiler configuration, reports
+project warnings and exits.
 Compiler-selected files outside every module's `src/`, including sibling
 `tests/` or `interfaces/` and loose `subs/` source, produce warnings without
 failing the check. An owned import targeting them is an outside-scope analysis

@@ -18,19 +18,28 @@ npm run check:self
 
 The build bootstraps from source. It also compiles the host's client executable
 with Bun, pinned as a devDependency, into `dist/src/`.
-`npm run production:files -- --root .` prints its deterministic source selection. Production omits every testing-classified
-area, including a testing module's ordinary `src/`; architectural checking and
-test discovery still cover those files. Toolkit `allowJs` includes its owned
-ESM process probe in source analysis. The example, scripts and site have separate
-compiler configurations and contribute no source findings to toolkit self-check.
+`npm run production:files -- --root .` prints its deterministic source selection. Production consumes the resolved
+profiles: it omits every testing-classified area, including a testing module's
+ordinary `src/`, and keeps only files beneath an owner's `src/`, so auxiliary
+source, inert owned files, declared nested trees and scratch directories never
+enter it. Architectural checking and test discovery still cover the testing
+files, and checking covers auxiliary source. Toolkit `allowJs` includes its owned
+ESM process probe and other owned JavaScript in source analysis. The example,
+the site, the reference harness and two probe fixture projects are owned-ignored
+trees with their own compiler configurations and contribute no source findings
+to toolkit self-check; other scripts are root auxiliary source, which self-check
+analyzes under the root's ordinary profile.
 
 To install the built package into a consumer, run `npm install /path/to/ramify`.
 Its `ramify` command is the `dist/src/ramify` launcher, which runs the compiled
 client or, where none was built, `node dist/src/cli-entry.js`. The compiled client
 runs `--batch` analysis in a Node child.
 Use `npx ramify check` inside a project or
-`npx ramify check --root /path/to/project --format json`. An invocation from a
-child directory still checks the whole discovered project. `--batch` is accepted.
+`npx ramify check --root /path/to/project --format json`. The project root's
+description carries the root marker, `root module <name>`. Without `--root` the
+command selects the nearest marked description at or above the working
+directory, so an invocation from a child directory still checks the whole
+project; `--root` must name a marked description. `--batch` is accepted.
 `--help` and `--version` finish without loading the compiler or UI.
 
 The CLI returns 0 for a completed check with no violations, 1 for invalid
@@ -50,7 +59,12 @@ complete with partial coverage. See the [invocation contract](../architecture/cl
 | `ramify.ts/model` | Portable registry, identities and rule evaluation. |
 | `ramify.ts/layout` | Portable geometry and neutral layout inputs. |
 | `ramify.ts/presentation` | Teaching diagrams and React components. |
+| `ramify.ts/module-tree`, `ramify.ts/module-tree.css` | The module tree canvas component and its stylesheet. |
 | `ramify.ts/cli` | Argument/output handling with an injected batch operation. |
+| `ramify.ts/client` | The lightweight resident daemon client. |
+
+No other subpath is exported: Node and TypeScript's NodeNext resolution refuse
+an import of any other file in the package, such as a path beneath `dist/`.
 
 Direct callers supply `AnalysisInputs`: an explicit project request, one resolved
 registry, requested capabilities and finite limits. There is no registry or scope
