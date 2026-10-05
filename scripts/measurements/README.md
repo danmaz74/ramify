@@ -298,7 +298,17 @@ opens, and Plan 2's unchanged entry-footprint workloads. The checked-set and col
 instances reuse those process observations with independent predicates; they do
 not claim an additional execution. Created/deleted files must report the
 membership path; a fixture change whose reach cannot be bounded would report the
-broad path and fail this workload.
+broad path and fail this workload. The one exception is the daemon's retry after
+a refusal at the per-context retained-fact limit: a broad created or deleted
+revision passes when the socket poll, between the write and the publication,
+shows the context's history reset to one revision while the analysis ran, from
+retained bytes whose headroom under the reported `maxRetainedBytesPerContext`
+was smaller than one membership revision's growth in the same workload. The
+row `membership revisions retried broad at the retained-fact limit` lists every
+such cycle. A save whose hook answers `unavailable`, or whose analysis settles
+without a new revision, stops its workload at once with its `failurePoint`
+recorded; the workload fails, and a derived row that needs its process names
+that point.
 
 The external POSIX sampler observes process RSS at a 50 ms target interval.
 A separate socket poll records daemon counters, contexts, retained facts and

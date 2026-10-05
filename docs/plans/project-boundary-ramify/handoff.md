@@ -96,6 +96,18 @@ through that Phase 2 integration. Phase 3 later pins both published providers.
 Defects found during Phase 1 that predate it and lie outside its scope. Each
 stays open until a toolkit-owned slice repairs it with its own verification.
 
+- **High priority for the first follow-up plan: the daemon does not recover a
+  context whose session worker died.** Every later hook check of that context
+  answers not checked, `unavailable`, until the daemon restarts. In the fast
+  recipe's S1000 workload on `a5b377e8`, the worker exited (1) during the retry
+  after a retained-limit refusal (see [known limitations](#known-limitations)).
+  Every later hook answered `unavailable` in about 33 ms, and the context
+  never published again. The failure branch of `analyze` in
+  `subs/daemon/subs/contexts/src/context-manager.ts` (around lines 778–790)
+  keeps the failed session; the same branch exists at `640583cc`, before the
+  phase. Evidence: `/home/app/ramify-pb1-evidence/a5b377e8/fast-diagnosis/`
+  (`s1000.json`) and the failed run's outputs in
+  `/home/app/ramify-pb1-evidence/a5b377e8/measurements/`.
 - **A daemon whose working directory is deleted fails later requests.** The
   resident daemon inherits the working directory of the command that starts
   it and never changes it. Once that directory is deleted, every later
@@ -142,6 +154,28 @@ phase, so that the hook check does not change before the measurements.
   `owned-ignored` or `external`. Evidence:
   `/home/app/ramify-pb1-evidence/iteration20/workflow/` (`scale.sh`,
   `limit.sh`).
+- **The per-context retained-fact limit of 96 MiB, 100.7 MB
+  (`maxRetainedBytesPerContext`).** When a new revision would exceed it, the
+  session refuses the revision and marks itself stale; the daemon discards the
+  revision history and retries once, on the broad path. Measured by the fast
+  recipe on `a5b377e8`:
+  - S500: each create or delete save added about 6.88 MB of retained facts
+    (77.7, 84.5, 91.4 and 98.3 MB; the next would reach about 105 MB). The
+    first crossing came at 98.3 MB, and from then on every fifth such save
+    crossed the limit, from 95.3 MB. Each broad retry took about 14 s against
+    about 2.1 s on the membership path. All eight retries completed correctly.
+    Every second configuration save crossed it too; that path is broad anyway.
+  - S1000: body edit 5 crossed the limit at 95.5 MB with five revisions
+    retained. The broad retry ran about 27.6 s, then the session worker exited
+    (1), probably at its 512 MiB heap; that is unproven, because the recipe
+    captures neither daemon nor worker stderr. The hook answered
+    `analysis-failed: Session worker exited (1)` after 29.0 s, and the context
+    never published again ([known defect](#known-defects-carried-forward)).
+  - The phase adds roughly 3% (X100) to 10% (reference) retained facts.
+  - The S500 and S1000 fast workloads were waived in Plan 5 and are first
+    measured here. `I5-13:hook-latency-s1000` is a measurement gap, and so are
+    `I5-13:checked-set-bounded` and `I5-13:cold-open`, which use S1000's
+    process.
 - **Not measured in this phase.** The architect view's size and timing
   measurements of Plans 2B and 2C lie outside the three recipes the user
   approved for iteration 20, and no reference instance needs them.
@@ -182,6 +216,10 @@ Left open by this phase, without an owning slice:
   findings, for an inert edit.
 - Three historical probe scripts build compiler hosts without `realpath` and
   `directoryExists`; no gate runs them.
+- **Daemon and worker stderr in the fast recipe.** Capture both, so that the
+  cause of a session worker's exit, its heap limit or another, can be proven.
+- Optionally, after a retained-limit refusal clears the history, retry the
+  narrow path instead of marking the session stale.
 
 ## Wordings settled through the relay session
 
@@ -218,6 +256,12 @@ of each and may override any of them:
   revision captures it, and keeping the lockfile behaviour for this phase.
 - The acquisition limit and the unmeasured Plan 2B and 2C views are accepted
   for this phase, as [known limitations](#known-limitations) states.
+- After `measure:fast` failed on `a5b377e8`, option (a): the repair changes the
+  fast recipe only, and the candidate's source is not changed. A broad created
+  or deleted revision passes only when the daemon telemetry shows its
+  retained-limit refusal and history reset, and the workload lists each such
+  retry. A workload whose daemon can no longer publish stops at once and
+  records where; it stays a measurement gap.
 
 ## Reference rows whose prose is stale
 
@@ -225,8 +269,8 @@ Every reviewed instance row stays byte-identical, because the instance tables
 are compared with the archived plans. These rows' prose no longer describes
 what their instance asserts; each instance asserts the behavior in the third
 column and passes. The table collects the lists in the receipts of iterations
-2, 3, 3B, 4, 8B, 8C and 17, baseline repair 2, the final-gate repair and the
-entry-footprints repair.
+2, 3, 3B, 4, 8B, 8C and 17, baseline repair 2, the final-gate repair, the
+entry-footprints repair and the measurement-recipe repair.
 
 | Row | Prose now stale | What the instance asserts | Since |
 | --- | --- | --- | --- |
@@ -251,6 +295,7 @@ entry-footprints repair.
 | I2-30:declarations-final | "Eleven declarations match owners.md" | fifteen owners, the eleven archived declarations plus named layers | final-gate repair |
 | I2-30:package-entries | "Resolve all eight entries" | nine import entries and a stylesheet entry | `26bba1e2` (baseline repair 2) |
 | I2A-02:explicit-config-excluded | "as application or outside-module source" | generated output never becomes application source; outside-module source no longer exists | 8C (named in 4) |
+| I2A-12:toolkit-scale | "with all eleven owners" | a completed toolkit materialization with nonzero output, sampled memory and filesystem metrics; no owner count is asserted, and the toolkit has fifteen owners | Plan 6 (named in the measurement-recipe repair) |
 | I2A-13:declarations-package | "Eleven declarations and eight package entries validate" | fifteen layered owners, the eight reviewed entries and the recorded additions | final-gate repair |
 | I5-01:namespace-lazy-equal | "the reference reports ... two configuration warnings"; "the toolkit ... no finding" | the reference expects no warning (8C); today's engine reports 18 companion findings on the pinned toolkit input (Plan 8) | 8C, final-gate repair |
 | I5-01:decide-indexed-equal | "the reference keeps its two warnings" | no warning | 8C, final-gate repair |
@@ -259,6 +304,7 @@ entry-footprints repair.
 | I5-11:changed-delta-document | "Exactly one `ramify.check/1` document" | `ramify.check/2` | 8B |
 | I5-11:plain-check-unchanged | "One bare `ramify.analysis/1` document" | `ramify.analysis/2` | 2 |
 | I5-13:entry-footprints | "Plan 2's entry footprint workloads on this build: idle CLI help, …" / "Each footprint is within Plan 2's recorded limit" | as for I2-29:entry-footprints | entry-footprints repair |
+| I5-13:repeated-edit-plateau | "Two hundred alternating edit and revert cycles"; "over the last hundred cycles" | 40 cycles on each of the reference and S100, with growth recorded over the last 30 | `14c5c2a8`, before the phase (named in the measurement-recipe repair) |
 | I5-14:declarations-final | "All eleven declarations match owners.md, including the six added lines and the removed increment line" | fifteen layered owners | final-gate repair |
 | I5-14:package-entries-unchanged | "all eight package entries"; "entry map is unchanged from Plan 2" | nine import entries and a stylesheet entry | `26bba1e2` (baseline repair 2) |
 

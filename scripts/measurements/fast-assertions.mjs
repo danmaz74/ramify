@@ -105,6 +105,80 @@ export function coverageMatches(fixture, timings, coverage, expected, state = {}
   return coverageEquals(coverage, expectedSignatureNotes(fixture, timings, state), expected);
 }
 
+/**
+ * The edit kinds whose update the measured runs show refused at the per-context
+ * retained-fact limit (`maxRetainedBytesPerContext`) and then retried broad.
+ */
+export const retainedLimitKinds = ['created', 'deleted'];
+
+/** The sample's row for the context `token` names; the only row when no token is known. */
+function contextOf(sample, token) {
+  const contexts = sample?.contexts;
+  if (!Array.isArray(contexts)) return null;
+  if (typeof token?.context !== 'string') return contexts.length === 1 ? contexts[0] : null;
+  return contexts.find(context => context?.token?.context === token.context) ?? null;
+}
+
+/**
+ * Reads the history reset that follows a refusal at the per-context retained-fact
+ * limit from the workload's own daemon telemetry, between `from` (the write) and
+ * `until` (the publication, or the hook's return). When a revision would exceed
+ * the limit, the session refuses it and marks itself stale; the daemon then
+ * discards every historical revision it can and retries once. Telemetry shows
+ * that as a sample of the context, still at the previous publication, with more
+ * than one retained revision and retained bytes within the daemon's reported
+ * limit, followed by one whose history holds a single revision while the
+ * analysis is still running. Returns null when the samples do not show that.
+ */
+export function retainedLimitReset(telemetry, token, beforeSequence, from, until) {
+  if (!Array.isArray(telemetry) || !Number.isSafeInteger(beforeSequence) || !finite(from) || !finite(until)) return null;
+  const samples = telemetry.filter(sample => finite(sample?.at) && sample.at >= from && sample.at <= until)
+    .map(sample => ({ at: sample.at, limit: sample.budgets?.maxRetainedBytesPerContext, context: contextOf(sample, token) }))
+    .filter(sample => sample.context?.published?.sequence === beforeSequence);
+  const reset = samples.findIndex(sample => sample.context.history?.retained === 1 && sample.context.pending?.analysisRunning === true);
+  if (reset < 1) return null;
+  const before = samples.slice(0, reset).findLast(sample => Number.isSafeInteger(sample.context.history?.retained) && sample.context.history.retained > 1);
+  const limit = samples[reset].limit;
+  if (!before || !Number.isSafeInteger(limit) || limit <= 0 || before.limit !== limit
+    || !finite(before.context.retainedBytes) || before.context.retainedBytes > limit) return null;
+  // The retry ends at the publication (`until`), or at the first sample that no longer shows it running.
+  const end = samples.slice(reset + 1).find(sample => !(sample.context.history?.retained === 1
+    && sample.context.level === 'hot' && sample.context.pending?.analysisRunning === true));
+  return { limitBytes: limit, retainedBytesBefore: before.context.retainedBytes, historyBefore: before.context.history.retained,
+    headroomBytes: limit - before.context.retainedBytes, resetObservedMs: samples[reset].at - from,
+    retryMs: (end?.at ?? until) - samples[reset].at, retryEnd: end ? 'analysis-stopped' : 'window-end' };
+}
+
+/**
+ * The largest retained-fact growth one membership revision added in this
+ * workload's created and deleted saves, from consecutive settled samples in
+ * write order; null when no such pair was recorded.
+ */
+export function membershipGrowth(data) {
+  const rows = retainedLimitKinds.flatMap(kind => data?.cycles?.[kind] ?? [])
+    .filter(cycle => finite(cycle?.writtenAt)).sort((a, b) => a.writtenAt - b.writtenAt);
+  let growth = null;
+  for (let index = 1; index < rows.length; index++) {
+    if (rows[index].revision?.checked?.path !== 'membership') continue;
+    const previous = contextOf(rows[index - 1].settled, rows[index - 1].revision?.token)?.retainedBytes;
+    const current = contextOf(rows[index].settled, rows[index].revision?.token)?.retainedBytes;
+    if (finite(previous) && finite(current) && current > previous) growth = Math.max(growth ?? 0, current - previous);
+  }
+  return growth;
+}
+
+/**
+ * A broad created or deleted revision is the daemon's retry after a refusal at
+ * the retained-fact limit only when telemetry shows the history reset before its
+ * publication, and the headroom left under the limit was smaller than the growth
+ * a membership revision of the same workload added. Otherwise null.
+ */
+export function retainedLimitRetry(data, kind, cycle, growth = membershipGrowth(data)) {
+  if (!retainedLimitKinds.includes(kind) || cycle?.revision?.checked?.path !== 'broad') return null;
+  const reset = retainedLimitReset(data?.telemetry, cycle.revision.token, cycle.beforeSequence, cycle.writtenAt, cycle.revision.publishedAt);
+  return reset && finite(growth) && growth > reset.headroomBytes ? { ...reset, membershipGrowthBytes: growth } : null;
+}
+
 const counterFields = ['analyses', 'revisions', 'coveredRequests', 'sweeps', 'audits'];
 const maintenance = counters => counters.sweeps + counters.audits;
 
@@ -311,6 +385,9 @@ export function assertFastWorkload(id, measurements) {
     const paths = { body: 'unchanged-surface', source: 'source', description: 'description', readme: 'metadata',
       created: 'membership', deleted: 'membership', configuration: 'broad', signature: 'source', companion: 'description' };
     const definition = data.fixtures?.find(item => item.name === name);
+    // A workload the recipe stopped at a failed analysis records where; it is a measured gap, never a pass.
+    if (data.failurePoint !== undefined) check('workload stopped at its measured failure point', false, data.failurePoint);
+    const growth = membershipGrowth(data), retries = Object.fromEntries(retainedLimitKinds.map(kind => [kind, []]));
     for (const kind of editKindsFor(name)) {
       const cycles = data.cycles?.[kind]; count(`${kind}: twenty cycles`, cycles, 20);
       for (const [index, cycle] of (cycles ?? []).entries()) {
@@ -329,11 +406,18 @@ export function assertFastWorkload(id, measurements) {
             finding.code === 'exposed-without-companion' && finding.location?.file === definition?.companion),
           cycle.hook?.document?.findings?.map(finding => finding.code) ?? null);
         }
-        check(`${kind} ${index + 1}: revision path`, cycle.revision?.checked?.path === paths[kind], cycle.revision?.checked?.path ?? null);
+        // A broad membership revision passes only as the recorded retry after a retained-limit refusal.
+        const retry = retainedLimitRetry(data, kind, cycle, growth);
+        if (retry) retries[kind].push(index + 1);
+        check(`${kind} ${index + 1}: revision path`, cycle.revision?.checked?.path === paths[kind] || retry !== null,
+          retry ? { path: cycle.revision.checked.path, retainedLimitRetry: retry } : cycle.revision?.checked?.path ?? null);
         retained(`${kind} ${index + 1}`, cycle.settled);
       }
       target(`${kind}: median session work (ms)`, med(cycles?.map(timing)), limit[kind]);
     }
+    // States, rather than hides, every broad membership revision accepted as a retained-limit retry.
+    check('membership revisions retried broad at the retained-fact limit', true,
+      { count: retainedLimitKinds.reduce((sum, kind) => sum + retries[kind].length, 0), ...retries, membershipGrowthBytes: growth });
     const racing = data.cycles?.body;
     check('racing hooks launched before publication', racing?.length > 0 && racing.every(cycle => cycle.hookStartedAt <= cycle.revision?.publishedAt),
       racing?.map(cycle => ({ started: cycle.hookStartedAt, published: cycle.revision?.publishedAt })) ?? null);
@@ -369,6 +453,7 @@ export function assertFastWorkload(id, measurements) {
   } else if (id === 'I5-13:repeated-edit-plateau') {
     for (const name of ['reference', 'S100']) {
       const data = measurements[name], cycles = data?.cycles;
+      if (data?.failurePoint !== undefined) check(`${name}: workload stopped at its measured failure point`, false, data.failurePoint);
       count(`${name}: alternating cycles`, cycles, budgets.repeatedCycles);
       for (const [index, cycle] of (cycles ?? []).entries()) { completed(`${name} ${index + 1}`, cycle, 0, [], { fixture: name }); retained(`${name} ${index + 1}`, cycle.settled); }
       check(`${name}: exactly two alternating identities`, new Set(cycles?.map(cycle => cycle.revision?.fingerprints?.inputId)).size === 2
@@ -491,6 +576,17 @@ export function fastDeferrals(workloads) {
       observed: { ready, clone },
       reason: 'Actual effective worker heap preflight plus twenty real structured-clone echo round trips separately for S1000 revision input and diagnostic arrays, with byte bounds and auxiliary thread cleanup. Includes both copies and scheduling; excludes analysis, JSON sizing and integrity hashing.' },
   };
+}
+
+/**
+ * The failure a derived row records for one source process workload that did
+ * not collect complete evidence: the point where it stopped, when recorded.
+ */
+export function derivedSourceFailure(row) {
+  const point = row?.measurements?.failurePoint;
+  const cause = point ? `stopped at ${point.phase} ${point.cycle} (${point.position}): ${point.message ?? point.hook?.reason ?? point.trigger}`
+    : row?.interrupted ? 'was interrupted' : `failed: ${String(row?.failures?.[0] ?? 'no complete evidence').split('\n')[0]}`;
+  return `Source process ${row?.id} ${cause}; this row has no complete evidence from it.`;
 }
 
 /** Derived instances reuse the same measured saves with their own predicates. */

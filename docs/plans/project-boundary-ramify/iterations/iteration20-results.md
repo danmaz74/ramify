@@ -497,3 +497,82 @@ Run by the coordinator on the final candidate; results appended below.
 ### Protected-file comparison and final handoff identity
 
 Run by the coordinator on the final candidate; results appended below.
+
+## Second measurement attempt on `a5b377e8`
+
+The first attempt, on `723d4698`, stopped in the resident recipe; its repair is
+the [measurement-recipe repair](measurement-recipe-repair-results.md), committed
+as `a5b377e8`. The coordinator ran the three approved recipes on `a5b377e8` in
+`/home/app/ramify-pb1`. Outputs are in
+`/home/app/ramify-pb1-evidence/a5b377e8/measurements/` (`timeline.txt`, each
+recipe's `.stdout`, `.stderr` and `.exit`, and `failed-run-archive/`).
+
+| Recipe | UTC | Exit |
+| --- | --- | --- |
+| `measure:resident` | 11:43:49–11:57:35 | 0 |
+| `measure:plan2a` | 11:57:35–12:07:41 | 0 |
+| `measure:fast` | 12:07:41–12:58:14 | 1 |
+
+In the fast report, the reference, S100 and X100 hook workloads,
+`repeated-edit-plateau`, `hot-warm-memory` and `entry-footprints` passed. Four
+rows failed:
+
+- `I5-13:hook-latency-s500`: eight `revision path` assertions. Created saves 5,
+  10, 15 and 20 and deleted saves 3, 8, 13 and 18 published on the broad path
+  where the recipe expects `membership`.
+- `I5-13:hook-latency-s1000`: the workload waited out its ten-minute guard at
+  its first "watcher already published" save.
+- `I5-13:checked-set-bounded` and `I5-13:cold-open`, only because they use the
+  S1000 process.
+
+**Diagnosis** (`/home/app/ramify-pb1-evidence/a5b377e8/fast-diagnosis/`). Both
+failures come from the per-context retained-fact limit of 96 MiB. A revision
+that would exceed it is refused, the session marks itself stale
+(`subs/analysis/src/session-engine.ts:817-820`), and the daemon discards the
+revision history and retries once, broad (`context-manager.ts:409-417`).
+
+- On S500 each create or delete adds about 6.88 MB. At each crossing the
+  history drops from six revisions to one, and the broad retry takes about 14 s
+  against about 2.1 s. The eight retries completed correctly.
+- On S1000, body edit 5 crossed the limit at 95.5 MB. The broad retry ran
+  about 27.6 s, then the session worker exited (1), and the hook answered
+  `analysis-failed: Session worker exited (1)` after 29.0 s. The daemon kept
+  the failed session, so every later hook answered `unavailable` in about
+  33 ms and nothing published again. This predates the phase (`640583cc`).
+
+The handoff records the [limit](../handoff.md#known-limitations) and the
+[defect](../handoff.md#known-defects-carried-forward).
+
+**Repair** (relay-settled option (a): the recipe only; no candidate source
+changed; uncommitted for the coordinator's review):
+
+- `fast-assertions.mjs`: a broad created or deleted revision passes its
+  `revision path` assertion only when the workload's daemon telemetry, between
+  the write and the publication, shows the context at the previous
+  publication with more than one retained revision and retained bytes within
+  the reported `maxRetainedBytesPerContext`, then a single retained revision
+  while the analysis runs. The headroom left under the limit must also be
+  smaller than the largest growth a membership revision of the same workload
+  added. The assertion records that evidence. A new row,
+  `membership revisions retried broad at the retained-fact limit`, lists the
+  accepted cycles. Any other broad revision still fails.
+- `fast-workloads.mjs` and `fast-driver.mjs`: a save whose hook answers
+  `unavailable`, or whose analysis settles without a new revision, stops the
+  workload at once. The workload records `failurePoint`: the phase, cycle,
+  hook answer and message, and, from telemetry, the retained bytes and history
+  before the reset and the retry's duration. A wait for publication also stops
+  once an analysis settles without publishing. The point fails the workload's
+  `workload stopped at its measured failure point` assertion.
+- `fast.mjs` and `verify-fast-evidence.mjs`: a derived row names each failed
+  source process and its failure point, and the reader's refusal carries that
+  text.
+- `fast-evidence.test.mjs`: three tests, for an accepted retry, rejected broad
+  revisions and the stop. `scripts/measurements/README.md` states both rules.
+
+Verification: `node --test scripts/measurements/*.test.mjs` passed, 10 files
+and 78 tests; `npm run type-check` exited 0. Over `s500.json` the rule
+accepts exactly the eight cycles named above and no other save, and the S500
+workload's assertions all pass. Over `s1000.json` the stop triggers first at
+body edit 5. It records 95,495,083 retained bytes with five revisions before
+the reset, a retry of about 27.7 s from the observed reset to the reply, and
+the worker's exit message. No recipe was rerun; the coordinator reruns them.
