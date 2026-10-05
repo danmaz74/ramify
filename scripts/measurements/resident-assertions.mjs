@@ -61,8 +61,17 @@ export function assertResidentWorkload(id, measurements) {
       check(`${name}: reported RSS equals raw observation`, observed === measurement?.rssBytes, measurement?.rssBytes);
       targetBytes(`${name}: RSS`, observed, limit);
     }
-    const helpPeak = rawPeak('help', measurements.help?.samples);
-    check('help contains real externally sampled RSS', helpPeak > 0 && helpPeak === measurements.help?.rssBytes, helpPeak);
+    const help = measurements.help, helpPeak = rawPeak('help', help?.samples);
+    // Relaxed by user decision, 2026-10-05: an entry that exits within one
+    // sampler interval may leave no resident sample. The measuring code marks
+    // it, and the raw samples, its wall time and the sampler interval must
+    // confirm the mark. A run of one interval or longer still needs real RSS.
+    if (help?.belowSamplingResolution === true) {
+      const interval = budgets.sampleIntervalMs, finiteOrNull = value => Number.isFinite(value) ? value : null;
+      check('help completed below sampling resolution', helpPeak === 0 && help.rssBytes === null
+        && help.samplerIntervalMs === interval && Number.isFinite(help.durationMs) && help.durationMs > 0 && help.durationMs < interval,
+      { durationMs: finiteOrNull(help.durationMs), samplerIntervalMs: finiteOrNull(help.samplerIntervalMs), sampledRssBytes: finiteOrNull(helpPeak) }, interval);
+    } else check('help contains real externally sampled RSS', helpPeak > 0 && helpPeak === help?.rssBytes, helpPeak);
   } else if (suffix.startsWith('cold-warm-broad-')) {
     const name = suffix.endsWith('reference') ? 'reference' : 'S100', limit = budgets[name];
     count('five independent cold starts', measurements.cold, budgets.coldSamples);

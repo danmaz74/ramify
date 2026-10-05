@@ -192,6 +192,19 @@ real daemon and helper/native descendants; controller memory is excluded from
 acceptance peaks. Sampled peaks can miss shorter spikes, and summed RSS counts
 shared mappings repeatedly.
 
+The compiled client can answer `ramify --help` faster than one sampler
+interval, so `entry-footprints` may hold no resident sample of it. The help
+record carries its measured wall time (`durationMs`), the sampler interval
+(`samplerIntervalMs`) and `belowSamplingResolution`. The measuring code sets
+that marker, with `rssBytes: null`, only when no sample holds resident bytes
+and the process exited within one interval. A marked row passes `help completed
+below sampling resolution` when its raw samples are complete and hold no
+resident bytes, the interval is the recipe's 50 ms and the wall time is finite,
+positive and below it. Any other help row must pass `help contains real
+externally sampled RSS`: a run of one interval or longer without a resident
+sample fails. This relaxes a reviewed check by user decision, 2026-10-05.
+The fast recipe reuses the same record and predicates.
+
 The values in `resident-plan.mjs` retain the numeric iteration-1 baselines.
 Empirical latency, RSS, heap and growth misses are advisory under the active
 scope decision. Missing samples, workload errors, invalid outcomes, exceeded

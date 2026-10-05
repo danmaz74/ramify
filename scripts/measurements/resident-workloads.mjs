@@ -10,6 +10,7 @@ import { packageRoot, median } from './common.mjs';
 import { treeIdentity } from './identities.mjs';
 import { measuredPath } from './resident-reuse.mjs';
 import { coldCommand, withResident } from './resident-failure.mjs';
+import { entryFootprint } from './resident-observer.mjs';
 
 const peak = samples => Math.max(0, ...samples.map(sample => sample.combinedRssBytes));
 function compactCli(sample, report) { return { pid: sample.pid, durationMs: sample.durationMs, code: sample.code, report,
@@ -60,8 +61,7 @@ export async function executeResidentWorkload(suffix, options, measurements, che
       const mark = short.observer.mark();
       const help = await command(executable, ['--help'], { env: short.environment, observer: short.observer });
       assert.equal(help.code, 0); assert.equal(help.stderr, ''); assert.match(help.stdout, /ramify/);
-      const samples = short.observer.since(mark);
-      measurements.help = { rssBytes: peak(samples), durationMs: help.durationMs, samples };
+      measurements.help = entryFootprint(short.observer.since(mark), help.durationMs, short.observer.intervalMs);
       const clientMark = short.observer.mark();
       const client = await command(process.execPath, ['--input-type=module', '--eval', "await import('ramify.ts/client'); await new Promise(resolve => setTimeout(resolve, 100));"], { observer: short.observer });
       assert.equal(client.code, 0); assert.equal(client.stderr, '');
