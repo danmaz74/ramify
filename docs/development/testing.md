@@ -115,6 +115,26 @@ reported reason. Fix the code, confirm the test passes and run affected regressi
 checks. Reproduce process or browser failures at that boundary. When a reliable
 reproduction is impractical, record why and the evidence used instead.
 
+## Flaky tests
+
+A flaky test fails in a full run but passes when run alone. Fixing one is often
+slow and rarely pays off, so a flake costs a record, not an investigation.
+
+- Keep the failing output. Nothing retries a test automatically.
+- Run the failing test alone three times. If all three pass, it is flaky and the
+  gate counts as passed for it, without rerunning the whole gate. If any of
+  the three fails, it is an ordinary failure and gets fixed.
+- Investigate only when the failure output points at a cheap fix, such as a
+  sleep standing in for an event or a shared directory or port, and stop after
+  about 15 minutes.
+- Record each occurrence in the plan's handoff, in a list of known flaky tests:
+  the test, date, gate and the path of the failing output.
+- Ask the user when a flake starts costing real time, for example at its third
+  occurrence or when it keeps forcing whole-gate reruns. Give a rough estimate
+  of fixing it against keeping it; the user decides whether to fix, quarantine
+  or keep it.
+- Skipping or quarantining a test requires the user's decision.
+
 ## Report what ran
 
 Record each required case's fixture, expected outcome, command, result and limits.
