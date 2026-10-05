@@ -5,6 +5,7 @@ import { runBatch } from '../../src/batch.js';
 import type { BatchOperation } from '../../src/interfaces/batch.js';
 import { runCli } from '../../subs/cli/src/index.js';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
+import { expectedGitAdviceLaunches, isGitAdviceLaunch } from '../../src/tests/entry-boundary-cases.js';
 import { cliProcess, compiledEntry } from '../../src/tests/process.js';
 import type { TraceEvent } from '../../src/tests/process.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
@@ -224,11 +225,11 @@ add('I1-28:no-servers', 'R', unchanged, async context => {
   // Re-reasoned in project-boundary iteration 17: inside a Git repository, as the run copy in the
   // checkout's work area is, the CLI also runs the advisory Git command once for the
   // ignored-but-walked warnings (contracts, "Git advisory warning"). It is a finite child of the
-  // CLI process, never a server or a daemon; it is reaped like the compiler helpers.
-  const advisory = (event: TraceEvent): boolean => event.pid === result.pid && event.command === 'git'
-    && (event.args ?? []).join(' ') === 'ls-files --others --ignored --exclude-standard --directory -z';
-  context.assertions.ok('at most one advisory Git command', result.events.filter(event => event.event === 'spawn' && advisory(event)).length <= 1);
-  const children = result.events.filter(event => event.event === 'spawn' && !advisory(event));
+  // CLI process, never a server or a daemon; it is reaped like the compiler helpers. Its count
+  // follows from the copy's location (iteration 17 fix), so a copy outside a repository runs none.
+  context.assertions.equal('one advisory Git command exactly when a .git entry is at or above the root',
+    result.events.filter(event => isGitAdviceLaunch(event, result.pid)).length, await expectedGitAdviceLaunches(context.root));
+  const children = result.events.filter(event => event.event === 'spawn' && !isGitAdviceLaunch(event, result.pid));
   context.assertions.ok('trace observes actual finite compiler integration', children.length >= 2);
   for (const [index, child] of children.entries()) {
     context.assertions.ok(`child ${index + 1} belongs to the reviewed compiler integration`, /configuration-helper\.js|compiler-helper\.js|\/@typescript\/typescript-(?:linux|darwin)-[^/]+\/lib\/tsc --api /.test([child.command, ...child.args ?? []].join(' ')));

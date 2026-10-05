@@ -213,7 +213,8 @@ exercise denied imports, invalid declarations, selected outside-source warnings,
 stray descriptions and unavailable invocation/configuration. Help/version trace
 loaded modules. Process probes record socket and process operations, captured
 handle counts and child termination; only the reviewed finite compiler helpers
-are permitted. Root-owned process tests additionally cover installed bin use,
+are permitted. Inside a Git repository a complete check also starts its one finite Git advice
+command, which the handlers count exactly. Root-owned process tests additionally cover installed bin use,
 SIGINT during acquisition/catalog work and broken stdout pipes.
 
 After `npm run build`, `npm run reference:verify -- --plan 1 --iteration 13`
