@@ -777,7 +777,7 @@ writes it as one `ramify.check/2` document. The command exits 0 with no finding,
 1 with findings or an invalid revision, whatever paths are not analyzed, and 2
 when a path was not checked, and it never falls back to batch. The whole
 report is built only for `scope: 'report'`, which the plain `ramify check` requests
-for its unchanged `ramify.analysis/2` document. The
+for its `ramify.analysis/2` document, to which the CLI adds only its Git advice. The
 [CLI invocation contract](cli-invocation.spec.md#hook-and-complete-checks) pairs the
 two forms.
 

@@ -13,16 +13,33 @@ function warningFiles(warning: ProjectWarning): string {
   return ` (${warning.files.join(', ')}${more > 0 ? `, and ${more} more` : ''})`;
 }
 
+/** A path as one human field: control characters, such as a newline in a name, are shown escaped. */
+const shownPath = (path: string): string => /[\u0000-\u001f\u007f]/u.test(path) ? JSON.stringify(path) : path;
+
+/** One named path's disposition: checked paths name their evidence, others why they were not analyzed or checked. */
+function pathLine(item: CheckDocument['paths'][number]): string {
+  const module = item.module === null ? '' : `; module ${item.module}`;
+  if (item.disposition === 'checked') return `Path ${shownPath(item.path)}: checked (${item.reason}${module})`;
+  const why = item.disposition === 'not-analyzed' && item.exclusion ? `${item.exclusion.kind} ${shownPath(item.exclusion.directory)}` : item.reason;
+  return `Path ${shownPath(item.path)}: ${item.disposition === 'not-analyzed' ? 'not analyzed' : 'not checked'} (${why}${module})`;
+}
+
+/**
+ * Root, mode, findings, warnings and limits, then one line per named path, then the
+ * outcome. Only a checked path is labelled checked: a not-analyzed path is one the
+ * complete check does not analyze either, and it never reads as passing.
+ */
 export function formatChangedHuman(document: CheckDocument): string {
   const lines = [`Root: ${document.root}`,
     `Mode: resident (${document.revision ? `revision ${document.revision.sequence}; ${document.revision.path}` : document.reason ?? 'no revision'})`];
   for (const finding of document.findings) lines.push(`Error${finding.new ? ' [new]' : ''} [${finding.code}]${finding.location ? ` ${location(finding.location)}` : ''}: ${finding.message.replace(/[\r\n]+/g, ' ')}`);
-  for (const warning of document.warnings) lines.push(`Warning [${warning.code}] ${warning.path}: ${oneLine(warning.message)}`);
+  for (const warning of document.warnings) lines.push(`Warning [${warning.code}] ${shownPath(warning.path)}: ${oneLine(warning.message)}`);
   for (const limit of document.coverage) lines.push(`Analysis limit [${limit.code}] ${location(limit.location)}: ${limit.message.replace(/[\r\n]+/g, ' ')}`);
+  for (const item of document.paths) lines.push(pathLine(item));
+  const count = (disposition: CheckDocument['paths'][number]['disposition']): number => document.paths.filter(item => item.disposition === disposition).length;
+  const paths = `${count('checked')} checked, ${count('not-analyzed')} not analyzed, ${count('not-checked')} not checked`;
   const checked = document.checked ? `${document.checked.files.length} files (${document.checked.files.join(', ') || 'none'}), ${document.checked.accesses} accesses` : 'none';
-  // A path the daemon did not analyze, or could not check, names its disposition.
-  const paths = document.paths.map(item => item.disposition === 'checked' ? item.path : `${item.path} (${item.disposition}: ${item.reason})`);
-  lines.push(`${document.outcome === 'checked' ? 'Checked' : `Not checked (${document.reason})`}: ${paths.join(', ')}; checked set: ${checked}; wait: ${document.timings.waitedMs.toFixed(1)} ms; findings: ${document.findings.length}`);
+  lines.push(`Outcome: ${document.outcome === 'checked' ? `checked (${paths})` : `not checked (${document.reason}; ${paths})`}; checked set: ${checked}; wait: ${document.timings.waitedMs.toFixed(1)} ms; findings: ${document.findings.length}`);
   return lines.join('\n') + '\n';
 }
 
@@ -72,7 +89,7 @@ export function formatHuman(report: AnalysisReport, mode: string): string {
     if (issue.original) lines.push(`  Original: ${issue.original.owner}/${issue.original.file}#${issue.original.binding}`);
     for (const related of issue.related) lines.push(`  Related: ${location(related)}`);
   }
-  for (const warning of report.warnings) lines.push(`Warning [${warning.code}] ${warning.path}: ${oneLine(warning.message)}${warningFiles(warning)}`);
+  for (const warning of report.warnings) lines.push(`Warning [${warning.code}] ${shownPath(warning.path)}: ${oneLine(warning.message)}${warningFiles(warning)}`);
   for (const limit of report.coverage) lines.push(`Analysis limit [${limit.code}] ${location(limit.location)}: ${limit.message}`);
   lines.push(`Execution: ${report.outcome.execution}; check: ${report.outcome.check}; coverage: ${report.outcome.coverage}`);
   lines.push(`Stages: ${report.stages.map(stage => `${stage.stage}=${stage.status}`).join(', ')}`);

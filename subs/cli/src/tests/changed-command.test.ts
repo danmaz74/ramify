@@ -292,7 +292,8 @@ describe('changed check command', { timeout: 30_000 }, () => {
       expect(configuration.document).toMatchObject({ outcome: 'not-checked', reason: 'configuration-changed', exitCode: 2,
         revision: null, execution: null, findings: [], checked: null,
         paths: [{ path: 'tsconfig.json', disposition: 'not-checked', module: 'fixture', exclusion: null, reason: 'configuration-changed' }] });
-      expect(formatChangedHuman(configuration.document!)).toContain('Not checked (configuration-changed): tsconfig.json');
+      expect(formatChangedHuman(configuration.document!)).toContain('Path tsconfig.json: not checked (configuration-changed; module fixture)\n'
+        + 'Outcome: not checked (configuration-changed; 0 checked, 0 not analyzed, 1 not checked); checked set: none;');
       // The next hook waits for the revision the configuration edit queued.
       await writeFile(join(f.root, 'src/main.ts'), 'export const value = 2;\n');
       const source = await command(f.root, f.quick.connect);

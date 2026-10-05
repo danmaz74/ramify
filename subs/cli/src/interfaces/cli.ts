@@ -36,7 +36,22 @@ export interface CliEnvironment {
   /** Resolves a refusal when this client cannot run the installed build, otherwise null.
    * A command awaits it before it connects or runs batch; help and version do not. */
   readonly buildRefusal?: () => Promise<string | null>;
+  /** Root-owned Git command port for the advisory `ignored-but-walked` warnings of a complete
+   * check. Without it a check gives no Git advice; tests inject a scripted port. */
+  readonly git?: GitPort;
 }
+/**
+ * What Git answered for one selected root. `listed` carries Git's NUL-terminated list of
+ * the repository-ignored untracked entries beneath the root, relative to it, a wholly
+ * ignored directory named once with a trailing `/`. Every other answer gives no advice.
+ */
+export type GitAnswer =
+  | { readonly status: 'listed'; readonly output: Uint8Array }
+  | { readonly status: 'not-repository' }
+  | { readonly status: 'unavailable' }
+  | { readonly status: 'failed'; readonly message: string };
+/** Lists the ignored entries beneath a canonical project root. It never throws for a Git failure. */
+export type GitPort = (root: string, control?: RunControl) => Promise<GitAnswer>;
 /** Why a changed check could not establish its result, for the whole request or one path. */
 export type NotCheckedReason = 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | 'configuration-changed' | 'classification-changed';
 /** One named path of a `ramify.check/2` document: the daemon's disposition, or not checked

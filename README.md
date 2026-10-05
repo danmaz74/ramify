@@ -127,8 +127,9 @@ npx ramify affected --path src/foo.ts --batch --format json
 
 `ramify affected` names the modules whose tests a change calls for: the changed
 modules, the modules that depend on them and their union as test modules, from
-one revision's dependency facts. A path outside every module, or partial
-coverage, widens the answer to every module and says why. It exits 0 for any
+one revision's dependency facts. Each path seed is owned, excluded or outside
+the project; only a path outside the project, written with a leading `../`, or
+partial coverage widens the answer to every module and says why. It exits 0 for any
 complete answer, 1 for an invalid project, unknown module ID or invalid seed,
 2 when unavailable and 130 when interrupted.
 
@@ -144,7 +145,9 @@ npm run reference:verify -- --plan 1
 working directory unless `--root` is given. It includes owned tests and
 resources. `--batch` uses and disposes a fresh
 session. Human output is the default; JSON output is one versioned report on
-stdout. See the [CLI contract](docs/architecture/cli-invocation.spec.md) for
+stdout. Inside a Git repository a complete check also warns about each
+directory Git ignores that Ramify still walks; that advice never changes the
+result. See the [CLI contract](docs/architecture/cli-invocation.spec.md) for
 scope and exit codes. `--help` and `--version` load no compiler or server.
 
 `check --changed <path>...` is the bounded hook check. It hashes the named files

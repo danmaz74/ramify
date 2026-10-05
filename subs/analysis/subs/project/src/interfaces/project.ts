@@ -105,9 +105,11 @@ export interface ExactReference {
  * are an open set: a reader tolerates a code it does not know.
  * `compiler-selected-owned-ignored` and `compiler-selected-scratch` name, at the
  * tree or scratch directory, compiler-selected source Ramify does not analyze.
+ * `ignored-but-walked`, which only the CLI adds from Git's output and never the
+ * analysis, names a repository-ignored directory Ramify still walks; it lists no files.
  */
 export interface ProjectWarning {
-  readonly code: 'compiler-selected-owned-ignored' | 'compiler-selected-scratch';
+  readonly code: 'compiler-selected-owned-ignored' | 'compiler-selected-scratch' | 'ignored-but-walked';
   readonly path: string;
   readonly message: string;
   /** Where file evidence is needed: a bounded, byte-ordered prefix of the files, with `count` the total. */

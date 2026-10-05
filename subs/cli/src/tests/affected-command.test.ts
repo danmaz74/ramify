@@ -108,7 +108,7 @@ describe('affected command through the real resident service (A7-10)', { timeout
         'Mode: resident',
         `Revision: sequence ${revision.sequence}, input ${revision.inputId}`,
         'Selection: dependency-closure',
-        'Path subs/core/module.ramify: example/core (declaration)',
+        'Path subs/core/module.ramify: owned by example/core (declaration)',
         'Changed modules (2):', '  example/core (subs/core)', '  example/mid (subs/mid)',
         'Affected modules (1):', '  example/app (subs/app)',
         'Test modules (3):', '  example/app (subs/app)', '  example/core (subs/core)', '  example/mid (subs/mid)',
@@ -130,13 +130,13 @@ describe('affected command through the real resident service (A7-10)', { timeout
         selection: 'all-modules', widening: ['unowned-path'] });
       const human = await invoke(f.root, f.quick.connect, ['affected', 'example/lone', '--path', '../notes.md']);
       expect(human.exit).toBe(0);
-      expect(human.stdout).toContain('Selection: all-modules (widened: unowned-path)\nPath ../notes.md: no module (none)\n');
+      expect(human.stdout).toContain('Selection: all-modules (widened: unowned-path)\nPath ../notes.md: outside the project\n');
       expect(human.stdout).toContain('Test modules (5):\n  example (.)\n');
       // Root-owned documentation selects the root by containment, and an installed-package path selects nothing; neither widens.
       const owned = await invoke(f.root, f.quick.connect, ['affected', '--path', 'docs/notes.md', '--path', 'node_modules/x/index.js']);
       expect(owned.exit).toBe(0);
-      expect(owned.stdout).toContain('Selection: dependency-closure\nPath docs/notes.md: example (containment)\n'
-        + 'Path node_modules/x/index.js: no module (excluded, packages node_modules)\nChanged modules (1):\n  example (.)\n'
+      expect(owned.stdout).toContain('Selection: dependency-closure\nPath docs/notes.md: owned by example (containment)\n'
+        + 'Path node_modules/x/index.js: excluded (packages node_modules)\nChanged modules (1):\n  example (.)\n'
         + 'Affected modules (0):\nTest modules (1):\n  example (.)\n');
     } finally { await f.dispose(); }
   });

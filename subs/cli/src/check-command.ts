@@ -5,6 +5,7 @@ import type { CliEnvironment, CliExitCode } from './interfaces/cli.js';
 import { capabilities, printReport } from './command-support.js';
 import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
 import { changedCommand } from './changed-command.js';
+import { withGitAdvice } from './git-advice.js';
 
 interface CheckArguments { readonly root?: string; readonly format: 'human' | 'json'; readonly batch: boolean;
   readonly changed?: readonly string[]; readonly since?: string; readonly deadlineMs?: number;
@@ -19,7 +20,8 @@ export async function checkCommand(args: CheckArguments, environment: CliEnviron
       ...(args.root === undefined ? {} : { root: args.root }), capabilities,
       ...(args.snapshot === false ? { snapshot: false } : {}) }, control);
     if (result.status === 'cancelled' || control.signal?.aborted) throw new Error('Interrupted');
-    const code = printReport(result.report, mode, output, environment);
+    // Git advice joins the report's warnings before printing; it never changes the exit code.
+    const code = printReport(await withGitAdvice(result.report, environment.git, control), mode, output, environment);
     return result.exitCode === 2 ? 2 : result.exitCode === 1 && code === 0 ? 1 : code;
   }
   async function fallback(message: string): Promise<CliExitCode> {
@@ -62,7 +64,7 @@ export async function checkCommand(args: CheckArguments, environment: CliEnviron
         if (value.status === 'reported' && value.report) {
           const revision = value.published ? `context ${token.context}; revision ${value.revision.sequence}; ${value.revision.checked.path}`
             : `context ${token.context}; unpublished`;
-          return printReport(value.report, `resident (daemon ${connection.daemon.instance.pid}; ${revision}; synchronized${value.freshness.reusedRevision ? '; revision reused' : ''})`, output, environment);
+          return printReport(await withGitAdvice(value.report, environment.git, control), `resident (daemon ${connection.daemon.instance.pid}; ${revision}; synchronized${value.freshness.reusedRevision ? '; revision reused' : ''})`, output, environment);
         }
         if (value.status === 'cancelled') throw new CliFailure('cancelled', 'Check was cancelled', value);
         if (value.status === 'unavailable' && ['expired-generation', 'unknown-context'].includes(value.reason) && !reopened) {

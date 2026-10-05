@@ -3,10 +3,11 @@
 The CLI parses supported arguments, reaches the resident daemon through an injected connector or runs an injected batch operation, formats completed reports, revision deltas for the files a caller names, streamed revisions and daemon status, and selects the documented process exit code. It contains no checking algorithm and keeps help, version and status independent of compiler and server startup. Its affected command prints module test selections from the resident service or a fresh batch session.
 
 `runCli(argv, environment, control?)` accepts output sinks, a working directory,
-the package version, a service connector, a `BatchOperation` and, for
-`affected --batch`, an `AffectedBatchOperation`. Root supplies the real connector
-and batch bindings, lazy in the Node entry and a Node child in the compiled
-client, and owns SIGINT and stream cleanup.
+the package version, a service connector, a `BatchOperation`, for
+`affected --batch` an `AffectedBatchOperation`, and an optional Git command port.
+Root supplies the real connector and batch bindings, lazy in the Node entry and a
+Node child in the compiled client, and the production Git port, and owns SIGINT
+and stream cleanup.
 The handler validates the complete invocation before dispatch and checks stage
 completion before reporting success. Pre-analysis invocation failures use
 `ramify.cli/1`; plain check results retain the bare `ramify.analysis/2` document.
@@ -18,8 +19,10 @@ the daemon's `classification-changed` answer says which paths are analyzed, and
 the command hashes those, a missing file as an absent identity, and asks again
 within the remaining deadline, retrying a stale classification once. JSON output
 is one `ramify.check/2` document with each path's disposition; human output marks
-new findings and names the revision path, checked set, wait and any path not
-checked or not analyzed. Findings anywhere in the project fail the check; a path
+new findings, prints one `Path` line per named path, `checked`, `not analyzed`
+or `not checked` with its reason, module and exclusion, then an `Outcome` line
+with those counts, the checked set and the wait. Only a checked path reads as
+checked. Findings anywhere in the project fail the check; a path
 not analyzed changes nothing. Cold, overdue, unobserved, superseded,
 configuration-named, unclassifiable and unavailable checks, and checks with a path
 not checked, exit 2 explicitly. This command never calls the batch
@@ -39,6 +42,21 @@ session. A check falls back to batch only after unexpected daemon failure has
 exhausted recovery; the fallback is visible on stdout in human mode and stderr
 in JSON mode. Explicit stop, incompatible peers and rejected requests retain
 their errors. Neither watch nor the client entry falls back.
+
+`affected` prints one line per path seed saying whether it is owned, with its
+module, basis and any owned-ignored or scratch exclusion, excluded, with its
+exclusion, or outside the project.
+
+A complete check, resident, batch or fallback, inside a Git repository adds one
+nonblocking `ignored-but-walked` warning for each directory Git ignores beneath
+the selected root that Ramify still walks, in the human report and in the JSON
+report's warnings and summary count. The command takes Git's NUL-terminated
+list from the injected port and classifies each directory by the report's
+ownership facts and the canonical reserved segments; excluded directories, their
+descendants and entries outside the root give none. No port, no repository,
+missing Git or a failed Git command give no advice and print nothing; the advice
+never changes the outcome, findings or exit code. `--changed`, `watch` and
+`affected` ask Git nothing.
 
 `--no-snapshot` prints a complete check's JSON report with `snapshot: null` and
 every other member unchanged. The batch operation receives it and drops the

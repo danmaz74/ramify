@@ -91,7 +91,7 @@ have selected it.
 
 This owned inventory is the application source set supplied to model
 validation. Compiler exclusion alone does not invalidate an exposure of an
-owned file. The outside-module file inventory described below is separate.
+owned file.
 
 Plan 1 handles one configuration as one program. A solution-style
 configuration that has `references` and no files of its own is an unavailable
@@ -106,11 +106,6 @@ errors are `tsc`'s concern and never appear in the result or affect the exit
 code.
 
 ## Files outside modules
-
-**Pending Git advice.** Discovery prunes declared nested trees and module
-scratch directories, is no longer stopped by a nested `tsconfig.json`, and
-analyzes auxiliary source; the first two warnings below are reported, and the
-Git warning remains pending.
 
 Ownership follows the
 [module description specification](../model/module-description.spec.md):
@@ -129,6 +124,23 @@ each repository-ignored directory the check would still enter. The CLI derives
 that last warning from Git's output; it is never an analysis input and never
 changes the result. Root selection follows the root marker, as
 [selecting the project](#selecting-the-project) states.
+
+The Git advice is the warning `ignored-but-walked`, located at the directory
+and listing no files. A complete check, resident, batch or after batch
+fallback, adds it once its report is complete. When `.git` exists at or above
+the selected root, the CLI runs
+`git ls-files --others --ignored --exclude-standard --directory -z` once in
+that root, bounded in time and output, and reads its NUL-terminated entries as
+they are, whitespace and newlines included. It warns about each listed
+directory beneath the root that the revision's ownership leaves Ramify to
+enter, naming the module whose walk enters it; an excluded directory, its
+descendants, the root itself and entries outside it give none. No repository,
+no `git` executable and a failed or oversized command give no warning and
+print nothing. The advice reads no ignore file, never enters the report's
+input identity or scope, and never changes ownership, selection, findings or
+the exit code. It appears among the human report's warnings and in the JSON
+report's `warnings`, counted in its summary. The bounded hook check, `watch`
+and `affected` ask Git nothing.
 
 A selected file inside an owned-ignored tree or a module's scratch directory
 is neither inventoried nor read, the compiler does not receive it as a root
@@ -172,18 +184,19 @@ None is an allowed import or an external package.
 
 The human report prints the root and how it was selected, the compiler
 configuration in use, a `Mode:` line, failures first, then warnings, then
-analysis limits, then the completed scope. `--format json` writes the unchanged
-`ramify.analysis/2` report to stdout, without the human mode line or an added mode
-member. Invocation failures use a `ramify.cli/1` diagnostic document. Logging goes
-to stderr; nothing else is written to stdout in that mode. Locations are relative
-to the root regardless of the working directory. Ordering is deterministic.
+analysis limits, then the completed scope. `--format json` writes the
+`ramify.analysis/2` report to stdout, unchanged apart from the Git advice
+warnings, without the human mode line or an added mode member. Invocation
+failures use a `ramify.cli/1` diagnostic document. Logging goes to stderr;
+nothing else is written to stdout in that mode. Locations are relative to the
+root regardless of the working directory. Ordering is deterministic.
 
-When project boundaries are implemented, every machine document whose payload
-shape they change moves to its next version, including `ramify.analysis/2`,
-`ramify.check/2`, `ramify.affected-cli/2` and the IPC protocol
-`ramify.ipc/2`. No reader for the earlier version is kept: a version number
-changes so that an outdated reader fails on it rather than misreading the
-document. Documents whose shape does not change keep their version.
+Project boundaries moved every machine document whose payload shape they
+changed to its next version, including `ramify.analysis/2`, `ramify.check/2`,
+`ramify.affected-cli/2` and the IPC protocol `ramify.ipc/2`. No reader for an
+earlier version is kept: a version number changes so that an outdated reader
+fails on it rather than misreading the document. Documents whose shape did not
+change keep their version.
 
 `--no-snapshot` leaves the snapshot, the record of every evaluated import, out of
 that report. The report keeps `ramify.analysis/2` and sets `snapshot` to null; its
@@ -259,7 +272,10 @@ including one in an owned-ignored tree or a scratch directory, selects its
 owner and that owner's transitive importers. A path in an external tree or
 another always-excluded path selects nothing. Only a path outside the project,
 written with a leading `../`, widens the answer to all modules; any other
-malformed seed is an invalid seed. The selection's scope carries the
+malformed seed is an invalid seed. Human output prints one line per path
+seed: owned, with its module, basis and any owned-ignored or scratch
+exclusion; excluded, with its exclusion; or outside the project. The
+selection's scope carries the
 revision's whole ownership topology: its modules and their rooted exclusions,
 while repository, package and generated segments are excluded wherever they
 occur. These answers use `ramify.affected-cli/2`, carrying a
@@ -279,7 +295,7 @@ with exit 2; it never substitutes an approximate result.
 
 | Form | Role | Waits for | Answers not checked |
 | --- | --- | --- | --- |
-| `ramify check --changed <path>...` | Bounded hook check | A daemon revision covering the named files' identities, up to `--deadline` (default 2000 ms) | Yes, exit 2, when it cannot answer in time or at all: a cold daemon, an expired deadline, unobserved or superseded content, or a named configuration file. It never falls back to batch. |
+| `ramify check --changed <path>...` | Bounded hook check | A daemon revision covering the identities of the named paths its classification analyzes, up to `--deadline` (default 2000 ms) | Yes, exit 2, when it cannot answer in time or at all: a cold daemon, an expired deadline, unobserved or superseded content, a named configuration file, or a classification that changes again after its one retry. It never falls back to batch. |
 | `ramify check` | Complete check | A synchronized revision covering every current input, including any pending configuration rebuild, with no deadline | No. It reports the whole project; exit 2 means it could not complete. |
 | `ramify check --batch` | Independent complete check | A fresh session that trusts no retained daemon state | No. It reports the whole project; exit 2 means it could not complete. |
 
@@ -296,16 +312,19 @@ not verified, never as a pass. An end-of-task hook, a pre-commit hook or CI runs
 complete check gives a configuration edit its verdict.
 
 The hook check names paths relative to the selected root and hashes those the
-daemon's classification analyzes. It exits 0
-when the covering revision has no findings, 1 for findings or an invalid
-revision, and 2 when it was not checked, naming the reason. One known limit:
+daemon's classification analyzes. It exits 0 when the covering revision has no
+findings and 1 for findings or an invalid revision, whatever paths are not
+analyzed, and 2 when the result could not be established, naming the reason.
+Its human output prints one line per named path with its disposition, reason,
+module and exclusion, then an outcome line with the counts of each
+disposition; only a checked path reads as checked. One known limit:
 where the root `tsconfig.json` carries `references` beside its own files, a
 created or deleted file makes the daemon find the project again rather than
 reuse what it knows, so those hooks are slower than the same hooks elsewhere.
 
-When project boundaries are implemented, the hook check gives each named path
-one disposition. `checked` means the covering revision completed the relevant
-analysis with evidence of the path's current content or its deletion; deleting
+The hook check gives each named path one disposition. `checked` means the
+covering revision completed the relevant analysis with evidence of the path's
+current content or its deletion; deleting
 previously analyzed source is checked once its removal is analyzed.
 `not-analyzed` means the complete check does not analyze the path either: it
 lies in an owned-ignored, external or scratch directory or another

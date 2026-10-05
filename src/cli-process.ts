@@ -7,6 +7,7 @@ import type { AffectedBatchOperation, BatchOperation } from './interfaces/batch.
 import { createBuildRefusal, createServiceConnector, type ClientLocation } from './client.js';
 import { reportCapacity } from './report-capacity.js';
 import { createPublicationQueue } from './publication-queue.js';
+import { createGitPort } from './git-command.js';
 
 export interface CliProcessOptions {
   /** Installed package root; its manifest supplies the version. */
@@ -75,7 +76,7 @@ export async function runCliProcess(options: CliProcessOptions): Promise<void> {
         catch (error) { outputFailure(); throw error; }
       }, stderr: text => write(process.stderr, text),
       connect: createServiceConnector(manifest.version, options.location),
-      batch: options.batch, affectedBatch: options.affectedBatch,
+      batch: options.batch, affectedBatch: options.affectedBatch, git: createGitPort(),
       explore: (input, control) => import('./explore-launcher.js').then(module => module.launchInstalledExplorer(input,
         { packageRoot: options.packageRoot, version: manifest.version, ...(options.location ? { location: options.location } : {}),
           ...(process.env.RAMIFY_ENDPOINT_DIR ? { endpointDirectory: process.env.RAMIFY_ENDPOINT_DIR } : {}) }, control)),

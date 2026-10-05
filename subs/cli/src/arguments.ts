@@ -21,20 +21,28 @@ are discovered from the working directory; --root gives an explicit root.
                    configuration changes included.
   check --batch    Independent complete check in a fresh session that trusts no
                    daemon state.
-  check --changed  Bounded hook check. Hashes the named paths relative to the
-                   root and waits for a daemon revision covering them; it never
-                   falls back to batch. A named configuration file, such as
-                   tsconfig.json, a file it extends or a package manifest, is
-                   answered at once as not checked while the daemon verifies it.
-                   --deadline bounds the wait (default 2000 ms; maximum
-                   600000 ms) but does not delay that reply. --since marks
-                   findings added since that revision.
+  check --changed  Bounded hook check with the complete check's findings and
+                   exit code. Paths are relative to the root; the daemon
+                   classifies them by the project's ownership, the CLI hashes
+                   those that classification analyzes, and the check waits for
+                   a daemon revision covering them. It never falls back to
+                   batch. Each path is checked, not analyzed (an excluded,
+                   ignored or inert path, which the complete check does not
+                   analyze either) or not checked. A named configuration file,
+                   such as tsconfig.json, a file it extends or a package
+                   manifest, is answered at once as not checked while the daemon
+                   verifies it. --deadline bounds the wait (default 2000 ms;
+                   maximum 600000 ms) but does not delay that reply. --since
+                   marks findings added since that revision.
   --no-snapshot    Leave the snapshot of every evaluated import out of a
                    complete check's JSON report. The report keeps its schema
                    and sets "snapshot": null; its summary, outcome and findings
                    are unchanged.
 --since and --deadline require --changed; --changed cannot accompany --batch.
 --no-snapshot requires --format json and cannot accompany --changed.
+Inside a Git repository, a complete check also warns about each directory Git
+ignores that Ramify still walks (ignored-but-walked); that advice never
+changes the result.
 Watch streams revisions until interrupted. Status and stop never start a daemon.
 
 materialize refreshes one module's or the whole project's generated .ramify
@@ -76,9 +84,10 @@ falls back to batch analysis.
 
 Exit codes: 0 completed, 1 violations or invalid input, 2 unable to complete,
 130 interrupted. Warnings and analysis limits alone do not fail a check.
-Changed checks: 0 checked with no findings, 1 findings or invalid revision,
-2 not checked (including cold, deadline, unobserved or superseded content, and a
-named configuration file).
+Changed checks: 0 no findings and 1 findings or an invalid revision, exactly as
+the complete check, whatever paths are not analyzed; 2 the result could not be
+established: a path not checked (cold, deadline, unobserved or superseded
+content, a named configuration file, or a classification that changed again).
 materialize: 0 every requested target complete, 1 the project is invalid,
 2 unavailable, partial/rollback failure, deadline, supersession or incompatible
 service, 130 interrupted.

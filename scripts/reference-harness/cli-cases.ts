@@ -221,7 +221,14 @@ add('I1-28:no-servers', 'R', unchanged, async context => {
   const result = await cliProcess(context.root, ['check', '--batch', '--root', context.root, '--format', 'json']);
   processResult(context, result, 0);
   context.assertions.equal('no socket listen/bind or alternate process launcher', result.events.filter(event => ['listen', 'bind', 'other-launch'].includes(event.event)), []);
-  const children = result.events.filter(event => event.event === 'spawn');
+  // Re-reasoned in project-boundary iteration 17: inside a Git repository, as the run copy in the
+  // checkout's work area is, the CLI also runs the advisory Git command once for the
+  // ignored-but-walked warnings (contracts, "Git advisory warning"). It is a finite child of the
+  // CLI process, never a server or a daemon; it is reaped like the compiler helpers.
+  const advisory = (event: TraceEvent): boolean => event.pid === result.pid && event.command === 'git'
+    && (event.args ?? []).join(' ') === 'ls-files --others --ignored --exclude-standard --directory -z';
+  context.assertions.ok('at most one advisory Git command', result.events.filter(event => event.event === 'spawn' && advisory(event)).length <= 1);
+  const children = result.events.filter(event => event.event === 'spawn' && !advisory(event));
   context.assertions.ok('trace observes actual finite compiler integration', children.length >= 2);
   for (const [index, child] of children.entries()) {
     context.assertions.ok(`child ${index + 1} belongs to the reviewed compiler integration`, /configuration-helper\.js|compiler-helper\.js|\/@typescript\/typescript-(?:linux|darwin)-[^/]+\/lib\/tsc --api /.test([child.command, ...child.args ?? []].join(' ')));
