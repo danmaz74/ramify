@@ -130,6 +130,22 @@ not checked with the reason `configuration-changed`, exit 2. The repair is to
 answer such an uncaptured file `not-analyzed`; it is left for after the
 phase, so that the hook check does not change before the measurements.
 
+## Known limitations
+
+- **Inert files count toward the acquisition limit.** Discovery records every
+  file in an ordinary directory by kind and path, and acquisition counts
+  those entries against its limit of 50,000 captured files. A project with
+  10,000 inert and 5,000 excluded files checks with the same analyzed files,
+  accesses, findings, inventory and captured bytes as without them, but
+  50,001 inert files give an explicit `resource-limit` error, exit 2, in
+  batch and resident checks. The remedy is to declare the directory
+  `owned-ignored` or `external`. Evidence:
+  `/home/app/ramify-pb1-evidence/iteration20/workflow/` (`scale.sh`,
+  `limit.sh`).
+- **Not measured in this phase.** The architect view's size and timing
+  measurements of Plans 2B and 2C lie outside the three recipes the user
+  approved for iteration 20, and no reference instance needs them.
+
 ## Follow-ups
 
 Deferred by the user to a later plan, not Phase 1:
@@ -143,6 +159,65 @@ Deferred by the user to a later plan, not Phase 1:
   verification baselines, which decision 10 of the
   [main plan](main-plan.md) keeps expecting the note on F's exposed `value`,
   back to "no note".
+
+Left open by this phase, without an owning slice:
+
+- **Count only files whose content is read** toward the acquisition limit,
+  which fits the glossary: an inert file is not inventoried.
+- **Lockfiles in the hook check**: answer an uncaptured configuration-named
+  file `not-analyzed`, as [known defects](#known-defects-carried-forward)
+  describes.
+- **A symlinked path in the hook check and in `affected`.** The hook check
+  resolves a named path through symbolic links and reports its real path and
+  owner; `affected` reports the same spelling as an installed package with no
+  owner. Disposition and exit code are right either way; the two should
+  agree.
+- A scope without a root module answers an in-project path as `invalid-path`.
+- A compiler-selected file reached through a link into a declared tree still
+  becomes a compiler root, and a `#` import-map entry pointing at a
+  dependency is not recognised as a package import.
+- The membership refusal for a failed resolution into an absent directory is
+  broader than needed.
+- A warm session publishes a new revision, with the same input identity and
+  findings, for an inert edit.
+- Three historical probe scripts build compiler hosts without `realpath` and
+  `directoryExists`; no gate runs them.
+
+## Wordings settled through the relay session
+
+The user's decisions reached the coordinator through a relay session, which
+also settled questions it judged clear-cut under the user's standing
+instruction. These are the ones the relay settled itself; the user was told
+of each and may override any of them:
+
+- The JavaScript rule first applied outside `src/` only (iteration 8C). The
+  user then worded the glossary's "Compiler source" entry on 2026-10-05,
+  which settles it.
+- The two `I5-01` instances compare two pinned Plan 5 builds, no longer the
+  current engine (`c99db9c4`).
+- The unused `referenced-resource` placement is removed (iteration 14).
+- Each hook check makes one classification round trip, with no client-side
+  cache, and `cli-invocation.spec.md` says a client hashes an owned file
+  before the revision shows it to be no analysis input, which narrows a
+  sentence of review decision R4 (iteration 15).
+- `module-description.spec.md` no longer says owned-ignored contents are never
+  "watched"; `daemon.md` states that the watcher prunes declared trees from a
+  context's first completed revision on (`86c1a7f2`).
+- The CLI keeps a copy of Project's reserved-name rule for the Git advice,
+  guarded by a test, and gives that advice on complete checks only
+  (iteration 17).
+- The `entry-footprints` measurement check accepts a help run recorded as
+  completed below sampling resolution (`befc5e77`), which relaxes a reviewed
+  pass/fail check.
+- Iteration 18's gate also ran the Plan 2A verification.
+- PB1-31 states the implemented production rule: files beneath `src/` with a
+  production profile (iteration 19).
+- In the wording package of 2026-10-05: the specification's statement of the
+  configuration rule in the hook check, its exact list of configuration-named
+  files, the sentence that an inert file is hashed and watched only when a
+  revision captures it, and keeping the lockfile behaviour for this phase.
+- The acquisition limit and the unmeasured Plan 2B and 2C views are accepted
+  for this phase, as [known limitations](#known-limitations) states.
 
 ## Reference rows whose prose is stale
 
