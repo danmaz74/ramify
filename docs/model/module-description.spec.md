@@ -205,7 +205,9 @@ is an always-excluded path or lies beneath one is invalid; a declared tree may
 contain always-excluded paths.
 
 Do not descend into either kind. Owned-ignored contents retain their owner but
-are never inventoried, compiled by Ramify, checked or watched. External contents
+are never inventoried, compiled by Ramify or checked, and a change beneath them
+never affects a result. The [daemon architecture](../architecture/daemon.md)
+states from when a resident watcher registers nothing beneath them. External contents
 have no owner in this evaluation. Plain data needs no declaration. A project
 within an owned-ignored tree is data to the enclosing evaluation and a separate
 project when selected as its own root. A project within a declared tree of

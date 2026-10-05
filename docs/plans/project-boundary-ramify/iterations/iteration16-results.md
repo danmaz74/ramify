@@ -387,3 +387,15 @@ recorded as a rule deviation, not as gate evidence. The agent did not run
 `reference:verify`; the coordinator's milestone gate runs the audit,
 `reference:cases` and the full verification of plans 1, 2, 5 and 2A on the
 committed candidate.
+
+After the milestone gate, the watcher window was settled by the relay session
+under the user's standing instruction; the user was told and may override it.
+The layout specification keeps the result guarantee for owned-ignored
+contents (never inventoried, compiled by Ramify or checked, and a change
+beneath them never affects a result) and no longer says "watched"; the daemon
+architecture states the timing: the watcher prunes declared trees from the
+first completed revision on, and before it only the reserved names are pruned
+and events from declared trees are ignored. The milestone gate on `3b5c168f`
+passed `reference:cases` and the verification of plans 1, 2, 5 and 2A with
+only the measurement instances failing; its audit step failed once on the
+load-sensitive explorer test MT09, which is repaired separately.

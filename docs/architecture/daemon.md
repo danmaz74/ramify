@@ -741,8 +741,8 @@ loses nothing the context reads and opens no gap. `ContextStatus.registrations`
 reports the active watcher's scope sequence, registered directory count and the
 excluded directories it pruned (at most 20, byte-ordered, with their total);
 null while no watcher is attached. Before the first completed revision the
-watcher registers by the reserved-path rules alone, and that revision's
-exclusions then prune the rest. Changes beneath an exclusion that a stage
+watcher registers by the reserved-path rules alone; events from declared trees
+are ignored in that window, and that revision's exclusions then prune the rest. Changes beneath an exclusion that a stage
 observed, such as a compiler listing of a scratch directory, are reconciled by
 sweeps, a plain synchronized check's included, and by the re-observation hints
 of a changed check that captures, never by a registration beneath the exclusion.
