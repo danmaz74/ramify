@@ -144,6 +144,56 @@ Deferred by the user to a later plan, not Phase 1:
   [main plan](main-plan.md) keeps expecting the note on F's exposed `value`,
   back to "no note".
 
+## Reference rows whose prose is stale
+
+Every reviewed instance row stays byte-identical, because the instance tables
+are compared with the archived plans. These rows' prose no longer describes
+what their instance asserts; each instance asserts the behavior in the third
+column and passes. The table collects the lists in the receipts of iterations
+2, 3, 3B, 4, 8B, 8C and 17, baseline repair 2, the final-gate repair and the
+entry-footprints repair.
+
+| Row | Prose now stale | What the instance asserts | Since |
+| --- | --- | --- | --- |
+| I1-01:baseline | "the two configuration warnings are separate" | no warnings; both files are root auxiliary source | 8C |
+| I1-02:stray-description | "alongside ordinary outside-source warning" | no warning; the file beneath the stray marker has no owner | 8C |
+| I1-02:loose-subs-source | "One aggregated `subs` warning count 1; no ... owner" | root auxiliary source, no warning | 8C |
+| I1-02:sibling-tests | "One `tests` warning count 1" | root auxiliary, ordinary; still no testing classification | 8C |
+| I1-02:sibling-interfaces | "One `interfaces` warning count 1; no owner" | root auxiliary; still no exposure or third area | 8C |
+| I1-27:self-check | "independent scripts/site/example absent from program" | scripts are analyzed auxiliary source; site and example stay absent | 8C |
+| I1-28:compiled-cli-warnings/human, /json | "Visible aggregated warning" / "Same warning/count" | no warning; exit 0 unchanged | 8C |
+| I1-28:compiled-cli-stray-description/human, /json | "marker not included in ordinary-file warning count" | no warning exists | 8C |
+| I1-29:nested-project-root/root-example, /child-example | "enclosing subs ancestry does not cross nearer non-subs boundary" | the nested project is selected because its description carries the root marker | 3B |
+| I1-29:outside-module-target | "Warning plus located outside-scope analysis limit" | a definite `not-visible` denial; still no allowed verdict, no external | 8C |
+| I1-29:stray-files | "Warnings root config-extra count 1 and tests count 2 only; ... ignored file silent" | all four files root auxiliary, no warning | 8C |
+| I1-30:production-selection/toolkit | "build consumes identical selected set" | the build also emits the explorer bundle from inputs outside the selection and does not emit the selected ambient `styles.d.ts` | `d5c24982` (baseline repair 2) |
+| I2-01:cold-context | "two warnings" | zero warnings | 8C |
+| I2-19:batch-no-daemon | "finite compiler helpers remain permitted" (also its Plan 2 subcase text) | the handler also permits the one advisory Git child when a `.git` entry is at or above the root | 17 (iteration 17 fix) |
+| I2-20:json-bare-report | "One `ramify.analysis/1` document" | `ramify.analysis/2` | 2 |
+| I2-21:json-lines | "One `ramify.watch/1` object per line" | `ramify.watch/2` | 3 |
+| I2-29:entry-footprints | "Idle CLI help, … CLI check client." / "Within the budget table; recorded raw." | help has no budget, and a fast exit is recorded without an RSS figure; the raw samples are kept | entry-footprints repair |
+| I2-30:self-check-fifteen | "no findings or limits" | 38 nonblocking limits, all in auxiliary source; still no finding | 8C |
+| I2-30:declarations-final | "Eleven declarations match owners.md" | fifteen owners, the eleven archived declarations plus named layers | final-gate repair |
+| I2-30:package-entries | "Resolve all eight entries" | nine import entries and a stylesheet entry | `26bba1e2` (baseline repair 2) |
+| I2A-02:explicit-config-excluded | "as application or outside-module source" | generated output never becomes application source; outside-module source no longer exists | 8C (named in 4) |
+| I2A-13:declarations-package | "Eleven declarations and eight package entries validate" | fifteen layered owners, the eight reviewed entries and the recorded additions | final-gate repair |
+| I5-01:namespace-lazy-equal | "the reference reports ... two configuration warnings"; "the toolkit ... no finding" | the reference expects no warning (8C); today's engine reports 18 companion findings on the pinned toolkit input (Plan 8) | 8C, final-gate repair |
+| I5-01:decide-indexed-equal | "the reference keeps its two warnings" | no warning | 8C, final-gate repair |
+| I5-06:export-removed-missing | "Remove the export `revisionScopeSchema` from the vocabulary file" | removes `resolvePredecessors` from the catalog core's `history.ts`; the checked set is that file and its importers | final-gate repair |
+| I5-06:wide-fanin-bounded | "which 56 importing accesses reach"; "at most those 56" | 61 importing accesses | `ff01212e` (final-gate repair) |
+| I5-11:changed-delta-document | "Exactly one `ramify.check/1` document" | `ramify.check/2` | 8B |
+| I5-11:plain-check-unchanged | "One bare `ramify.analysis/1` document" | `ramify.analysis/2` | 2 |
+| I5-13:entry-footprints | "Plan 2's entry footprint workloads on this build: idle CLI help, …" / "Each footprint is within Plan 2's recorded limit" | as for I2-29:entry-footprints | entry-footprints repair |
+| I5-14:declarations-final | "All eleven declarations match owners.md, including the six added lines and the removed increment line" | fifteen layered owners | final-gate repair |
+| I5-14:package-entries-unchanged | "all eight package entries"; "entry map is unchanged from Plan 2" | nine import entries and a stylesheet entry | `26bba1e2` (baseline repair 2) |
+
+Archived prose outside the instance tables, not edited: Plan 1's
+`subcases.md` exact-reason table uses "root marker" for the root description
+file, and its I1-29:nested-project-root subcase keeps the `subs/`-ancestry
+wording (3B); Plan 7's `cases.json` A7-02 `unowned-root-file`, `docs-path` and
+`dotdot-rejected` and its `contracts.md` "Query validation" and "Path
+resolution" describe affected answers before containment (iteration 14).
+
 ## Known flaky tests
 
 The user's policy of 2026-10-05: a failing test is run alone three times; if
@@ -155,3 +205,4 @@ occurrence is listed here with its failing output.
 | `src/tests/compiled-client.test.ts`, A7-11:compiled-child: the compiled client's result for `affected example/mid --path docs/notes.md --batch` differed from the Node entry's, in the relocated copy only | 2026-10-04 | Iteration 14, Plan 1 `I1-28:relocated-package` | `.reference-work/evidence/7cf05b52-22e2-42df-a7e6-b196b78231c2.json.gz` in the phase worktree; investigation in [the receipt](iterations/iteration14-fix-results.md) | Not reproduced; cause unknown. The test now records both outputs. |
 | `subs/explorer/src/tests/ModuleTreePage.test.tsx`, MT09 | 2026-10-04 | Iteration 16 milestone, audit | Audit run `refs/audited/runs/2026-10-04T23-24-54Z-3b5c168fa` | Resolved: a product defect, repaired in `e3c10dc8`. |
 | `subs/analysis/src/tests/session-worker.test.ts`, "cancels queued and active calls without losing the last published revision" | 2026-10-05 | Iteration 17 rerun, Plan 1 `I1-28:relocated-package` | `.reference-work/evidence/f030a68f-8c50-4572-82f9-e2f026a5d3b0.json.gz` in the phase worktree | Resolved: a product defect in the session host, repaired with [this receipt](iterations/session-cancel-repair-results.md). |
+| `scripts/reference-harness/self.test.ts`, "checks the real toolkit and detects the independently specified dispatch type violation": timed out at its 180,000 ms limit | 2026-10-05 | Iteration 20 qualification, locked `npm run reference:cases` on `befc5e77` in the second worktree, while unlocked focused runs and another session's gate were running | `/home/app/ramify-pb1-evidence/iteration20/cmd/reference-cases.err` | Flaky: three locked runs of the file alone passed in 85 s, 94 s and 86 s (`iteration20/flaky-self/run{1,2,3}.out`). |
