@@ -12,6 +12,11 @@ The authorization applies to the text in this file at the baselines below,
 which the planner verified: each "Old" block occurs exactly once in its
 document.
 
+**Revision, 2026-10-06.** After iteration 0, the coordinator decided how a
+configuration file's governed set is computed: by directory, instead of every
+module. P1's captured-input bullet below states that decision. The coordinator
+requested the wording change, and no other P1 or P2 text changed.
+
 | Document | Baseline sha256 at `b4858aec` | Last commit touching it |
 | --- | --- | --- |
 | `docs/architecture/cli-invocation.spec.md` | `7386295542372967c25040735d89e8e9e5230323d4320e57490bf2c031f32e6a` | `6598a29d` |
@@ -95,10 +100,12 @@ applies decides:
   owner;
 - a captured input of the revision, meaning content or absence it read and
   fingerprinted rather than an existence probe, is a `captured-input` and
-  selects every module it governs. The compiler configuration, a
-  configuration it extends and a package manifest govern every module. Any
-  other captured input governs the owners of the analyzed files that read or
-  probed it, or every module when none did;
+  selects every module it governs. A package manifest, present or absent,
+  and the compiler configuration govern the module that owns their directory
+  and every module whose directory lies at or beneath it. A configuration the
+  compiler configuration extends governs what the configurations extending it
+  govern. Any other captured input governs the owners of the analyzed files
+  that read or probed it, or every module when none did;
 - any other owned path is `inert` and selects nothing.
 
 The changed modules are the module seeds and every module a path seed

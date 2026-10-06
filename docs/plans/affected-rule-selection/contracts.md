@@ -86,15 +86,44 @@ named like a configuration file.
 
 ### Governed sets
 
-- **The whole project.** An input with role `configuration`, and a captured
-  input whose last segment is `package.json`, govern every inventoried module.
-  The configuration compiles every module's source, auxiliary source included.
-  The manifest decides package resolution and module format for all of them.
-- **Its readers.** Any other captured input governs the owners of the files in
+- **Configuration files, by directory.** A configuration file is a captured
+  input that is either:
+  - an input with role `configuration`, or
+  - an input whose last segment is `package.json`, present with content read
+    or recorded `absent`.
+
+  It governs the module that owns its directory and every module whose
+  directory lies at or beneath its directory. A nested manifest changes
+  resolution and module format only for the files beneath it.
+
+  The selected compiler configuration governs by its own directory. Every
+  other `configuration` input is a configuration that the selected one
+  extends, directly or transitively. It governs what every configuration
+  extending it governs, which is the selected configuration's set, because
+  Ramify captures only that one chain. Iteration 1 verifies that no
+  `configuration` input lies off the chain.
+
+  Examples:
+  - the root `tsconfig.json`, its base and a root `package.json` govern every
+    module;
+  - an absent `subs/a/package.json` governs `app/a` and `app/a/grand`;
+  - an absent `scripts/package.json` governs `app`, the owner of `scripts/`.
+
+  The owner is included because a manifest in a directory that is not a
+  module directory, such as `scripts/`, changes resolution for that owner's
+  auxiliary source there. Without the owner, the rule would select nothing for
+  it. Where the file's directory is a module directory, the owner is that
+  module, so the owner adds nothing new.
+
+  A `package.json` at or beneath a module's `src/` never reaches this rule:
+  it is `source-area`, by row 5.
+- **Other captured inputs, by readers.** Any other captured input governs the owners of the files in
   `indexes.contributors[path]`: the analyzed files whose description reads it,
   resolves it or probed its absence.
 - **The fallback.** When no file contributes the path, the input governs every
   inventoried module.
+
+Every governed set is non-empty.
 
 ### Module lists and empty answers
 
@@ -298,10 +327,13 @@ illustrative; iteration 1's tests record the exact ones.
 
 ### Example: one seed per kind
 
-These are the same query on the same revision, one seed each. Each row shows
-the seed and the members that differ from the document above. All of them
-have `widening: []` and `selection: 'dependency-closure'`, except the last,
-and `coverage` is complete.
+These are the same query on the base revision, one seed each, except the
+readers row, which uses the data variant. Each row shows the seed and the
+members that differ from the document above. All of them have `widening: []`,
+`selection: 'dependency-closure'` and complete coverage, except two:
+
+- the readers row: the data variant's coverage is partial;
+- the last row: it is outside the project.
 
 | Kind | Seed (`path`, `status`, `module`, `basis`, `exclusion`, `kind`, `selects`) | `changedModules` | `affectedModules` | `testModules` |
 | --- | --- | --- | --- | --- |
@@ -310,7 +342,8 @@ and `coverage` is complete.
 | `description` | `subs/a/module.ramify`, owned, `app/a`, declaration, null, `description`, `["app/a"]` | app/a | app, app/b | app, app/a, app/b |
 | `readme` | `subs/a/README.md`, owned, `app/a`, declaration, null, `readme`, `[]` | — | — | — |
 | `captured-input` | `tsconfig.json`, as in the complete document | all five | — | all five |
-| `captured-input` (readers) | `data/limits.json` in the data variant, owned, `app`, containment, null, `captured-input`, `["app/b"]` | app/b | — | app/b |
+| `captured-input` (nested manifest) | `subs/a/package.json`, absent, owned, `app/a`, containment, null, `captured-input`, `["app/a", "app/a/grand"]` | app/a, app/a/grand | app, app/b | app, app/a, app/a/grand, app/b |
+| `captured-input` (readers) | `data/limits.json` in the data variant, owned, `app`, containment, null, `captured-input`, `["app/b"]` | app/b | — | all five; `selection: 'all-modules'`, `widening: ['partial-coverage']`, coverage partial with one `resource-target` note. The widening is existing behavior, not this plan's rule. |
 | `inert` (`.md` in `src/`) | `subs/b/src/prompt.md`, owned, `app/b`, inventory, null, `inert`, `[]` | — | — | — |
 | `inert` (other) | `notes/design.md`, owned, `app`, containment, null, `inert`, `[]` | — | — | — |
 | `ignored` | `subs/a/src/tmp/new.ts`, owned, `app/a`, containment, `{ kind: 'scratch', directory: 'subs/a/src/tmp', owner: 'app/a' }`, `ignored`, `[]` | — | — | — |
@@ -330,8 +363,12 @@ The plan adds:
 
 The **data variant** is a second revision. In it `subs/b/src/consumer.ts`
 imports `../../../data/limits.json` under `resolveJsonModule`. It is a separate
-revision because the import may add a coverage note. Coverage is complete in
-the base revision.
+revision because the import adds a `resource-target` coverage note, so the
+data variant's coverage is partial. Every answer of the data variant
+therefore widens with `partial-coverage` and `all-modules`, and its
+`testModules` lists all five modules. That widening is existing behavior and
+not part of this plan's rule; ramify-audit 0.6.0 already handles it. Coverage
+is complete in the base revision.
 
 The module IDs are `app`, `app/a`, `app/a-extra`, `app/a/grand` and `app/b`.
 The reverse edges are `a -> app` and `a -> b`. "all" means all five IDs.
@@ -357,7 +394,9 @@ The reverse edges are `a -> app` and `a -> b`. "all" means all five IDs.
 | `tsconfig.json` | owned / app / containment / null | captured-input | all | all | [] |
 | `tsconfig.base.json` | owned / app / containment / null | captured-input | all | all | [] |
 | `package.json` | owned / app / containment / null | captured-input if captured with content, else inert | all, else [] | all, else [] | [] |
-| `data/limits.json` (data variant) | owned / app / containment / null | captured-input | [app/b] | [app/b] | [] |
+| `data/limits.json` (data variant) | owned / app / containment / null | captured-input | [app/b] | [app/b] | [], widened `partial-coverage` (existing behavior) |
+| `subs/a/package.json` (absent) | owned / app/a / containment / null | captured-input, if the revision records it `absent`, else inert | [app/a, app/a/grand], else [] | [app/a, app/a/grand], else [] | [app, app/b], else [] |
+| `scripts/package.json` (absent) | owned / app / containment / null | captured-input, if the revision records it `absent`, else inert | [app], else [] | [app], else [] | [], else [] |
 | `subs/a/subs/grand/new.txt` | owned / app/a/grand / containment / null | inert | [] | [] | [] |
 | `scripts/run.sh` | owned / app / containment / null | inert | [] | [] | [] |
 | `.devcontainer/devcontainer.json` | owned / app / containment / null | inert | [] | [] | [] |
@@ -379,16 +418,19 @@ Combined queries:
 - Module ID `app/b` with `.devcontainer/devcontainer.json`: changed [app/b],
   affected [].
 
-Three cells depend on facts that iteration 0 records:
+Iteration 0 recorded the facts that three rows depend on:
 
-- the `package.json` row, by its recorded role;
-- the `data/limits.json` row, by its recorded role and contributors;
-- the `.devcontainer` row, which assumes the fixture does not read that file's
-  content.
+- `package.json` is captured with content, so it is `captured-input`.
+- `data/limits.json` in the data variant is captured with content, and its
+  contributor is `subs/b/src/consumer.ts`.
+- `.devcontainer/devcontainer.json` is an existence probe, so it is `inert`.
 
-Once those facts are recorded, the rule decides each cell. If a fact turns out
-differently, iteration 0 records it and reports it to the coordinator before
-iteration 1.
+The two nested-manifest rows depend on whether the base revision records the
+path as `absent`, which iteration 0 did not list. Iteration 1 lists the base
+revision's `absent` inputs named `package.json` before writing those
+expectations. If a path is not recorded, the row's case runs on
+`projectAffected` with assembled facts that hold it as `absent`, with the same
+expected values, and the results file records it.
 
 Today's 0.2.0 answers differ in these rows:
 
@@ -424,6 +466,16 @@ ramify/service-api]. "all 15" means changed all fifteen modules and affected [].
 | `.` | inert | [] | root + 5 |
 | `subs/presentation/subs/project-view/src/tests/fixtures/dependency-models.json` | source-area | [ramify/presentation/project-view] | unchanged |
 | `subs/presentation/subs/layout/module.ramify` | description | [ramify/presentation/layout] | unchanged |
+| `subs/service-api/package.json` (absent) | captured-input | [ramify/service-api] | not in iteration 0's baseline; 0.2.0 selects the owner `ramify/service-api` |
+| `subs/daemon/package.json` (absent) | captured-input | [ramify/daemon, ramify/daemon/contexts] | not in iteration 0's baseline; 0.2.0 selects the owner `ramify/daemon` |
+| `scripts/package.json` (absent) | captured-input | [ramify] | not in iteration 0's baseline; 0.2.0 gives root + 5 |
+
+Iteration 0 recorded the three `package.json` rows as `absent` inputs of the
+toolkit's revision. Of the 77 recorded `package.json` paths outside `dist`
+and `node_modules`:
+- those in owned-ignored trees are `ignored`, by row 1;
+- those beneath a `src/` are `source-area`, by row 5;
+- every other one governs by its directory.
 
 The `tsconfig.scripts.json`, `tsconfig.build.json` and `tsconfig.portable.json`
 files are existence-only probes in the toolkit's revision, so they are `inert`.

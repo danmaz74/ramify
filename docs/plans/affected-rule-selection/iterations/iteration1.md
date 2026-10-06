@@ -75,8 +75,22 @@ iteration ends:
 5. **Rule.** In `resolvePath`:
    - compute `kind` in the contracts' eight-row precedence order, with the
      `.md` row before the `src/` row, and leave `basis` unchanged;
-   - compute `selects`, giving governed sets as byte-ordered module IDs and
-     mapping contributor files to owners through the inventory;
+   - compute `selects`, giving governed sets as byte-ordered module IDs. Follow
+     [governed sets](../contracts.md#governed-sets):
+     - **Configuration files** (role `configuration`, or a captured
+       `package.json`, present or absent) govern by directory: the owner of
+       the file's directory plus every module whose directory lies at or
+       beneath it.
+     - **The extends chain.** A `configuration` input other than the selected
+       configuration (`scope.configuration`, made project-relative) governs
+       the selected configuration's set.
+     - **Other captured inputs** map contributor files to their owners
+       through the inventory, and govern every module when there are none.
+   - check that every `configuration` input other than the selected one lies
+     on its extends chain, using the configuration data the session already
+     holds. If the engine keeps no record of the chain, rely on the observation
+     that the revision captures only that chain, and record this in the
+     results file. If an input is found off the chain, stop and report;
    - build `seedIds` from module seeds plus every `selects`, not from
      `module`.
 
@@ -107,11 +121,27 @@ iteration ends:
 Write expected values from the contracts and iteration 0's recorded facts, not
 from output.
 
-- **`subs/analysis/src/tests/affected-rule.test.ts`.** Change the
-  characterization's expected values to the contracts' examples table and the
-  combined queries (AR-01 to AR-03). Keep one assertion per row.
+- **`subs/analysis/src/tests/affected-rule.test.ts`.**
+  - Change the characterization's expected values to the contracts'
+    examples table and the combined queries (AR-01 to AR-03). Keep one
+    assertion per row.
+  - Keep the data variant's recorded widening: `all-modules`,
+    `['partial-coverage']`, `testModules` all five. It is existing behavior.
+  - Add the two nested-manifest rows. First list the base revision's `absent`
+    inputs named `package.json`. A row whose path the revision does not
+    record moves to the pure cases below, with the same expected values;
+    record that in the results file. Do not change the fixture to create or
+    avoid such probes.
 - **`subs/analysis/src/tests/affected-query.test.ts`.** Add pure cases:
   - a captured input with no contributors selects every module;
+  - configuration files by directory, each with exact expected `selects`:
+    - an absent `subs/a/package.json` governs `app/a` and `app/a/grand`;
+    - an absent `scripts/package.json` governs `app`;
+    - a root `package.json` and the selected root configuration govern every
+      module;
+    - an extended base configuration governs the selected configuration's
+      set;
+    - a `package.json` under `subs/a/src/` stays `source-area`;
   - an existence-only `dependency` input with 0 bytes is inert;
   - a `dependency` input with the empty-file sha256 is captured;
   - an absent `scripts/x.js` is `auxiliary-source` when the configuration
@@ -161,7 +191,7 @@ Run any other test file you changed the same way. Do not run the full suite.
      finds only the history sentence in `cli-invocation.spec.md`.
    - `git diff --stat b4858aec -- '**/module.ramify'` is empty.
 2. **AR-07.** After `npm run build`, run
-   `dist/src/ramify affected --batch --format json --path <p>` for the 15
+   `dist/src/ramify affected --batch --format json --path <p>` for the 18
    toolkit paths. Record the table: path, kind, selects, changed, affected,
    widening. Compare it with the
    [expected toolkit table](../contracts.md#expected-toolkit-answers-with-030).

@@ -73,7 +73,7 @@ documents, `ramify-agent/`, `/ramify` or any ramify-audit checkout.
      - `notes/design.md`.
    - `indexes.contributors['data/limits.json']`, and whether any contributor
      key is owned, outside every `src/`, not compiler source and not under an
-     exclusion. List up to ten if so; these are the paths rule row 6 will
+     exclusion. List up to ten if so; these are the paths rule row 7 will
      select through contributors.
    - the coverage notes of the data variant, and whether it widens with
      `partial-coverage`.

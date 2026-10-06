@@ -59,7 +59,7 @@ coordinator says so before iteration 1.
 | --- | --- | --- |
 | J1 | Version | `0.3.0`. The answer schema is incompatible, which takes a minor version under 0.x, as 0.2.0 did. |
 | J2 | Where the rule lives | The `ramify affected` paragraphs of [cli-invocation.spec.md](../../architecture/cli-invocation.spec.md) (patch P1) and the glossary status line (P2). Both were authorized by the coordinator on 2026-10-06 as spec corrections expressing accepted decisions. Plus the affected row in [daemon.md](../../architecture/daemon.md). No principles or model-specification change. |
-| J3 | Which modules a compiler configuration governs | Every inventoried module. The root configuration compiles all owned source, including auxiliary source it does not select. A configuration it extends, and a captured `package.json`, govern the same set. |
+| J3 | Which modules a configuration file governs | Revised by the coordinator after iteration 0. A captured configuration file, present or absent, governs the module that owns its directory and every module whose directory lies at or beneath that directory. Configuration files are the selected compiler configuration, the configurations it extends and any `package.json`. A configuration a `tsconfig` extends governs what every configuration extending it governs. So the root `tsconfig.json` and root `package.json` govern every module, while an absent `subs/service-api/package.json` governs only `service-api` and the modules beneath it. A nested manifest changes resolution only for files beneath it, so selecting every module would be padding. The planner added the owner of the directory: for a manifest in a non-module directory such as `scripts/`, modules beneath alone would select nothing. See [governed sets](contracts.md#governed-sets). |
 | J4 | Which modules any other captured input governs, such as an imported data file or an absent resolution candidate | The owners of the analyzed files that read or probed it (`indexes.contributors`). Every inventoried module when none did. |
 | J5 | `.md` paths | Every `.md` path selects nothing, wherever it lies, including beneath `src/`. A module README has kind `readme`; every other `.md` path has kind `inert`. This rule precedes the `src/` rule. Dan's decision is literal: "that's a consequence of being classified as inert". ramify-agent's runtime prompts beneath `src/` are an accepted miss under D1, which full audits catch. |
 | J6 | Module README | Selects nothing, by decision 1 and J5, even though the revision captures it with role `readme`. |
@@ -70,6 +70,19 @@ coordinator says so before iteration 1.
 | J11 | Toolkit audits between iteration 1 and adoption | With ramify-audit 0.4.0, toolkit audits in default mode cannot read `/3` and fall back to full (`ramify-unavailable`). Every gate in this plan already uses `--full`. |
 | J12 | Who reads `/3` | ramify-audit 0.6.0, through a Plan 8 iteration briefed from [contracts](contracts.md). [Contracts](contracts.md) is therefore the complete reader contract. |
 | J13 | The audit's stage 2 under `/3` | An `undetectedConfigFilesForcingFullAudit` entry is accepted only when its seed has `kind: 'inert'`. Every other kind is refused, and the refusal names the kind. This is the audit's behavior, which the [handoff](iterations/iteration2.md#handoff) states. |
+
+## Execution record
+
+- **Iteration 0** (`ec586cb0`, `ed74ad7d`).
+  - The plan-start audit was a reused record of the full audit of
+    `b4858aec`. ramify-audit 0.4.0 resolved the reuse as requested, because
+    the plan commit changed only documents. That reuse is correct.
+  - The gate audit ran fresh.
+  - Coordinator corrections after iteration 0:
+    - The data variant widens with `partial-coverage`. That is existing
+      behavior and not part of this rule.
+    - The contributors rule is row 7.
+    - Configuration files govern by directory (J3).
 
 ## Engine limits found while planning
 
