@@ -80,8 +80,8 @@ level. No `parent` or `children` declaration overrides physical containment.
 
 Every in-project path has exactly one module owner: its nearest enclosing
 module, excluding child-module subtrees, declared external trees and
-always-excluded paths other than the module's scratch directory. Owned-ignored
-trees remain owned. The root owns configuration, documentation and other paths
+always-excluded paths other than the module's scratch directory. Owned
+nested trees remain owned. The root owns configuration, documentation and other paths
 that no child owns. Ownership is determined for existing, new and deleted
 paths without requiring an inventory entry.
 
@@ -132,7 +132,7 @@ A description carrying the root marker, other than the selected root's, is a
 layout error wherever discovery meets it, including beneath `subs/`: the root
 of another project inside the tree belongs within a declared nested tree.
 An excluded description is not interpreted by this evaluation; one carrying
-the root marker inside a declared tree of either kind is the root of a
+the root marker inside a declared tree of any kind is the root of a
 separate project.
 
 Analyze all owned compiler source outside those exclusions, including source
@@ -143,7 +143,7 @@ a `.js`, `.jsx`, `.mjs` or `.cjs` extension when it lies beneath a module's
 defaults to `checkJs`); no other extension makes a file compiler source. Inside
 `src/`, a JavaScript file the compiler does not load is reported as an analysis
 limit; every other file there, apart from a misplaced `module.ramify`, is a
-resource. Outside `src/` and the owned-ignored trees,
+resource. Outside `src/` and the owned nested trees,
 owned compiler source is auxiliary source. Every other owned file there, apart
 from `module.ramify` files and module READMEs, is an inert file: it is not
 inventoried and receives no source classification, even when the compiler
@@ -174,19 +174,30 @@ to escape its checked boundary.
 
 Discovery implements the declaration, validation and pruning rules of this
 section, and acquisition reports the warning about compiler-selected source in
-an owned-ignored tree.
+an owned nested tree.
 
 A module declares each nested tree in its own description, using a directory
-relative to the module and one of two kinds: `owned-ignored` or `external`.
-The directory must lie strictly beneath that module and outside every child
-module. External trees must lie outside the declaring module's `src/`;
-owned-ignored trees may lie within owned source, including `src/tests/`.
+relative to the module and one of three kinds:
+
+| Kind | Owned by the declaring module | Analyzed | Its directory is a separate project's root |
+| --- | --- | --- | --- |
+| `owned-unwired` | yes | never | no |
+| `owned-nested-project` | yes | never | yes |
+| `external` | no | never | not stated |
+
+`owned-unwired` and `owned-nested-project` are the owned kinds. The kind is what
+the declaration says; Ramify never verifies it against the directory's
+contents. The directory must lie strictly beneath the declaring module and
+outside every child module. External trees must lie outside the declaring
+module's `src/`; owned trees may lie within owned source, including
+`src/tests/`.
 
 ```ramify
 ramify 1
 root module shop
 
-owned-ignored "examples/demo"
+owned-unwired "docs"
+owned-nested-project "examples/demo"
 external "tool-cache"
 ```
 
@@ -199,7 +210,7 @@ and globs are unsupported.
 
 Validation does not traverse symbolic links. A declared directory, or any
 directory between it and its declaring module, that is a symbolic link makes
-the declaration invalid. An `owned-ignored` directory must exist as a real
+the declaration invalid. An owned tree's directory must exist as a real
 directory. An `external` directory may be absent; when present it must be a
 real directory.
 
@@ -210,19 +221,24 @@ no precedence rule exists between declarations. A declaration whose directory
 is an always-excluded path or lies beneath one is invalid; a declared tree may
 contain always-excluded paths.
 
-Do not descend into either kind. Owned-ignored contents retain their owner but
-are never inventoried, compiled by Ramify or checked, and a change beneath them
-never affects a result. The [daemon architecture](../architecture/daemon.md)
-states from when a resident watcher registers nothing beneath them. External contents
-have no owner in this evaluation. Plain data needs no declaration. A project
-within an owned-ignored tree is data to the enclosing evaluation and a separate
-project when selected as its own root. A project within a declared tree of
-either kind carries the root marker in its own root description, which the
+Do not descend into any kind. Owned contents retain their owner but are never
+inventoried, compiled by Ramify or checked, and a change beneath them never
+affects a result. The [daemon architecture](../architecture/daemon.md)
+states from when a resident watcher registers nothing beneath them. External
+contents have no owner in this evaluation. Plain data needs no declaration.
+
+An `owned-unwired` tree holds content, code included, that is deliberately
+not wired into the project: documentation, spikes, samples and other material
+the project keeps but nothing imports or analyzes. An `owned-nested-project`
+tree holds a separate project, such as an example or a fixture project: data
+to the enclosing evaluation, and a project in its own right when selected as
+its own root. A Ramify project within an `owned-nested-project` or `external`
+tree carries the root marker in its own root description, which the
 enclosing evaluation does not interpret.
 
-Warn about compiler-selected source within an owned-ignored tree. A declaration
-does not prevent another runner or tool from executing the tree's contents;
-that limitation is a convention, not a Ramify guarantee. Imports into declared
+Warn about compiler-selected source within an owned tree. A declaration does
+not prevent another runner or tool from executing the tree's contents; that
+limitation is a convention, not a Ramify guarantee. Imports into declared
 nested trees follow the source-interpretation boundary rule.
 
 The declarations extend version 1 beside exposure statements without changing
@@ -417,8 +433,8 @@ name nor identifier assigns tags or confers importability.
 
 A version 1 description contains a version header, one module declaration,
 which carries the root marker exactly when the module is the project root,
-and zero or more `expose-src`, `expose-test`, `expose-sub`, `owned-ignored`,
-or `external` statements.
+and zero or more `expose-src`, `expose-test`, `expose-sub`, `owned-unwired`,
+`owned-nested-project` or `external` statements.
 It is parsed as data and never executed.
 There are no expressions, variables, imports, includes, conditional blocks,
 or configuration inheritance.
@@ -469,7 +485,7 @@ version-line   = "ramify", hws, "1", LF ;
 module-line    = [ "root", hws ], "module", hws, module-name,
                  [ hws, tag-clause ], LF ;
 exposure-line  = source-line | test-line | sub-line ;
-nested-tree-line = ( "owned-ignored" | "external" ), hws, STRING, LF ;
+nested-tree-line = ( "owned-unwired" | "owned-nested-project" | "external" ), hws, STRING, LF ;
 source-line    = "expose-src", hws, whole-selection, source-tail ;
 test-line      = "expose-test", hws, selection-list, source-tail ;
 source-tail    = hws, "from", hws, STRING,
@@ -487,7 +503,7 @@ name           = BARE-NAME | STRING ;
 module-name    = BARE-MODULE-NAME | STRING ;
 tag-clause     = "tagged", hws, "[", ows, [ tag-list ], ows, "]" ;
 tag-list       = tag, { ows, ",", ows, tag } ;
-tag            = "testing" | "browser" | "ui" | "owned-ignored" | "external"
+tag            = "testing" | "browser" | "ui" | "owned-unwired" | "owned-nested-project" | "external"
                | "root" | BARE-MODULE-NAME ;
 destination-list = destination, { ows, ",", ows, destination } ;
 destination    = "parent" | "descendants" ;
@@ -497,7 +513,7 @@ ows            = { SPACE | TAB } ;
 ```
 
 - The reserved keywords are exactly `ramify`, `module`, `expose-src`,
-  `expose-test`, `expose-sub`, `owned-ignored`, `external`, `root`, `from`,
+  `expose-test`, `expose-sub`, `owned-unwired`, `owned-nested-project`, `external`, `root`, `from`,
   `as`, `tagged`, `to`, `parent`, `descendants`, `testing`, `browser`, and `ui`.
   They are reserved in every name position: a source export, child-exposed
   name, alias, module declaration, or child reference equal to one of these
@@ -532,12 +548,13 @@ ows            = { SPACE | TAB } ;
 
 Tag names use the lower-case, hyphen-separated spelling of `BARE-MODULE-NAME`,
 with `testing`, `browser`, and `ui` also accepted despite their legacy keyword
-status, and `owned-ignored`, `external` and `root` despite their keyword status. Every
+status, and `owned-unwired`, `owned-nested-project`,
+`external` and `root` despite their keyword status. Every
 use must resolve in the evaluation's registry. Thus `dispatch`
 and registered project tags are valid without adding grammar keywords;
 registering a tag does not reserve its name in export or module-name positions.
 Registering tags does not extend the fixed keyword list. Quoted tags and unknown tag names
-are errors. The six explicit alternatives in `tag` preserve lexical syntax;
+are errors. The seven explicit alternatives in `tag` preserve lexical syntax;
 they do not give these names extra matching or propagation semantics. A
 nested-tree statement and the root marker define no tag.
 
@@ -569,7 +586,7 @@ Semicolons, implicit sources, JSON objects, and unknown clauses are invalid.
 A quoted export name `"*"`, if one exists, names that exact export; it is
 never a wildcard.
 
-An `owned-ignored` or `external` statement consists of its keyword and one
+An `owned-unwired`, `owned-nested-project` or `external` statement consists of its keyword and one
 quoted directory. It accepts no tag clause, selection, alias, `from`, `to`,
 destination, or other clause, and an unquoted or empty directory is invalid.
 Nested-tree statements may appear before, between, or after exposure
@@ -1013,7 +1030,7 @@ application model from descriptions containing them:
 | A description carrying the root marker, other than the selected root's, outside every declared nested tree | Another project's root inside the evaluated tree must lie within a declared nested tree |
 | An interpreted module declared inside `src/` (including tests or interfaces), at a reserved container root, or outside its parent's `subs/` | The required module layout is violated |
 | An exposure selecting an original defined in auxiliary source | Auxiliary originals cannot be exposed, including through forwarding aliases |
-| A nested-tree declaration outside its owner's contents, equal to its module directory, inside a child module, at or beneath an always-excluded path, traversing a symlink, or with a malformed directory path; an external tree beneath `src/`; a missing owned-ignored directory or a declared path that exists but is not a real directory; two declarations whose directories are equal or nested | The declared boundary is invalid |
+| A nested-tree declaration outside its owner's contents, equal to its module directory, inside a child module, at or beneath an always-excluded path, traversing a symlink, or with a malformed directory path; an external tree beneath `src/`; a missing owned directory or a declared path that exists but is not a real directory; two declarations whose directories are equal or nested | The declared boundary is invalid |
 | Missing source path, excluded target, symlink traversal, escape from the statement's `src/` or `src/tests/` root, or a non-file target | The source reference has no valid application target |
 | A source file owned by another module or a foreign forwarding export claimed as owned | Source references cannot transfer ownership |
 | An `expose-sub` name that is not a declared direct child | The reference does not identify a permitted provider |
@@ -1102,8 +1119,8 @@ parser. Analysis limits in a completed source check are nonblocking by default;
 invalid descriptions or registries still fail model validation.
 
 Discovery implements the nested-tree declarations, their validation and the
-pruning of declared trees and module scratch directories. Acquisition warns
-about compiler-selected source in an owned-ignored tree or a module scratch
+pruning of declared trees and module scratch directories. Acquisition warns about
+compiler-selected source in an owned nested tree or a module scratch
 directory, never inventories or reads it and never makes it a compiler root.
 Auxiliary source is inventoried and analyzed under its owner's ordinary
 classification. Linking reports an exposure that selects an auxiliary original

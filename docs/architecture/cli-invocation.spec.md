@@ -68,8 +68,8 @@ directory such as the toolkit's `site/`, or an independent project nested in
 the tree such as the toolkit's example, all resolve by the same rule, and the
 example resolves to its own root because its description carries the marker.
 For example, a command inside `project/subs/group/child/src/` selects `project`
-when `project`'s description carries the marker and `child`'s does not. A
-project in an owned-ignored tree `project/subs/child/fixtures/demo/`, whose
+when `project`'s description carries the marker and `child`'s does not. An owned nested
+project `project/subs/child/fixtures/demo/`, whose
 description carries the marker, is selected from inside `demo`, although it
 lies beneath `project`'s `subs/`.
 
@@ -118,13 +118,13 @@ module's auxiliary source. It is analyzed with that owner's ordinary
 classification whether or not the configuration selects it, and it produces no
 warning. A `.js`, `.jsx`, `.mjs` or `.cjs` file there is compiler source only
 when the configuration admits JavaScript. Every other owned file outside `src/`
-and the owned-ignored trees, apart from `module.ramify` files and module
+and the owned nested trees, apart from `module.ramify` files and module
 READMEs, is an inert file and produces no warning; a compiler configuration,
 package manifest or imported data file there is an inert file that may also be
 a captured input. Only declared nested trees and always-excluded paths are left
 out; a nested `tsconfig.json` and repository ignore rules exclude nothing.
 Three nonblocking warnings remain: compiler-selected source inside an
-owned-ignored tree, compiler-selected source inside a module's scratch
+owned nested tree, compiler-selected source inside a module's scratch
 directory, and, when the root lies in a Git repository and `git` is available,
 each repository-ignored directory the check would still enter. The CLI derives
 that last warning from Git's output; it is never an analysis input and never
@@ -148,10 +148,11 @@ the exit code. It appears among the human report's warnings and in the JSON
 report's `warnings`, counted in its summary. The bounded hook check, `watch`
 and `affected` ask Git nothing.
 
-A selected file inside an owned-ignored tree or a module's scratch directory
+A selected file inside an owned nested tree or a module's scratch directory
 is neither inventoried nor read, the compiler does not receive it as a root
-file, and it produces one `compiler-selected-owned-ignored` or
-`compiler-selected-scratch` warning per tree or scratch directory, located at
+file, and it produces one `compiler-selected-owned-unwired`,
+`compiler-selected-owned-nested-project` or `compiler-selected-scratch` warning
+per tree or scratch directory, located at
 that directory. A selected file inside an external tree produces no warning.
 Each warning carries a code, a path and a message and, where it lists files,
 at most 20 of them in byte order with their total count.
@@ -191,7 +192,7 @@ None is an allowed import or an external package.
 The human report prints the root and how it was selected, the compiler
 configuration in use, a `Mode:` line, failures first, then warnings, then
 analysis limits, then the completed scope. `--format json` writes the
-`ramify.analysis/2` report to stdout, unchanged apart from the Git advice
+`ramify.analysis/3` report to stdout, unchanged apart from the Git advice
 warnings, without the human mode line or an added mode member. Invocation
 failures use a `ramify.cli/1` diagnostic document. Logging goes to stderr;
 nothing else is written to stdout in that mode. Locations are relative to the
@@ -209,15 +210,20 @@ seed's kind and selected modules, so the affected answer moved to
 `ramify.affected-cli/3` with `ramify.affected/3`. The IPC protocol, which
 carries the selection without decoding it, kept `ramify.ipc/2`.
 
+Three kinds of nested tree changed the kind strings that exclusions,
+warnings and dispositions carry, so `ramify.analysis/2`, `ramify.check/2`
+and `ramify.affected-cli/3` with `ramify.affected/3` moved to their next
+versions. The IPC protocol kept `ramify.ipc/2`.
+
 `--no-snapshot` leaves the snapshot, the record of every evaluated import, out of
-that report. The report keeps `ramify.analysis/2` and sets `snapshot` to null; its
+that report. The report keeps `ramify.analysis/3` and sets `snapshot` to null; its
 summary, outcome, findings, warnings, analysis limits and exit code are those of
 the same check with the snapshot. A caller that reads only the verdict and its
 findings uses it: on the toolkit itself the snapshot is almost all of a
 25 MB report. It applies to complete checks in both modes; a batch session drops
 the snapshot before its result leaves the session, and a resident check drops it
 when printing. The flag requires `--format json` and cannot accompany `--changed`,
-whose `ramify.check/2` document has no snapshot; either misuse is an invalid
+whose `ramify.check/3` document has no snapshot; either misuse is an invalid
 invocation, exit 2.
 
 | Exit | Meaning |
@@ -267,7 +273,7 @@ opens the project context and requests synchronized freshness from the
 resident daemon, and never falls back to batch. `--batch` answers from a fresh
 session over the same root, with the same capabilities as `check --batch`, in
 the same process seam, and disposes it. `--format json` prints one
-`ramify.affected-cli/3` document with the root, the mode, the revision's
+`ramify.affected-cli/4` document with the root, the mode, the revision's
 sequence (null in batch) and input identity, and the selection; failures use
 `ramify.cli/1`. It exits 0 for any answer, including one widened to all
 modules, 1 for an invalid project, an unknown module ID or an invalid seed,
@@ -283,7 +289,8 @@ seed also names its owner, its kind and the modules it selects; the owner
 attributes the path and does not by itself select it. The first kind that
 applies decides:
 
-- a path in an owned-ignored tree or a scratch directory is `ignored` and
+- a path in an owned
+  nested tree or a scratch directory is `ignored` and
   selects nothing;
 - a `module.ramify` is a `description` and selects its owner;
 - a module's `README.md` is a `readme` and selects nothing;
@@ -308,13 +315,13 @@ selects; the answer adds their transitive importers. A path in an external
 tree or another always-excluded path selects nothing. Only a path outside the
 project, written with a leading `../`, widens the answer to all modules; any
 other malformed seed is an invalid seed. Human output prints one line per path
-seed: owned, with its module, basis, any owned-ignored or scratch exclusion,
+seed: owned, with its module, basis, any owned nested tree or scratch exclusion,
 its kind and the modules it selects; excluded, with its exclusion; or outside
 the project. The selection's scope carries the
 revision's whole ownership topology: its modules and their rooted exclusions,
 while repository, package and generated segments are excluded wherever they
-occur. These answers use `ramify.affected-cli/3`, carrying a
-`ramify.affected/3` selection; the IPC protocol keeps `ramify.ipc/2`.
+occur. These answers use `ramify.affected-cli/4`, carrying a
+`ramify.affected/4` selection; the IPC protocol keeps `ramify.ipc/2`.
 
 ### Hook and complete checks
 
@@ -365,7 +372,8 @@ covering revision completed the relevant analysis with evidence of the path's
 current content or its deletion; deleting
 previously analyzed source is checked once its removal is analyzed.
 `not-analyzed` means the complete check does not analyze the path either: it
-lies in an owned-ignored, external or scratch directory or another
+lies in an `owned-unwired`,
+`owned-nested-project`, external or scratch directory or another
 always-excluded path, or it is an inert file the covering revision did not
 capture. Source, resources, `module.ramify` files and module READMEs are not
 inert files. An inert file the covering revision captured, such as an imported
@@ -386,7 +394,7 @@ result for that path, for example through stale or unobserved content, an
 expired deadline, a named configuration file or unavailable work; it gives
 exit 2 and retains findings verified before the failure. The disposition, not
 the exit code, states that a path was not analyzed, and no such path is shown
-as passing source checks. The `ramify.check/2` document reports these
+as passing source checks. The `ramify.check/3` document reports these
 dispositions in place of each changed path's coverage flag, with the analyzed
 content or deletion identity only for checked paths.
 

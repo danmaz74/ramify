@@ -179,7 +179,7 @@ order:
 
 ```json
 {
-  "schema": "ramify.architect-module/2",
+  "schema": "ramify.architect-module/3",
   "module": "ramify/service-api",
   "dir": "subs/service-api",
   "parent": "ramify",
@@ -231,14 +231,14 @@ order:
   `"cut": true` beside it when cut; the map shows the same text.
 - `docs` lists the module's `src/docs/**` files, project-relative, sorted.
   Their contents are not rendered.
-- `boundaries` lists the owned-ignored and external trees the module's
+- `boundaries` lists the owned nested and external trees the module's
   description declares, in byte order by `dir`, one tree per line, and is
   `[]` when it declares none. Each entry gives the tree's `kind`, its
   project-relative `dir`, and the declaring statement's project-relative
   `description` path, `line` and `column`:
 
   ```json
-  { "kind": "owned-ignored", "dir": "scripts/reference-harness", "description": "module.ramify", "line": 12, "column": 1 }
+  { "kind": "owned-unwired", "dir": "scripts/reference-harness", "description": "module.ramify", "line": 12, "column": 1 }
   ```
 
   Nothing beneath a declared tree is analyzed, so no file, symbol or test
@@ -253,6 +253,8 @@ order:
   outside `src/`.
 - Version 2 of `ramify.architect-module`, of `ramify.architect-view` and of
   the session projection `ramify.architect-projection` added `boundaries`.
+- Version 3 of the same three documents replaced the boundary kind
+  `owned-ignored` with `owned-unwired` and `owned-nested-project`.
 - `uses` and `usedBy` count distinct originals per module pair, from the
   dependency facts under the production source filter. Unused imports are
   absent. An `unknown` count is present only when nonzero. Both arrays are
@@ -480,7 +482,7 @@ the coverage counts say how much the rule could not decide.
 `_meta.json` is a deterministic single-line JSON document:
 
 ```json
-{"schema":"ramify.architect-view/2","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured"}
+{"schema":"ramify.architect-view/3","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured"}
 ```
 
 `dependencies` is `measured` or `unavailable`, and `dependencyScope` names

@@ -81,7 +81,7 @@ insufficient.
 
 ### Evidence Makes Analysis Boundaries Visible
 
-Architectural evidence identifies each module's owned-ignored trees without
+Architectural evidence identifies each module's owned nested trees without
 listing or interpreting their contents. Absence of evidence within an
 unanalyzed tree proves nothing about its contents. Module ownership, analysis
 coverage and observed behavior remain distinct facts.

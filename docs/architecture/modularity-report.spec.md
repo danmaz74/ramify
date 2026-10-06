@@ -250,7 +250,8 @@ repository interface use = selected exposed owned originals / exposed owned orig
 ```
 
 The label is `repository interface use`, never unused API. The declared
-nested-tree directories, owned-ignored and external, are recorded as
+nested-tree directories, owned nested and
+external, are recorded as
 `omittedScopes` in provenance, in byte order; consumers inside them are absent
 from the graph, so their absence is not zero use. Module scratch directories
 and other always-excluded paths are not listed.

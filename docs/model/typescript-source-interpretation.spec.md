@@ -189,15 +189,15 @@ package import, including when a link's real target lies within the project.
 A bare spelling alone is insufficient: an alias directly into project source
 does not establish package resolution.
 
-An import from analyzed source that resolves into an `owned-ignored` or
-`external` tree without package resolution is a definite finding. Relative
+An import from analyzed source that resolves into an `owned-unwired`,
+`owned-nested-project` or `external` tree without package resolution is a definite finding. Relative
 paths, aliases and workspace links do not bypass this rule. Apply it to
 type-only imports and symbol-free loads as well as selected values; shared
-ownership with an ignored tree does not create an exemption. Do not analyze
-imports originating inside either kind of excluded tree.
+ownership with an owned nested tree does not create an exemption. Do not analyze
+imports originating inside any kind of excluded tree.
 
 Package exports are enforced by the consuming toolchain, not modeled as
-Ramify exposure. A project within an ignored tree uses the enclosing package
+Ramify exposure. An owned nested project uses the enclosing package
 by convention. In that project's own evaluation, a direct import outside its
 root without package resolution remains an outside-scope analysis limit;
 Ramify does not certify the convention. Unresolved targets remain coverage

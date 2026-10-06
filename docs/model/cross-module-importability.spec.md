@@ -47,7 +47,7 @@ importability decisions.
 
 Every in-project path belongs to exactly one module by containment, independently
 of inventory. Declared external trees and always-excluded paths other than
-module scratch directories are outside ownership. Owned-ignored trees retain
+module scratch directories are outside ownership. Owned nested trees retain
 their owner without being analyzed. A symbol belongs to the
 module that defines its original binding. Forwarding a symbol does not change
 its owner. Sharing a parent does not give sibling modules shared ownership
@@ -61,8 +61,8 @@ violation, including same-owner, type-only and symbol-free imports. Excluded
 contents are not analyzed in the enclosing evaluation.
 
 Package resolution remains outside the module-exposure model, including when
-an installed link resolves to a real path within the project. A project within
-an ignored tree uses the enclosing project's package by convention; Ramify
+an installed link resolves to a real path within the project. An owned nested
+project uses the enclosing project's package by convention; Ramify
 does not verify that dependent's adherence to the package boundary.
 
 ### Visibility Comes From Ownership And Exposure
