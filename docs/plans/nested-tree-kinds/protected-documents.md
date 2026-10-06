@@ -1,6 +1,6 @@
 # Protected documents
 
-**Status:** proposed. No patch is approved. Dan approves each patch below by
+**Status:** proposed. Approved by Dan on 2026-10-06: G3, G4. Dan approves each patch below by
 its ID; the approval covers that exact text at the baseline hash given.
 Patches that depend on a [proposal](main-plan.md#proposals) cite
 it and change if the proposal changes.
@@ -101,9 +101,9 @@ not wired into the project: documentation, spikes, samples and other material
 the project keeps but never builds, imports or analyzes. An `owned-nested-project`
 tree holds a separate project, such as an example or a fixture project: data
 to the enclosing evaluation, and a project in its own right when selected as
-its own root. A project within a declared tree of either `owned-nested-project` or
-`external` kind carries the root marker in its own root description, which
-the enclosing evaluation does not interpret.
+its own root. A Ramify project within an `owned-nested-project` or `external`
+tree carries the root marker in its own root description, which the
+enclosing evaluation does not interpret.
 
 Warn about compiler-selected source within an owned tree. A declaration does
 not prevent another runner or tool from executing the tree's contents; that
