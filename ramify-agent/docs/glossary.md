@@ -235,11 +235,11 @@ result of one append to it.
 ## Included child
 
 An **included child** is a child module whose entire subtree is included in
-an assignment's scope, subject to the scope's external and ignored-tree rules.
+an assignment's scope, subject to the scope's external and project-tree rules.
 
 ## Included tree
 
-An **included tree** is an owned-ignored tree of an assigned module explicitly
+An **included tree** is an owned nested project of an assigned module explicitly
 included, whole, in the assignment's scope.
 
 ## Vertical work

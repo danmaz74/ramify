@@ -23,16 +23,15 @@ their own work. Considering them does not by itself coordinate their execution.
 ### Every Agent Scope Is a Cut on the Module Tree
 
 A module assignment covers its owned contents, including configuration,
-documentation and scratch, except its owned-ignored trees. Child subtrees and
-owned-ignored trees require explicit inclusion, each as a whole. External
-trees are never writable in the enclosing run. Guarded configuration remains
+documentation, scratch and owned-unwired trees, except its owned-nested-project
+trees. Child subtrees and owned nested projects require explicit inclusion,
+each as a whole. External trees are never writable in the enclosing run. Guarded configuration remains
 an authorization restriction within ownership; owning a file does not waive
 that restriction.
 
-The issuing architect names each included tree with a reason and instructions
-for its meaning. The tree is excluded from Ramify source checks; the owner's
-tests and README define its use. Where it is a project, its own instructions
-and commands apply from its root. Substantial work on that project belongs in
+The issuing architect names each included project tree with a reason and
+instructions for its meaning. The tree is excluded from Ramify source checks;
+its own instructions and commands apply from its root. Substantial work on that project belongs in
 a run rooted there. An engineer needing a scope expansion asks its architect;
 excluded analysis never creates write authority.
 
@@ -60,7 +59,7 @@ not-analyzed answer, never a passing source-check claim.
 
 The harness consumes ramify-audit's combined evidence across required commands
 and configurations. It cannot accept missing required tests or incomplete
-execution as passing. An included ignored tree is verified by its owner's
+execution as passing. An included project tree is verified by its owner's
 tests during ordinary iterations; a project's own nested audit is required
 at the plan's final gate. Preserve each project's audit result separately.
 
