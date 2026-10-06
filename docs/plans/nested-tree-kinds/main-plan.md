@@ -1,6 +1,6 @@
 # Three kinds of nested tree
 
-**Date:** 2026-10-06. **Status:** approved; not started. The decisions below
+**Date:** 2026-10-06. **Status:** complete. The decisions below
 are Dan's, and the [proposals](#proposals) are settled. Every protected patch
 in [protected documents](protected-documents.md) is approved: G3 and G4 by
 Dan, the rest on his delegation on 2026-10-06.

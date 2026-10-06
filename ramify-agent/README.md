@@ -164,7 +164,7 @@ prepare another.
 
 `fixtures/collection-review/` is a copy of the toolkit's reference example
 with two plans under `plans/`. It is test data and an independent project:
-Plan 21 declares its root as an `owned-nested-project` tree at the harness,
+Plan 21 will declare its root as an `owned-nested-project` tree at the harness,
 so the enclosing project never analyzes its contents. Its own description,
 compiler configuration and instructions apply when it is selected as a project.
 
