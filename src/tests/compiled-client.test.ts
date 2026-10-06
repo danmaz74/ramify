@@ -75,7 +75,7 @@ describe('compiled client process contracts', () => {
     }
     const document = JSON.parse((await run(launcher, ['affected', '--path', 'subs/core/src/interfaces/api.ts', '--batch', '--format', 'json'],
       { cwd: root, env })).stdout);
-    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/2', root, mode: 'batch', revision: { sequence: null },
+    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/3', root, mode: 'batch', revision: { sequence: null },
       selection: { changedModules: [{ id: 'example/core' }], affectedModules: [{ id: 'example/app' }, { id: 'example/mid' }],
         selection: 'dependency-closure' } });
     expect(document.revision.inputId).toBe(document.selection.inputId);

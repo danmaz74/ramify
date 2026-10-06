@@ -204,6 +204,11 @@ earlier version is kept: a version number changes so that an outdated reader
 fails on it rather than misreading the document. Documents whose shape did not
 change keep their version.
 
+Affected-rule selection changed what an owned path seed selects and added each
+seed's kind and selected modules, so the affected answer moved to
+`ramify.affected-cli/3` with `ramify.affected/3`. The IPC protocol, which
+carries the selection without decoding it, kept `ramify.ipc/2`.
+
 `--no-snapshot` leaves the snapshot, the record of every evaluated import, out of
 that report. The report keeps `ramify.analysis/2` and sets `snapshot` to null; its
 summary, outcome, findings, warnings, analysis limits and exit code are those of
@@ -262,7 +267,7 @@ opens the project context and requests synchronized freshness from the
 resident daemon, and never falls back to batch. `--batch` answers from a fresh
 session over the same root, with the same capabilities as `check --batch`, in
 the same process seam, and disposes it. `--format json` prints one
-`ramify.affected-cli/2` document with the root, the mode, the revision's
+`ramify.affected-cli/3` document with the root, the mode, the revision's
 sequence (null in batch) and input identity, and the selection; failures use
 `ramify.cli/1`. It exits 0 for any answer, including one widened to all
 modules, 1 for an invalid project, an unknown module ID or an invalid seed,
@@ -271,21 +276,45 @@ interrupted. `--changed`, `--since` and `--deadline` do not apply.
 
 `ramify affected` answers every path
 seed by containment under the current declarations, without an inventory entry
-or a filesystem read, so absent, new and deleted paths and both sides of a
-rename resolve. Each path seed states whether the path is owned, excluded or
-outside the project, with its exclusion when one applies. An owned path,
-including one in an owned-ignored tree or a scratch directory, selects its
-owner and that owner's transitive importers. A path in an external tree or
-another always-excluded path selects nothing. Only a path outside the project,
-written with a leading `../`, widens the answer to all modules; any other
-malformed seed is an invalid seed. Human output prints one line per path
-seed: owned, with its module, basis and any owned-ignored or scratch
-exclusion; excluded, with its exclusion; or outside the project. The
-selection's scope carries the
+or a filesystem read of the seed, so absent, new and deleted paths and both
+sides of a rename resolve. Each path seed states whether the path is owned,
+excluded or outside the project, with its exclusion when one applies. An owned
+seed also names its owner, its kind and the modules it selects; the owner
+attributes the path and does not by itself select it. The first kind that
+applies decides:
+
+- a path in an owned-ignored tree or a scratch directory is `ignored` and
+  selects nothing;
+- a `module.ramify` is a `description` and selects its owner;
+- a module's `README.md` is a `readme` and selects nothing;
+- any other `.md` path, wherever it lies and including beneath `src/`, is
+  `inert` and selects nothing;
+- any other path at or beneath its owner's `src/` is `source-area` and
+  selects its owner;
+- auxiliary source, present or absent, is `auxiliary-source` and selects its
+  owner;
+- a captured input of the revision, meaning content or absence it read and
+  fingerprinted rather than an existence probe, is a `captured-input` and
+  selects every module it governs. A package manifest, present or absent,
+  and the compiler configuration govern the module that owns their directory
+  and every module whose directory lies at or beneath it. A configuration the
+  compiler configuration extends governs what the configurations extending it
+  govern. Any other captured input governs the owners of the analyzed files
+  that read or probed it, or every module when none did;
+- any other owned path is `inert` and selects nothing.
+
+The changed modules are the module seeds and every module a path seed
+selects; the answer adds their transitive importers. A path in an external
+tree or another always-excluded path selects nothing. Only a path outside the
+project, written with a leading `../`, widens the answer to all modules; any
+other malformed seed is an invalid seed. Human output prints one line per path
+seed: owned, with its module, basis, any owned-ignored or scratch exclusion,
+its kind and the modules it selects; excluded, with its exclusion; or outside
+the project. The selection's scope carries the
 revision's whole ownership topology: its modules and their rooted exclusions,
 while repository, package and generated segments are excluded wherever they
-occur. These answers use `ramify.affected-cli/2`, carrying a
-`ramify.affected/2` selection.
+occur. These answers use `ramify.affected-cli/3`, carrying a
+`ramify.affected/3` selection; the IPC protocol keeps `ramify.ipc/2`.
 
 ### Hook and complete checks
 

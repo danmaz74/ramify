@@ -94,7 +94,7 @@ export type DaemonStatusDocument =
 /** One `ramify affected --format json` answer. `revision.sequence` is the resident
  * revision's sequence and null for a batch session. */
 export interface AffectedDocument {
-  readonly schemaVersion: 'ramify.affected-cli/2';
+  readonly schemaVersion: 'ramify.affected-cli/3';
   readonly root: string;
   readonly mode: 'resident' | 'batch';
   readonly revision: { readonly sequence: number | null; readonly inputId: string };

@@ -29,10 +29,10 @@ describe('affected batch form (A7-11)', () => {
     expect([result.exitCode, result.stderr, result.writes]).toEqual([0, '', 1]);
     const document = JSON.parse(result.stdout) as AffectedDocument;
     expect(Object.keys(document)).toEqual(['schemaVersion', 'root', 'mode', 'revision', 'ramifyVersion', 'selection']);
-    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/2', root, mode: 'batch', ramifyVersion: '1.2.3' });
+    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/3', root, mode: 'batch', ramifyVersion: '1.2.3' });
     expect(document.revision.sequence).toBeNull();
     expect(document.revision.inputId).toMatch(/.+/);
-    expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/2', inputId: document.revision.inputId,
+    expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/3', inputId: document.revision.inputId,
       paths: [{ path: 'subs/core/src/interfaces/api.ts', status: 'owned', module: 'example/core', basis: 'inventory', exclusion: null }],
       changedModules: [core], affectedModules: [app, mid], testModules: [app, core, mid],
       selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
@@ -48,8 +48,10 @@ describe('affected batch form (A7-11)', () => {
   it('A7-11:resident-batch-agree: resident and batch selections on the unchanged project are equal', () => affectedFixture(async root => {
     const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
     try {
+      // The last set holds an inert, an ignored (scratch) and a captured-input seed.
+      const kinded = ['--path', 'docs/notes.md', '--path', 'subs/core/src/tmp/x.ts', '--path', 'tsconfig.json'];
       for (const seeds of [['--path', 'subs/core/src/interfaces/api.ts'], ['example/lone', '--path', 'docs/notes.md'],
-        ['example/app', '--path', 'subs/mid/module.ramify']]) {
+        ['example/app', '--path', 'subs/mid/module.ramify'], kinded]) {
         const args = ['affected', ...seeds, '--root', root, '--format', 'json'];
         const resident = await invoke(root, args, async () => { throw new Error('Unexpected batch'); }, quick.connect);
         const batch = await invoke(root, [...args, '--batch']);
@@ -61,6 +63,11 @@ describe('affected batch form (A7-11)', () => {
         expect(two.selection).toEqual(one.selection);
         expect(JSON.stringify(two.selection)).toBe(JSON.stringify(one.selection));
         expect({ ...two, mode: 'resident', revision: one.revision }).toEqual(one);
+        if (seeds === kinded) {
+          expect(one.selection.paths.map(seed => [seed.path, seed.kind, seed.selects])).toEqual([['docs/notes.md', 'inert', []],
+            ['subs/core/src/tmp/x.ts', 'ignored', []],
+            ['tsconfig.json', 'captured-input', ['example', 'example/app', 'example/core', 'example/lone', 'example/mid']]]);
+        }
       }
     } finally { await quick.dispose(); }
   }), 90_000);

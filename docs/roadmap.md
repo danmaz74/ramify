@@ -45,6 +45,12 @@ and is the next plan to execute. Everything else is the deferred
 with usage, staleness and an architect query as separable later parts.
 `ramify available`, availability search and the module summary are withdrawn.
 
+**Addition, 2026-10-06:** [Affected-rule selection for audits](plans/affected-rule-selection/main-plan.md)
+gives each affected path seed a kind and the modules it selects: ignored paths,
+`.md` files and inert files select nothing, captured inputs select the modules they govern,
+and the answer moves to `ramify.affected/3`. It was released as `ramify.ts` 0.3.0 on
+2026-10-06; its [handoff](plans/affected-rule-selection/handoff.md) lists the joint adoption with ramify-audit 0.6.0.
+
 The intended system is defined in the [architecture documents](architecture/README.md).
 They own the decided process/client, resource and testing architecture, plus
 the proposed module tree, exposure paths, retained state and synchronization.

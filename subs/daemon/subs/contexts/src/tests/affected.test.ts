@@ -9,7 +9,7 @@ const inputIdOf = (content: string) => `input/1:${hash(JSON.stringify([{ path: '
 const observed = (content: string) => [{ path: 'src/index.ts', sha256: hash(content) }];
 /** The scripted session's fixed answer: the named seeds changed and nothing depends on them. */
 const selection = (inputId: string, modules: readonly string[]): AffectedSelection => ({
-  schemaVersion: 'ramify.affected/2', inputId, paths: [],
+  schemaVersion: 'ramify.affected/3', inputId, paths: [],
   changedModules: modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` })), affectedModules: [],
   testModules: modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` })),
   selection: 'dependency-closure', widening: [],

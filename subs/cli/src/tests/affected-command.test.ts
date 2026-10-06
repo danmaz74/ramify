@@ -70,7 +70,7 @@ async function expectReleased(quick: QuickEnvironment): Promise<void> {
 }
 
 describe('affected command through the real resident service (A7-10)', { timeout: 60_000 }, () => {
-  it('A7-10:json-document: prints one ramify.affected-cli/2 document with root, resident mode, revision and selection', async () => {
+  it('A7-10:json-document: prints one ramify.affected-cli/3 document with root, resident mode, revision and selection', async () => {
     const f = await fixture();
     try {
       const requests: AffectedParams[] = [];
@@ -83,10 +83,10 @@ describe('affected command through the real resident service (A7-10)', { timeout
         freshness: { mode: 'synchronized', expect: [] }, modules: [], paths: ['subs/core/src/interfaces/api.ts'] }]);
       const document = JSON.parse(result.stdout) as AffectedDocument;
       expect(Object.keys(document)).toEqual(['schemaVersion', 'root', 'mode', 'revision', 'ramifyVersion', 'selection']);
-      expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/2', root: f.root, mode: 'resident', ramifyVersion: '0.1.2' });
+      expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/3', root: f.root, mode: 'resident', ramifyVersion: '0.1.2' });
       expect(document.revision.sequence).toEqual(expect.any(Number));
       expect(document.revision.inputId).toMatch(/.+/);
-      expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/2', inputId: document.revision.inputId,
+      expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/3', inputId: document.revision.inputId,
         paths: [{ path: 'subs/core/src/interfaces/api.ts', status: 'owned', module: 'example/core', basis: 'inventory', exclusion: null }],
         changedModules: [core], affectedModules: [app, mid], testModules: [app, core, mid],
         selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
@@ -95,7 +95,7 @@ describe('affected command through the real resident service (A7-10)', { timeout
     } finally { await f.dispose(); }
   });
 
-  it('A7-10:human: lists root, mode, revision, selection, each path with module and basis, and the three module lists', async () => {
+  it('A7-10:human: lists root, mode, revision, selection, each path with module, basis, kind and selection, and the three module lists', async () => {
     const f = await fixture();
     try {
       const json = await invoke(f.root, f.quick.connect, ['affected', 'example/mid', '--path', 'subs/core/module.ramify', '--format', 'json']);
@@ -108,7 +108,7 @@ describe('affected command through the real resident service (A7-10)', { timeout
         'Mode: resident',
         `Revision: sequence ${revision.sequence}, input ${revision.inputId}`,
         'Selection: dependency-closure',
-        'Path subs/core/module.ramify: owned by example/core (declaration)',
+        'Path subs/core/module.ramify: owned by example/core (declaration; description; selects example/core)',
         'Changed modules (2):', '  example/core (subs/core)', '  example/mid (subs/mid)',
         'Affected modules (1):', '  example/app (subs/app)',
         'Test modules (3):', '  example/app (subs/app)', '  example/core (subs/core)', '  example/mid (subs/mid)',
@@ -132,12 +132,33 @@ describe('affected command through the real resident service (A7-10)', { timeout
       expect(human.exit).toBe(0);
       expect(human.stdout).toContain('Selection: all-modules (widened: unowned-path)\nPath ../notes.md: outside the project\n');
       expect(human.stdout).toContain('Test modules (5):\n  example (.)\n');
-      // Root-owned documentation selects the root by containment, and an installed-package path selects nothing; neither widens.
+      // Root-owned documentation is the root's by containment but inert, and an installed-package path is excluded:
+      // neither selects a module, and neither widens.
       const owned = await invoke(f.root, f.quick.connect, ['affected', '--path', 'docs/notes.md', '--path', 'node_modules/x/index.js']);
       expect(owned.exit).toBe(0);
-      expect(owned.stdout).toContain('Selection: dependency-closure\nPath docs/notes.md: owned by example (containment)\n'
-        + 'Path node_modules/x/index.js: excluded (packages node_modules)\nChanged modules (1):\n  example (.)\n'
-        + 'Affected modules (0):\nTest modules (1):\n  example (.)\n');
+      expect(owned.stdout).toContain('Selection: dependency-closure\nPath docs/notes.md: owned by example (containment; inert; selects none)\n'
+        + 'Path node_modules/x/index.js: excluded (packages node_modules)\nChanged modules (0):\n'
+        + 'Affected modules (0):\nTest modules (0):\n');
+    } finally { await f.dispose(); }
+  });
+
+  it('A7-10:human-kinds: each owned seed line names its kind and the modules it selects, or none', async () => {
+    const f = await fixture();
+    try {
+      const paths = ['README.md', 'docs/notes.md', 'scripts/x.ts', 'subs/core/module.ramify', 'subs/core/src/interfaces/api.ts',
+        'subs/core/src/tmp/x.ts', 'tsconfig.json'];
+      const result = await invoke(f.root, f.quick.connect, ['affected', ...paths.flatMap(path => ['--path', path])]);
+      expect([result.exit, result.stderr, result.batchCalls]).toEqual([0, '', 0]);
+      expect(result.stdout).toContain(['Selection: dependency-closure',
+        'Path README.md: owned by example (declaration; readme; selects none)',
+        'Path docs/notes.md: owned by example (containment; inert; selects none)',
+        'Path scripts/x.ts: owned by example (containment; auxiliary-source; selects example)',
+        'Path subs/core/module.ramify: owned by example/core (declaration; description; selects example/core)',
+        'Path subs/core/src/interfaces/api.ts: owned by example/core (inventory; source-area; selects example/core)',
+        'Path subs/core/src/tmp/x.ts: owned by example/core (containment, scratch subs/core/src/tmp; ignored; selects none)',
+        'Path tsconfig.json: owned by example (containment; captured-input; selects example, example/app, example/core, example/lone, example/mid)',
+        'Changed modules (5):', ''].join('\n'));
+      await expectReleased(f.quick);
     } finally { await f.dispose(); }
   });
 

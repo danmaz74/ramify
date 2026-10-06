@@ -1,4 +1,5 @@
-import type { InventoryArea, PathOwnership, ProjectInventory, ProjectScope } from '../subs/project/src/interfaces/project.js';
+import { relative } from 'node:path';
+import type { CapturedInput, InventoryArea, PathOwnership, ProjectInventory, ProjectScope } from '../subs/project/src/interfaces/project.js';
 import { classifyProjectPath } from '../subs/project/src/ownership.js';
 import type { SourceAccess, SourceLimit } from '../subs/typescript/src/interfaces/source.js';
 import type { AffectedModule, AffectedPathSeed, AffectedSelection, AffectedWideningReason,
@@ -17,6 +18,15 @@ export interface AffectedFacts {
   readonly scope: ProjectScope;
   readonly inputId: string;
   readonly analysisCheck: 'passed' | 'failed';
+  /** The revision's captured inputs, which decide the `captured-input` kind. */
+  readonly inputs: readonly CapturedInput[];
+  /** Each observation path to the analyzed files whose description reads, resolves or probed it. */
+  readonly contributors: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Whether an owned path outside every `src/` would be auxiliary source under
+   * the revision's configuration, JavaScript admission included. Reads nothing.
+   */
+  readonly auxiliarySource: (path: string) => boolean;
 }
 export interface AffectedLimits {
   readonly maxModules: number;
@@ -40,12 +50,14 @@ const unavailable = (reason: Unavailable['reason'], message: string, unknownModu
   ({ status: 'unavailable', reason, message, unknownModules });
 
 /**
- * Assemble the projector's input from one revision's retained facts. The
- * access and shim lists refer to the retained objects; nothing is cloned.
- * Coverage is every note a report of these facts records, in the report's order.
+ * Assemble the projector's input from one revision's retained facts, its
+ * captured inputs and its configuration's auxiliary-source predicate. The
+ * access, shim, input and contributor lists refer to the retained objects;
+ * nothing is cloned. Coverage is every note a report of these facts records,
+ * in the report's order.
  */
 export function assembleAffectedFacts(facts: SessionFacts, inputId: string, scope: ProjectScope,
-  analysisCheck: 'passed' | 'failed'): AffectedFacts {
+  analysisCheck: 'passed' | 'failed', inputs: readonly CapturedInput[], auxiliarySource: (path: string) => boolean): AffectedFacts {
   if (!facts.inventory) throw new Error('Affected-module facts require an inventory');
   const files = Object.entries(facts.files);
   const accesses: SourceAccess[] = [];
@@ -59,8 +71,26 @@ export function assembleAffectedFacts(facts: SessionFacts, inputId: string, scop
     if (retained.description.dependencies.shims.length) shims.push({ file, shims: retained.description.dependencies.shims });
   }
   facts.companions.coverage.forEach(note);
-  return { inventory: facts.inventory, accesses, shims, coverage: [...notes.values()].sort(locatedOrder), scope, inputId, analysisCheck };
+  return { inventory: facts.inventory, accesses, shims, coverage: [...notes.values()].sort(locatedOrder), scope, inputId, analysisCheck,
+    inputs, contributors: facts.indexes.contributors, auxiliarySource };
 }
+
+const emptySha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+const readRoles: ReadonlySet<CapturedInput['role']> = new Set(['description', 'readme', 'source', 'resource', 'configuration', 'absent']);
+/**
+ * Whether the revision read the input's content or absence. A directory and a
+ * dependency existence probe, recorded with no bytes and a signature hash, are
+ * not captured inputs for affected selection. The counterpart of the contexts'
+ * `analysisInput()` in `subs/daemon/subs/contexts/src/dispositions.ts`, which
+ * leaves out absence; keep the two in step.
+ */
+function capturedInput(input: CapturedInput): boolean {
+  return readRoles.has(input.role) || input.role === 'dependency' && (input.bytes > 0 || input.sha256 === emptySha256);
+}
+const lastSegment = (path: string): string => path.slice(path.lastIndexOf('/') + 1);
+const parentDirectory = (path: string): string => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '.';
+const within = (directory: string, path: string): boolean =>
+  directory === '.' || path === directory || path.startsWith(`${directory}/`);
 
 type Classified = Exclude<PathOwnership, { readonly status: 'invalid-path' }>;
 /**
@@ -94,9 +124,12 @@ function validateSeeds(seeds: { readonly modules: unknown; readonly paths: unkno
  * Builds one temporary reverse module graph, traverses it once from every seed
  * and discards it. Path seeds resolve by the scope's ownership without an
  * inventory entry or a read, so absent, new and deleted paths resolve alike.
- * Unknown module IDs fail the whole query; a path outside the project or
- * partial coverage widens the test selection to every module while the seeds
- * and their closure are still reported. Ownership alone selects no descendant.
+ * Each owned seed takes the kind of the first rule row that applies and
+ * selects exactly the modules that kind names: its owner, a captured input's
+ * governed modules, or none. The changed modules are the module seeds and
+ * every selected module. Unknown module IDs fail the whole query; a path
+ * outside the project or partial coverage widens the test selection to every
+ * module while the changed modules and their closure are still reported.
  */
 export function projectAffected(facts: AffectedFacts, seeds: { readonly modules: readonly string[]; readonly paths: readonly string[] },
   limits: AffectedLimits, control: RunControl = {}): AffectedProjection {
@@ -116,33 +149,83 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
   // every exclusion resolves by its inventory entry, its module's description or
   // README, or one of its module's areas, else by containment, as does an owned
   // path in an owned-ignored tree or a scratch directory. An excluded path and a
-  // path outside the project name no module.
+  // path outside the project name no module. The basis only attributes a path;
+  // its kind decides the modules it selects.
   const fileOwners = new Map(inventory.files.map(file => [file.path, file.owner]));
+  const auxiliaryFiles = new Set(inventory.files.flatMap(file => file.placement === 'auxiliary' ? [file.path] : []));
   const declarations = new Map<string, string>();
+  const readmes = new Set<string>();
   const areas = new Map<string, readonly InventoryArea[]>();
   for (const module of inventory.modules) {
     const prefix = module.directory === '.' ? '' : `${module.directory}/`;
     declarations.set(`${prefix}module.ramify`, module.id);
     declarations.set(`${prefix}README.md`, module.id);
+    readmes.add(`${prefix}README.md`);
     areas.set(module.id, module.areas);
   }
-  const resolvePath = (path: string, ownership: Classified): AffectedPathSeed => {
-    if (ownership.status === 'outside-project') return { path, status: 'outside-project', module: null, basis: 'none', exclusion: null };
-    if (ownership.status === 'excluded') return { path, status: 'excluded', module: null, basis: 'excluded', exclusion: ownership.exclusion };
+  const captured = new Map<string, CapturedInput>();
+  for (const input of facts.inputs) if (input.role !== 'directory' && !captured.has(input.path)) captured.set(input.path, input);
+  const allModules = [...modules.keys()].sort(byteOrder);
+  /** The module owning a directory and every module whose directory lies at or beneath it. */
+  const governedBy = (directory: string, owner: string): string[] => [...new Set([owner,
+    ...inventory.modules.filter(module => within(directory, module.directory)).map(module => module.id)])].sort(byteOrder);
+  const selected = relative(facts.scope.root, facts.scope.configuration);
+  const selectedDirectory = selected.startsWith('../') || selected === '..' ? '.' : parentDirectory(selected);
+  const ownerOf = (path: string): string | undefined => {
+    const owner = fileOwners.get(path);
+    if (owner !== undefined) return owner;
+    const ownership = classifyProjectPath(facts.scope, path);
+    return ownership.status === 'owned' ? ownership.module : undefined;
+  };
+  /** The modules a captured input governs; never empty. */
+  const governed = (path: string, input: CapturedInput, owner: string): string[] => {
+    // The selected configuration and the configurations it extends: Ramify captures
+    // only that chain, so each governs the selected configuration's set.
+    if (input.role === 'configuration') return governedBy(selectedDirectory, ownerOf(selected) ?? owner);
+    if (lastSegment(path) === 'package.json') return governedBy(parentDirectory(path), owner);
+    const readers = (facts.contributors[path] ?? []).flatMap(file => { const id = ownerOf(file); return id === undefined ? [] : [id]; });
+    return readers.length ? [...new Set(readers)].sort(byteOrder) : allModules;
+  };
+  type Owned = Extract<AffectedPathSeed, { status: 'owned' }>;
+  /** The first of the rule's eight rows that applies to an owned path. */
+  const classify = (path: string, module: string, exclusion: Owned['exclusion']): Pick<Owned, 'kind' | 'selects'> => {
+    if (exclusion !== null) return { kind: 'ignored', selects: [] };
+    const name = lastSegment(path);
+    if (name === 'module.ramify') return { kind: 'description', selects: [module] };
+    if (readmes.has(path)) return { kind: 'readme', selects: [] };
+    if (name.endsWith('.md')) return { kind: 'inert', selects: [] };
+    const directory = modules.get(module)!.directory;
+    if (within(directory === '.' ? 'src' : `${directory}/src`, path)) return { kind: 'source-area', selects: [module] };
+    if (auxiliaryFiles.has(path) || !fileOwners.has(path) && facts.auxiliarySource(path)) {
+      return { kind: 'auxiliary-source', selects: [module] };
+    }
+    const input = captured.get(path);
+    if (input && capturedInput(input)) return { kind: 'captured-input', selects: governed(path, input, module) };
+    return { kind: 'inert', selects: [] };
+  };
+  const resolvePath = (path: string, ownership: Classified): AffectedPathSeed | string => {
+    if (ownership.status === 'outside-project') {
+      return { path, status: 'outside-project', module: null, basis: 'none', exclusion: null, kind: null, selects: [] };
+    }
+    if (ownership.status === 'excluded') {
+      return { path, status: 'excluded', module: null, basis: 'excluded', exclusion: ownership.exclusion, kind: null, selects: [] };
+    }
     const { module, exclusion } = ownership;
+    if (!modules.has(module)) return module;
     const basis = exclusion !== null ? 'containment'
       : fileOwners.get(path) === module ? 'inventory'
         : declarations.get(path) === module ? 'declaration'
           : (areas.get(module) ?? []).some(area => path === area.root || path.startsWith(`${area.root}/`)) ? 'area' : 'containment';
-    return { path, status: 'owned', module, basis, exclusion };
+    return { path, status: 'owned', module, basis, exclusion, ...classify(path, module, exclusion) };
   };
-  const pathSeeds = [...valid.paths.entries()].sort(([a], [b]) => byteOrder(a, b)).map(([path, ownership]) => resolvePath(path, ownership));
-  const strangers = pathSeeds.flatMap(path => path.module !== null && !modules.has(path.module) ? [path.module] : []);
+  const resolved = [...valid.paths.entries()].sort(([a], [b]) => byteOrder(a, b)).map(([path, ownership]) => resolvePath(path, ownership));
+  const strangers = resolved.filter((seed): seed is string => typeof seed === 'string');
   if (strangers.length) {
     return unavailable('invalid-current', `The scope's ownership names modules the inventory lacks: ${[...new Set(strangers)].sort(byteOrder).join(', ')}`);
   }
+  const pathSeeds = resolved as AffectedPathSeed[];
   const seedIds = new Set(valid.modules);
-  for (const path of pathSeeds) if (path.module !== null) seedIds.add(path.module);
+  for (const path of pathSeeds) for (const id of path.selects) seedIds.add(id);
 
   // Reverse edges: each provider to the modules depending on it.
   const dependents = new Map<string, Set<string>>();
@@ -203,7 +286,7 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
   const changedModules = listed(seedIds);
   const affectedModules = listed([...reached].filter(id => !seedIds.has(id)));
   return { status: 'answered', result: {
-    schemaVersion: 'ramify.affected/2', inputId: facts.inputId, paths: pathSeeds, changedModules, affectedModules,
+    schemaVersion: 'ramify.affected/3', inputId: facts.inputId, paths: pathSeeds, changedModules, affectedModules,
     testModules: widening.length ? listed(modules.keys()) : listed(reached),
     selection: widening.length ? 'all-modules' : 'dependency-closure', widening, scope: facts.scope,
     coverage: { status: partial ? 'partial' : 'complete', notes: [...facts.coverage].sort(locatedOrder) },

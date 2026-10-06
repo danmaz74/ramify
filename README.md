@@ -128,10 +128,13 @@ npx ramify affected --path src/foo.ts --batch --format json
 `ramify affected` names the modules whose tests a change calls for: the changed
 modules, the modules that depend on them and their union as test modules, from
 one revision's dependency facts. Each path seed is owned, excluded or outside
-the project; only a path outside the project, written with a leading `../`, or
-partial coverage widens the answer to every module and says why. It exits 0 for any
-complete answer, 1 for an invalid project, unknown module ID or invalid seed,
-2 when unavailable and 130 when interrupted.
+the project, and an owned seed's kind decides the modules it selects: paths in
+owned-ignored trees and scratch directories, `.md` files and other inert files
+select nothing, and a captured input such as the compiler configuration selects
+every module it governs. Only a path outside the project, written with a
+leading `../`, or partial coverage widens the answer to every module and says
+why. It exits 0 for any complete answer, 1 for an invalid project, unknown
+module ID or invalid seed, 2 when unavailable and 130 when interrupted.
 
 From this checkout, the same executable can check the reference directly:
 

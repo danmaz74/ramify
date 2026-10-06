@@ -103,6 +103,7 @@ class Observer implements ProjectObserver {
   /** Filesystem work performed so far, for locality evidence outside the port. */
   get enumerations(): number { return this.#capture.enumerations; }
   get sink(): ObservationSink { return this.#reported.sink; }
+  auxiliarySource(path: string): boolean { return auxiliarySource(path, this.#configurationData); }
   /**
    * Captured inputs merged with pending reports. Both sides carry versions, so
    * an unchanged observer returns the list it last built; without pending
