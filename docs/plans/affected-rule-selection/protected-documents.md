@@ -1,10 +1,16 @@
 # Protected documents
 
-**Status:** the plan proposes these patches; none is applied. The coordinator
-authorizes P1 before iteration 1 begins. P1 expresses Dan's 2026-10-06
-decisions in the architecture specification that already owns the affected
-rule. P2 is optional. No `.principles.md` file and no model specification
+**Status:** P1 and P2 are authorized and not yet applied. Iteration 1 applies
+them. No `.principles.md` file and no model specification
 (`docs/model/*.spec.md`) changes.
+
+**Authorization.** Coordinator ramify-65 authorized P1 and P2 on 2026-10-06 as
+spec corrections. They express accepted decisions D3, D5 and D7 of the
+ramify-audit decisions document. The same message decided that `.md` paths
+select nothing wherever they lie, so P1's hunk 2 below includes that rule.
+The authorization applies to the text in this file at the baselines below,
+which the planner verified: each "Old" block occurs exactly once in its
+document.
 
 | Document | Baseline sha256 at `b4858aec` | Last commit touching it |
 | --- | --- | --- |
@@ -23,7 +29,7 @@ in the same change:
 - `docs/development/testing.md`, the `ramify affected` row;
 - `README.md`, the `ramify affected` paragraph.
 
-## P1: the affected rule in `cli-invocation.spec.md` (required)
+## P1: the affected rule in `cli-invocation.spec.md` (authorized)
 
 ### Hunk 1: the JSON document version
 
@@ -81,8 +87,10 @@ applies decides:
   selects nothing;
 - a `module.ramify` is a `description` and selects its owner;
 - a module's `README.md` is a `readme` and selects nothing;
-- a path at or beneath its owner's `src/` is `source-area` and selects its
-  owner;
+- any other `.md` path, wherever it lies and including beneath `src/`, is
+  `inert` and selects nothing;
+- any other path at or beneath its owner's `src/` is `source-area` and
+  selects its owner;
 - auxiliary source, present or absent, is `auxiliary-source` and selects its
   owner;
 - a captured input of the revision, meaning content or absence it read and
@@ -119,7 +127,7 @@ seed's kind and selected modules, so the affected answer moved to
 carries the selection without decoding it, kept `ramify.ipc/2`.
 ```
 
-## P2: the glossary status line (optional)
+## P2: the glossary status line (authorized)
 
 `docs/model/glossary.md` is a model document, although not suffix-protected,
 so it goes through the same authorization. The current status line says

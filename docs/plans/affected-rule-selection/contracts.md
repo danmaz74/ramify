@@ -1,9 +1,12 @@
 # Contracts: affected-rule selection
 
-**Status:** draft for coordinator review. These contracts are binding on
-iterations 0 to 2 once they are reviewed. The authoritative wording of the rule
-goes into [cli-invocation.spec.md](../../architecture/cli-invocation.spec.md)
-through patch P1 in [protected documents](protected-documents.md).
+**Status:** reviewed by the coordinator on 2026-10-06. This file is the
+complete reader contract for `ramify.affected-cli/3` and `ramify.affected/3`.
+ramify-audit 0.6.0 (its Plan 8) reads it.
+
+Iterations 0 to 2 are bound by it. The rule's authoritative wording goes into
+[cli-invocation.spec.md](../../architecture/cli-invocation.spec.md) through
+the authorized patch P1 in [protected documents](protected-documents.md).
 
 ## Scope
 
@@ -21,38 +24,44 @@ What does not change:
 - widening;
 - coverage;
 - limits;
-- refusals;
+- refusals and exit codes;
 - the daemon operation and its IPC protocol `ramify.ipc/2`.
 
 ## The rule
 
-Each distinct path seed is classified, without a filesystem read, into exactly
-one kind. Owned seeds take a kind from the first row that applies; excluded and
-outside-project seeds have kind `null`. The `selects` column lists the modules
-the seed selects.
+Each distinct path seed is classified into exactly one kind, without a
+filesystem read. An owned seed takes the kind of the first row that applies.
+Excluded and outside-project seeds have kind `null`. A seed selects the
+modules in its `selects` list.
 
 | Order | Kind | Applies when | `selects` |
 | --- | --- | --- | --- |
 | 1 | `ignored` | The seed carries an owned-ignored or scratch exclusion. | `[]` |
 | 2 | `description` | The path's last segment is `module.ramify`, present or absent. | `[owner]` |
 | 3 | `readme` | The path is `README.md` directly in a current module's directory. | `[]` |
-| 4 | `source-area` | The path is at or beneath its owner's `src/`, present or absent. This includes testing and interface areas and resources such as `.md` files. | `[owner]` |
-| 5 | `auxiliary-source` | The inventory lists the path with placement `auxiliary`. Or the inventory does not list it and it is compiler source under the revision's configuration, so a `.js`, `.jsx`, `.mjs` or `.cjs` path counts only when the configuration admits JavaScript. | `[owner]` |
-| 6 | `captured-input` | The path is a [captured input](#captured-inputs) of the revision. | its [governed set](#governed-sets) |
-| 7 | `inert` | Anything else: inert files, `.` and directories outside `src/`, other `.md` files and unread configuration files. | `[]` |
+| 4 | `inert` | The path's last segment ends in `.md`, compared case-sensitively, wherever the path lies, including beneath `src/`. | `[]` |
+| 5 | `source-area` | The path is at or beneath its owner's `src/`, present or absent. This includes the testing and interface areas and every non-`.md` resource. | `[owner]` |
+| 6 | `auxiliary-source` | The inventory lists the path with placement `auxiliary`. Or the inventory does not list it and it is compiler source under the revision's configuration; a `.js`, `.jsx`, `.mjs` or `.cjs` path counts only when the configuration admits JavaScript. | `[owner]` |
+| 7 | `captured-input` | The path is a [captured input](#captured-inputs) of the revision. | its [governed set](#governed-sets) |
+| 8 | `inert` | Anything else: inert files, `.` and directories outside `src/`, and configuration files the revision did not read. | `[]` |
 
-Rows 1 to 5 restate today's ownership facts, so only rows 6 and 7 consult the
-revision's captured inputs. Row 4 precedes row 6, so a resource inside `src/`
-that the revision also captures stays `source-area`. Row 3 precedes row 6, so
-a README stays `readme` even though the revision captures it with role
-`readme`.
+Notes on the ordering:
 
-For an owned seed, `module` still names the owner and `basis` keeps its `/2`
-computation. Both are attribution only; `selects` alone decides selection.
+- Rows 1 to 6 depend only on the path and the inventory. Only rows 7 and 8
+  consult the revision's captured inputs.
+- Rows 3 and 4 precede row 7. A module README, or a `.md` resource that the
+  revision captures, still selects nothing. This is Dan's decision: a `.md`
+  path is classified as inert wherever it lies.
+- The kind `inert` is broader than the glossary's *inert file*, which lies
+  outside `src/`. The kind also covers `.md` paths beneath `src/`. Both mean
+  that Ramify selects nothing for the path.
+
+For an owned seed, `module` still names the owner, and `basis` keeps its `/2`
+computation. Both only attribute the path; `selects` alone decides selection.
 
 ### Captured inputs
 
-For row 6, a path is a captured input when the revision's `CapturedInput` list
+For row 7, a path is a captured input when the revision's `CapturedInput` list
 holds it with one of these:
 
 - role `configuration`: the selected compiler configuration and the
@@ -60,11 +69,11 @@ holds it with one of these:
 - role `absent`: absence the analysis read, such as a resolution candidate;
 - role `dependency` with `bytes > 0`, or with the sha256 of empty content: a
   file whose content the analysis read;
-- roles `source` or `resource`: unreachable here, because rows 4 and 5 come
-  first; listed for completeness.
+- role `source` or `resource`: listed for completeness; rows 4 to 6 always
+  come first, so these never reach row 7.
 
-The definition mirrors the contexts' `analysisInput()` in
-`subs/daemon/subs/contexts/src/dispositions.ts`. It holds the glossary's
+This mirrors the contexts' `analysisInput()` in
+`subs/daemon/subs/contexts/src/dispositions.ts`. It matches the glossary's
 "content or absence an analysis revision read and fingerprinted".
 
 These never count:
@@ -79,34 +88,122 @@ named like a configuration file.
 
 - **The whole project.** An input with role `configuration`, and a captured
   input whose last segment is `package.json`, govern every inventoried module.
-  The configuration compiles every module's source, auxiliary source included,
-  and the manifest decides package resolution and module format for all of
-  them.
+  The configuration compiles every module's source, auxiliary source included.
+  The manifest decides package resolution and module format for all of them.
 - **Its readers.** Any other captured input governs the owners of the files in
   `indexes.contributors[path]`: the analyzed files whose description reads it,
   resolves it or probed its absence.
 - **The fallback.** When no file contributes the path, the input governs every
   inventoried module.
 
-`selects` is byte-ordered and has no duplicates.
+### Module lists and empty answers
 
-### Module lists
-
-- `changedModules` is the set of module-ID seeds together with every seed's
+- **`changedModules`:** the module-ID seeds together with every seed's
   `selects`.
-- `affectedModules` is the reverse-dependency closure of `changedModules`,
+- **`affectedModules`:** the reverse-dependency closure of `changedModules`,
   minus `changedModules`.
-- `testModules`, `selection` and `widening` keep their `/2` rules. Only a path
-  outside the project, or partial coverage, widens.
+- **`testModules`:**
+  - `changedModules` ∪ `affectedModules` when `selection` is
+    `dependency-closure`;
+  - every module when `selection` is `all-modules`.
+- **`selection` and `widening`:** they keep their `/2` rules. Only a seed
+  outside the project (`unowned-path`) or partial coverage (`partial-coverage`)
+  widens. Widening never adds to `changedModules` or `affectedModules`.
 
-A query whose seeds are all `ignored`, `readme` or `inert`, or that has only
-excluded seeds, answers with empty `changedModules`, `affectedModules` and
-`testModules` and `selection: 'dependency-closure'`, unless it is widened.
+**Empty answers.** If no module-ID seed is given and no path seed has a
+non-empty `selects`, then `changedModules` and `affectedModules` are empty.
+That happens when every seed is `ignored`, `readme`, `inert`, or excluded. An
+empty answer is a complete answer:
 
-## The `/3` answer
+- Ramify selects no module because of the change.
+- `testModules` is also empty unless the answer is widened.
+- When it is widened, `testModules` lists every module while
+  `changedModules` and `affectedModules` stay empty.
+- An empty answer is never "unavailable". It exits 0 like any other answer.
+
+## Reader contract
+
+### Invocation and exit
+
+```text
+ramify affected [<module-id>...] [--path <path>]... [--root <dir>] [--batch] --format json
+```
+
+| Exit | stdout |
+| --- | --- |
+| 0 | One `ramify.affected-cli/3` document, including empty and widened answers. |
+| 1 | One `ramify.cli/1` document: an invalid project, an unknown module ID or an invalid seed. |
+| 2 | One `ramify.cli/1` document: unavailable, pending, cold, superseded or past a deadline. |
+| 130 | Interrupted; no result. |
+
+The `ramify.cli/1` failure document is unchanged:
+`{ schemaVersion, status: 'unavailable', diagnostics: [{ category, code, message }], exitCode }`.
+
+### `ramify.affected-cli/3`
+
+The document has exactly these members:
+
+| Member | Type | Meaning |
+| --- | --- | --- |
+| `schemaVersion` | `'ramify.affected-cli/3'` | |
+| `root` | string | The absolute project root. It equals `selection.scope.root`. |
+| `mode` | `'resident'` or `'batch'` | |
+| `revision` | `{ sequence: number or null, inputId: string }` | `sequence` is null in batch. `inputId` equals `selection.inputId`. |
+| `ramifyVersion` | string | For example `'0.3.0'`. |
+| `selection` | `ramify.affected/3` | Below. |
+
+### `ramify.affected/3`
+
+The selection has exactly these members:
+
+| Member | Type | Meaning |
+| --- | --- | --- |
+| `schemaVersion` | `'ramify.affected/3'` | |
+| `inputId` | string | The revision's input identity, `input/1:<64 hex>`. |
+| `paths` | path seed[] | One per distinct path seed, byte-ordered by `path`. |
+| `changedModules` | `{ id, directory }[]` | Byte-ordered by `id`. See [module lists](#module-lists-and-empty-answers). |
+| `affectedModules` | `{ id, directory }[]` | As above. |
+| `testModules` | `{ id, directory }[]` | As above. |
+| `selection` | `'dependency-closure'` or `'all-modules'` | |
+| `widening` | `('partial-coverage' or 'unowned-path')[]` | Distinct and sorted. Empty exactly when `selection` is `dependency-closure`. |
+| `scope` | `{ root, selection, invokedFrom, configuration, walkedAreas, ownership }` | Unchanged from `/2`. `ownership` is `{ modules: { id, parent, directory }[], exclusions: { kind, directory, owner }[] }`. |
+| `coverage` | `{ status: 'complete' or 'partial', notes }` | Unchanged from `/2`. Each note is `{ id, code, location, message, related }`. |
+| `analysisCheck` | `'passed'` or `'failed'` | Unchanged. |
+
+### Path seeds
+
+Every seed has exactly the members `path`, `status`, `module`, `basis`,
+`exclusion`, `kind` and `selects`:
+
+| `status` | `module` | `basis` | `exclusion` | `kind` | `selects` |
+| --- | --- | --- | --- | --- | --- |
+| `owned` | the owner's ID | `inventory`, `declaration`, `area` or `containment` | null, or an `owned-ignored` or `scratch` exclusion whose `owner` is `module` | one of the eight rows' kinds | as the row says |
+| `excluded` | null | `excluded` | an exclusion whose `owner` is null | null | `[]` |
+| `outside-project` | null | `none` | null | null | `[]` |
+
+Invariants a reader may rely on, and should reject a document that breaks:
+
+- For an owned seed, `kind` is `ignored` exactly when `exclusion` is not null.
+- `selects` is `[]` for `ignored`, `readme`, `inert` and `null`.
+- `selects` is exactly `[module]` for `source-area`, `auxiliary-source` and
+  `description`.
+- For `captured-input`, `selects` is non-empty and may omit `module`.
+- `selects` is byte-ordered with no duplicates, and names only modules in
+  `scope.ownership.modules`.
+- Every module in any seed's `selects` appears in `changedModules`.
+- `readme` and `description` seeds have basis `declaration` when the path is
+  a current module's README or description. A `description` seed for a
+  module that does not exist yet has basis `containment`.
+
+A path *selects* exactly when its `selects` is non-empty.
+
+### TypeScript shape
+
+The interface in `subs/analysis/src/interfaces/affected.ts` uses inline unions
+only. It adds no new exported type name, because a new name would become a
+signature companion that the root description must relay.
 
 ```ts
-// subs/analysis/src/interfaces/affected.ts — inline unions only; no new exported type name
 export type AffectedPathSeed =
   | { readonly path: string; readonly status: 'owned'; readonly module: string;
       readonly basis: 'inventory' | 'declaration' | 'area' | 'containment';
@@ -118,39 +215,107 @@ export type AffectedPathSeed =
       readonly exclusion: ProjectExclusion; readonly kind: null; readonly selects: readonly [] }
   | { readonly path: string; readonly status: 'outside-project'; readonly module: null; readonly basis: 'none';
       readonly exclusion: null; readonly kind: null; readonly selects: readonly [] };
-
-export interface AffectedSelection {
-  readonly schemaVersion: 'ramify.affected/3';
-  // every other member unchanged from /2
-}
+// AffectedSelection.schemaVersion: 'ramify.affected/3'; AffectedDocument.schemaVersion: 'ramify.affected-cli/3'.
 ```
 
-The answer must satisfy these invariants:
-
-- `kind === 'ignored'` exactly when `exclusion !== null` on an owned seed.
-- `selects` is `[]` for `ignored`, `readme` and `inert`.
-- `selects` is `[module]` for `source-area`, `auxiliary-source` and `description`.
-- `selects` is non-empty for `captured-input`, and it may omit the owner.
-- Seeds stay byte-ordered by path, as in `/2`.
-
-The CLI document `AffectedDocument` becomes `ramify.affected-cli/3`. Its other
-members are unchanged. Help text and every reader that names `/2` move to `/3`
-together. No reader for `/2` is kept, as the
+The IPC protocol stays `ramify.ipc/2`. The daemon codec carries the selection
+as a payload it does not decode, and an envelope's version advances only when
+its own members change. No `/2` reader is kept, as the
 [schema-versions rule](../../architecture/cli-invocation.spec.md) requires.
 
-The IPC protocol stays `ramify.ipc/2`. The daemon codec carries the selection
-as an opaque payload; it does not decode its contents. An envelope advances
-only when its own members change.
+### Human output
 
-Human output appends the kind and the selection to each owned seed's line:
+`--format human` appends the kind and the selection to each owned seed's line:
 
 ```text
-notes/design.md: owned by app (containment; inert; selects none)
-tsconfig.json: owned by app (containment; captured-input; selects app, app/a, app/a-extra, app/a/grand, app/b)
-subs/a/src/tmp/new.ts: owned by app/a (containment, scratch subs/a/src/tmp; ignored; selects none)
+Path notes/design.md: owned by app (containment; inert; selects none)
+Path tsconfig.json: owned by app (containment; captured-input; selects app, app/a, app/a-extra, app/a/grand, app/b)
+Path subs/a/src/tmp/new.ts: owned by app/a (containment, scratch subs/a/src/tmp; ignored; selects none)
 ```
 
 Excluded and outside-project lines are unchanged.
+
+### Example: one complete document
+
+This is `ramify affected --batch --format json --path tsconfig.json` on the
+[extended topology](#examples-on-the-extended-topology), rooted at
+`/work/app` and pretty-printed. The `scope` values and the `inputId` are
+illustrative; iteration 1's tests record the exact ones.
+
+```json
+{
+  "schemaVersion": "ramify.affected-cli/3",
+  "root": "/work/app",
+  "mode": "batch",
+  "revision": { "sequence": null, "inputId": "input/1:0000000000000000000000000000000000000000000000000000000000000000" },
+  "ramifyVersion": "0.3.0",
+  "selection": {
+    "schemaVersion": "ramify.affected/3",
+    "inputId": "input/1:0000000000000000000000000000000000000000000000000000000000000000",
+    "paths": [
+      { "path": "tsconfig.json", "status": "owned", "module": "app", "basis": "containment", "exclusion": null,
+        "kind": "captured-input", "selects": ["app", "app/a", "app/a-extra", "app/a/grand", "app/b"] }
+    ],
+    "changedModules": [
+      { "id": "app", "directory": "." }, { "id": "app/a", "directory": "subs/a" },
+      { "id": "app/a-extra", "directory": "subs/a-extra" }, { "id": "app/a/grand", "directory": "subs/a/subs/grand" },
+      { "id": "app/b", "directory": "subs/b" }
+    ],
+    "affectedModules": [],
+    "testModules": [
+      { "id": "app", "directory": "." }, { "id": "app/a", "directory": "subs/a" },
+      { "id": "app/a-extra", "directory": "subs/a-extra" }, { "id": "app/a/grand", "directory": "subs/a/subs/grand" },
+      { "id": "app/b", "directory": "subs/b" }
+    ],
+    "selection": "dependency-closure",
+    "widening": [],
+    "scope": {
+      "root": "/work/app", "selection": "given", "invokedFrom": "/work/app",
+      "configuration": "/work/app/tsconfig.json",
+      "walkedAreas": ["scripts", "src", "subs/a/scripts", "subs/a/src", "subs/a/src/tests", "subs/a-extra/src", "subs/b/src", "tools"],
+      "ownership": {
+        "modules": [
+          { "id": "app", "parent": null, "directory": "." },
+          { "id": "app/a", "parent": "app", "directory": "subs/a" },
+          { "id": "app/a-extra", "parent": "app", "directory": "subs/a-extra" },
+          { "id": "app/a/grand", "parent": "app/a", "directory": "subs/a/subs/grand" },
+          { "id": "app/b", "parent": "app", "directory": "subs/b" }
+        ],
+        "exclusions": [
+          { "kind": "external", "directory": "external-project", "owner": null },
+          { "kind": "owned-ignored", "directory": "fixture-project", "owner": "app" },
+          { "kind": "scratch", "directory": "src/tmp", "owner": "app" },
+          { "kind": "owned-ignored", "directory": "subs/a/fixtures/sample", "owner": "app/a" },
+          { "kind": "scratch", "directory": "subs/a/src/tmp", "owner": "app/a" }
+        ]
+      }
+    },
+    "coverage": { "status": "complete", "notes": [] },
+    "analysisCheck": "passed"
+  }
+}
+```
+
+### Example: one seed per kind
+
+These are the same query on the same revision, one seed each. Each row shows
+the seed and the members that differ from the document above. All of them
+have `widening: []` and `selection: 'dependency-closure'`, except the last,
+and `coverage` is complete.
+
+| Kind | Seed (`path`, `status`, `module`, `basis`, `exclusion`, `kind`, `selects`) | `changedModules` | `affectedModules` | `testModules` |
+| --- | --- | --- | --- | --- |
+| `source-area` | `subs/a/src/api.ts`, owned, `app/a`, inventory, null, `source-area`, `["app/a"]` | app/a | app, app/b | app, app/a, app/b |
+| `auxiliary-source` | `scripts/check.ts`, owned, `app`, inventory, null, `auxiliary-source`, `["app"]` | app | — | app |
+| `description` | `subs/a/module.ramify`, owned, `app/a`, declaration, null, `description`, `["app/a"]` | app/a | app, app/b | app, app/a, app/b |
+| `readme` | `subs/a/README.md`, owned, `app/a`, declaration, null, `readme`, `[]` | — | — | — |
+| `captured-input` | `tsconfig.json`, as in the complete document | all five | — | all five |
+| `captured-input` (readers) | `data/limits.json` in the data variant, owned, `app`, containment, null, `captured-input`, `["app/b"]` | app/b | — | app/b |
+| `inert` (`.md` in `src/`) | `subs/b/src/prompt.md`, owned, `app/b`, inventory, null, `inert`, `[]` | — | — | — |
+| `inert` (other) | `notes/design.md`, owned, `app`, containment, null, `inert`, `[]` | — | — | — |
+| `ignored` | `subs/a/src/tmp/new.ts`, owned, `app/a`, containment, `{ kind: 'scratch', directory: 'subs/a/src/tmp', owner: 'app/a' }`, `ignored`, `[]` | — | — | — |
+| `null` (excluded) | `external-project/file.ts`, excluded, null, excluded, `{ kind: 'external', directory: 'external-project', owner: null }`, null, `[]` | — | — | — |
+| `null` (outside) | `../outside.ts`, outside-project, null, none, null, null, `[]` | — | — | all five; `selection: 'all-modules'`, `widening: ['unowned-path']` |
 
 ## Examples on the extended topology
 
@@ -166,16 +331,16 @@ The plan adds:
 The **data variant** is a second revision. In it `subs/b/src/consumer.ts`
 imports `../../../data/limits.json` under `resolveJsonModule`. It is a separate
 revision because the import may add a coverage note. Coverage is complete in
-the base revision. The module IDs are `app`, `app/a`, `app/a-extra`,
-`app/a/grand` and `app/b`, and the reverse edges are `a -> app` and `a -> b`.
-"all" means all five IDs.
+the base revision.
+
+The module IDs are `app`, `app/a`, `app/a-extra`, `app/a/grand` and `app/b`.
+The reverse edges are `a -> app` and `a -> b`. "all" means all five IDs.
 
 | Path seed | status / module / basis / exclusion | kind | selects | changed | affected |
 | --- | --- | --- | --- | --- | --- |
 | `subs/a/src/api.ts` | owned / app/a / inventory / null | source-area | [app/a] | [app/a] | [app, app/b] |
 | `subs/a/src/new.ts` (absent) | owned / app/a / area / null | source-area | [app/a] | [app/a] | [app, app/b] |
 | `subs/a/src/tests/tmp/real.test.ts` | owned / app/a / inventory / null | source-area | [app/a] | [app/a] | [app, app/b] |
-| `subs/b/src/prompt.md` | owned / app/b / inventory / null | source-area | [app/b] | [app/b] | [] |
 | `scripts/check.ts` | owned / app / inventory / null | auxiliary-source | [app] | [app] | [] |
 | `tools/tmp/helper.ts` | owned / app / inventory / null | auxiliary-source | [app] | [app] | [] |
 | `subs/a/scripts/report.ts` | owned / app/a / inventory / null | auxiliary-source | [app/a] | [app/a] | [app, app/b] |
@@ -186,11 +351,13 @@ the base revision. The module IDs are `app`, `app/a`, `app/a-extra`,
 | `subs/c/module.ramify` (absent) | owned / app / containment / null | description | [app] | [app] | [] |
 | `README.md` | owned / app / declaration / null | readme | [] | [] | [] |
 | `subs/a/README.md` | owned / app/a / declaration / null | readme | [] | [] | [] |
+| `subs/b/src/prompt.md` | owned / app/b / inventory / null | inert | [] | [] | [] |
+| `subs/a/src/notes.md` (absent) | owned / app/a / area / null | inert | [] | [] | [] |
+| `notes/design.md`, `notes/new.md` (absent) | owned / app / containment / null | inert | [] | [] | [] |
 | `tsconfig.json` | owned / app / containment / null | captured-input | all | all | [] |
 | `tsconfig.base.json` | owned / app / containment / null | captured-input | all | all | [] |
 | `package.json` | owned / app / containment / null | captured-input if captured with content, else inert | all, else [] | all, else [] | [] |
 | `data/limits.json` (data variant) | owned / app / containment / null | captured-input | [app/b] | [app/b] | [] |
-| `notes/design.md`, `notes/new.md` (absent) | owned / app / containment / null | inert | [] | [] | [] |
 | `subs/a/subs/grand/new.txt` | owned / app/a/grand / containment / null | inert | [] | [] | [] |
 | `scripts/run.sh` | owned / app / containment / null | inert | [] | [] | [] |
 | `.devcontainer/devcontainer.json` | owned / app / containment / null | inert | [] | [] | [] |
@@ -212,20 +379,21 @@ Combined queries:
 - Module ID `app/b` with `.devcontainer/devcontainer.json`: changed [app/b],
   affected [].
 
-Three cells are fixed by facts that iteration 0 records, not by the rule:
+Three cells depend on facts that iteration 0 records:
 
 - the `package.json` row, by its recorded role;
 - the `data/limits.json` row, by its recorded role and contributors;
 - the `.devcontainer` row, which assumes the fixture does not read that file's
   content.
 
-The rule above decides each cell once those facts are recorded. If a fact turns
-out differently, iteration 0 records it and the coordinator decides before
+Once those facts are recorded, the rule decides each cell. If a fact turns out
+differently, iteration 0 records it and reports it to the coordinator before
 iteration 1.
 
-Today's 0.2.0 answers are different in these rows:
+Today's 0.2.0 answers differ in these rows:
 
-- every `ignored`, `readme` and `inert` row selects its owner;
+- every `ignored`, `readme` and `inert` row selects its owner, including both
+  `.md` rows under `src/`;
 - `tsconfig.json`, `tsconfig.base.json` and `package.json` select only `app`;
 - `data/limits.json` selects `app`.
 
@@ -259,8 +427,9 @@ ramify/service-api]. "all 15" means changed all fifteen modules and affected [].
 
 The `tsconfig.scripts.json`, `tsconfig.build.json` and `tsconfig.portable.json`
 files are existence-only probes in the toolkit's revision, so they are `inert`.
-Ramify never reads them. Whether an edit to one should still trigger a full
-audit is the audit configuration's choice; see the [handoff](iterations/iteration2.md#handoff).
+Ramify never reads them. Under 0.6.0 they are the only kind of file a
+toolkit `undetectedConfigFilesForcingFullAudit` entry could name; see the
+[handoff](iterations/iteration2.md#handoff).
 
 ## Compatibility with ramify-audit 0.5.0
 
@@ -318,10 +487,10 @@ and `ramify.affected-cli/3`.** Three reasons, each sufficient on its own:
    An inert `docs/` path in a mixed change would therefore count toward the
    drift cap.
 
-   Second, its stage-2 validation of `fullAuditPaths` entries
-   (`undetectedPlacementRefusal`) accepts any owned seed with basis `area` or
-   `containment`. That would accept `tsconfig.json` as a path Ramify leaves to
-   the audit, although it now selects every module.
+   Second, its stage-2 validation of `undetectedConfigFilesForcingFullAudit`
+   entries (`undetectedPlacementRefusal`) accepts any owned seed with basis
+   `area` or `containment`. It would therefore accept `tsconfig.json` as a file
+   no tool detects, although Ramify now selects every module for it.
 
    With no member to carry the kind, 0.5.0 cannot tell which seeds selected
    anything.
@@ -330,44 +499,32 @@ and `ramify.affected-cli/3`.** Three reasons, each sufficient on its own:
    implies that its owner is selected. Phase 1's
    [schema versions](../project-boundary-ramify/contracts.md) state this rule.
 
-What 0.5.0 does with a 0.3.0 answer: `decodeAffectedDocument` reports
+What 0.5.0 does with a 0.3.0 answer: its decoder reports
 `unsupported-schema` for `ramify.affected-cli/3`. `interpretAffectedResult`
 maps that to `ramify-unavailable`, so every partial audit becomes a full audit,
 recorded as a fallback rather than a failure. Iteration 2 confirms this on
 real 0.3.0 answers.
 
-## What ramify-audit 0.6.0 must read
+## How ramify-audit 0.6.0 consumes `/3`
 
-- **Schema.** Read `ramify.affected-cli/3` and `ramify.affected/3` strictly,
-  with no `/2` reader, and pin `ramify.ts` 0.3.0 in its fixtures.
-- **Seed members.** Decode `kind` and `selects` on every seed, enforcing the
-  invariants under [the `/3` answer](#the-3-answer).
-- **Selecting paths.** A path selects when its seed's `selects` is non-empty,
-  not when its status is `owned`. The drift cap counts only those paths.
-- **Empty selections.** A query that selects nothing answers empty, with
-  `dependency-closure`. Treat that as a selection of zero modules, which
-  needs no tests from Ramify, and not as unavailable.
-- **Stage 2 (validating `fullAuditPaths` entries).** Branch on `selects`,
-  not on `basis`. The entry is for a path the audit must handle itself because
-  Ramify selects nothing for it, so the rule is:
-  - **Accept** an owned seed whose `selects` is empty. Its kind is `ignored`,
-    `readme` or `inert`. Under `/3`, owned-ignored content such as
-    `examples/collection-review/` and `scripts/reference-harness/` selects
-    nothing. A full-audit entry is then the only way to make its edit run
-    every check, so 0.5.0's `excluded-placement` refusal of owned seeds no
-    longer fits.
-  - **Refuse** an owned seed whose `selects` is not empty, because Ramify
-    already selects modules for it:
-    - `source-area` and `auxiliary-source` keep `ramify-source`;
-    - `description` keeps `ramify-declaration`;
-    - `captured-input` needs a new reason, recommended name
-      `ramify-captured-input`.
-  - **Keep** `excluded-placement` for excluded seeds, and keep the
-    `outside-project` handling.
+ramify-audit 0.6.0 is the first release that reads `/3`, through an iteration
+of its Plan 8 briefed from this file. Its qualification runs on this plan's
+iteration 2 production artifact before publication, as Plan 7 did with 0.2.0.
 
-  This closes the gap that Plan 7's contracts document: "a captured-input
-  entry is accepted until a Ramify answer marks captured inputs". The audit's
-  0.6.0 plan decides the reason names.
-- **Ignore lists.** `ignorePaths` applies before the query, as ramify-audit's
-  Plan 8 (ignore paths, release 0.6.0) reinstates it. It is independent of this
-  contract.
+- **Schema.** It reads `ramify.affected-cli/3` and `ramify.affected/3`
+  strictly, as this [reader contract](#reader-contract) defines them, with no
+  `/2` reader. It pins `ramify.ts` 0.3.0.
+- **Selecting paths.** A queried path selects when its seed's `selects` is
+  non-empty. Only those paths count toward the drift cap.
+- **Selected modules.** Its reading stays `changedModules` ∪
+  `affectedModules`. An [empty answer](#module-lists-and-empty-answers) is a
+  selection of zero modules, never `ramify-unavailable`.
+- **Stage 2.** It validates `undetectedConfigFilesForcingFullAudit` entries.
+  An entry is accepted only when its seed has `kind: 'inert'`. Every other
+  kind is refused, and the refusal names the kind: `source-area`,
+  `auxiliary-source`, `description`, `readme`, `captured-input`, `ignored`, or
+  `null` for excluded or outside-project paths. This keeps the audit's D7
+  (the list is for files that no tool detects) and closes the captured-input
+  gap that Plan 7's contracts record.
+- **Ignore lists.** `ignorePaths` applies before the query, as Plan 8
+  reinstates it. It is independent of this contract.

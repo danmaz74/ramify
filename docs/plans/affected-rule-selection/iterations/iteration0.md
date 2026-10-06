@@ -105,11 +105,13 @@ documents, `ramify-agent/`, `/ramify` or any ramify-audit checkout.
 - AR-00 passes.
 - The plan-start and gate audits pass.
 - Every fact in step 3 is recorded.
-- Every contracts cell that iteration 0 must settle is settled, either
-  confirmed or recorded as a deviation for the coordinator:
+- The four facts are confirmed, or recorded as deviations:
   - the `package.json` row;
   - the `data/limits.json` row;
-  - the `.devcontainer` row.
+  - the `.devcontainer` row;
+  - the toolkit's `package-lock.json` role.
+
+  Report every surprise to the coordinator before iteration 1 starts.
 
 ## Results file
 

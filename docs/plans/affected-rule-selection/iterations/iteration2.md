@@ -10,13 +10,20 @@ gate passed.
     else in that commit;
   - this iteration's results file;
   - `docs/plans/affected-rule-selection/handoff.md`;
-- outside the checkout, under `/home/app/ramify-affected-evidence/0.3.0/`:
-  - a clean release clone;
-  - a qualification clone;
-  - artifacts and logs.
+- outside the checkout, under `/home/app/ramify-audit-pb-evidence/ramify-0.3.0-prod/`.
+  This mirrors the 0.2.0 layout `ramify-0.2.0-prod/` and contains:
+  - `RECEIPT.md`;
+  - `artifact/ramify.ts-0.3.0.tgz` and its manifest;
+  - `src/`, the clean release clone;
+  - `logs/` and `smoke/`;
+  - `qualify/`, the toolkit qualification clone.
 
-No source changes. No changes to `ramify-agent/`, `/ramify`, any ramify-audit
-checkout, `~/.npmrc` or the registry before the publication gate.
+  The directory is an evidence directory, not a ramify-audit checkout.
+
+No source changes. Do not change `ramify-agent/`, `/ramify`, any ramify-audit
+checkout, `~/.npmrc` or the registry before the publication gate. ramify-audit
+Plan 8 qualifies against this exact tarball, so it must never be rebuilt or
+replaced in place.
 
 ## Goal
 
@@ -24,13 +31,14 @@ checkout, `~/.npmrc` or the registry before the publication gate.
    built the same way as the 0.2.0 provider artifact.
 2. Qualify it against real toolkit changes.
 3. Show what ramify-audit 0.5.0 does with its answers.
-4. Stop at Dan's publication gate.
+4. Hand the artifact to ramify-audit Plan 8's qualification, then stop at the
+   publication gate.
 5. Write the adoption handoff.
 
 ## Read first
 
-- [Contracts](../contracts.md): compatibility, what 0.6.0 must read, and the
-  expected toolkit table.
+- [Contracts](../contracts.md): the reader contract, compatibility, how 0.6.0
+  consumes `/3`, and the expected toolkit table.
 - [Acceptance](../acceptance.md): AR-07 to AR-11.
 - `iteration1-results.md`.
 - The 0.2.0 production receipt
@@ -58,7 +66,7 @@ npm version 0.3.0 --no-git-tag-version
 In a fresh clone, never the working checkout:
 
 ```sh
-E=/home/app/ramify-affected-evidence/0.3.0
+E=/home/app/ramify-audit-pb-evidence/ramify-0.3.0-prod
 mkdir -p "$E/logs" "$E/artifact"
 git clone /home/app/ramify-affected "$E/src" && cd "$E/src" && git checkout --detach <release commit>
 git status --porcelain && git status --porcelain --ignored           # both empty
@@ -152,19 +160,37 @@ answer is `unavailable`, `ramify-unavailable`, `unsupported-schema`.
 Do not run a 0.5.0 audit end to end. A partial audit needs a schema-4 baseline
 for the clone, and the decoder verdict is the whole finding.
 
-### 5. Results and handoff
+### 5. Hand the artifact to ramify-audit Plan 8
 
-Write `iteration2-results.md` and [`handoff.md`](#handoff). Commit both. These
-commits change only this plan directory, so the packed source is unchanged.
+Report the following to the coordinator:
 
-### 6. Publication gate
+- the receipt path;
+- the tarball path, SHA-256 and integrity;
+- the release commit.
 
-**Stop here.** Report the receipt to the coordinator: the path, SHA-256,
-integrity and release commit. The coordinator asks Dan to approve publishing
-exactly this tarball to `https://npm.braimax.com`. Publish nothing without
-Dan's recorded approval.
+ramify-audit's Plan 8 qualifies 0.6.0 against this exact tarball, installed
+by path, before anything is published, as its Plan 7 did with 0.2.0. That
+qualification is Plan 8's work, not this iteration's. If it finds a defect in
+0.3.0, fix it on this branch with a new release commit, a new artifact and a
+new receipt. Keep the first receipt and mark it superseded.
 
-After approval, the coordinator publishes, or instructs the implementer to:
+### 6. Results and handoff
+
+Write `iteration2-results.md` and [`handoff.md`](#handoff), and commit both.
+These commits change only this plan directory, so the packed source is
+unchanged.
+
+### 7. Publication gate
+
+**Stop here.** Publication requires both:
+
+1. ramify-audit Plan 8's qualification on this tarball has passed. The
+   coordinator records its reference.
+2. Dan has approved publishing exactly this tarball to
+   `https://npm.braimax.com`. The coordinator asks him.
+
+Publish nothing before both are recorded. After that, the coordinator
+publishes, or instructs the implementer to:
 
 ```sh
 npm publish "$E/artifact/ramify.ts-0.3.0.tgz" --registry https://npm.braimax.com
@@ -172,48 +198,63 @@ npm view ramify.ts@0.3.0 dist --registry https://npm.braimax.com --json
 ```
 
 The registry's `integrity` and `shasum` must equal the receipt's (AR-11).
-Record the approval (who and when), the publish output and the registry
-verification in an addendum to `iteration2-results.md`.
+Record these in an addendum to `iteration2-results.md`:
+
+- the Plan 8 qualification reference;
+- the approval, with who and when;
+- the publish output;
+- the registry verification.
 
 ## Handoff
 
-`handoff.md` lists, for joint adoption with ramify-audit 0.6.0, the following.
-Adoption itself is not part of this plan.
+`handoff.md` lists what changes for joint adoption with ramify-audit 0.6.0.
+Adoption itself is not part of this plan. Adopters follow ramify-audit's own
+handoffs (Plan 7 Phase 3 and Plan 8); this handoff states Ramify's side.
 
 ### Release
 
 - The published version, tarball SHA-256, integrity and receipt path.
-- The schema change: `ramify.affected-cli/3` and `ramify.affected/3`;
+- The schema change: `ramify.affected-cli/3` and `ramify.affected/3`.
   `ramify.ipc/2` is unchanged.
-- The qualification table.
+- The qualification table from step 4.
 
-### What ramify-audit 0.6.0 must read
+### What ramify-audit 0.6.0 does with `/3`
 
-Copy [what 0.6.0 must read](../contracts.md#what-ramify-audit-060-must-read),
-updated with any finding from qualification.
+State this as the audit's behavior, copied from
+[how ramify-audit 0.6.0 consumes `/3`](../contracts.md#how-ramify-audit-060-consumes-3):
+
+- It reads `/3` strictly.
+- A path selects only when its `selects` is non-empty.
+- An empty answer is a selection of zero modules.
+- An `undetectedConfigFilesForcingFullAudit` entry is accepted only when its
+  seed has `kind: 'inert'`. Every other kind is refused, and the refusal names
+  the kind: `source-area`, `auxiliary-source`, `description`, `readme`,
+  `captured-input`, `ignored`, or `null` for excluded or outside-project
+  paths.
 
 ### Toolkit changes
 
-- **Classify each `fullAuditPaths` entry.** Classify each of the twelve
-  entries under 0.3.0, recording the measured kind of each file it matches.
-  Mark each one as either "Ramify selects; drop" or "Ramify selects nothing;
-  the audit decides". The expected classification, which the implementer
-  verifies:
+- **`fullAuditPaths`.** The twelve old patterns are dropped.
+  `undetectedConfigFilesForcingFullAudit` takes literal files only, never
+  globs, and refuses every kind but `inert`. The toolkit declares no undetected
+  configuration file unless a literal inert file qualifies under D7, meaning a
+  file that no tool detects. As facts for that decision, record the measured
+  0.3.0 kind of each file the old patterns match. The expected kinds:
+  - `tsconfig.json`: `captured-input`;
+  - `package.json`: `captured-input`;
+  - `tsconfig.scripts.json`, `tsconfig.build.json`, `tsconfig.portable.json`:
+    `inert`;
+  - the `vite*`/`vitest*` configurations and the build scripts:
+    `auxiliary-source`;
+  - `scripts/reference-harness/**` and `examples/collection-review/**`:
+    `ignored`;
+  - `package-lock.json`: as iteration 0 recorded it.
 
-  | Entry | Kind under 0.3.0 | Recommendation |
-  | --- | --- | --- |
-  | `package.json` | captured-input, all modules | drop |
-  | `tsconfig*.json` | `tsconfig.json`: captured-input, all modules. `tsconfig.scripts.json`, `tsconfig.build.json`, `tsconfig.portable.json`: inert | keep only the inert three, as literal paths, if the adoption wants their edits to run everything |
-  | `vite*.config.*`, `scripts/build-production.ts`, `scripts/production-*.ts`, `scripts/compiled-client.ts` | auxiliary-source, `ramify` and its importers | drop, unless the adoption judges build-script effects wider than that closure |
-  | `package-lock.json` | as recorded in iteration 0, expected inert | the audit's own preparation input; the audit decides |
-  | `ramify-audit.json` | inert | the audit's own definition; the audit decides |
-  | `vitest.config.*`, `vitest.*.config.*` | auxiliary-source | the audit's runner configuration; the audit decides |
-  | `scripts/reference-harness/**`, `examples/collection-review/**` | ignored, selects nothing | keep: only a full-audit entry runs every check for these |
-
-  ramify-audit's Plan 7 format refuses globs, so the adoption rewrites the
-  kept entries as literal files in any case.
-- **Probe fixtures.** Keep the two probe-fixture declarations and
-  `ignorePaths: ["scripts/probes/**"]`.
+  `ramify-audit.json` and the preparation lockfile are refused at the audit's
+  stage 1 regardless of kind.
+- **Probe fixtures.** Keep the two probe-fixture declarations. For context
+  only, as a Plan 8 matter decided 2026-10-06: the toolkit's `ignorePaths`
+  will be `["docs/**", "ramify-agent/**", "scripts/probes/**"]`.
 - **Executable.** Change the executable path in `CLAUDE.md` from 0.4.0 to the
   installed 0.6.0.
 - **Baseline.** Expect a new full baseline, because the audit definition
@@ -231,21 +272,22 @@ updated with any finding from qualification.
 - Expect a new full baseline.
 - Its source never invokes `ramify affected` directly; it consumes answers
   only through ramify-audit.
-- Its prompt `.md` files beneath `src/` stay `source-area` and keep selecting
-  their owners, per J5.
+- Its prompt `.md` files beneath `src/` are `inert` and select nothing (J5).
+  An edit to one is an accepted miss under D1, which full audits catch.
 
 ### Open items
 
-Every judgment Dan has not confirmed (J1 to J11) and every deviation recorded
-in iterations 0 to 2.
+- Every deviation recorded in iterations 0 to 2.
+- Whether Dan has confirmed or reversed J5.
 
 ## Exit criteria
 
 - The release commit's full audit passes.
 - AR-07, AR-08 and AR-09 have evidence.
 - The handoff is committed.
-- The publication gate is reached. AR-11 completes only after Dan's approval
-  and the registry verification.
+- The artifact is handed to ramify-audit Plan 8.
+- The publication gate is reached. AR-11 completes only after Plan 8's
+  qualification, Dan's approval and the registry verification.
 
 ## Results file
 
@@ -260,4 +302,4 @@ Write `iteration2-results.md` with:
   verdict;
 - the protected-document hashes;
 - the remaining gaps;
-- after publication, the addendum.
+- after publication, the addendum with the Plan 8 qualification reference.

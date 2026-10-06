@@ -1,6 +1,6 @@
 # Affected-rule selection for audits
 
-**Date:** 2026-10-06. **Status:** draft for coordinator review. Execution runs
+**Date:** 2026-10-06. **Status:** reviewed by the coordinator on 2026-10-06. Execution runs
 on branch `feat/affected-rule` in `/home/app/ramify-affected`, from `b4858aec`.
 Nothing here is implemented.
 
@@ -17,6 +17,8 @@ Several of them make up for configuration paths that select too little.
 This plan gives each owned path seed a kind and an explicit list of the
 modules it selects. It then releases `ramify.ts` 0.3.0 with the rule, so that
 ramify-audit 0.6.0 can read it and both projects can adopt it.
+ramify-audit 0.6.0 consumes `/3`. Its Plan 8 qualifies against this plan's
+production artifact before 0.3.0 is published.
 
 ## Decisions, 2026-10-06 (Dan)
 
@@ -39,29 +41,35 @@ ramify-audit 0.6.0 can read it and both projects can adopt it.
    [contracts: compatibility](contracts.md#compatibility-with-ramify-audit-050).
    It is `/3`.
 5. Release `ramify.ts` on `https://npm.braimax.com`, built like the 0.2.0
-   provider artifact. Publication waits for Dan's approval at the
-   [publication gate](iterations/iteration2.md#6-publication-gate).
+   provider artifact, at
+   `/home/app/ramify-audit-pb-evidence/ramify-0.3.0-prod/artifact/ramify.ts-0.3.0.tgz`.
+   Publication waits for ramify-audit Plan 8's qualification on that artifact
+   and for Dan's approval at the
+   [publication gate](iterations/iteration2.md#7-publication-gate).
 6. Write a handoff listing the toolkit and ramify-agent changes for joint
    adoption with ramify-audit 0.6.0. Adoption itself is not part of this plan.
 
 ## Planning decisions
 
-The decisions above leave some questions open. These are the planner's
-recommendations. The coordinator confirms them or asks Dan before iteration 1.
+The decisions above left some questions open. The planner proposed answers,
+and the coordinator settled them on 2026-10-06. If Dan reverses J5, the
+coordinator says so before iteration 1.
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 | --- | --- | --- |
 | J1 | Version | `0.3.0`. The answer schema is incompatible, which takes a minor version under 0.x, as 0.2.0 did. |
-| J2 | Where the rule lives | The `ramify affected` paragraphs of [cli-invocation.spec.md](../../architecture/cli-invocation.spec.md) (patch P1), plus the affected row in [daemon.md](../../architecture/daemon.md). No principles or model-specification change. The glossary status line (P2) is optional. |
+| J2 | Where the rule lives | The `ramify affected` paragraphs of [cli-invocation.spec.md](../../architecture/cli-invocation.spec.md) (patch P1) and the glossary status line (P2). Both were authorized by the coordinator on 2026-10-06 as spec corrections expressing accepted decisions. Plus the affected row in [daemon.md](../../architecture/daemon.md). No principles or model-specification change. |
 | J3 | Which modules a compiler configuration governs | Every inventoried module. The root configuration compiles all owned source, including auxiliary source it does not select. A configuration it extends, and a captured `package.json`, govern the same set. |
 | J4 | Which modules any other captured input governs, such as an imported data file or an absent resolution candidate | The owners of the analyzed files that read or probed it (`indexes.contributors`). Every inventoried module when none did. |
-| J5 | `.md` beneath a module's `src/` | It keeps selecting its owner: it is an owned resource, not an inert file. ramify-agent's runtime prompts live there. D5's wording "wherever it lies" is broader, so Dan confirms. |
-| J6 | Module README | Selects nothing, by decision 1, even though the revision captures it with role `readme`. It feeds module purpose only, never a verdict. |
+| J5 | `.md` paths | Every `.md` path selects nothing, wherever it lies, including beneath `src/`. A module README has kind `readme`; every other `.md` path has kind `inert`. This rule precedes the `src/` rule. Dan's decision is literal: "that's a consequence of being classified as inert". ramify-agent's runtime prompts beneath `src/` are an accepted miss under D1, which full audits catch. |
+| J6 | Module README | Selects nothing, by decision 1 and J5, even though the revision captures it with role `readme`. |
 | J7 | Existence-only probes (`dependency`, 0 bytes, a signature hash) | Not captured inputs for this rule. They record that a walked file exists, not content or absence the analysis read, and the contexts' `analysisInput()` makes the same distinction. This is what makes `.devcontainer/*`, `CLAUDE.md` and the unread `tsconfig.*.json` files select nothing. |
 | J8 | Where the captured-input predicate lives | A private copy in analysis that mirrors `analysisInput()` in `subs/daemon/subs/contexts/src/dispositions.ts`. Sharing one predicate is a follow-up. |
 | J9 | How JavaScript admission reaches the query | A read-only member on `ProjectObserver` that answers whether a path would be auxiliary source under the revision's configuration. It reads nothing from disk and adds no new exported type name. |
 | J10 | Deleted and new paths, `.` and directory seeds | They are classified by path, exactly like present files. `.` and directories that are not under `src/` are inert. |
 | J11 | Toolkit audits between iteration 1 and adoption | With ramify-audit 0.4.0, toolkit audits in default mode cannot read `/3` and fall back to full (`ramify-unavailable`). Every gate in this plan already uses `--full`. |
+| J12 | Who reads `/3` | ramify-audit 0.6.0, through a Plan 8 iteration briefed from [contracts](contracts.md). [Contracts](contracts.md) is therefore the complete reader contract. |
+| J13 | The audit's stage 2 under `/3` | An `undetectedConfigFilesForcingFullAudit` entry is accepted only when its seed has `kind: 'inert'`. Every other kind is refused, and the refusal names the kind. This is the audit's behavior, which the [handoff](iterations/iteration2.md#handoff) states. |
 
 ## Engine limits found while planning
 

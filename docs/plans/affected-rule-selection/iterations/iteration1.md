@@ -3,8 +3,8 @@
 **Plan:** [Affected-rule selection for audits](../main-plan.md).
 **Prerequisites:**
 - [Iteration 0](iteration0.md) results are committed and its gate passed.
-- The coordinator has authorized patch P1, and optionally P2, from
-  [protected documents](../protected-documents.md).
+- Patches P1 and P2 in [protected documents](../protected-documents.md) are
+  authorized (coordinator ramify-65, 2026-10-06). Apply them as written.
 - The coordinator has settled every iteration 0 deviation.
 
 **Write scope:**
@@ -24,12 +24,13 @@ Not in scope:
 ## Goal
 
 Implement the [rule](../contracts.md#the-rule) and the
-[`/3` answer](../contracts.md#the-3-answer) exactly as written. When this
+[reader contract](../contracts.md#reader-contract) exactly as written. When this
 iteration ends:
 
 - every owned path seed carries its `kind` and `selects`;
 - captured inputs are marked as such and select their governed set;
-- ignored, README and inert paths select nothing;
+- ignored paths, every `.md` path (module READMEs as `readme`, all others as
+  `inert`, including beneath `src/`) and inert files select nothing;
 - auxiliary source and the other existing kinds keep selecting their owner.
 
 ## Read first
@@ -50,8 +51,7 @@ iteration ends:
 
 ## Implementation
 
-1. **Spec patch first.** Apply the authorized P1 hunks, and P2 if authorized,
-   verbatim. Commit them as `docs(spec): …`. Check the baseline hash first; if
+1. **Spec patch first.** Apply the authorized P1 hunks and P2 verbatim. Commit them as `docs(spec): …`. Check the baseline hash first; if
    it differs, stop and report.
 2. **Answer type.** In `subs/analysis/src/interfaces/affected.ts`:
    - add `kind` and `selects` to each `AffectedPathSeed` variant as inline
@@ -73,8 +73,8 @@ iteration ends:
 
    `projectAffected` stays pure and reads nothing.
 5. **Rule.** In `resolvePath`:
-   - compute `kind` in the contracts' precedence order and leave `basis`
-     unchanged;
+   - compute `kind` in the contracts' eight-row precedence order, with the
+     `.md` row before the `src/` row, and leave `basis` unchanged;
    - compute `selects`, giving governed sets as byte-ordered module IDs and
      mapping contributor files to owners through the inventory;
    - build `seedIds` from module seeds plus every `selects`, not from
@@ -99,8 +99,8 @@ iteration ends:
      selected modules, `/3`;
    - `docs/development/testing.md`: `/3`;
    - the `ramify affected` paragraph of `README.md`: one sentence saying that
-     ignored, README and inert paths select nothing and captured inputs select
-     the modules they govern.
+     ignored paths, `.md` files and inert files select nothing and captured
+     inputs select the modules they govern.
 
 ## Tests
 
@@ -116,7 +116,11 @@ from output.
   - a `dependency` input with the empty-file sha256 is captured;
   - an absent `scripts/x.js` is `auxiliary-source` when the configuration
     admits JavaScript and `inert` when it does not;
-  - a `directory` role is never captured.
+  - a `directory` role is never captured;
+  - a `.md` resource beneath `src/` that the revision captures is `inert`,
+    while a `.json` resource beside it stays `source-area`;
+  - every invariant listed in [path seeds](../contracts.md#path-seeds) holds
+    over all answers in the file, checked by one shared assertion helper.
 - **`subs/analysis/src/tests/project-boundary-affected.test.ts`.**
   - Change the header comment, which says owned-ignored and scratch select
     their owner.
