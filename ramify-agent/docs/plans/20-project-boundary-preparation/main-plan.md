@@ -180,8 +180,8 @@ User decisions accepted on 2026-10-04:
 - **D2: delete the obsolete `spikes/` tree now.** The tree and its executable
   probes have been removed, and documents retain the historical findings
   without links to deleted files. Conceptually, `spikes/` is an
-  `owned-ignored` directory; deletion does not change that classification.
-  If reintroduced, declare it `owned-ignored` when Phase 3's provider syntax
+  `owned-unwired` directory; deletion does not change that classification.
+  If reintroduced, declare it `owned-unwired` when Phase 3's provider syntax
   is available. The separate `docs/spikes/` evidence remains.
 
 ## Iterations
@@ -338,7 +338,7 @@ Phase 3 keeps all of the following, with the reason each cannot start now:
 
 - **The pins, the root marker in committed descriptions and target projects.**
   `ramify.ts` 0.1.0 rejects the marker.
-- **Whole-tree module scope and explicit inclusion of owned-ignored trees,
+- **Whole-tree module scope and explicit inclusion of owned nested projects,
   with their instructions.** The declared trees come from the updated Ramify.
 - **Relaying the not-analyzed answer through the write hook.** The answer
   does not exist yet.
@@ -352,8 +352,9 @@ Phase 3 keeps all of the following, with the reason each cannot start now:
   to read its configuration, the harness overrides the configuration's
   workspace section on every request, and the package directories do not say
   which packages have tests. This needs the Phase 2 audit.
-- **Declaring fixtures `owned-ignored` and `scripts/` as root-owned analyzed
+- **Declaring the three harness fixture project roots individually
+  `owned-nested-project` and `scripts/` as root-owned analyzed
   code.** The statements and the analysis are new. A reintroduced `spikes/`
-  tree also belongs to its owner as `owned-ignored`, under D2.
+  tree also belongs to its owner as `owned-unwired`, under D2.
 - **The shared-input audit policy and nested audits at the final gate.** Both
   are Phase 2 audit features.
