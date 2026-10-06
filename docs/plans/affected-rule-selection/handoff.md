@@ -190,11 +190,11 @@ Facts for the D7 decision, without making it:
 
 ## Open items
 
-- **J5.** The planner proposed J5 and the coordinator settled it, quoting
-  Dan's decision ("that's a consequence of being classified as inert"). No
-  reversal was reported, and 0.3.0 implements it. No explicit confirmation
-  from Dan of the consequence for ramify-agent's prompts beneath `src/` is
-  recorded.
+- **J5, confirmed.** The planner proposed J5 and the coordinator settled it,
+  quoting Dan's decision ("that's a consequence of being classified as
+  inert"). On 2026-10-06, after the release, Dan explicitly confirmed that
+  `.md` files beneath `src/`, including ramify-agent's prompts, select
+  nothing ("yes"). 0.3.0 implements it.
 - **Deviations, iteration 0**
   ([results](iterations/iteration0-results.md)):
   - The contracts' "one seed per kind" row for `data/limits.json` did not
