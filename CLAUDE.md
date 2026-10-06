@@ -121,11 +121,14 @@ have separate compiler scopes. The [iteration 15 completion report](docs/plans/d
 records acceptance evidence and remaining limitations.
 
 The toolkit audit is defined by the committed root `ramify-audit.json` and runs
-from a clean commit with `ramify-agent/node_modules/.bin/ramify-audit audit
---cwd . --json`. Use `--full` for the release audit. `check:self` and
+from a clean commit with the published `ramify-audit` 0.4.0, installed outside
+the repository: `/home/app/tools/ramify-audit-0.4.0/node_modules/.bin/ramify-audit
+audit --cwd . --json`. Use `--full` for the release audit. `check:self` and
 `check:reference` use disposable batch sessions so an audit leaves no resident
 daemon behind. The nested `ramify-agent/ramify-audit.json` defines that
-project's own audit; invoke it with `--project-root ramify-agent --cwd .`.
+project's own audit, which keeps the agent's installed version; invoke it with
+`ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent
+--cwd .`.
 
 ## Implementation Architecture
 
