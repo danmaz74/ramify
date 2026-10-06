@@ -1,7 +1,9 @@
-import type { InventoryFile, InventoryModule, ProjectInventory, ProjectScope } from '../../subs/project/src/interfaces/project.js';
+import type { CapturedInput, InventoryFile, InventoryModule, ProjectInventory, ProjectScope } from '../../subs/project/src/interfaces/project.js';
 import type { AccessSelection, SourceAccess, SourceLimit, SourceTarget } from '../../subs/typescript/src/interfaces/source.js';
 import type { SourceArea, SourceOrigin } from '../../subs/model/src/interfaces/model.js';
+import { expect } from 'vitest';
 import type { AffectedFacts } from '../affected-query.js';
+import type { AffectedSelection } from '../interfaces/affected.js';
 
 /**
  * Plain `AffectedFacts` builders for the projector's unit cases. Each module
@@ -19,7 +21,7 @@ export function scopeOf(modules: readonly Pick<InventoryModule, 'id' | 'parent' 
     .sort((a, b) => byteOrder(a.directory, b.directory) || byteOrder(a.id, b.id));
   const exclusions = owners.map(owner => ({ kind: 'scratch' as const, directory: `${sourceRoot(owner.directory)}/tmp`, owner: owner.id }))
     .sort((a, b) => byteOrder(a.directory, b.directory));
-  return { root: '/project', selection: 'given', invokedFrom: '/project', configuration: 'tsconfig.json', walkedAreas: [],
+  return { root: '/project', selection: 'given', invokedFrom: '/project', configuration: '/project/tsconfig.json', walkedAreas: [],
     ownership: { modules: owners, exclusions } };
 }
 
@@ -81,7 +83,19 @@ export interface GraphSpec {
   readonly shims?: readonly { readonly file: string; readonly shims: readonly string[] }[];
   readonly coverage?: readonly SourceLimit[];
   readonly analysisCheck?: 'passed' | 'failed';
+  /** The revision's captured inputs; none by default. */
+  readonly inputs?: readonly CapturedInput[];
+  /** Observation path to the analyzed files contributing it; none by default. */
+  readonly contributors?: Readonly<Record<string, readonly string[]>>;
+  /** Whether the configuration admits JavaScript as auxiliary source; false by default. */
+  readonly admitsJavaScript?: boolean;
 }
+
+const typeScriptSource = /\.(?:[cm]?ts|tsx)$/;
+const javaScriptSource = /\.(?:[cm]?js|jsx)$/;
+/** The auxiliary-source predicate of a configuration that does or does not admit JavaScript. */
+export const auxiliarySourceUnder = (admitsJavaScript: boolean) => (path: string): boolean =>
+  typeScriptSource.test(path) || admitsJavaScript && javaScriptSource.test(path);
 
 export function graphFacts(spec: GraphSpec): AffectedFacts {
   const modules = Object.entries(spec.modules).map(([id, directory]) => inventoryModule(id, directory));
@@ -98,7 +112,8 @@ export function graphFacts(spec: GraphSpec): AffectedFacts {
   const scope = scopeOf(modules);
   const inventory: ProjectInventory = { scope, modules, files, references: [], warnings: [] };
   return { inventory, accesses: [...edgeAccesses, ...spec.accesses ?? []], shims: spec.shims ?? [], coverage: spec.coverage ?? [],
-    scope, inputId: 'input/1', analysisCheck: spec.analysisCheck ?? 'passed' };
+    scope, inputId: 'input/1', analysisCheck: spec.analysisCheck ?? 'passed', inputs: spec.inputs ?? [],
+    contributors: spec.contributors ?? {}, auxiliarySource: auxiliarySourceUnder(spec.admitsJavaScript ?? false) };
 }
 
 /** `a -> b -> c`, where an arrow means "depends on", and an unrelated `d`. */
@@ -195,3 +210,43 @@ export const formModules = ['fixture', 'fixture/barrel', 'fixture/branch', 'fixt
 /** The dependents of `p` in the source-form project, one per access form, in byte order. */
 export const formDependentsOfP = ['fixture/barrel', 'fixture/cand', 'fixture/dyn', 'fixture/effect', 'fixture/ns', 'fixture/ptests',
   'fixture/star', 'fixture/typeonly', 'fixture/viabarrel'];
+
+/**
+ * The path-seed invariants of the `ramify.affected/3` reader contract, asserted
+ * over one answer: kinds agree with exclusions, each kind selects what the
+ * rule says, `selects` is byte-ordered, distinct and names only scope modules,
+ * and every selected module is a changed module.
+ */
+export function expectSeedInvariants(result: AffectedSelection, label = ''): void {
+  const scopeModules = result.scope.ownership.modules;
+  const known = new Set(scopeModules.map(module => module.id));
+  const changed = new Set(result.changedModules.map(module => module.id));
+  const declared = new Set(scopeModules.flatMap(module => {
+    const prefix = module.directory === '.' ? '' : `${module.directory}/`;
+    return [`${prefix}README.md`, `${prefix}module.ramify`];
+  }));
+  const beneathSource = (path: string): boolean => scopeModules.some(module => {
+    const root = module.directory === '.' ? 'src' : `${module.directory}/src`;
+    return path === root || path.startsWith(`${root}/`);
+  });
+  for (const seed of result.paths) {
+    const at = `${label} ${seed.path}`;
+    if (seed.status !== 'owned') {
+      expect(seed.kind, at).toBeNull();
+      expect(seed.selects, at).toEqual([]);
+      continue;
+    }
+    expect(seed.kind === 'ignored', at).toBe(seed.exclusion !== null);
+    if (seed.kind === 'ignored' || seed.kind === 'readme' || seed.kind === 'inert') expect(seed.selects, at).toEqual([]);
+    if (seed.kind === 'source-area' || seed.kind === 'auxiliary-source' || seed.kind === 'description') expect(seed.selects, at).toEqual([seed.module]);
+    if (seed.kind === 'captured-input') expect(seed.selects.length, at).toBeGreaterThan(0);
+    expect([...seed.selects].sort(byteOrder), at).toEqual(seed.selects);
+    expect(new Set(seed.selects).size, at).toBe(seed.selects.length);
+    for (const id of seed.selects) {
+      expect(known.has(id), `${at} selects ${id}`).toBe(true);
+      expect(changed.has(id), `${at} changes ${id}`).toBe(true);
+    }
+    if ((seed.kind === 'readme' || seed.kind === 'description') && declared.has(seed.path)) expect(seed.basis, at).toBe('declaration');
+    if (seed.kind === 'description' && !declared.has(seed.path) && !beneathSource(seed.path)) expect(seed.basis, at).toBe('containment');
+  }
+}

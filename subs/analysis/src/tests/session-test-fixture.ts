@@ -122,7 +122,7 @@ export function instrumentObserver(state: SessionState) {
   state.observer = {
     get inventory() { return observer.inventory; }, get resolution() { return observer.resolution; }, get inputs() { return observer.inputs; },
     get inputId() { return observer.inputId; }, sink: observer.sink, apply, reobserve, retire,
-    readDescription: observer.readDescription.bind(observer),
+    auxiliarySource: observer.auxiliarySource.bind(observer), readDescription: observer.readDescription.bind(observer),
     readReadme: observer.readReadme.bind(observer), dispose: observer.dispose.bind(observer),
   };
   return { observer, apply, reobserve, retire };

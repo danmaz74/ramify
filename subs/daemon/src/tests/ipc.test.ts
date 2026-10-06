@@ -371,7 +371,7 @@ import { createMeasureDriver } from './measure-driver.js';
       // The one-module fixture: the seed module changed and nothing depends on it. The root owns
       // the manifest by containment, so the path seeds the root and nothing widens.
       const root = { id: 'example', directory: '.' };
-      expect(socket.value.result).toMatchObject({ schemaVersion: 'ramify.affected/2',
+      expect(socket.value.result).toMatchObject({ schemaVersion: 'ramify.affected/3',
         paths: [{ path: 'package.json', status: 'owned', module: 'example', basis: 'containment', exclusion: null },
           { path: 'src/index.ts', status: 'owned', module: 'example', basis: 'inventory', exclusion: null }],
         changedModules: [root], affectedModules: [], testModules: [root], selection: 'dependency-closure', widening: [],
@@ -440,7 +440,7 @@ import { createMeasureDriver } from './measure-driver.js';
     let blocking = true;
     const driver = createMeasureDriver({ modules: [], files: [] }, false, {
       affected: async (query, control) => {
-        if (!blocking) return { status: 'answered', sequence: query.sequence, result: { schemaVersion: 'ramify.affected/2',
+        if (!blocking) return { status: 'answered', sequence: query.sequence, result: { schemaVersion: 'ramify.affected/3',
           inputId: 'input/1:scripted', paths: [], changedModules: [], affectedModules: [], testModules: [], selection: 'dependency-closure',
           widening: [], scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json',
             walkedAreas: [], ownership: { modules: [], exclusions: [] } }, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' } };

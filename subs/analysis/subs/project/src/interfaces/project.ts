@@ -215,6 +215,13 @@ export interface ProjectObserver {
   readonly inputs: readonly CapturedInput[];
   readonly inputId: string;
   readonly sink: ObservationSink;
+  /**
+   * Whether an owned project-relative path outside every `src/` would be
+   * auxiliary source under the current configuration: compiler source by
+   * extension, where JavaScript counts only when the configuration admits it.
+   * Reads nothing.
+   */
+  auxiliarySource(path: string): boolean;
   /** An aborted signal rejects `apply` and `reobserve` with an error named `Cancelled`, or with the signal's reason. */
   apply(changes: readonly ObservedChange[], signal?: AbortSignal): Promise<InventoryUpdate>;
   /** Release compiler-reported observations before a compiler update that reports them again. */

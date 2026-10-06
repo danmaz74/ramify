@@ -262,15 +262,16 @@ describe('PB1-25: the installed daemon carries the changed check over real IPC',
           directories: 3, pruned: ['external-tree', 'node_modules', 'src/tmp', 'vendor'], prunedCount: 4 });
         expect(events.some(event => event.type === 'status-changed' && event.current.registrations !== null)).toBe(true);
 
-        // Affected seeds keep their status, basis and exclusion across the worker and the wire.
+        // Affected seeds keep their status, basis, exclusion, kind and selection across the worker and the wire.
         const affected = unwrap(await connection.affected({ token: contextToken, requestId: 'seeds', freshness: { mode: 'published', wait: true },
           paths: ['vendor/src/x.ts', 'external-tree/y.ts', '../outside.ts'] }));
         if (affected.status !== 'answered') throw new Error(JSON.stringify(affected).slice(0, 2000));
         // Seeds are byte-ordered (affected contract).
         expect(affected.result.paths).toEqual([
-          { path: '../outside.ts', status: 'outside-project', module: null, basis: 'none', exclusion: null },
-          { path: 'external-tree/y.ts', status: 'excluded', module: null, basis: 'excluded', exclusion: exclusion('external', 'external-tree') },
-          { path: 'vendor/src/x.ts', status: 'owned', module: 'app', basis: 'containment', exclusion: ignored },
+          { path: '../outside.ts', status: 'outside-project', module: null, basis: 'none', exclusion: null, kind: null, selects: [] },
+          { path: 'external-tree/y.ts', status: 'excluded', module: null, basis: 'excluded', exclusion: exclusion('external', 'external-tree'),
+            kind: null, selects: [] },
+          { path: 'vendor/src/x.ts', status: 'owned', module: 'app', basis: 'containment', exclusion: ignored, kind: 'ignored', selects: [] },
         ]);
         children = await descendants(pid);
         expect(JSON.parse(await readFile(endpoint.record, 'utf8'))).toMatchObject({ protocol: 'ramify.ipc/2', state: 'running' });

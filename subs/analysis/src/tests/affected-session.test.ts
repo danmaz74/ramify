@@ -71,7 +71,7 @@ describe('RetainedSession.affected: source forms (A7-03)', () => {
     const { handle, revision } = shared.get();
     expect(revision.outcome).toMatchObject({ execution: 'completed', check: 'passed' });
     const result = await answer(handle, { modules: ['fixture/p'] });
-    expect(result).toMatchObject({ schemaVersion: 'ramify.affected/2', inputId: revision.inputId, paths: [],
+    expect(result).toMatchObject({ schemaVersion: 'ramify.affected/3', inputId: revision.inputId, paths: [],
       changedModules: [{ id: 'fixture/p', directory: 'subs/p' }], selection: 'dependency-closure', widening: [],
       coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' });
     // Each dependent of p reaches it through one form; star is among them.
@@ -94,7 +94,8 @@ describe('RetainedSession.affected: source forms (A7-03)', () => {
   it('A7-03:type-only: import type is an edge, so a change to the type\'s file selects the importer', async () => {
     const { handle } = shared.get();
     const result = await answer(handle, { paths: [formPaths.api] });
-    expect(result.paths).toEqual([{ path: formPaths.api, status: 'owned', module: 'fixture/p', basis: 'inventory', exclusion: null }]);
+    expect(result.paths).toEqual([{ path: formPaths.api, status: 'owned', module: 'fixture/p', basis: 'inventory', exclusion: null,
+      kind: 'source-area', selects: ['fixture/p'] }]);
     expect(ids(result.changedModules)).toEqual(['fixture/p']);
     expect(ids(result.affectedModules)).toContain('fixture/typeonly');
   }, timeout);
@@ -209,7 +210,8 @@ describe('RetainedSession.affected: coverage (A7-04)', () => {
       await revised(handle, ['subs/lonely/src/extra.ts'], 'deleted');
       const result = await answer(handle, { paths: ['subs/lonely/src/extra.ts'] });
       // The deleted file resolves by area; the importer's unresolved target widens.
-      expect(result.paths).toEqual([{ path: 'subs/lonely/src/extra.ts', status: 'owned', module: 'fixture/lonely', basis: 'area', exclusion: null }]);
+      expect(result.paths).toEqual([{ path: 'subs/lonely/src/extra.ts', status: 'owned', module: 'fixture/lonely', basis: 'area', exclusion: null,
+        kind: 'source-area', selects: ['fixture/lonely'] }]);
       expect(result.coverage.notes.map(note => note.code)).toEqual(['unresolved-target']);
       expect(result).toMatchObject({ selection: 'all-modules', widening: ['partial-coverage'] });
       expect(ids(result.testModules)).toEqual(formModules);

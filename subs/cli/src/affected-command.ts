@@ -19,11 +19,13 @@ function moduleList(label: string, modules: readonly AffectedModule[]): string {
   return `${label} (${modules.length}):\n` + modules.map(module => `  ${module.id} (${module.directory})\n`).join('');
 }
 
-/** Whether a path seed is owned, excluded or outside the project, with its basis and exclusion. */
+/** Whether a path seed is owned, excluded or outside the project; an owned seed adds its basis, exclusion, kind and selected modules. */
 function seedLine(seed: AffectedPathSeed): string {
   if (seed.status === 'outside-project') return `${seed.path}: outside the project`;
   if (seed.status === 'excluded') return `${seed.path}: excluded (${seed.exclusion.kind} ${seed.exclusion.directory})`;
-  return `${seed.path}: owned by ${seed.module} (${seed.basis}${seed.exclusion ? `, ${seed.exclusion.kind} ${seed.exclusion.directory}` : ''})`;
+  const exclusion = seed.exclusion ? `, ${seed.exclusion.kind} ${seed.exclusion.directory}` : '';
+  const selects = seed.selects.length ? seed.selects.join(', ') : 'none';
+  return `${seed.path}: owned by ${seed.module} (${seed.basis}${exclusion}; ${seed.kind}; selects ${selects})`;
 }
 
 /** Root, mode, revision and selection, then one line per path seed and the three module lists. */
@@ -43,7 +45,7 @@ export function formatAffected(document: AffectedDocument): string {
 
 function print(environment: CliEnvironment, format: 'human' | 'json', mode: 'resident' | 'batch', sequence: number | null,
   selection: AffectedSelection): CliExitCode {
-  const document: AffectedDocument = { schemaVersion: 'ramify.affected-cli/2', root: selection.scope.root, mode,
+  const document: AffectedDocument = { schemaVersion: 'ramify.affected-cli/3', root: selection.scope.root, mode,
     revision: { sequence, inputId: selection.inputId }, ramifyVersion: environment.version, selection };
   environment.stdout(format === 'json' ? JSON.stringify(document) + '\n' : formatAffected(document));
   // An all-modules answer is complete and conservative; consumers read `selection` and `widening`.

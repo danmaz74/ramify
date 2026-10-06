@@ -26,25 +26,30 @@ export interface AffectedModule {
  */
 export type AffectedPathBasis = 'inventory' | 'declaration' | 'area' | 'containment' | 'excluded' | 'none';
 /**
- * One path seed, resolved without an inventory entry or a filesystem read. An
- * owned path names its module and the owned-ignored tree or scratch directory
- * it lies in, if any, in which case its basis is containment. An excluded path
+ * One path seed, resolved without an inventory entry or a filesystem read of
+ * the seed. An owned path names its module and the owned-ignored tree or
+ * scratch directory it lies in, if any, in which case its basis is
+ * containment. The module attributes the path; `kind` classifies it and
+ * `selects` alone names the modules it selects, byte-ordered. An excluded path
  * selects nothing, and only a path outside the project widens the answer.
  */
 export type AffectedPathSeed =
   | { readonly path: string; readonly status: 'owned'; readonly module: string;
-      readonly basis: 'inventory' | 'declaration' | 'area' | 'containment'; readonly exclusion: ProjectExclusion | null }
+      readonly basis: 'inventory' | 'declaration' | 'area' | 'containment'; readonly exclusion: ProjectExclusion | null;
+      readonly kind: 'source-area' | 'auxiliary-source' | 'description' | 'readme'
+        | 'captured-input' | 'inert' | 'ignored';
+      readonly selects: readonly string[] }
   | { readonly path: string; readonly status: 'excluded'; readonly module: null; readonly basis: 'excluded';
-      readonly exclusion: ProjectExclusion }
+      readonly exclusion: ProjectExclusion; readonly kind: null; readonly selects: readonly [] }
   | { readonly path: string; readonly status: 'outside-project'; readonly module: null; readonly basis: 'none';
-      readonly exclusion: null };
+      readonly exclusion: null; readonly kind: null; readonly selects: readonly [] };
 export type AffectedWideningReason = 'unowned-path' | 'partial-coverage';
 export interface AffectedSelection {
-  readonly schemaVersion: 'ramify.affected/2';
+  readonly schemaVersion: 'ramify.affected/3';
   /** The revision's observed-input identity; the answer describes exactly these inputs. */
   readonly inputId: string;
   readonly paths: readonly AffectedPathSeed[];
-  /** The seeds. */
+  /** The module seeds and every module a path seed selects. */
   readonly changedModules: readonly AffectedModule[];
   /** Reached dependents, seeds excluded. */
   readonly affectedModules: readonly AffectedModule[];

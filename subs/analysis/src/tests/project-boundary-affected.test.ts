@@ -18,10 +18,13 @@ import { opened, revised } from './session-test-fixture.js';
  * - a path seed resolves by containment under the current declarations,
  *   without an inventory entry or a read, so absent, new and deleted paths and
  *   both sides of a rename resolve;
- * - an owned seed, also in an owned-ignored tree or a scratch directory,
- *   selects its owner and the owner's transitive importers; ancestry selects
- *   nothing; an external or always-excluded seed selects nothing with the
- *   excluded basis; only a seed outside the project widens, by unowned-path;
+ * - an owned seed names its owner and its kind; source, auxiliary source and
+ *   a description select the owner and the owner's transitive importers, a
+ *   captured input selects the modules it governs, and a seed in an
+ *   owned-ignored tree or a scratch directory, a README, a `.md` path or
+ *   another inert file selects nothing (affected-rule selection); ancestry
+ *   selects nothing; an external or always-excluded seed selects nothing with
+ *   the excluded basis; only a seed outside the project widens, by unowned-path;
  * - the answer carries the revision's whole ownership topology.
  *
  * The only import edges are a -> app (scripts/check.ts and src/main.ts) and
@@ -150,27 +153,30 @@ const ownership = {
     scratch('subs/a/subs/grand/src/tmp', 'app/a/grand'), scratch('subs/b/src/tmp', 'app/b')],
 };
 
-const owned = (path: string, module: string, basis: 'inventory' | 'declaration' | 'area' | 'containment',
-  exclusion: ProjectExclusion | null = null): AffectedPathSeed => ({ path, status: 'owned', module, basis, exclusion });
+type OwnedKind = Extract<AffectedPathSeed, { status: 'owned' }>['kind'];
+const owned = (path: string, module: string, basis: 'inventory' | 'declaration' | 'area' | 'containment', kind: OwnedKind,
+  selects: readonly string[], exclusion: ProjectExclusion | null = null): AffectedPathSeed =>
+  ({ path, status: 'owned', module, basis, exclusion, kind, selects });
 const excluded = (path: string, exclusion: ProjectExclusion): AffectedPathSeed =>
-  ({ path, status: 'excluded', module: null, basis: 'excluded', exclusion });
-const outside = (path: string): AffectedPathSeed => ({ path, status: 'outside-project', module: null, basis: 'none', exclusion: null });
+  ({ path, status: 'excluded', module: null, basis: 'excluded', exclusion, kind: null, selects: [] });
+const outside = (path: string): AffectedPathSeed =>
+  ({ path, status: 'outside-project', module: null, basis: 'none', exclusion: null, kind: null, selects: [] });
 
 /** One written row: a path seed, its resolution, and its changed and test modules with complete coverage. */
 interface Row { readonly seed: AffectedPathSeed; readonly changed: readonly string[]; readonly tests: readonly string[] }
-const ofA = { changed: ['app/a'], tests: ['app', 'app/a', 'app/b'] };
 const nothing = { changed: [], tests: [] };
+const ofA = { changed: ['app/a'], tests: ['app', 'app/a', 'app/b'] };
 const rows: readonly Row[] = [
-  // Root-owned inert prose, existing, new and deleted: app alone, by containment.
-  { seed: owned('notes/design.md', 'app', 'containment'), changed: ['app'], tests: ['app'] },
-  { seed: owned('notes/new.md', 'app', 'containment'), changed: ['app'], tests: ['app'] },
-  { seed: owned('notes/old.md', 'app', 'containment'), changed: ['app'], tests: ['app'] },
-  { seed: owned('scripts/check.ts', 'app', 'inventory'), changed: ['app'], tests: ['app'] },
-  { seed: owned('subs/a/scripts/report.ts', 'app/a', 'inventory'), ...ofA },
-  { seed: owned('subs/a/fixtures/sample/src/world.ts', 'app/a', 'containment', sample), ...ofA },
-  { seed: owned('subs/a/src/tmp/new.ts', 'app/a', 'containment', scratch('subs/a/src/tmp', 'app/a')), ...ofA },
-  { seed: owned('subs/a/src/tests/tmp/real.test.ts', 'app/a', 'inventory'), ...ofA },
-  { seed: owned('subs/a/subs/grand/new.txt', 'app/a/grand', 'containment'), changed: ['app/a/grand'], tests: ['app/a/grand'] },
+  // Root-owned inert prose, existing, new and deleted: app's by containment, selecting nothing.
+  { seed: owned('notes/design.md', 'app', 'containment', 'inert', []), ...nothing },
+  { seed: owned('notes/new.md', 'app', 'containment', 'inert', []), ...nothing },
+  { seed: owned('notes/old.md', 'app', 'containment', 'inert', []), ...nothing },
+  { seed: owned('scripts/check.ts', 'app', 'inventory', 'auxiliary-source', ['app']), changed: ['app'], tests: ['app'] },
+  { seed: owned('subs/a/scripts/report.ts', 'app/a', 'inventory', 'auxiliary-source', ['app/a']), ...ofA },
+  { seed: owned('subs/a/fixtures/sample/src/world.ts', 'app/a', 'containment', 'ignored', [], sample), ...nothing },
+  { seed: owned('subs/a/src/tmp/new.ts', 'app/a', 'containment', 'ignored', [], scratch('subs/a/src/tmp', 'app/a')), ...nothing },
+  { seed: owned('subs/a/src/tests/tmp/real.test.ts', 'app/a', 'inventory', 'source-area', ['app/a']), ...ofA },
+  { seed: owned('subs/a/subs/grand/new.txt', 'app/a/grand', 'containment', 'inert', []), ...nothing },
   { seed: excluded('external-project/file.ts', external), ...nothing },
   { seed: excluded('external-project/lib.ts', external), ...nothing },
   { seed: excluded('node_modules/sample/index.ts', { kind: 'packages', directory: 'node_modules', owner: null }), ...nothing },
@@ -192,7 +198,7 @@ describe('affected selection over project ownership (PB1-08, PB1-17, PB1-18, PB1
         const result = await unread(() => answer(handle, { paths: [row.seed.path] }));
         answers.push(result);
         expect(result.paths, row.seed.path).toEqual([row.seed]);
-        expect(result, row.seed.path).toMatchObject({ schemaVersion: 'ramify.affected/2', inputId: revision.inputId,
+        expect(result, row.seed.path).toMatchObject({ schemaVersion: 'ramify.affected/3', inputId: revision.inputId,
           changedModules: listed(row.changed), testModules: listed(row.tests), selection: 'dependency-closure', widening: [],
           coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' });
         expect(ids(result.affectedModules), row.seed.path).toEqual(row.tests.filter(id => !row.changed.includes(id)));
@@ -207,7 +213,7 @@ describe('affected selection over project ownership (PB1-08, PB1-17, PB1-18, PB1
       const union = await unread(() => answer(handle, { paths: [...rows.map(row => row.seed.path), '../outside.ts'] }));
       expect(union.paths).toEqual([outside('../outside.ts'), ...rows.map(row => row.seed)]
         .sort((a, b) => Buffer.compare(Buffer.from(a.path), Buffer.from(b.path))));
-      expect(union).toMatchObject({ changedModules: listed(['app', 'app/a', 'app/a/grand']), affectedModules: listed(['app/b']),
+      expect(union).toMatchObject({ changedModules: listed(['app', 'app/a']), affectedModules: listed(['app/b']),
         testModules: listed(all), selection: 'all-modules', widening: ['unowned-path'] });
 
       // A warm session answers the same from its retained facts.
@@ -228,18 +234,20 @@ describe('affected selection over project ownership (PB1-08, PB1-17, PB1-18, PB1
       };
       // The root imports a; it is no provider of its descendants, so a root seed selects the root alone.
       expect(await select({ modules: ['app'] })).toEqual([['app'], [], ['app'], 'dependency-closure']);
-      expect(await select({ paths: ['.', 'package.json', 'tsconfig.json'] })).toEqual([['app'], [], ['app'], 'dependency-closure']);
+      // The root directory is inert; the root manifest and compiler configuration are captured inputs that govern every module.
+      expect(await select({ paths: ['.'] })).toEqual([[], [], [], 'dependency-closure']);
+      expect(await select({ paths: ['.', 'package.json', 'tsconfig.json'] })).toEqual([all, [], all, 'dependency-closure']);
       // a is imported by app and b; its own child grand is not selected.
       expect(await select({ modules: ['app/a'] })).toEqual([['app/a'], ['app', 'app/b'], ['app', 'app/a', 'app/b'], 'dependency-closure']);
       expect(await select({ modules: ['app/a-extra'] })).toEqual([['app/a-extra'], [], ['app/a-extra'], 'dependency-closure']);
       expect(await select({ modules: ['app/a/grand'] })).toEqual([['app/a/grand'], [], ['app/a/grand'], 'dependency-closure']);
       expect((await unread(() => answer(handle, { paths: ['subs/a/module.ramify', 'subs/a/README.md', 'README.md', 'subs/a/src/api.ts',
-        'subs/a/src/new.ts'] }))).paths).toEqual([owned('README.md', 'app', 'declaration'), owned('subs/a/README.md', 'app/a', 'declaration'),
-        owned('subs/a/module.ramify', 'app/a', 'declaration'), owned('subs/a/src/api.ts', 'app/a', 'inventory'),
-        owned('subs/a/src/new.ts', 'app/a', 'area')]);
+        'subs/a/src/new.ts'] }))).paths).toEqual([owned('README.md', 'app', 'declaration', 'readme', []),
+        owned('subs/a/README.md', 'app/a', 'declaration', 'readme', []), owned('subs/a/module.ramify', 'app/a', 'declaration', 'description', ['app/a']),
+        owned('subs/a/src/api.ts', 'app/a', 'inventory', 'source-area', ['app/a']), owned('subs/a/src/new.ts', 'app/a', 'area', 'source-area', ['app/a'])]);
       // A sibling whose name extends a's selects neither a nor its closure.
       expect((await answer(handle, { paths: ['subs/a-extra/src/other.test.ts'] })).paths)
-        .toEqual([owned('subs/a-extra/src/other.test.ts', 'app/a-extra', 'inventory')]);
+        .toEqual([owned('subs/a-extra/src/other.test.ts', 'app/a-extra', 'inventory', 'source-area', ['app/a-extra'])]);
       // Malformed seeds other than the outside form are invalid queries.
       for (const path of ['subs/a/../b/src/consumer.ts', '/etc/passwd', './notes/design.md', 'notes/', 'notes\\design.md', '../x/../y']) {
         expect(await query(handle, { paths: [path] }), path).toMatchObject({ status: 'unavailable', reason: 'invalid-query' });
@@ -272,10 +280,11 @@ describe('affected selection over project ownership (PB1-08, PB1-17, PB1-18, PB1
       }
       const result = await unread(() => answer(handle, { paths: ['notes/design.md', 'notes/new.md', 'notes/old.md',
         'subs/a/fixtures/sample/src/index.ts', 'src/tmp/throwaway.test.ts'] }));
-      expect(result.paths).toEqual([owned('notes/design.md', 'app', 'containment'), owned('notes/new.md', 'app', 'containment'),
-        owned('notes/old.md', 'app', 'containment'), owned('src/tmp/throwaway.test.ts', 'app', 'containment', scratch('src/tmp', 'app')),
-        owned('subs/a/fixtures/sample/src/index.ts', 'app/a', 'containment', sample)]);
-      expect(ids(result.testModules)).toEqual(['app', 'app/a', 'app/b']);
+      expect(result.paths).toEqual([owned('notes/design.md', 'app', 'containment', 'inert', []),
+        owned('notes/new.md', 'app', 'containment', 'inert', []), owned('notes/old.md', 'app', 'containment', 'inert', []),
+        owned('src/tmp/throwaway.test.ts', 'app', 'containment', 'ignored', [], scratch('src/tmp', 'app')),
+        owned('subs/a/fixtures/sample/src/index.ts', 'app/a', 'containment', 'ignored', [], sample)]);
+      expect(ids(result.testModules)).toEqual([]);
       // Their bytes are no input: editing every one leaves the revision's inputs unchanged.
       for (const path of unanalyzed) await put(root, path, `// edited ${path}\n`);
       expect(await handle.sweep()).toMatchObject({ status: 'unchanged' });
@@ -289,18 +298,21 @@ describe('affected selection over project ownership (PB1-08, PB1-17, PB1-18, PB1
       try {
         // A source file moved from a to b, and prose moved from the root into a sibling: each side resolves, present or not.
         const moved = await unread(() => answer(handle, { paths: ['subs/a/src/api.ts', 'subs/b/src/moved.ts'] }));
-        expect(moved.paths).toEqual([owned('subs/a/src/api.ts', 'app/a', 'inventory'), owned('subs/b/src/moved.ts', 'app/b', 'area')]);
+        expect(moved.paths).toEqual([owned('subs/a/src/api.ts', 'app/a', 'inventory', 'source-area', ['app/a']),
+          owned('subs/b/src/moved.ts', 'app/b', 'area', 'source-area', ['app/b'])]);
         expect([ids(moved.changedModules), ids(moved.affectedModules), ids(moved.testModules)])
           .toEqual([['app/a', 'app/b'], ['app'], ['app', 'app/a', 'app/b']]);
         const prose = await unread(() => answer(handle, { paths: ['notes/design.md', 'subs/a-extra/notes/design.md'] }));
-        expect(prose.paths).toEqual([owned('notes/design.md', 'app', 'containment'), owned('subs/a-extra/notes/design.md', 'app/a-extra', 'containment')]);
+        expect(prose.paths).toEqual([owned('notes/design.md', 'app', 'containment', 'inert', []),
+          owned('subs/a-extra/notes/design.md', 'app/a-extra', 'containment', 'inert', [])]);
         expect([ids(prose.changedModules), ids(prose.affectedModules), ids(prose.testModules), prose.widening])
-          .toEqual([['app', 'app/a-extra'], [], ['app', 'app/a-extra'], []]);
+          .toEqual([[], [], [], []]);
 
         const seeds = ['subs/b/data/x.json', 'subs/b/subs/c/notes.txt', 'subs/b/vendor/lib.ts'];
         const before = await answer(handle, { paths: seeds });
-        expect(before.paths).toEqual([owned('subs/b/data/x.json', 'app/b', 'containment'), owned('subs/b/subs/c/notes.txt', 'app/b', 'containment'),
-          owned('subs/b/vendor/lib.ts', 'app/b', 'containment')]);
+        expect(before.paths).toEqual([owned('subs/b/data/x.json', 'app/b', 'containment', 'inert', []),
+          owned('subs/b/subs/c/notes.txt', 'app/b', 'containment', 'inert', []),
+          owned('subs/b/vendor/lib.ts', 'app/b', 'containment', 'auxiliary-source', ['app/b'])]);
         const stale = handle.current!.sequence;
 
         // b declares an owned-ignored tree (which must exist) and an absent external one.
@@ -310,10 +322,10 @@ describe('affected selection over project ownership (PB1-08, PB1-17, PB1-18, PB1
         const data: ProjectExclusion = { kind: 'owned-ignored', directory: 'subs/b/data', owner: 'app/b' };
         const vendor: ProjectExclusion = { kind: 'external', directory: 'subs/b/vendor', owner: null };
         const declared = await unread(() => answer(handle, { paths: seeds }));
-        expect(declared.paths).toEqual([owned('subs/b/data/x.json', 'app/b', 'containment', data),
-          owned('subs/b/subs/c/notes.txt', 'app/b', 'containment'), excluded('subs/b/vendor/lib.ts', vendor)]);
+        expect(declared.paths).toEqual([owned('subs/b/data/x.json', 'app/b', 'containment', 'ignored', [], data),
+          owned('subs/b/subs/c/notes.txt', 'app/b', 'containment', 'inert', []), excluded('subs/b/vendor/lib.ts', vendor)]);
         expect(declared.scope.ownership.exclusions).toEqual(expect.arrayContaining([data, vendor]));
-        expect([ids(declared.changedModules), declared.widening]).toEqual([['app/b'], []]);
+        expect([ids(declared.changedModules), declared.widening]).toEqual([[], []]);
         // The previous revision no longer answers.
         expect(await query(handle, { paths: seeds }, stale)).toMatchObject({ status: 'unavailable', reason: 'invalid-revision' });
 
@@ -321,16 +333,17 @@ describe('affected selection over project ownership (PB1-08, PB1-17, PB1-18, PB1
         await put(root, 'subs/b/subs/c/module.ramify', 'ramify 1\nmodule c\n');
         await revised(handle, ['subs/b/subs/c/module.ramify'], 'created');
         const child = await unread(() => answer(handle, { paths: seeds }));
-        expect(child.paths).toEqual([owned('subs/b/data/x.json', 'app/b', 'containment', data),
-          owned('subs/b/subs/c/notes.txt', 'app/b/c', 'containment'), excluded('subs/b/vendor/lib.ts', vendor)]);
-        expect([ids(child.changedModules), ids(child.testModules)]).toEqual([['app/b', 'app/b/c'], ['app/b', 'app/b/c']]);
+        expect(child.paths).toEqual([owned('subs/b/data/x.json', 'app/b', 'containment', 'ignored', [], data),
+          owned('subs/b/subs/c/notes.txt', 'app/b/c', 'containment', 'inert', []), excluded('subs/b/vendor/lib.ts', vendor)]);
+        expect([ids(child.changedModules), ids(child.testModules)]).toEqual([[], []]);
 
         // Removing the declarations restores plain containment, and a fresh session answers exactly as the retained one.
         await put(root, 'subs/b/module.ramify', bDescription());
         await revised(handle, ['subs/b/module.ramify']);
         const removed = await unread(() => answer(handle, { paths: seeds }));
-        expect(removed.paths).toEqual([owned('subs/b/data/x.json', 'app/b', 'containment'), owned('subs/b/subs/c/notes.txt', 'app/b/c', 'containment'),
-          owned('subs/b/vendor/lib.ts', 'app/b', 'containment')]);
+        expect(removed.paths).toEqual([owned('subs/b/data/x.json', 'app/b', 'containment', 'inert', []),
+          owned('subs/b/subs/c/notes.txt', 'app/b/c', 'containment', 'inert', []),
+          owned('subs/b/vendor/lib.ts', 'app/b', 'containment', 'auxiliary-source', ['app/b'])]);
         const fresh = await opened(inputs);
         try {
           expect(fresh.revision.inputId).toBe(handle.current!.inputId);

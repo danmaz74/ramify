@@ -513,7 +513,8 @@ class Session implements RetainedSession {
    * access interpretation did not complete, because the link stage is invalid
    * and access is blocked, answers `missing-facts`; the revision's published
    * `outcome.execution` is `completed` exactly when the access and decide
-   * stages completed over a linked model.
+   * stages completed over a linked model. Path seeds are classified against the
+   * revision's captured inputs and the observer's configuration.
    */
   affected(query: AffectedQuery, control: RunControl = {}): Promise<SessionAffectedOutcome> {
     return this.#serialize(async () => {
@@ -534,7 +535,11 @@ class Session implements RetainedSession {
       if (current.outcome.execution !== 'completed' || check === 'not-run' || !facts.model || facts.linkIssues.length) {
         return unavailable('missing-facts', 'The current revision did not complete access interpretation');
       }
-      const outcome = projectAffected(assembleAffectedFacts(facts, current.inputId, facts.inventory.scope, check),
+      // The observer answers JavaScript admission from the configuration it holds, reading nothing.
+      const observer = this.#state.observer;
+      if (!observer) return unavailable('missing-facts', 'The current revision\'s configuration is no longer observed');
+      const outcome = projectAffected(assembleAffectedFacts(facts, current.inputId, facts.inventory.scope, check, current.inputs,
+        path => observer.auxiliarySource(path)),
         { modules: query.modules === undefined ? [] : query.modules, paths: query.paths === undefined ? [] : query.paths },
         affectedLimits, control);
       if (control.signal?.aborted) return { status: 'cancelled' };

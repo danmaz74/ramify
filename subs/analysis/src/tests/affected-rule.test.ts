@@ -9,26 +9,30 @@ import type { SessionState } from '../session-revision.js';
 import type { CapturedInput, ProjectExclusion } from '../../subs/project/src/interfaces/project.js';
 import { classifyProjectPath } from '../../subs/project/src/ownership.js';
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
+import { expectSeedInvariants } from './affected-fixtures.js';
 import { opened } from './session-test-fixture.js';
 
 /*
- * AR-00 (affected-rule selection, iteration 0): the affected answers of the
- * 0.2.0 rule on the extended topology, fixed as the baseline that iteration 1
- * changes in place. The topology is the Phase 1 written topology plus a base
+ * AR-00 to AR-03 (affected-rule selection): the affected answers on the
+ * extended topology. Iteration 0 fixed the 0.2.0 answers as a baseline;
+ * iteration 1 changed them in place to the 0.3.0 rule. The topology is the Phase 1 written topology plus a base
  * configuration that `tsconfig.json` extends, `subs/b/src/prompt.md` (named at
  * run time, never imported), `.devcontainer/devcontainer.json` and
  * `scripts/run.sh`. The data variant is a second revision in which b's consumer
  * imports `data/limits.json` under `resolveJsonModule`.
  *
- * Expected answers are written from the 0.2.0 rule in cli-invocation.spec.md,
- * not from a recorded run: every owned path seed, including one in an
- * owned-ignored tree or a scratch directory, selects its owner and the owner's
- * transitive importers; an excluded seed selects nothing; only a seed outside
- * the project widens, by unowned-path. The only reverse edges are a -> app and
- * a -> b, so an `a` seed changes a and affects app and b.
+ * Expected answers are written from the rule in cli-invocation.spec.md and
+ * the plan's contracts, not from a recorded run: each owned seed takes the
+ * kind of the first rule row that applies and selects the modules that kind
+ * names; ignored, readme and inert seeds select nothing, a captured input
+ * selects the modules it governs, and the changed modules are the module seeds
+ * and every selected module. An excluded seed selects nothing; only a seed
+ * outside the project widens, by unowned-path. The only reverse edges are
+ * a -> app and a -> b, so selecting `a` affects app and b.
  *
  * The recorded-facts blocks fix the captured inputs and contributors the
- * 0.3.0 rule's expectations are reasoned from (iteration 0, step 3).
+ * rule's expectations are reasoned from (iteration 0, step 3), and the base
+ * revision's absent nested manifests (iteration 1).
  */
 
 const timeout = 300_000;
@@ -124,64 +128,76 @@ const byteOrder = (a: string, b: string): number => Buffer.compare(Buffer.from(a
 const union = (...lists: readonly (readonly string[])[]): string[] => [...new Set(lists.flat())].sort(byteOrder);
 
 const all = ['app', 'app/a', 'app/a-extra', 'app/a/grand', 'app/b'];
+type OwnedKind = Extract<AffectedPathSeed, { status: 'owned' }>['kind'];
 const scratch = (directory: string, owner: string): ProjectExclusion => ({ kind: 'scratch', directory, owner });
 const ignored = (directory: string, owner: string): ProjectExclusion => ({ kind: 'owned-ignored', directory, owner });
-const owned = (path: string, module: string, basis: 'inventory' | 'declaration' | 'area' | 'containment',
-  exclusion: ProjectExclusion | null = null): AffectedPathSeed => ({ path, status: 'owned', module, basis, exclusion });
+const owned = (path: string, module: string, basis: 'inventory' | 'declaration' | 'area' | 'containment', kind: OwnedKind,
+  selects: readonly string[], exclusion: ProjectExclusion | null = null): AffectedPathSeed =>
+  ({ path, status: 'owned', module, basis, exclusion, kind, selects });
 const excluded = (path: string, exclusion: ProjectExclusion): AffectedPathSeed =>
-  ({ path, status: 'excluded', module: null, basis: 'excluded', exclusion });
-const outside = (path: string): AffectedPathSeed => ({ path, status: 'outside-project', module: null, basis: 'none', exclusion: null });
+  ({ path, status: 'excluded', module: null, basis: 'excluded', exclusion, kind: null, selects: [] });
+const outside = (path: string): AffectedPathSeed =>
+  ({ path, status: 'outside-project', module: null, basis: 'none', exclusion: null, kind: null, selects: [] });
 
-/** One row of the contracts' examples table: the seed, and its changed and affected modules under the 0.2.0 rule. */
+/** One row of the contracts' examples table: the seed with its kind and selection, and its changed and affected modules. */
 interface Row { readonly seed: AffectedPathSeed; readonly changed: readonly string[]; readonly affected: readonly string[] }
-/** 0.2.0: an owned seed changes its owner and affects the owner's transitive importers. */
 const ofApp = { changed: ['app'], affected: [] };
 const ofA = { changed: ['app/a'], affected: ['app', 'app/b'] };
+const ofAll = { changed: all, affected: [] };
 const nothing = { changed: [], affected: [] };
 const rows: readonly Row[] = [
-  { seed: owned('subs/a/src/api.ts', 'app/a', 'inventory'), ...ofA },
-  { seed: owned('subs/a/src/new.ts', 'app/a', 'area'), ...ofA },
-  { seed: owned('subs/a/src/tests/tmp/real.test.ts', 'app/a', 'inventory'), ...ofA },
-  { seed: owned('scripts/check.ts', 'app', 'inventory'), ...ofApp },
-  { seed: owned('tools/tmp/helper.ts', 'app', 'inventory'), ...ofApp },
-  { seed: owned('subs/a/scripts/report.ts', 'app/a', 'inventory'), ...ofA },
-  { seed: owned('subs/a/scripts/removed.ts', 'app/a', 'containment'), ...ofA },
-  { seed: owned('subs/old/src/gone.ts', 'app', 'containment'), ...ofApp },
-  { seed: owned('module.ramify', 'app', 'declaration'), ...ofApp },
-  { seed: owned('subs/a/module.ramify', 'app/a', 'declaration'), ...ofA },
-  { seed: owned('subs/c/module.ramify', 'app', 'containment'), ...ofApp },
-  { seed: owned('README.md', 'app', 'declaration'), ...ofApp },
-  { seed: owned('subs/a/README.md', 'app/a', 'declaration'), ...ofA },
-  { seed: owned('subs/b/src/prompt.md', 'app/b', 'inventory'), changed: ['app/b'], affected: [] },
-  { seed: owned('subs/a/src/notes.md', 'app/a', 'area'), ...ofA },
-  { seed: owned('notes/design.md', 'app', 'containment'), ...ofApp },
-  { seed: owned('notes/new.md', 'app', 'containment'), ...ofApp },
-  { seed: owned('tsconfig.json', 'app', 'containment'), ...ofApp },
-  { seed: owned('tsconfig.base.json', 'app', 'containment'), ...ofApp },
-  { seed: owned('package.json', 'app', 'containment'), ...ofApp },
-  { seed: owned('subs/a/subs/grand/new.txt', 'app/a/grand', 'containment'), changed: ['app/a/grand'], affected: [] },
-  { seed: owned('scripts/run.sh', 'app', 'containment'), ...ofApp },
-  { seed: owned('.devcontainer/devcontainer.json', 'app', 'containment'), ...ofApp },
-  { seed: owned('.', 'app', 'containment'), ...ofApp },
-  { seed: owned('subs/a/fixtures/sample/src/world.ts', 'app/a', 'containment', ignored('subs/a/fixtures/sample', 'app/a')), ...ofA },
-  { seed: owned('fixture-project/src/index.ts', 'app', 'containment', ignored('fixture-project', 'app')), ...ofApp },
-  { seed: owned('subs/a/src/tmp/new.ts', 'app/a', 'containment', scratch('subs/a/src/tmp', 'app/a')), ...ofA },
-  { seed: owned('src/tmp/throwaway.test.ts', 'app', 'containment', scratch('src/tmp', 'app')), ...ofApp },
+  { seed: owned('subs/a/src/api.ts', 'app/a', 'inventory', 'source-area', ['app/a']), ...ofA },
+  { seed: owned('subs/a/src/new.ts', 'app/a', 'area', 'source-area', ['app/a']), ...ofA },
+  { seed: owned('subs/a/src/tests/tmp/real.test.ts', 'app/a', 'inventory', 'source-area', ['app/a']), ...ofA },
+  { seed: owned('scripts/check.ts', 'app', 'inventory', 'auxiliary-source', ['app']), ...ofApp },
+  { seed: owned('tools/tmp/helper.ts', 'app', 'inventory', 'auxiliary-source', ['app']), ...ofApp },
+  { seed: owned('subs/a/scripts/report.ts', 'app/a', 'inventory', 'auxiliary-source', ['app/a']), ...ofA },
+  { seed: owned('subs/a/scripts/removed.ts', 'app/a', 'containment', 'auxiliary-source', ['app/a']), ...ofA },
+  { seed: owned('subs/old/src/gone.ts', 'app', 'containment', 'auxiliary-source', ['app']), ...ofApp },
+  { seed: owned('module.ramify', 'app', 'declaration', 'description', ['app']), ...ofApp },
+  { seed: owned('subs/a/module.ramify', 'app/a', 'declaration', 'description', ['app/a']), ...ofA },
+  { seed: owned('subs/c/module.ramify', 'app', 'containment', 'description', ['app']), ...ofApp },
+  { seed: owned('README.md', 'app', 'declaration', 'readme', []), ...nothing },
+  { seed: owned('subs/a/README.md', 'app/a', 'declaration', 'readme', []), ...nothing },
+  { seed: owned('subs/b/src/prompt.md', 'app/b', 'inventory', 'inert', []), ...nothing },
+  { seed: owned('subs/a/src/notes.md', 'app/a', 'area', 'inert', []), ...nothing },
+  { seed: owned('notes/design.md', 'app', 'containment', 'inert', []), ...nothing },
+  { seed: owned('notes/new.md', 'app', 'containment', 'inert', []), ...nothing },
+  { seed: owned('tsconfig.json', 'app', 'containment', 'captured-input', all), ...ofAll },
+  { seed: owned('tsconfig.base.json', 'app', 'containment', 'captured-input', all), ...ofAll },
+  // Recorded fact: the root manifest is captured with content.
+  { seed: owned('package.json', 'app', 'containment', 'captured-input', all), ...ofAll },
+  // Recorded facts (iteration 1): the base revision records both nested manifests absent.
+  { seed: owned('subs/a/package.json', 'app/a', 'containment', 'captured-input', ['app/a', 'app/a/grand']),
+    changed: ['app/a', 'app/a/grand'], affected: ['app', 'app/b'] },
+  { seed: owned('scripts/package.json', 'app', 'containment', 'captured-input', ['app']), ...ofApp },
+  { seed: owned('subs/a/subs/grand/new.txt', 'app/a/grand', 'containment', 'inert', []), ...nothing },
+  { seed: owned('scripts/run.sh', 'app', 'containment', 'inert', []), ...nothing },
+  // Recorded fact: the devcontainer file is an existence probe.
+  { seed: owned('.devcontainer/devcontainer.json', 'app', 'containment', 'inert', []), ...nothing },
+  { seed: owned('.', 'app', 'containment', 'inert', []), ...nothing },
+  { seed: owned('subs/a/fixtures/sample/src/world.ts', 'app/a', 'containment', 'ignored', [],
+    ignored('subs/a/fixtures/sample', 'app/a')), ...nothing },
+  { seed: owned('fixture-project/src/index.ts', 'app', 'containment', 'ignored', [], ignored('fixture-project', 'app')), ...nothing },
+  { seed: owned('subs/a/src/tmp/new.ts', 'app/a', 'containment', 'ignored', [], scratch('subs/a/src/tmp', 'app/a')), ...nothing },
+  { seed: owned('src/tmp/throwaway.test.ts', 'app', 'containment', 'ignored', [], scratch('src/tmp', 'app')), ...nothing },
   { seed: excluded('external-project/file.ts', { kind: 'external', directory: 'external-project', owner: null }), ...nothing },
   { seed: excluded('node_modules/sample/index.ts', { kind: 'packages', directory: 'node_modules', owner: null }), ...nothing },
 ];
 /**
- * The data-variant row: under 0.2.0 the data file changes its owner, the root.
- * The variant's import adds a resource-target coverage note (a recorded fact),
- * so its answer widens by partial-coverage to every module.
+ * The data-variant row: the data file is captured with content and read only by
+ * b's consumer, so it selects b. The variant's import adds a resource-target
+ * coverage note (a recorded fact), so its answer widens by partial-coverage to
+ * every module; that widening is existing behavior.
  */
-const dataRow: Row = { seed: owned('data/limits.json', 'app', 'containment'), ...ofApp };
+const dataRow: Row = { seed: owned('data/limits.json', 'app', 'containment', 'captured-input', ['app/b']), changed: ['app/b'], affected: [] };
 
 /** Assert one answer: the seeds, the module lists, and the selection; without widening it is the dependency closure. */
 function expectAnswer(result: AffectedSelection, seeds: readonly AffectedPathSeed[], changed: readonly string[],
   affected: readonly string[], label: string, widening: readonly string[] = []): void {
-  expect(result.schemaVersion, label).toBe('ramify.affected/2');
+  expect(result.schemaVersion, label).toBe('ramify.affected/3');
   expect(result.paths, label).toEqual(seeds);
+  expectSeedInvariants(result, label);
   expect([ids(result.changedModules), ids(result.affectedModules), ids(result.testModules)], label)
     .toEqual([[...changed], [...affected], widening.length ? all : union(changed, affected)]);
   expect([result.selection, result.widening], label).toEqual([widening.length ? 'all-modules' : 'dependency-closure', [...widening]]);
@@ -236,8 +252,8 @@ function expectFacts(revision: SessionRevision, state: SessionState, files: Read
   expect(outsideSource).toEqual(readers);
 }
 
-describe('AR-00 affected-rule baseline: path seed selection on the extended topology', () => {
-  it('base revision: every examples-table seed and the combined queries answer by the 0.2.0 rule', () => session(topology,
+describe('AR-01 to AR-03 affected rule: path seed kinds and selection on the extended topology', () => {
+  it('base revision: every examples-table seed and the combined queries answer by the rule', () => session(topology,
     async ({ handle, revision, state }) => {
       // Precondition: the extended topology is a passing project with complete coverage.
       expect(revision.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'complete' });
@@ -248,20 +264,24 @@ describe('AR-00 affected-rule baseline: path seed selection on the extended topo
       // Outside the project: no module, and the unowned-path widening to every module.
       expectAnswer(await answer(handle, { paths: ['../outside.ts'] }), [outside('../outside.ts')], [], [], '../outside.ts', ['unowned-path']);
 
-      // Combined queries: under 0.2.0 every owned seed adds its owner.
+      // Combined queries: a seed that selects nothing adds nothing.
       const seed = (path: string): AffectedPathSeed => rows.find(row => row.seed.path === path)!.seed;
       expectAnswer(await answer(handle, { paths: ['notes/design.md', 'subs/a/src/api.ts'] }),
-        [seed('notes/design.md'), seed('subs/a/src/api.ts')], ['app', 'app/a'], ['app/b'], 'design and api');
+        [seed('notes/design.md'), seed('subs/a/src/api.ts')], ['app/a'], ['app', 'app/b'], 'design and api');
       expectAnswer(await answer(handle, { paths: ['README.md', 'subs/a/src/tmp/new.ts'] }),
-        [seed('README.md'), seed('subs/a/src/tmp/new.ts')], ['app', 'app/a'], ['app/b'], 'README and scratch');
+        [seed('README.md'), seed('subs/a/src/tmp/new.ts')], [], [], 'README and scratch');
       expectAnswer(await answer(handle, { modules: ['app/b'], paths: ['.devcontainer/devcontainer.json'] }),
-        [seed('.devcontainer/devcontainer.json')], ['app', 'app/b'], [], 'b and devcontainer');
+        [seed('.devcontainer/devcontainer.json')], ['app/b'], [], 'b and devcontainer');
+
+      // Recorded facts (iteration 1): both nested manifests are recorded absent.
+      expect([captured(revision.inputs, 'subs/a/package.json'), captured(revision.inputs, 'scripts/package.json')])
+        .toEqual([[{ role: 'absent', bytes: 0, sha256: expect.any(String) }], [{ role: 'absent', bytes: 0, sha256: expect.any(String) }]]);
 
       // Recorded facts: the data file is only an existence probe here, and no contributor lies outside source.
       expectFacts(revision, state, topology, 'probe', undefined, []);
     }), timeout);
 
-  it('data variant: the imported data file answers by the 0.2.0 rule, widened by its coverage note', () => session(dataVariant,
+  it('data variant: the imported data file selects its reader\'s owner, widened by its coverage note', () => session(dataVariant,
     async ({ handle, revision, state }) => {
       // Recorded facts: the JSON import is one resource-target note, which widens every answer of this revision.
       expect(revision.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
