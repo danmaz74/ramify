@@ -56,7 +56,7 @@ The fix is to name the two owned kinds separately:
 | Kind | Owned by the declaring module | Ramify analyzes it | Analyzed source may import it | Its directory is a separate project's root | Agent writes |
 | --- | --- | --- | --- | --- | --- |
 | `owned-unwired` | yes | never | no | no | ordinary owned contents |
-| `owned-nested-project` | yes | never | no | yes, verified | only by explicit inclusion |
+| `owned-nested-project` | yes | never | no | yes, as declared | only by explicit inclusion |
 | `external` | no | never | no | not stated | never |
 
 `owned-unwired` replaces the name `owned-ignored`. The code in such a tree is
@@ -91,15 +91,17 @@ deliberate, and the architect view shows the kind beside each tree.
 The planner proposes these. Each needs Dan's confirmation before iteration 1;
 a change to any of them changes the patches and briefs that cite it.
 
+Dan withdrew three earlier proposals on 2026-10-06 ("KISS"): Ramify does not
+check whether a declared directory is a project root (Q1, Q2), and
+ramify-audit's nested discovery does not change (Q7). The kind is what the
+declaration says. The remaining proposals keep their numbers.
+
 | # | Question | Proposal | Why |
 | --- | --- | --- | --- |
-| Q1 | What makes a directory a project root for `owned-nested-project` | The declared directory itself holds a `module.ramify` whose module line carries the root marker, or a `package.json`. Ramify checks only that directory and never walks the tree. A declaration without either is invalid: `owned-nested-project-without-root`. | The same two signals `undeclared-project-boundary` already uses. The model forbids inferring a project from `tsconfig.json` alone (module-description spec, discovery). One check per declaration. |
-| Q2 | May an `owned-unwired` directory hold a project root | No. A root-marked `module.ramify` or a `package.json` directly in an `owned-unwired` directory makes the declaration invalid: `owned-unwired-project-root`, whose message says to declare `owned-nested-project`. Deeper roots are not checked. | Without it a misdeclared project silently loses its write protection and its nested audit. The check is one stat per declaration. |
-| Q3 | Where each toolkit tree goes | `docs`: `owned-unwired`. `examples/collection-review`: `owned-nested-project` (marker and manifest). `site`: `owned-nested-project` (manifest). `scripts/reference-harness`, `scripts/probes/fixtures/compiler-api` and `scripts/probes/fixtures/plan2a-symbol-details`: `owned-unwired`; each has only a `tsconfig.json`, which is not a project root under Q1. | Follows Q1 and Q2 mechanically. The reference harness is run by `check:reference`, but nothing imports it and Ramify does not analyze it, so it is unwired. |
-| Q4 | ramify-agent's fixtures | Three `owned-nested-project` declarations in the harness, one per fixture directory beneath `subs/harness/fixtures/`, made by Plan 21 where it adopts 0.4.0. Each already holds a `package.json`. | Q1 checks the declared directory itself, so the parent `fixtures/` cannot be declared as one project. |
+| Q3 | Where each toolkit tree goes | `docs`: `owned-unwired`. `examples/collection-review`: `owned-nested-project` (marker and manifest). `site`: `owned-nested-project` (manifest). `scripts/reference-harness`, `scripts/probes/fixtures/compiler-api` and `scripts/probes/fixtures/plan2a-symbol-details`: `owned-unwired`. | Each tree goes by what it is. The example and the site are separate projects with their own `package.json`, and the example also has a root-marked description. The probe fixtures are compiler inputs, not projects. The reference harness is run by `check:reference`, but nothing imports it and Ramify does not analyze it, so it is unwired. |
+| Q4 | ramify-agent's fixtures | Three `owned-nested-project` declarations in the harness, one per fixture directory beneath `subs/harness/fixtures/`, made by Plan 21 where it adopts 0.4.0. Each already holds a `package.json`. | The kind says the declared directory is a project's root; each fixture is one, and the parent `fixtures/` is not. |
 | Q5 | Placement rules | Both owned kinds keep `owned-ignored`'s rules: strictly beneath the module, outside child modules, allowed beneath `src/tests/`; the directory must exist. | No new requirement. |
-| Q6 | The undeclared-project message | `undeclared-project-boundary` suggests `owned-nested-project "<dir>"` or `external "<dir>"` (only `owned-nested-project` beneath `src/`). | The tree it reports holds a project root, so `owned-unwired` would be refused under Q2. |
-| Q7 | Nested audits | ramify-audit discovers nested audit definitions in ordinary owned paths and beneath `owned-nested-project` trees, as it does today beneath `owned-ignored`. It skips definitions beneath `owned-unwired` trees with skip reason `owned-unwired`. | An unwired tree is declared not to be a project. |
+| Q6 | The undeclared-project message | `undeclared-project-boundary` suggests `owned-nested-project "<dir>"` or `external "<dir>"` (only `owned-nested-project` beneath `src/`). | The tree it reports holds a project root, which is what `owned-nested-project` declares; `owned-unwired` would say it is not a separate project. |
 | Q8 | Seed kind of a path in an owned nested tree | Stays `ignored`; `exclusion.kind` says which tree. | The meaning is unchanged, and renaming it adds churn to every reader for nothing. |
 | Q9 | Description format version | Stays version 1. `owned-ignored` becomes an unknown statement whose error names `owned-unwired` and `owned-nested-project`. | The precedent of the root marker, R7, which made existing descriptions invalid in version 1 until migrated. |
 
@@ -117,10 +119,9 @@ a change to any of them changes the patches and briefs that cite it.
   watched, an import into it is `project-boundary-import`, compiler-selected
   source in it is a warning, and its paths select nothing in `ramify
   affected`.
-- **Validation (Q1, Q2).** `owned-nested-project-without-root` and
-  `owned-unwired-project-root`, both layout errors located at the
-  declaration. `missing-owned-ignored` becomes `missing-owned-unwired` and
-  `missing-owned-nested-project`.
+- **Validation.** `missing-owned-ignored` becomes `missing-owned-unwired`
+  and `missing-owned-nested-project`. Ramify does not check whether either
+  directory is a project root.
 - **Warnings.** `compiler-selected-owned-ignored` becomes
   `compiler-selected-owned-unwired` and `compiler-selected-owned-nested-project`.
 - **Messages.** `undeclared-project-boundary` (Q6), the `ignored-but-walked`
@@ -172,17 +173,16 @@ protected file and lists the rename-only sites. In summary:
 
 **Ramify model (protected).**
 - `docs/model/module-description.spec.md`: the nested-trees section is
-  rewritten for three kinds, with the table above, Q1, Q2 and Q5; the
+  rewritten for three kinds, with the table above and Q5; the
   grammar, keyword list, tag rule, statement form, error table, discovery
   paragraph and warnings paragraph change with it.
 - `docs/model/glossary.md`: "Nested tree" names three kinds; "Owned-ignored
-  tree" becomes "Owned-unwired tree"; a new "Owned-project tree" entry;
+  tree" becomes "Owned-unwired tree"; a new "Owned nested project" entry;
   "Files belonging to a module", "Auxiliary source" and "Inert file" name
   the owned nested trees. `site/src/pages/glossary.md` follows.
 - `docs/model/cross-module-importability.spec.md` and
   `docs/model/typescript-source-interpretation.spec.md`: the kind names, and
-  "a project within an ignored tree" becomes "a project in an owned-nested-project
-  tree".
+  "a project within an ignored tree" becomes "an owned nested project".
 - `docs/agents/module-architect.principles.md`: "owned-ignored trees"
   becomes "owned nested trees". A principles edit: Dan's approval names it.
 
@@ -206,9 +206,8 @@ protected file and lists the rename-only sites. In summary:
 **ramify-audit.**
 - `docs/partial-audit.principles.md` (protected): "A project within an
   owned-ignored tree" becomes "An owned nested project".
-- `docs/partial-audit.spec.md` (protected): the seed-kind sentences and the
-  nested-discovery paragraph (Q7).
-- `README.md`: the kind names, the nested-discovery rules and the release
+- `docs/partial-audit.spec.md` (protected): the seed-kind sentences.
+- `README.md`: the kind names and the release
   notes for 0.7.0. Dated decision and analysis documents and earlier plans
   are history and do not change.
 
@@ -234,7 +233,7 @@ protected file and lists the rename-only sites. In summary:
 | --- | --- | --- | --- |
 | 1 | [Model and engine](iterations/iteration1.md) | Ramify worktree | Approved patches applied; grammar, validation, kinds, formats and messages; toolkit declarations migrated; every test, script and doc updated |
 | 2 | [Ramify release candidate](iterations/iteration2.md) | Ramify worktree, evidence directory | Version 0.4.0, production artifact, expected toolkit answers, qualification answers |
-| 3 | [Audit reader and release candidate](iterations/iteration3.md) | ramify-audit checkout | `/4` reader, three kinds, Q7, docs, real suite on the artifact, qualification on a toolkit clone, 0.7.0 release commit and gate |
+| 3 | [Audit reader and release candidate](iterations/iteration3.md) | ramify-audit checkout | `/4` reader, three kinds, docs, real suite on the artifact, qualification on a toolkit clone, 0.7.0 release commit and gate |
 | 4 | [Publication and adoption](iterations/iteration4.md) | All three | Clean audit of Ramify's release commit by the 0.7.0 candidate, Dan's publication approval, both publications, toolkit adoption, ramify-agent documentation, handoff |
 
 [Acceptance](acceptance.md) lists the cases and the iteration producing each.
@@ -286,4 +285,5 @@ protected file and lists the rename-only sites. In summary:
 - Moving a module's purpose from README into `module.ramify`.
 - Preventing a test runner or tool from executing files in an owned tree;
   that remains a convention, as the model says.
-- Detecting project roots deeper than a declared directory.
+- Checking whether a declared directory is a project root, at any depth.
+- Any change to ramify-audit's nested discovery.

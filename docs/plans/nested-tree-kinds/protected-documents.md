@@ -35,7 +35,7 @@ only H1's hunks and leaves Dan's edits unstaged.
 
 ## M: module-description specification
 
-### M1: the nested-trees section (Q1, Q2, Q5, Q9)
+### M1: the nested-trees section (Q5, Q9)
 
 Replace the whole section "Declared Nested Trees Bound Interpretation", from
 its heading to the line before the next heading, with:
@@ -82,12 +82,6 @@ directory between it and its declaring module, that is a symbolic link makes
 the declaration invalid. An owned tree's directory must exist as a real
 directory. An `external` directory may be absent; when present it must be a
 real directory.
-
-A project root is a directory holding a `module.ramify` whose module line
-carries the root marker, or a `package.json`. An `owned-nested-project` directory
-must itself be a project root, and an `owned-unwired` directory must not be
-one. Validation inspects only the declared directory; it never enters the
-tree, so a project root deeper inside either owned kind is not detected.
 
 Any two nested-tree declarations whose resolved directories are equal, or one
 of which lies beneath the other, are invalid, whatever their kinds or
@@ -184,12 +178,11 @@ alternatives in `tag`" with "The seven explicit alternatives in `tag`".
 Old: `An `owned-ignored` or `external` statement consists of its keyword and one`
 New: `An `owned-unwired`, `owned-nested-project` or `external` statement consists of its keyword and one`
 
-### M9: error table, nested-tree row (Q1, Q2)
+### M9: error table, nested-tree row
 
 Replace "a missing owned-ignored directory or a declared path that exists but
 is not a real directory;" with "a missing owned directory or a declared path
-that exists but is not a real directory; an `owned-nested-project` directory that is
-not a project root, or an `owned-unwired` directory that is one;".
+that exists but is not a real directory;".
 
 ### M10: implementation warnings paragraph
 
@@ -345,25 +338,6 @@ Replace "a path in an owned-ignored or scratch tree (`ignored`)" with "a path
 in an owned nested or scratch tree (`ignored`)", and "including inside an
 owned-ignored or external tree" with "including inside an owned nested or
 external tree".
-
-### R3: specification, nested discovery (Q7)
-
-Old:
-
-```text
-On an explicit nested-audit request, discover projects by their audit
-definitions. A Ramify project skips definitions beneath its external trees and
-other unowned exclusions; any other project audits every definition below it.
-```
-
-New:
-
-```text
-On an explicit nested-audit request, discover projects by their audit
-definitions. A Ramify project skips definitions beneath its external and
-owned-unwired trees and other unowned exclusions; any other project audits
-every definition below it.
-```
 
 ## H: ramify-agent (iteration 4)
 

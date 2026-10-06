@@ -1,7 +1,7 @@
 # Iteration 1: Model and engine
 
 **Plan:** [Three kinds of nested tree](../main-plan.md).
-**Prerequisites:** Dan has confirmed proposals Q1 to Q9 and approved patches
+**Prerequisites:** Dan has confirmed proposals Q3 to Q6, Q8 and Q9 and approved patches
 M, G, C, T, A and S in [protected documents](../protected-documents.md). The
 worktree `/home/app/ramify-nested-kinds` is clean on `plan/nested-tree-kinds`.
 **Owners:** `analysis/descriptions`, `analysis/project`, `analysis/typescript`,
@@ -13,7 +13,7 @@ worktree `/home/app/ramify-nested-kinds` is clean on `plan/nested-tree-kinds`.
 Replace `owned-ignored` with `owned-unwired`, add `owned-nested-project`, and move
 every document that carries the kind to its next version. Migrate the
 toolkit's own declarations. Ramify's behavior for both owned kinds is
-`owned-ignored`'s behavior today, plus the two validation rules.
+`owned-ignored`'s behavior today.
 
 ## Read first
 
@@ -36,9 +36,7 @@ toolkit's own declarations. Ramify's behavior for both owned kinds is
    is an error naming `owned-unwired` and `owned-nested-project`.
 3. **Ownership and validation.** `ownership.ts` kind union and owner rule
    (both owned kinds keep the owner); `nested-trees.ts` existence codes
-   `missing-owned-unwired` and `missing-owned-nested-project`, plus Q1's
-   `owned-nested-project-without-root` and Q2's `owned-unwired-project-root`, each a
-   stat of the declared directory only. Add the codes to `ProjectIssue`,
+   `missing-owned-unwired` and `missing-owned-nested-project`. Add the codes to `ProjectIssue`,
    `report-data.ts` and `report.ts` as layout errors.
 4. **Inventory and messages.** `compiler-selected-owned-unwired` and
    `compiler-selected-owned-nested-project`; `undeclaredBoundary()` suggests
