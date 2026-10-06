@@ -134,21 +134,10 @@
     }
   ],
   "ignorePaths": [
+    ".devcontainer/**",
+    "docs/**",
+    "ramify-agent/**",
     "scripts/probes/**"
-  ],
-  "fullAuditPaths": [
-    "ramify-audit.json",
-    "package.json",
-    "package-lock.json",
-    "tsconfig*.json",
-    "vitest.config.*",
-    "vitest.*.config.*",
-    "vite*.config.*",
-    "scripts/build-production.ts",
-    "scripts/production-*.ts",
-    "scripts/compiled-client.ts",
-    "scripts/reference-harness/**",
-    "examples/collection-review/**"
   ],
   "workspace": {
     "preparation": "nodejs",
