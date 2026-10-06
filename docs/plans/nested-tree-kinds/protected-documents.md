@@ -53,10 +53,10 @@ relative to the module and one of three kinds:
 | Kind | Owned by the declaring module | Analyzed | Its directory is a separate project's root |
 | --- | --- | --- | --- |
 | `owned-unwired` | yes | never | no |
-| `owned-project` | yes | never | yes |
+| `owned-nested-project` | yes | never | yes |
 | `external` | no | never | not stated |
 
-`owned-unwired` and `owned-project` are the owned kinds. The directory must
+`owned-unwired` and `owned-nested-project` are the owned kinds. The directory must
 lie strictly beneath the declaring module and outside every child module.
 External trees must lie outside the declaring module's `src/`; owned trees
 may lie within owned source, including `src/tests/`.
@@ -66,7 +66,7 @@ ramify 1
 root module shop
 
 owned-unwired "docs"
-owned-project "examples/demo"
+owned-nested-project "examples/demo"
 external "tool-cache"
 ```
 
@@ -84,7 +84,7 @@ directory. An `external` directory may be absent; when present it must be a
 real directory.
 
 A project root is a directory holding a `module.ramify` whose module line
-carries the root marker, or a `package.json`. An `owned-project` directory
+carries the root marker, or a `package.json`. An `owned-nested-project` directory
 must itself be a project root, and an `owned-unwired` directory must not be
 one. Validation inspects only the declared directory; it never enters the
 tree, so a project root deeper inside either owned kind is not detected.
@@ -104,10 +104,10 @@ contents have no owner in this evaluation. Plain data needs no declaration.
 
 An `owned-unwired` tree holds content, code included, that is deliberately
 not wired into the project: documentation, spikes, samples and other material
-the project keeps but never builds, imports or analyzes. An `owned-project`
+the project keeps but never builds, imports or analyzes. An `owned-nested-project`
 tree holds a separate project, such as an example or a fixture project: data
 to the enclosing evaluation, and a project in its own right when selected as
-its own root. A project within a declared tree of either `owned-project` or
+its own root. A project within a declared tree of either `owned-nested-project` or
 `external` kind carries the root marker in its own root description, which
 the enclosing evaluation does not interpret.
 
@@ -144,7 +144,7 @@ New:
 ```text
 An excluded description is not interpreted by this evaluation; one carrying
 the root marker inside a declared tree of any kind is the root of a separate
-project. A nested project's root belongs within an `owned-project` or
+project. A nested project's root belongs within an `owned-nested-project` or
 `external` tree.
 ```
 
@@ -159,36 +159,36 @@ Old: `and zero or more `expose-src`, `expose-test`, `expose-sub`, `owned-ignored
 `or `external` statements.`
 
 New: `and zero or more `expose-src`, `expose-test`, `expose-sub`, `owned-unwired`,`
-``owned-project` or `external` statements.`
+``owned-nested-project` or `external` statements.`
 
 ### M6: grammar
 
 Old: `nested-tree-line = ( "owned-ignored" | "external" ), hws, STRING, LF ;`
-New: `nested-tree-line = ( "owned-unwired" | "owned-project" | "external" ), hws, STRING, LF ;`
+New: `nested-tree-line = ( "owned-unwired" | "owned-nested-project" | "external" ), hws, STRING, LF ;`
 
 Old: `tag            = "testing" | "browser" | "ui" | "owned-ignored" | "external"`
-New: `tag            = "testing" | "browser" | "ui" | "owned-unwired" | "owned-project" | "external"`
+New: `tag            = "testing" | "browser" | "ui" | "owned-unwired" | "owned-nested-project" | "external"`
 
 ### M7: reserved keywords and tag names
 
 In the reserved-keyword bullet, replace `` `owned-ignored`, `external`, `root`, ``
-with `` `owned-unwired`, `owned-project`, `external`, `root`, ``.
+with `` `owned-unwired`, `owned-nested-project`, `external`, `root`, ``.
 
 In the tag-name paragraph, replace "and `owned-ignored`, `external` and `root`
-despite their keyword status" with "and `owned-unwired`, `owned-project`,
+despite their keyword status" with "and `owned-unwired`, `owned-nested-project`,
 `external` and `root` despite their keyword status", and "The six explicit
 alternatives in `tag`" with "The seven explicit alternatives in `tag`".
 
 ### M8: statement form
 
 Old: `An `owned-ignored` or `external` statement consists of its keyword and one`
-New: `An `owned-unwired`, `owned-project` or `external` statement consists of its keyword and one`
+New: `An `owned-unwired`, `owned-nested-project` or `external` statement consists of its keyword and one`
 
 ### M9: error table, nested-tree row (Q1, Q2)
 
 Replace "a missing owned-ignored directory or a declared path that exists but
 is not a real directory;" with "a missing owned directory or a declared path
-that exists but is not a real directory; an `owned-project` directory that is
+that exists but is not a real directory; an `owned-nested-project` directory that is
 not a project root, or an `owned-unwired` directory that is one;".
 
 ### M10: implementation warnings paragraph
@@ -221,7 +221,7 @@ New:
 
 ```text
 A **nested tree** is a directory declared in its enclosing module's
-description as an owned-unwired tree, an owned-project tree or an external
+description as an owned-unwired tree, an owned nested project or an external
 tree.
 ```
 
@@ -235,13 +235,14 @@ included, are deliberately not wired into the project: Ramify never
 interprets them, and analyzed source may not import them.
 ```
 
-### G4: owned-project tree (new, after G3)
+### G4: owned nested project (new, after G3)
 
 ```markdown
-## Owned-project tree
+## Owned nested project
 
-An **owned-project tree** is an owned nested tree whose directory is the root
-of a separate project; Ramify never interprets its contents.
+An **owned nested project** is an owned nested tree, declared
+`owned-nested-project`, whose directory is the root of a separate project;
+Ramify never interprets its contents.
 ```
 
 ### G5: auxiliary source and inert file
@@ -261,8 +262,8 @@ New: `module scratch directories are outside ownership. Owned nested trees retai
 Old: `an installed link resolves to a real path within the project. A project within`
 `an ignored tree uses the enclosing project's package by convention; Ramify`
 
-New: `an installed link resolves to a real path within the project. A project in an`
-`owned-project tree uses the enclosing project's package by convention; Ramify`
+New: `an installed link resolves to a real path within the project. An owned nested`
+`project uses the enclosing project's package by convention; Ramify`
 
 ## T: TypeScript source interpretation specification
 
@@ -272,13 +273,12 @@ Old: `An import from analyzed source that resolves into an `owned-ignored` or`
 `` `external` tree without package resolution is a definite finding. ``
 
 New: `An import from analyzed source that resolves into an `owned-unwired`,`
-`` `owned-project` or `external` tree without package resolution is a definite finding. ``
+`` `owned-nested-project` or `external` tree without package resolution is a definite finding. ``
 
 Also replace "shared ownership with an ignored tree does not create an
 exemption" with "shared ownership with an owned nested tree does not create
 an exemption", and "A project within an ignored tree uses the enclosing
-package" with "A project in an owned-project tree uses the enclosing
-package".
+package" with "An owned nested project uses the enclosing package".
 
 ## A: module architect principles
 
@@ -292,17 +292,17 @@ New: `Architectural evidence identifies each module's owned nested trees without
 ### S1: `cli-invocation.spec.md`
 
 - The nested-project example: "A project in an owned-ignored tree
-  `project/subs/child/fixtures/demo/`" becomes "A project in an
-  owned-project tree `project/subs/child/fixtures/demo/`".
+  `project/subs/child/fixtures/demo/`" becomes "An owned nested
+  project `project/subs/child/fixtures/demo/`".
 - The warnings paragraph: "A selected file inside an owned-ignored tree" and
   "one `compiler-selected-owned-ignored` or `compiler-selected-scratch`
   warning per tree or scratch directory" become "A selected file inside an
   owned nested tree" and "one `compiler-selected-owned-unwired`,
-  `compiler-selected-owned-project` or `compiler-selected-scratch` warning
+  `compiler-selected-owned-nested-project` or `compiler-selected-scratch` warning
   per tree or scratch directory".
 - "A nested project belongs in a declared nested tree: undeclared, its
   marked root description or package manifest is a layout error." becomes
-  "A nested project belongs in an `owned-project` or `external` tree:
+  "A nested project belongs in an `owned-nested-project` or `external` tree:
   undeclared, its marked root description or package manifest is a layout
   error."
 - The affected seed rule: "a path in an owned-ignored tree or a scratch
@@ -336,8 +336,8 @@ external". `ramify.modularity/3` does not move.
 Old: `An audit covers one project by default. A project within an owned-ignored`
 `tree has its own definition, change set, reuse lookup and evidence key.`
 
-New: `An audit covers one project by default. A project in an owned-project tree`
-`has its own definition, change set, reuse lookup and evidence key.`
+New: `An audit covers one project by default. An owned nested project has its`
+`own definition, change set, reuse lookup and evidence key.`
 
 ### R2: specification, seed kinds
 
@@ -382,8 +382,8 @@ New:
 
 ```text
 A module assignment covers its owned contents, including configuration,
-documentation, scratch and owned-unwired trees, except its owned-project
-trees. Child subtrees and owned-project trees require explicit inclusion,
+documentation, scratch and owned-unwired trees, except its owned-nested-project
+trees. Child subtrees and owned nested projects require explicit inclusion,
 each as a whole. External trees are never writable in the enclosing run.
 ```
 
@@ -435,7 +435,7 @@ included, whole, in the assignment's scope.
 New:
 
 ```text
-An **included tree** is an owned-project tree of an assigned module explicitly
+An **included tree** is an owned nested project of an assigned module explicitly
 included, whole, in the assignment's scope.
 ```
 

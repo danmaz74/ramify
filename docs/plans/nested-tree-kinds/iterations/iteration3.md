@@ -30,11 +30,11 @@ publish.
 
 1. **Patches.** Apply R1 to R3 verbatim at their baselines, first commit.
 2. **Reader.** `/4` schema constants only; `owned-unwired` and
-   `owned-project` replace `owned-ignored` in every kind list, including the
+   `owned-nested-project` replace `owned-ignored` in every kind list, including the
    owned kinds and the topology check. `/3` answers are `unsupported-schema`.
 3. **Nested discovery (Q7).** A definition beneath an `owned-unwired` tree is
    skipped with reason `owned-unwired`, added to `NestedSkipReason` and
-   `NESTED_SKIP_REASONS`. `owned-project` trees stay eligible.
+   `NESTED_SKIP_REASONS`. `owned-nested-project` trees stay eligible.
 4. **Tests and fixtures.** Re-record `test/fixtures/ramify-affected/*.json`
    from the artifact with `scripts/record-ramify-affected.mjs`; rename the
    fixture `owned-ignored-path`; update about 120 test occurrences by

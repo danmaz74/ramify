@@ -10,7 +10,7 @@ worktree `/home/app/ramify-nested-kinds` is clean on `plan/nested-tree-kinds`.
 
 ## Goal
 
-Replace `owned-ignored` with `owned-unwired`, add `owned-project`, and move
+Replace `owned-ignored` with `owned-unwired`, add `owned-nested-project`, and move
 every document that carries the kind to its next version. Migrate the
 toolkit's own declarations. Ramify's behavior for both owned kinds is
 `owned-ignored`'s behavior today, plus the two validation rules.
@@ -33,16 +33,16 @@ toolkit's own declarations. Ramify's behavior for both owned kinds is
    tree`.
 2. **Parser.** `tokenize.ts` keywords, `parse.ts` special tags and statement
    dispatch, `interfaces/syntax.ts` kind union. `owned-ignored` as a statement
-   is an error naming `owned-unwired` and `owned-project`.
+   is an error naming `owned-unwired` and `owned-nested-project`.
 3. **Ownership and validation.** `ownership.ts` kind union and owner rule
    (both owned kinds keep the owner); `nested-trees.ts` existence codes
-   `missing-owned-unwired` and `missing-owned-project`, plus Q1's
-   `owned-project-without-root` and Q2's `owned-unwired-project-root`, each a
+   `missing-owned-unwired` and `missing-owned-nested-project`, plus Q1's
+   `owned-nested-project-without-root` and Q2's `owned-unwired-project-root`, each a
    stat of the declared directory only. Add the codes to `ProjectIssue`,
    `report-data.ts` and `report.ts` as layout errors.
 4. **Inventory and messages.** `compiler-selected-owned-unwired` and
-   `compiler-selected-owned-project`; `undeclaredBoundary()` suggests
-   `owned-project` or `external` (Q6); `git-advice.ts` and the affected help
+   `compiler-selected-owned-nested-project`; `undeclaredBoundary()` suggests
+   `owned-nested-project` or `external` (Q6); `git-advice.ts` and the affected help
    text name the new kinds.
 5. **Resolution, accesses, synthetic roots, observer, affected query,
    architect view, modularity, daemon codec, watcher and dispositions.**
@@ -60,7 +60,7 @@ toolkit's own declarations. Ramify's behavior for both owned kinds is
    `subs/integration-tests/src/browser-acceptance.ts` match both owned kinds;
    `scripts/reference-harness/plan2b-cases.ts` and `self-cases.ts` follow.
 8. **Tests.** About 300 lines in 38 test files spell `owned-ignored`. Rename
-   them by meaning: a fixture holding a project root becomes `owned-project`,
+   them by meaning: a fixture holding a project root becomes `owned-nested-project`,
    any other `owned-unwired`. Add tests for NT-02 to NT-05.
 9. **Documentation.** The rename-only sites and the proposal amendment listed
    in [protected documents](../protected-documents.md#rename-only-sites-not-protected);

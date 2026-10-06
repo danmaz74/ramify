@@ -36,7 +36,7 @@ approval, adopt them in the toolkit, and update ramify-agent's documentation.
    Plan 20's "What waits for the providers" and D2 as the main plan lists;
    Plan 21 stays untracked. No agent source, pins or tests change.
 5. **Handoff (NT-20).** `handoff.md`: what Plan 21 adopts (pins, root
-   marker, `owned-unwired "docs"`, three `owned-project` fixture
+   marker, `owned-unwired "docs"`, three `owned-nested-project` fixture
    declarations, the write-scope rule, `ignorePaths: ["docs/**"]`, no
    `enclosingProject`), the artifacts and their digests, and remaining gaps.
 
