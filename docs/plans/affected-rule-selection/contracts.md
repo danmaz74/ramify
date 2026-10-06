@@ -210,6 +210,10 @@ Every seed has exactly the members `path`, `status`, `module`, `basis`,
 | `excluded` | null | `excluded` | an exclusion whose `owner` is null | null | `[]` |
 | `outside-project` | null | `none` | null | null | `[]` |
 
+The `basis` of a `description` seed is `declaration` for a current module's
+`module.ramify`. Otherwise it is `containment`, or `area` when the path lies
+beneath its owner's `src/`, as an absent `subs/a/src/x/module.ramify` does.
+
 Invariants a reader may rely on, and should reject a document that breaks:
 
 - For an owned seed, `kind` is `ignored` exactly when `exclusion` is not null.
@@ -221,8 +225,9 @@ Invariants a reader may rely on, and should reject a document that breaks:
   `scope.ownership.modules`.
 - Every module in any seed's `selects` appears in `changedModules`.
 - `readme` and `description` seeds have basis `declaration` when the path is
-  a current module's README or description. A `description` seed for a
-  module that does not exist yet has basis `containment`.
+  a current module's README or description. Any other `description` seed,
+  such as one for a module that does not exist yet, has basis `containment`,
+  or `area` when it lies beneath its owner's `src/`.
 
 A path *selects* exactly when its `selects` is non-empty.
 
@@ -386,6 +391,7 @@ The reverse edges are `a -> app` and `a -> b`. "all" means all five IDs.
 | `module.ramify` | owned / app / declaration / null | description | [app] | [app] | [] |
 | `subs/a/module.ramify` | owned / app/a / declaration / null | description | [app/a] | [app/a] | [app, app/b] |
 | `subs/c/module.ramify` (absent) | owned / app / containment / null | description | [app] | [app] | [] |
+| `subs/a/src/x/module.ramify` (absent) | owned / app/a / area / null | description | [app/a] | [app/a] | [app, app/b] |
 | `README.md` | owned / app / declaration / null | readme | [] | [] | [] |
 | `subs/a/README.md` | owned / app/a / declaration / null | readme | [] | [] | [] |
 | `subs/b/src/prompt.md` | owned / app/b / inventory / null | inert | [] | [] | [] |

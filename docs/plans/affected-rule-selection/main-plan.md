@@ -84,6 +84,15 @@ coordinator says so before iteration 1.
     - The contributors rule is row 7.
     - Configuration files govern by directory (J3).
 
+- **Post-release contract correction** (after the release commit
+  `63cb7ccf`, documents only, artifact unchanged). ramify-audit Plan 8's
+  iteration 3 found the error against the 0.3.0 artifact. The engine answers
+  an absent `module.ramify` beneath its owner's `src/`, such as
+  `subs/a/src/x/module.ramify`, as a `description` seed with basis `area`.
+  The contracts had said `containment`. The engine is right. The contracts now
+  say "basis `containment`, or `area` when it lies beneath its owner's `src/`"
+  in the member-table note, the invariants and the examples table.
+
 ## Engine limits found while planning
 
 - **JavaScript admission.** The affected query cannot see JavaScript admission
