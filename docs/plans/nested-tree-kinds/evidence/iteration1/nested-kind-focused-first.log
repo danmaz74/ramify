@@ -426,4 +426,3 @@ AssertionError: expected [ 'data/hidden.ts' ] to deeply equal []
       Tests  10 failed | 130 passed (140)
    Start at  21:40:14
    Duration  13.91s (transform 895ms, setup 0ms, import 1.17s, tests 17.90s, environment 1ms)
-
