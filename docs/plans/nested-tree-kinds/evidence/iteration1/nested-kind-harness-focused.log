@@ -1,0 +1,43 @@
+
+ RUN  v4.1.11 /home/app/ramify-nested-kinds
+
+(node:2488307) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2488307) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ scripts/reference-harness/plan2b.test.ts (6 tests | 1 failed) 200652ms
+     × gives byte-identical views on a second daemon, apart from the revision identifier, and at another path apart from the input too 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  scripts/reference-harness/plan2b.test.ts > Plan 2B real runs (AV29, AV31) > gives byte-identical views on a second daemon, apart from the revision identifier, and at another path apart from the input too
+AssertionError: other-path toolkit: expected { code: +0, stderr: '', …(9) } to match object { code: +0, …(3) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "bytesWritten": 1080859,
++   "bytesWritten": 1081844,
+    "code": 0,
+    "dependencies": "measured",
+-   "records": 2094,
++   "records": 2096,
+  }
+
+ ❯ scripts/reference-harness/plan2b.test.ts:66:35
+     64|       const label = `${second.placement} ${second.kind}`;
+     65|       const first = runs.primary.find(item => item.kind === second.kin…
+     66|       expect(second.first, label).toMatchObject({ code: 0, dependencie…
+       |                                   ^
+     67|       expect(second.revision, label).not.toBe(first.revision);
+     68|       if (second.placement === 'same-path') {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 37 passed (38)
+   Start at  21:41:52
+   Duration  202.29s (transform 2.06s, setup 0ms, import 2.50s, tests 380.69s, environment 0ms)
