@@ -2,7 +2,7 @@
 
 **Status:** proposed. No patch is approved. Dan approves each patch below by
 its ID; the approval covers that exact text at the baseline hash given.
-Patches that depend on a [proposal](main-plan.md#proposals-to-confirm) cite
+Patches that depend on a [proposal](main-plan.md#proposals) cite
 it and change if the proposal changes.
 
 Iteration 1 applies the Ramify patches (M, G, C, T, A, S) as its first commit,

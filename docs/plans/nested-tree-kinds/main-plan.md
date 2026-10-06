@@ -1,9 +1,8 @@
 # Three kinds of nested tree
 
 **Date:** 2026-10-06. **Status:** proposed; not started. The decisions below
-are Dan's. The [proposals](#proposals-to-confirm) need his confirmation, and
-every protected patch in [protected documents](protected-documents.md) needs
-his approval, before iteration 1 starts.
+are Dan's, and the [proposals](#proposals) are settled. Every protected patch in [protected documents](protected-documents.md) needs
+his approval before iteration 1 starts.
 
 This plan spans three projects. Ramify (this repository) changes its model
 and releases `ramify.ts` 0.4.0. ramify-audit reads the new answers and
@@ -86,10 +85,12 @@ deliberate, and the architect view shows the kind beside each tree.
    still needed: full-audit reuse never asks Ramify.
 6. One plan across the three projects.
 
-## Proposals to confirm
+## Proposals
 
-The planner proposes these. Each needs Dan's confirmation before iteration 1;
-a change to any of them changes the patches and briefs that cite it.
+The planner proposed these. Dan confirmed Q3 on 2026-10-06. Q4 to Q6, Q8
+and Q9 follow from his decisions and existing precedent, so the planner
+settled them; Dan can reopen any of them. A change to one changes the
+patches and briefs that cite it.
 
 Dan withdrew three earlier proposals on 2026-10-06 ("KISS"): Ramify does not
 check whether a declared directory is a project root (Q1, Q2), and

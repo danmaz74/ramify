@@ -1,7 +1,7 @@
 # Iteration 1: Model and engine
 
 **Plan:** [Three kinds of nested tree](../main-plan.md).
-**Prerequisites:** Dan has confirmed proposals Q3 to Q6, Q8 and Q9 and approved patches
+**Prerequisites:** Dan has approved patches
 M, G, C, T, A and S in [protected documents](../protected-documents.md). The
 worktree `/home/app/ramify-nested-kinds` is clean on `plan/nested-tree-kinds`.
 **Owners:** `analysis/descriptions`, `analysis/project`, `analysis/typescript`,
