@@ -5,9 +5,10 @@
 Whole-tree ownership and project-boundary vocabulary adopted 2026-10-01,
 and the root marker adopted 2026-10-03; discovery implements the root marker
 and the declared nested trees, auxiliary source is analyzed and its originals
-are never exposed, imports into declared nested trees are enforced, and
-containment decides affected selection and the hook check's path
-dispositions.
+are never exposed, imports into declared nested trees are enforced,
+containment attributes each affected path seed to its owner and decides the
+hook check's path dispositions, and a seed's kind decides which modules it
+selects.
 
 ## Purpose
 
