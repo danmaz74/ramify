@@ -233,9 +233,9 @@ describe('project-boundary CLI processes', () => {
       expect(human.code).toBe(0);
       expect(human.stdout).toContain('Path ../outside.ts: outside the project\n'
         + 'Path external-project/file.ts: excluded (external external-project)\n'
-        + 'Path fixture-project/src/index.ts: owned by app (containment, owned-ignored fixture-project)\n'
-        + 'Path notes/with space.md: owned by app (containment)\n'
-        + 'Path subs/a/scripts/report.ts: owned by app/a (inventory)\n');
+        + 'Path fixture-project/src/index.ts: owned by app (containment, owned-ignored fixture-project; ignored; selects none)\n'
+        + 'Path notes/with space.md: owned by app (containment; inert; selects none)\n'
+        + 'Path subs/a/scripts/report.ts: owned by app/a (inventory; auxiliary-source; selects app/a)\n');
     }
   }, 300_000);
 
