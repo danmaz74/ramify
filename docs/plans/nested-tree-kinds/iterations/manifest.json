@@ -1,0 +1,30 @@
+{
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "planPath": "main-plan.md",
+  "iterations": [
+    {
+      "index": 1,
+      "file": "iteration1.md",
+      "title": "Model and engine",
+      "parallelGroup": null
+    },
+    {
+      "index": 2,
+      "file": "iteration2.md",
+      "title": "Ramify release candidate",
+      "parallelGroup": null
+    },
+    {
+      "index": 3,
+      "file": "iteration3.md",
+      "title": "Audit reader and release candidate",
+      "parallelGroup": null
+    },
+    {
+      "index": 4,
+      "file": "iteration4.md",
+      "title": "Publication and adoption",
+      "parallelGroup": null
+    }
+  ]
+}
