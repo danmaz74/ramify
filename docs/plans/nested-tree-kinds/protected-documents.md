@@ -1,7 +1,9 @@
 # Protected documents
 
-**Status:** proposed. Approved by Dan on 2026-10-06: G3, G4. Dan approves each patch below by
-its ID; the approval covers that exact text at the baseline hash given.
+**Status:** approved. Approved by Dan on 2026-10-06: G3, G4. Approved on
+2026-10-06 by a Fable reviewer on Dan's delegation: M1–M10, G1, G2, G5, C1,
+C2, T1, A1, S1–S3, R1, R2, H1, H2; M1, M3, T1, S1, S2 and R1 in the amended
+form below. Each approval covers that exact text at the baseline hash given.
 Patches that depend on a [proposal](main-plan.md#proposals) cite
 it and change if the proposal changes.
 
@@ -56,10 +58,12 @@ relative to the module and one of three kinds:
 | `owned-nested-project` | yes | never | yes |
 | `external` | no | never | not stated |
 
-`owned-unwired` and `owned-nested-project` are the owned kinds. The directory must
-lie strictly beneath the declaring module and outside every child module.
-External trees must lie outside the declaring module's `src/`; owned trees
-may lie within owned source, including `src/tests/`.
+`owned-unwired` and `owned-nested-project` are the owned kinds. The kind is what
+the declaration says; Ramify never verifies it against the directory's
+contents. The directory must lie strictly beneath the declaring module and
+outside every child module. External trees must lie outside the declaring
+module's `src/`; owned trees may lie within owned source, including
+`src/tests/`.
 
 ```ramify
 ramify 1
@@ -98,7 +102,7 @@ contents have no owner in this evaluation. Plain data needs no declaration.
 
 An `owned-unwired` tree holds content, code included, that is deliberately
 not wired into the project: documentation, spikes, samples and other material
-the project keeps but never builds, imports or analyzes. An `owned-nested-project`
+the project keeps but nothing imports or analyzes. An `owned-nested-project`
 tree holds a separate project, such as an example or a fixture project: data
 to the enclosing evaluation, and a project in its own right when selected as
 its own root. A Ramify project within an `owned-nested-project` or `external`
@@ -123,7 +127,7 @@ Old: `always-excluded paths other than the module's scratch directory. Owned-ign
 New: `always-excluded paths other than the module's scratch directory. Owned`
 `nested trees remain owned.`
 
-### M3: discovery paragraph (Q6)
+### M3: discovery paragraph
 
 Old:
 
@@ -138,8 +142,7 @@ New:
 ```text
 An excluded description is not interpreted by this evaluation; one carrying
 the root marker inside a declared tree of any kind is the root of a separate
-project. A nested project's root belongs within an `owned-nested-project` or
-`external` tree.
+project.
 ```
 
 ### M4: auxiliary source
@@ -270,8 +273,10 @@ New: `An import from analyzed source that resolves into an `owned-unwired`,`
 
 Also replace "shared ownership with an ignored tree does not create an
 exemption" with "shared ownership with an owned nested tree does not create
-an exemption", and "A project within an ignored tree uses the enclosing
-package" with "An owned nested project uses the enclosing package".
+an exemption", "imports originating inside either kind of excluded tree" with
+"imports originating inside any kind of excluded tree", and "A project within
+an ignored tree uses the enclosing package" with "An owned nested project
+uses the enclosing package".
 
 ## A: module architect principles
 
@@ -293,11 +298,15 @@ New: `Architectural evidence identifies each module's owned nested trees without
   owned nested tree" and "one `compiler-selected-owned-unwired`,
   `compiler-selected-owned-nested-project` or `compiler-selected-scratch` warning
   per tree or scratch directory".
-- "A nested project belongs in a declared nested tree: undeclared, its
-  marked root description or package manifest is a layout error." becomes
-  "A nested project belongs in an `owned-nested-project` or `external` tree:
+- The auxiliary-source paragraph: "Every other owned file outside `src/`
+  and the owned-ignored trees," becomes "Every other owned file outside
+  `src/` and the owned nested trees,", and "compiler-selected source inside an
+  owned-ignored tree, compiler-selected source inside a module's scratch
+  directory" becomes "compiler-selected source inside an owned nested tree,
+  compiler-selected source inside a module's scratch directory".
+- The sentence "A nested project belongs in a declared nested tree:
   undeclared, its marked root description or package manifest is a layout
-  error."
+  error." is unchanged: a declaration of any kind satisfies it.
 - The affected seed rule: "a path in an owned-ignored tree or a scratch
   directory is `ignored` and selects nothing" becomes "a path in an owned
   nested tree or a scratch directory is `ignored` and selects nothing" (Q8).
@@ -305,9 +314,21 @@ New: `Architectural evidence identifies each module's owned nested trees without
   names "any owned nested tree or scratch exclusion".
 - Every version the [formats table](main-plan.md#formats) moves:
   `ramify.analysis/3`, `ramify.affected/4`, `ramify.affected-cli/4`,
-  `ramify.check/3`. History sentences keep their old versions.
-- Every other `owned-ignored` occurrence, including the `not-analyzed`
-  disposition, names the two owned kinds.
+  `ramify.check/3`. History sentences keep their old versions, and this
+  paragraph follows the one ending "kept `ramify.ipc/2`." in "Output and
+  exit":
+
+  ```text
+  Three kinds of nested tree changed the kind strings that exclusions,
+  warnings and dispositions carry, so `ramify.analysis/2`, `ramify.check/2`
+  and `ramify.affected-cli/3` with `ramify.affected/3` moved to their next
+  versions. The IPC protocol kept `ramify.ipc/2`.
+  ```
+
+- The `not-analyzed` disposition: "it lies in an owned-ignored, external or
+  scratch directory" becomes "it lies in an `owned-unwired`,
+  `owned-nested-project`, external or scratch directory". No other
+  `owned-ignored` occurrence remains.
 
 ### S2: `architect-view.spec.md`
 
@@ -315,7 +336,14 @@ New: `Architectural evidence identifies each module's owned nested trees without
 owned nested and external trees", and the JSON example becomes
 `{ "kind": "owned-unwired", "dir": "scripts/reference-harness", … }`. The
 schema names move to `ramify.architect-projection/3`,
-`ramify.architect-module/3` and `ramify.architect-view/3`.
+`ramify.architect-module/3` and `ramify.architect-view/3`; the history bullet
+"Version 2 of `ramify.architect-module` ... added `boundaries`." keeps its
+versions, and this bullet follows it:
+
+```text
+- Version 3 of the same three documents replaced the boundary kind
+  `owned-ignored` with `owned-unwired` and `owned-nested-project`.
+```
 
 ### S3: `modularity-report.spec.md`
 
@@ -329,8 +357,8 @@ external". `ramify.modularity/3` does not move.
 Old: `An audit covers one project by default. A project within an owned-ignored`
 `tree has its own definition, change set, reuse lookup and evidence key.`
 
-New: `An audit covers one project by default. An owned nested project has its`
-`own definition, change set, reuse lookup and evidence key.`
+New: `An audit covers one project by default. A project within an owned nested`
+`tree has its own definition, change set, reuse lookup and evidence key.`
 
 ### R2: specification, seed kinds
 

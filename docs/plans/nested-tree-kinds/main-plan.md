@@ -1,8 +1,9 @@
 # Three kinds of nested tree
 
-**Date:** 2026-10-06. **Status:** proposed; not started. The decisions below
-are Dan's, and the [proposals](#proposals) are settled. Every protected patch in [protected documents](protected-documents.md) needs
-his approval before iteration 1 starts.
+**Date:** 2026-10-06. **Status:** approved; not started. The decisions below
+are Dan's, and the [proposals](#proposals) are settled. Every protected patch
+in [protected documents](protected-documents.md) is approved: G3 and G4 by
+Dan, the rest on his delegation on 2026-10-06.
 
 This plan spans three projects. Ramify (this repository) changes its model
 and releases `ramify.ts` 0.4.0. ramify-audit reads the new answers and
@@ -206,7 +207,7 @@ protected file and lists the rename-only sites. In summary:
 
 **ramify-audit.**
 - `docs/partial-audit.principles.md` (protected): "A project within an
-  owned-ignored tree" becomes "An owned nested project".
+  owned-ignored tree" becomes "A project within an owned nested tree".
 - `docs/partial-audit.spec.md` (protected): the seed-kind sentences.
 - `README.md`: the kind names and the release
   notes for 0.7.0. Dated decision and analysis documents and earlier plans
