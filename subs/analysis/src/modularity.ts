@@ -106,7 +106,7 @@ function provenance(revision: string, report: CompleteReport, ownership: Ownersh
     // The declared nested trees: their contents are neither inventoried nor
     // analyzed, so consumers inside them are absent from the measures.
     omittedScopes: sorted((report.scope ?? report.snapshot.inventory.scope).ownership.exclusions
-      .filter(exclusion => exclusion.kind === 'owned-ignored' || exclusion.kind === 'external').map(exclusion => exclusion.directory)),
+      .filter(exclusion => exclusion.kind === 'owned-unwired' || exclusion.kind === 'owned-nested-project' || exclusion.kind === 'external').map(exclusion => exclusion.directory)),
     ownership: ownership.mode,
     candidateId: ownership.candidateId,
   };

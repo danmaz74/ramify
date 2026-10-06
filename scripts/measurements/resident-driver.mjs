@@ -61,7 +61,7 @@ export function reportCommand(result, project, { denied = 0, expected = [], setu
     assert.fail(`Resident command exited ${result.code}; expected ${denied ? 1 : 0}${detail ? `: ${detail.slice(0, 4096)}` : ''}`);
   }
   const report = JSON.parse(result.stdout);
-  assert.equal(report.schemaVersion, 'ramify.analysis/2');
+  assert.equal(report.schemaVersion, 'ramify.analysis/3');
   assertMeasuredOutcome(report, project, { denied, setupExposureRemoved });
   assert.ok(report.stages.every(stage => stage.status === 'completed'));
   return { inputId: report.inputId, runId: report.runId, summary: report.summary, outcome: report.outcome,

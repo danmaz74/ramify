@@ -179,7 +179,7 @@ remain later work.
 | `contexts` | Select and isolate contexts; order watcher changes and requests per context; publish revisions atomically; keep compact history; apply the covering rule, the sweep schedule, deadlines, leases, the hot and warm levels and eviction. | `createContextManager`, revision/status/outcome vocabulary, the `AnalysisDriver` port and controlled test ports. |
 | `presentation` | Render model data, interactions and teaching examples; report views remain later work. | Selected components explicitly tagged `[ui, browser]` and owned props. |
 | `layout` | Calculate diagram geometry from supplied neutral data. | Selected functions explicitly tagged `[browser]` and owned layout vocabulary. |
-| `cli` | Parse arguments, send resident checks, hook checks, watch and daemon requests through the injected connector, invoke an injected batch operation, render results and map execution status to exits. MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary, including the `ramify.check/2` document. |
+| `cli` | Parse arguments, send resident checks, hook checks, watch and daemon requests through the injected connector, invoke an injected batch operation, render results and map execution status to exits. MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary, including the `ramify.check/3` document. |
 
 `analysis` owns computational invalidation; `contexts` owns scheduling and
 publication; `daemon` owns process and transport mechanics. There is one authority
@@ -337,7 +337,7 @@ seals the view before publishing a report. Changed inputs trigger a fresh
 acquisition within the configured retry limit or an explicit incomplete result.
 Compiler state is not retained across batch runs.
 
-Reports use schema `ramify.analysis/2`, a fresh `runId` and a captured `inputId`
+Reports use schema `ramify.analysis/3`, a fresh `runId` and a captured `inputId`
 when established. They retain stage and capability execution, inventory, linked
 contracts, accesses, decisions, diagnostics, warnings and coverage as frozen
 plain data. These batch identities are not context generations or revisions.
@@ -552,7 +552,7 @@ a fresh batch check.
   table of the latest completed published revision: `checked`, `not-analyzed`
   or `not-checked`, as the
   [CLI invocation contract](cli-invocation.spec.md#hook-and-complete-checks)
-  defines them. Containment decides first: a path in an owned-ignored, external
+  defines them. Containment decides first: a path in an owned-unwired, owned-nested-project, external
   or scratch directory or another always-excluded path is not analyzed and
   needs no content, and its bytes are never an expectation or a captured input.
   An owned path outside every exclusion is analyzed and needs its content
@@ -723,11 +723,11 @@ classifier over the ownership table of the latest completed published revision,
 whose rooted exclusions it lists, or over an empty table before the first one,
 where only the canonical reserved-path rules (repository metadata, installed
 packages and generated paths, wherever they occur) exclude. It registers no
-directory the scope excludes and nothing beneath one, so an owned-ignored,
+directory the scope excludes and nothing beneath one, so an owned-unwired, owned-nested-project,
 external, scratch, output, package, repository or generated tree holds no
 registration and its byte edits, creations and deletions reach no listener; no
 fixed directory-name set remains. The enclosing directory stays registered, and
-the own creation, removal or replacement of an owned-ignored, external or
+the own creation, removal or replacement of an owned-unwired, owned-nested-project, external or
 scratch directory is delivered, which keeps boundary-root evidence observed;
 the own entries of the other excluded kinds are not. Registration and event
 classification cost one classifier call per directory met and per event,
@@ -776,11 +776,11 @@ retried once. The compact reply names the covering revision's identifier,
 sequence and path, its checked set, each named path's disposition, every project
 finding with a `new` mark against `since` or the previous revision, removed
 finding identities, warnings, coverage and timings. With `--format json` the CLI
-writes it as one `ramify.check/2` document. The command exits 0 with no finding,
+writes it as one `ramify.check/3` document. The command exits 0 with no finding,
 1 with findings or an invalid revision, whatever paths are not analyzed, and 2
 when a path was not checked, and it never falls back to batch. The whole
 report is built only for `scope: 'report'`, which the plain `ramify check` requests
-for its `ramify.analysis/2` document, to which the CLI adds only its Git advice. The
+for its `ramify.analysis/3` document, to which the CLI adds only its Git advice. The
 [CLI invocation contract](cli-invocation.spec.md#hook-and-complete-checks) pairs the
 two forms.
 
@@ -798,7 +798,7 @@ schemas and transport framing are review items, not new `module.ramify` syntax.
 | Change notifications | Announce published revisions, status changes and updated findings; a reconnect can fetch a complete snapshot without replaying an unbounded event history. |
 | Symbol intelligence | Search usable exports and request optional details at a specified revision, with access evidence and explicit missing enrichment. |
 | Module measurement | `measure({ token, requestId, freshness, deadlineMs? })` synchronizes one current revision, joins its retained inventory/documentation buckets to one bounded all-module API-view render, and returns `ramify.measure/2` without publishing files. API projection or render limits retain valid inventory with a uniform unavailable views reason. Invalid current inventory, cancellation, deadline expiry and supersession terminate the whole request. The transport passes its negotiated `maxResponseBytes` and request-envelope identity into exact incremental escaped UTF-8 counting; direct calls reserve a conservative maximum request-id envelope. Oversized documents are refused whole as `resource-unavailable`. |
-| Affected modules | `affected({ token, requestId, freshness, modules?, paths?, deadlineMs? })` answers, from the covering revision's retained dependency facts, the changed modules (the module seeds and every module a path seed selects), the modules that depend on them and the test modules, with each path seed's status, module, basis, exclusion, kind and selected modules, widening reasons and coverage notes, as one `ramify.affected/3` selection, without publishing files. Synchronized freshness shares the covering-revision scheduler with `measure`; published freshness waits for or reuses a publication. Unknown module IDs and invalid seeds are domain refusals naming the unknown set; invalid current input, cancellation, deadline expiry and supersession terminate the request. Answers above the negotiated response bound are refused whole as `resource-unavailable`. `ramify affected` is its CLI client; `ramify affected --batch` asks a fresh session the same query. |
+| Affected modules | `affected({ token, requestId, freshness, modules?, paths?, deadlineMs? })` answers, from the covering revision's retained dependency facts, the changed modules (the module seeds and every module a path seed selects), the modules that depend on them and the test modules, with each path seed's status, module, basis, exclusion, kind and selected modules, widening reasons and coverage notes, as one `ramify.affected/4` selection, without publishing files. Synchronized freshness shares the covering-revision scheduler with `measure`; published freshness waits for or reuses a publication. Unknown module IDs and invalid seeds are domain refusals naming the unknown set; invalid current input, cancellation, deadline expiry and supersession terminate the request. Answers above the negotiated response bound are refused whole as `resource-unavailable`. `ramify affected` is its CLI client; `ramify affected --batch` asks a fresh session the same query. |
 | Dependency diagram | `dependencyDiagram({ token, requestId, revision })` answers the behavioral dependency diagram of the context's exact current published revision, only when a client requests it. A revision that is not current is `superseded`; a retained result is `ready`; an equal running job is joined; while any other job runs the answer is `busy/analysis-running`; otherwise one job starts. The job runs a separate analyzer process that acquires the project with the request the revision's inputs were captured with, the one its retained session was opened with, verifies those inputs against the published report, classifies the report's recorded imports in its own compiler helper, projects the diagram and exits. Changed inputs answer `busy/inputs-changed`; a newer publication aborts the job and answers its callers `superseded`; the last caller's cancellation aborts it. A result above its byte limit or the retained budget is `unavailable/resource-limit`. Checks, hooks, watches, materialization and the retained session never classify behavior. |
 
 At most one diagram job runs daemon-wide, and each context retains at most one

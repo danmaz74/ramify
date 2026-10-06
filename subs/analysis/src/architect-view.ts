@@ -112,14 +112,14 @@ function declaredDirectory(moduleDirectory: string, written: string): string {
 }
 
 /**
- * Each module's declared owned-ignored and external trees, from its parsed
+ * Each module's declared owned nested and external trees, from its parsed
  * description joined to the scope's ownership exclusions: a statement whose
  * directory is no exclusion of its kind and owner, or a declared exclusion no
  * statement accounts for, makes the facts unusable.
  */
 function boundariesOf(modules: readonly InventoryModule[], ownership: ProjectOwnership):
   ReadonlyMap<ModuleId, readonly Boundary[]> | Unavailable {
-  const declared = ownership.exclusions.filter(exclusion => exclusion.kind === 'owned-ignored' || exclusion.kind === 'external');
+  const declared = ownership.exclusions.filter(exclusion => exclusion.kind === 'owned-unwired' || exclusion.kind === 'owned-nested-project' || exclusion.kind === 'external');
   const byDirectory = new Map(declared.map(exclusion => [exclusion.directory, exclusion]));
   const claimed = new Set<string>();
   const result = new Map<ModuleId, Boundary[]>();
@@ -131,7 +131,7 @@ function boundariesOf(modules: readonly InventoryModule[], ownership: ProjectOwn
         if (!('directory' in statement)) continue;
         const dir = declaredDirectory(module.directory, statement.directory.value);
         const exclusion = byDirectory.get(dir);
-        if (!exclusion || exclusion.kind !== statement.kind || exclusion.owner !== (statement.kind === 'owned-ignored' ? module.id : null)
+        if (!exclusion || exclusion.kind !== statement.kind || exclusion.owner !== ((statement.kind === 'owned-unwired' || statement.kind === 'owned-nested-project') ? module.id : null)
           || claimed.has(dir)) {
           return { status: 'unavailable', reason: 'analysis-failed',
             message: `The ${statement.kind} tree "${dir}" that module "${module.id}" declares is not one of the revision's exclusions` };
@@ -350,7 +350,7 @@ export function projectArchitectView(facts: SessionFacts, sequence: number, inpu
   // The catalog limits a check report publishes: a resource description counts only when the inventory references it.
   counts.coverage = new Set(facts.catalog.coverage.filter(note => note.code !== 'resource-description'
     || facts.inventory!.references.some(reference => reference.normalized === note.location.file)).map(note => note.id)).size;
-  const draft = { schema: 'ramify.architect-projection/2' as const, sequence, inputId, root: modules[0]!.module,
+  const draft = { schema: 'ramify.architect-projection/3' as const, sequence, inputId, root: modules[0]!.module,
     modules, symbols, tests, counts, bytes: 0 };
   const bytes = Buffer.byteLength(JSON.stringify(draft), 'utf8');
   if (bytes > limits.maxProjectionBytes) {

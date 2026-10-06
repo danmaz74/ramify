@@ -75,7 +75,7 @@ describe('compiled client process contracts', () => {
     }
     const document = JSON.parse((await run(launcher, ['affected', '--path', 'subs/core/src/interfaces/api.ts', '--batch', '--format', 'json'],
       { cwd: root, env })).stdout);
-    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/3', root, mode: 'batch', revision: { sequence: null },
+    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/4', root, mode: 'batch', revision: { sequence: null },
       selection: { changedModules: [{ id: 'example/core' }], affectedModules: [{ id: 'example/app' }, { id: 'example/mid' }],
         selection: 'dependency-closure' } });
     expect(document.revision.inputId).toBe(document.selection.inputId);
@@ -202,7 +202,7 @@ describe('compiled client process contracts', () => {
       const bin = join(installation, 'node_modules/.bin/ramify');
       const batch = await run(bin, ['check', '--batch', '--format', 'json'], { cwd: root, env });
       expect([batch.code, batch.signal, batch.stderr]).toEqual([0, null, '']);
-      expect(JSON.parse(batch.stdout)).toMatchObject({ schemaVersion: 'ramify.analysis/2', summary: { complete: true, owners: 2 } });
+      expect(JSON.parse(batch.stdout)).toMatchObject({ schemaVersion: 'ramify.analysis/3', summary: { complete: true, owners: 2 } });
       // Only the compiled client can answer without Node on PATH.
       const version = await run(bin, ['--version'], { cwd: root, env: { ...env, PATH: '/usr/bin:/bin' } });
       expect([version.code, version.stderr]).toEqual([0, '']);

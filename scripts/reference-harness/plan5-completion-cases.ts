@@ -56,7 +56,7 @@ export const documentChecks: readonly DocumentCheck[] = [
   { document: 'docs/architecture/daemon.md', name: 'the covering rule', pattern: /\*\*Covering rule\.\*\*/ },
   { document: 'docs/architecture/daemon.md', name: 'the periodic and required sweep', pattern: /\*\*Sweep\.\*\*[^]*periodic sweep[^]*required sweep/ },
   { document: 'docs/architecture/daemon.md', name: 'the revision paths', pattern: /`unchanged-surface`, `source`, `description`, `metadata`, `membership` and `broad`/ },
-  // Phase 1 project boundaries, iteration 8: the hook reply's document advanced to `ramify.check/2`.
+  // Phase 1 project boundaries, iteration 8: the hook reply's document advanced to `ramify.check/3`.
   { document: 'docs/architecture/daemon.md', name: 'the hook request and reply', pattern: /\*\*Hook request and reply\.\*\*[^]*`ramify\.check\/2`/ },
   { document: 'docs/architecture/memory-lifecycle.md', name: 'the compiler server is a bounded cost', pattern: /compiler server[^.]*bounded cost/ },
   { document: 'docs/architecture/memory-lifecycle.md', name: 'the hot, warm and cold levels', pattern: /\| Hot \|[^]*\| Warm \|[^]*\| Cold \|/ },

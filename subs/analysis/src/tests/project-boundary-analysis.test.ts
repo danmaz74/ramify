@@ -13,7 +13,7 @@ import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
  * importability and TypeScript source interpretation specifications, not a
  * recorded run:
  *
- * - an import from analyzed source into a declared owned-ignored or external
+ * - an import from analyzed source into a declared owned nested or external
  *   tree without package resolution is a definite `project-boundary-import`
  *   finding, decided before symbol selection and the same-owner exemption,
  *   for every form: value, type-only, symbol-free, namespace and lazy member
@@ -31,15 +31,15 @@ const nodeNext = JSON.stringify({
   include: ['src', 'subs/*/src'],
 });
 
-/** The topology: root `app` [dispatch] with owned-ignored `fixture-project` and external `external-project`; child `a` with owned-ignored `fixtures/sample`. */
+/** The topology: root `app` [dispatch] with owned-nested-project `fixture-project` and external `external-project`; child `a` with owned-nested-project `fixtures/sample`. */
 const topology: Readonly<Record<string, string>> = {
   'package.json': '{"name":"app","type":"module"}',
   'tsconfig.json': nodeNext,
-  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-ignored "fixture-project"\nexternal "external-project"\nexpose-sub api from a to descendants\n',
+  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-nested-project "fixture-project"\nexternal "external-project"\nexpose-sub api from a to descendants\n',
   'README.md': '# App\n\nThe written provider topology, boundary part.\n',
   // Positive control: the root receives a's api, exposed to its parent.
   'src/main.ts': "import { api } from '../subs/a/src/api.js';\nexport const main: number = api();\n",
-  // Every form into the root's own owned-ignored tree by a relative route: same-owner, still denied.
+  // Every form into the root's own owned nested tree by a relative route: same-owner, still denied.
   'src/forms.ts': [
     "import { thing } from '../fixture-project/src/thing.js';",
     "import type { Shape } from '../fixture-project/src/thing.js';",
@@ -88,7 +88,7 @@ const topology: Readonly<Record<string, string>> = {
   'fixture-project/tsconfig.json': '{ "include": ["src"] }',
   'fixture-project/src/thing.ts': 'export const thing: number = 1;\nexport interface Shape { readonly size: number }\n',
   'external-project/lib.ts': 'export const lib: number = 2;\n',
-  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
+  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
   'subs/a/README.md': '# A\n\nProvides api.\n',
   'subs/a/src/api.ts': 'export function api(): number { return 1; }\n',
   'subs/a/src/internal.ts': 'export const internal: number = 3;\n',
@@ -193,12 +193,12 @@ function findings(report: AnalysisReport, importer: string): [number, string][] 
   return report.diagnostics.filter(item => item.code === 'project-boundary-import' && item.location?.file === importer)
     .map(item => [item.location!.line, item.message]);
 }
-const tree = (specifier: string, file: string, kind: 'owned-ignored' | 'external', directory: string): string =>
+const tree = (specifier: string, file: string, kind: 'owned-unwired' | 'owned-nested-project' | 'external', directory: string): string =>
   `'${specifier}' resolves to ${file} in the declared ${kind} tree ${directory}; an import into a declared tree must use package resolution`;
 const denied = (specifier: string, form: string): unknown[] => [specifier, form, 'denied', []];
 
 describe('PB1-14: non-package imports into declared trees are definite boundary findings', () => {
-  it('denies every form into the root\'s own owned-ignored tree, before symbol selection and the same-owner exemption', async () => {
+  it('denies every form into the root\'s own owned-unwired tree, before symbol selection and the same-owner exemption', async () => {
     const report = await topologyReport();
     const specifier = '../fixture-project/src/thing.js';
     expect(decided(report, 'src/forms.ts')).toEqual([
@@ -207,13 +207,13 @@ describe('PB1-14: non-package imports into declared trees are definite boundary 
       denied(specifier, 'dynamic-import'), denied(specifier, 'import-type-query'),
     ]);
     // One located finding per occurrence: at the selected name, or at the statement for a symbol-free load.
-    const message = tree(specifier, 'fixture-project/src/thing.ts', 'owned-ignored', 'fixture-project');
+    const message = tree(specifier, 'fixture-project/src/thing.ts', 'owned-nested-project', 'fixture-project');
     expect(findings(report, 'src/forms.ts')).toEqual([1, 2, 3, 4, 5, 9, 7, 8].sort((a, b) => a - b).map(line => [line, message]));
     // No symbol decision is fabricated and no excluded export is interpreted; no limit stands in for the finding.
     const accesses = report.snapshot!.accesses.filter(access => access.importer.file === 'src/forms.ts');
     for (const access of accesses) {
       expect(access.target).toEqual({ kind: 'nested-tree', file: 'fixture-project/src/thing.ts',
-        exclusion: { kind: 'owned-ignored', directory: 'fixture-project', owner: 'app' } });
+        exclusion: { kind: 'owned-nested-project', directory: 'fixture-project', owner: 'app' } });
       expect([access.form, access.coverageIds, access.selections.every(selection => selection.original === null)]).toEqual([access.form, [], true]);
     }
     const first = report.diagnostics.find(item => item.code === 'project-boundary-import' && item.location?.file === 'src/forms.ts')!;
@@ -233,8 +233,8 @@ describe('PB1-14: non-package imports into declared trees are definite boundary 
       ['@a/api.js', 'import', 'checked', [['allowed', 'exposed']]],
     ]);
     expect(findings(report, 'src/routes.ts')).toEqual([
-      [1, tree('@tree/thing.js', 'fixture-project/src/thing.ts', 'owned-ignored', 'fixture-project')],
-      [2, tree('sample-alias', 'subs/a/fixtures/sample/index.d.ts', 'owned-ignored', 'subs/a/fixtures/sample')],
+      [1, tree('@tree/thing.js', 'fixture-project/src/thing.ts', 'owned-nested-project', 'fixture-project')],
+      [2, tree('sample-alias', 'subs/a/fixtures/sample/index.d.ts', 'owned-nested-project', 'subs/a/fixtures/sample')],
       // The link is classified at its physical target.
       [3, tree('../links/external/lib.js', 'external-project/lib.ts', 'external', 'external-project')],
       [4, tree('../external-project/lib.js', 'external-project/lib.ts', 'external', 'external-project')],
@@ -264,7 +264,7 @@ describe('PB1-14: non-package imports into declared trees are definite boundary 
     const sample = '../fixtures/sample/index.js';
     expect(decided(report, 'subs/a/src/own.ts')).toEqual([denied(sample, 'import')]);
     expect(decided(report, 'subs/a/src/tests/tree.test.ts')).toEqual([denied('../../fixtures/sample/index.js', 'import')]);
-    expect(findings(report, 'subs/a/src/own.ts')).toEqual([[1, tree(sample, 'subs/a/fixtures/sample/index.d.ts', 'owned-ignored', 'subs/a/fixtures/sample')]]);
+    expect(findings(report, 'subs/a/src/own.ts')).toEqual([[1, tree(sample, 'subs/a/fixtures/sample/index.d.ts', 'owned-nested-project', 'subs/a/fixtures/sample')]]);
     expect(report.diagnostics.filter(item => item.code === 'project-boundary-import' && item.location?.file === 'subs/a/src/tests/tree.test.ts')
       .map(item => item.importer)).toEqual([{ owner: 'app/a', kind: 'tests', root: 'subs/a/src/tests', profile: ['testing'] }]);
     expect(decided(report, 'scripts/check.ts')[2]).toEqual(denied('../fixture-project/src/thing.js', 'import'));
@@ -350,4 +350,23 @@ describe('PB1-16: outside, always-excluded and unresolved targets stay distinct 
     expect(snapshot.results.flatMap(result => result.decisions)).toEqual([]);
     expect(snapshot.catalog!.files.map(file => file.file)).toEqual(['src/limits.ts']);
   }, 120_000);
+});
+
+
+describe('NT-03: both owned kinds enforce the source boundary', () => {
+  it.each(['owned-unwired', 'owned-nested-project'] as const)('denies same-owner imports into %s while allowing ordinary owned source', async kind => {
+    const report = await analyze({
+      'package.json': '{"type":"module"}',
+      'module.ramify': `ramify 1\nroot module app\n${kind} "data"\n`,
+      'tsconfig.json': '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","types":[]},"include":["src"]}',
+      'data/hidden.ts': 'export const hidden = 1;',
+      'src/helper.ts': 'export const helper = 1;',
+      'src/main.ts': "import { hidden } from '../data/hidden.js';\nimport { helper } from './helper.js';\nexport const value = hidden + helper;",
+    });
+    expect(report.outcome.check).toBe('failed');
+    expect(report.diagnostics.map(item => item.code)).toEqual(['project-boundary-import']);
+    expect(report.snapshot!.accesses.map(access => access.target)).toContainEqual({ kind: 'nested-tree', file: 'data/hidden.ts',
+      exclusion: { kind, directory: 'data', owner: 'app' } });
+    expect(decided(report, 'src/main.ts').map(item => (item as unknown[])[2])).toEqual(['denied', 'checked']);
+  });
 });

@@ -30,7 +30,7 @@ export function projectDiagnostics(inventory: ProjectInventory | null, issues: r
       return statement && 'from' in statement ? [{ file: issue.path, ...statement.from.span }] : [];
     });
     const layout = ['missing-root-description', 'unmarked-root-description', 'invalid-layout', 'duplicate-name', 'description-in-src',
-      'stray-description', 'reserved-container', 'undeclared-project-boundary', 'invalid-nested-tree', 'missing-owned-ignored',
+      'stray-description', 'reserved-container', 'undeclared-project-boundary', 'invalid-nested-tree', 'missing-owned-unwired', 'missing-owned-nested-project',
       'overlapping-nested-tree', 'symlink-root', 'symlink-description'].includes(issue.code);
     result.push(diagnostic(issue.code, issue.message, references.length ? 'description' : layout ? 'layout' : 'acquisition',
       spans.length ? spans : [{ file: issue.path, ...issue.span ?? { start: 0, end: 0, line: 1, column: 1 } }]));

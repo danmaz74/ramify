@@ -10,7 +10,7 @@ Node child in the compiled client, and the production Git port, and owns SIGINT
 and stream cleanup.
 The handler validates the complete invocation before dispatch and checks stage
 completion before reporting success. Pre-analysis invocation failures use
-`ramify.cli/1`; plain check results retain the bare `ramify.analysis/2` document.
+`ramify.cli/1`; plain check results retain the bare `ramify.analysis/3` document.
 
 `check --changed <path>...` names each path relative to the selected root and
 requests a compact delta with synchronized freshness, a two-second default
@@ -18,7 +18,7 @@ deadline and an optional `--since` revision. It cannot classify paths itself:
 the daemon's `classification-changed` answer says which paths are analyzed, and
 the command hashes those, a missing file as an absent identity, and asks again
 within the remaining deadline, retrying a stale classification once. JSON output
-is one `ramify.check/2` document with each path's disposition; human output marks
+is one `ramify.check/3` document with each path's disposition; human output marks
 new findings, prints one `Path` line per named path, `checked`, `not analyzed`
 or `not checked` with its reason, module and exclusion, then an `Outcome` line
 with those counts, the checked set and the wait. Only a checked path reads as
@@ -44,7 +44,7 @@ in JSON mode. Explicit stop, incompatible peers and rejected requests retain
 their errors. Neither watch nor the client entry falls back.
 
 `affected` prints one line per path seed saying whether it is owned, with its
-module, basis and any owned-ignored or scratch exclusion, excluded, with its
+module, basis and any owned nested tree or scratch exclusion, excluded, with its
 exclusion, or outside the project.
 
 A complete check, resident, batch or fallback, inside a Git repository adds one

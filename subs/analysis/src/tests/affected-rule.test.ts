@@ -51,7 +51,7 @@ const topology: Readonly<Record<string, string>> = {
   'package.json': '{"name":"app","type":"module"}',
   'tsconfig.json': configuration,
   'tsconfig.base.json': baseConfiguration,
-  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-ignored "fixture-project"\nexternal "external-project"\n'
+  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-nested-project "fixture-project"\nexternal "external-project"\n'
     + 'expose-sub api from a to descendants\n',
   'README.md': '# App\n\nThe extended provider topology.\n',
   'notes/design.md': 'Inert root-owned prose.\n',
@@ -66,7 +66,7 @@ const topology: Readonly<Record<string, string>> = {
   'fixture-project/tsconfig.json': '{ "include": ["src"] }',
   'fixture-project/src/thing.ts': "import { missing } from './missing.js';\nexport const thing = missing;\n",
   'external-project/lib.ts': "import { gone } from './gone.js';\nexport const lib = gone;\n",
-  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
+  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
   'subs/a/README.md': '# A\n\nProvides api.\n',
   'subs/a/src/api.ts': 'export function api(): number { return 1; }\n',
   'subs/a/src/tests/api.test.ts': "import { api } from '../api.js';\nexport const tested: number = api();\n",
@@ -130,7 +130,7 @@ const union = (...lists: readonly (readonly string[])[]): string[] => [...new Se
 const all = ['app', 'app/a', 'app/a-extra', 'app/a/grand', 'app/b'];
 type OwnedKind = Extract<AffectedPathSeed, { status: 'owned' }>['kind'];
 const scratch = (directory: string, owner: string): ProjectExclusion => ({ kind: 'scratch', directory, owner });
-const ignored = (directory: string, owner: string): ProjectExclusion => ({ kind: 'owned-ignored', directory, owner });
+const ignored = (directory: string, owner: string): ProjectExclusion => ({ kind: 'owned-nested-project', directory, owner });
 const owned = (path: string, module: string, basis: 'inventory' | 'declaration' | 'area' | 'containment', kind: OwnedKind,
   selects: readonly string[], exclusion: ProjectExclusion | null = null): AffectedPathSeed =>
   ({ path, status: 'owned', module, basis, exclusion, kind, selects });
@@ -195,7 +195,7 @@ const dataRow: Row = { seed: owned('data/limits.json', 'app', 'containment', 'ca
 /** Assert one answer: the seeds, the module lists, and the selection; without widening it is the dependency closure. */
 function expectAnswer(result: AffectedSelection, seeds: readonly AffectedPathSeed[], changed: readonly string[],
   affected: readonly string[], label: string, widening: readonly string[] = []): void {
-  expect(result.schemaVersion, label).toBe('ramify.affected/3');
+  expect(result.schemaVersion, label).toBe('ramify.affected/4');
   expect(result.paths, label).toEqual(seeds);
   expectSeedInvariants(result, label);
   expect([ids(result.changedModules), ids(result.affectedModules), ids(result.testModules)], label)

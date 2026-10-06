@@ -173,10 +173,10 @@ function interpretAccesses(setup: AccessInterpretation,
     if (resolved.kind === 'application' && resolved.file) return { kind: 'application', origin: origin(resolved.file) };
     if (resolved.kind === 'outside-project' && resolved.file) return { kind: 'outside-project', file: resolved.file };
     const exclusion = resolved.exclusion;
-    if (resolved.kind === 'nested-tree' && resolved.file && exclusion && (exclusion.kind === 'owned-ignored' || exclusion.kind === 'external')) {
+    if (resolved.kind === 'nested-tree' && resolved.file && exclusion && (exclusion.kind === 'owned-unwired' || exclusion.kind === 'owned-nested-project' || exclusion.kind === 'external')) {
       return { kind: 'nested-tree', file: resolved.file, exclusion: { ...exclusion, kind: exclusion.kind } };
     }
-    if (resolved.kind === 'excluded' && resolved.file && exclusion && exclusion.kind !== 'owned-ignored' && exclusion.kind !== 'external') {
+    if (resolved.kind === 'excluded' && resolved.file && exclusion && exclusion.kind !== 'owned-unwired' && exclusion.kind !== 'owned-nested-project' && exclusion.kind !== 'external') {
       return { kind: 'excluded', file: resolved.file, exclusion: { ...exclusion, kind: exclusion.kind } };
     }
     if (resolved.kind === 'external') {

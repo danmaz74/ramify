@@ -20,7 +20,7 @@ function affectedResult(value: unknown): value is AffectedBatchResult {
     && Array.isArray(result.unknownModules) && [1, 2].includes(result.exitCode as number);
   const selection = result.result as Record<string, unknown> | null | undefined;
   return result.status === 'answered' && typeof result.inputId === 'string' && !!selection && typeof selection === 'object'
-    && selection.schemaVersion === 'ramify.affected/3' && selection.inputId === result.inputId;
+    && selection.schemaVersion === 'ramify.affected/4' && selection.inputId === result.inputId;
 }
 
 /** One Node child per run of the named operation. A cancelled run resolves as cancelled once the child has exited. */

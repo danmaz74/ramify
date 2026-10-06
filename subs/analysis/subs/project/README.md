@@ -60,8 +60,8 @@ Configuration scripts and application entries are never executed. Owned source
 is inventoried independently of compiler selection. Each project warning
 carries a `code`, a `path`, a `message` and, where file evidence is needed, a
 byte-ordered `files` list of at most 20 entries with the total `count`.
-Compiler-selected source inside an owned-ignored tree or a module's scratch
-directory produces one `compiler-selected-owned-ignored` or
+Compiler-selected source inside an owned nested tree or a module's scratch
+directory produces one `compiler-selected-owned-unwired`, `compiler-selected-owned-nested-project` or
 `compiler-selected-scratch` warning per tree or directory, located there; such a
 file is neither inventoried nor read, and selected files in an external tree
 produce no warning. Each inventory file records its `placement`: `src` or
@@ -104,7 +104,7 @@ table: the modules, each module's scratch directory `src/tmp`, the compiler
 configuration's output directories and the declared nested trees, byte-ordered
 by directory. `classifyProjectPath` answers the owner of one canonical
 project-relative path from that table alone, without reads or existence checks:
-the first exclusion reached from the root wins, owned-ignored and scratch paths
+the first exclusion reached from the root wins, owned nested and scratch paths
 keep their owner, and repository, package and generated segments are excluded
 wherever they occur. Declarations are decoded and normalized against their
 module; one that escapes, lies in a child module, overlaps another, places an
@@ -115,8 +115,8 @@ overlap, located at its directory string. It then checks every other
 declaration on the filesystem without traversing a symbolic link, observing
 each directory from the declaring module down to the declared one: a link on
 that path or at the target, or a target that exists but is not a directory, is
-`invalid-nested-tree`; an absent owned-ignored target is
-`missing-owned-ignored`; an absent external target is valid. Those
+`invalid-nested-tree`; an absent owned nested target is
+`missing-owned-unwired` or `missing-owned-nested-project`, matching its declaration; an absent external target is valid. Those
 observations are captured inputs, so a tree's appearance or disappearance makes
 the revision stale. Any such issue makes the acquisition invalid. The observer
 rebuilds when a declared tree's or scratch directory's own directory, or a

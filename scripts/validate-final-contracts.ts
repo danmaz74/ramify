@@ -455,12 +455,12 @@ const declarationLayers: readonly DeclarationLayer[] = [
   { plan: 'Phase 1 project boundaries (toolkit nested trees)',
     added: {
       './': [
-        'owned-ignored "docs"',
-        'owned-ignored "examples/collection-review"',
-        'owned-ignored "scripts/probes/fixtures/compiler-api"',
-        'owned-ignored "scripts/probes/fixtures/plan2a-symbol-details"',
-        'owned-ignored "scripts/reference-harness"',
-        'owned-ignored "site"',
+        'owned-unwired "docs"',
+        'owned-nested-project "examples/collection-review"',
+        'owned-unwired "scripts/probes/fixtures/compiler-api"',
+        'owned-unwired "scripts/probes/fixtures/plan2a-symbol-details"',
+        'owned-unwired "scripts/reference-harness"',
+        'owned-nested-project "site"',
         'external ".cucumber-viz"',
         'external ".history"',
         'external ".playwright-mcp"',

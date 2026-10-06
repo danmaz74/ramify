@@ -50,7 +50,7 @@ async function changed(p: SequenceProcess, root: string, a: Assertions, label: s
   recordObservation(label, { ...result, raw: await archiveObservation(label, result) });
   a.equal(`${label}: finite process exit and stderr`, [result.code, result.signal, result.error, result.stderr], [expected, null, null, '']);
   const document = JSON.parse(result.stdout) as CheckDocument;
-  a.equal(`${label}: one compact document and matching exit`, [document.schemaVersion, result.stdout.trim().split('\n').length, document.exitCode], ['ramify.check/2', 1, expected]);
+  a.equal(`${label}: one compact document and matching exit`, [document.schemaVersion, result.stdout.trim().split('\n').length, document.exitCode], ['ramify.check/3', 1, expected]);
   // Phase 1 project boundaries, iteration 15: each named path carries a disposition in
   // place of the coverage flag. An answered check leaves no path not checked; a check
   // that could not establish its result shows none of these single paths as checked.
@@ -202,7 +202,7 @@ add('plain-check-unchanged', async (p, root, _directory, a) => {
   const resident = await p.check(root, false), batch = await p.check(root, true);
   const { runId: _resident, ...one } = resident, { runId: _batch, ...two } = batch;
   a.equal('plain resident document remains exactly batch except runId', one, two);
-  a.equal('plain schema and independent reference expectation', [resident.schemaVersion, resident.summary.owners, resident.summary.denied], ['ramify.analysis/2', 15, 0]);
+  a.equal('plain schema and independent reference expectation', [resident.schemaVersion, resident.summary.owners, resident.summary.denied], ['ramify.analysis/3', 15, 0]);
   a.equal('compact members do not leak into plain report', ['revision', 'since', 'paths', 'timings', 'exitCode'].filter(key => key in resident), []);
   const human = await p.run(root, ['check']);
   a.equal('plain human exit', [human.code, human.stderr], [0, '']);

@@ -103,8 +103,8 @@ describe('pure description linking', () => {
   });
 
   it('links interleaved nested-tree statements as no exposure, keeping exposures and their reference indices', () => {
-    const child = ['owned-ignored "fixtures/sample"', `${owned} to parent`, 'external "cache"'];
-    const root = ['external "external-project"', 'expose-sub * from child to descendants', 'owned-ignored "fixture-project"'];
+    const child = ['owned-nested-project "fixtures/sample"', `${owned} to parent`, 'external "cache"'];
+    const root = ['external "external-project"', 'expose-sub * from child to descendants', 'owned-nested-project "fixture-project"'];
     // The control replaces each nested-tree line with a comment of equal length, so every location is unchanged.
     const comment = (line: string) => line.includes('expose-') ? line : '//'.padEnd(line.length, '-');
     const plain = linkDescriptions(fixture(child.map(comment).join('\n'), root.map(comment).join('\n')));

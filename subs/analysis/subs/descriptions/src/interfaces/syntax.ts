@@ -44,7 +44,7 @@ export interface ExposureStatement {
 /** A declared nested tree; its directory is the decoded string, interpreted only by project acquisition. */
 export interface NestedTreeStatement {
   readonly index: number;
-  readonly kind: 'owned-ignored' | 'external';
+  readonly kind: 'owned-unwired' | 'owned-nested-project' | 'external';
   readonly span: TextSpan;
   readonly directory: { readonly value: string; readonly span: TextSpan };
 }

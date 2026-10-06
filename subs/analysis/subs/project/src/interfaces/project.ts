@@ -22,11 +22,11 @@ export interface PathOwner {
   readonly directory: string;
 }
 /**
- * A directory Ramify does not enter. Only `owned-ignored` and `scratch`
+ * A directory Ramify does not enter. Only owned nested trees and `scratch`
  * exclusions keep an owner; every other kind is unowned.
  */
 export interface ProjectExclusion {
-  readonly kind: 'owned-ignored' | 'external' | 'scratch' | 'repository' | 'packages' | 'output' | 'generated';
+  readonly kind: 'owned-unwired' | 'owned-nested-project' | 'external' | 'scratch' | 'repository' | 'packages' | 'output' | 'generated';
   readonly directory: string;
   readonly owner: string | null;
 }
@@ -43,7 +43,7 @@ export interface ProjectOwnership {
 }
 /**
  * The ownership of one canonical project-relative path. An owned path may lie
- * in an owned-ignored tree or a scratch directory, named by `exclusion`;
+ * in an owned nested tree or a scratch directory, named by `exclusion`;
  * ownership alone never states that a path was inventoried or checked.
  */
 export type PathOwnership =
@@ -103,13 +103,13 @@ export interface ExactReference {
 /**
  * A nonblocking project warning, located at a project-relative `path`. Codes
  * are an open set: a reader tolerates a code it does not know.
- * `compiler-selected-owned-ignored` and `compiler-selected-scratch` name, at the
+ * `compiler-selected-owned-unwired`, `compiler-selected-owned-nested-project` and `compiler-selected-scratch` name, at the
  * tree or scratch directory, compiler-selected source Ramify does not analyze.
  * `ignored-but-walked`, which only the CLI adds from Git's output and never the
  * analysis, names a repository-ignored directory Ramify still walks; it lists no files.
  */
 export interface ProjectWarning {
-  readonly code: 'compiler-selected-owned-ignored' | 'compiler-selected-scratch' | 'ignored-but-walked';
+  readonly code: 'compiler-selected-owned-unwired' | 'compiler-selected-owned-nested-project' | 'compiler-selected-scratch' | 'ignored-but-walked';
   readonly path: string;
   readonly message: string;
   /** Where file evidence is needed: a bounded, byte-ordered prefix of the files, with `count` the total. */
@@ -127,7 +127,7 @@ export interface ProjectIssue {
   readonly code: 'root-not-found' | 'missing-root-description' | 'unmarked-root-description'
     | 'configuration-not-found' | 'references-only-configuration' | 'invalid-layout'
     | 'invalid-description' | 'duplicate-name' | 'description-in-src' | 'stray-description'
-    | 'reserved-container' | 'undeclared-project-boundary' | 'invalid-nested-tree' | 'missing-owned-ignored'
+    | 'reserved-container' | 'undeclared-project-boundary' | 'invalid-nested-tree' | 'missing-owned-unwired' | 'missing-owned-nested-project'
     | 'overlapping-nested-tree' | 'symlink-root' | 'symlink-description'
     | 'symlink-reference' | 'case-mismatch' | 'missing-file' | 'invalid-path'
     | 'resource-limit' | 'read-failure' | 'changed-input';

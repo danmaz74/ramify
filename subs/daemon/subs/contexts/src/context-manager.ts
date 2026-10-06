@@ -583,7 +583,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     } catch (error) { completeAffected(entry, unavailableAffected({ ...unavailable('analysis-failed', String(error)), requestId })); }
     finally { unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
-  /** False only for a path the latest ownership table places in an owned-ignored, external
+  /** False only for a path the latest ownership table places in an owned nested, external
    * or scratch directory or another always-excluded path: Ramify reads nothing there, so a
    * manifest or compiler configuration inside one is no configuration change. */
   function contained(context: LiveContext, path: string): boolean {

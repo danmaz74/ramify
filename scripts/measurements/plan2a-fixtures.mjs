@@ -40,13 +40,13 @@ async function copyFile(from, to) {
 }
 
 /**
- * The root description's owned-ignored trees that a copy leaves out are
+ * The root description's owned nested trees that a copy leaves out are
  * recreated empty: each must exist as a real directory, and nothing beneath
  * one is ever read, so an empty directory is an equivalent input.
  */
-async function restoreOwnedIgnored(root) {
+async function restoreOwnedNestedTrees(root) {
   const description = await readFile(join(root, 'module.ramify'), 'utf8');
-  for (const [, directory] of description.matchAll(/^owned-ignored "([^"\\]+)"[ \t]*$/gm)) await mkdir(join(root, directory), { recursive: true });
+  for (const [, directory] of description.matchAll(/^(?:owned-unwired|owned-nested-project) "([^"\\]+)"[ \t]*$/gm)) await mkdir(join(root, directory), { recursive: true });
 }
 /**
  * An isolated copy of the reference example or the whole toolkit, with the
@@ -61,7 +61,7 @@ export async function isolatedProject(kind, scratchRoot) {
   const root = await mkdtemp(join(scratchRoot, `${kind.toLowerCase()}-`));
   const source = kind === 'R' ? join(packageRoot, 'examples/collection-review') : packageRoot;
   await copyTree(source, root, kind === 'R' ? new Set(['node_modules', 'dist', '.reference-work', '.git', '.vite']) : excludedTopLevel);
-  await restoreOwnedIgnored(root);
+  await restoreOwnedNestedTrees(root);
   await symlink(join(source, 'node_modules'), join(root, 'node_modules'));
   return { root, kind, dispose: () => rm(root, { recursive: true, force: true }) };
 }

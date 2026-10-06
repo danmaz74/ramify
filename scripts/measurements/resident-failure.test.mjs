@@ -49,7 +49,7 @@ const unresolved = { id: 'access-limit/1:x', code: 'unresolved-target', location
   message: 'Cannot establish the accessed source or resource target', related: [] };
 function analysis({ owners = 100, denied = 0, check = denied ? 'failed' : 'passed', coverage = [note('value')],
   level = coverage.length ? 'partial' : 'complete', execution = 'completed', code = denied ? 1 : 0 } = {}) {
-  return { failure: null, signal: null, stderr: '', code, stdout: JSON.stringify({ schemaVersion: 'ramify.analysis/2',
+  return { failure: null, signal: null, stderr: '', code, stdout: JSON.stringify({ schemaVersion: 'ramify.analysis/3',
     outcome: { execution, check, coverage: level }, summary: { owners, denied }, coverage, stages: [{ status: 'completed' }] }) };
 }
 const S100 = { name: 'S100', owners: 100 }, reference = { name: 'reference', owners: 15 };

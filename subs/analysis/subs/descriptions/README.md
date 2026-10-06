@@ -15,7 +15,7 @@ whitespace and comments. Names and paths retain exact decoded strings.
 
 A valid result contains located headers, tokens and ordered statements. An
 invalid result contains tokens and sorted diagnostics, with no partial document.
-Statements are either exposure statements or `owned-ignored` and `external`
+Statements are either exposure statements or `owned-unwired`, `owned-nested-project` and `external`
 nested-tree statements, each holding one located decoded directory; indices
 count all statements in source order. The linker and exact source references
 read exposure statements only; nested-tree statements belong to project

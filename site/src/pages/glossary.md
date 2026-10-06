@@ -25,17 +25,25 @@ module, which is a single file.
 
 A module's **owned contents** are all paths beneath its directory except
 child-module subtrees, declared external trees and always-excluded paths
-other than its scratch directory; owned-ignored trees remain included.
+other than its scratch directory; owned nested trees remain included.
 
 ## Nested tree
 
 A **nested tree** is a directory declared in its enclosing module's
-description as an owned-ignored tree or an external tree.
+description as an owned-unwired tree, an owned nested project or an external
+tree. The first two are the owned nested trees.
 
-## Owned-ignored tree
+## Owned-unwired tree
 
-An **owned-ignored tree** is an owned nested tree whose contents are excluded
-from Ramify interpretation.
+An **owned-unwired tree** is an owned nested tree whose contents, code
+included, are deliberately not wired into the project: Ramify never
+interprets them, and analyzed source may not import them.
+
+## Owned nested project
+
+An **owned nested project** is an owned nested tree, declared
+`owned-nested-project`, whose directory is the root of a separate project;
+Ramify never interprets its contents.
 
 ## External tree
 
@@ -64,12 +72,12 @@ selects it.
 ## Auxiliary source
 
 **Auxiliary source** is compiler source a module owns outside its `src/` and
-outside its owned-ignored trees.
+outside its owned nested trees.
 
 ## Inert file
 
 An **inert file** is a file a module owns outside its `src/` and outside its
-owned-ignored trees that is neither compiler source, a `module.ramify` nor the
+owned nested trees that is neither compiler source, a `module.ramify` nor the
 module's `README.md`; Ramify does not inventory or classify it.
 
 ## Captured input

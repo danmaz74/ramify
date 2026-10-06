@@ -212,7 +212,7 @@ export const formDependentsOfP = ['fixture/barrel', 'fixture/cand', 'fixture/dyn
   'fixture/star', 'fixture/typeonly', 'fixture/viabarrel'];
 
 /**
- * The path-seed invariants of the `ramify.affected/3` reader contract, asserted
+ * The path-seed invariants of the `ramify.affected/4` reader contract, asserted
  * over one answer: kinds agree with exclusions, each kind selects what the
  * rule says, `selects` is byte-ordered, distinct and names only scope modules,
  * and every selected module is a changed module.

@@ -15,13 +15,13 @@ export interface ArchitectModuleFacts {
   /** Present source areas relative to `dir`: `src`, `src/tests`. */
   readonly areas: readonly string[];
   /**
-   * The owned-ignored and external trees the module's description declares, in
+   * The owned nested and external trees the module's description declares, in
    * byte order by `dir`: each tree's project-relative directory and the
    * declaring statement's project-relative description path, line and column.
    * Nothing beneath a tree is analyzed, so no file, symbol or test inside one
    * is ever recorded.
    */
-  readonly boundaries: readonly { readonly kind: 'owned-ignored' | 'external'; readonly dir: string;
+  readonly boundaries: readonly { readonly kind: 'owned-unwired' | 'owned-nested-project' | 'external'; readonly dir: string;
     readonly description: string; readonly line: number; readonly column: number }[];
   /** The README's first top-level prose paragraph, uncut; no fallback to another owner's prose. */
   readonly purpose: { readonly state: 'present'; readonly path: string; readonly text: string }
@@ -88,7 +88,7 @@ export interface ArchitectViewCounts {
 
 /** The architect view's facts for one revision: frozen by the session boundary, never retained. */
 export interface ArchitectViewProjection {
-  readonly schema: 'ramify.architect-projection/2';
+  readonly schema: 'ramify.architect-projection/3';
   readonly sequence: number;
   readonly inputId: string;
   readonly root: ModuleId;

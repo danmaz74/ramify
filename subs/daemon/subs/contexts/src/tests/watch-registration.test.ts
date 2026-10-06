@@ -17,7 +17,7 @@ function scope(extra: readonly ProjectExclusion[]): ProjectScope {
       exclusions: [exclusion('scratch', 'src/tmp', 'app'), ...extra].sort((a, b) => a.directory < b.directory ? -1 : 1) } };
 }
 const inputs: readonly CapturedInput[] = [{ path: 'src/index.ts', role: 'source', sha256: hash('index'), bytes: 5 }];
-const ignored = scope([exclusion('owned-ignored', 'vendor', 'app')]);
+const ignored = scope([exclusion('owned-unwired', 'vendor', 'app')]);
 const reincluded = scope([]);
 const covered = (outcome: CheckOutcome) => outcome.status === 'reported' && outcome.freshness.captureStarted === null && outcome.freshness.reusedRevision;
 
@@ -50,12 +50,12 @@ describe('watch registrations from the published ownership', () => {
       expect(e.status(token).synchronization).toBe('synchronized');
 
       // A revision with the same exclusions changes no registration.
-      await boundaryChange(e, 2, scope([exclusion('owned-ignored', 'vendor', 'app')]));
+      await boundaryChange(e, 2, scope([exclusion('owned-unwired', 'vendor', 'app')]));
       expect(e.status(token).published?.sequence).toBe(2);
       expect(e.watcher.registrations).toHaveLength(2);
 
       // A new declaration only prunes: no gap, so no conservative sweep follows.
-      await boundaryChange(e, 3, scope([exclusion('owned-ignored', 'vendor', 'app'), exclusion('external', 'tools')]));
+      await boundaryChange(e, 3, scope([exclusion('owned-unwired', 'vendor', 'app'), exclusion('external', 'tools')]));
       expect(e.watcher.registrations.at(-1)).toEqual({ root: '/fixture', sequence: 3, exclusions: ['src/tmp', 'tools', 'vendor'] });
       e.clock.advance(1000); await flush();
       expect(e.script.sweepCalls).toHaveLength(0);

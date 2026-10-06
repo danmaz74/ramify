@@ -1,0 +1,65 @@
+
+ RUN  v4.1.11 /home/app/ramify-nested-kinds
+
+ ❯ subs/analysis/subs/project/src/tests/path-ownership.test.ts (93 tests | 1 failed) 351ms
+     × normalizes equivalent spellings relative to the declaring module and retains located evidence 15ms
+ ❯ subs/daemon/src/tests/project-boundary-wire.test.ts (6 tests | 2 failed) 966ms
+     × accepts owned-unwired and rejects mismatched ownership or reason 3ms
+     × accepts owned-nested-project and rejects mismatched ownership or reason 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  subs/daemon/src/tests/project-boundary-wire.test.ts > NT-06: wire ownership and not-analyzed reasons > accepts owned-unwired and rejects mismatched ownership or reason
+ FAIL  subs/daemon/src/tests/project-boundary-wire.test.ts > NT-06: wire ownership and not-analyzed reasons > accepts owned-nested-project and rejects mismatched ownership or reason
+AssertionError: expected [Function] to not throw an error but 'Error: Invalid check reply schema' was thrown
+
+- Expected:
+undefined
+
++ Received:
+"Error: Invalid check reply schema"
+
+ ❯ subs/daemon/src/tests/project-boundary-wire.test.ts:291:64
+    289|       exclusion: exclusion(kind, 'vendor', 'app'), reason: kind };
+    290|     const value = at(reported, 4, item);
+    291|     expect(() => validateServiceReply('check', ok(value))).not.toThrow…
+       |                                                                ^
+    292|     expect(() => validateServiceReply('check', ok(at(reported, 4, { ..…
+    293|     const other = kind === 'owned-unwired' ? 'owned-nested-project' : …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  subs/analysis/subs/project/src/tests/path-ownership.test.ts > PB1-03/PB1-04: declaration evidence without the filesystem > normalizes equivalent spellings relative to the declaring module and retains located evidence
+AssertionError: expected [ …(2) ] to deeply equal [ Array(2) ]
+
+- Expected
++ Received
+
+@@ -1,9 +1,9 @@
+  [
+    {
+      "directory": "subs/a/fixtures/sample",
+-     "kind": "owned-nested-project",
++     "kind": "owned-unwired",
+      "owner": "app/a",
+    },
+    {
+      "directory": "tool-cache",
+      "kind": "external",
+
+ ❯ subs/analysis/subs/project/src/tests/path-ownership.test.ts:225:39
+    223|       ['app/a', './fixtures/../fixtures/sample', 'subs/a/fixtures/samp…
+    224|     expect(built.declarations[1]).toMatchObject({ description: 'subs/a…
+    225|     expect(declared(built.ownership)).toEqual([{ kind: 'owned-nested-p…
+       |                                       ^
+    226|       { kind: 'external', directory: 'tool-cache', owner: null }]);
+    227|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  3 failed | 120 passed (123)
+   Start at  21:42:45
+   Duration  129.92s (transform 1.07s, setup 0ms, import 1.29s, tests 145.08s, environment 1ms)
+

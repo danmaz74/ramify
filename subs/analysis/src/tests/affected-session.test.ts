@@ -71,7 +71,7 @@ describe('RetainedSession.affected: source forms (A7-03)', () => {
     const { handle, revision } = shared.get();
     expect(revision.outcome).toMatchObject({ execution: 'completed', check: 'passed' });
     const result = await answer(handle, { modules: ['fixture/p'] });
-    expect(result).toMatchObject({ schemaVersion: 'ramify.affected/3', inputId: revision.inputId, paths: [],
+    expect(result).toMatchObject({ schemaVersion: 'ramify.affected/4', inputId: revision.inputId, paths: [],
       changedModules: [{ id: 'fixture/p', directory: 'subs/p' }], selection: 'dependency-closure', widening: [],
       coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' });
     // Each dependent of p reaches it through one form; star is among them.

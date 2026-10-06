@@ -21,7 +21,7 @@ import { opened, revised } from './session-test-fixture.js';
  * - an owned seed names its owner and its kind; source, auxiliary source and
  *   a description select the owner and the owner's transitive importers, a
  *   captured input selects the modules it governs, and a seed in an
- *   owned-ignored tree or a scratch directory, a README, a `.md` path or
+ *   owned nested tree or a scratch directory, a README, a `.md` path or
  *   another inert file selects nothing (affected-rule selection); ancestry
  *   selects nothing; an external or always-excluded seed selects nothing with
  *   the excluded basis; only a seed outside the project widens, by unowned-path;
@@ -61,7 +61,7 @@ const bDescription = (statements = ''): string => `ramify 1\nmodule b\n${stateme
 const topology: Readonly<Record<string, string>> = {
   'package.json': '{"name":"app","type":"module"}',
   'tsconfig.json': tsconfig,
-  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-ignored "fixture-project"\nexternal "external-project"\n'
+  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-nested-project "fixture-project"\nexternal "external-project"\n'
     + 'expose-sub api from a to descendants\n',
   'README.md': '# App\n\nThe written provider topology.\n',
   'notes/design.md': 'Inert root-owned prose.\n',
@@ -73,7 +73,7 @@ const topology: Readonly<Record<string, string>> = {
   'fixture-project/tsconfig.json': '{ "include": ["src"] }',
   'fixture-project/src/thing.ts': "import { missing } from './missing.js';\nexport const thing = missing;\n",
   'external-project/lib.ts': "import { gone } from './gone.js';\nexport const lib = gone;\n",
-  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
+  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
   'subs/a/README.md': '# A\n\nProvides api.\n',
   'subs/a/src/api.ts': 'export function api(): number { return 1; }\n',
   'subs/a/src/tests/api.test.ts': "import { api } from '../api.js';\nexport const tested: number = api();\n",
@@ -140,7 +140,7 @@ const all = ['app', 'app/a', 'app/a-extra', 'app/a/grand', 'app/b'];
 const directories: Readonly<Record<string, string>> = { app: '.', 'app/a': 'subs/a', 'app/a-extra': 'subs/a-extra',
   'app/a/grand': 'subs/a/subs/grand', 'app/b': 'subs/b' };
 const scratch = (directory: string, owner: string): ProjectExclusion => ({ kind: 'scratch', directory, owner });
-const sample: ProjectExclusion = { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'app/a' };
+const sample: ProjectExclusion = { kind: 'owned-nested-project', directory: 'subs/a/fixtures/sample', owner: 'app/a' };
 const external: ProjectExclusion = { kind: 'external', directory: 'external-project', owner: null };
 /** The written topology's ownership, byte-ordered by directory; reserved segments are classifier rules, not rows. */
 const ownership = {
@@ -148,7 +148,7 @@ const ownership = {
     { id: 'app/a-extra', parent: 'app', directory: 'subs/a-extra' }, { id: 'app/a/grand', parent: 'app/a', directory: 'subs/a/subs/grand' },
     { id: 'app/b', parent: 'app', directory: 'subs/b' }],
   exclusions: [{ kind: 'output', directory: 'dist', owner: null }, external,
-    { kind: 'owned-ignored', directory: 'fixture-project', owner: 'app' }, scratch('src/tmp', 'app'),
+    { kind: 'owned-nested-project', directory: 'fixture-project', owner: 'app' }, scratch('src/tmp', 'app'),
     scratch('subs/a-extra/src/tmp', 'app/a-extra'), sample, scratch('subs/a/src/tmp', 'app/a'),
     scratch('subs/a/subs/grand/src/tmp', 'app/a/grand'), scratch('subs/b/src/tmp', 'app/b')],
 };
@@ -198,7 +198,7 @@ describe('affected selection over project ownership (PB1-08, PB1-17, PB1-18, PB1
         const result = await unread(() => answer(handle, { paths: [row.seed.path] }));
         answers.push(result);
         expect(result.paths, row.seed.path).toEqual([row.seed]);
-        expect(result, row.seed.path).toMatchObject({ schemaVersion: 'ramify.affected/3', inputId: revision.inputId,
+        expect(result, row.seed.path).toMatchObject({ schemaVersion: 'ramify.affected/4', inputId: revision.inputId,
           changedModules: listed(row.changed), testModules: listed(row.tests), selection: 'dependency-closure', widening: [],
           coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' });
         expect(ids(result.affectedModules), row.seed.path).toEqual(row.tests.filter(id => !row.changed.includes(id)));
@@ -315,11 +315,11 @@ describe('affected selection over project ownership (PB1-08, PB1-17, PB1-18, PB1
           owned('subs/b/vendor/lib.ts', 'app/b', 'containment', 'auxiliary-source', ['app/b'])]);
         const stale = handle.current!.sequence;
 
-        // b declares an owned-ignored tree (which must exist) and an absent external one.
+        // b declares an owned nested tree (which must exist) and an absent external one.
         await put(root, 'subs/b/data/x.json', '{}\n');
-        await put(root, 'subs/b/module.ramify', bDescription('owned-ignored "data"\nexternal "vendor"\n'));
+        await put(root, 'subs/b/module.ramify', bDescription('owned-unwired "data"\nexternal "vendor"\n'));
         await revised(handle, ['subs/b/module.ramify']);
-        const data: ProjectExclusion = { kind: 'owned-ignored', directory: 'subs/b/data', owner: 'app/b' };
+        const data: ProjectExclusion = { kind: 'owned-unwired', directory: 'subs/b/data', owner: 'app/b' };
         const vendor: ProjectExclusion = { kind: 'external', directory: 'subs/b/vendor', owner: null };
         const declared = await unread(() => answer(handle, { paths: seeds }));
         expect(declared.paths).toEqual([owned('subs/b/data/x.json', 'app/b', 'containment', 'ignored', [], data),

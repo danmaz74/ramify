@@ -39,7 +39,7 @@ const TARGET_NAME = '.ramify';
 /** The architect view's directory name, at the project root. */
 const ARCHITECT_NAME = '.ramify-architect';
 /** The schema this build renders; a published view must name exactly it. */
-const ARCHITECT_SCHEMA = 'ramify.architect-view/2';
+const ARCHITECT_SCHEMA = 'ramify.architect-view/3';
 /** The schemas an existing view may name to be replaced: the architect view of any Ramify version. */
 const ANY_ARCHITECT_SCHEMA = /^ramify\.architect-view\/[0-9]+$/;
 

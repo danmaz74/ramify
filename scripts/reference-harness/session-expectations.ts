@@ -18,7 +18,7 @@ export async function sessionReport(root: string): Promise<AnalysisReport> {
   return run.report;
 }
 export function completed(report: AnalysisReport, assertions: Assertions, coverage: 'complete' | 'partial' = 'complete', check: 'passed' | 'failed' = 'passed'): void {
-  assertions.equal('public schema version', report.schemaVersion, 'ramify.analysis/2');
+  assertions.equal('public schema version', report.schemaVersion, 'ramify.analysis/3');
   assertions.equal('independent execution, permission and coverage outcomes', report.outcome, { execution: 'completed', check, coverage });
   assertions.ok('all required stages completed', report.stages.length === 8 && report.stages.every(stage => stage.status === 'completed'));
   assertions.ok('all requested capabilities executed', report.capabilities.filter(item => item.requested).every(item => item.available && item.executed));

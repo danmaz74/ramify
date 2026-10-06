@@ -249,7 +249,7 @@ describe('export completeness and compiler limits', () => {
 
   it('distinguishes proven external forwarding, outside-module source, unresolved names and application aliases', async () => {
     // Owned source outside src/ is auxiliary application source; `loose` is
-    // therefore declared owned-ignored, so its file is not application source.
+    // therefore declared owned-unwired, so its file is not application source.
     await withCatalog({
       'node_modules/fixture-dependency/package.json': '{"name":"fixture-dependency","type":"module","types":"./index.d.ts"}',
       'node_modules/fixture-dependency/index.d.ts': 'export declare const dependency: number;',
@@ -268,7 +268,7 @@ describe('export completeness and compiler limits', () => {
       // file's description is incomplete; the statement's access is the boundary finding.
       expect(catalog.coverage).toContainEqual(expect.objectContaining({
         code: 'unresolved-original', location: expect.objectContaining({ file: 'src/outside.ts' }),
-        message: expect.stringContaining('declared owned-ignored tree loose'),
+        message: expect.stringContaining('declared owned-unwired tree loose'),
       }));
       expect(catalog.coverage).toContainEqual(expect.objectContaining({
         code: 'unresolved-target', location: expect.objectContaining({ file: 'src/unresolved.ts' }),
@@ -279,7 +279,7 @@ describe('export completeness and compiler limits', () => {
       expect(file(catalog, 'src/alias.ts').state).toBe('complete');
       expect(exported(catalog, 'src/alias.ts', 'value').original).toEqual(code('value.ts', 'value'));
       expect(catalog.originals.map(entry => entry.id)).toEqual([code('value.ts', 'value')]);
-    }, { exclusions: [{ kind: 'owned-ignored', directory: 'loose', owner: 'fixture' }] });
+    }, { exclusions: [{ kind: 'owned-unwired', directory: 'loose', owner: 'fixture' }] });
   }, 30_000);
 
   it('keeps known exports while an unresolved forwarding declaration prevents a complete contract', async () => {

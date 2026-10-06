@@ -1,0 +1,54 @@
+
+> ramify.ts@0.3.0 check:self
+> dist/src/ramify check --root . --batch
+
+Root: /home/app/ramify-nested-kinds (given)
+Configuration: /home/app/ramify-nested-kinds/tsconfig.json
+Mode: batch
+Analysis limit [unresolved-target] cucumber-viz.config.ts:3:30: Cannot establish the accessed source or resource target
+Analysis limit [unsupported-commonjs] ecosystem.config.cjs:14:1: CommonJS export assignment is outside the ECMAScript interpretation profile
+Analysis limit [excluded-target] scripts/measurements/resident-daemon.mjs:202:13: Accessed file dist/src/daemon-entry.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/measurements/resident-workloads.mjs:6:1: Accessed file dist/subs/daemon/src/codec.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [nonliteral-target] scripts/memory-probe.mjs:45:36: Cannot establish the accessed source or resource target
+Analysis limit [nonliteral-target] scripts/memory-probe.mjs:52:35: Cannot establish the accessed source or resource target
+Analysis limit [unsupported-commonjs] scripts/probes/compiler-api.ts:13:18: CommonJS require access is outside the ECMAScript interpretation profile
+Analysis limit [resource-target] scripts/probes/compiler-api.ts:13:26: Cannot establish the accessed source or resource target
+Analysis limit [unsupported-commonjs] scripts/probes/compiler-api.ts:14:22: CommonJS require access is outside the ECMAScript interpretation profile
+Analysis limit [unresolved-target] scripts/probes/compiler-api.ts:14:30: Cannot establish the accessed source or resource target
+Analysis limit [excluded-target] scripts/probes/fast-check/decide-timing.mjs:3:1: Accessed file dist/subs/analysis/src/evaluate-accesses.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/decide-timing.mjs:4:1: Accessed file dist/subs/analysis/subs/model/src/decisions.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/description-closure.mjs:6:1: Accessed file dist/subs/analysis/subs/typescript/src/resolution.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/interpreter-setup.mjs:6:1: Accessed file dist/subs/analysis/subs/typescript/src/catalog.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/interpreter-setup.mjs:27:31: Accessed file dist/subs/analysis/subs/typescript/src/accesses.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/observed-reads.mjs:5:1: Accessed file dist/subs/analysis/subs/project/src/capture.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/observed-reads.mjs:6:1: Accessed file dist/subs/analysis/subs/typescript/src/source-analysis.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/observed-reads.mjs:7:1: Accessed file dist/subs/analysis/subs/typescript/src/catalog.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/observed-reads.mjs:8:1: Accessed file dist/subs/analysis/subs/typescript/src/accesses.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/p5-common.mjs:9:1: Accessed file dist/subs/analysis/subs/project/src/read-project.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/p5-common.mjs:10:1: Accessed file dist/subs/analysis/subs/descriptions/src/parse.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/p5-common.mjs:11:1: Accessed file dist/subs/analysis/subs/model/src/index.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/review-package.mjs:5:1: Accessed file dist/subs/analysis/subs/descriptions/src/parse.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/stage-timing.mjs:2:1: Accessed file dist/subs/analysis/subs/project/src/read-project.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/stage-timing.mjs:3:1: Accessed file dist/subs/analysis/subs/descriptions/src/parse.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/stage-timing.mjs:4:1: Accessed file dist/subs/analysis/subs/descriptions/src/link.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/stage-timing.mjs:5:1: Accessed file dist/subs/analysis/subs/model/src/index.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/stage-timing.mjs:6:1: Accessed file dist/subs/analysis/subs/model/src/registry.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/stage-timing.mjs:7:1: Accessed file dist/subs/analysis/subs/typescript/src/source-analysis.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/stage-timing.mjs:8:1: Accessed file dist/subs/analysis/src/evaluate-accesses.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/warm-compiler-cycles.mjs:5:1: Accessed file node_modules/typescript/dist/api/sync/api.d.ts lies in the always-excluded packages directory node_modules without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/warm-compiler-stages.mjs:5:1: Accessed file node_modules/typescript/dist/api/sync/api.d.ts lies in the always-excluded packages directory node_modules without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/warm-compiler-stages.mjs:6:1: Accessed file dist/subs/analysis/subs/typescript/src/catalog.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/warm-compiler-stages.mjs:7:1: Accessed file dist/subs/analysis/subs/typescript/src/accesses.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/worker-session.mjs:34:34: Accessed file dist/subs/analysis/subs/typescript/src/catalog.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/worker-session.mjs:35:37: Accessed file dist/subs/analysis/subs/typescript/src/accesses.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [excluded-target] scripts/probes/fast-check/worker-thread.mjs:12:25: Accessed file node_modules/typescript/dist/api/sync/api.d.ts lies in the always-excluded packages directory node_modules without package resolution
+Analysis limit [excluded-target] scripts/probes/fixtures/warm-recompute-worker.mjs:43:28: Accessed file dist/src/batch.d.ts lies in the always-excluded output directory dist without package resolution
+Analysis limit [unsupported-commonjs] scripts/probes/reference-resolution.ts:14:18: CommonJS require access is outside the ECMAScript interpretation profile
+Analysis limit [resource-target] scripts/probes/reference-resolution.ts:14:26: Cannot establish the accessed source or resource target
+Analysis limit [excluded-target] scripts/spikes/bun-cli-startup/entry.mjs:17:9: Accessed file dist/src/cli-entry.d.ts lies in the always-excluded output directory dist without package resolution
+Execution: completed; check: passed; coverage: partial
+Stages: registry=completed, acquisition=completed, parse=completed, catalog=completed, link=completed, access=completed, decide=completed, report=completed
+Requested capabilities: registry=executed, layout=executed, metadata=executed, descriptions=executed, source-catalog=executed, exposure-linking=executed, static-access=executed, tags-origin=executed, namespace-access=executed, lazy-access=executed, symbol-free-access=executed, resource-access=executed, coverage=executed
+Completed scope: 15 owners, 600 source files, 17 resources, 8936 accesses
+Findings: 0 errors, 0 warnings, 41 analysis limits; 5696 allowed, 0 denied, 3196 external
+Walked source areas: src, src/tests, subs/analysis/src, subs/analysis/src/tests, subs/analysis/subs/descriptions/src, subs/analysis/subs/descriptions/src/tests, subs/analysis/subs/model/src, subs/analysis/subs/model/src/tests, subs/analysis/subs/project/src, subs/analysis/subs/project/src/tests, subs/analysis/subs/typescript/src, subs/analysis/subs/typescript/src/tests, subs/cli/src, subs/cli/src/tests, subs/daemon/src, subs/daemon/src/tests, subs/daemon/subs/contexts/src, subs/daemon/subs/contexts/src/tests, subs/explorer/src, subs/explorer/src/tests, subs/integration-tests/src, subs/integration-tests/src/tests, subs/presentation/src, subs/presentation/src/tests, subs/presentation/subs/layout/src, subs/presentation/subs/layout/src/tests, subs/presentation/subs/project-view/src, subs/presentation/subs/project-view/src/tests, subs/service-api/src, subs/service-api/src/tests

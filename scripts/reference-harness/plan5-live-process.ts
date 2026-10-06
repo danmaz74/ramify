@@ -93,7 +93,7 @@ export async function changed(p: SequenceProcess, root: string, a: Assertions, l
   recordObservation('live-hook', { label, raw: await archiveObservation('live-hook', outcome) });
   a.equal(`${label}: installed hook exits with one result`, [outcome.code, outcome.error, outcome.signal, outcome.stderr], [expected, null, null, '']);
   const document = JSON.parse(outcome.stdout) as CheckDocument;
-  a.equal(`${label}: compact document`, [document.schemaVersion, document.exitCode, outcome.stdout.trim().split('\n').length], ['ramify.check/2', expected, 1]);
+  a.equal(`${label}: compact document`, [document.schemaVersion, document.exitCode, outcome.stdout.trim().split('\n').length], ['ramify.check/3', expected, 1]);
   a.equal(`${label}: exact CLI identities and dispositions`, document.paths.map(item => item.disposition === 'checked'
     ? [item.path, item.disposition, item.reason, item.sha256] : [item.path, item.disposition, 'sha256' in item ? item.sha256 : null]), expectedIdentities);
   if (expected !== 2) a.equal(`${label}: completed covering check`, [document.outcome, document.reason, document.execution], ['checked', null, 'completed']);

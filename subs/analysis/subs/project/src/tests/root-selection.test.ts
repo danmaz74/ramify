@@ -34,11 +34,11 @@ const views: { dispose(): Promise<void> }[] = [];
  * `app` of the written topology: marked; `a`, `grand` and `b` unmarked;
  * `subs/a/fixtures/sample` and `fixture-project` marked projects with their
  * own configurations, which `app`'s configuration does not select, declared
- * owned-ignored by `a` and by `app`, which also declares the absent
+ * owned-unwired by `a` and by `app`, which also declares the absent
  * `external-project`.
  */
-const appText = 'ramify 1\nroot module app tagged [dispatch]\nowned-ignored "fixture-project"\nexternal "external-project"\n';
-const aText = 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\n';
+const appText = 'ramify 1\nroot module app tagged [dispatch]\nowned-nested-project "fixture-project"\nexternal "external-project"\n';
+const aText = 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\n';
 async function topology(): Promise<void> {
   await put(app, 'module.ramify', appText);
   await put(app, 'tsconfig.json', '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},'
@@ -233,10 +233,10 @@ describe('PB1-43: root-marker validity in acquisition', () => {
       expect(module.description).toEqual(parse(path, text));
     }
     // The declared trees are pruned before descent, so their marked roots are never read; the absent external tree is valid.
-    expect(acquired.scope.ownership.exclusions.filter(item => item.kind === 'owned-ignored' || item.kind === 'external')).toEqual([
+    expect(acquired.scope.ownership.exclusions.filter(item => item.kind === 'owned-unwired' || item.kind === 'owned-nested-project' || item.kind === 'external')).toEqual([
       { kind: 'external', directory: 'external-project', owner: null },
-      { kind: 'owned-ignored', directory: 'fixture-project', owner: 'app' },
-      { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'app/a' }]);
+      { kind: 'owned-nested-project', directory: 'fixture-project', owner: 'app' },
+      { kind: 'owned-nested-project', directory: 'subs/a/fixtures/sample', owner: 'app/a' }]);
     if (result.status === 'acquired') expect(result.view.inputs.filter(input => input.path.startsWith('fixture-project/')
       || input.path.startsWith('subs/a/fixtures/sample/'))).toEqual([]);
     if (result.status === 'acquired') expect(result.view.inputs.filter(input => input.role === 'description').map(input => input.path))
@@ -264,7 +264,7 @@ describe('PB1-43: root-marker validity in acquisition', () => {
     expect(result.issues).toEqual([
       { code: 'undeclared-project-boundary', path: 'subs/b/module.ramify', span: { start: 9, end: 13, line: 2, column: 1 },
         message: 'Invalid module boundary: undeclared-project-boundary at 2:1: a marked project root must lie in a declared nested tree; '
-          + 'declare owned-ignored "subs/b" or external "subs/b" in module.ramify' },
+          + 'declare owned-nested-project "subs/b" or external "subs/b" in module.ramify' },
       // Its contents belong to no module of this project, as beneath any layout-invalid description.
       { code: 'stray-description', path: 'subs/b/subs/inner/module.ramify', message: 'Invalid module boundary: stray-description' },
     ]);
@@ -283,10 +283,10 @@ describe('PB1-43: root-marker validity in acquisition', () => {
     expect(result.issues).toEqual([
       { code: 'undeclared-project-boundary', path: 'subs/a/src/vendor/module.ramify', span: { start: 9, end: 13, line: 2, column: 1 },
         message: 'Invalid module boundary: undeclared-project-boundary at 2:1: a marked project root must lie in a declared nested tree; '
-          + 'declare owned-ignored "src/vendor" in subs/a/module.ramify' },
+          + 'declare owned-nested-project "src/vendor" in subs/a/module.ramify' },
       { code: 'undeclared-project-boundary', path: 'tools/module.ramify', span: { start: 9, end: 13, line: 2, column: 1 },
         message: 'Invalid module boundary: undeclared-project-boundary at 2:1: a marked project root must lie in a declared nested tree; '
-          + 'declare owned-ignored "tools" or external "tools" in module.ramify' },
+          + 'declare owned-nested-project "tools" or external "tools" in module.ramify' },
     ]);
     expect(inventory(result).files.some(file => file.path.startsWith('subs/a/src/vendor/'))).toBe(false);
   });

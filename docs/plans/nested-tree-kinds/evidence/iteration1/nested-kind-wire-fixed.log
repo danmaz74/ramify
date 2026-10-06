@@ -1,0 +1,35 @@
+
+ RUN  v4.1.11 /home/app/ramify-nested-kinds
+
+ ❯ subs/daemon/src/tests/project-boundary-wire.test.ts (6 tests | 2 failed) 967ms
+     × accepts owned-unwired and rejects mismatched ownership or reason 4ms
+     × accepts owned-nested-project and rejects mismatched ownership or reason 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  subs/daemon/src/tests/project-boundary-wire.test.ts > NT-06: wire ownership and not-analyzed reasons > accepts owned-unwired and rejects mismatched ownership or reason
+ FAIL  subs/daemon/src/tests/project-boundary-wire.test.ts > NT-06: wire ownership and not-analyzed reasons > accepts owned-nested-project and rejects mismatched ownership or reason
+AssertionError: expected [Function] to not throw an error but 'Error: Invalid check reply schema' was thrown
+
+- Expected:
+undefined
+
++ Received:
+"Error: Invalid check reply schema"
+
+ ❯ subs/daemon/src/tests/project-boundary-wire.test.ts:291:64
+    289|       exclusion: exclusion(kind, 'vendor', 'app'), reason: kind };
+    290|     const value = at(reported, 6, item);
+    291|     expect(() => validateServiceReply('check', ok(value))).not.toThrow…
+       |                                                                ^
+    292|     expect(() => validateServiceReply('check', ok(at(reported, 6, { ..…
+    293|     const other = kind === 'owned-unwired' ? 'owned-nested-project' : …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  21:43:55
+   Duration  1.32s (transform 174ms, setup 0ms, import 210ms, tests 967ms, environment 0ms)
+

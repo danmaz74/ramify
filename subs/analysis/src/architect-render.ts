@@ -267,7 +267,7 @@ function moduleDocument(summary: ModuleSummary, revision: string, measurements: 
     : { state: 'measured', views: measurements.views,
       contextSize: { exact: measurement!.exact, subtree: measurement!.subtree } };
   const fields = [
-    field('schema', str('ramify.architect-module/2')),
+    field('schema', str('ramify.architect-module/3')),
     field('module', str(facts.module)),
     field('dir', str(facts.dir)),
     field('parent', facts.parent === null ? 'null' : str(facts.parent)),
@@ -323,7 +323,7 @@ function readme(revision: string, projection: ArchitectViewProjection, summaries
  */
 function metadata(revision: string, projection: ArchitectViewProjection, dependencies: ArchitectDependencies,
   exercises: Exercises | null, purposesCut: number, measurements: ArchitectMeasurements): string {
-  const meta: Record<string, unknown> = { schema: 'ramify.architect-view/2', revision, input: projection.inputId,
+  const meta: Record<string, unknown> = { schema: 'ramify.architect-view/3', revision, input: projection.inputId,
     modules: projection.modules.length, dependencies: dependencies.state };
   if (dependencies.state === 'unavailable') meta.dependencyReason = dependencies.reason;
   meta.dependencyScope = 'production';

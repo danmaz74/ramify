@@ -119,7 +119,7 @@ the importer's own package name, a path segment named `node_modules` or the
 compiler's external-library flag never establishes one.
 Every other compiler-resolved file that is not inventoried is classified at its
 physical location, through every link, by Project's `classifyProjectPath`: a
-`nested-tree` target in a declared owned-ignored or external tree, an
+`nested-tree` target in a declared owned-unwired, owned-nested-project or external tree, an
 `excluded` target in a scratch, output, installed-package, repository or
 generated directory, each with its exclusion, and an `outside-project` target
 outside the root. An owned location the inventory does not hold is unresolved.

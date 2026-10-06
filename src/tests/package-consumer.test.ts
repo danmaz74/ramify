@@ -37,9 +37,9 @@ import type { ResolvedTagRegistry } from 'ramify.ts/model';
 
 const registry: ResolvedTagRegistry = createDefaultTagRegistry();
 export const supported = [${Object.values(entries).join(', ')}, registry] as const;
-export const schema: AnalysisReport['schemaVersion'] = 'ramify.analysis/2';
+export const schema: AnalysisReport['schemaVersion'] = 'ramify.analysis/3';
 // Real declarations, not \`any\`: a wrong schema literal must fail to type-check.
-// @ts-expect-error the report schema is 'ramify.analysis/2'
+// @ts-expect-error the report schema is 'ramify.analysis/3'
 export const wrong: AnalysisReport['schemaVersion'] = 'ramify.analysis/1';
 `;
 const internalSource = `import { analyzeProject } from '${internal}';\nexport const internal = analyzeProject;\n`;

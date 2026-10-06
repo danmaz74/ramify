@@ -65,7 +65,7 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
   }
   function document(reason: NotCheckedReason, revision: ContextRevision | null = null,
     report: AnalysisReport | null = null): CheckDocument {
-    return { schemaVersion: 'ramify.check/2', root,
+    return { schemaVersion: 'ramify.check/3', root,
       revision: revision ? { id: revision.revision, sequence: revision.sequence, path: revision.checked.path } : null,
       since: args.since ?? null, paths: notChecked(reason),
       outcome: 'not-checked', reason, execution: report?.outcome.execution ?? null,

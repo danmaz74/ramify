@@ -40,7 +40,7 @@ export async function fixture(root: string): Promise<void> {
 /**
  * A local header parser for observer tests: it reflects the declared name and
  * tags of real bytes, so a renamed or broken header is a distinguishable fact.
- * It also reflects each `owned-ignored "…"` or `external "…"` line as a
+ * It also reflects each `owned-unwired "…"` or `external "…"` line as a
  * nested-tree statement with its spans (no escapes); other statement lines
  * are not reflected, so indices count nested-tree lines only.
  */
@@ -60,7 +60,7 @@ export const declaration: ProjectReadOptions['parse'] = (file, text) => {
   }
   const statements: NestedTreeStatement[] = [];
   lines.forEach((line, number) => {
-    const tree = /^(owned-ignored|external)([ \t]+)"([^"]*)"[ \t]*$/.exec(line);
+    const tree = /^(owned-unwired|owned-nested-project|external)([ \t]+)"([^"]*)"[ \t]*$/.exec(line);
     if (!tree) return;
     const offset = lines.slice(0, number).reduce((total, entry) => total + entry.length + 1, 0);
     const at = tree[1]!.length + tree[2]!.length;

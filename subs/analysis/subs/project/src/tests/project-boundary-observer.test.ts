@@ -13,7 +13,7 @@ import { declaration, limits, marker, put } from './fixtures.js';
 // follow the project-boundary contracts ("Transport, observation and
 // projections") and the module description specification, independently of
 // the implementation: a declaration or child-module change, a missing
-// owned-ignored root and a manifest in the walked tree are structural;
+// owned-unwired root and a manifest in the walked tree are structural;
 // auxiliary source changes membership in place; byte edits of excluded or
 // inert files change no input, read nothing and update nothing; an invalid
 // boundary never replaces the last valid inventory. Retained sessions, watch
@@ -25,7 +25,7 @@ let work: string, app: string;
 const observers: ProjectObserver[] = [];
 const normal = '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src","subs/*/src","scripts","tools"],"exclude":["src/tmp","subs/*/src/tmp"]}\n';
 const root = (...declarations: string[]): string =>
-  ['ramify 1', 'root module app tagged [dispatch]', 'owned-ignored "fixture-project"', 'external "external-project"', ...declarations, ''].join('\n');
+  ['ramify 1', 'root module app tagged [dispatch]', 'owned-nested-project "fixture-project"', 'external "external-project"', ...declarations, ''].join('\n');
 const sha256 = (bytes: Buffer | string): string => createHash('sha256').update(bytes).digest('hex');
 
 beforeEach(async () => {
@@ -46,7 +46,7 @@ beforeEach(async () => {
     await put(app, `${directory}/src/world.ts`, 'export const world = 1;\n');
   }
   await put(app, 'external-project/file.ts', 'export const file = 1;\n');
-  await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\n');
+  await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\n');
   await put(app, 'subs/a/src/api.ts', 'export function api(): number { return 1; }\n');
   await put(app, 'subs/a/src/tmp/throwaway.ts', 'export {};\n');
   await put(app, 'subs/a/scripts/report.ts', "import { api } from '../src/api.js';\nvoid api;\n");
@@ -122,7 +122,7 @@ describe('PB1-23 at the observer: excluded and inert byte edits', () => {
     await put(app, 'tsconfig.json', '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src","fixture-project"]}\n');
     const observer = await observe();
     expect(observer.inventory.warnings.map(warning => [warning.code, warning.path, warning.count])).toEqual([
-      ['compiler-selected-owned-ignored', 'fixture-project', 1], ['compiler-selected-scratch', 'src/tmp', 1]]);
+      ['compiler-selected-owned-nested-project', 'fixture-project', 1], ['compiler-selected-scratch', 'src/tmp', 1]]);
     const inputs = observer.inputs;
     // The selection depends on membership and kind, so the listed entries are observed, unread.
     for (const path of ['fixture-project/src/world.ts', 'src/tmp/throwaway.test.ts']) {
@@ -141,11 +141,11 @@ describe('PB1-23 at the observer: excluded and inert byte edits', () => {
     await unlink(join(app, 'src/tmp/throwaway.test.ts'));
     const removed = expectKind(await observer.apply([{ path: 'src/tmp/throwaway.test.ts', kind: 'deleted' }]), 'structural');
     expect(removed.inventory.warnings.map(warning => [warning.code, warning.path, warning.count]))
-      .toEqual([['compiler-selected-owned-ignored', 'fixture-project', 1]]);
+      .toEqual([['compiler-selected-owned-nested-project', 'fixture-project', 1]]);
     // A new file in a listed directory, named only by its own event, is seen through that listing.
     await put(app, 'fixture-project/src/second.ts', 'export {};\n');
     const added = expectKind(await observer.apply([{ path: 'fixture-project/src/second.ts', kind: 'created' }]), 'structural');
-    expect(added.inventory.warnings).toEqual([expect.objectContaining({ code: 'compiler-selected-owned-ignored', path: 'fixture-project',
+    expect(added.inventory.warnings).toEqual([expect.objectContaining({ code: 'compiler-selected-owned-nested-project', path: 'fixture-project',
       files: ['fixture-project/src/second.ts', 'fixture-project/src/world.ts'], count: 2 })]);
     expect(contentReads(observer.inputs).filter(path => path.startsWith('fixture-project/'))).toEqual([]);
   });
@@ -171,10 +171,10 @@ describe('PB1-21 at the observer: boundary and child declaration changes', () =>
     const observer = await observe();
     expect(observer.inventory.files.find(file => file.path === 'vendor/lib.ts')).toMatchObject({ owner: 'app', placement: 'auxiliary' });
 
-    await put(app, 'module.ramify', root('owned-ignored "vendor"'));
+    await put(app, 'module.ramify', root('owned-unwired "vendor"'));
     const declared = expectKind(await observer.apply([{ path: 'module.ramify', kind: 'changed' }]), 'structural');
     expect(declared.inventory.files.some(file => file.path.startsWith('vendor/'))).toBe(false);
-    expect(declared.inventory.scope.ownership.exclusions).toContainEqual({ kind: 'owned-ignored', directory: 'vendor', owner: 'app' });
+    expect(declared.inventory.scope.ownership.exclusions).toContainEqual({ kind: 'owned-unwired', directory: 'vendor', owner: 'app' });
     expect(beneath(observer.inputs, 'vendor')).toEqual([]);
     expect(observer.inputs.some(input => input.path === 'vendor' && input.role === 'directory')).toBe(true);
 
@@ -194,29 +194,29 @@ describe('PB1-21 at the observer: boundary and child declaration changes', () =>
 
   it('rebuilds when a declaration changes kind or directory', async () => {
     const observer = await observe();
-    await put(app, 'module.ramify', root().replace('owned-ignored "fixture-project"', 'external "fixture-project"'));
+    await put(app, 'module.ramify', root().replace('owned-nested-project "fixture-project"', 'external "fixture-project"'));
     const kind = expectKind(await observer.apply([{ path: 'module.ramify', kind: 'changed' }]), 'structural');
     expect(kind.inventory.scope.ownership.exclusions.filter(exclusion => exclusion.directory === 'fixture-project'))
       .toEqual([{ kind: 'external', directory: 'fixture-project', owner: null }]);
-    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-ignored "fixtures"\n');
+    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-unwired "fixtures"\n');
     const moved = expectKind(await observer.apply([{ path: 'subs/a/module.ramify', kind: 'changed' }]), 'structural');
-    expect(moved.inventory.scope.ownership.exclusions.filter(exclusion => exclusion.owner === 'app/a' && exclusion.kind === 'owned-ignored'))
-      .toEqual([{ kind: 'owned-ignored', directory: 'subs/a/fixtures', owner: 'app/a' }]);
+    expect(moved.inventory.scope.ownership.exclusions.filter(exclusion => exclusion.owner === 'app/a' && exclusion.kind === 'owned-unwired'))
+      .toEqual([{ kind: 'owned-unwired', directory: 'subs/a/fixtures', owner: 'app/a' }]);
   });
 
-  it('invalidates the model when an owned-ignored root or a directory above it disappears, keeping the last valid inventory', async () => {
-    await put(app, 'module.ramify', root('owned-ignored "data/cache"'));
+  it('invalidates the model when an owned-unwired root or a directory above it disappears, keeping the last valid inventory', async () => {
+    await put(app, 'module.ramify', root('owned-unwired "data/cache"'));
     await put(app, 'data/cache/blob.bin', 'cached\n');
     const observer = await observe();
     const inventory = observer.inventory;
     // One event names only the removed parent directory.
     await rm(join(app, 'data'), { recursive: true });
     expect(await observer.apply([{ path: 'data', kind: 'deleted' }]))
-      .toMatchObject({ kind: 'invalid', issues: [{ code: 'missing-owned-ignored', path: 'module.ramify' }] });
+      .toMatchObject({ kind: 'invalid', issues: [{ code: 'missing-owned-unwired', path: 'module.ramify' }] });
     expect(observer.inventory).toBe(inventory);
     await rm(join(app, 'fixture-project'), { recursive: true });
     expect(await observer.apply([{ path: 'fixture-project', kind: 'deleted' }]))
-      .toMatchObject({ kind: 'invalid', issues: expect.arrayContaining([expect.objectContaining({ code: 'missing-owned-ignored' })]) });
+      .toMatchObject({ kind: 'invalid', issues: expect.arrayContaining([expect.objectContaining({ code: 'missing-owned-unwired' })]) });
     expect(observer.inventory).toBe(inventory);
   });
 
@@ -333,25 +333,25 @@ describe('PB1-24 at the observer: invalid boundaries and cancellation', () => {
   it('reports an overlapping declaration as invalid without adopting a partial inventory, then recovers', async () => {
     const observer = await observe();
     const inventory = observer.inventory;
-    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\nexternal "fixtures"\n');
+    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\nexternal "fixtures"\n');
     expect(await observer.apply([{ path: 'subs/a/module.ramify', kind: 'changed' }]))
       .toMatchObject({ kind: 'invalid', issues: expect.arrayContaining([expect.objectContaining({ code: 'overlapping-nested-tree', path: 'subs/a/module.ramify' })]) });
     expect(observer.inventory).toBe(inventory);
     // Restored, the description matches the last valid inventory again: a local description update.
-    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\n');
+    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\n');
     expect(expectKind(await observer.apply([{ path: 'subs/a/module.ramify', kind: 'changed' }]), 'local').descriptions).toEqual(['subs/a/module.ramify']);
   });
 
   it('rejects a cancelled structural update and keeps observing the last inventory', async () => {
     const observer = await observe();
     const inventory = observer.inventory;
-    await put(app, 'module.ramify', root('owned-ignored "notes"'));
+    await put(app, 'module.ramify', root('owned-unwired "notes"'));
     const controller = new AbortController();
     controller.abort();
     await expect(observer.apply([{ path: 'module.ramify', kind: 'changed' }], controller.signal)).rejects.toThrow();
     expect(observer.inventory).toBe(inventory);
     const update = expectKind(await observer.apply([{ path: 'module.ramify', kind: 'changed' }]), 'structural');
-    expect(update.inventory.scope.ownership.exclusions).toContainEqual({ kind: 'owned-ignored', directory: 'notes', owner: 'app' });
+    expect(update.inventory.scope.ownership.exclusions).toContainEqual({ kind: 'owned-unwired', directory: 'notes', owner: 'app' });
   });
 
   it('reports an exceeded byte bound while rebuilding as incomplete, never as a valid partial model', async () => {

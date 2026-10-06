@@ -298,8 +298,8 @@ describe('an existing .ramify-architect that is not recognizably generated (AV22
     }],
     // Deliverable 4 of project-boundary iteration 18: only `ramify.architect-view/<number>` is an architect view.
     ...['{}', '{"schema":2}', '{"schema":"ramify.architect-view"}', '{"schema":"ramify.architect-view/"}', '{"schema":"ramify.architect-view/x"}',
-      '{"schema":"ramify.architect-view/2.1"}', '{"schema":"ramify.architect-view/-1"}', '{"schema":"ramify.architect-viewer/2"}',
-      '{"schema":" ramify.architect-view/2"}', '["ramify.architect-view/2"]'].map(text =>
+      '{"schema":"ramify.architect-view/3.1"}', '{"schema":"ramify.architect-view/-1"}', '{"schema":"ramify.architect-viewer/2"}',
+      '{"schema":" ramify.architect-view/3"}', '["ramify.architect-view/3"]'].map(text =>
       [`a directory whose _meta.json is ${text}`, 'invalid-path' as const, async (root: string) => {
         await mkdir(join(root, '.ramify-architect'));
         await writeFile(join(root, '.ramify-architect/_meta.json'), `${text}\n`);
@@ -357,7 +357,7 @@ describe('an existing .ramify-architect that is not recognizably generated (AV22
   });
 
   // Deliverable 4 of project-boundary iteration 18: a view written by any Ramify version is replaced.
-  it.each(['ramify.architect-view/1', 'ramify.architect-view/2', 'ramify.architect-view/3', 'ramify.architect-view/40'])(
+  it.each(['ramify.architect-view/1', 'ramify.architect-view/3', 'ramify.architect-view/3', 'ramify.architect-view/40'])(
     'replaces a directory whose _meta.json names %s', async schema => {
       const root = await tempRoot();
       await mkdir(join(root, '.ramify-architect/old-module'), { recursive: true });
@@ -367,7 +367,7 @@ describe('an existing .ramify-architect that is not recognizably generated (AV22
       const outcome = await onePublisher(controlled()).publish(root, 'rev-1', architectOnly(view), 'req-1');
       expect(outcome).toMatchObject({ status: 'published', targets: [{ changed: true }] });
       expect(await tree(join(root, '.ramify-architect'))).toEqual(expectedTree(view));
-      expect(JSON.parse(meta)).toMatchObject({ schema: 'ramify.architect-view/2' });
+      expect(JSON.parse(meta)).toMatchObject({ schema: 'ramify.architect-view/3' });
     });
 });
 

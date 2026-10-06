@@ -52,7 +52,7 @@ function checkDocument(result: Awaited<ReturnType<typeof invokeResident>>): Chec
   expect(result.stderr).toBe('');
   expect(result.batchCalls).toBe(0);
   const document = JSON.parse(result.stdout) as CheckDocument;
-  expect(document.schemaVersion).toBe('ramify.check/2');
+  expect(document.schemaVersion).toBe('ramify.check/3');
   expect(document.exitCode).toBe(result.exitCode);
   return document;
 }
@@ -147,7 +147,7 @@ describe('changed-file CLI through the real resident service', () => {
       expect(plain.stderr).toBe('');
       expect(plain.batchCalls).toBe(0);
       const report = JSON.parse(plain.stdout);
-      expect(report.schemaVersion).toBe('ramify.analysis/2');
+      expect(report.schemaVersion).toBe('ramify.analysis/3');
       expect(report).not.toHaveProperty('revision');
       expect(report).not.toHaveProperty('mode');
       expect(report).not.toHaveProperty('findings');
@@ -215,9 +215,9 @@ describe('changed-file CLI through the real resident service', () => {
 
 describe('changed-path dispositions through the real resident service', () => {
   it('gives the complete check\'s verdict with each named path classified by the project\'s ownership', () => fixture(async root => {
-    // An owned-ignored tree with its own manifest, inert prose, a scratch file and an
+    // An owned nested tree with its own manifest, inert prose, a scratch file and an
     // unreferenced source; the session's observer and Project's classifier are real.
-    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nowned-ignored "vendor"\nexpose-src value from "interfaces/api.ts" to descendants\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nowned-unwired "vendor"\nexpose-src value from "interfaces/api.ts" to descendants\n');
     await put(root, 'vendor/package.json', '{"name":"vendor"}');
     await put(root, 'vendor/src/broken.ts', "import { nothing } from './missing.js';\n");
     await put(root, 'docs/guide.md', '# Guide\n');
@@ -232,10 +232,10 @@ describe('changed-path dispositions through the real resident service', () => {
     try {
       const clean = await changed('src/extra.ts');
       expect([clean.document.exitCode, brief(clean.document)]).toEqual([0, [['src/extra.ts', 'checked', 'fixture', 'content']]]);
-      // A manifest inside the owned-ignored tree is not analyzed and no configuration change.
+      // A manifest inside the owned nested tree is not analyzed and no configuration change.
       const manifest = await changed('vendor/package.json', 'docs/guide.md', 'src/tmp/scratch.ts');
       expect([manifest.document.exitCode, manifest.document.outcome, manifest.document.reason]).toEqual([0, 'checked', null]);
-      expect(brief(manifest.document)).toEqual([['vendor/package.json', 'not-analyzed', 'fixture', 'owned-ignored'],
+      expect(brief(manifest.document)).toEqual([['vendor/package.json', 'not-analyzed', 'fixture', 'owned-unwired'],
         ['docs/guide.md', 'not-analyzed', 'fixture', 'owned-non-source'], ['src/tmp/scratch.ts', 'not-analyzed', 'fixture', 'scratch']]);
       // Neither the ignored tree's nor the scratch file's bytes were sent; the inert file's were.
       expect(manifest.requests.map(request => request.freshness.mode === 'synchronized' ? request.freshness.expect.map(item => item.path) : null))
@@ -253,7 +253,7 @@ describe('changed-path dispositions through the real resident service', () => {
       expect(denied.document.exitCode).toBe(1);
       const ignored = await changed('vendor/package.json', 'vendor/src/broken.ts');
       expect([ignored.document.exitCode, ignored.document.outcome, brief(ignored.document)]).toEqual([1, 'checked',
-        [['vendor/package.json', 'not-analyzed', 'fixture', 'owned-ignored'], ['vendor/src/broken.ts', 'not-analyzed', 'fixture', 'owned-ignored']]]);
+        [['vendor/package.json', 'not-analyzed', 'fixture', 'owned-unwired'], ['vendor/src/broken.ts', 'not-analyzed', 'fixture', 'owned-unwired']]]);
       expect(ignored.document.findings.map(finding => [finding.code, finding.location?.file])).toEqual([['not-visible', 'subs/consumer/src/use.ts']]);
       const complete = await invokeResident(quick, root, ['check', '--format', 'json', '--no-snapshot']);
       expect(complete.exitCode).toBe(ignored.document.exitCode);
@@ -346,7 +346,7 @@ describe('resident materialize with views (AV28)', () => {
 
       const meta = JSON.parse(await readFile(join(root, '.ramify-architect/_meta.json'), 'utf8')) as Record<string, unknown>;
       const apiMeta = JSON.parse(await readFile(join(root, 'src/.ramify/_meta.json'), 'utf8')) as Record<string, unknown>;
-      expect(meta).toMatchObject({ schema: 'ramify.architect-view/2', revision: publish!.revision, modules: 2, dependencies: 'measured',
+      expect(meta).toMatchObject({ schema: 'ramify.architect-view/3', revision: publish!.revision, modules: 2, dependencies: 'measured',
         testReferences: 'measured' });
       expect(apiMeta).toMatchObject({ schema: 'ramify.api-view/1', revision: publish!.revision });
       // The consumer's production call and its test's call, from the same analyzer run.

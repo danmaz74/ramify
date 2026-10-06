@@ -27,7 +27,7 @@ export interface AffectedModule {
 export type AffectedPathBasis = 'inventory' | 'declaration' | 'area' | 'containment' | 'excluded' | 'none';
 /**
  * One path seed, resolved without an inventory entry or a filesystem read of
- * the seed. An owned path names its module and the owned-ignored tree or
+ * the seed. An owned path names its module and the owned nested tree or
  * scratch directory it lies in, if any, in which case its basis is
  * containment. The module attributes the path; `kind` classifies it and
  * `selects` alone names the modules it selects, byte-ordered. An excluded path
@@ -45,7 +45,7 @@ export type AffectedPathSeed =
       readonly exclusion: null; readonly kind: null; readonly selects: readonly [] };
 export type AffectedWideningReason = 'unowned-path' | 'partial-coverage';
 export interface AffectedSelection {
-  readonly schemaVersion: 'ramify.affected/3';
+  readonly schemaVersion: 'ramify.affected/4';
   /** The revision's observed-input identity; the answer describes exactly these inputs. */
   readonly inputId: string;
   readonly paths: readonly AffectedPathSeed[];

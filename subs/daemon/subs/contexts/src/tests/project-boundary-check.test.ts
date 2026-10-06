@@ -24,10 +24,10 @@ const modules = [
 const exclusions = [
   exclusion('output', 'dist'),
   exclusion('external', 'external-project'),
-  exclusion('owned-ignored', 'fixture-project', 'app'),
+  exclusion('owned-nested-project', 'fixture-project', 'app'),
   exclusion('scratch', 'src/tmp', 'app'),
   exclusion('scratch', 'subs/a-extra/src/tmp', 'app/a-extra'),
-  exclusion('owned-ignored', 'subs/a/fixtures/sample', 'app/a'),
+  exclusion('owned-nested-project', 'subs/a/fixtures/sample', 'app/a'),
   exclusion('scratch', 'subs/a/src/tmp', 'app/a'),
   exclusion('scratch', 'subs/a/subs/grand/src/tmp', 'app/a/grand'),
   exclusion('scratch', 'subs/b/src/tmp', 'app/b'),
@@ -91,8 +91,8 @@ describe('changed-check path dispositions from revision-bound project scope', ()
       const named = ['src/main.ts', 'notes/design.md', 'fixture-project/package.json', 'subs/a/fixtures/sample/src/world.ts',
         'external-project/file.ts', 'node_modules/sample/index.ts', 'dist/output.ts', 'src/tmp/throwaway.test.ts', 'subs/a/src/tmp/new.ts'];
       const notAnalyzed: PathCheckDisposition[] = [
-        { path: 'fixture-project/package.json', disposition: 'not-analyzed', module: 'app', exclusion: exclusion('owned-ignored', 'fixture-project', 'app'), reason: 'owned-ignored' },
-        { path: 'subs/a/fixtures/sample/src/world.ts', disposition: 'not-analyzed', module: 'app/a', exclusion: exclusion('owned-ignored', 'subs/a/fixtures/sample', 'app/a'), reason: 'owned-ignored' },
+        { path: 'fixture-project/package.json', disposition: 'not-analyzed', module: 'app', exclusion: exclusion('owned-nested-project', 'fixture-project', 'app'), reason: 'owned-nested-project' },
+        { path: 'subs/a/fixtures/sample/src/world.ts', disposition: 'not-analyzed', module: 'app/a', exclusion: exclusion('owned-nested-project', 'subs/a/fixtures/sample', 'app/a'), reason: 'owned-nested-project' },
         { path: 'external-project/file.ts', disposition: 'not-analyzed', module: null, exclusion: exclusion('external', 'external-project'), reason: 'external' },
         { path: 'node_modules/sample/index.ts', disposition: 'not-analyzed', module: null, exclusion: exclusion('packages', 'node_modules'), reason: 'reserved' },
         { path: 'dist/output.ts', disposition: 'not-analyzed', module: null, exclusion: exclusion('output', 'dist'), reason: 'reserved' },
@@ -136,7 +136,7 @@ describe('changed-check path dispositions from revision-bound project scope', ()
       expect(answer).toMatchObject({ status: 'reported', published: true, revision: { sequence: 1 },
         freshness: { verified: true, reusedRevision: true, captureStarted: null } });
       expect(paths(answer).map(item => [item.path, item.disposition, item.module, item.reason])).toEqual([
-        ['subs/a/fixtures/sample/package.json', 'not-analyzed', 'app/a', 'owned-ignored'],
+        ['subs/a/fixtures/sample/package.json', 'not-analyzed', 'app/a', 'owned-nested-project'],
         ['external-project/package.json', 'not-analyzed', null, 'external']]);
       expect(e.script.calls.length).toBe(calls);
       // With findings in the covering revision the same request reports them: the not-analyzed
@@ -147,19 +147,19 @@ describe('changed-check path dispositions from revision-bound project scope', ()
       expect(failing).toMatchObject({ status: 'reported', published: true, revision: { sequence: 2 },
         delta: { findings: [{ id: finding.id, new: true }] } });
       expect(paths(failing)).toEqual([{ path: 'subs/a/fixtures/sample/package.json', disposition: 'not-analyzed', module: 'app/a',
-        exclusion: exclusion('owned-ignored', 'subs/a/fixtures/sample', 'app/a'), reason: 'owned-ignored' }]);
+        exclusion: exclusion('owned-nested-project', 'subs/a/fixtures/sample', 'app/a'), reason: 'owned-nested-project' }]);
       expect(e.script.sweepCalls).toHaveLength(0);
     } finally { await e.dispose(); }
   });
 
-  it('treats a package manifest or compiler configuration inside an owned-ignored tree as no configuration change', async () => {
+  it('treats a package manifest or compiler configuration inside an owned-unwired tree as no configuration change', async () => {
     const e = environment();
     try {
       const token = await e.open();
       // Hook: not analyzed, answered with the revision's verdict, never configuration-changed.
       for (const path of ['subs/a/fixtures/sample/package.json', 'fixture-project/tsconfig.json', 'fixture-project/package-lock.json']) {
         const answer = await e.check(token, [path], [], null);
-        expect([answer.status, paths(answer)[0]?.disposition, paths(answer)[0]?.reason]).toEqual(['reported', 'not-analyzed', 'owned-ignored']);
+        expect([answer.status, paths(answer)[0]?.disposition, paths(answer)[0]?.reason]).toEqual(['reported', 'not-analyzed', 'owned-nested-project']);
       }
       // The root's own configuration stays a configuration change, answered at once.
       const first = await e.check(token, ['tsconfig.json'], [], null);
@@ -193,7 +193,7 @@ describe('changed-check path dispositions from revision-bound project scope', ()
         [content('src/main.ts'), { path: 'fixture-project/src/index.ts', sha256: hash('excluded bytes') }], 1);
       expect(refused).toMatchObject({ status: 'classification-changed', revision: { sequence: 1 } });
       expect(paths(refused).map(item => [item.path, item.disposition, item.reason])).toEqual([
-        ['src/main.ts', 'not-checked', 'classification-changed'], ['fixture-project/src/index.ts', 'not-analyzed', 'owned-ignored']]);
+        ['src/main.ts', 'not-checked', 'classification-changed'], ['fixture-project/src/index.ts', 'not-analyzed', 'owned-nested-project']]);
       await flush();
       expect([e.script.updateCalls.length, e.status(token).pending.changedPaths]).toEqual([updates, 0]);
       // Following the classification, the analyzed path alone carries content and is covered.
@@ -255,7 +255,7 @@ describe('changed-check path dispositions from revision-bound project scope', ()
         { path: 'subs/b/src/consumer.ts', disposition: 'not-checked', module: 'app/b', exclusion: null, reason: 'superseded' },
         { path: 'notes/design.md', disposition: 'not-analyzed', module: 'app', exclusion: null, reason: 'owned-non-source' },
         { path: 'subs/a/fixtures/sample/README.md', disposition: 'not-analyzed', module: 'app/a',
-          exclusion: exclusion('owned-ignored', 'subs/a/fixtures/sample', 'app/a'), reason: 'owned-ignored' },
+          exclusion: exclusion('owned-nested-project', 'subs/a/fixtures/sample', 'app/a'), reason: 'owned-nested-project' },
       ]);
     } finally { await e.dispose(); }
   });
@@ -264,8 +264,8 @@ describe('changed-check path dispositions from revision-bound project scope', ()
     const e = environment();
     try {
       const token = await e.open();
-      const data = topology([exclusion('owned-ignored', 'subs/b/data', 'app/b')]);
-      const declared = 'ramify 1\nmodule b\nowned-ignored "data"\n';
+      const data = topology([exclusion('owned-unwired', 'subs/b/data', 'app/b')]);
+      const declared = 'ramify 1\nmodule b\nowned-unwired "data"\n';
       const named = ['subs/b/module.ramify', 'subs/b/data/x.json'];
       const declaredInputs = baseInputs().map(input => input.path === 'subs/b/module.ramify' ? read(input.path, declared) : input);
       // The client classified at revision 1, where `data` was b's ordinary territory, and
@@ -275,12 +275,12 @@ describe('changed-check path dispositions from revision-bound project scope', ()
       expect(raced).toMatchObject({ status: 'classification-changed', revision: { sequence: 2 } });
       expect(paths(raced)).toEqual([
         { path: 'subs/b/module.ramify', disposition: 'not-checked', module: 'app/b', exclusion: null, reason: 'classification-changed' },
-        { path: 'subs/b/data/x.json', disposition: 'not-analyzed', module: 'app/b', exclusion: exclusion('owned-ignored', 'subs/b/data', 'app/b'), reason: 'owned-ignored' },
+        { path: 'subs/b/data/x.json', disposition: 'not-analyzed', module: 'app/b', exclusion: exclusion('owned-unwired', 'subs/b/data', 'app/b'), reason: 'owned-unwired' },
       ]);
       const retried = await e.check(token, named, [content('subs/b/module.ramify', declared)], 2);
       expect(retried).toMatchObject({ status: 'reported', revision: { sequence: 2 }, freshness: { reusedRevision: true } });
       expect(paths(retried).map(item => [item.path, item.disposition, item.reason])).toEqual([
-        ['subs/b/module.ramify', 'checked', 'content'], ['subs/b/data/x.json', 'not-analyzed', 'owned-ignored']]);
+        ['subs/b/module.ramify', 'checked', 'content'], ['subs/b/data/x.json', 'not-analyzed', 'owned-unwired']]);
       // A client still classifying at revision 1 meets the published declaration at arrival.
       const stale = await e.check(token, named, [content('subs/b/module.ramify', declared), { path: 'subs/b/data/x.json', sha256: hash('{"x":1}') }], 1);
       expect(stale).toMatchObject({ status: 'classification-changed', revision: { sequence: 2 } });
@@ -309,7 +309,7 @@ describe('changed-check path dispositions from revision-bound project scope', ()
         [content('module.ramify', broken)], 1);
       expect(invalid).toMatchObject({ status: 'reported', published: true, revision: { sequence: 2, outcome: { execution: 'invalid' } } });
       expect(paths(invalid).map(item => [item.path, item.disposition, item.module, item.reason])).toEqual([
-        ['module.ramify', 'checked', 'app', 'content'], ['fixture-project/module.ramify', 'not-analyzed', 'app', 'owned-ignored']]);
+        ['module.ramify', 'checked', 'app', 'content'], ['fixture-project/module.ramify', 'not-analyzed', 'app', 'owned-nested-project']]);
     } finally { await e.dispose(); }
   });
 

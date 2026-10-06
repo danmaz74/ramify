@@ -68,11 +68,11 @@ const beneath = (view: ProjectInputView, directory: string): string[] =>
 
 describe('PB1-03: boundary layout validation', () => {
   it.each([
-    ['an escape from the declaring module', 'subs/a', 'ramify 1\nmodule a\nowned-ignored "../b"\n', 3],
+    ['an escape from the declaring module', 'subs/a', 'ramify 1\nmodule a\nowned-unwired "../b"\n', 3],
     ['an external tree beneath its module src/', '.', root('external "src/vendor"'), 3],
-    ['a declaration inside a child module', '.', root('owned-ignored "subs/a/data"'), 3],
+    ['a declaration inside a child module', '.', root('owned-unwired "subs/a/data"'), 3],
     ['a declaration at an always-excluded path', '.', root('external "node_modules/cache"'), 3],
-    ['a malformed directory string', '.', root('owned-ignored "data//one"'), 3],
+    ['a malformed directory string', '.', root('owned-unwired "data//one"'), 3],
   ])('rejects %s as invalid-nested-tree at the declared directory', async (_name, module, text, line) => {
     await mkdir(join(app, 'subs/a/data'), { recursive: true });
     await mkdir(join(app, 'subs/b'), { recursive: true });
@@ -81,21 +81,21 @@ describe('PB1-03: boundary layout validation', () => {
     expect(invalid(await read())).toEqual([located('invalid-nested-tree', path, text, line)]);
   });
 
-  it('rejects a missing owned-ignored directory and accepts an absent external one', async () => {
-    const text = root('owned-ignored "fixtures/absent"', 'external "tool-cache"');
+  it.each(['owned-unwired', 'owned-nested-project'] as const)('NT-04: rejects a missing %s directory and accepts an absent external one', async kind => {
+    const text = root(`${kind} "fixtures/absent"`, 'external "tool-cache"');
     await put(app, 'module.ramify', text);
-    expect(invalid(await read())).toEqual([located('missing-owned-ignored', 'module.ramify', text, 3)]);
-    // Positive control: the owned-ignored directory exists; the external one stays absent.
+    expect(invalid(await read())).toEqual([located(`missing-${kind}`, 'module.ramify', text, 3)]);
+    // Positive control: the owned-unwired directory exists; the external one stays absent.
     await mkdir(join(app, 'fixtures/absent'), { recursive: true });
     const view = acquired(await read());
-    expect(view.inventory.scope.ownership.exclusions.filter(item => item.kind === 'owned-ignored' || item.kind === 'external')).toEqual([
-      { kind: 'owned-ignored', directory: 'fixtures/absent', owner: 'app' },
+    expect(view.inventory.scope.ownership.exclusions.filter(item => item.kind === kind || item.kind === 'external')).toEqual([
+      { kind, directory: 'fixtures/absent', owner: 'app' },
       { kind: 'external', directory: 'tool-cache', owner: null }]);
   });
 
   it('rejects a declared path that exists but is not a real directory, for either kind', async () => {
     await put(app, 'data.txt', 'plain\n');
-    for (const kind of ['owned-ignored', 'external']) {
+    for (const kind of ['owned-unwired', 'external']) {
       const text = root(`${kind} "data.txt"`);
       await put(app, 'module.ramify', text);
       expect(invalid(await read())).toEqual([located('invalid-nested-tree', 'module.ramify', text, 3)]);
@@ -106,11 +106,11 @@ describe('PB1-03: boundary layout validation', () => {
 describe('PB1-04: declaration ambiguity and symlinks', () => {
   it('rejects equal normalized directories and nested declarations across kinds and modules, every participant', async () => {
     await mkdir(join(app, 'data/inner'), { recursive: true });
-    const equal = root('owned-ignored "data"', 'external "./data"');
+    const equal = root('owned-unwired "data"', 'external "./data"');
     await put(app, 'module.ramify', equal);
     expect(invalid(await read())).toEqual([located('overlapping-nested-tree', 'module.ramify', equal, 3),
       located('overlapping-nested-tree', 'module.ramify', equal, 4)]);
-    const nested = root('owned-ignored "data"', 'external "data/inner"');
+    const nested = root('owned-unwired "data"', 'external "data/inner"');
     await put(app, 'module.ramify', nested);
     expect(invalid(await read())).toEqual([located('overlapping-nested-tree', 'module.ramify', nested, 3),
       located('overlapping-nested-tree', 'module.ramify', nested, 4)]);
@@ -118,7 +118,7 @@ describe('PB1-04: declaration ambiguity and symlinks', () => {
     await mkdir(join(app, 'subs/a/cache/deep'), { recursive: true });
     const outer = root('external "subs/a/cache"');
     await put(app, 'module.ramify', outer);
-    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-ignored "cache/deep"\n');
+    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-unwired "cache/deep"\n');
     expect(invalid(await read())).toEqual([expect.objectContaining({ code: 'invalid-nested-tree', path: 'module.ramify',
       span: directorySpan(outer, 3), message: expect.stringContaining('lies inside a child module') })]);
   });
@@ -126,13 +126,13 @@ describe('PB1-04: declaration ambiguity and symlinks', () => {
   it('accepts equivalent spellings of distinct non-overlapping real directories', async () => {
     await mkdir(join(app, 'data/one'), { recursive: true });
     await mkdir(join(app, 'subs/a/data/two'), { recursive: true });
-    await put(app, 'module.ramify', root('owned-ignored "./data/one"', 'external "data/./two/../three"'));
-    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-ignored "data/two"\n');
+    await put(app, 'module.ramify', root('owned-unwired "./data/one"', 'external "data/./two/../three"'));
+    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-unwired "data/two"\n');
     const view = acquired(await read());
-    expect(view.inventory.scope.ownership.exclusions.filter(item => item.kind === 'owned-ignored' || item.kind === 'external')).toEqual([
-      { kind: 'owned-ignored', directory: 'data/one', owner: 'app' },
+    expect(view.inventory.scope.ownership.exclusions.filter(item => item.kind === 'owned-unwired' || item.kind === 'external')).toEqual([
+      { kind: 'owned-unwired', directory: 'data/one', owner: 'app' },
       { kind: 'external', directory: 'data/three', owner: null },
-      { kind: 'owned-ignored', directory: 'subs/a/data/two', owner: 'app/a' }]);
+      { kind: 'owned-unwired', directory: 'subs/a/data/two', owner: 'app/a' }]);
   });
 
   it('rejects a declared directory that is a symbolic link or lies beneath one, without traversing it', async () => {
@@ -140,7 +140,7 @@ describe('PB1-04: declaration ambiguity and symlinks', () => {
     await put(work, 'outside/sample/module.ramify', 'ramify 1\nroot module sample\n');
     await symlink(join(work, 'outside'), join(app, 'linked'));
     await symlink(join(work, 'outside/sample'), join(app, 'sample-link'));
-    for (const [text, detail] of [[root('owned-ignored "linked/sample"'), 'traverses the symbolic link linked'],
+    for (const [text, detail] of [[root('owned-unwired "linked/sample"'), 'traverses the symbolic link linked'],
       [root('external "sample-link"'), 'is a symbolic link']] as const) {
       await put(app, 'module.ramify', text);
       const result = await read();
@@ -155,8 +155,8 @@ describe('PB1-04: declaration ambiguity and symlinks', () => {
 
 describe('PB1-05: excluded discovery and separate roots (inventory)', () => {
   beforeEach(async () => {
-    await put(app, 'module.ramify', root('owned-ignored "fixture-project"', 'external "external-project"'));
-    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\n');
+    await put(app, 'module.ramify', root('owned-nested-project "fixture-project"', 'external "external-project"'));
+    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\n');
     for (const directory of ['fixture-project', 'external-project', 'subs/a/fixtures/sample']) {
       await put(app, `${directory}/module.ramify`, 'ramify 1\nroot module nested\n');
       await put(app, `${directory}/tsconfig.json`, configuration);
@@ -169,7 +169,7 @@ describe('PB1-05: excluded discovery and separate roots (inventory)', () => {
     }
   });
 
-  it('never enters an owned-ignored or external tree: no description, module, file or input beneath it', async () => {
+  it('never enters an owned-unwired or external tree: no description, module, file or input beneath it', async () => {
     const view = acquired(await read());
     expect(view.inventory.modules.map(module => module.id)).toEqual(['app', 'app/a']);
     expect(view.inventory.files.map(file => file.path)).toEqual(['src/main.ts', 'subs/a/src/api.ts']);
@@ -194,7 +194,7 @@ describe('PB1-05: excluded discovery and separate roots (inventory)', () => {
   });
 
   it('keeps boundary existence in the captured inputs while bytes beneath the tree are not inputs', async () => {
-    await put(app, 'module.ramify', root('owned-ignored "fixture-project"', 'external "external-project"', 'external "tool-cache"'));
+    await put(app, 'module.ramify', root('owned-nested-project "fixture-project"', 'external "external-project"', 'external "tool-cache"'));
     const view = acquired(await read());
     // An edit beneath a declared tree changes no input.
     await put(app, 'fixture-project/src/world.ts', 'export const world = 2;\n');
@@ -205,10 +205,10 @@ describe('PB1-05: excluded discovery and separate roots (inventory)', () => {
     await mkdir(join(app, 'tool-cache'));
     expect(await again.seal()).toEqual({ status: 'changed', paths: expect.arrayContaining(['tool-cache']) });
     const third = acquired(await read());
-    // An owned-ignored tree disappearing is one too, and the next acquisition rejects it.
+    // An owned nested tree disappearing is one too, and the next acquisition rejects it.
     await rm(join(app, 'fixture-project'), { recursive: true });
     expect(await third.seal()).toEqual({ status: 'changed', paths: expect.arrayContaining(['fixture-project']) });
-    expect(invalid(await read()).map(item => item.code)).toEqual(['missing-owned-ignored']);
+    expect(invalid(await read()).map(item => item.code)).toEqual(['missing-owned-nested-project']);
   });
 });
 
@@ -222,17 +222,17 @@ describe('PB1-06: undeclared project migration', () => {
     expect(issues).toEqual([
       { code: 'undeclared-project-boundary', path: 'subs/a/src/vendor/package.json',
         message: 'Invalid module boundary: undeclared-project-boundary: a directory with a package manifest must be a module\'s own directory '
-          + 'or lie in a declared nested tree; declare owned-ignored "src/vendor" in subs/a/module.ramify' },
+          + 'or lie in a declared nested tree; declare owned-nested-project "src/vendor" in subs/a/module.ramify' },
       { code: 'undeclared-project-boundary', path: 'tools/package.json',
         message: 'Invalid module boundary: undeclared-project-boundary: a directory with a package manifest must be a module\'s own directory '
-          + 'or lie in a declared nested tree; declare owned-ignored "tools" or external "tools" in module.ramify' },
+          + 'or lie in a declared nested tree; declare owned-nested-project "tools" or external "tools" in module.ramify' },
       { code: 'stray-description', path: 'tools/subs/x/module.ramify', message: 'Invalid module boundary: stray-description' },
     ]);
     const result = await read();
     if (result.status === 'invalid') expect(result.inventory?.files.map(file => file.path)).toEqual(['src/main.ts', 'subs/a/src/api.ts']);
     // Declared, both are pruned and the project is valid.
     await put(app, 'module.ramify', root('external "tools"'));
-    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-ignored "src/vendor"\n');
+    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-unwired "src/vendor"\n');
     expect(acquired(await read()).inventory.files.map(file => file.path)).toEqual(['src/main.ts', 'subs/a/src/api.ts']);
   });
 
@@ -244,7 +244,7 @@ describe('PB1-06: undeclared project migration', () => {
     expect(invalid(await read())).toEqual([{ code: 'undeclared-project-boundary', path: 'demo/module.ramify',
       span: { start: 9, end: 13, line: 2, column: 1 },
       message: 'Invalid module boundary: undeclared-project-boundary at 2:1: a marked project root must lie in a declared nested tree; '
-        + 'declare owned-ignored "demo" or external "demo" in module.ramify' }]);
+        + 'declare owned-nested-project "demo" or external "demo" in module.ramify' }]);
   });
 
   it('never stops discovery at a directory holding only a compiler configuration', async () => {
@@ -293,30 +293,30 @@ describe('PB1-09: scratch position', () => {
 });
 
 // PB1-11 at the iteration 8B boundary: compiler-selected source inside an
-// owned-ignored tree or a module's scratch directory yields one nonblocking
+// owned nested tree or a module's scratch directory yields one nonblocking
 // warning per tree or directory, with a bounded byte-ordered file list and the
 // total count, and is neither inventoried nor read. Message texts are this
 // slice's choice where the contracts leave them open.
 describe('PB1-11: compiler-selected exclusion warnings', () => {
   const selecting = (exclude: readonly string[] = []): string => JSON.stringify({ compilerOptions: { types: [], module: 'ESNext',
     moduleResolution: 'bundler' }, include: ['src', 'subs', 'fixtures', 'vendor', 'tools'], exclude }) + '\n';
-  const ownedIgnored = (count: number): string => `${count} compiler-selected file${count === 1 ? '' : 's'} in an owned-ignored tree `
+  const ownedUnwired = (count: number): string => `${count} compiler-selected file${count === 1 ? '' : 's'} in an owned-unwired tree `
     + 'of module app, which Ramify does not analyze; exclude the tree from the compiler configuration';
   const scratch = (module: string, count: number): string => `${count} compiler-selected file${count === 1 ? '' : 's'} in the scratch `
     + `directory of module ${module}, which Ramify does not analyze; exclude the directory from the compiler configuration`;
   const unanalyzed = ['fixtures/a.ts', 'fixtures/deep/b.ts', 'src/tmp/draft.ts', 'subs/a/src/tmp/draft.ts', 'vendor/lib.ts'];
   beforeEach(async () => {
-    await put(app, 'module.ramify', root('owned-ignored "fixtures"', 'external "vendor"'));
+    await put(app, 'module.ramify', root('owned-unwired "fixtures"', 'external "vendor"'));
     await put(app, 'tsconfig.json', selecting());
     for (const path of unanalyzed) await put(app, path, 'export const value = 1;\n');
     // Positive control: selected source outside every src/ is the root's auxiliary source, inventoried and read, with no warning.
     await put(app, 'tools/loose.ts', 'export const loose = 1;\n');
   });
 
-  it('warns once per owned-ignored tree and scratch directory, distinctly, and neither inventories nor reads those files', async () => {
+  it('warns once per owned-unwired tree and scratch directory, distinctly, and neither inventories nor reads those files', async () => {
     const view = acquired(await read());
     expect(view.inventory.warnings).toEqual([
-      { code: 'compiler-selected-owned-ignored', path: 'fixtures', message: ownedIgnored(2), files: ['fixtures/a.ts', 'fixtures/deep/b.ts'], count: 2 },
+      { code: 'compiler-selected-owned-unwired', path: 'fixtures', message: ownedUnwired(2), files: ['fixtures/a.ts', 'fixtures/deep/b.ts'], count: 2 },
       { code: 'compiler-selected-scratch', path: 'src/tmp', message: scratch('app', 1), files: ['src/tmp/draft.ts'], count: 1 },
       { code: 'compiler-selected-scratch', path: 'subs/a/src/tmp', message: scratch('app/a', 1), files: ['subs/a/src/tmp/draft.ts'], count: 1 },
     ]);
@@ -333,7 +333,7 @@ describe('PB1-11: compiler-selected exclusion warnings', () => {
     for (let index = 0; index < 25; index++) await put(app, `fixtures/many/f${String(index).padStart(2, '0')}.ts`, 'export {};\n');
     const warning = acquired(await read()).inventory.warnings.find(item => item.path === 'fixtures');
     const all = ['fixtures/a.ts', 'fixtures/deep/b.ts', ...Array.from({ length: 25 }, (_, index) => `fixtures/many/f${String(index).padStart(2, '0')}.ts`)];
-    expect(warning).toEqual({ code: 'compiler-selected-owned-ignored', path: 'fixtures', message: ownedIgnored(27), files: all.slice(0, 20), count: 27 });
+    expect(warning).toEqual({ code: 'compiler-selected-owned-unwired', path: 'fixtures', message: ownedUnwired(27), files: all.slice(0, 20), count: 27 });
   });
 
   it('reports no exclusion warning once the compiler configuration excludes those directories', async () => {
@@ -459,7 +459,7 @@ describe('observation of auxiliary source', () => {
 
 describe('observation of declared trees', () => {
   it('ignores changes beneath a declared tree and rebuilds when its directory disappears', async () => {
-    await put(app, 'module.ramify', root('owned-ignored "fixture-project"'));
+    await put(app, 'module.ramify', root('owned-nested-project "fixture-project"'));
     await put(app, 'fixture-project/module.ramify', 'ramify 1\nroot module nested\n');
     const result = await observeProject({ request: { cwd: app, root: app, scope: 'whole-project', configuration: 'discover' },
       parse: declaration, marker, limits, registry: 'registry/1:test' });
@@ -472,12 +472,12 @@ describe('observation of declared trees', () => {
       .toBe('unchanged');
     await rm(join(app, 'fixture-project'), { recursive: true });
     expect(await observer.apply([{ path: 'fixture-project', kind: 'deleted' }]))
-      .toMatchObject({ kind: 'invalid', issues: [{ code: 'missing-owned-ignored', path: 'module.ramify' }] });
+      .toMatchObject({ kind: 'invalid', issues: [{ code: 'missing-owned-nested-project', path: 'module.ramify' }] });
   });
 
   it('rebuilds when a description adds or removes a nested-tree declaration', async () => {
     await put(app, 'tools/inner/module.ramify', 'ramify 1\nmodule inner\n');
-    await put(app, 'module.ramify', root('owned-ignored "tools"'));
+    await put(app, 'module.ramify', root('owned-unwired "tools"'));
     const result = await observeProject({ request: { cwd: app, root: app, scope: 'whole-project', configuration: 'discover' },
       parse: declaration, marker, limits, registry: 'registry/1:test' });
     if (result.status !== 'observing') throw new Error(JSON.stringify(result));
@@ -486,5 +486,28 @@ describe('observation of declared trees', () => {
     await put(app, 'module.ramify', root());
     expect(await result.observer.apply([{ path: 'module.ramify', kind: 'changed' }]))
       .toMatchObject({ kind: 'invalid', issues: [{ code: 'stray-description', path: 'tools/inner/module.ramify' }] });
+  });
+});
+
+
+describe('NT-03/NT-04: owned declarations are authoritative without inspecting contents', () => {
+  it.each(['owned-unwired', 'owned-nested-project'] as const)('retains ownership and prunes compiler-selected source in %s', async kind => {
+    const text = root(`${kind} "data"`);
+    await put(app, 'module.ramify', text);
+    await put(app, 'data/hidden.ts', 'export const hidden = 1;\n');
+    // Unwired contents may look like a project; a nested-project declaration needs no project marker.
+    if (kind === 'owned-unwired') {
+      await put(app, 'data/package.json', '{}\n');
+      await put(app, 'data/module.ramify', 'malformed root description');
+    }
+    await put(app, 'tsconfig.json', '{"compilerOptions":{"types":[]},"include":["src","data"]}\n');
+    const view = acquired(await read());
+    expect(view.inventory.scope.ownership.exclusions).toContainEqual({ kind, directory: 'data', owner: 'app' });
+    expect(view.inventory.files.some(file => file.path.startsWith('data/'))).toBe(false);
+    // Compiler discovery may retain zero-byte existence probes, never content.
+    expect(view.inputs.filter(input => input.path.startsWith('data/')).every(input => input.bytes === 0 && input.role === 'dependency')).toBe(true);
+    expect(view.inventory.warnings).toEqual([{ code: `compiler-selected-${kind}`, path: 'data',
+      message: `1 compiler-selected file in an ${kind} tree of module app, which Ramify does not analyze; exclude the tree from the compiler configuration`,
+      files: ['data/hidden.ts'], count: 1 }]);
   });
 });

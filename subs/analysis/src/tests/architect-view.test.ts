@@ -233,7 +233,7 @@ describe('projectArchitectView: bounds and inputs', () => {
       tests: [...provided.tests].reverse(), features: [...provided.features].reverse() };
     expect(projectArchitectView(facts, 3, 'input/1:architect', reversed, architectLimits)).toEqual(first);
     expect(JSON.parse(JSON.stringify(first))).toEqual(first);
-    expect(projection(first)).toMatchObject({ schema: 'ramify.architect-projection/2', sequence: 3, inputId: 'input/1:architect' });
+    expect(projection(first)).toMatchObject({ schema: 'ramify.architect-projection/3', sequence: 3, inputId: 'input/1:architect' });
     const without = <T>(values: readonly T[]): T[] => values.slice(1);
     expect(() => projectArchitectView(facts, 3, 'x', { ...provided, details: without<SymbolDetail>(provided.details) }, architectLimits)).toThrow(/symbol detail/);
     expect(() => projectArchitectView(facts, 3, 'x', { ...provided, shapes: without(provided.shapes) }, architectLimits)).toThrow(/export shape/);

@@ -1,0 +1,429 @@
+
+ RUN  v4.1.11 /home/app/ramify-nested-kinds
+
+ ❯ subs/analysis/src/tests/project-boundary-analysis.test.ts (10 tests | 2 failed) 4351ms
+     × denies same-owner imports into owned-unwired while allowing ordinary owned source 1050ms
+     × denies same-owner imports into owned-nested-project while allowing ordinary owned source 1054ms
+ ❯ subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts (46 tests | 4 failed) 91ms
+     × parses both kinds interleaved with exposures, indexed among all statements with located directories 32ms
+     × classifies both keywords as keyword tokens and excludes comments from the token stream 3ms
+     × parses owned-unwired with a keyword token and admits it as a tag 2ms
+     × parses owned-nested-project with a keyword token and admits it as a tag 2ms
+ ❯ subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts (30 tests | 4 failed) 13407ms
+     × keeps boundary existence in the captured inputs while bytes beneath the tree are not inputs 1212ms
+     × ignores changes beneath a declared tree and rebuilds when its directory disappears 572ms
+     × retains ownership and prunes compiler-selected source in owned-unwired 283ms
+     × retains ownership and prunes compiler-selected source in owned-nested-project 254ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  subs/analysis/src/tests/project-boundary-analysis.test.ts > NT-03: both owned kinds enforce the source boundary > denies same-owner imports into owned-unwired while allowing ordinary owned source
+ FAIL  subs/analysis/src/tests/project-boundary-analysis.test.ts > NT-03: both owned kinds enforce the source boundary > denies same-owner imports into owned-nested-project while allowing ordinary owned source
+AssertionError: expected [ 'denied', 'checked' ] to deeply equal [ 'denied', 'allowed' ]
+
+- Expected
++ Received
+
+  [
+    "denied",
+-   "allowed",
++   "checked",
+  ]
+
+ ❯ subs/analysis/src/tests/project-boundary-analysis.test.ts:370:80
+    368|     expect(report.snapshot!.accesses.map(access => access.target)).toC…
+    369|       exclusion: { kind, directory: 'data', owner: 'app' } });
+    370|     expect(decided(report, 'src/main.ts').map(item => (item as unknown…
+       |                                                                                ^
+    371|   });
+    372| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts > PB1-01: valid nested-tree statements > parses both kinds interleaved with exposures, indexed among all statements with located directories
+AssertionError: expected [ { index: +0, …(3) }, …(4) ] to deeply equal [ { index: +0, …(3) }, …(4) ]
+
+- Expected
++ Received
+
+@@ -1,21 +1,21 @@
+  [
+    {
+      "directory": {
+        "span": {
+-         "column": 15,
+-         "end": 69,
++         "column": 22,
++         "end": 76,
+          "line": 3,
+-         "start": 52,
++         "start": 59,
+        },
+        "value": "fixture-project",
+      },
+      "index": 0,
+-     "kind": "owned-unwired",
++     "kind": "owned-nested-project",
+      "span": {
+        "column": 1,
+-       "end": 69,
++       "end": 76,
+        "line": 3,
+        "start": 38,
+      },
+    },
+    {
+@@ -23,13 +23,13 @@
+        "parent",
+      ],
+      "from": {
+        "span": {
+          "column": 21,
+-         "end": 118,
++         "end": 125,
+          "line": 4,
+-         "start": 110,
++         "start": 117,
+        },
+        "value": "api.ts",
+      },
+      "index": 1,
+      "kind": "expose-src",
+@@ -39,54 +39,54 @@
+          {
+            "alias": "api",
+            "name": "api",
+            "span": {
+              "column": 12,
+-             "end": 104,
++             "end": 111,
+              "line": 4,
+-             "start": 101,
++             "start": 108,
+            },
+          },
+        ],
+      },
+      "span": {
+        "column": 1,
+-       "end": 128,
++       "end": 135,
+        "line": 4,
+-       "start": 90,
++       "start": 97,
+      },
+      "tags": null,
+    },
+    {
+      "directory": {
+        "span": {
+          "column": 12,
+-         "end": 158,
++         "end": 165,
+          "line": 5,
+-         "start": 140,
++         "start": 147,
+        },
+        "value": "external-project",
+      },
+      "index": 2,
+      "kind": "external",
+      "span": {
+        "column": 3,
+-       "end": 158,
++       "end": 165,
+        "line": 5,
+-       "start": 131,
++       "start": 138,
+      },
+    },
+    {
+      "destinations": [
+        "descendants",
+      ],
+      "from": {
+        "span": {
+          "column": 23,
+-         "end": 186,
++         "end": 193,
+          "line": 6,
+-         "start": 181,
++         "start": 188,
+        },
+        "value": "child",
+      },
+      "index": 3,
+      "kind": "expose-sub",
+@@ -96,40 +96,40 @@
+          {
+            "alias": "value",
+            "name": "value",
+            "span": {
+              "column": 12,
+-             "end": 175,
++             "end": 182,
+              "line": 6,
+-             "start": 170,
++             "start": 177,
+            },
+          },
+        ],
+      },
+      "span": {
+        "column": 1,
+-       "end": 201,
++       "end": 208,
+        "line": 6,
+-       "start": 159,
++       "start": 166,
+      },
+      "tags": null,
+    },
+    {
+      "directory": {
+        "span": {
+          "column": 15,
+-         "end": 228,
++         "end": 235,
+          "line": 7,
+-         "start": 216,
++         "start": 223,
+        },
+        "value": "a/../b/./c",
+      },
+      "index": 4,
+      "kind": "owned-unwired",
+      "span": {
+        "column": 1,
+-       "end": 228,
++       "end": 235,
+        "line": 7,
+-       "start": 202,
++       "start": 209,
+      },
+    },
+  ]
+
+ ❯ subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts:41:33
+     39|     const document = valid(text);
+     40|     expect(document.module).toEqual({ name: 'app', tags: ['dispatch'],…
+     41|     expect(document.statements).toEqual([
+       |                                 ^
+     42|       { index: 0, kind: 'owned-unwired', span: { start: 38, end: 69, l…
+     43|         directory: { value: 'fixture-project', span: { start: 52, end:…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts > PB1-01: valid nested-tree statements > classifies both keywords as keyword tokens and excludes comments from the token stream
+AssertionError: expected [ [ 'keyword', …(2) ], …(1) ] to deeply equal [ [ 'keyword', …(2) ], …(1) ]
+
+- Expected
++ Received
+
+@@ -1,10 +1,10 @@
+  [
+    [
+      "keyword",
+-     "owned-unwired",
+-     "owned-unwired",
++     "owned-nested-project",
++     "owned-nested-project",
+    ],
+    [
+      "string",
+      "\"fixture-project\"",
+      "fixture-project",
+
+ ❯ subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts:59:96
+     57|   it('classifies both keywords as keyword tokens and excludes comments…
+     58|     const document = valid(text);
+     59|     expect(document.tokens.slice(8, 10).map(({ kind, raw, decoded }) =…
+       |                                                                                                ^
+     60|       ['keyword', 'owned-unwired', 'owned-unwired'], ['string', '"fixt…
+     61|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts > NT-02: three nested-tree kinds in version 1 > parses owned-unwired with a keyword token and admits it as a tag
+AssertionError: expected [ { index: +0, …(3) } ] to deeply equal [ { index: +0, …(3) } ]
+
+- Expected
++ Received
+
+  [
+    {
+      "directory": {
+        "span": {
+          "column": 15,
+-         "end": 59,
++         "end": 60,
+          "line": 3,
+-         "start": 56,
++         "start": 57,
+        },
+        "value": "d",
+      },
+      "index": 0,
+      "kind": "owned-unwired",
+      "span": {
+        "column": 1,
+-       "end": 59,
++       "end": 60,
+        "line": 3,
+-       "start": 42,
++       "start": 43,
+      },
+    },
+  ]
+
+ ❯ subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts:238:33
+    236|     expect(document.version).toBe(1);
+    237|     expect(document.module.tags).toEqual([kind]);
+    238|     expect(document.statements).toEqual([{ index: 0, kind,
+       |                                 ^
+    239|       span: { start: 29 + kind.length, end: 29 + kind.length + kind.le…
+    240|       directory: { value: 'd', span: { start: 29 + kind.length + kind.…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts > NT-02: three nested-tree kinds in version 1 > parses owned-nested-project with a keyword token and admits it as a tag
+AssertionError: expected [ { index: +0, …(3) } ] to deeply equal [ { index: +0, …(3) } ]
+
+- Expected
++ Received
+
+  [
+    {
+      "directory": {
+        "span": {
+          "column": 22,
+-         "end": 73,
++         "end": 74,
+          "line": 3,
+-         "start": 70,
++         "start": 71,
+        },
+        "value": "d",
+      },
+      "index": 0,
+      "kind": "owned-nested-project",
+      "span": {
+        "column": 1,
+-       "end": 73,
++       "end": 74,
+        "line": 3,
+-       "start": 49,
++       "start": 50,
+      },
+    },
+  ]
+
+ ❯ subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts:238:33
+    236|     expect(document.version).toBe(1);
+    237|     expect(document.module.tags).toEqual([kind]);
+    238|     expect(document.statements).toEqual([{ index: 0, kind,
+       |                                 ^
+    239|       span: { start: 29 + kind.length, end: 29 + kind.length + kind.le…
+    240|       directory: { value: 'd', span: { start: 29 + kind.length + kind.…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts > PB1-05: excluded discovery and separate roots (inventory) > keeps boundary existence in the captured inputs while bytes beneath the tree are not inputs
+AssertionError: expected [ 'missing-owned-nested-project' ] to deeply equal [ 'missing-owned-unwired' ]
+
+- Expected
++ Received
+
+  [
+-   "missing-owned-unwired",
++   "missing-owned-nested-project",
+  ]
+
+ ❯ subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts:211:58
+    209|     await rm(join(app, 'fixture-project'), { recursive: true });
+    210|     expect(await third.seal()).toEqual({ status: 'changed', paths: exp…
+    211|     expect(invalid(await read()).map(item => item.code)).toEqual(['mis…
+       |                                                          ^
+    212|   });
+    213| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts > observation of declared trees > ignores changes beneath a declared tree and rebuilds when its directory disappears
+AssertionError: expected { kind: 'invalid', …(2) } to match object { kind: 'invalid', …(1) }
+(12 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "issues": [
+      {
+-       "code": "missing-owned-unwired",
++       "code": "missing-owned-nested-project",
+        "path": "module.ramify",
+      },
+    ],
+    "kind": "invalid",
+  }
+
+ ❯ subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts:475:8
+    473|     await rm(join(app, 'fixture-project'), { recursive: true });
+    474|     expect(await observer.apply([{ path: 'fixture-project', kind: 'del…
+    475|       .toMatchObject({ kind: 'invalid', issues: [{ code: 'missing-owne…
+       |        ^
+    476|   });
+    477|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts > NT-03/NT-04: owned declarations are authoritative without inspecting contents > retains ownership and prunes compiler-selected source in owned-unwired
+AssertionError: expected [ 'data/hidden.ts', …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "data/hidden.ts",
++   "data/module.ramify",
++   "data/package.json",
++ ]
+
+ ❯ subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts:507:35
+    505|     expect(view.inventory.scope.ownership.exclusions).toContainEqual({…
+    506|     expect(view.inventory.files.some(file => file.path.startsWith('dat…
+    507|     expect(beneath(view, 'data')).toEqual([]);
+       |                                   ^
+    508|     expect(view.inventory.warnings).toEqual([{ code: `compiler-selecte…
+    509|       message: `1 compiler-selected file in an ${kind} tree of module …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts > NT-03/NT-04: owned declarations are authoritative without inspecting contents > retains ownership and prunes compiler-selected source in owned-nested-project
+AssertionError: expected [ 'data/hidden.ts' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "data/hidden.ts",
++ ]
+
+ ❯ subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts:507:35
+    505|     expect(view.inventory.scope.ownership.exclusions).toContainEqual({…
+    506|     expect(view.inventory.files.some(file => file.path.startsWith('dat…
+    507|     expect(beneath(view, 'data')).toEqual([]);
+       |                                   ^
+    508|     expect(view.inventory.warnings).toEqual([{ code: `compiler-selecte…
+    509|       message: `1 compiler-selected file in an ${kind} tree of module …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+
+ Test Files  3 failed | 1 passed (4)
+      Tests  10 failed | 130 passed (140)
+   Start at  21:40:14
+   Duration  13.91s (transform 895ms, setup 0ms, import 1.17s, tests 17.90s, environment 1ms)
+

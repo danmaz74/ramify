@@ -1,0 +1,34 @@
+{
+  "docs/model/module-description.spec.md": {
+    "before": "19e292a9bc44bff47d60398b7cc1a507523e1aa73e11cc4b2c56e0988c10b07c",
+    "after": "181402e5b5c64aaffbb544b268681dbb7a99b7e5f35811f89cb51ea929cf6281"
+  },
+  "docs/model/glossary.md": {
+    "before": "247587c20b8864b2d0a07f7688fe3e3eeb8b61aadb42603387fa72be0c192cfc",
+    "after": "4c3c1e2efc3f2c7bdf310349399cf9e58ff2129140eb15113910f80253e67976"
+  },
+  "docs/model/cross-module-importability.spec.md": {
+    "before": "4aba3df0be6ff7356e7107f8d7c2786ff45ab35c9ede0b319454547b5029d789",
+    "after": "4d2485d768ec798b070482b95ab3efda84efbdd92ad48d016c8c26924884d673"
+  },
+  "docs/model/typescript-source-interpretation.spec.md": {
+    "before": "c1fd4d6551d130bbcd723c8b1a56075e858c06e2a6eaacb50fb147ea0e3a1a95",
+    "after": "8cf9eb66529b1de11a771af768138285be186ffa2bb7eadbd859ecdf1da79d53"
+  },
+  "docs/agents/module-architect.principles.md": {
+    "before": "3858898770ab5f2a54fd375ba5aa6a4c3f72a5ac00f04f974405ac95aa580d25",
+    "after": "a4fec944e1697f411a605d1f4506ef9fa16318cb1ba4ed8eaa6ec1d13533e851"
+  },
+  "docs/architecture/cli-invocation.spec.md": {
+    "before": "dac3ae58473c74d5f03f82d695e715a41cab98466df48cd4477efd7d8bdabd9f",
+    "after": "81a6a899ebdb31c602feacf8a978bdb95ee2f7b2f12543f086a6a99b224eedc9"
+  },
+  "docs/architecture/architect-view.spec.md": {
+    "before": "f8989ad661566eaf668ad6c213994e345988a4f31d7d733e175302225a826794",
+    "after": "be6def0a5ec6029ef8a8627cc6280bfea5f101ac9f521f1a49b0890591524c0e"
+  },
+  "docs/architecture/modularity-report.spec.md": {
+    "before": "00fc9dba0b42145267e9e83a9b454d2d332deecc845adeadf14cfcf60472c1b4",
+    "after": "1ab86a7d095a1943b1c87763f104b8715618e3cda636a006dffb09a8b112d765"
+  }
+}

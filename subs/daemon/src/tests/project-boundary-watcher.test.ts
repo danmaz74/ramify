@@ -28,7 +28,7 @@ async function put(base: string, path: string, content: string): Promise<void> {
   await mkdir(join(base, path, '..'), { recursive: true });
   await writeFile(join(base, path), content);
 }
-/** Source, inert prose, a declared owned-ignored and external tree, a scratch directory,
+/** Source, inert prose, a declared owned nested and external tree, a scratch directory,
  * installed packages and compiler output, each with nested directories. */
 async function layout(base: string): Promise<void> {
   for (const [path, content] of Object.entries({
@@ -72,7 +72,7 @@ describe('PB1-23: the filesystem watcher registers nothing beneath an exclusion'
         await put(base, `vendor/deep/dir/f${index}.ts`, 'export {};\n');
         await put(base, `docs/inert-${index}.md`, '# inert\n');
       }
-      const handle = await state.open(watchScope(declared(exclusion('owned-ignored', 'vendor', 'app')), 4));
+      const handle = await state.open(watchScope(declared(exclusion('owned-unwired', 'vendor', 'app')), 4));
       expect([...state.paths].sort()).toEqual(['.', 'docs', 'src']);
       // Root children src, docs, vendor, external-tree, node_modules, dist, and src's child tmp.
       expect(state.classified()).toBe(7);
@@ -83,7 +83,7 @@ describe('PB1-23: the filesystem watcher registers nothing beneath an exclusion'
 
   it('delivers no change beneath an exclusion and a declared or scratch root\'s own removal, never a reserved root\'s', async () => {
     await watching(async (base, state) => {
-      const handle = await state.open(watchScope(declared(exclusion('owned-ignored', 'vendor', 'app'))));
+      const handle = await state.open(watchScope(declared(exclusion('owned-unwired', 'vendor', 'app'))));
       const before = [...state.paths];
       // Byte edits and creations beneath each excluded tree.
       for (const path of ['vendor/deep/dir/file.ts', 'external-tree/x/y.ts', 'src/tmp/sub/scratch.ts', 'node_modules/pkg/index.js', 'dist/out/main.js']) {
@@ -102,7 +102,7 @@ describe('PB1-23: the filesystem watcher registers nothing beneath an exclusion'
       expect(events.filter(event => event.path === 'dist')).toEqual([]);
       expect(state.paths).toEqual(before);
 
-      // The owned-ignored and scratch roots' own removals reach the listener.
+      // The owned nested and scratch roots' own removals reach the listener.
       await rename(join(base, 'vendor'), join(base, 'moved'));
       await rm(join(base, 'src/tmp'), { recursive: true });
       await until('boundary root removals', 4000, () => ['vendor', 'src/tmp', 'moved'].every(path => state.events().some(event => event.path === path)));
@@ -115,11 +115,11 @@ describe('PB1-23: the filesystem watcher registers nothing beneath an exclusion'
 
   it('reconfigures: a new exclusion ends registrations beneath it, a removed one registers its tree', async () => {
     await watching(async (base, state) => {
-      const handle = await state.open(watchScope(declared(exclusion('owned-ignored', 'vendor', 'app')), 1));
+      const handle = await state.open(watchScope(declared(exclusion('owned-unwired', 'vendor', 'app')), 1));
       expect([...state.paths].sort()).toEqual(['.', 'docs', 'src']);
       const classified = state.classified();
       // It reports the three directories registered beneath the removed exclusion.
-      expect(await handle.reconfigure(watchScope(declared(exclusion('owned-ignored', 'docs', 'app')), 2))).toBe(3);
+      expect(await handle.reconfigure(watchScope(declared(exclusion('owned-unwired', 'docs', 'app')), 2))).toBe(3);
       expect([...state.paths].sort()).toEqual(['.', 'docs', 'src', 'vendor', 'vendor/deep', 'vendor/deep/dir']);
       expect(handle.registrations()).toEqual({ sequence: 2, directories: 5,
         pruned: ['dist', 'docs', 'external-tree', 'node_modules', 'src/tmp'], prunedCount: 5 });
@@ -134,24 +134,24 @@ describe('PB1-23: the filesystem watcher registers nothing beneath an exclusion'
   });
 });
 
-/** The real daemon fixture: an owned-ignored tree the configuration lists, an external tree,
+/** The real daemon fixture: an owned nested tree the configuration lists, an external tree,
  * a scratch directory and inert prose; one analyzed source file. */
-async function project(base: string): Promise<void> {
+async function project(base: string, kind: 'owned-unwired' | 'owned-nested-project'): Promise<void> {
   await layout(base);
   await rm(join(base, 'dist'), { recursive: true });
   await rm(join(base, 'node_modules'), { recursive: true });
-  await put(base, 'module.ramify', 'ramify 1\nroot module app\nowned-ignored "vendor"\nexternal "external-tree"\n');
+  await put(base, 'module.ramify', `ramify 1\nroot module app\n${kind} "vendor"\nexternal "external-tree"\n`);
   await put(base, 'README.md', '# App\n\nA watcher fixture.\n');
   await put(base, 'tsconfig.json', JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022',
     types: [], skipLibCheck: true }, include: ['src', 'vendor'], exclude: ['src/tmp'] }));
 }
 
 describe('PB1-23: the installed daemon watches by the published ownership', () => {
-  it('records no registration beneath excluded trees, publishes nothing for their edits, observes boundary roots and reconfigures on declaration changes', async () => {
+  it.each(['owned-unwired', 'owned-nested-project'] as const)('NT-03: %s records no excluded registrations or revisions and observes boundary roots', async kind => {
     const base = await realpath(await mkdtemp(join(tmpdir(), 'rpb16-project-')));
     let pid = 0, children: number[] = [];
     try {
-      await project(base);
+      await project(base, kind);
       await withDaemonProcess('pb1-23', async daemon => {
         pid = daemon.pid;
         const { connection } = daemon;
@@ -201,15 +201,15 @@ describe('PB1-23: the installed daemon watches by the published ownership', () =
         await settled('source revision', current => (current.published?.sequence ?? 0) > first.revision.sequence);
         expect((await status()).published?.cause).toBe('watch');
 
-        // Boundary-root evidence: removing the owned-ignored root is observed through its parent.
+        // Boundary-root evidence: removing the owned-unwired root is observed through its parent.
         await rename(join(base, 'vendor'), join(base, 'vendor-away'));
-        await until('missing owned-ignored root', 30_000, async () => (await status()).published?.outcome.execution === 'invalid');
+        await until('missing owned-unwired root', 30_000, async () => (await status()).published?.outcome.execution === 'invalid');
         await rename(join(base, 'vendor-away'), join(base, 'vendor'));
         await settled('root restored', current => current.published?.outcome.execution === 'completed');
 
         // Adding a declaration prunes its tree: the registration of docs ends.
         const description = await readFile(join(base, 'module.ramify'), 'utf8');
-        await writeFile(join(base, 'module.ramify'), `${description}owned-ignored "docs"\n`);
+        await writeFile(join(base, 'module.ramify'), `${description}owned-unwired "docs"\n`);
         await settled('docs declared', current => current.registrations?.pruned.includes('docs') === true);
         const declaredAt = (await status()).published!.sequence;
         expect((await status()).registrations).toEqual({ sequence: declaredAt, directories: 2,
@@ -217,7 +217,7 @@ describe('PB1-23: the installed daemon watches by the published ownership', () =
         expect(await daemon.registered()).toEqual(['.', 'src'].map(at).sort());
 
         // Removing the vendor declaration registers its tree, then sweeps conservatively.
-        await writeFile(join(base, 'module.ramify'), 'ramify 1\nroot module app\nexternal "external-tree"\nowned-ignored "docs"\n');
+        await writeFile(join(base, 'module.ramify'), 'ramify 1\nroot module app\nexternal "external-tree"\nowned-unwired "docs"\n');
         await settled('vendor reincluded', current => current.registrations !== null && !current.registrations.pruned.includes('vendor'));
         expect(await daemon.registered()).toEqual(['.', 'src', 'vendor', 'vendor/deep', 'vendor/deep/dir'].map(at).sort());
         const reincluded = await status();

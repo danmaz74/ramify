@@ -28,7 +28,7 @@ function run(cwd: string, args: readonly string[], env: NodeJS.ProcessEnv, timeo
 
 /** The written topology: `app` marked, `a`, `grand`, `a-extra` and `b` unmarked; two marked ignored projects. */
 const topology: Readonly<Record<string, string>> = {
-  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-ignored "fixture-project"\nexternal "external-project"\nexpose-sub api from a to descendants\n',
+  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-nested-project "fixture-project"\nexternal "external-project"\nexpose-sub api from a to descendants\n',
   'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', types: [], skipLibCheck: true, outDir: 'dist' },
     include: ['src', 'subs', 'scripts', 'tools'], exclude: ['subs/a/fixtures', 'src/tmp', 'subs/*/src/tmp', 'subs/a/subs/*/src/tmp'] }),
   'package.json': '{"type":"module"}',
@@ -42,7 +42,7 @@ const topology: Readonly<Record<string, string>> = {
   'fixture-project/tsconfig.json': JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', types: [] } }),
   'fixture-project/src/index.ts': 'export const index: number = 1;\n',
   'external-project/file.ts': 'export const external = 1;\n',
-  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
+  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
   'subs/a/src/api.ts': 'export function api(): number { return 1; }\n',
   'subs/a/src/internal.ts': 'export const secret: number = 2;\n',
   'subs/a/src/tmp/throwaway.ts': 'export const scratch = 1;\n',
@@ -155,8 +155,8 @@ describe('project-boundary CLI processes', () => {
       'src/with space.ts': { disposition: 'checked', module: 'app', exclusion: null, reason: 'content' },
       'notes/design.md': { disposition: 'not-analyzed', module: 'app', exclusion: null, reason: 'owned-non-source' },
       'notes/with space.md': { disposition: 'not-analyzed', module: 'app', exclusion: null, reason: 'owned-non-source' },
-      'fixture-project/src/index.ts': { disposition: 'not-analyzed', module: 'app', exclusion: owned('fixture-project', 'owned-ignored', 'app'), reason: 'owned-ignored' },
-      'subs/a/fixtures/sample/src/world.ts': { disposition: 'not-analyzed', module: 'app/a', exclusion: owned('subs/a/fixtures/sample', 'owned-ignored', 'app/a'), reason: 'owned-ignored' },
+      'fixture-project/src/index.ts': { disposition: 'not-analyzed', module: 'app', exclusion: owned('fixture-project', 'owned-nested-project', 'app'), reason: 'owned-nested-project' },
+      'subs/a/fixtures/sample/src/world.ts': { disposition: 'not-analyzed', module: 'app/a', exclusion: owned('subs/a/fixtures/sample', 'owned-nested-project', 'app/a'), reason: 'owned-nested-project' },
       'external-project/file.ts': { disposition: 'not-analyzed', module: null, exclusion: { kind: 'external', directory: 'external-project', owner: null }, reason: 'external' },
       'src/tmp/throwaway.test.ts': { disposition: 'not-analyzed', module: 'app', exclusion: owned('src/tmp', 'scratch', 'app'), reason: 'scratch' },
       'subs/a/src/tmp/throwaway.ts': { disposition: 'not-analyzed', module: 'app/a', exclusion: owned('subs/a/src/tmp', 'scratch', 'app/a'), reason: 'scratch' },
@@ -177,7 +177,7 @@ describe('project-boundary CLI processes', () => {
     const human = await run(app, ['check', '--changed', 'src/main.ts', 'fixture-project/src/index.ts', 'notes/design.md', 'external-project/file.ts'], env);
     expect([human.code, human.stderr]).toEqual([0, '']);
     expect(human.stdout).toContain('Path src/main.ts: checked (content; module app)\n'
-      + 'Path fixture-project/src/index.ts: not analyzed (owned-ignored fixture-project; module app)\n'
+      + 'Path fixture-project/src/index.ts: not analyzed (owned-nested-project fixture-project; module app)\n'
       + 'Path notes/design.md: not analyzed (owned-non-source; module app)\n'
       + 'Path external-project/file.ts: not analyzed (external external-project)\n'
       + 'Outcome: checked (1 checked, 3 not analyzed, 0 not checked); ');
@@ -226,14 +226,14 @@ describe('project-boundary CLI processes', () => {
       const document = json<AffectedDocument>(outcome);
       expect(document.selection.paths.map(seed => [seed.path, seed.status, seed.module, seed.exclusion?.kind ?? null])).toEqual([
         ['../outside.ts', 'outside-project', null, null], ['external-project/file.ts', 'excluded', null, 'external'],
-        ['fixture-project/src/index.ts', 'owned', 'app', 'owned-ignored'], ['notes/with space.md', 'owned', 'app', null],
+        ['fixture-project/src/index.ts', 'owned', 'app', 'owned-nested-project'], ['notes/with space.md', 'owned', 'app', null],
         ['subs/a/scripts/report.ts', 'owned', 'app/a', null]]);
       expect([document.selection.selection, document.selection.widening]).toEqual(['all-modules', ['unowned-path']]);
       const human = await run(app, ['affected', ...args, ...mode], env);
       expect(human.code).toBe(0);
       expect(human.stdout).toContain('Path ../outside.ts: outside the project\n'
         + 'Path external-project/file.ts: excluded (external external-project)\n'
-        + 'Path fixture-project/src/index.ts: owned by app (containment, owned-ignored fixture-project; ignored; selects none)\n'
+        + 'Path fixture-project/src/index.ts: owned by app (containment, owned-nested-project fixture-project; ignored; selects none)\n'
         + 'Path notes/with space.md: owned by app (containment; inert; selects none)\n'
         + 'Path subs/a/scripts/report.ts: owned by app/a (inventory; auxiliary-source; selects app/a)\n');
     }

@@ -8,7 +8,7 @@ import type { TokenLine } from './tokenize.js';
 const moduleName = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const exportName = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 // Keywords that remain valid tag names; the registry alone decides whether a tag exists.
-const specialTags = new Set(['testing', 'browser', 'ui', 'owned-ignored', 'external', 'root']);
+const specialTags = new Set(['testing', 'browser', 'ui', 'owned-unwired', 'owned-nested-project', 'external', 'root']);
 const through = (first: TextSpan, last: TextSpan): TextSpan => ({ ...first, end: last.end });
 
 // Recovery is at a physical line boundary, where every version 1 statement ends.
@@ -262,14 +262,14 @@ export function parseDescription(file: string, text: string): ParsedDescription 
       } else if (['expose-src', 'expose-test', 'expose-sub'].includes(first.raw)) {
         if (!versionSeen || !moduleSeen) report('invalid-order', 'Exposure statements must follow both headers.');
         if (!line.invalid) statements.push(parser.exposure(statements.length));
-      } else if (first.raw === 'owned-ignored' || first.raw === 'external') {
+      } else if (first.raw === 'owned-unwired' || first.raw === 'owned-nested-project' || first.raw === 'external') {
         if (!versionSeen || !moduleSeen) report('invalid-order', 'Nested-tree statements must follow both headers.');
         if (!line.invalid) statements.push(parser.nestedTree(statements.length));
       } else if (first.raw === 'root') {
         report('unknown-statement', 'The root marker belongs only immediately before module on the module line.');
       } else if (first.raw === 'tests' && line.tokens[1]?.raw === 'tagged') {
         report('test-profile-declaration', 'The testing profile has no declaration syntax.');
-      } else report('unknown-statement', `Unknown statement ${first.raw}.`);
+      } else report('unknown-statement', `Unknown statement ${first.raw}. Use an exposure statement, owned-unwired, owned-nested-project or external.`);
     } catch (error) {
       if (!(error instanceof LineFailure)) throw error;
     }

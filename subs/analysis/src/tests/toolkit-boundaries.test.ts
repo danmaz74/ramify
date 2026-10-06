@@ -11,15 +11,17 @@ import type { PathOwnership, ProjectExclusion, ProjectScope } from '../../subs/p
 // 2026-10-03, not acquisition output: their entry into the ownership table
 // and, from iteration 8, their pruning before descent (PB1-32 for the harness).
 const root = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
-const ownedIgnored = ['docs', 'examples/collection-review', 'scripts/probes/fixtures/compiler-api',
-  'scripts/probes/fixtures/plan2a-symbol-details', 'scripts/reference-harness', 'site'];
+const ownedUnwired = ['docs', 'scripts/probes/fixtures/compiler-api',
+  'scripts/probes/fixtures/plan2a-symbol-details', 'scripts/reference-harness'];
+const ownedProjects = ['examples/collection-review', 'site'];
 const external = ['.cucumber-viz', '.history', '.playwright-mcp', '.reference-work', 'ramify-agent'];
 const declared: readonly ProjectExclusion[] = [
-  ...ownedIgnored.map(directory => ({ kind: 'owned-ignored' as const, directory, owner: 'ramify' })),
+  ...ownedUnwired.map(directory => ({ kind: 'owned-unwired' as const, directory, owner: 'ramify' })),
+  ...ownedProjects.map(directory => ({ kind: 'owned-nested-project' as const, directory, owner: 'ramify' })),
   ...external.map(directory => ({ kind: 'external' as const, directory, owner: null })),
 ];
 const ignoredBy = (directory: string): PathOwnership =>
-  ({ status: 'owned', module: 'ramify', directory: '.', exclusion: { kind: 'owned-ignored', directory, owner: 'ramify' } });
+  ({ status: 'owned', module: 'ramify', directory: '.', exclusion: { kind: ownedProjects.includes(directory) ? 'owned-nested-project' : 'owned-unwired', directory, owner: 'ramify' } });
 const externalBy = (directory: string): PathOwnership =>
   ({ status: 'excluded', module: null, exclusion: { kind: 'external', directory, owner: null } });
 const rootOwned: PathOwnership = { status: 'owned', module: 'ramify', directory: '.', exclusion: null };
@@ -39,7 +41,7 @@ async function toolkitInventory(): Promise<InventorySnapshot> {
 describe('the toolkit root description declares its nested trees', () => {
   it('enters exactly the decided declarations beside the scratch and output exclusions', async () => {
     const { ownership } = await toolkitScope();
-    const trees = ownership.exclusions.filter(exclusion => exclusion.kind === 'owned-ignored' || exclusion.kind === 'external');
+    const trees = ownership.exclusions.filter(exclusion => exclusion.kind === 'owned-unwired' || exclusion.kind === 'owned-nested-project' || exclusion.kind === 'external');
     // The table is byte-ordered by directory.
     expect(trees).toEqual([...declared].sort((a, b) => a.directory < b.directory ? -1 : 1));
     // Every other exclusion is a module's scratch directory or the compiler output directory.
@@ -97,7 +99,7 @@ describe('the toolkit root description declares its nested trees', () => {
     const { inventory, inputs } = await toolkitInventory();
     // The scope carries the ownership table and no inferred independent scopes.
     expect(Object.keys(inventory.scope).sort()).toEqual(['configuration', 'invokedFrom', 'ownership', 'root', 'selection', 'walkedAreas']);
-    for (const directory of [...ownedIgnored, ...external]) {
+    for (const directory of [...ownedUnwired, ...ownedProjects, ...external]) {
       const inside = (path: string): boolean => path.startsWith(`${directory}/`);
       expect(inventory.files.filter(file => inside(file.path)), directory).toEqual([]);
       expect(inventory.warnings.filter(warning => warning.path === directory || inside(warning.path)

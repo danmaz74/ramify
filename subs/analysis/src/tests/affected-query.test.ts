@@ -24,7 +24,7 @@ describe('affected-module projection: graph (A7-01)', () => {
   it('A7-01:chain: A->B->C seeded at C selects A and B as affected and A, B, C as tests', () => {
     const { scope } = chain();
     expect(select(chain(), ['c'])).toEqual({
-      schemaVersion: 'ramify.affected/3', inputId: 'input/1', paths: [],
+      schemaVersion: 'ramify.affected/4', inputId: 'input/1', paths: [],
       changedModules: [sub('c')], affectedModules: [sub('a'), sub('b')], testModules: [sub('a'), sub('b'), sub('c')],
       selection: 'dependency-closure', widening: [], scope, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
     });
@@ -260,14 +260,14 @@ describe('affected-module projection: path seeds (A7-02)', () => {
     expect(result).toMatchObject({ changedModules: [], affectedModules: [], testModules: [], selection: 'dependency-closure', widening: [] });
   });
 
-  it('a path in an owned-ignored tree or an external tree selects nothing and does not widen', () => {
+  it.each(['owned-unwired', 'owned-nested-project'] as const)('NT-03: a path in %s or an external tree selects nothing and does not widen', kind => {
     const base = facts();
     const ownership = { ...base.scope.ownership, exclusions: [...base.scope.ownership.exclusions,
       { kind: 'external' as const, directory: 'external-project', owner: null },
-      { kind: 'owned-ignored' as const, directory: 'subs/a/fixtures/sample', owner: 'r/a' }] };
+      { kind: 'owned-nested-project' as const, directory: 'subs/a/fixtures/sample', owner: 'r/a' }] };
     const scope = { ...base.scope, ownership };
     const declared: AffectedFacts = { ...base, scope, inventory: { ...base.inventory, scope } };
-    const ignored = { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'r/a' } as const;
+    const ignored = { kind: 'owned-nested-project', directory: 'subs/a/fixtures/sample', owner: 'r/a' } as const;
     const result = select(declared, [], ['subs/a/fixtures/sample/src/world.ts', 'subs/a/fixtures/sample/module.ramify',
       'external-project/file.ts', 'external-project']);
     expect(result.paths).toEqual([
@@ -344,16 +344,16 @@ describe('affected-module projection: coverage (A7-04)', () => {
     expect(select(coverageGraph(outside), ['c'])).toMatchObject({ ...widened, coverage: { status: 'partial', notes: [outside] } });
   });
 
-  it('a boundary import into an owned-ignored tree, which carries no note, still depends on the tree\'s owner', () => {
+  it('a boundary import into an owned-unwired tree, which carries no note, still depends on the tree\'s owner', () => {
     // Project-boundary iteration 11: the import is a definite finding without a
     // coverage note, so it widens nothing. Iteration 14: a path in an
-    // owned-ignored tree is its owner's, so the importer of that path depends
-    // on the owner, although a seed in a declared owned-ignored tree selects
+    // owned nested tree is its owner's, so the importer of that path depends
+    // on the owner, although a seed in a declared owned nested tree selects
     // nothing. An external tree has no owner and adds no edge.
     const consumer = origin('subs/b/src/b.ts', 'b');
     const facts = graphFacts({ modules: { a: 'subs/a', b: 'subs/b', c: 'subs/c' }, accesses: [
       access(consumer, { kind: 'nested-tree', file: 'subs/a/fixtures/sample/index.ts',
-        exclusion: { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'a' } }),
+        exclusion: { kind: 'owned-nested-project', directory: 'subs/a/fixtures/sample', owner: 'a' } }),
       access(origin('subs/c/src/c.ts', 'c'), { kind: 'nested-tree', file: 'external-project/lib.ts',
         exclusion: { kind: 'external', directory: 'external-project', owner: null } }),
     ] });
@@ -363,7 +363,7 @@ describe('affected-module projection: coverage (A7-04)', () => {
   });
 
   it('an import of a scratch file depends on the scratch directory\'s owner; other excluded targets add no edge', () => {
-    // A scratch path is its module's, like an owned-ignored one. The import's
+    // A scratch path is its module's, like an owned-unwired one. The import's
     // excluded-target note still makes coverage partial, so the closure is
     // reported and the test selection widens.
     const excluded = note('excluded-target', 'subs/b/src/b.ts');

@@ -59,7 +59,7 @@ async function inventory(root: string) {
 }
 
 const topology: Readonly<Record<string, string>> = {
-  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-ignored "fixture-project"\nexternal "external-project"\nexpose-sub api from a to descendants\n',
+  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-nested-project "fixture-project"\nexternal "external-project"\nexpose-sub api from a to descendants\n',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext',
     strict: true, types: [], noEmit: true }, include: ['**/*.ts'] }),
   'README.md': '# App\n\nThe production-selection fixture root.\n',
@@ -72,7 +72,7 @@ const topology: Readonly<Record<string, string>> = {
   'fixture-project/module.ramify': 'ramify 1\nroot module fixture\n',
   'fixture-project/src/index.ts': 'export const ignoredRoot = 1;\n',
   'external-project/src/index.ts': 'export const externalTree = 1;\n',
-  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
+  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
   'subs/a/src/api.ts': 'export function api(): number { return 1; }\n',
   'subs/a/src/tests/api.test.ts': "import { api } from '../api.js';\nexport const tested: number = api();\n",
   'subs/a/src/tests/tmp/real.test.ts': 'export const realTest = 1;\n',
@@ -142,9 +142,9 @@ describe('PB1-31: production selection over project boundaries', () => {
       'subs/a/src/tmp/throwaway.ts', 'fixture-project/src/index.ts', 'external-project/src/index.ts', 'subs/a/fixtures/sample/src/world.ts']) {
       expect(files.has(path)).toBe(false);
     }
-    // The compiler selected them; the owned-ignored trees and scratch directories warn, the external tree does not.
+    // The compiler selected them; the owned nested trees and scratch directories warn, the external tree does not.
     expect(snapshot.inventory.warnings.map(warning => [warning.code, warning.path]).sort()).toEqual([
-      ['compiler-selected-owned-ignored', 'fixture-project'], ['compiler-selected-owned-ignored', 'subs/a/fixtures/sample'],
+      ['compiler-selected-owned-nested-project', 'fixture-project'], ['compiler-selected-owned-nested-project', 'subs/a/fixtures/sample'],
       ['compiler-selected-scratch', 'src/tmp'], ['compiler-selected-scratch', 'subs/a/src/tmp']]);
   }), 30_000);
 

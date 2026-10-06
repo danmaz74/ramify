@@ -257,7 +257,7 @@ export interface ModularityProvenance {
   readonly analysisCoverage: AnalysisReport['outcome']['coverage'];
   /** Requested and executed capabilities, in byte order. */
   readonly capabilities: readonly Capability[];
-  /** The declared nested-tree directories, owned-ignored and external: consumers absent from the repository measures. */
+  /** The declared nested-tree directories, owned nested and external: consumers absent from the repository measures. */
   readonly omittedScopes: readonly string[];
   readonly ownership: 'declared' | 'candidate';
   readonly candidateId: string | null;

@@ -17,7 +17,7 @@ const owners = ['ramify', 'ramify/analysis', 'ramify/analysis/descriptions', 'ra
 const testingModules = ['ramify/integration-tests'];
 const probe = 'subs/presentation/subs/layout/src/__i1_probe.ts';
 /**
- * The root description's nested trees (owned-ignored and external): never
+ * The root description's nested trees (owned nested and external): never
  * entered, catalogued or walked. Owned compiler source anywhere else outside a
  * module's src/ is that module's auxiliary source (project-boundary iteration
  * 8C), and the root configuration admits JavaScript.

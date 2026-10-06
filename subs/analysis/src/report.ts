@@ -133,7 +133,7 @@ const acquisitionFailure: Readonly<Record<CarriedCode, AnalysisDiagnostic['categ
   'read-failure': 'acquisition', 'changed-input': 'acquisition',
   'missing-root-description': 'layout', 'unmarked-root-description': 'layout', 'invalid-layout': 'layout', 'duplicate-name': 'layout',
   'description-in-src': 'layout', 'stray-description': 'layout', 'reserved-container': 'layout',
-  'undeclared-project-boundary': 'layout', 'invalid-nested-tree': 'layout', 'missing-owned-ignored': 'layout',
+  'undeclared-project-boundary': 'layout', 'invalid-nested-tree': 'layout', 'missing-owned-unwired': 'layout', 'missing-owned-nested-project': 'layout',
   'overlapping-nested-tree': 'layout', 'symlink-root': 'layout', 'symlink-description': 'layout',
 };
 
@@ -227,7 +227,7 @@ export class ReportDraft {
     const warnings = [...this.warnings].sort(warningOrder);
     const diagnosticIds = new Set(this.diagnostics.map(item => item.id));
     return {
-      schemaVersion: 'ramify.analysis/2', runId: this.runId, inputId: this.inputId, request: this.echo,
+      schemaVersion: 'ramify.analysis/3', runId: this.runId, inputId: this.inputId, request: this.echo,
       scope: this.scope, registry: this.registry,
       capabilities: [...availableCapabilities, 'browser-verification' as const].map(capability => ({ capability,
         available: availableCapabilities.includes(capability), requested: this.request.capabilities.includes(capability),

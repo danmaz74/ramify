@@ -25,7 +25,7 @@ function located(declaration: NestedTreeDeclaration, code: ProjectIssue['code'],
  * checked on the filesystem without traversing a symbolic link: each directory
  * from its declaring module down to the declared one is observed, never
  * listed, so the captured inputs hold the boundary's existence evidence and
- * nothing beneath it. An owned-ignored target must exist as a real directory;
+ * nothing beneath it. An owned nested target must exist as a real directory;
  * an external target may be absent, and must be a real directory when present.
  */
 export async function nestedTreeIssues(capture: Capture, modules: readonly InventoryModule[],
@@ -55,7 +55,7 @@ export async function nestedTreeIssues(capture: Capture, modules: readonly Inven
           : `traverses the symbolic link ${[...base, ...segments.slice(0, index + 1)].join('/')}`));
       } else if (kind === 'absent' || !last) {
         // Absent, or beneath an entry that is not a directory: the declared directory does not exist.
-        if (declaration.kind === 'owned-ignored') issues.push(located(declaration, 'missing-owned-ignored', 'does not exist as a directory'));
+        if (declaration.kind === 'owned-unwired' || declaration.kind === 'owned-nested-project') issues.push(located(declaration, `missing-${declaration.kind}`, 'does not exist as a directory'));
       } else issues.push(located(declaration, 'invalid-nested-tree', 'exists but is not a real directory'));
       break;
     }

@@ -35,7 +35,7 @@ describe('validated daemon service', () => {
     if (!opened.ok || opened.value.status !== 'opened') throw new Error('Expected opened context');
     const token = opened.value.token;
     const plain = await environment.service.check({ token, requestId: 'plain', freshness: { mode: 'synchronized', expect: [] } });
-    expect(plain).toMatchObject({ ok: true, value: { status: 'reported', published: true, report: { schemaVersion: 'ramify.analysis/2' } } });
+    expect(plain).toMatchObject({ ok: true, value: { status: 'reported', published: true, report: { schemaVersion: 'ramify.analysis/3' } } });
     if (!plain.ok || plain.value.status !== 'reported' || !plain.value.published) throw new Error('Expected publication');
     const since = plain.value.revision.revision;
     const sha256 = createHash('sha256').update('export const value = 1;\n').digest('hex');
@@ -310,7 +310,7 @@ describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
     expect(f.inputs[0]!.api).toBeNull();
     expect(f.inputs[0]!.renderedApi).toEqual([]);
     expect(f.inputs[0]!.architect).toMatchObject({ modules: 1, dependencies: 'measured' });
-    expect(await f.meta()).toMatchObject({ schema: 'ramify.architect-view/2', revision: revision.revision, input: revision.fingerprints.inputId,
+    expect(await f.meta()).toMatchObject({ schema: 'ramify.architect-view/3', revision: revision.revision, input: revision.fingerprints.inputId,
       dependencies: 'measured', dependencyScope: 'production', testReferences: 'measured', metrics: 'measured' });
     expect(JSON.parse(await f.view('module.json'))).toMatchObject({ metrics: { state: 'measured', views: 'measured',
       contextSize: { exact: { production: { sourceFiles: 1 }, tests: { sourceFiles: 1 },

@@ -30,7 +30,7 @@ export interface NestedTreeDeclaration {
   readonly module: string;
   readonly description: string;
   readonly statement: number;
-  readonly kind: 'owned-ignored' | 'external';
+  readonly kind: 'owned-unwired' | 'owned-nested-project' | 'external';
   readonly decoded: string;
   readonly span: TextSpan;
   readonly directory: string | null;
@@ -122,7 +122,7 @@ export function buildProjectOwnership(modules: readonly Pick<InventoryModule, 'i
   for (const declaration of evidence) {
     if (declaration.problem !== null) continue;
     exclusions.push({ kind: declaration.kind, directory: declaration.directory!,
-      owner: declaration.kind === 'owned-ignored' ? declaration.module : null });
+      owner: (declaration.kind === 'owned-unwired' || declaration.kind === 'owned-nested-project') ? declaration.module : null });
   }
   exclusions.sort((a, b) => byteOrder(a.directory, b.directory) || byteOrder(a.kind, b.kind));
   return freeze({ ownership: { modules: owners, exclusions }, declarations: evidence });

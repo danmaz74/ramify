@@ -197,8 +197,8 @@ export interface DeclaredModule {
   readonly tags: readonly string[];
   readonly readme: boolean;
   readonly statements: readonly DeclaredStatement[];
-  /** The `owned-ignored` and `external` statements, as `module.json` lists them: project-relative directory and 1-based line and column. */
-  readonly trees: readonly { readonly kind: 'owned-ignored' | 'external'; readonly dir: string; readonly line: number; readonly column: number }[];
+  /** The `owned-unwired` and `external` statements, as `module.json` lists them: project-relative directory and 1-based line and column. */
+  readonly trees: readonly { readonly kind: 'owned-unwired' | 'owned-nested-project' | 'external'; readonly dir: string; readonly line: number; readonly column: number }[];
   /** Child directory name to child module identifier. */
   readonly childByDirectory: Map<string, string>;
 }
@@ -240,8 +240,8 @@ export async function declaredModules(root: string): Promise<DeclaredModule[]> {
     }
     // Nested-tree statements keep their physical line; the toolkit and the reference project name plain relative directories.
     const trees = text.split('\n').flatMap((line, index) => {
-      const tree = /^(\s*)(owned-ignored|external)\s+"([^"]+)"\s*(?:\/\/.*)?$/.exec(line);
-      return tree ? [{ kind: tree[2] as 'owned-ignored' | 'external', dir: joinView(dir, tree[3]!), line: index + 1, column: tree[1]!.length + 1 }] : [];
+      const tree = /^(\s*)(owned-unwired|owned-nested-project|external)\s+"([^"]+)"\s*(?:\/\/.*)?$/.exec(line);
+      return tree ? [{ kind: tree[2] as 'owned-unwired' | 'owned-nested-project' | 'external', dir: joinView(dir, tree[3]!), line: index + 1, column: tree[1]!.length + 1 }] : [];
     }).sort((a, b) => a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0);
     let readme = true;
     try { await stat(join(root, dir, 'README.md')); } catch { readme = false; }
@@ -323,7 +323,7 @@ export async function structuralExpectation(root: string, modules: readonly Decl
   const meta = JSON.parse(files.get('_meta.json') ?? '{}') as Record<string, unknown>;
   // Plan 2C fixed the architect metrics policy as `measure`, and a materialized
   // tree comes from a valid inventory, so its metrics are measured.
-  for (const [key, value] of [['schema', 'ramify.architect-view/2'], ['revision', revision], ['input', inputId], ['modules', modules.length],
+  for (const [key, value] of [['schema', 'ramify.architect-view/3'], ['revision', revision], ['input', inputId], ['modules', modules.length],
     ['dependencies', 'measured'], ['dependencyScope', 'production'], ['testReferences', 'measured'], ['metrics', 'measured']] as const) {
     if (meta[key] !== value) mismatches.push(`_meta.json ${key}: ${JSON.stringify(meta[key])}, expected ${JSON.stringify(value)}`);
   }
@@ -339,7 +339,7 @@ export async function structuralExpectation(root: string, modules: readonly Decl
       ['children', document.children, module.children], ['revision', document.revision, revision],
       ['tags', [...(document.tags as string[] ?? [])].sort(), [...module.tags].sort()],
       ['purpose.state', (document.purpose as { state?: string } | undefined)?.state, module.readme ? 'present' : 'missing'],
-      ['schema', document.schema, 'ramify.architect-module/2'],
+      ['schema', document.schema, 'ramify.architect-module/3'],
       // Project boundaries: each declared tree with its kind, directory and declaring statement, nothing beneath it.
       ['boundaries', document.boundaries, module.trees.map(tree => ({ kind: tree.kind, dir: tree.dir,
         description: joinView(module.dir, 'module.ramify'), line: tree.line, column: tree.column }))],
@@ -880,7 +880,7 @@ export async function apiViewIdentity(): Promise<ApiIdentityEvidence> {
       const description = join(root, 'module.ramify');
       const marked = await readFile(description, 'utf8');
       if ((marked.match(/^root module /gm) ?? []).length !== 1) throw new Error(`Expected one marked root module line in the ${kind} copy`);
-      await writeFile(description, marked.replace(/^root module /m, 'module ').replace(/^(?:owned-ignored|external) "[^"\n]*"\n/gm, ''));
+      await writeFile(description, marked.replace(/^root module /m, 'module ').replace(/^(?:owned-unwired|owned-nested-project|external) "[^"\n]*"\n/gm, ''));
       const before = await run(join(base, 'dist/src/ramify'));
       await writeFile(description, marked);
       await removeGenerated(root);
@@ -973,7 +973,7 @@ export async function entryClosures(): Promise<EntryEvidence> {
 
 /** The instruction block the renderer places at the top of every view's `README.md`. */
 export async function renderedInstructionBlock(): Promise<string> {
-  const projection = { schema: 'ramify.architect-projection/2' as const, sequence: 1, inputId: 'input/1:0', root: 'm',
+  const projection = { schema: 'ramify.architect-projection/3' as const, sequence: 1, inputId: 'input/1:0', root: 'm',
     modules: [{ module: 'm', dir: '', parent: null, children: [], tags: [], areas: [], boundaries: [], purpose: { state: 'missing' as const }, docs: [],
       files: { own: 0, subtree: 0 } }], symbols: [], tests: [],
     counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0 };

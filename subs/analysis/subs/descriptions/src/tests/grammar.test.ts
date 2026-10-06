@@ -77,7 +77,7 @@ describe('the complete version 1 grammar', () => {
     expect(valid(`${header}${source('dispatch, tests')}`).statements).toHaveLength(1);
   });
 
-  const keywords = ['ramify', 'module', 'expose-src', 'expose-test', 'expose-sub', 'owned-ignored', 'external', 'from', 'as', 'tagged', 'to', 'parent', 'descendants', 'testing', 'browser', 'ui'];
+  const keywords = ['ramify', 'module', 'expose-src', 'expose-test', 'expose-sub', 'owned-unwired', 'external', 'from', 'as', 'tagged', 'to', 'parent', 'descendants', 'testing', 'browser', 'ui'];
   for (const word of keywords) {
     it(`requires quotes for ${word} in every name position`, () => {
       for (const make of [

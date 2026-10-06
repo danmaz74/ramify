@@ -184,7 +184,7 @@ describe('real project configuration and scope', () => {
     expect(undeclared).toMatchObject({ status: 'invalid', issues: [{ code: 'undeclared-project-boundary', path: 'examples/demo/module.ramify' }] });
     if (undeclared.status === 'invalid') expect(undeclared.issues).toHaveLength(1);
     // Declared, it is never entered: nothing beneath it is read or inventoried.
-    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nowned-ignored "examples/demo"\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nowned-unwired "examples/demo"\n');
     const acquired = view(await read({ parse: declaration }));
     expect(acquired.inventory.modules.map(module => module.id)).toEqual(['fixture']);
     expect(acquired.inputs.filter(input => input.path.startsWith('examples/demo/'))).toEqual([]);

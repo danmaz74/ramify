@@ -261,7 +261,7 @@ export class Resolution {
     const exclusion = ownership.status === 'owned' || ownership.status === 'excluded' ? ownership.exclusion : null;
     if (ownership.status === 'outside-project') return { kind: 'outside-project', module, file: local, resource: null, exclusion: null };
     if (exclusion) {
-      const declared = exclusion.kind === 'owned-ignored' || exclusion.kind === 'external';
+      const declared = exclusion.kind === 'owned-unwired' || exclusion.kind === 'owned-nested-project' || exclusion.kind === 'external';
       return { kind: declared ? 'nested-tree' : 'excluded', module, file: local, resource: null, exclusion };
     }
     return { kind: resource ? 'resource-target' : 'unresolved', module, file: null, resource: null, exclusion: null };

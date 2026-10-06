@@ -18,9 +18,9 @@ const ownership: ProjectOwnership = {
     { id: 'app/a/grand', parent: 'app/a', directory: 'subs/a/subs/grand' }, { id: 'app/a-extra', parent: 'app', directory: 'subs/a-extra' },
     { id: 'app/b', parent: 'app', directory: 'subs/b' }],
   exclusions: [{ kind: 'output', directory: 'dist', owner: null }, { kind: 'external', directory: 'external-project', owner: null },
-    { kind: 'owned-ignored', directory: 'fixture-project', owner: 'app' }, { kind: 'scratch', directory: 'src/tmp', owner: 'app' },
+    { kind: 'owned-nested-project', directory: 'fixture-project', owner: 'app' }, { kind: 'scratch', directory: 'src/tmp', owner: 'app' },
     { kind: 'scratch', directory: 'subs/a-extra/src/tmp', owner: 'app/a-extra' },
-    { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'app/a' }, { kind: 'scratch', directory: 'subs/a/src/tmp', owner: 'app/a' },
+    { kind: 'owned-nested-project', directory: 'subs/a/fixtures/sample', owner: 'app/a' }, { kind: 'scratch', directory: 'subs/a/src/tmp', owner: 'app/a' },
     { kind: 'scratch', directory: 'subs/a/subs/grand/src/tmp', owner: 'app/a/grand' }, { kind: 'scratch', directory: 'subs/b/src/tmp', owner: 'app/b' }],
 };
 const scope: ProjectScope = { root: '/project/app', selection: 'found', invokedFrom: '/project/app', configuration: '/project/app/tsconfig.json',
@@ -75,7 +75,7 @@ describe('Git advisory warning', () => {
     const advice = ignoredButWalked(ownership, nul(...excluded.map(directory => `${directory}/`), ...Object.keys(walked).map(directory => `${directory}/`), 'notes.log'));
     expect(advice.map(warning => [warning.code, warning.path])).toEqual(Object.keys(walked).map(directory => ['ignored-but-walked', directory]));
     expect(advice[0]).toEqual({ code: 'ignored-but-walked', path: 'coverage',
-      message: 'Git ignores this directory, but Ramify walks it as part of module app; declare it owned-ignored or external in that module\'s description if Ramify should leave it out' });
+      message: 'Git ignores this directory, but Ramify walks it as part of module app; declare it owned-unwired, owned-nested-project or external in that module\'s description if Ramify should leave it out' });
     expect(advice.every(warning => warning.files === undefined && warning.count === undefined)).toBe(true);
   });
 
@@ -116,7 +116,7 @@ describe('Git advice in CLI checks', { timeout: 60_000 }, () => {
     const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
     try {
       for (const [path, text] of Object.entries({
-        'module.ramify': 'ramify 1\nroot module app\nowned-ignored "fixture-project"\n',
+        'module.ramify': 'ramify 1\nroot module app\nowned-nested-project "fixture-project"\n',
         'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', types: [], outDir: 'dist' }, include: ['src'] }),
         'src/main.ts': 'export const value = 1;\n', 'fixture-project/README.md': '# Data\n',
         'subs/b/module.ramify': 'ramify 1\nmodule b\n', 'subs/b/src/use.ts': 'export const used = 1;\n',

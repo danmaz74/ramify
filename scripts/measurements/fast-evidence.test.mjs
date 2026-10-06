@@ -49,7 +49,7 @@ function report() {
 
 const verify = value => verifyFastEvidence(value, id, inputs, dependencies);
 
-/** A `ramify.check/2` path the covering revision checked: its content, or its deletion when absent. */
+/** A `ramify.check/3` path the covering revision checked: its content, or its deletion when absent. */
 const checkedPath = item => ({ path: item.path, disposition: 'checked', module: 'fixture', exclusion: null,
   reason: item.sha256 === null ? 'deleted' : 'content', sha256: item.sha256 });
 
@@ -66,7 +66,7 @@ function cycle(index, kind = 'body') {
   return { kind, index, expected, beforeSequence: sequence - 1, revision,
     hookStartedAt: index * 1000 + 1, countersBeforeSave: { coveredRequests: 0 },
     hook: { failure: null, signal: null, stderr: '', code: 0, durationMs: 1,
-      document: { schemaVersion: 'ramify.check/2', outcome: 'checked', execution: 'completed', exitCode: 0,
+      document: { schemaVersion: 'ramify.check/3', outcome: 'checked', execution: 'completed', exitCode: 0,
         revision: { id: revision.revision, sequence }, paths: expected.map(checkedPath),
         findings: [], coverage: [], timings: { daemon: timings } } },
   };
@@ -371,7 +371,7 @@ function configurationCycle(index) {
   row.expected = [{ path: 'tsconfig.json', sha256: (index % 2 ? 'a' : 'b').repeat(64) }];
   row.revision.checked = { path: 'broad', accesses: 1, files: ['src/body.ts'], modelRebuilt: true };
   row.hook.code = 2;
-  row.hook.document = { schemaVersion: 'ramify.check/2', outcome: 'not-checked', reason: 'configuration-changed',
+  row.hook.document = { schemaVersion: 'ramify.check/3', outcome: 'not-checked', reason: 'configuration-changed',
     execution: null, exitCode: 2, revision: null, checked: null, findings: [], coverage: [],
     paths: row.expected.map(item => ({ path: item.path, disposition: 'not-checked', module: 'fixture', exclusion: null,
       reason: 'configuration-changed' })), timings: { daemon: null } };
@@ -837,7 +837,7 @@ function workerExitCycle() {
   row.countersBeforeSave = counters(10, 0, 0, 0, 5);
   row.settled = { counters: counters(13, 0, 0, 0, 5) };
   row.hook = { failure: null, signal: null, stderr: '', code: 2, durationMs: 29_000,
-    document: { schemaVersion: 'ramify.check/2', outcome: 'not-checked', reason: 'unavailable', execution: 'unavailable',
+    document: { schemaVersion: 'ramify.check/3', outcome: 'not-checked', reason: 'unavailable', execution: 'unavailable',
       exitCode: 2, revision: null, checked: null, coverage: [], paths: [{ path: 'src/body.ts', disposition: 'not-checked', reason: 'unavailable' }],
       findings: [{ code: 'internal-error', category: 'unavailable', message: 'analysis-failed: Session worker exited (1)' }],
       timings: { daemon: null } } };

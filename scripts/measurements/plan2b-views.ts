@@ -43,13 +43,13 @@ export function git(cwd: string, args: readonly string[]): Promise<Buffer> {
  * Generated view directories are never copied, so every copy starts without a view.
  */
 /**
- * The root description's owned-ignored trees that a copy leaves out are
+ * The root description's owned nested trees that a copy leaves out are
  * recreated empty: each must exist as a real directory, and nothing beneath
  * one is ever read, so an empty directory is an equivalent input.
  */
-async function restoreOwnedIgnored(root: string): Promise<void> {
+async function restoreOwnedNestedTrees(root: string): Promise<void> {
   const description = await readFile(join(root, 'module.ramify'), 'utf8');
-  for (const [, directory] of description.matchAll(/^owned-ignored "([^"\\]+)"[ \t]*$/gm)) await mkdir(join(root, directory!), { recursive: true });
+  for (const [, directory] of description.matchAll(/^(?:owned-unwired|owned-nested-project) "([^"\\]+)"[ \t]*$/gm)) await mkdir(join(root, directory!), { recursive: true });
 }
 export async function copyProject(kind: ProjectKind, destination: string): Promise<string> {
   const source = kind === 'reference' ? join(repositoryRoot, 'examples/collection-review') : repositoryRoot;
@@ -68,7 +68,7 @@ export async function copyProject(kind: ProjectKind, destination: string): Promi
     await mkdir(dirname(join(destination, path)), { recursive: true });
     await writeFile(join(destination, path), await readFile(from));
   }
-  await restoreOwnedIgnored(destination);
+  await restoreOwnedNestedTrees(destination);
   await symlink(join(source, 'node_modules'), join(destination, 'node_modules'));
   return realpath(destination);
 }

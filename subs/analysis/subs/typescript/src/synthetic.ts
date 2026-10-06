@@ -44,7 +44,7 @@ function unanalyzedSelection(inventory: ProjectInventory, file: string): boolean
   if (path === '') return false;
   const owned = classifyProjectPath(inventory.scope, path);
   const exclusion = owned.status === 'owned' || owned.status === 'excluded' ? owned.exclusion : null;
-  return exclusion?.kind === 'owned-ignored' || exclusion?.kind === 'external' || exclusion?.kind === 'scratch';
+  return exclusion?.kind === 'owned-unwired' || exclusion?.kind === 'owned-nested-project' || exclusion?.kind === 'external' || exclusion?.kind === 'scratch';
 }
 
 export function syntheticInputs(inventory: ProjectInventory, configuration: string, selectedFiles: readonly string[],

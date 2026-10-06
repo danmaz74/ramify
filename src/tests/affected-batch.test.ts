@@ -29,10 +29,10 @@ describe('affected batch form (A7-11)', () => {
     expect([result.exitCode, result.stderr, result.writes]).toEqual([0, '', 1]);
     const document = JSON.parse(result.stdout) as AffectedDocument;
     expect(Object.keys(document)).toEqual(['schemaVersion', 'root', 'mode', 'revision', 'ramifyVersion', 'selection']);
-    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/3', root, mode: 'batch', ramifyVersion: '1.2.3' });
+    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/4', root, mode: 'batch', ramifyVersion: '1.2.3' });
     expect(document.revision.sequence).toBeNull();
     expect(document.revision.inputId).toMatch(/.+/);
-    expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/3', inputId: document.revision.inputId,
+    expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/4', inputId: document.revision.inputId,
       paths: [{ path: 'subs/core/src/interfaces/api.ts', status: 'owned', module: 'example/core', basis: 'inventory', exclusion: null }],
       changedModules: [core], affectedModules: [app, mid], testModules: [app, core, mid],
       selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',

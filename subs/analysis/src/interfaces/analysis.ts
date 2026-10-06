@@ -120,7 +120,7 @@ export interface AnalysisSummary {
   readonly external: number;
 }
 export interface AnalysisReport {
-  readonly schemaVersion: 'ramify.analysis/2';
+  readonly schemaVersion: 'ramify.analysis/3';
   readonly runId: string;
   readonly inputId: string | null;
   readonly request: AnalysisInputs;

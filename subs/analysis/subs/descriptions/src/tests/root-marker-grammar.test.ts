@@ -76,9 +76,9 @@ describe('PB1-41: the root marker on the module line', () => {
   it('accepts the marker before every module-line form and with nested-tree statements', () => {
     expect(valid('ramify 1\nroot module "root"').module).toMatchObject({ name: 'root', root: { start: 9, end: 13 } });
     expect(valid('ramify 1\nroot module app tagged []').module).toMatchObject({ tags: [], span: { start: 9, end: 34 } });
-    const trees = valid('ramify 1\nroot module app\nowned-ignored "fixtures"\nexternal "cache"');
+    const trees = valid('ramify 1\nroot module app\nowned-unwired "fixtures"\nexternal "cache"');
     expect(trees.module.root).toEqual({ start: 9, end: 13, line: 2, column: 1 });
-    expect(trees.statements.map(({ kind }) => kind)).toEqual(['owned-ignored', 'external']);
+    expect(trees.statements.map(({ kind }) => kind)).toEqual(['owned-unwired', 'external']);
   });
 });
 

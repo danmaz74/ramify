@@ -33,7 +33,7 @@ const resourcePlacement: InventoryFile['placement'] = 'referenced-resource';
 const unplaced: InventoryFile = { path: 'src/main.ts', owner: 'fixture', area: 'ordinary', kind: 'source', sha256: '0'.repeat(64), bytes: 1 };
 const targets: readonly SourceTarget[] = [
   { kind: 'outside-project', file: '../elsewhere/tool.ts' },
-  { kind: 'nested-tree', file: 'fixture-project/src/main.ts', exclusion: { kind: 'owned-ignored', directory: 'fixture-project', owner: 'fixture' } },
+  { kind: 'nested-tree', file: 'fixture-project/src/main.ts', exclusion: { kind: 'owned-nested-project', directory: 'fixture-project', owner: 'fixture' } },
   { kind: 'nested-tree', file: 'external-project/index.ts', exclusion: { kind: 'external', directory: 'external-project', owner: null } },
   { kind: 'excluded', file: 'src/tmp/throwaway.ts', exclusion: { kind: 'scratch', directory: 'src/tmp', owner: 'fixture' } },
   { kind: 'excluded', file: 'dist/main.js', exclusion: { kind: 'output', directory: 'dist', owner: null } },
@@ -50,8 +50,8 @@ const declaredExcluded: SourceTarget = { kind: 'excluded', file: 'external-proje
 const bareTree: SourceTarget = { kind: 'nested-tree', file: 'fixture-project/a.ts' };
 
 const files: Record<string, string> = {
-  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src publicValue from "interfaces/api.ts" to descendants\nowned-ignored "vendor"\n',
-  'README.md': '# Fixture\n\nOne project with source beneath src, one loose root file and an owned-ignored tree.\n',
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src publicValue from "interfaces/api.ts" to descendants\nowned-unwired "vendor"\n',
+  'README.md': '# Fixture\n\nOne project with source beneath src, one loose root file and an owned-unwired tree.\n',
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
     types: [], skipLibCheck: true }, include: ['src', 'subs', 'loose.ts'] }),
@@ -110,7 +110,7 @@ describe('auxiliary provenance vocabulary', () => {
 
   it('gives files beneath src/ src placement and false flags, and the loose root file auxiliary placement and true flags', async () => {
     const value = await report();
-    // The import into the owned-ignored vendor tree is a definite finding, not a
+    // The import into the owned-unwired vendor tree is a definite finding, not a
     // limit, so the check fails with complete coverage (see the next test).
     expect(value.outcome).toEqual({ execution: 'completed', check: 'failed', coverage: 'complete' });
     const inventory = value.snapshot!.inventory;
@@ -139,15 +139,15 @@ describe('auxiliary provenance vocabulary', () => {
     expect(all).toContainEqual({ file: 'src/barrel.ts', area: { owner: 'fixture', kind: 'ordinary', root: 'src', profile: [] }, auxiliary: false });
   });
 
-  it('reports an import into an owned-ignored tree as a nested-tree target that is never checked', async () => {
+  it('reports an import into an owned-unwired tree as a nested-tree target that is never checked', async () => {
     const value = await report();
     // Owned source outside src/ is an application target; a file in an
-    // owned-ignored tree is not inventoried and is classified at its physical
+    // owned nested tree is not inventoried and is classified at its physical
     // location as a nested-tree target with its declaration. Its outcome is the
     // definite boundary denial: one located finding, no symbol decision, no limit.
     const tool = value.snapshot!.accesses.filter(access => access.specifier === '../vendor/tool.js');
     expect(tool.map(access => access.target)).toEqual([{ kind: 'nested-tree', file: 'vendor/tool.ts',
-      exclusion: { kind: 'owned-ignored', directory: 'vendor', owner: 'fixture' } }]);
+      exclusion: { kind: 'owned-unwired', directory: 'vendor', owner: 'fixture' } }]);
     const result = value.snapshot!.results.find(item => item.accessId === tool[0]!.id)!;
     expect(result).toMatchObject({ outcome: 'denied', decisions: [], coverage: [] });
     expect(value.diagnostics.map(item => [item.id, item.code, item.category, item.location?.file, item.location?.line, item.accessId]))

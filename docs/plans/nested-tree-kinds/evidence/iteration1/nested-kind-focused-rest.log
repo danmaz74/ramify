@@ -1,0 +1,1155 @@
+
+ RUN  v4.1.11 /home/app/ramify-nested-kinds
+
+(node:2467479) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2467479) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2467746) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2467746) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ subs/analysis/src/tests/architect-render.test.ts (30 tests | 3 failed) 2106ms
+     × renders the exact golden files with measured dependencies 21ms
+     × renders the exact golden files with measured dependencies and no test references 5ms
+     × renders the exact golden files with unavailable dependencies 4ms
+(node:2467970) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2467970) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468021) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468021) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468093) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468093) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468153) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468153) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468224) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468224) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468478) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468478) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468534) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468534) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468872) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468872) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468924) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2468924) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469016) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469016) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469128) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469128) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469314) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469314) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469417) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469417) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469614) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469639) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469614) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469639) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469885) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2469885) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470051) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470051) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470170) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470170) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470358) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470358) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470459) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470459) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470615) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470615) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470679) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470679) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470976) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2470976) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471158) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471158) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471228) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471228) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471376) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471376) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471434) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471434) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471581) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471581) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471769) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471769) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471972) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2471972) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2472223) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2472223) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2472432) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2472432) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2472779) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2472779) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2473287) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2473287) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts (9 tests | 6 failed) 51ms
+     × classifies by containment before any content rule and answers excluded and inert paths without their content 24ms
+     × answers a request naming only not-analyzed paths from the published revision with no content, capture or sweep 4ms
+     × treats a package manifest or compiler configuration inside an owned-unwired tree as no configuration change 3ms
+     × never admits excluded bytes as content expectations 2ms
+     × retains checked path and finding evidence in a mixed request with a path it could not check 3ms
+     × classifies an invalid deciding revision by the latest completed ownership table 2ms
+ ❯ subs/analysis/subs/project/src/tests/project-boundary-observer.test.ts (16 tests | 1 failed) 10025ms
+     × keeps the listing a configuration makes of a declared tree and a scratch directory, without any byte becoming an input (8B deviation 1) 759ms
+ ❯ src/tests/project-boundary-cli.test.ts (5 tests | 2 failed) 29268ms
+     × PB1-20: a changed check gives the complete check's exit code and findings, with each path's disposition 1595ms
+     × PB1-20: affected states each path seed's status, with outside and whitespace seeds, in both modes 775ms
+ ❯ subs/analysis/src/tests/affected-rule.test.ts (2 tests | 1 failed) 1199ms
+     × base revision: every examples-table seed and the combined queries answer by the rule 673ms
+(node:2482124) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482124) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482218) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482218) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482438) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482438) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482586) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482586) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482663) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482663) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482875) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482905) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482875) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2482905) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483142) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483142) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483321) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483335) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483321) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483335) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483559) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483559) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483804) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483820) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483804) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2483820) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2484100) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2484100) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2484359) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2484359) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2484607) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2484607) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2484864) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2484864) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485122) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485122) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ subs/analysis/subs/project/src/tests/path-ownership.test.ts (93 tests | 1 failed) 310ms
+     × normalizes equivalent spellings relative to the declaring module and retains located evidence 14ms
+(node:2485422) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485422) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485534) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485534) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485601) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485601) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485722) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485722) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485775) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485775) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485903) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485903) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485953) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2485953) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486147) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486147) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486250) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486250) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486294) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486294) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486522) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486522) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486822) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2486822) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2487981) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2487981) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2488370) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2488370) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2488794) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2488794) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2489192) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2489192) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2489695) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2489695) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2489988) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2489988) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ subs/analysis/src/tests/project-boundary-session.test.ts (15 tests | 2 failed) 117077ms
+     × PB1-21: declarations added, edited beneath, removed, changed and a missing root equal fresh batch runs (hot) 8997ms
+     × PB1-21: declarations added, edited beneath, removed, changed and a missing root equal fresh batch runs (warm) 8337ms
+(node:2491305) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491305) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491527) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491547) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491527) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491547) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491687) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491687) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491812) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491812) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491869) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2491869) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492147) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492147) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492298) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492298) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492403) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492403) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492599) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492599) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492659) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492659) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492900) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492913) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492900) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2492913) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493146) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493170) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493146) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493170) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493295) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493295) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493441) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493441) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493512) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493512) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493606) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493606) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493668) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493668) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493724) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493724) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493787) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493787) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493837) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493837) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493892) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493892) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493945) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2493945) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494011) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494011) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494226) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494226) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494454) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494454) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494767) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494767) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494976) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2494976) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2495277) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2495277) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/project-boundary-cli.test.ts > project-boundary CLI processes > PB1-20: a changed check gives the complete check's exit code and findings, with each path's disposition
+AssertionError: fixture-project/src/index.ts: expected [ { …(5) } ] to deeply equal [ { …(5) } ]
+
+- Expected
++ Received
+
+  [
+    {
+      "disposition": "not-analyzed",
+      "exclusion": {
+        "directory": "fixture-project",
+-       "kind": "owned-unwired",
++       "kind": "owned-nested-project",
+        "owner": "app",
+      },
+      "module": "app",
+      "path": "fixture-project/src/index.ts",
+-     "reason": "owned-unwired",
++     "reason": "owned-nested-project",
+    },
+  ]
+
+ ❯ src/tests/project-boundary-cli.test.ts:171:43
+    169|       const result = await changed(path);
+    170|       expect([result.code, result.document.outcome, result.document.ex…
+    171|       expect(result.document.paths, path).toEqual([{ path, ...disposit…
+       |                                           ^
+    172|         ...(disposition.disposition === 'checked' ? { sha256: expect.s…
+    173|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+
+ FAIL  src/tests/project-boundary-cli.test.ts > project-boundary CLI processes > PB1-20: affected states each path seed's status, with outside and whitespace seeds, in both modes
+AssertionError: expected [ [ '../outside.ts', …(3) ], …(4) ] to deeply equal [ [ '../outside.ts', …(3) ], …(4) ]
+
+- Expected
++ Received
+
+@@ -13,11 +13,11 @@
+    ],
+    [
+      "fixture-project/src/index.ts",
+      "owned",
+      "app",
+-     "owned-unwired",
++     "owned-nested-project",
+    ],
+    [
+      "notes/with space.md",
+      "owned",
+      "app",
+
+ ❯ src/tests/project-boundary-cli.test.ts:227:121
+    225|       expect([outcome.code, outcome.stderr], mode.join(' ')).toEqual([…
+    226|       const document = json<AffectedDocument>(outcome);
+    227|       expect(document.selection.paths.map(seed => [seed.path, seed.sta…
+       |                                                                                                                         ^
+    228|         ['../outside.ts', 'outside-project', null, null], ['external-p…
+    229|         ['fixture-project/src/index.ts', 'owned', 'app', 'owned-nested…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+
+ FAIL  subs/analysis/src/tests/affected-rule.test.ts > AR-01 to AR-03 affected rule: path seed kinds and selection on the extended topology > base revision: every examples-table seed and the combined queries answer by the rule
+AssertionError: subs/a/fixtures/sample/src/world.ts: expected [ { …(7) } ] to deeply equal [ { …(7) } ]
+
+- Expected
++ Received
+
+@@ -1,11 +1,11 @@
+  [
+    {
+      "basis": "containment",
+      "exclusion": {
+        "directory": "subs/a/fixtures/sample",
+-       "kind": "owned-unwired",
++       "kind": "owned-nested-project",
+        "owner": "app/a",
+      },
+      "kind": "ignored",
+      "module": "app/a",
+      "path": "subs/a/fixtures/sample/src/world.ts",
+
+ ❯ expectAnswer subs/analysis/src/tests/affected-rule.test.ts:199:31
+    197|   affected: readonly string[], label: string, widening: readonly strin…
+    198|   expect(result.schemaVersion, label).toBe('ramify.affected/4');
+    199|   expect(result.paths, label).toEqual(seeds);
+       |                               ^
+    200|   expectSeedInvariants(result, label);
+    201|   expect([ids(result.changedModules), ids(result.affectedModules), ids…
+ ❯ subs/analysis/src/tests/affected-rule.test.ts:262:9
+ ❯ session subs/analysis/src/tests/affected-rule.test.ts:116:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+
+ FAIL  subs/analysis/src/tests/architect-render.test.ts > renderArchitectView: the architect fixture (golden) > renders the exact golden files with measured dependencies
+AssertionError: expected '==> README.md <==\n```text\nThis dire…' to be '==> README.md <==\n```text\nThis dire…' // Object.is equality
+
+- Expected
++ Received
+
+@@ -34,18 +34,18 @@
+        headline: Engine, begin, loose
+    - **fixture/gamma** — Gamma reads a loose value.
+      exposed 0 · internal 0 · supporting 1 · tests 0 · uses 1 · used by 0
+
+  ==> _meta.json <==
+- {"schema":"ramify.architect-view/2","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"unclassifiedExercises":1,"coverage":1}
++ {"schema":"ramify.architect-view/3","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"unclassifiedExercises":1,"coverage":1}
+
+  ==> alpha/behavior.jsonl <==
+  {"module":"fixture/alpha","name":"build","role":"internal","shape":"callable","behavioral":[],"nonBehavioral":[],"sig":"function build(): Engine;","file":"subs/alpha/src/alpha.ts"}
+
+  ==> alpha/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/alpha",
+    "dir": "subs/alpha",
+    "parent": "fixture",
+    "children": [],
+    "tags": [],
+@@ -81,11 +81,11 @@
+  ==> beta/behavior.jsonl <==
+  {"module":"fixture/beta","name":"drive","role":"internal","shape":"callable","tags":["ui"],"behavioral":[],"nonBehavioral":[],"sig":"function drive(): Engine;","file":"subs/beta/src/beta.ts"}
+
+  ==> beta/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/beta",
+    "dir": "subs/beta",
+    "parent": "fixture",
+    "children": [],
+    "tags": ["ui"],
+@@ -118,11 +118,11 @@
+  ==> checks/behavior.jsonl <==
+  {"module":"fixture/checks","name":"makeEngine","role":"internal","shape":"callable","tags":["testing"],"behavioral":[],"nonBehavioral":[],"sig":"function makeEngine(): Engine;","file":"subs/checks/src/support.ts"}
+
+  ==> checks/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/checks",
+    "dir": "subs/checks",
+    "parent": "fixture",
+    "children": [],
+    "tags": ["testing"],
+@@ -161,11 +161,11 @@
+  {"module":"fixture/core/engine","name":"loose","role":"exposed","shape":"unknown","to":["parent"],"reexposed":[{"by":"fixture/core","to":["parent"]},{"by":"fixture","to":["descendants"]}],"behavioral":[],"nonBehavioral":[],"unclassified":["fixture/gamma"],"sig":"const loose: any","file":"subs/core/subs/engine/src/engine.ts"}
+  {"module":"fixture/core/engine","name":"default","binding":"boot","role":"internal","shape":"callable","behavioral":[],"nonBehavioral":[],"sig":"function default(): void;","file":"subs/core/subs/engine/src/engine.ts"}
+
+  ==> core/engine/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/core/engine",
+    "dir": "subs/core/subs/engine",
+    "parent": "fixture/core",
+    "children": [],
+    "tags": [],
+@@ -195,11 +195,11 @@
+  ==> core/engine/tests.jsonl <==
+  {"module":"fixture/core/engine","file":"subs/core/subs/engine/src/tests/options.test.ts","suite":["options"],"tests":["names the engine and its options as types"],"exercises":[]}
+
+  ==> core/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/core",
+    "dir": "subs/core",
+    "parent": "fixture",
+    "children": ["fixture/core/engine"],
+    "tags": [],
+@@ -236,11 +236,11 @@
+  ==> gamma/behavior.jsonl <==
+
+
+  ==> gamma/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/gamma",
+    "dir": "subs/gamma",
+    "parent": "fixture",
+    "children": [],
+    "tags": [],
+@@ -269,11 +269,11 @@
+  ==> gamma/tests.jsonl <==
+
+
+  ==> module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture",
+    "dir": "",
+    "parent": null,
+    "children": ["fixture/alpha", "fixture/beta", "fixture/checks", "fixture/core", "fixture/gamma"],
+    "tags": [],
+
+ ❯ golden subs/analysis/src/tests/architect-render.test.ts:90:18
+     88|     await writeFile(path, actual);
+     89|   }
+     90|   expect(actual).toBe(await readFile(path, 'utf8'));
+       |                  ^
+     91| }
+     92|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+
+ FAIL  subs/analysis/src/tests/architect-render.test.ts > renderArchitectView: the architect fixture (golden) > renders the exact golden files with measured dependencies and no test references
+AssertionError: expected '==> README.md <==\n```text\nThis dire…' to be '==> README.md <==\n```text\nThis dire…' // Object.is equality
+
+- Expected
++ Received
+
+@@ -34,18 +34,18 @@
+        headline: Engine, begin, loose
+    - **fixture/gamma** — Gamma reads a loose value.
+      exposed 0 · internal 0 · supporting 1 · tests 0 · uses 1 · used by 0
+
+  ==> _meta.json <==
+- {"schema":"ramify.architect-view/2","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"unavailable","metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}
++ {"schema":"ramify.architect-view/3","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"unavailable","metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}
+
+  ==> alpha/behavior.jsonl <==
+  {"module":"fixture/alpha","name":"build","role":"internal","shape":"callable","behavioral":[],"nonBehavioral":[],"sig":"function build(): Engine;","file":"subs/alpha/src/alpha.ts"}
+
+  ==> alpha/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/alpha",
+    "dir": "subs/alpha",
+    "parent": "fixture",
+    "children": [],
+    "tags": [],
+@@ -81,11 +81,11 @@
+  ==> beta/behavior.jsonl <==
+  {"module":"fixture/beta","name":"drive","role":"internal","shape":"callable","tags":["ui"],"behavioral":[],"nonBehavioral":[],"sig":"function drive(): Engine;","file":"subs/beta/src/beta.ts"}
+
+  ==> beta/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/beta",
+    "dir": "subs/beta",
+    "parent": "fixture",
+    "children": [],
+    "tags": ["ui"],
+@@ -118,11 +118,11 @@
+  ==> checks/behavior.jsonl <==
+  {"module":"fixture/checks","name":"makeEngine","role":"internal","shape":"callable","tags":["testing"],"behavioral":[],"nonBehavioral":[],"sig":"function makeEngine(): Engine;","file":"subs/checks/src/support.ts"}
+
+  ==> checks/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/checks",
+    "dir": "subs/checks",
+    "parent": "fixture",
+    "children": [],
+    "tags": ["testing"],
+@@ -161,11 +161,11 @@
+  {"module":"fixture/core/engine","name":"loose","role":"exposed","shape":"unknown","to":["parent"],"reexposed":[{"by":"fixture/core","to":["parent"]},{"by":"fixture","to":["descendants"]}],"behavioral":[],"nonBehavioral":[],"unclassified":["fixture/gamma"],"sig":"const loose: any","file":"subs/core/subs/engine/src/engine.ts"}
+  {"module":"fixture/core/engine","name":"default","binding":"boot","role":"internal","shape":"callable","behavioral":[],"nonBehavioral":[],"sig":"function default(): void;","file":"subs/core/subs/engine/src/engine.ts"}
+
+  ==> core/engine/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/core/engine",
+    "dir": "subs/core/subs/engine",
+    "parent": "fixture/core",
+    "children": [],
+    "tags": [],
+@@ -195,11 +195,11 @@
+  ==> core/engine/tests.jsonl <==
+  {"module":"fixture/core/engine","file":"subs/core/subs/engine/src/tests/options.test.ts","suite":["options"],"tests":["names the engine and its options as types"]}
+
+  ==> core/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/core",
+    "dir": "subs/core",
+    "parent": "fixture",
+    "children": ["fixture/core/engine"],
+    "tags": [],
+@@ -236,11 +236,11 @@
+  ==> gamma/behavior.jsonl <==
+
+
+  ==> gamma/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/gamma",
+    "dir": "subs/gamma",
+    "parent": "fixture",
+    "children": [],
+    "tags": [],
+@@ -269,11 +269,11 @@
+  ==> gamma/tests.jsonl <==
+
+
+  ==> module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture",
+    "dir": "",
+    "parent": null,
+    "children": ["fixture/alpha", "fixture/beta", "fixture/checks", "fixture/core", "fixture/gamma"],
+    "tags": [],
+
+ ❯ golden subs/analysis/src/tests/architect-render.test.ts:90:18
+     88|     await writeFile(path, actual);
+     89|   }
+     90|   expect(actual).toBe(await readFile(path, 'utf8'));
+       |                  ^
+     91| }
+     92|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/16]⎯
+
+ FAIL  subs/analysis/src/tests/architect-render.test.ts > renderArchitectView: the architect fixture (golden) > renders the exact golden files with unavailable dependencies
+AssertionError: expected '==> README.md <==\n```text\nThis dire…' to be '==> README.md <==\n```text\nThis dire…' // Object.is equality
+
+- Expected
++ Received
+
+@@ -34,18 +34,18 @@
+        headline: Engine, begin, loose
+    - **fixture/gamma** — Gamma reads a loose value.
+      exposed 0 · internal 0 · supporting 1 · tests 0 · uses ? · used by ?
+
+  ==> _meta.json <==
+- {"schema":"ramify.architect-view/2","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"unavailable","dependencyReason":"wait-limit","dependencyScope":"production","testReferences":"unavailable","metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}
++ {"schema":"ramify.architect-view/3","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"unavailable","dependencyReason":"wait-limit","dependencyScope":"production","testReferences":"unavailable","metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}
+
+  ==> alpha/behavior.jsonl <==
+  {"module":"fixture/alpha","name":"build","role":"internal","shape":"callable","sig":"function build(): Engine;","file":"subs/alpha/src/alpha.ts"}
+
+  ==> alpha/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/alpha",
+    "dir": "subs/alpha",
+    "parent": "fixture",
+    "children": [],
+    "tags": [],
+@@ -77,11 +77,11 @@
+  ==> beta/behavior.jsonl <==
+  {"module":"fixture/beta","name":"drive","role":"internal","shape":"callable","tags":["ui"],"sig":"function drive(): Engine;","file":"subs/beta/src/beta.ts"}
+
+  ==> beta/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/beta",
+    "dir": "subs/beta",
+    "parent": "fixture",
+    "children": [],
+    "tags": ["ui"],
+@@ -109,11 +109,11 @@
+  ==> checks/behavior.jsonl <==
+  {"module":"fixture/checks","name":"makeEngine","role":"internal","shape":"callable","tags":["testing"],"sig":"function makeEngine(): Engine;","file":"subs/checks/src/support.ts"}
+
+  ==> checks/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/checks",
+    "dir": "subs/checks",
+    "parent": "fixture",
+    "children": [],
+    "tags": ["testing"],
+@@ -150,11 +150,11 @@
+  {"module":"fixture/core/engine","name":"loose","role":"exposed","shape":"unknown","to":["parent"],"reexposed":[{"by":"fixture/core","to":["parent"]},{"by":"fixture","to":["descendants"]}],"sig":"const loose: any","file":"subs/core/subs/engine/src/engine.ts"}
+  {"module":"fixture/core/engine","name":"default","binding":"boot","role":"internal","shape":"callable","sig":"function default(): void;","file":"subs/core/subs/engine/src/engine.ts"}
+
+  ==> core/engine/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/core/engine",
+    "dir": "subs/core/subs/engine",
+    "parent": "fixture/core",
+    "children": [],
+    "tags": [],
+@@ -175,11 +175,11 @@
+  ==> core/engine/tests.jsonl <==
+  {"module":"fixture/core/engine","file":"subs/core/subs/engine/src/tests/options.test.ts","suite":["options"],"tests":["names the engine and its options as types"]}
+
+  ==> core/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/core",
+    "dir": "subs/core",
+    "parent": "fixture",
+    "children": ["fixture/core/engine"],
+    "tags": [],
+@@ -209,11 +209,11 @@
+  ==> gamma/behavior.jsonl <==
+
+
+  ==> gamma/module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture/gamma",
+    "dir": "subs/gamma",
+    "parent": "fixture",
+    "children": [],
+    "tags": [],
+@@ -238,11 +238,11 @@
+  ==> gamma/tests.jsonl <==
+
+
+  ==> module.json <==
+  {
+-   "schema": "ramify.architect-module/2",
++   "schema": "ramify.architect-module/3",
+    "module": "fixture",
+    "dir": "",
+    "parent": null,
+    "children": ["fixture/alpha", "fixture/beta", "fixture/checks", "fixture/core", "fixture/gamma"],
+    "tags": [],
+
+ ❯ golden subs/analysis/src/tests/architect-render.test.ts:90:18
+     88|     await writeFile(path, actual);
+     89|   }
+     90|   expect(actual).toBe(await readFile(path, 'utf8'));
+       |                  ^
+     91| }
+     92|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/16]⎯
+
+ FAIL  subs/analysis/src/tests/project-boundary-session.test.ts > project boundaries in a hot retained session > PB1-21: declarations added, edited beneath, removed, changed and a missing root equal fresh batch runs (hot)
+ FAIL  subs/analysis/src/tests/project-boundary-session.test.ts > project boundaries in a warm retained session > PB1-21: declarations added, edited beneath, removed, changed and a missing root equal fresh batch runs (warm)
+AssertionError: expected [ { kind: 'external', …(2) }, …(3) ] to deeply equal [ { kind: 'external', …(2) }, …(3) ]
+
+- Expected
++ Received
+
+@@ -14,9 +14,9 @@
+      "kind": "owned-unwired",
+      "owner": "app",
+    },
+    {
+      "directory": "subs/a/fixtures/sample",
+-     "kind": "owned-nested-project",
++     "kind": "owned-unwired",
+      "owner": "app/a",
+    },
+  ]
+
+ ❯ subs/analysis/src/tests/project-boundary-session.test.ts:266:10
+    264|       expect(auxiliaryFiles(declared.report)).toEqual(initialAuxiliary…
+    265|       expect(declared.report.snapshot!.inventory.scope.ownership.exclu…
+    266|         .toEqual([{ kind: 'external', directory: 'external-project', o…
+       |          ^
+    267|           { kind: 'owned-unwired', directory: 'scripts', owner: 'app' …
+    268|       expect(declared.report.summary).toMatchObject({ denied: 1, error…
+ ❯ session subs/analysis/src/tests/project-boundary-session.test.ts:231:5
+ ❯ subs/analysis/src/tests/project-boundary-session.test.ts:237:5
+ ❯ project subs/analysis/src/tests/project-boundary-session.test.ts:112:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/16]⎯
+
+ FAIL  subs/analysis/subs/project/src/tests/path-ownership.test.ts > PB1-03/PB1-04: declaration evidence without the filesystem > normalizes equivalent spellings relative to the declaring module and retains located evidence
+AssertionError: expected [ …(2) ] to deeply equal [ Array(2) ]
+
+- Expected
++ Received
+
+@@ -1,9 +1,9 @@
+  [
+    {
+      "directory": "subs/a/fixtures/sample",
+-     "kind": "owned-nested-project",
++     "kind": "owned-unwired",
+      "owner": "app/a",
+    },
+    {
+      "directory": "tool-cache",
+      "kind": "external",
+
+ ❯ subs/analysis/subs/project/src/tests/path-ownership.test.ts:225:39
+    223|       ['app/a', './fixtures/../fixtures/sample', 'subs/a/fixtures/samp…
+    224|     expect(built.declarations[1]).toMatchObject({ description: 'subs/a…
+    225|     expect(declared(built.ownership)).toEqual([{ kind: 'owned-nested-p…
+       |                                       ^
+    226|       { kind: 'external', directory: 'tool-cache', owner: null }]);
+    227|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/16]⎯
+
+ FAIL  subs/analysis/subs/project/src/tests/project-boundary-observer.test.ts > PB1-23 at the observer: excluded and inert byte edits > keeps the listing a configuration makes of a declared tree and a scratch directory, without any byte becoming an input (8B deviation 1)
+AssertionError: expected [ { …(5) } ] to deeply equal [ ObjectContaining{…} ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "code": "compiler-selected-owned-unwired",
++     "code": "compiler-selected-owned-nested-project",
+      "count": 2,
+      "files": [
+        "fixture-project/src/second.ts",
+        "fixture-project/src/world.ts",
+      ],
++     "message": "2 compiler-selected files in an owned-nested-project tree of module app, which Ramify does not analyze; exclude the tree from the compiler configuration",
+      "path": "fixture-project",
+    },
+  ]
+
+ ❯ subs/analysis/subs/project/src/tests/project-boundary-observer.test.ts:148:38
+    146|     await put(app, 'fixture-project/src/second.ts', 'export {};\n');
+    147|     const added = expectKind(await observer.apply([{ path: 'fixture-pr…
+    148|     expect(added.inventory.warnings).toEqual([expect.objectContaining(…
+       |                                      ^
+    149|       files: ['fixture-project/src/second.ts', 'fixture-project/src/wo…
+    150|     expect(contentReads(observer.inputs).filter(path => path.startsWit…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/16]⎯
+
+ FAIL  subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts > changed-check path dispositions from revision-bound project scope > classifies by containment before any content rule and answers excluded and inert paths without their content
+AssertionError: expected [ { path: 'src/main.ts', …(4) }, …(8) ] to deeply equal [ { path: 'src/main.ts', …(4) }, …(8) ]
+
+- Expected
++ Received
+
+@@ -20,22 +20,22 @@
+        "kind": "owned-nested-project",
+        "owner": "app",
+      },
+      "module": "app",
+      "path": "fixture-project/package.json",
+-     "reason": "owned-unwired",
++     "reason": "owned-nested-project",
+    },
+    {
+      "disposition": "not-analyzed",
+      "exclusion": {
+        "directory": "subs/a/fixtures/sample",
+        "kind": "owned-nested-project",
+        "owner": "app/a",
+      },
+      "module": "app/a",
+      "path": "subs/a/fixtures/sample/src/world.ts",
+-     "reason": "owned-unwired",
++     "reason": "owned-nested-project",
+    },
+    {
+      "disposition": "not-analyzed",
+      "exclusion": {
+        "directory": "external-project",
+
+ ❯ subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts:107:37
+    105|       const classification = await e.check(token, named, [], null);
+    106|       expect(classification).toMatchObject({ status: 'classification-c…
+    107|       expect(paths(classification)).toEqual([
+       |                                     ^
+    108|         { path: 'src/main.ts', disposition: 'not-checked', module: 'ap…
+    109|         { path: 'notes/design.md', disposition: 'not-checked', module:…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯
+
+ FAIL  subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts > changed-check path dispositions from revision-bound project scope > answers a request naming only not-analyzed paths from the published revision with no content, capture or sweep
+AssertionError: expected [ [ …(4) ], [ …(4) ] ] to deeply equal [ [ …(4) ], [ …(4) ] ]
+
+- Expected
++ Received
+
+@@ -1,11 +1,11 @@
+  [
+    [
+      "subs/a/fixtures/sample/package.json",
+      "not-analyzed",
+      "app/a",
+-     "owned-unwired",
++     "owned-nested-project",
+    ],
+    [
+      "external-project/package.json",
+      "not-analyzed",
+      null,
+
+ ❯ subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts:138:98
+    136|       expect(answer).toMatchObject({ status: 'reported', published: tr…
+    137|         freshness: { verified: true, reusedRevision: true, captureStar…
+    138|       expect(paths(answer).map(item => [item.path, item.disposition, i…
+       |                                                                                                  ^
+    139|         ['subs/a/fixtures/sample/package.json', 'not-analyzed', 'app/a…
+    140|         ['external-project/package.json', 'not-analyzed', null, 'exter…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/16]⎯
+
+ FAIL  subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts > changed-check path dispositions from revision-bound project scope > treats a package manifest or compiler configuration inside an owned-unwired tree as no configuration change
+AssertionError: expected [ 'reported', 'not-analyzed', …(1) ] to deeply equal [ 'reported', 'not-analyzed', …(1) ]
+
+- Expected
++ Received
+
+  [
+    "reported",
+    "not-analyzed",
+-   "owned-unwired",
++   "owned-nested-project",
+  ]
+
+ ❯ subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts:162:90
+    160|       for (const path of ['subs/a/fixtures/sample/package.json', 'fixt…
+    161|         const answer = await e.check(token, [path], [], null);
+    162|         expect([answer.status, paths(answer)[0]?.disposition, paths(an…
+       |                                                                                          ^
+    163|       }
+    164|       // The root's own configuration stays a configuration change, an…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/16]⎯
+
+ FAIL  subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts > changed-check path dispositions from revision-bound project scope > never admits excluded bytes as content expectations
+AssertionError: expected [ [ 'src/main.ts', …(2) ], [ …(3) ] ] to deeply equal [ [ 'src/main.ts', …(2) ], [ …(3) ] ]
+
+- Expected
++ Received
+
+@@ -5,8 +5,8 @@
+      "classification-changed",
+    ],
+    [
+      "fixture-project/src/index.ts",
+      "not-analyzed",
+-     "owned-unwired",
++     "owned-nested-project",
+    ],
+  ]
+
+ ❯ subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts:195:86
+    193|         [content('src/main.ts'), { path: 'fixture-project/src/index.ts…
+    194|       expect(refused).toMatchObject({ status: 'classification-changed'…
+    195|       expect(paths(refused).map(item => [item.path, item.disposition, …
+       |                                                                                      ^
+    196|         ['src/main.ts', 'not-checked', 'classification-changed'], ['fi…
+    197|       await flush();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/16]⎯
+
+ FAIL  subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts > changed-check path dispositions from revision-bound project scope > retains checked path and finding evidence in a mixed request with a path it could not check
+AssertionError: expected [ { path: 'src/main.ts', …(5) }, …(3) ] to deeply equal [ { path: 'src/main.ts', …(5) }, …(3) ]
+
+- Expected
++ Received
+
+@@ -28,8 +28,8 @@
+        "kind": "owned-nested-project",
+        "owner": "app/a",
+      },
+      "module": "app/a",
+      "path": "subs/a/fixtures/sample/README.md",
+-     "reason": "owned-unwired",
++     "reason": "owned-nested-project",
+    },
+  ]
+
+ ❯ subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts:253:28
+    251|       expect(mixed).toMatchObject({ status: 'reported', published: tru…
+    252|         delta: { findings: [{ id: finding.id, new: true }] } });
+    253|       expect(paths(mixed)).toEqual([
+       |                            ^
+    254|         { path: 'src/main.ts', disposition: 'checked', module: 'app', …
+    255|         { path: 'subs/b/src/consumer.ts', disposition: 'not-checked', …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/16]⎯
+
+ FAIL  subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts > changed-check path dispositions from revision-bound project scope > classifies an invalid deciding revision by the latest completed ownership table
+AssertionError: expected [ [ 'module.ramify', …(3) ], [ …(4) ] ] to deeply equal [ [ 'module.ramify', …(3) ], [ …(4) ] ]
+
+- Expected
++ Received
+
+@@ -7,8 +7,8 @@
+    ],
+    [
+      "fixture-project/module.ramify",
+      "not-analyzed",
+      "app",
+-     "owned-unwired",
++     "owned-nested-project",
+    ],
+  ]
+
+ ❯ subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts:311:99
+    309|         [content('module.ramify', broken)], 1);
+    310|       expect(invalid).toMatchObject({ status: 'reported', published: t…
+    311|       expect(paths(invalid).map(item => [item.path, item.disposition, …
+       |                                                                                                   ^
+    312|         ['module.ramify', 'checked', 'app', 'content'], ['fixture-proj…
+    313|     } finally { await e.dispose(); }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/16]⎯
+
+
+ Test Files  7 failed | 42 passed (49)
+      Tests  16 failed | 1049 passed (1065)
+   Start at  21:40:12
+   Duration  147.49s (transform 3.47s, setup 0ms, import 7.96s, tests 560.82s, environment 6ms)
+

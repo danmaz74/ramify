@@ -68,7 +68,7 @@ IDs and --path paths relative to the root, present or not; give at least one.
 Each owned path has a kind that decides what it selects: source in its
 module's src/, auxiliary source and a module.ramify select their module; a
 captured input, such as the compiler configuration or a package manifest the
-revision read, selects every module it governs; a path in an owned-ignored
+revision read, selects every module it governs; a path in an owned-unwired or owned-nested-project
 tree or a scratch directory, a .md file and any other inert file select
 nothing, as does a path in an external tree or another always-excluded path.
 The answer lists the changed modules, the modules that depend on them, and
@@ -77,7 +77,7 @@ outside the project, written with a leading ../, widens the answer to all
 modules, as does partial coverage; the widening reasons are printed. Without
 --batch it is a synchronized resident query that never falls back to batch;
 --batch answers from a fresh session that trusts no daemon state.
---format json prints one ramify.affected-cli/3 document.
+--format json prints one ramify.affected-cli/4 document.
 --changed, --since and --deadline do not apply.
 
 explore selects one project through the resident daemon, starts or reuses that
@@ -206,7 +206,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (command === 'check') {
     if (changed && batch) throw new Error('--changed cannot be combined with --batch');
     if (!changed && (since !== undefined || deadlineMs !== undefined)) throw new Error('--since and --deadline require --changed');
-    // A changed check's ramify.check/2 document has no snapshot to leave out.
+    // A changed check's ramify.check/3 document has no snapshot to leave out.
     if (changed && noSnapshot) throw new Error('--no-snapshot cannot be combined with --changed');
     if (noSnapshot && format !== 'json') throw new Error('--no-snapshot requires --format json');
     return { command, ...project, batch, ...(changed ? { changed } : {}),

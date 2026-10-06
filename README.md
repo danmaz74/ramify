@@ -129,7 +129,7 @@ npx ramify affected --path src/foo.ts --batch --format json
 modules, the modules that depend on them and their union as test modules, from
 one revision's dependency facts. Each path seed is owned, excluded or outside
 the project, and an owned seed's kind decides the modules it selects: paths in
-owned-ignored trees and scratch directories, `.md` files and other inert files
+owned nested trees and scratch directories, `.md` files and other inert files
 select nothing, and a captured input such as the compiler configuration selects
 every module it governs. Only a path outside the project, written with a
 leading `../`, or partial coverage widens the answer to every module and says
@@ -151,8 +151,8 @@ name a directory whose description carries the marker. The compiler
 configuration is found from the root as TypeScript finds it. The check includes
 owned tests and resources. Owned compiler source outside every module's `src/`
 is that module's auxiliary source, checked under its ordinary rules; trees a
-description declares `owned-ignored` or `external` are not analyzed, and
-compiler-selected source inside an owned-ignored tree or a module's scratch
+description declares `owned-unwired`, `owned-nested-project` or `external` are not analyzed, and
+compiler-selected source inside an owned nested tree or a module's scratch
 directory `src/tmp/` produces a warning. `--batch` uses and disposes a fresh
 session. Human output is the default; JSON output is one versioned report on
 stdout. Inside a Git repository a complete check also warns about each
@@ -164,7 +164,7 @@ scope and exit codes. `--help` and `--version` load no compiler or server.
 the daemon's classification analyzes, waits up to `--deadline` milliseconds
 (default 2000) for a daemon revision that covers them and prints every project
 finding, marking the new ones, with each path checked, not analyzed or not
-checked; JSON output is one `ramify.check/2` document. It exits 0 without
+checked; JSON output is one `ramify.check/3` document. It exits 0 without
 findings, 1 with findings or an invalid revision, whatever paths are not
 analyzed, and 2 when a path was not checked, and it never falls back to batch. The
 example adapter [`examples/hooks/claude-code-post-write.mjs`](examples/hooks/README.md)
@@ -209,20 +209,20 @@ usage, production selection, gate evidence and measurement commands.
 - `examples/` - the [Collection Review reference project](examples/collection-review/README.md):
   a small runnable application whose fifteen owners carry the module
   descriptions, with its own package, lockfile and toolchain; the root declares
-  `examples/collection-review` owned-ignored, and the example is its own
+  `examples/collection-review` owned-nested-project, and the example is its own
   project. The [post-write hook adapter](examples/hooks/README.md) beside it is
   root auxiliary source.
 - `scripts/reference-harness/` - the reference harness: one record per case
   family from the [case catalogue](docs/plans/reference-project/cases.md), and
   `npm run reference:report`, which runs the example's own tiers and reports
   what has and has not been established. `npm run reference:cases` runs the
-  harness's own tests. The root declares it owned-ignored, as it does two
-  probe fixture projects under `scripts/probes/fixtures/`; other compiler source
+  harness's own tests. The root declares it owned-unwired, as it does two
+  compiler probe inputs under `scripts/probes/fixtures/`; other compiler source
   beneath `scripts/` is root auxiliary source.
 - `site/` - the documentation website (its own npm package), declared
-  owned-ignored.
+  owned-nested-project.
 
-The root description also declares `docs/` owned-ignored, and `ramify-agent/`
+The root description also declares `docs/` owned-unwired, and `ramify-agent/`
 and the work directories tools write into the checkout external.
 
 ## Documentation site

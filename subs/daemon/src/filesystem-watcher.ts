@@ -6,7 +6,7 @@ import type { ClockPort, WatchBatch, WatchEvent, WatcherHandle, WatcherPort, Wat
 /** Excluded directories whose own creation, removal or replacement the context observes:
  * declared trees and scratch directories. Nothing beneath any exclusion is delivered, and
  * the own entries of repository, package, output and generated directories are not either. */
-const observedRoots: ReadonlySet<string> = new Set(['owned-ignored', 'external', 'scratch']);
+const observedRoots: ReadonlySet<string> = new Set(['owned-unwired', 'owned-nested-project', 'external', 'scratch']);
 /** Pruned directories a registrations answer lists; `prunedCount` gives the total. */
 const listedPruned = 20;
 const maximumPaths = 10_000;

@@ -101,7 +101,7 @@ describe('exact owned source paths', () => {
       const parsed = syntax(file, text);
       if (parsed.status !== 'valid') return parsed;
       return { ...parsed, document: { ...parsed.document, statements: [
-        { index: 0, kind: 'owned-ignored', span, directory: { value: 'fixtures/sample', span } },
+        { index: 0, kind: 'owned-unwired', span, directory: { value: 'fixtures/sample', span } },
         { index: 1, kind: 'expose-src', span, selection: { kind: 'named', names: [{ name: 'value', alias: 'value', span }] },
           from: { value: 'interfaces/api.ts', span }, tags: null, destinations: ['parent'] },
         { index: 2, kind: 'external', span, directory: { value: 'absent-cache', span } },

@@ -14,7 +14,7 @@ import { repositoryRoot } from './plan.js';
 import { sessionReport } from './session-expectations.js';
 import { Assertions } from './runner.js';
 
-const document = { schemaVersion: 'ramify.analysis/2', runId: 'a', inputId: 'input/1:one', stages: [], capabilities: [],
+const document = { schemaVersion: 'ramify.analysis/3', runId: 'a', inputId: 'input/1:one', stages: [], capabilities: [],
   request: {}, scope: null, registry: null, outcome: {}, snapshot: { linked: { selections: [{ name: 'Type' }] } },
   diagnostics: [], warnings: [], coverage: [], summary: {} };
 const report = () => structuredClone(document) as unknown as AnalysisReport;

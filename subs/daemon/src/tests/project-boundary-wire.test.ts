@@ -32,9 +32,9 @@ const revision: ContextRevision = {
   outcome: { execution: 'completed', check: 'passed', coverage: 'complete' },
   summary: { complete: true, owners: 1, sourceFiles: 1, resources: 0, originals: 1, accesses: 0, allowed: 0, denied: 0, errors: 0, warnings: 0, coverageNotes: 0, external: 0 },
 };
-const ignored = exclusion('owned-ignored', 'vendor', 'app');
+const ignored = exclusion('owned-unwired', 'vendor', 'app');
 const settledPaths: PathCheckDisposition[] = [
-  { path: 'vendor/src/x.ts', disposition: 'not-analyzed', module: 'app', exclusion: ignored, reason: 'owned-ignored' },
+  { path: 'vendor/src/x.ts', disposition: 'not-analyzed', module: 'app', exclusion: ignored, reason: 'owned-unwired' },
   { path: 'external-tree/y.ts', disposition: 'not-analyzed', module: null, exclusion: exclusion('external', 'external-tree'), reason: 'external' },
   { path: 'src/tmp/scratch.ts', disposition: 'not-analyzed', module: 'app', exclusion: exclusion('scratch', 'src/tmp', 'app'), reason: 'scratch' },
   { path: 'node_modules/pkg/index.js', disposition: 'not-analyzed', module: null, exclusion: exclusion('packages', 'node_modules'), reason: 'reserved' },
@@ -73,7 +73,7 @@ describe('PB1-25: strict codecs reject malformed new variants', () => {
       at(reported, 2, { sha256: sha('notes') }), at(reported, 2, { exclusion: ignored }), at(reported, 2, { module: null }),
       at(reported, 3, { reason: 'covered' }), at(reported, 3, { sha256: null }),
       at(reported, 4, { reason: 'external' }), at(reported, 4, { module: null }), at(reported, 5, { module: 'app' }),
-      at(reported, 6, { exclusion: exclusion('owned-ignored', 'src/tmp', 'app') }), at(reported, 7, { exclusion: exclusion('scratch', 'src/tmp', 'app') }),
+      at(reported, 6, { exclusion: exclusion('owned-unwired', 'src/tmp', 'app') }), at(reported, 7, { exclusion: exclusion('scratch', 'src/tmp', 'app') }),
       at(reported, 0, { disposition: 'passed' }), at(reported, 0, { path: '../outside.ts' }), at(reported, 0, { path: '/abs.ts' }),
       at(reported, 0, { path: 'src/./main.ts' }), at(reported, 1, { path: 'src/main.ts' }),
       { ...reported, timings: { ...reported.timings, unknown: 1 } }, { ...reported, report: { schemaVersion: 'ramify.analysis/1' } },
@@ -160,7 +160,7 @@ describe('PB1-25: the client decodes check replies strictly over a real socket',
 
 async function project(base: string): Promise<Record<string, string>> {
   const files: Record<string, string> = {
-    'module.ramify': 'ramify 1\nroot module app\nowned-ignored "vendor"\nexternal "external-tree"\n',
+    'module.ramify': 'ramify 1\nroot module app\nowned-unwired "vendor"\nexternal "external-tree"\n',
     'README.md': '# App\n\nA wire fixture.\n',
     'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022', types: [], skipLibCheck: true },
       include: ['src'], exclude: ['src/tmp'] }),
@@ -280,4 +280,17 @@ describe('PB1-25: the installed daemon carries the changed check over real IPC',
       expect([pid, ...children].filter(alive)).toEqual([]);
     } finally { await rm(base, { recursive: true, force: true }); }
   }, 180_000);
+});
+
+
+describe('NT-06: wire ownership and not-analyzed reasons', () => {
+  it.each(['owned-unwired', 'owned-nested-project'] as const)('accepts %s and rejects mismatched ownership or reason', kind => {
+    const item = { path: 'vendor/src/x.ts', disposition: 'not-analyzed', module: 'app',
+      exclusion: exclusion(kind, 'vendor', 'app'), reason: kind };
+    const value = at(reported, 4, item);
+    expect(() => validateServiceReply('check', ok(value))).not.toThrow();
+    expect(() => validateServiceReply('check', ok(at(reported, 4, { ...item, exclusion: exclusion(kind, 'vendor') })))).toThrow('Invalid check reply schema');
+    const other = kind === 'owned-unwired' ? 'owned-nested-project' : 'owned-unwired';
+    expect(() => validateServiceReply('check', ok(at(reported, 4, { ...item, reason: other })))).toThrow('Invalid check reply schema');
+  });
 });

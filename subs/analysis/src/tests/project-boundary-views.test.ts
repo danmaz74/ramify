@@ -21,7 +21,7 @@ import { opened } from './session-test-fixture.js';
  * from the contracts ("Transport, observation and projections") and the
  * architect and API-view specifications, never from a recorded run:
  *
- * - a module record lists its declared owned-ignored and external trees with
+ * - a module record lists its declared owned nested and external trees with
  *   the declaring statement, and nothing beneath them; its counts include its
  *   auxiliary source and exclude inert files, scratch and declared trees;
  * - auxiliary originals are internal records, never available foreign APIs;
@@ -44,7 +44,7 @@ const topology: Readonly<Record<string, string>> = {
   'package.json': '{"name":"app","type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', types: [],
     strict: true, skipLibCheck: true }, include: ['src', 'subs/*/src', 'subs/*/subs/*/src'], exclude: ['src/tmp', 'subs/*/src/tmp'] }),
-  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-ignored "fixture-project"\nexternal "external-project"\n'
+  'module.ramify': 'ramify 1\nroot module app tagged [dispatch]\nowned-nested-project "fixture-project"\nexternal "external-project"\n'
     + 'expose-sub api from a to descendants\n',
   'README.md': '# App\n\nThe written provider topology, viewed.\n',
   'notes/design.md': 'Inert root-owned prose naming inertNotesMarker.\n',
@@ -53,14 +53,14 @@ const topology: Readonly<Record<string, string>> = {
   'tools/tmp/helper.ts': 'export function helper(): number { return 7; }\n',
   'src/main.ts': 'export const main: number = 1;\n',
   'src/tmp/throwaway.test.ts': "export const scratchRootMarker = 1;\ndescribe('scratch root suite', () => { it('scratch root title', () => {}); });\n",
-  // The root's owned-ignored project, with a malformed description and test-shaped files Ramify must never read.
+  // The root's owned-unwired project, with a malformed description and test-shaped files Ramify must never read.
   'fixture-project/module.ramify': 'ramify 1\nroot module fixture-project\n',
   'fixture-project/tsconfig.json': '{ "include": ["src"] }',
   'fixture-project/src/thing.ts': 'export function ignoredRootTreeMarker(): number { return 1; }\n',
   'fixture-project/src/tests/thing.test.ts': "describe('ignored root suite', () => { it('ignored root title', () => {}); });\n",
   'fixture-project/subs/broken/module.ramify': 'this is not a description\n',
   'external-project/lib.ts': 'export function externalTreeMarker(): number { return 2; }\n',
-  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
+  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\nexpose-src api from "api.ts" to parent\n',
   'subs/a/README.md': '# A\n\nProvides api.\n',
   'subs/a/src/api.ts': 'export function api(): number { return 1; }\n',
   'subs/a/src/tests/api.test.ts': "import { api } from '../api.js';\n\ndescribe('api', () => {\n  it('returns one', () => {\n    api();\n  });\n});\n",
@@ -110,7 +110,7 @@ const metrics = (owner: Owner): string => JSON.stringify({ state: 'measured', vi
 
 /** The two module records with boundaries, written out byte for byte from the architect specification's layout. */
 const expectedRootModule = (): string => `{
-  "schema": "ramify.architect-module/2",
+  "schema": "ramify.architect-module/3",
   "module": "app",
   "dir": "",
   "parent": null,
@@ -119,7 +119,7 @@ const expectedRootModule = (): string => `{
   "areas": ["src"],
   "boundaries": [
     { "kind": "external", "dir": "external-project", "description": "module.ramify", "line": 4, "column": 1 },
-    { "kind": "owned-ignored", "dir": "fixture-project", "description": "module.ramify", "line": 3, "column": 1 }
+    { "kind": "owned-nested-project", "dir": "fixture-project", "description": "module.ramify", "line": 3, "column": 1 }
   ],
   "purpose": {
     "state": "present",
@@ -139,7 +139,7 @@ const expectedRootModule = (): string => `{
 }
 `;
 const expectedAModule = (): string => `{
-  "schema": "ramify.architect-module/2",
+  "schema": "ramify.architect-module/3",
   "module": "app/a",
   "dir": "subs/a",
   "parent": "app",
@@ -147,7 +147,7 @@ const expectedAModule = (): string => `{
   "tags": [],
   "areas": ["src", "src/tests"],
   "boundaries": [
-    { "kind": "owned-ignored", "dir": "subs/a/fixtures/sample", "description": "subs/a/module.ramify", "line": 3, "column": 1 }
+    { "kind": "owned-nested-project", "dir": "subs/a/fixtures/sample", "description": "subs/a/module.ramify", "line": 3, "column": 1 }
   ],
   "purpose": {
     "state": "present",
@@ -179,12 +179,12 @@ interface Views {
   readonly view: RenderedArchitectView;
 }
 
-async function withViews(check: (views: Views) => Promise<void>): Promise<void> {
+async function withViews(check: (views: Views) => Promise<void>, kind: 'owned-unwired' | 'owned-nested-project' = 'owned-nested-project'): Promise<void> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-boundary-views-')));
   try {
     for (const [path, text] of Object.entries(topology)) {
       await mkdir(dirname(join(root, path)), { recursive: true });
-      await writeFile(join(root, path), text);
+      await writeFile(join(root, path), path.endsWith('module.ramify') ? text.replaceAll('owned-nested-project', kind) : text);
     }
     const inputs: SessionInputs = {
       project: { cwd: root, root, scope: 'whole-project', configuration: 'discover' },
@@ -234,11 +234,11 @@ const entries = (projection: ApiViewProjection): unknown[] => projection.modules
 describe('architect view boundaries (PB1-27)', () => {
   it('lists both boundary kinds with their declarations, counts analyzed auxiliary source, and records nothing beneath a declared tree', () => withViews(async views => {
     const { view, projection } = views;
-    expect(projection).toMatchObject({ schema: 'ramify.architect-projection/2', sequence: views.revision.sequence, inputId: views.revision.inputId });
+    expect(projection).toMatchObject({ schema: 'ramify.architect-projection/3', sequence: views.revision.sequence, inputId: views.revision.inputId });
     expect(projection.modules.map(module => [module.module, module.boundaries])).toEqual([
       ['app', [{ kind: 'external', dir: 'external-project', description: 'module.ramify', line: 4, column: 1 },
-        { kind: 'owned-ignored', dir: 'fixture-project', description: 'module.ramify', line: 3, column: 1 }]],
-      ['app/a', [{ kind: 'owned-ignored', dir: 'subs/a/fixtures/sample', description: 'subs/a/module.ramify', line: 3, column: 1 }]],
+        { kind: 'owned-nested-project', dir: 'fixture-project', description: 'module.ramify', line: 3, column: 1 }]],
+      ['app/a', [{ kind: 'owned-nested-project', dir: 'subs/a/fixtures/sample', description: 'subs/a/module.ramify', line: 3, column: 1 }]],
       ['app/a/grand', []], ['app/b', []],
     ]);
     // Byte-exact module records, metrics included, and the other two with no boundaries.
@@ -249,7 +249,7 @@ describe('architect view boundaries (PB1-27)', () => {
     }
     expect(JSON.parse(file(view, 'b/module.json'))).toMatchObject({ files: { own: 1, subtree: 1 },
       uses: [{ module: 'app/a', behavioral: 1, nonBehavioral: 0 }], usedBy: [] });
-    expect(JSON.parse(file(view, '_meta.json'))).toMatchObject({ schema: 'ramify.architect-view/2', revision: revisionLabel,
+    expect(JSON.parse(file(view, '_meta.json'))).toMatchObject({ schema: 'ramify.architect-view/3', revision: revisionLabel,
       input: views.revision.inputId, modules: 4, dependencies: 'measured', testReferences: 'measured', metrics: 'measured' });
     expect(view.files.map(item => item.path)).toEqual(['README.md', '_meta.json', 'a/behavior.jsonl', 'a/grand/behavior.jsonl',
       'a/grand/module.json', 'a/grand/supporting.jsonl', 'a/grand/tests.jsonl', 'a/module.json', 'a/supporting.jsonl', 'a/tests.jsonl',
@@ -335,7 +335,7 @@ describe('API views from legal exposures only (PB1-28)', () => {
       expect(outcome, from).toEqual({ status: 'unavailable', reason: 'invalid-location', message: expect.stringContaining(`"${from}" lies in the `) });
     }
     const declared = await handle.apiView(apiQuery(revision.sequence, { scope: 'module', from: 'subs/a/fixtures/sample/src/index.ts' }));
-    expect(declared).toMatchObject({ message: '"subs/a/fixtures/sample/src/index.ts" lies in the owned-ignored directory "subs/a/fixtures/sample", which Ramify does not analyze' });
+    expect(declared).toMatchObject({ message: '"subs/a/fixtures/sample/src/index.ts" lies in the owned-nested-project directory "subs/a/fixtures/sample", which Ramify does not analyze' });
   }), timeout);
 });
 
@@ -376,4 +376,16 @@ describe('measurements and one revision (PB1-29)', () => {
     expect(await handle.apiView(apiQuery(revision.sequence, { scope: 'module', from: 'scripts/check.ts' }, { maxAreaBytes: 1 })))
       .toMatchObject({ status: 'unavailable', reason: 'resource-limit' });
   }), timeout);
+});
+
+
+describe('NT-06: architect boundary kind serialization', () => {
+  it.each(['owned-unwired', 'owned-nested-project'] as const)('preserves %s in the projection and rendered module record', kind => withViews(async ({ projection, view }) => {
+    const expected = { kind, dir: 'fixture-project', description: 'module.ramify', line: 3, column: 1 };
+    expect(projection.schema).toBe('ramify.architect-projection/3');
+    expect(projection.modules[0]!.boundaries).toContainEqual(expected);
+    expect(JSON.parse(file(view, 'module.json'))).toMatchObject({ schema: 'ramify.architect-module/3',
+      boundaries: expect.arrayContaining([expected]) });
+    expect(JSON.parse(file(view, '_meta.json')).schema).toBe('ramify.architect-view/3');
+  }, kind), timeout);
 });

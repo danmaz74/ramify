@@ -29,8 +29,8 @@ function scopeOf(ownership: ProjectOwnership): ProjectScope {
     walkedAreas: [], ownership };
 }
 
-const rootTrees = [tree(0, 'owned-ignored', 'fixture-project'), tree(1, 'external', 'external-project')];
-const aTrees = [tree(0, 'owned-ignored', 'fixtures/sample')];
+const rootTrees = [tree(0, 'owned-nested-project', 'fixture-project'), tree(1, 'external', 'external-project')];
+const aTrees = [tree(0, 'owned-nested-project', 'fixtures/sample')];
 const topology: readonly ModuleInput[] = [
   module('app', null, '.', rootTrees), module('app/a', 'app', 'subs/a', aTrees), module('app/a/grand', 'app/a', 'subs/a/subs/grand'),
   module('app/a-extra', 'app', 'subs/a-extra'), module('app/b', 'app', 'subs/b'),
@@ -43,8 +43,8 @@ const excluded = (kind: ProjectExclusion['kind'], directory: string): PathOwners
 const outside: PathOwnership = { status: 'outside-project', module: null };
 const appScratch: ProjectExclusion = { kind: 'scratch', directory: 'src/tmp', owner: 'app' };
 const aScratch: ProjectExclusion = { kind: 'scratch', directory: 'subs/a/src/tmp', owner: 'app/a' };
-const aSample: ProjectExclusion = { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'app/a' };
-const fixtureProject: ProjectExclusion = { kind: 'owned-ignored', directory: 'fixture-project', owner: 'app' };
+const aSample: ProjectExclusion = { kind: 'owned-nested-project', directory: 'subs/a/fixtures/sample', owner: 'app/a' };
+const fixtureProject: ProjectExclusion = { kind: 'owned-nested-project', directory: 'fixture-project', owner: 'app' };
 
 /** The written topology's table: byte-ordered modules, then rooted exclusions with `dist` as the output directory. */
 const expectedTable: ProjectOwnership = {
@@ -114,8 +114,8 @@ describe('PB1-08/PB1-17/PB1-18: the written topology from a pure ownership table
   it('holds byte-ordered modules and rooted exclusions, with a scratch directory for every module', () => {
     expect(built.ownership).toEqual(expectedTable);
     expect(built.declarations.map(item => [item.module, item.kind, item.directory, item.problem])).toEqual([
-      ['app', 'owned-ignored', 'fixture-project', null], ['app', 'external', 'external-project', null],
-      ['app/a', 'owned-ignored', 'subs/a/fixtures/sample', null],
+      ['app', 'owned-nested-project', 'fixture-project', null], ['app', 'external', 'external-project', null],
+      ['app/a', 'owned-nested-project', 'subs/a/fixtures/sample', null],
     ]);
     expect(Object.isFrozen(built.ownership) && Object.isFrozen(built.ownership.exclusions[0])).toBe(true);
   });
@@ -215,24 +215,24 @@ describe('PB1-03/PB1-04: declaration evidence without the filesystem', () => {
   }
   const problems = (declarations: readonly NestedTreeDeclaration[]) =>
     declarations.map(item => [item.module, item.decoded, item.directory, item.problem]);
-  const declared = (ownership: ProjectOwnership) => ownership.exclusions.filter(item => item.kind === 'owned-ignored' || item.kind === 'external');
+  const declared = (ownership: ProjectOwnership) => ownership.exclusions.filter(item => item.kind === 'owned-unwired' || item.kind === 'owned-nested-project' || item.kind === 'external');
 
   it('normalizes equivalent spellings relative to the declaring module and retains located evidence', () => {
-    const built = evidence([tree(0, 'external', 'tool-cache/./x/..')], [tree(3, 'owned-ignored', './fixtures/../fixtures/sample')]);
+    const built = evidence([tree(0, 'external', 'tool-cache/./x/..')], [tree(3, 'owned-nested-project', './fixtures/../fixtures/sample')]);
     expect(problems(built.declarations)).toEqual([['app', 'tool-cache/./x/..', 'tool-cache', null],
       ['app/a', './fixtures/../fixtures/sample', 'subs/a/fixtures/sample', null]]);
-    expect(built.declarations[1]).toMatchObject({ description: 'subs/a/module.ramify', statement: 3, kind: 'owned-ignored', span: { start: 3 } });
-    expect(declared(built.ownership)).toEqual([{ kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'app/a' },
+    expect(built.declarations[1]).toMatchObject({ description: 'subs/a/module.ramify', statement: 3, kind: 'owned-nested-project', span: { start: 3 } });
+    expect(declared(built.ownership)).toEqual([{ kind: 'owned-nested-project', directory: 'subs/a/fixtures/sample', owner: 'app/a' },
       { kind: 'external', directory: 'tool-cache', owner: null }]);
   });
 
   it('rejects escapes, malformed strings, child overlap, external source trees and always-excluded targets', () => {
     const built = evidence([
-      tree(0, 'external', '../outside'), tree(1, 'owned-ignored', '.'), tree(2, 'external', '/abs'), tree(3, 'external', 'a//b'),
-      tree(4, 'external', 'trailing/'), tree(5, 'external', 'C:/x'), tree(6, 'owned-ignored', 'subs/a/fixtures'), tree(7, 'external', 'subs/b'),
-      tree(8, 'external', 'src/vendor'), tree(9, 'owned-ignored', 'src/tmp/keep'), tree(10, 'external', 'node_modules/x'),
-      tree(11, 'external', 'dist'), tree(12, 'owned-ignored', 'src/.ramify'), tree(13, 'owned-ignored', 'src/tests/fixture'),
-    ], [tree(0, 'owned-ignored', '../../x'), tree(1, 'external', 'fixtures/../..'), tree(2, 'external', 'src/tests/data')]);
+      tree(0, 'external', '../outside'), tree(1, 'owned-unwired', '.'), tree(2, 'external', '/abs'), tree(3, 'external', 'a//b'),
+      tree(4, 'external', 'trailing/'), tree(5, 'external', 'C:/x'), tree(6, 'owned-unwired', 'subs/a/fixtures'), tree(7, 'external', 'subs/b'),
+      tree(8, 'external', 'src/vendor'), tree(9, 'owned-unwired', 'src/tmp/keep'), tree(10, 'external', 'node_modules/x'),
+      tree(11, 'external', 'dist'), tree(12, 'owned-unwired', 'src/.ramify'), tree(13, 'owned-unwired', 'src/tests/fixture'),
+    ], [tree(0, 'owned-unwired', '../../x'), tree(1, 'external', 'fixtures/../..'), tree(2, 'external', 'src/tests/data')]);
     expect(problems(built.declarations)).toEqual([
       ['app', '../outside', null, 'escape'], ['app', '.', '.', 'escape'], ['app', '/abs', null, 'invalid-path'],
       ['app', 'a//b', null, 'invalid-path'], ['app', 'trailing/', null, 'invalid-path'], ['app', 'C:/x', null, 'invalid-path'],
@@ -240,21 +240,21 @@ describe('PB1-03/PB1-04: declaration evidence without the filesystem', () => {
       ['app', 'src/vendor', 'src/vendor', 'external-in-src'], ['app', 'src/tmp/keep', 'src/tmp/keep', 'always-excluded'],
       ['app', 'node_modules/x', 'node_modules/x', 'always-excluded'], ['app', 'dist', 'dist', 'always-excluded'],
       ['app', 'src/.ramify', 'src/.ramify', 'always-excluded'],
-      // An owned-ignored tree may lie within owned source, including its testing area.
+      // An owned nested tree may lie within owned source, including its testing area.
       ['app', 'src/tests/fixture', 'src/tests/fixture', null],
       ['app/a', '../../x', 'x', 'escape'], ['app/a', 'fixtures/../..', 'subs', 'escape'],
       ['app/a', 'src/tests/data', 'subs/a/src/tests/data', 'external-in-src'],
     ]);
-    expect(declared(built.ownership)).toEqual([{ kind: 'owned-ignored', directory: 'src/tests/fixture', owner: 'app' }]);
+    expect(declared(built.ownership)).toEqual([{ kind: 'owned-unwired', directory: 'src/tests/fixture', owner: 'app' }]);
   });
 
   it('rejects equal or nested declarations of either kind and accepts nonoverlapping neighbours', () => {
-    const built = evidence([tree(0, 'owned-ignored', 'data'), tree(1, 'external', 'data/cache'), tree(2, 'owned-ignored', 'logs'),
-      tree(3, 'external', './logs'), tree(4, 'owned-ignored', 'data2'), tree(5, 'external', 'datastore/x')]);
+    const built = evidence([tree(0, 'owned-unwired', 'data'), tree(1, 'external', 'data/cache'), tree(2, 'owned-unwired', 'logs'),
+      tree(3, 'external', './logs'), tree(4, 'owned-unwired', 'data2'), tree(5, 'external', 'datastore/x')]);
     expect(problems(built.declarations)).toEqual([['app', 'data', 'data', 'overlap'], ['app', 'data/cache', 'data/cache', 'overlap'],
       ['app', 'logs', 'logs', 'overlap'], ['app', './logs', 'logs', 'overlap'], ['app', 'data2', 'data2', null],
       ['app', 'datastore/x', 'datastore/x', null]]);
-    expect(declared(built.ownership)).toEqual([{ kind: 'owned-ignored', directory: 'data2', owner: 'app' },
+    expect(declared(built.ownership)).toEqual([{ kind: 'owned-unwired', directory: 'data2', owner: 'app' },
       { kind: 'external', directory: 'datastore/x', owner: null }]);
     // A rejected declaration excludes nothing: its paths keep their ordinary owner.
     expect(classifyProjectPath(scopeOf(built.ownership), 'data/cache/x.ts')).toEqual(owned('app', '.'));
@@ -281,7 +281,7 @@ describe('PB1-08/PB1-19: an acquired scope classifies absent and deleted paths w
       files: ['src/main.ts', 'subs/a/src/api.ts', 'subs/b/src/consumer.ts'] }));
     for (const file of ['src/main.ts', 'subs/a/src/api.ts', 'subs/b/src/consumer.ts']) await put(root, file, 'export {};\n');
     await put(root, 'notes/design.md', '# Design\n');
-    // The owned-ignored trees hold only data here: discovery does not yet prune them.
+    // The owned nested trees hold only data here: discovery does not yet prune them.
     await put(root, 'fixture-project/data.txt', 'data\n');
     await put(root, 'subs/a/fixtures/sample/data.txt', 'data\n');
     // The external tree, scratch directories, `dist` and every seeded file below stay absent.

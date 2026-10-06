@@ -148,7 +148,7 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
   // Path seeds by the scope's ownership, which reads nothing: an owned path outside
   // every exclusion resolves by its inventory entry, its module's description or
   // README, or one of its module's areas, else by containment, as does an owned
-  // path in an owned-ignored tree or a scratch directory. An excluded path and a
+  // path in an owned nested tree or a scratch directory. An excluded path and a
   // path outside the project name no module. The basis only attributes a path;
   // its kind decides the modules it selects.
   const fileOwners = new Map(inventory.files.map(file => [file.path, file.owner]));
@@ -246,7 +246,7 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
     if (++visited % cancellationStride === 0 && signal?.aborted) return { status: 'cancelled' };
     const consumer = access.importer.area.owner;
     if (access.target.kind === 'application' && !depend(consumer, access.target.origin.area.owner)) return edgeLimit();
-    // A path in an owned-ignored tree or a scratch directory is its owner's,
+    // A path in an owned nested tree or a scratch directory is its owner's,
     // although its contents are not analyzed: an import of it depends on the owner.
     if ((access.target.kind === 'nested-tree' || access.target.kind === 'excluded') && access.target.exclusion.owner !== null
       && !depend(consumer, access.target.exclusion.owner)) return edgeLimit();
@@ -286,7 +286,7 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
   const changedModules = listed(seedIds);
   const affectedModules = listed([...reached].filter(id => !seedIds.has(id)));
   return { status: 'answered', result: {
-    schemaVersion: 'ramify.affected/3', inputId: facts.inputId, paths: pathSeeds, changedModules, affectedModules,
+    schemaVersion: 'ramify.affected/4', inputId: facts.inputId, paths: pathSeeds, changedModules, affectedModules,
     testModules: widening.length ? listed(modules.keys()) : listed(reached),
     selection: widening.length ? 'all-modules' : 'dependency-closure', widening, scope: facts.scope,
     coverage: { status: partial ? 'partial' : 'complete', notes: [...facts.coverage].sort(locatedOrder) },

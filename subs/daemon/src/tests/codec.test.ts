@@ -212,7 +212,7 @@ describe('ramify.ipc/2: the strict context-status scope carries its ownership ta
   const ownership = {
     modules: [{ id: 'app', parent: null, directory: '.' }, { id: 'app/a', parent: 'app', directory: 'subs/a' }],
     exclusions: [{ kind: 'output', directory: 'dist', owner: null }, { kind: 'external', directory: 'external-project', owner: null },
-      { kind: 'owned-ignored', directory: 'fixture-project', owner: 'app' }, { kind: 'scratch', directory: 'src/tmp', owner: 'app' },
+      { kind: 'owned-nested-project', directory: 'fixture-project', owner: 'app' }, { kind: 'scratch', directory: 'src/tmp', owner: 'app' },
       { kind: 'scratch', directory: 'subs/a/src/tmp', owner: 'app/a' }],
   };
   const scope = { root: '/project', selection: 'given', invokedFrom: '/project', configuration: '/project/tsconfig.json',
@@ -240,7 +240,7 @@ describe('ramify.ipc/2: the strict context-status scope carries its ownership ta
       { ...scope, ownership: { ...ownership, extra: [] } },
       { ...scope, ownership: { ...ownership, modules: [{ id: 'app', directory: '.' }] } },
       { ...scope, ownership: { ...ownership, modules: [{ id: 'app', parent: 1, directory: '.' }] } },
-      exclusion({ kind: 'scratch', directory: 'src/tmp', owner: null }), exclusion({ kind: 'owned-ignored', directory: 'x', owner: null }),
+      exclusion({ kind: 'scratch', directory: 'src/tmp', owner: null }), exclusion({ kind: 'owned-unwired', directory: 'x', owner: null }),
       exclusion({ kind: 'external', directory: 'x', owner: 'app' }), exclusion({ kind: 'packages', directory: 'node_modules', owner: 'app' }),
       exclusion({ kind: 'ignored', directory: 'x', owner: null }), exclusion({ kind: 'output', directory: 1, owner: null }),
       exclusion({ kind: 'output', directory: 'dist' })]) {

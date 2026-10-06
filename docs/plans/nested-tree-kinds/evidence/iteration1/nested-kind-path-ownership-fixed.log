@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /home/app/ramify-nested-kinds
+
+
+ Test Files  1 passed (1)
+      Tests  93 passed (93)
+   Start at  21:43:00
+   Duration  770ms (transform 209ms, setup 0ms, import 264ms, tests 341ms, environment 0ms)
+

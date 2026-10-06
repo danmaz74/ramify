@@ -104,13 +104,13 @@ const focusedTestDirectories = [
 ];
 
 /**
- * The root description's owned-ignored trees that a copy leaves out are
+ * The root description's owned nested trees that a copy leaves out are
  * recreated empty: each must exist as a real directory, and nothing beneath
  * one is ever read, so an empty directory is an equivalent input.
  */
-async function restoreOwnedIgnored(root: string): Promise<void> {
+async function restoreOwnedNestedTrees(root: string): Promise<void> {
   const description = await readFile(join(root, 'module.ramify'), 'utf8');
-  for (const [, directory] of description.matchAll(/^owned-ignored "([^"\\]+)"[ \t]*$/gm)) await mkdir(join(root, directory!), { recursive: true });
+  for (const [, directory] of description.matchAll(/^(?:owned-unwired|owned-nested-project) "([^"\\]+)"[ \t]*$/gm)) await mkdir(join(root, directory!), { recursive: true });
 }
 /** A minimal isolated copy of R or T for a real materialize/check cycle:
  * `node_modules` is symlinked from the real checkout, never copied, matching
@@ -128,7 +128,7 @@ async function isolatedCopy(kind: 'R' | 'T', scratchRoot: string): Promise<{ rea
     + excluded.map(name => `rm -rf ${JSON.stringify(join(root, name))}`).join(' && ')
     + ` && find ${JSON.stringify(root)} -maxdepth 8 \\( -name '.ramify' -o -name '.ramify.tmp-*' -o -name '.ramify.old-*' \\) -exec rm -rf {} +`], 120_000);
   if (copy.code !== 0) throw new Error(`Isolated ${kind} copy failed: ${copy.stderr}`);
-  await restoreOwnedIgnored(root);
+  await restoreOwnedNestedTrees(root);
   await symlink(join(source, 'node_modules'), join(root, 'node_modules'));
   return { root, dispose: () => rm(root, { recursive: true, force: true }) };
 }

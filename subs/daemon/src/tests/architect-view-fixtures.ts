@@ -56,7 +56,7 @@ export function architectView(options: {
     tests.push(suite(facts.module, facts.dir, local, [`${term}s ${local} once`, `${term}s ${local} twice`]));
   }
   const projection: ArchitectViewProjection = {
-    schema: 'ramify.architect-projection/2', sequence: 1, inputId: 'input/1:fixture', root, modules, symbols, tests,
+    schema: 'ramify.architect-projection/3', sequence: 1, inputId: 'input/1:fixture', root, modules, symbols, tests,
     counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0,
   };
   return renderArchitectView({ revision: options.revision ?? 'rev/1:fixture', projection,

@@ -1,0 +1,4 @@
+
+> ramify.ts@0.3.0 type-check
+> tsc --noEmit && tsc -p tsconfig.portable.json && tsc -p tsconfig.scripts.json && tsc -p scripts/reference-harness/tsconfig.json
+

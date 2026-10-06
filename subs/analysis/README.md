@@ -25,7 +25,7 @@ compiler update, then only the files whose resolution those paths can change are
 described and interpreted. A membership change whose reach the retained facts or
 the compiler cannot bound takes the broad path instead. Every revision
 carries its checked set, finding delta and timings; `report` materializes the
-`ramify.analysis/2` document of a retained revision on request, equal to
+`ramify.analysis/3` document of a retained revision on request, equal to
 `analyzeProject` over the same inputs except `runId`, and `verify` recomputes
 everything from the warm compiler and compares it with the retained facts.
 A broad revision retires the compiler's earlier observations immediately before
@@ -97,7 +97,7 @@ exports fail it. A missing resource import is unverifiable, while an exposure
 naming that missing resource is invalid.
 
 Project boundaries are decided before symbol selection and the same-owner
-exemption. An access whose target lies in a declared owned-ignored or external
+exemption. An access whose target lies in a declared owned-unwired, owned-nested-project or external
 tree without package resolution has the `denied` outcome, one located
 `project-boundary-import` finding and no symbol decision, whatever its form:
 value, type-only, symbol-free, namespace or lazy member selection, or
@@ -107,7 +107,7 @@ always-excluded target is unverifiable with the nonblocking `excluded-target`
 limit; a target outside the root is outside scope with `outside-module-target`;
 neither is allowed or external.
 
-`ramify.analysis/2` reports retain inventory and purpose metadata, captured
+`ramify.analysis/3` reports retain inventory and purpose metadata, captured
 input identity, expanded declarations, original and accessed source locations,
 source selections, decisions and provenance. The batch UUID identifies a call;
 the input digest identifies its sealed root/configuration/registry and captured
@@ -128,7 +128,7 @@ including selections within one large namespace occurrence.
 Plan 2B's architect view is projected here and rendered here. `planArchitectView`
 lists the symbol details, export shapes, test files and `.feature` files a
 revision needs, and `projectArchitectView` builds the `ArchitectViewProjection`:
-module facts in tree order, each with the owned-ignored and external trees its
+module facts in tree order, each with the owned nested and external trees its
 description declares, joined to the revision's ownership exclusions, every
 owned exported original once with its role, destinations, tags and the
 ancestors that re-expose it, an auxiliary original outside `src/` always as an

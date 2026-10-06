@@ -162,7 +162,7 @@ describe('daemon affected operation (A7-07)', { timeout: 120_000 }, () => {
 
     // The independently expected answer for the stated edges.
     const expected = {
-      schemaVersion: 'ramify.affected/3', paths: [{ path: 'subs/core/src/interfaces/api.ts', status: 'owned', module: 'example/core', basis: 'inventory', exclusion: null }],
+      schemaVersion: 'ramify.affected/4', paths: [{ path: 'subs/core/src/interfaces/api.ts', status: 'owned', module: 'example/core', basis: 'inventory', exclusion: null }],
       changedModules: [core], affectedModules: [app, mid], testModules: [app, core, mid],
       selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
     };

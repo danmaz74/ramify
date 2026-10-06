@@ -146,7 +146,7 @@ export interface CheckRequest {
  * How a changed check treated one named path, classified by the deciding revision's
  * ownership table. `checked`: the revision analyzed the path's current content, whose
  * identity it names, or its deletion. `not-analyzed`: the complete check does not
- * analyze the path either: it lies in an owned-ignored, external or scratch directory
+ * analyze the path either: it lies in an owned nested, external or scratch directory
  * or another always-excluded path, or it is an owned file that is neither source nor
  * an analysis input; it needs no content and carries no content identity.
  * `not-checked`: the path's result could not be established.
@@ -158,7 +158,7 @@ export type PathCheckDisposition =
       readonly reason: 'deleted'; readonly sha256: null }
   | { readonly path: string; readonly disposition: 'not-analyzed'; readonly module: string | null;
       readonly exclusion: ProjectExclusion | null;
-      readonly reason: 'owned-ignored' | 'external' | 'scratch' | 'reserved' | 'owned-non-source' }
+      readonly reason: 'owned-unwired' | 'owned-nested-project' | 'external' | 'scratch' | 'reserved' | 'owned-non-source' }
   | { readonly path: string; readonly disposition: 'not-checked'; readonly module: string | null;
       readonly exclusion: ProjectExclusion | null;
       readonly reason: 'superseded' | 'unobserved-input' | 'classification-changed' };
@@ -357,7 +357,7 @@ export interface WatchEvent {
  * What a watcher must not register beneath: one revision's rooted exclusions and the
  * canonical reserved-path rules, both applied by Project's classifier. A watcher registers
  * no directory `excluded` names and nothing beneath one; it keeps watching the enclosing
- * directory, so an owned-ignored, external or scratch directory's own creation, removal
+ * directory, so an owned nested, external or scratch directory's own creation, removal
  * or replacement still reaches the listener.
  */
 export interface WatchScope {

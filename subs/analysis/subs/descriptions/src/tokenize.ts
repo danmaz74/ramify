@@ -1,7 +1,7 @@
 import type { DescriptionIssue, DescriptionToken, TextSpan } from './interfaces/syntax.js';
 
 const keywords = new Set([
-  'ramify', 'module', 'expose-src', 'expose-test', 'expose-sub', 'owned-ignored',
+  'ramify', 'module', 'expose-src', 'expose-test', 'expose-sub', 'owned-unwired', 'owned-nested-project',
   'external', 'root', 'from', 'as', 'tagged', 'to', 'parent', 'descendants', 'testing',
   'browser', 'ui',
 ]);

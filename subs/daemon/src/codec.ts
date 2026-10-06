@@ -156,8 +156,8 @@ function selection(value: unknown): boolean {
   return shape(value, ['root', 'scope', 'configuration', 'setup']) && string(value.root) && value.scope === 'whole-project'
     && value.configuration === 'discover' && shape(value.setup, ['registry', 'capabilities']) && string(value.setup.registry) && strings(value.setup.capabilities);
 }
-// Owned-ignored and scratch exclusions carry their owner; every other kind is unowned.
-const ownedExclusions = ['owned-ignored', 'scratch'];
+// Owned nested and scratch exclusions carry their owner; every other kind is unowned.
+const ownedExclusions = ['owned-unwired', 'owned-nested-project', 'scratch'];
 const unownedExclusions = ['external', 'repository', 'packages', 'output', 'generated'];
 function exclusion(value: unknown): value is { readonly kind: string; readonly directory: string; readonly owner: string | null } {
   return shape(value, ['kind', 'directory', 'owner']) && string(value.directory)
@@ -263,7 +263,7 @@ function requestPath(value: unknown): value is string {
     && posix.normalize(value) === value && value !== '.' && value !== '..' && !value.startsWith('../');
 }
 const notAnalyzedReasons: Readonly<Record<string, readonly string[]>> = {
-  'owned-ignored': ['owned-ignored'], external: ['external'], scratch: ['scratch'], reserved: ['repository', 'packages', 'output', 'generated'],
+  'owned-unwired': ['owned-unwired'], 'owned-nested-project': ['owned-nested-project'], external: ['external'], scratch: ['scratch'], reserved: ['repository', 'packages', 'output', 'generated'],
 };
 /** One `PathCheckDisposition`: only a checked path carries an identity; a not-analyzed path's
  * reason agrees with its exclusion, whose owned kinds name a module and unowned kinds none. */
@@ -307,7 +307,7 @@ function delta(value: unknown): boolean {
     && strings(value.removed) && Array.isArray(value.warnings) && value.warnings.every(plain) && Array.isArray(value.coverage) && value.coverage.every(plain);
 }
 /** An embedded analysis report carries its own schema identifier, which must be this build's. */
-function report(value: unknown): boolean { return plain(value) && value.schemaVersion === 'ramify.analysis/2'; }
+function report(value: unknown): boolean { return plain(value) && value.schemaVersion === 'ramify.analysis/3'; }
 const unavailableReasons = ['unknown-context', 'expired-generation', 'evicted-revision', 'unobserved-input', 'resource-unavailable',
   'analysis-failed', 'unsupported-setup', 'disposed', 'configuration-changed'];
 /** One `CheckOutcome`: a closed status with exactly its variant's members. */

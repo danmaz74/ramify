@@ -34,7 +34,7 @@ interface InventoryIndex {
   readonly auxiliary: ReadonlySet<string>;
   /** Every module directory other than the root's, with its proper ancestors. */
   readonly modulePaths: ReadonlySet<string>;
-  /** The proper ancestors of every declared owned-ignored or external directory. */
+  /** The proper ancestors of every declared owned nested or external directory. */
   readonly declared: ReadonlySet<string>;
 }
 const indices = new WeakMap<ProjectInventory, InventoryIndex>();
@@ -49,7 +49,7 @@ function indexOf(inventory: ProjectInventory): InventoryIndex {
   for (const file of inventory.files) if (file.placement === 'auxiliary') addChain(auxiliary, dirname(file.path));
   for (const module of inventory.modules) addChain(modulePaths, module.directory);
   for (const exclusion of inventory.scope.ownership.exclusions) {
-    if (exclusion.kind === 'owned-ignored' || exclusion.kind === 'external') addChain(declared, dirname(exclusion.directory));
+    if (exclusion.kind === 'owned-unwired' || exclusion.kind === 'owned-nested-project' || exclusion.kind === 'external') addChain(declared, dirname(exclusion.directory));
   }
   const index: InventoryIndex = { files: new Map(inventory.files.map(file => [file.path, file])),
     modules: new Map(inventory.modules.map(module => [module.directory, module])), auxiliary, modulePaths, declared };
@@ -268,7 +268,7 @@ class Observer implements ProjectObserver {
     const ownership = relativePath === '' ? null : classifyProjectPath(this.#inventory.scope, relativePath);
     const exclusion = ownership?.status === 'owned' || ownership?.status === 'excluded' ? ownership.exclusion : null;
     if (exclusion) {
-      if (exclusion.kind === 'owned-ignored' || exclusion.kind === 'external' || exclusion.kind === 'scratch') {
+      if (exclusion.kind === 'owned-unwired' || exclusion.kind === 'owned-nested-project' || exclusion.kind === 'external' || exclusion.kind === 'scratch') {
         return this.#excluded(path, relativePath, exclusion);
       }
       // Repository metadata, installed packages and compiler output are never

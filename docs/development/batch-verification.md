@@ -24,10 +24,9 @@ ordinary `src/`, and keeps only files beneath an owner's `src/`, so auxiliary
 source, inert owned files, declared nested trees and scratch directories never
 enter it. Architectural checking and test discovery still cover the testing
 files, and checking covers auxiliary source. Toolkit `allowJs` includes its owned
-ESM process probe and other owned JavaScript in source analysis. The example,
-the site, the reference harness and two probe fixture projects are owned-ignored
-trees with their own compiler configurations and contribute no source findings
-to toolkit self-check; other scripts are root auxiliary source, which self-check
+ESM process probe and other owned JavaScript in source analysis. The example and site are owned nested projects; the reference harness and
+two compiler probe inputs are owned-unwired trees. All are excluded from toolkit
+analysis and contribute no source findings to toolkit self-check; other scripts are root auxiliary source, which self-check
 analyzes under the root's ordinary profile.
 
 To install the built package into a consumer, run `npm install /path/to/ramify`.

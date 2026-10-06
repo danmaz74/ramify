@@ -44,7 +44,7 @@ It specifies the required `src/` and `subs/` layout, with optional same-owner
 `src/tests/` and `src/interfaces/`, and the formal `module.ramify` version 1
 language. Modules may occur only beneath `subs/`. The project root's description
 is marked `root module <name>`, and `ramify check` climbs to the nearest marked
-description. A description may declare nested trees as `owned-ignored` or
+description. A description may declare nested trees as `owned-unwired`, `owned-nested-project` or
 `external`; Ramify does not inventory or analyze them, and an analyzed file
 that imports from one violates the boundary unless the import resolves through
 a package, which makes it external. The module header classifies
@@ -149,7 +149,7 @@ direct adapters, supplemented by actual transport and process tests. The
 [CLI invocation contract](docs/architecture/cli-invocation.spec.md) fixes how
 `ramify check` selects the project, finds the compiler configuration, reports
 project warnings and exits.
-Owned compiler source outside every module's `src/` and its owned-ignored trees,
+Owned compiler source outside every module's `src/` and its owned nested trees,
 including `scripts/`, sibling `tests/` or `interfaces/` and loose `subs/` source,
 is its nearest module's auxiliary source: it is analyzed under that owner's
 ordinary classification even when the compiler configuration does not select
@@ -157,7 +157,7 @@ it, and its originals can never be exposed. Other owned files there, apart from
 `module.ramify` files and module READMEs, are inert files: Ramify never
 classifies them, though one the compiler reads, such as `tsconfig.json` or an
 imported data file, is a captured input whose change is rechecked.
-Compiler-selected source inside an owned-ignored tree or a module's scratch
+Compiler-selected source inside an owned nested tree or a module's scratch
 directory produces a warning without failing the check. Discovered stray
 `module.ramify` files are layout errors even with valid contents. Other invalid
 declarations and invalid exposure paths remain errors. A future

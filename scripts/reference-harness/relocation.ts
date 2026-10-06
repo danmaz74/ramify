@@ -112,7 +112,7 @@ function semantic(report: AnalysisReport) {
 function assertClean(context: ProjectContext, report: AnalysisReport, label: string): void {
   context.assertions.equal(`${label}: real reference completed cleanly`, [report.schemaVersion, report.outcome.execution,
     report.outcome.check, report.outcome.coverage, report.summary.complete, report.summary.owners,
-    report.summary.denied, report.summary.errors, report.coverage], ['ramify.analysis/2', 'completed', 'passed', 'complete', true, 15, 0, 0, []]);
+    report.summary.denied, report.summary.errors, report.coverage], ['ramify.analysis/3', 'completed', 'passed', 'complete', true, 15, 0, 0, []]);
   // Project-boundary iteration 8C: vite.config.ts and vitest.config.ts are the root's auxiliary source (no warning); cucumber.js is inert, as the example does not admit JavaScript.
   context.assertions.equal(`${label}: no configuration warnings`, report.warnings, []);
   observe(context, 'relocation-analysis', { label, report: analysisEvidence(report) });

@@ -88,7 +88,7 @@ function expectFrozenPlainData(value: unknown, active = new Set<object>(), verif
 describe('public disposable analysis session', () => {
   it('publishes the full real pipeline, provenance and independent capability dimensions', async () => fixture(async (root, inputs) => {
     const report = reported(await analyzeProject(inputs));
-    expect(report).toMatchObject({ schemaVersion: 'ramify.analysis/2', request: inputs,
+    expect(report).toMatchObject({ schemaVersion: 'ramify.analysis/3', request: inputs,
       scope: { root, configuration: join(root, 'tsconfig.json'), selection: 'given', walkedAreas: expect.arrayContaining(['src', 'subs/consumer/src']) },
       registry: inputs.registry, outcome: { execution: 'completed', check: 'passed', coverage: 'complete' },
       diagnostics: [], warnings: [], coverage: [],
@@ -254,8 +254,8 @@ describe('public disposable analysis session', () => {
 
   // PB1-11 through the batch session: the source Project leaves unanalyzed is
   // also kept out of the compiler's roots, so no stage reads its bytes.
-  it('warns about compiler-selected source in an owned-ignored tree and a scratch directory without compiling or reading it', async () => fixture(async (root, inputs) => {
-    await put(root, 'module.ramify', `${fixtureFiles['module.ramify']}owned-ignored "tools/fixtures"\n`);
+  it('warns about compiler-selected source in an owned-unwired tree and a scratch directory without compiling or reading it', async () => fixture(async (root, inputs) => {
+    await put(root, 'module.ramify', `${fixtureFiles['module.ramify']}owned-unwired "tools/fixtures"\n`);
     const unanalyzed = ['subs/consumer/src/tmp/draft.ts', 'tools/fixtures/data.ts'];
     for (const path of unanalyzed) await put(root, path, 'export const value = 1;\n');
     await put(root, 'tools/outside.ts', 'export const outside = 1;\n');
@@ -266,8 +266,8 @@ describe('public disposable analysis session', () => {
     expect(report.warnings).toEqual([
       { code: 'compiler-selected-scratch', path: 'subs/consumer/src/tmp', files: ['subs/consumer/src/tmp/draft.ts'], count: 1,
         message: '1 compiler-selected file in the scratch directory of module fixture/consumer, which Ramify does not analyze; exclude the directory from the compiler configuration' },
-      { code: 'compiler-selected-owned-ignored', path: 'tools/fixtures', files: ['tools/fixtures/data.ts'], count: 1,
-        message: '1 compiler-selected file in an owned-ignored tree of module fixture, which Ramify does not analyze; exclude the tree from the compiler configuration' },
+      { code: 'compiler-selected-owned-unwired', path: 'tools/fixtures', files: ['tools/fixtures/data.ts'], count: 1,
+        message: '1 compiler-selected file in an owned-unwired tree of module fixture, which Ramify does not analyze; exclude the tree from the compiler configuration' },
     ]);
     // The auxiliary file is read; the unanalyzed ones never are, by acquisition or by the compiler.
     const read = report.snapshot!.inputs.filter(input => input.bytes > 0).map(input => input.path);

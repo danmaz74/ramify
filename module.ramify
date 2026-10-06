@@ -1,16 +1,14 @@
 ramify 1
 root module "ramify" tagged [dispatch]
 
-// Owned trees Ramify does not interpret: the documentation, the documentation
-// site (its own package), the Collection Review example (its own package and
-// project), the reference harness, and two probe fixture projects with their
-// own compiler configurations.
-owned-ignored "docs"
-owned-ignored "examples/collection-review"
-owned-ignored "scripts/probes/fixtures/compiler-api"
-owned-ignored "scripts/probes/fixtures/plan2a-symbol-details"
-owned-ignored "scripts/reference-harness"
-owned-ignored "site"
+// Owned trees Ramify never analyzes: unwired documentation, reference harness
+// and compiler probe inputs, plus the Collection Review and site projects.
+owned-unwired "docs"
+owned-nested-project "examples/collection-review"
+owned-unwired "scripts/probes/fixtures/compiler-api"
+owned-unwired "scripts/probes/fixtures/plan2a-symbol-details"
+owned-unwired "scripts/reference-harness"
+owned-nested-project "site"
 
 // The agent harness, a separate project, and the work directories tools write
 // into the checkout: cucumber-viz state, editor history, browser-agent output

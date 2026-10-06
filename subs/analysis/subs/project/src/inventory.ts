@@ -72,7 +72,7 @@ function projectWarnings(groups: ReadonlyMap<string, { readonly code: ProjectWar
   }).sort((a, b) => byteOrder(a.path, b.path) || byteOrder(a.code, b.code));
 }
 /**
- * One warning per owned-ignored tree or module scratch directory holding
+ * One warning per owned nested tree or module scratch directory holding
  * compiler-selected source, located at that directory. Such source is neither
  * inventoried nor read; an external tree's selected files warn about nothing.
  */
@@ -82,10 +82,10 @@ function excludedSelectionWarnings(ownership: ProjectOwnership, scope: Omit<Proj
   for (const file of files) {
     const owned = classifyProjectPath({ ...scope, walkedAreas: [], ownership }, file);
     const exclusion = owned.status === 'owned' ? owned.exclusion : null;
-    if (exclusion?.kind !== 'owned-ignored' && exclusion?.kind !== 'scratch') continue;
-    const group = groups.get(exclusion.directory) ?? (exclusion.kind === 'owned-ignored'
-      ? { code: 'compiler-selected-owned-ignored', files: [],
-        message: count => `${selectedFiles(count)} in an owned-ignored tree of module ${exclusion.owner}, which Ramify does not analyze; exclude the tree from the compiler configuration` }
+    if (exclusion?.kind !== 'owned-unwired' && exclusion?.kind !== 'owned-nested-project' && exclusion?.kind !== 'scratch') continue;
+    const group = groups.get(exclusion.directory) ?? ((exclusion.kind === 'owned-unwired' || exclusion.kind === 'owned-nested-project')
+      ? { code: `compiler-selected-${exclusion.kind}`, files: [],
+        message: count => `${selectedFiles(count)} in an ${exclusion.kind} tree of module ${exclusion.owner}, which Ramify does not analyze; exclude the tree from the compiler configuration` }
       : { code: 'compiler-selected-scratch', files: [],
         message: count => `${selectedFiles(count)} in the scratch directory of module ${exclusion.owner}, which Ramify does not analyze; exclude the directory from the compiler configuration` });
     group.files.push(file); groups.set(exclusion.directory, group);
@@ -99,7 +99,7 @@ function excludedSelectionWarnings(ownership: ProjectOwnership, scope: Omit<Proj
 function undeclaredBoundary(root: string, path: string, directory: string, marker: TextSpan | null, enclosing: InventoryModule | null): ProjectIssue {
   const owner = join(root, enclosing?.directory ?? '.');
   const declared = JSON.stringify(relative(owner, directory).split(sep).join('/'));
-  const kinds = within(join(owner, 'src'), directory) ? `owned-ignored ${declared}` : `owned-ignored ${declared} or external ${declared}`;
+  const kinds = within(join(owner, 'src'), directory) ? `owned-nested-project ${declared}` : `owned-nested-project ${declared} or external ${declared}`;
   const description = enclosing ? join(enclosing.directory, 'module.ramify') : 'its nearest enclosing module description';
   const declare = `declare ${kinds} in ${description}`;
   return marker
@@ -261,7 +261,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
     issues.push(...await nestedTreeIssues(capture, modules, buildProjectOwnership(modules, outputDirectories(capture.root, config)).declarations));
     await exactReferences(capture, modules, owned, issues, references);
     // Selected source in a declared tree or a scratch directory is neither
-    // inventoried nor read; owned-ignored and scratch selections are warned about.
+    // inventoried nor read; owned nested and scratch selections are warned about.
     // Each selected path is tested by its prefixes, not against every directory.
     const projectRelative = (path: string): string => relative(capture.root, path).split(sep).join('/');
     const prunedPaths = new Set([...pruned].map(projectRelative));

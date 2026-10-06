@@ -18,7 +18,7 @@ import { audited, equalToBatch, instrumentObserver, opened } from './session-tes
  * run of the same disk state, and its findings with expectations reasoned from
  * the contracts and the specifications, not from a recorded run:
  *
- * - a declaration change, a missing owned-ignored root and a manifest are
+ * - a declaration change, a missing owned-unwired root and a manifest are
  *   structural; source a declaration excludes leaves the inventory and an
  *   import into it is a definite `project-boundary-import`; source a removed
  *   declaration brings back is read afresh ("Transport, observation and
@@ -41,10 +41,10 @@ import { audited, equalToBatch, instrumentObserver, opened } from './session-tes
 const timeout = 300_000;
 const tsconfig = JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', types: [], strict: true,
   skipLibCheck: true }, include: ['src', 'subs/*/src'], exclude: ['src/tmp', 'subs/*/src/tmp'] });
-const rootDescription = (trees: readonly string[] = ['owned-ignored "fixture-project"', 'external "external-project"']): string =>
+const rootDescription = (trees: readonly string[] = ['owned-nested-project "fixture-project"', 'external "external-project"']): string =>
   `ramify 1\nroot module app tagged [dispatch]\n${trees.map(tree => `${tree}\n`).join('')}expose-sub api from a to descendants\n`
   + 'expose-src * from "interfaces/contract.ts" to descendants\n';
-const aDescription = (tree = 'fixtures/sample'): string => `ramify 1\nmodule a\nowned-ignored "${tree}"\nexpose-src api from "api.ts" to parent\n`;
+const aDescription = (tree = 'fixtures/sample'): string => `ramify 1\nmodule a\n${tree === 'fixtures/sample' ? 'owned-nested-project' : 'owned-unwired'} "${tree}"\nexpose-src api from "api.ts" to parent\n`;
 const check = "import { api } from '../subs/a/src/api.js';\nexport const checked: number = api();\n";
 const checkWithHidden = "import { api } from '../subs/a/src/api.js';\nimport { hidden } from '../subs/b/src/hidden.js';\nexport const checked: number = api() + hidden;\n";
 
@@ -126,7 +126,7 @@ async function project(check: (project: Project) => Promise<void>, files: Readon
 
 /** A finding as `[code, file, line]`, in report order. */
 const located = (items: readonly AnalysisDiagnostic[]): unknown[] => items.map(item => [item.code, item.location?.file, item.location?.line]);
-const boundary = (specifier: string, file: string, kind: 'owned-ignored' | 'external', directory: string): string =>
+const boundary = (specifier: string, file: string, kind: 'owned-unwired' | 'owned-nested-project' | 'external', directory: string): string =>
   `'${specifier}' resolves to ${file} in the declared ${kind} tree ${directory}; an import into a declared tree must use package resolution`;
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 const auxiliaryFiles = (report: AnalysisReport): string[] =>
@@ -236,7 +236,7 @@ describe.each(['hot', 'warm'] as const)('project boundaries in a %s retained ses
   it(`PB1-21: declarations added, edited beneath, removed, changed and a missing root equal fresh batch runs (${level})`, () => project(async ({ inputs, write, remove }) => {
     await session(inputs, level, async (run, first) => {
       expect(first.diagnostics).toEqual([]);
-      // Byte edits of an inert file, owned-ignored contents, a scratch file and a's ignored sample change no input.
+      // Byte edits of an inert file, owned-unwired contents, a scratch file and a's ignored sample change no input.
       await write('notes/design.md', 'Inert root-owned prose, edited.\n');
       await write('fixture-project/src/thing.ts', 'export const thing: number = 2;\nexport interface Shape { readonly size: number }\n');
       await write('subs/a/fixtures/sample/src/index.ts', 'export const sample: number = 2;\n');
@@ -255,16 +255,16 @@ describe.each(['hot', 'warm'] as const)('project boundaries in a %s retained ses
       const removed = await run.step(['subs/a-extra'], 'broad', true);
       expect(removed.report.snapshot!.inventory.modules.map(module => module.id)).toEqual(['app', 'app/a', 'app/a/grand', 'app/b']);
 
-      // Declaring scripts owned-ignored removes its auxiliary source and makes the same-owner import a boundary import.
-      await write('module.ramify', rootDescription(['owned-ignored "fixture-project"', 'owned-ignored "scripts"', 'external "external-project"']));
+      // Declaring scripts owned-unwired removes its auxiliary source and makes the same-owner import a boundary import.
+      await write('module.ramify', rootDescription(['owned-nested-project "fixture-project"', 'owned-unwired "scripts"', 'external "external-project"']));
       const declared = await run.step(['module.ramify'], 'broad', true);
       expect(declared.revision.outcome).toEqual(failed);
       expect(located(declared.revision.diagnostics)).toEqual([['project-boundary-import', 'src/uses-check.ts', 1]]);
-      expect(declared.revision.diagnostics[0]!.message).toBe(boundary('../scripts/check.js', 'scripts/check.ts', 'owned-ignored', 'scripts'));
+      expect(declared.revision.diagnostics[0]!.message).toBe(boundary('../scripts/check.js', 'scripts/check.ts', 'owned-unwired', 'scripts'));
       expect(auxiliaryFiles(declared.report)).toEqual(initialAuxiliary.filter(path => !path.startsWith('scripts/')));
-      expect(declared.report.snapshot!.inventory.scope.ownership.exclusions.filter(item => item.kind === 'owned-ignored' || item.kind === 'external'))
-        .toEqual([{ kind: 'external', directory: 'external-project', owner: null }, { kind: 'owned-ignored', directory: 'fixture-project', owner: 'app' },
-          { kind: 'owned-ignored', directory: 'scripts', owner: 'app' }, { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'app/a' }]);
+      expect(declared.report.snapshot!.inventory.scope.ownership.exclusions.filter(item => item.kind === 'owned-unwired' || item.kind === 'owned-nested-project' || item.kind === 'external'))
+        .toEqual([{ kind: 'external', directory: 'external-project', owner: null }, { kind: 'owned-nested-project', directory: 'fixture-project', owner: 'app' },
+          { kind: 'owned-unwired', directory: 'scripts', owner: 'app' }, { kind: 'owned-nested-project', directory: 'subs/a/fixtures/sample', owner: 'app/a' }]);
       expect(declared.report.summary).toMatchObject({ denied: 1, errors: 1 });
 
       // An unread file beneath the tree is not an input; the file the compiler reads through the denied import is
@@ -286,23 +286,23 @@ describe.each(['hot', 'warm'] as const)('project boundaries in a %s retained ses
         .toEqual([['scripts/check.ts', sha256(checkWithHidden)], ['scripts/idle.ts', sha256('export const idle: number = 6;\n')]]);
       expect(reincluded.report.summary).toMatchObject({ denied: 1, errors: 1 });
 
-      // A missing owned-ignored root invalidates the project; restoring it recovers the same findings.
+      // A missing owned-unwired root invalidates the project; restoring it recovers the same findings.
       await remove('fixture-project');
       const missing = await run.step(['fixture-project'], 'broad');
       expect(missing.revision.outcome).toEqual(invalid);
       expect(missing.revision.diagnostics.map(item => [item.code, item.category, item.location?.file]))
-        .toEqual([['missing-owned-ignored', 'layout', 'module.ramify']]);
+        .toEqual([['missing-owned-nested-project', 'layout', 'module.ramify']]);
       for (const [path, text] of Object.entries(topology)) if (path.startsWith('fixture-project/')) await write(path, text);
       const restored = await run.step(['fixture-project'], 'broad', true);
       expect(restored.revision.outcome).toEqual(failed);
       expect(located(restored.revision.diagnostics)).toEqual(located(reincluded.revision.diagnostics));
 
-      // An import into the owned-ignored tree, then the same tree declared external. The new importer brings a file
+      // An import into the owned nested tree, then the same tree declared external. The new importer brings a file
       // the inventory does not own into the program, a reach the membership path cannot bound: broad.
       await write('src/tree.ts', "import type { Shape } from '../fixture-project/src/thing.js';\nexport type Seen = Shape;\n");
       const importer = await run.step(['src/tree.ts'], 'broad');
       expect(located(importer.revision.diagnostics)).toEqual([['not-visible', 'scripts/check.ts', 2], ['project-boundary-import', 'src/tree.ts', 1]]);
-      expect(importer.revision.diagnostics[1]!.message).toBe(boundary('../fixture-project/src/thing.js', 'fixture-project/src/thing.ts', 'owned-ignored', 'fixture-project'));
+      expect(importer.revision.diagnostics[1]!.message).toBe(boundary('../fixture-project/src/thing.js', 'fixture-project/src/thing.ts', 'owned-nested-project', 'fixture-project'));
       await write('module.ramify', rootDescription(['external "fixture-project"', 'external "external-project"']));
       const external = await run.step(['module.ramify'], 'broad', true);
       expect(located(external.revision.diagnostics)).toEqual(located(importer.revision.diagnostics));
@@ -337,7 +337,7 @@ describe.each(['hot', 'warm'] as const)('project boundaries in a %s retained ses
       const widened = await run.step(['subs/a/module.ramify'], 'broad', true);
       expect(located(widened.revision.diagnostics)).toEqual([['not-visible', 'scripts/check.ts', 2],
         ['project-boundary-import', 'src/tree.ts', 1], ['project-boundary-import', 'subs/a/scripts/report.ts', 2]]);
-      expect(widened.revision.diagnostics[2]!.message).toBe(boundary('../fixtures/seed.js', 'subs/a/fixtures/seed.ts', 'owned-ignored', 'subs/a/fixtures'));
+      expect(widened.revision.diagnostics[2]!.message).toBe(boundary('../fixtures/seed.js', 'subs/a/fixtures/seed.ts', 'owned-unwired', 'subs/a/fixtures'));
       expect(auxiliaryFiles(widened.report)).toEqual(initialAuxiliary.filter(path => path !== 'subs/a/fixtures/seed.ts'));
 
       // The compiler read the denied target, so its deletion is an input change; with no target the import is no
@@ -503,20 +503,20 @@ describe.each(['hot', 'warm'] as const)('project boundaries in a %s retained ses
     project(async ({ inputs, write, remove }) => {
       await session(inputs, level, async run => {
         const warning = (report: AnalysisReport): unknown[] => report.warnings.map(item => [item.code, item.path, item.files, item.count]);
-        await write('module.ramify', rootDescription(['owned-ignored "fixture-project"', 'owned-ignored "scripts"', 'external "external-project"']));
+        await write('module.ramify', rootDescription(['owned-nested-project "fixture-project"', 'owned-unwired "scripts"', 'external "external-project"']));
         const declared = await run.step(['module.ramify'], 'broad', true);
-        expect(warning(declared.report)).toEqual([['compiler-selected-owned-ignored', 'scripts', ['scripts/check.ts', 'scripts/idle.ts'], 2]]);
+        expect(warning(declared.report)).toEqual([['compiler-selected-owned-unwired', 'scripts', ['scripts/check.ts', 'scripts/idle.ts'], 2]]);
         expect(located(declared.revision.diagnostics)).toEqual([['project-boundary-import', 'src/uses-check.ts', 1]]);
         // The new file is selected by the configuration and read through the import that could not resolve.
         await write('scripts/later.ts', 'export const later: number = 1;\n');
         const created = await run.step(['scripts/later.ts'], 'broad', true);
-        expect(warning(created.report)).toEqual([['compiler-selected-owned-ignored', 'scripts', ['scripts/check.ts', 'scripts/idle.ts', 'scripts/later.ts'], 3]]);
+        expect(warning(created.report)).toEqual([['compiler-selected-owned-unwired', 'scripts', ['scripts/check.ts', 'scripts/idle.ts', 'scripts/later.ts'], 3]]);
         expect(located(created.revision.diagnostics)).toEqual([['project-boundary-import', 'src/later.ts', 1], ['project-boundary-import', 'src/uses-check.ts', 1]]);
         expect(coverage(created.report)).toEqual([]);
         // Its deletion leaves the configuration's listing, so the selection and the warning change with it.
         await remove('scripts/later.ts');
         const deleted = await run.step(['scripts/later.ts'], 'broad', true);
-        expect(warning(deleted.report)).toEqual([['compiler-selected-owned-ignored', 'scripts', ['scripts/check.ts', 'scripts/idle.ts'], 2]]);
+        expect(warning(deleted.report)).toEqual([['compiler-selected-owned-unwired', 'scripts', ['scripts/check.ts', 'scripts/idle.ts'], 2]]);
         expect(located(deleted.revision.diagnostics)).toEqual([['project-boundary-import', 'src/uses-check.ts', 1]]);
         expect(coverage(deleted.report)).toEqual([['unresolved-target', 'src/later.ts']]);
         // A byte edit of a read file there stays an input change, without a new acquisition.
@@ -530,7 +530,7 @@ describe.each(['hot', 'warm'] as const)('project boundaries in a %s retained ses
 describe('PB1-24: invalid boundaries, cancellation, byte bounds and cleanup', () => {
   it('publishes an overlapping declaration and a manifest as invalid revisions, never a passing one, and recovers', () => project(async ({ inputs, write, remove }) => {
     await session(inputs, 'hot', async run => {
-      await write('module.ramify', rootDescription(['owned-ignored "fixture-project"', 'owned-ignored "fixture-project/src"', 'external "external-project"']));
+      await write('module.ramify', rootDescription(['owned-nested-project "fixture-project"', 'owned-unwired "fixture-project/src"', 'external "external-project"']));
       const overlap = await run.step(['module.ramify'], 'broad');
       expect(overlap.revision.outcome).toEqual(invalid);
       expect(overlap.revision.diagnostics.map(item => [item.code, item.category, item.location?.file]))
@@ -577,7 +577,7 @@ describe('PB1-24: invalid boundaries, cancellation, byte bounds and cleanup', ()
           controller.abort();
           return update;
         });
-        await write('module.ramify', rootDescription(['owned-ignored "fixture-project"', 'owned-ignored "scripts"', 'external "external-project"']));
+        await write('module.ramify', rootDescription(['owned-nested-project "fixture-project"', 'owned-unwired "scripts"', 'external "external-project"']));
         expect(await handle.update([{ path: 'module.ramify', kind: 'changed' }], { signal: controller.signal })).toEqual({ status: 'cancelled' });
         expect(handle.current).toBe(first);
         // A sweep finds nothing the observer has not seen, yet the passing revision no longer describes the disk.
@@ -601,7 +601,7 @@ describe('PB1-24: invalid boundaries, cancellation, byte bounds and cleanup', ()
 
         // While invalid, a file the invalid acquisition inventoried disappears silently: the sweep publishes the
         // invalid revision of the current disk, and a further sweep finds nothing.
-        await write('module.ramify', rootDescription(['owned-ignored "fixture-project"', 'owned-ignored "fixture-project/src"', 'owned-ignored "scripts"',
+        await write('module.ramify', rootDescription(['owned-nested-project "fixture-project"', 'owned-unwired "fixture-project/src"', 'owned-unwired "scripts"',
           'external "external-project"']));
         expect(await handle.update([{ path: 'module.ramify', kind: 'changed' }])).toMatchObject({ status: 'revised', revision: { outcome: invalid } });
         await write('subs/loose.ts', 'export const loose: number = 1;\n');
@@ -627,7 +627,7 @@ describe('PB1-24: invalid boundaries, cancellation, byte bounds and cleanup', ()
           controller.abort();
           return update;
         });
-        await write('module.ramify', rootDescription(['owned-ignored "fixture-project"', 'owned-ignored "scripts"', 'external "external-project"']));
+        await write('module.ramify', rootDescription(['owned-nested-project "fixture-project"', 'owned-unwired "scripts"', 'external "external-project"']));
         expect(await handle.update([{ path: 'module.ramify', kind: 'changed' }], { signal: controller.signal })).toEqual({ status: 'cancelled' });
         expect(handle.current).toBe(first);
         expect(observer.apply).toHaveBeenCalledTimes(1);
@@ -650,9 +650,9 @@ describe('PB1-24: invalid boundaries, cancellation, byte bounds and cleanup', ()
     }), timeout);
 
   it('reports a reinclusion past the application byte bound as incomplete, keeps the last revision unchanged and recovers', () => {
-    // 64 KiB of auxiliary source inside an owned-ignored tree, under a 48 KiB application bound the rest of the topology stays well below.
+    // 64 KiB of auxiliary source inside an owned nested tree, under a 48 KiB application bound the rest of the topology stays well below.
     const big = `export const big: string = '${'x'.repeat(64 * 1024)}';\n`;
-    const files = { ...topology, 'module.ramify': rootDescription(['owned-ignored "data"', 'owned-ignored "fixture-project"', 'external "external-project"']),
+    const files = { ...topology, 'module.ramify': rootDescription(['owned-unwired "data"', 'owned-nested-project "fixture-project"', 'external "external-project"']),
       'data/big.ts': big };
     return project(async ({ inputs, write }) => {
       const { handle, revision: first } = await opened(inputs);
@@ -702,7 +702,7 @@ describe('PB1-24: invalid boundaries, cancellation, byte bounds and cleanup', ()
         await settled(1);
         await handle.releaseCompiler();
         await settled(0);
-        await write('module.ramify', rootDescription(['owned-ignored "fixture-project"', 'owned-ignored "scripts"', 'external "external-project"']));
+        await write('module.ramify', rootDescription(['owned-nested-project "fixture-project"', 'owned-unwired "scripts"', 'external "external-project"']));
         const warm = await handle.update([{ path: 'module.ramify', kind: 'changed' }]);
         expect(warm).toMatchObject({ status: 'revised', identical: false, revision: { checked: { path: 'broad' } } });
         await settled(1);

@@ -18,7 +18,7 @@ function coveringEdit(cycle, fixture = null, state = {}) {
   const revision = cycle?.revision, hook = cycle?.hook, document = hook?.document;
   const notes = expectedSignatureNotes(fixture, revision?.timings, state).length;
   return hook?.failure === null && hook.signal === null && hook.stderr === '' && [0, 1].includes(hook.code)
-    && document?.schemaVersion === 'ramify.check/2' && document.outcome === 'checked'
+    && document?.schemaVersion === 'ramify.check/3' && document.outcome === 'checked'
     && document.execution === 'completed' && document.exitCode === hook.code
     && revision?.outcome?.execution === 'completed' && revision.outcome.coverage === (notes ? 'partial' : 'complete')
     && coverageMatches(fixture, revision.timings, document.coverage, [], state)
@@ -275,7 +275,7 @@ export function assertFastWorkload(id, measurements) {
     const timings = cycle?.revision?.timings, state = { setupExposureRemoved };
     const notes = expectedSignatureNotes(fixture, timings, state).length;
     check(`${label}: real covering CLI result`, hook?.failure === null && hook.signal === null && hook.stderr === ''
-      && hook.code === (findings ? 1 : 0) && doc?.schemaVersion === 'ramify.check/2'
+      && hook.code === (findings ? 1 : 0) && doc?.schemaVersion === 'ramify.check/3'
       && doc.outcome === 'checked' && doc.execution === 'completed' && doc.exitCode === hook.code
       && natural(cycle.beforeSequence) && doc.revision?.sequence > cycle.beforeSequence
       && cycle.revision?.revision === doc.revision.id && cycle.revision.sequence === doc.revision.sequence
@@ -301,7 +301,7 @@ export function assertFastWorkload(id, measurements) {
     const hook = cycle?.hook, doc = hook?.document;
     const notes = expectedSignatureNotes(fixture, cycle?.revision?.timings).length;
     check(`${label}: real immediate not-checked CLI result`, hook?.failure === null && hook.signal === null && hook.stderr === ''
-      && hook.code === 2 && doc?.schemaVersion === 'ramify.check/2' && doc.outcome === 'not-checked'
+      && hook.code === 2 && doc?.schemaVersion === 'ramify.check/3' && doc.outcome === 'not-checked'
       && doc.reason === 'configuration-changed' && doc.exitCode === 2 && doc.revision === null
       && doc.checked === null && doc.execution === null && doc.timings?.daemon === null
       && Array.isArray(cycle.expected) && cycle.expected.length > 0

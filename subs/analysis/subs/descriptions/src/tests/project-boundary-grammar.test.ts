@@ -31,15 +31,15 @@ function meaning(statement: DescriptionStatement): unknown {
 }
 
 describe('PB1-01: valid nested-tree statements', () => {
-  const text = 'ramify 1\nmodule app tagged [dispatch]\nowned-ignored "fixture-project" // retained comment\n'
+  const text = 'ramify 1\nmodule app tagged [dispatch]\nowned-unwired "fixture-project" // retained comment\n'
     + 'expose-src api from "api.ts" to parent\n  external\t"external-project"\n'
-    + 'expose-sub value from child to descendants\nowned-ignored "a/../b/./c"\n';
+    + 'expose-sub value from child to descendants\nowned-unwired "a/../b/./c"\n';
 
   it('parses both kinds interleaved with exposures, indexed among all statements with located directories', () => {
     const document = valid(text);
     expect(document.module).toEqual({ name: 'app', tags: ['dispatch'], root: null, span: { start: 9, end: 37, line: 2, column: 1 } });
     expect(document.statements).toEqual([
-      { index: 0, kind: 'owned-ignored', span: { start: 38, end: 69, line: 3, column: 1 },
+      { index: 0, kind: 'owned-unwired', span: { start: 38, end: 69, line: 3, column: 1 },
         directory: { value: 'fixture-project', span: { start: 52, end: 69, line: 3, column: 15 } } },
       { index: 1, kind: 'expose-src', span: { start: 90, end: 128, line: 4, column: 1 },
         selection: { kind: 'named', names: [{ name: 'api', alias: 'api', span: { start: 101, end: 104, line: 4, column: 12 } }] },
@@ -49,7 +49,7 @@ describe('PB1-01: valid nested-tree statements', () => {
       { index: 3, kind: 'expose-sub', span: { start: 159, end: 201, line: 6, column: 1 },
         selection: { kind: 'named', names: [{ name: 'value', alias: 'value', span: { start: 170, end: 175, line: 6, column: 12 } }] },
         from: { value: 'child', span: { start: 181, end: 186, line: 6, column: 23 } }, tags: null, destinations: ['descendants'] },
-      { index: 4, kind: 'owned-ignored', span: { start: 202, end: 228, line: 7, column: 1 },
+      { index: 4, kind: 'owned-unwired', span: { start: 202, end: 228, line: 7, column: 1 },
         directory: { value: 'a/../b/./c', span: { start: 216, end: 228, line: 7, column: 15 } } },
     ]);
   });
@@ -57,7 +57,7 @@ describe('PB1-01: valid nested-tree statements', () => {
   it('classifies both keywords as keyword tokens and excludes comments from the token stream', () => {
     const document = valid(text);
     expect(document.tokens.slice(8, 10).map(({ kind, raw, decoded }) => [kind, raw, decoded])).toEqual([
-      ['keyword', 'owned-ignored', 'owned-ignored'], ['string', '"fixture-project"', 'fixture-project'],
+      ['keyword', 'owned-unwired', 'owned-unwired'], ['string', '"fixture-project"', 'fixture-project'],
     ]);
     expect(document.tokens.find(({ raw }) => raw === 'external')).toEqual(
       { kind: 'keyword', raw: 'external', decoded: 'external', span: { start: 131, end: 139, line: 5, column: 3 } });
@@ -66,11 +66,11 @@ describe('PB1-01: valid nested-tree statements', () => {
   });
 
   it('keeps UTF-16 spans with a BOM, CRLF, tab separators, escapes and an astral directory', () => {
-    const encoded = '﻿ramify 1\r\nmodule x\r\n\texternal \t"t\\u00e9st\\/cache" // tail\r\nowned-ignored "😀/d"';
+    const encoded = '﻿ramify 1\r\nmodule x\r\n\texternal \t"t\\u00e9st\\/cache" // tail\r\nowned-unwired "😀/d"';
     expect(valid(encoded).statements).toEqual([
       { index: 0, kind: 'external', span: { start: 22, end: 50, line: 3, column: 2 },
         directory: { value: 'tést/cache', span: { start: 32, end: 50, line: 3, column: 12 } } },
-      { index: 1, kind: 'owned-ignored', span: { start: 60, end: 80, line: 4, column: 1 },
+      { index: 1, kind: 'owned-unwired', span: { start: 60, end: 80, line: 4, column: 1 },
         directory: { value: '😀/d', span: { start: 74, end: 80, line: 4, column: 15 } } },
     ]);
   });
@@ -88,9 +88,9 @@ describe('PB1-01: valid nested-tree statements', () => {
     const source = 'expose-src api from "api.ts" to parent';
     const child = 'expose-sub * from child to descendants';
     const orders = [
-      [source, child, 'owned-ignored "kept"', 'external "cache"'],
-      ['owned-ignored "kept"', source, 'external "cache"', child],
-      ['external "cache"', 'owned-ignored "kept"', source, child],
+      [source, child, 'owned-unwired "kept"', 'external "cache"'],
+      ['owned-unwired "kept"', source, 'external "cache"', child],
+      ['external "cache"', 'owned-unwired "kept"', source, child],
     ];
     for (const lines of orders) {
       const ordered = `${header}${lines.join('\n')}\n`;
@@ -108,8 +108,8 @@ describe('PB1-01: valid nested-tree statements', () => {
       'expose-src * from "interfaces/vocabulary.ts" to parent',
     ];
     const plain = valid(`${header}${exposures.join('\n')}`);
-    const interleaved = valid(`${header}owned-ignored "fixtures"\n${exposures[0]}\n${exposures[1]}\nexternal "cache"\n`
-      + `${exposures[2]}\nowned-ignored "examples/demo"\n${exposures[3]}`);
+    const interleaved = valid(`${header}owned-unwired "fixtures"\n${exposures[0]}\n${exposures[1]}\nexternal "cache"\n`
+      + `${exposures[2]}\nowned-unwired "examples/demo"\n${exposures[3]}`);
     expect(interleaved.statements.map(({ index }) => index)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     const kept = interleaved.statements.filter((statement) => !('directory' in statement));
     expect(kept.map(({ index }) => index)).toEqual([1, 2, 4, 6]);
@@ -122,22 +122,22 @@ describe('PB1-01: valid nested-tree statements', () => {
       { kind: 'expose-src', from: 'interfaces/vocabulary.ts', tags: null, destinations: ['parent'], selection: '*' },
     ]);
     expect(interleaved.statements.filter((statement) => 'directory' in statement).map(meaning)).toEqual([
-      { kind: 'owned-ignored', directory: 'fixtures' }, { kind: 'external', directory: 'cache' },
-      { kind: 'owned-ignored', directory: 'examples/demo' },
+      { kind: 'owned-unwired', directory: 'fixtures' }, { kind: 'external', directory: 'cache' },
+      { kind: 'owned-unwired', directory: 'examples/demo' },
     ]);
   });
 
   it('admits both keywords as tag names in every tag position without a declaration defining a tag', () => {
-    const document = valid('ramify 1\nmodule app tagged [owned-ignored, external, ui]\n'
-      + 'expose-src value from "value.ts" tagged [external, owned-ignored] to parent\nowned-ignored "fixtures"\nexternal "cache"');
-    expect(document.module.tags).toEqual(['owned-ignored', 'external', 'ui']);
-    expect(document.statements[0]).toMatchObject({ kind: 'expose-src', tags: { values: ['external', 'owned-ignored'] } });
-    expect(valid(`${header}owned-ignored "fixtures"\nexternal "cache"`).module.tags).toEqual([]);
-    const issues = invalid('ramify 1\nmodule app tagged [owned-ignored, owned-ignored]');
+    const document = valid('ramify 1\nmodule app tagged [owned-unwired, external, ui]\n'
+      + 'expose-src value from "value.ts" tagged [external, owned-unwired] to parent\nowned-unwired "fixtures"\nexternal "cache"');
+    expect(document.module.tags).toEqual(['owned-unwired', 'external', 'ui']);
+    expect(document.statements[0]).toMatchObject({ kind: 'expose-src', tags: { values: ['external', 'owned-unwired'] } });
+    expect(valid(`${header}owned-unwired "fixtures"\nexternal "cache"`).module.tags).toEqual([]);
+    const issues = invalid('ramify 1\nmodule app tagged [owned-unwired, owned-unwired]');
     expect(issues.map(({ code, span }) => [code, span.start])).toEqual([['duplicate-tag', 43]]);
   });
 
-  for (const word of ['owned-ignored', 'external']) {
+  for (const word of ['owned-unwired', 'owned-nested-project', 'external']) {
     it(`reserves ${word} in every name position and accepts it quoted`, () => {
       for (const make of [
         (name: string) => `ramify 1\nmodule ${name}`,
@@ -157,7 +157,7 @@ describe('PB1-01: valid nested-tree statements', () => {
   }
 
   it('does not reserve keyword prefixes, extensions or other letter cases', () => {
-    expect(valid('ramify 1\nmodule external-tools\nexpose-sub value from owned-ignored-cache to parent').module.name).toBe('external-tools');
+    expect(valid('ramify 1\nmodule external-tools\nexpose-sub value from owned-unwired-cache to parent').module.name).toBe('external-tools');
     expect(valid('ramify 1\nmodule owned').module.name).toBe('owned');
     expect(valid(`${header}expose-src externalValue, External, ignored from "a.ts" to parent`).statements[0])
       .toMatchObject({ selection: { kind: 'named', names: [{ name: 'externalValue' }, { name: 'External' }, { name: 'ignored' }] } });
@@ -169,37 +169,37 @@ describe('PB1-02: malformed nested-tree statements', () => {
   //  offset from which the offending text is first found].
   const statement = (line: string) => `${header}${line}`;
   const cases: readonly (readonly [string, DescriptionIssue['code'], string | null, number, number])[] = [
-    [statement('owned-ignored examples'), 'invalid-name', 'examples', 3, header.length],
-    [statement('owned-ignored examples/demo'), 'invalid-name', 'examples', 3, header.length],
+    [statement('owned-unwired examples'), 'invalid-name', 'examples', 3, header.length],
+    [statement('owned-unwired examples/demo'), 'invalid-name', 'examples', 3, header.length],
     [statement('external parent'), 'invalid-name', 'parent', 3, header.length],
-    [statement("owned-ignored 'examples'"), 'invalid-name', "'", 3, header.length],
+    [statement("owned-unwired 'examples'"), 'invalid-name', "'", 3, header.length],
     [statement('external * from "cache"'), 'invalid-name', '*', 3, header.length],
     [statement('external'), 'invalid-name', null, 3, header.length],
-    [statement('owned-ignored ""'), 'empty-name', '""', 3, header.length],
+    [statement('owned-unwired ""'), 'empty-name', '""', 3, header.length],
     [statement('external "a\\tb"'), 'invalid-name', '"a\\tb"', 3, header.length],
     [statement('external "a\\u007fb"'), 'invalid-name', '"a\\u007fb"', 3, header.length],
-    [statement('owned-ignored "examples\ndemo"'), 'unterminated-string', '"examples', 3, header.length],
-    [statement('owned-ignored "examples" tagged [testing]'), 'unknown-clause', 'tagged', 3, header.length],
+    [statement('owned-unwired "examples\ndemo"'), 'unterminated-string', '"examples', 3, header.length],
+    [statement('owned-unwired "examples" tagged [testing]'), 'unknown-clause', 'tagged', 3, header.length],
     [statement('external "cache" to parent'), 'unknown-clause', 'to', 3, header.length],
     [statement('external "cache" from "elsewhere"'), 'unknown-clause', 'from', 3, header.length],
-    [statement('owned-ignored "a" "b"'), 'unknown-clause', '"b"', 3, header.length],
-    [statement('owned-ignored "a", "b"'), 'trailing-token', ',', 3, header.length],
-    [statement('owned-ignored "a";'), 'trailing-token', ';', 3, header.length],
-    [statement('owned-ignored"a"'), 'invalid-whitespace', '"a"', 3, header.length],
+    [statement('owned-unwired "a" "b"'), 'unknown-clause', '"b"', 3, header.length],
+    [statement('owned-unwired "a", "b"'), 'trailing-token', ',', 3, header.length],
+    [statement('owned-unwired "a";'), 'trailing-token', ';', 3, header.length],
+    [statement('owned-unwired"a"'), 'invalid-whitespace', '"a"', 3, header.length],
     [statement('external "a"'), 'invalid-whitespace', ' ', 3, header.length],
-    [statement('Owned-ignored "a"'), 'unknown-statement', 'Owned-ignored', 3, header.length],
+    [statement('Owned-unwired "a"'), 'unknown-statement', 'Owned-unwired', 3, header.length],
     [statement('EXTERNAL "a"'), 'unknown-statement', 'EXTERNAL', 3, header.length],
     [statement('"external" "a"'), 'unknown-statement', '"external"', 3, header.length],
-    ['ramify 1\nowned-ignored "a"\nmodule app', 'invalid-order', 'owned-ignored', 2, 0],
+    ['ramify 1\nowned-unwired "a"\nmodule app', 'invalid-order', 'owned-unwired', 2, 0],
     ['external "a"\nramify 1\nmodule app', 'invalid-order', 'external', 1, 0],
-    [statement('owned-ignored "a"\nmodule again'), 'duplicate-header', 'module', 4, header.length],
+    [statement('owned-unwired "a"\nmodule again'), 'duplicate-header', 'module', 4, header.length],
     [statement('external "a"\nramify 1'), 'duplicate-header', 'ramify', 4, header.length],
-    [statement('owned-ignored "a"\rexternal "b"'), 'bare-cr', '\r', 3, header.length],
+    [statement('owned-unwired "a"\rexternal "b"'), 'bare-cr', '\r', 3, header.length],
     [statement('external "\\uD800"'), 'invalid-scalar', '\\uD800', 3, header.length],
     [statement('external "\\uDC00x"'), 'invalid-scalar', '\\uDC00', 3, header.length],
     [statement('external "\uD800"'), 'invalid-scalar', '\uD800', 3, header.length],
     [statement('external "a\u0001b"'), 'invalid-scalar', '\u0001', 3, header.length],
-    [statement('owned-ignored "a\\qb"'), 'invalid-escape', '\\q', 3, header.length],
+    [statement('owned-unwired "a\\qb"'), 'invalid-escape', '\\q', 3, header.length],
   ];
   it.each(cases)('rejects %j with %s at the offending text', (text, code, at, line, from) => {
     const issues = invalid(text);
@@ -221,10 +221,35 @@ describe('PB1-02: malformed nested-tree statements', () => {
   });
 
   it('reports every malformed nested-tree line in source order without publishing the valid ones', () => {
-    const text = `${header}owned-ignored "kept"\nexternal cache\nexpose-src api from "api.ts" to parent\n`
-      + 'owned-ignored ""\nexternal "x" tagged []\nowned-ignored "fine"';
+    const text = `${header}owned-unwired "kept"\nexternal cache\nexpose-src api from "api.ts" to parent\n`
+      + 'owned-unwired ""\nexternal "x" tagged []\nowned-unwired "fine"';
     expect(invalid(text).map(({ code, span }) => [code, span.line, text.slice(span.start, span.end)])).toEqual([
       ['invalid-name', 4, 'cache'], ['empty-name', 6, '""'], ['unknown-clause', 7, 'tagged'],
     ]);
+  });
+});
+
+
+describe('NT-02: three nested-tree kinds in version 1', () => {
+  it.each(['owned-unwired', 'owned-nested-project'] as const)('parses %s with a keyword token and admits it as a tag', kind => {
+    const document = valid(`ramify 1\nmodule app tagged [${kind}]\n${kind} "d"\n`);
+    expect(document.version).toBe(1);
+    expect(document.module.tags).toEqual([kind]);
+    expect(document.statements).toEqual([{ index: 0, kind,
+      span: { start: 30 + kind.length, end: 30 + kind.length + kind.length + 4, line: 3, column: 1 },
+      directory: { value: 'd', span: { start: 30 + kind.length + kind.length + 1,
+        end: 30 + kind.length + kind.length + 4, line: 3, column: kind.length + 2 } } }]);
+    expect(document.tokens.filter(token => token.raw === kind).map(token => token.kind)).toEqual(['keyword', 'keyword']);
+  });
+
+  it('rejects the removed statement with both replacements and leaves its spelling available as a name', () => {
+    const removed = 'owned-' + 'ignored';
+    const issue = invalid(`${header}${removed} "d"\n`)[0]!;
+    expect(issue.code).toBe('unknown-statement');
+    expect(issue.message).toContain('owned-unwired');
+    expect(issue.message).toContain('owned-nested-project');
+    const document = valid(`ramify 1\nmodule ${removed}\nexpose-sub value from ${removed} to parent\n`);
+    expect(document.module.name).toBe(removed);
+    expect(document.tokens.filter(token => token.raw === removed).every(token => token.kind === 'name')).toBe(true);
   });
 });

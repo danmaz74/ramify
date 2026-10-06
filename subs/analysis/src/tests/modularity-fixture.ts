@@ -21,7 +21,7 @@ export interface FixtureFile { readonly path: string; readonly owner: string; re
 export interface FixtureOriginal { readonly file: string; readonly binding: string; readonly value?: boolean }
 export interface FixtureExposure { readonly module: string; readonly file: string; readonly binding: string;
   readonly destinations: readonly Destination[]; readonly effective?: boolean }
-/** `nested` lies in an owned-ignored `vendor` tree of `app`; `excluded` in the output directory `dist`. */
+/** `nested` lies in an owned-unwired `vendor` tree of `app`; `excluded` in the output directory `dist`. */
 export type FixtureTarget = string | { readonly external: string } | { readonly outside: string }
   | { readonly nested: string } | { readonly excluded: string } | 'unresolved';
 export interface FixtureSelection { readonly file: string; readonly binding: string; readonly name?: string;
@@ -110,7 +110,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
     const target: SourceAccess['target'] = typeof access.target === 'string'
       ? access.target === 'unresolved' ? { kind: 'unresolved' } : { kind: 'application', origin: { file: access.target, area: area(access.target), auxiliary: auxiliary(access.target) } }
       : 'external' in access.target ? { kind: 'external', resolution: 'package', name: access.target.external, resolvedFile: null }
-      : 'nested' in access.target ? { kind: 'nested-tree', file: access.target.nested, exclusion: { kind: 'owned-ignored', directory: 'vendor', owner: 'app' } }
+      : 'nested' in access.target ? { kind: 'nested-tree', file: access.target.nested, exclusion: { kind: 'owned-unwired', directory: 'vendor', owner: 'app' } }
       : 'excluded' in access.target ? { kind: 'excluded', file: access.target.excluded, exclusion: { kind: 'output', directory: 'dist', owner: null } }
       : { kind: 'outside-project', file: access.target.outside };
     return {
@@ -171,7 +171,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
   const scope = { root: '/fixture', selection: 'given' as const, invokedFrom: '/fixture', configuration: '/fixture/tsconfig.json',
     walkedAreas: areas.map(item => item.root), ownership: { modules: [], exclusions: spec.exclusions ?? [] } };
   return {
-    schemaVersion: 'ramify.analysis/2', runId: 'random', inputId: 'input-1',
+    schemaVersion: 'ramify.analysis/3', runId: 'random', inputId: 'input-1',
     request: { project: { cwd: '/fixture', scope: 'whole-project', configuration: 'discover' }, registry, capabilities: requested,
       limits: {} as AnalysisReport['request']['limits'] },
     scope, registry,

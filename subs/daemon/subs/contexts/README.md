@@ -16,7 +16,7 @@ A changed check names its paths and the revision sequence whose classification
 its expectations follow. The manager classifies each path with the driver's
 `classify`, Project's classifier, over the ownership table of the latest
 completed published revision, before any content or configuration rule: a path
-in an owned-ignored, external or scratch directory or another always-excluded
+in an owned-unwired, owned-nested-project, external or scratch directory or another always-excluded
 path is `not-analyzed` and needs no content, so a manifest inside such a tree is
 no configuration change; an owned path outside every exclusion is analyzed and
 needs its expected identity. Expectations that do not follow the classification

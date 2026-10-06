@@ -60,7 +60,7 @@ export type SourceTarget =
   | { readonly kind: 'outside-project'; readonly file: string }
   /** A physical project-relative target inside a declared nested tree, with its declaration. */
   | { readonly kind: 'nested-tree'; readonly file: string;
-      readonly exclusion: ProjectExclusion & { readonly kind: 'owned-ignored' | 'external' } }
+      readonly exclusion: ProjectExclusion & { readonly kind: 'owned-unwired' | 'owned-nested-project' | 'external' } }
   /** A non-package target inside an always-excluded path; its contents are not interpreted. */
   | { readonly kind: 'excluded'; readonly file: string;
       readonly exclusion: ProjectExclusion & { readonly kind: 'scratch' | 'repository' | 'packages' | 'output' | 'generated' } }

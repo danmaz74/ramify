@@ -217,7 +217,7 @@ export function createScriptedDriver() {
             return { status: 'unavailable', reason: 'invalid-revision', message: `Sequence ${query.sequence} is not current` };
           }
           return { status: 'projected', sequence: query.sequence, inputId: current.inputId, projection: {
-            schema: 'ramify.architect-projection/2', sequence: query.sequence, inputId: current.inputId, root: 'fixture',
+            schema: 'ramify.architect-projection/3', sequence: query.sequence, inputId: current.inputId, root: 'fixture',
             modules: [], symbols: [], tests: [],
             counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0 } };
         },
@@ -278,7 +278,7 @@ export function createScriptedDriver() {
  * nothing depends on them. The fake computes no dependency closure. */
 export function scriptedSelection(inputId: string, modules: readonly string[]): AffectedSelection {
   const changed = modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` }));
-  return { schemaVersion: 'ramify.affected/3', inputId, paths: [], changedModules: changed, affectedModules: [], testModules: changed,
+  return { schemaVersion: 'ramify.affected/4', inputId, paths: [], changedModules: changed, affectedModules: [], testModules: changed,
     selection: 'dependency-closure', widening: [], scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture',
       configuration: 'tsconfig.json', walkedAreas: [], ownership: { modules: [], exclusions: [] } },
     coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' };

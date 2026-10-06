@@ -14,17 +14,17 @@ import { acquire, analyze, analyzeView, areasFor, code, fixture, sourceLimits, t
  * project-boundary-analysis.test.ts.
  *
  * The topology follows the written provider topology: a root `app` with an
- * owned-ignored `fixture-project`, an external `external-project`, a child
- * `a` whose owned-ignored `fixtures/sample` is a NodeNext package installed
+ * owned-nested-project `fixture-project`, an external `external-project`, a child
+ * `a` whose owned-nested-project `fixtures/sample` is a NodeNext package installed
  * through the link `node_modules/sample`, a plain installed `realpkg`, the
  * output directory `dist`, the root scratch directory and a file beside the
  * root. Every expectation below is derived from the contracts' rules, not
  * from a recorded run.
  */
 
-const fixtureProject: ProjectExclusion = { kind: 'owned-ignored', directory: 'fixture-project', owner: 'fixture' };
+const fixtureProject: ProjectExclusion = { kind: 'owned-nested-project', directory: 'fixture-project', owner: 'fixture' };
 const externalProject: ProjectExclusion = { kind: 'external', directory: 'external-project', owner: null };
-const sampleTree: ProjectExclusion = { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'fixture/a' };
+const sampleTree: ProjectExclusion = { kind: 'owned-nested-project', directory: 'subs/a/fixtures/sample', owner: 'fixture/a' };
 const output: ProjectExclusion = { kind: 'output', directory: 'dist', owner: null };
 const scratch: ProjectExclusion = { kind: 'scratch', directory: 'src/tmp', owner: 'fixture' };
 const packages: ProjectExclusion = { kind: 'packages', directory: 'node_modules', owner: null };
@@ -58,8 +58,8 @@ const topology: Readonly<Record<string, string>> = {
     '#tree/*': ['./fixture-project/src/*'],
     '#internal/*': ['./subs/a/src/*'],
   }),
-  'module.ramify': 'ramify 1\nroot module fixture tagged [browser]\nowned-ignored "fixture-project"\nexternal "external-project"\n',
-  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\n',
+  'module.ramify': 'ramify 1\nroot module fixture tagged [browser]\nowned-nested-project "fixture-project"\nexternal "external-project"\n',
+  'subs/a/module.ramify': 'ramify 1\nmodule a\nowned-nested-project "fixtures/sample"\n',
   'subs/a/src/api.ts': 'export function api(): number { return 1; }\n',
   ...samplePackage,
   'fixture-project/module.ramify': 'ramify 1\nroot module fixture-project\n',
@@ -73,7 +73,7 @@ const topology: Readonly<Record<string, string>> = {
   'dist/out.d.ts': 'export declare const out: number;\n',
   'src/tmp/scratch.ts': 'export const scratch = 1;\n',
   'src/resources.d.ts': 'declare module "*.css" { const classes: Record<string, string>; export default classes; }\n',
-  // Every form into the owned-ignored tree by a relative route.
+  // Every form into the owned nested tree by a relative route.
   'src/forms.ts': [
     "import { thing } from '../fixture-project/src/thing.js';",
     "import type { Shape } from '../fixture-project/src/thing.js';",
@@ -214,7 +214,7 @@ describe('PB1-14: nonpackage imports into declared trees are boundary targets', 
     expect(forward.exports.find(entry => entry.name === 'thing')).toMatchObject({ original: null });
     expect(forward.exports.find(entry => entry.name === 'api')).toMatchObject({ original: code('api.ts', 'api', 'fixture/a') });
     // Its description is incomplete: the named and type exports into the
-    // owned-ignored tree and the package export describe no original, and the
+    // owned nested tree and the package export describe no original, and the
     // star export into the external tree cannot be enumerated.
     expect(catalog.coverage.filter(note => note.location.file === 'src/forward.ts').map(note => note.code).sort())
       .toEqual(['incomplete-exports', 'unresolved-original', 'unresolved-original', 'unresolved-original']);

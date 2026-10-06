@@ -112,7 +112,7 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
       equal('cleanup failure exits 2 with exactly one document and no stderr or batch', [exitCode, stdout.length, stderr, batchCalls], [2, 1, [], 0]);
       const document = JSON.parse(stdout[0]) as CheckDocument;
       equal('cleanup failure remains explicit', [document.schemaVersion, document.outcome, document.reason, document.exitCode],
-        ['ramify.check/2', 'not-checked', 'unavailable', 2]);
+        ['ramify.check/3', 'not-checked', 'unavailable', 2]);
       equal('received diagnostics and new marks survive cleanup failure', document.findings, received.delta.findings);
       equal('the independently expected invalid name is marked new', document.findings.map(item => [item.code, item.new]), [['invalid-name', true]]);
       equal('received revision and execution evidence is preserved', [document.revision, document.execution, document.checked],

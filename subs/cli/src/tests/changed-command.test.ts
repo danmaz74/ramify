@@ -63,7 +63,7 @@ describe('changed check command', { timeout: 30_000 }, () => {
         freshness: { mode: 'synchronized', expect: [{ path: 'src/main.ts', sha256 }] } });
       expect(requests[1].deadlineMs).toBeLessThanOrEqual(2_000);
       const output = JSON.parse(stdout[0]) as CheckDocument;
-      expect(output).toMatchObject({ schemaVersion: 'ramify.check/2', root: f.root, outcome: 'checked', reason: null,
+      expect(output).toMatchObject({ schemaVersion: 'ramify.check/3', root: f.root, outcome: 'checked', reason: null,
         execution: 'completed', exitCode: 0, findings: [],
         paths: [{ path: 'src/main.ts', disposition: 'checked', module: 'fixture', exclusion: null, reason: 'content', sha256 }] });
       expect(output.revision?.path).toBe('cold');
@@ -141,7 +141,7 @@ describe('changed check command', { timeout: 30_000 }, () => {
       : kind === 'incompatible' ? { kind, client: 'ramify.ipc/2', daemon: 'ramify.ipc/0' } : { kind, requestId: null };
     const result = await command('/project', async () => ({ status: 'unavailable', attempts: 3, reason, message: 'Unavailable' }));
     expect([result.code, result.stdout.length, result.stderr, result.batchCalls]).toEqual([2, 1, [], 0]);
-    expect(result.document).toMatchObject({ schemaVersion: 'ramify.check/2', outcome: 'not-checked',
+    expect(result.document).toMatchObject({ schemaVersion: 'ramify.check/3', outcome: 'not-checked',
       reason: kind === 'failure' ? 'unavailable' : kind === 'explicit-stop' ? 'stopped' : 'incompatible', exitCode: 2 });
   });
 

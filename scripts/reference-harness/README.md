@@ -53,9 +53,9 @@ always comes from the reviewed plan, never available handlers.
 
 ## Project boundary
 
-This directory is an owned-ignored tree of the toolkit root: the root owns it,
+This directory is an owned-unwired tree of the toolkit root: the root owns it,
 and Ramify does not inventory, analyze or view its files. The root description
-declares it with `owned-ignored "scripts/reference-harness"` from iteration 7
+declares it with `owned-unwired "scripts/reference-harness"` from iteration 7
 of the project-boundary plan, and the checker honors the declaration from
 iteration 8. Its imports into toolkit internals, such as another owner's `src/`
 or `src/tests/` and the root's scripts, are a declared, unverified convention:

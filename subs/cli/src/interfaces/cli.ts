@@ -54,13 +54,13 @@ export type GitAnswer =
 export type GitPort = (root: string, control?: RunControl) => Promise<GitAnswer>;
 /** Why a changed check could not establish its result, for the whole request or one path. */
 export type NotCheckedReason = 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | 'configuration-changed' | 'classification-changed';
-/** One named path of a `ramify.check/2` document: the daemon's disposition, or not checked
+/** One named path of a `ramify.check/3` document: the daemon's disposition, or not checked
  * for a reason of the whole request. Only a checked path carries a content or deletion identity. */
 export type CheckedPath = Exclude<PathCheckDisposition, { readonly disposition: 'not-checked' }>
   | { readonly path: string; readonly disposition: 'not-checked'; readonly module: string | null;
       readonly exclusion: ProjectExclusion | null; readonly reason: NotCheckedReason };
 export interface CheckDocument {
-  readonly schemaVersion: 'ramify.check/2';
+  readonly schemaVersion: 'ramify.check/3';
   readonly root: string;
   readonly revision: { readonly id: RevisionId; readonly sequence: number; readonly path: RevisionPath } | null;
   readonly since: RevisionId | null;
@@ -94,7 +94,7 @@ export type DaemonStatusDocument =
 /** One `ramify affected --format json` answer. `revision.sequence` is the resident
  * revision's sequence and null for a batch session. */
 export interface AffectedDocument {
-  readonly schemaVersion: 'ramify.affected-cli/3';
+  readonly schemaVersion: 'ramify.affected-cli/4';
   readonly root: string;
   readonly mode: 'resident' | 'batch';
   readonly revision: { readonly sequence: number | null; readonly inputId: string };

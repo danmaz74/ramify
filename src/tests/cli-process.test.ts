@@ -17,7 +17,7 @@ describe('compiled CLI process lifetime', () => {
         { cwd: installation, timeout: 20_000 });
       const result = await cliProcess(root, ['check', '--batch', '--format', 'json'], { executable: join(installation, 'node_modules/ramify.ts/dist/src/cli-entry.js') });
       expect([result.code, result.signal, result.stderr]).toEqual([0, null, '']);
-      expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.analysis/2', summary: { complete: true, owners: 2 } });
+      expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.analysis/3', summary: { complete: true, owners: 2 } });
       expect(result.survivingChildren).toEqual([]);
     } finally { await rm(installation, { recursive: true, force: true }); }
   }), 30_000);

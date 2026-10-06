@@ -45,7 +45,7 @@ function fixture(): { readonly report: AnalysisReport; readonly revision: Contex
     { name: 'dispatch', kind: 'required-importer' as const }, { name: 'browser', kind: 'required-symbol' as const },
   ], isDefault: false };
   const report = {
-    schemaVersion: 'ramify.analysis/2', runId: 'run/1:fixture', inputId: 'input/1:fixture',
+    schemaVersion: 'ramify.analysis/3', runId: 'run/1:fixture', inputId: 'input/1:fixture',
     request: { project: { cwd: '/fixture', root: '/fixture', scope: 'whole-project', configuration: 'discover' },
       registry, capabilities: [], limits: { acquisition: { attempts: 1, maxFiles: 100, maxApplicationFiles: 100,
         maxFileBytes: 1000, maxInputBytes: 1000, maxApplicationBytes: 1000, maxOwners: 10, maxDepth: 10, deadlineMs: 1000 },

@@ -71,7 +71,7 @@ export function ignoredButWalked(ownership: ProjectOwnership, output: Uint8Array
     if (module === null) continue;
     advice.push({ code: 'ignored-but-walked', path: directory,
       message: `Git ignores this directory, but Ramify walks it as part of module ${module}; `
-        + 'declare it owned-ignored or external in that module\'s description if Ramify should leave it out' });
+        + 'declare it owned-unwired, owned-nested-project or external in that module\'s description if Ramify should leave it out' });
   }
   return advice;
 }

@@ -37,14 +37,14 @@ export function analysisInput(input: CapturedInput | undefined): boolean {
 }
 
 function notAnalyzedReason(exclusion: ProjectExclusion): NotAnalyzed['reason'] {
-  if (exclusion.kind === 'owned-ignored' || exclusion.kind === 'external' || exclusion.kind === 'scratch') return exclusion.kind;
+  if (exclusion.kind === 'owned-unwired' || exclusion.kind === 'owned-nested-project' || exclusion.kind === 'external' || exclusion.kind === 'scratch') return exclusion.kind;
   return 'reserved';
 }
 
 /**
  * Classify each named path by containment under `scope`, before any content rule: an
  * owned path outside every exclusion is analyzed and needs its content; a path in an
- * owned-ignored, external or scratch directory or another always-excluded path is
+ * owned nested, external or scratch directory or another always-excluded path is
  * not analyzed. Work is one classifier call per path.
  */
 export function classifyPaths(classify: Classify, scope: ProjectScope, paths: readonly string[]): PathClass[] {
