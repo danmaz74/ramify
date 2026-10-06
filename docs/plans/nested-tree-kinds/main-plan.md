@@ -1,6 +1,7 @@
 # Three kinds of nested tree
 
-**Date:** 2026-10-06. **Status:** complete. The decisions below
+**Date:** 2026-10-06. **Status:** complete; final plan-branch synchronization
+pending authentication (see [iteration 4 results](iterations/iteration4-results.md)). The decisions below
 are Dan's, and the [proposals](#proposals) are settled. Every protected patch
 in [protected documents](protected-documents.md) is approved: G3 and G4 by
 Dan, the rest on his delegation on 2026-10-06.

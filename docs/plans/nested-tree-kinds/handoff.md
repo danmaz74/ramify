@@ -112,3 +112,12 @@ this plan's approved patches and awaits the separately requested approval. It
 does not change implemented output or gate results. Agent P3/P4 and runtime
 adoption remain Plan 21's explicit prerequisites and work, not incomplete
 provider deliverables in this plan.
+
+Final plan documentation is adopted locally in `/ramify`; its remote branch
+synchronization is pending restoration of Git authentication. The origin plan
+branch remains at `c34f910bfa29efec481dd2e45eb2161ba003bf41`. Bounded HTTPS pushes
+and alternate SSH/agent checks timed out in the devcontainer credential bridge;
+no replacement history was created. Audit main is synchronized. The iteration 4
+receipt and its external final synchronization evidence distinguish local HEAD
+from the last published plan receipt. This transport gap does not change the
+published packages, passed gates or completed NT-16 through NT-20 cases.

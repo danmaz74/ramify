@@ -104,9 +104,16 @@ equality are in
 
 Clean ramify-audit main fast-forwarded from `38cfb308` to its published release
 `5e5228da63fcab934dbb72622798b01482789344` and was pushed; HEAD equals
-origin/main. The plan branch receives the adoption/doc commits, final receipt,
-handoff and completed status, is pushed and is adopted into `/ramify` again.
-The root branch's unrelated pre-existing local commits are not pushed.
+origin/main. The plan branch contains the adoption/doc commits, final receipt,
+handoff and completed status and is adopted locally into `/ramify`. Its final
+push remains pending authentication: three bounded attempts timed out in the
+VS Code devcontainer credential helper. Parent fallback checks found no alternate
+GitHub token/store, while SSH and ssh-agent requests also timed out in the
+forwarded devcontainer bridge. No alternate commit history was synthesized.
+`origin/plan/nested-tree-kinds` remains at `c34f910bfa29efec481dd2e45eb2161ba003bf41`;
+the latest local HEAD and attempted synchronization are recorded in the linked
+final synchronization evidence. Audit main is synchronized. The root branch's
+unrelated pre-existing local commits are not pushed.
 The earlier iteration 3 plan-receipt synchronization gap is closed by a
 successful bounded retry; no tests were repeated for that network issue.
 
