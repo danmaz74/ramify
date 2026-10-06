@@ -215,7 +215,7 @@ New:
 ```text
 A **nested tree** is a directory declared in its enclosing module's
 description as an owned-unwired tree, an owned nested project or an external
-tree.
+tree. The first two are the owned nested trees.
 ```
 
 ### G3: owned-unwired tree (replaces "Owned-ignored tree")
