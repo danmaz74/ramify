@@ -1,8 +1,10 @@
 # Affected-rule selection for audits
 
-**Date:** 2026-10-06. **Status:** reviewed by the coordinator on 2026-10-06. Execution runs
-on branch `feat/affected-rule` in `/home/app/ramify-affected`, from `b4858aec`.
-Nothing here is implemented.
+**Date:** 2026-10-06. **Status:** complete. Implemented on branch
+`feat/affected-rule` in `/home/app/ramify-affected`, from `b4858aec`, and
+released as `ramify.ts` 0.3.0 on 2026-10-06 (release commit `63cb7ccf`). The
+[handoff](handoff.md) lists the joint adoption with ramify-audit 0.6.0,
+which is outside this plan.
 
 ## Purpose
 
@@ -83,6 +85,24 @@ coordinator says so before iteration 1.
       behavior and not part of this rule.
     - The contributors rule is row 7.
     - Configuration files govern by directory (J3).
+
+- **Iteration 1** (`e3ac50d6` to `a188a124`). It delivered the rule, `/3`
+  and the authorized patches P1 and P2. Its gate passed.
+
+- **Iteration 2** (`63cb7ccf`, `154bcb97`, `83a33801`, the publication
+  commit).
+  - The release commit's full audit passed.
+  - The production artifact, its isolated smoke and the toolkit-clone
+    qualification are recorded in the
+    [results](iterations/iteration2-results.md) and the receipt
+    `/home/app/ramify-audit-pb-evidence/ramify-0.3.0-prod/RECEIPT.md`.
+  - ramify-audit Plan 8's iteration 4 qualified 0.6.0 against the artifact,
+    with verdict pass and no defects (`a4483a35`).
+  - Dan approved publication on 2026-10-06, conditional on that
+    qualification.
+  - The coordinator published `ramify.ts` 0.3.0 at 2026-10-06T17:47:14Z. The
+    registry's integrity and shasum equal the receipt's (AR-11).
+  - The [handoff](handoff.md) is written. The plan is complete.
 
 - **Post-release contract correction** (after the release commit
   `63cb7ccf`, documents only, artifact unchanged). ramify-audit Plan 8's

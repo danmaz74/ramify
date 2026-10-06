@@ -6,16 +6,19 @@ gate passed). Uncommitted evidence is under
 `/home/app/ramify-affected-evidence/iteration2/`. The production evidence is
 under `/home/app/ramify-audit-pb-evidence/ramify-0.3.0-prod/`.
 
-**Status:** steps 1 to 4 are done and step 5's hand-over is reported to the
-coordinator. The handoff (step 6) and publication (step 7) are pending the
-coordinator's word.
+**Status:** complete. Steps 1 to 5 are done. ramify-audit Plan 8 qualified the
+artifact, Dan approved, and the coordinator published `ramify.ts` 0.3.0; see
+the [publication addendum](#addendum-publication). The
+[handoff](../handoff.md) is written (step 6).
 
 ## Commits
 
 | Commit | Content |
 | --- | --- |
 | `63cb7ccf` | **Release commit.** `chore(release): ramify.ts 0.3.0`: `npm version 0.3.0 --no-git-tag-version`. The diff touches only the `version` member of `package.json` and the two `version` members of `package-lock.json` (the root and `packages[""]`). |
-| this commit | `docs(plan)`: this results file. |
+| `154bcb97` | `docs(plan)`: this results file up to the publication gate. |
+| `83a33801` | `docs(plan)`: the post-release contract correction (the basis of a description seed beneath `src/`); see the plan's execution record. |
+| the publication commit | `docs(plan)`: the [publication addendum](#addendum-publication), the [handoff](../handoff.md), the plan's completion and the roadmap line. |
 
 ## Protected documents
 
@@ -156,19 +159,11 @@ this tarball is its own work and has not been recorded here.
 
 ## Steps 6 and 7: handoff and publication
 
-Pending the coordinator's word:
-
-- `docs/plans/affected-rule-selection/handoff.md` is not written yet.
-- Publication waits for Plan 8's qualification reference and Dan's approval.
-  The publication step then runs:
-
-  ```sh
-  npm publish /home/app/ramify-audit-pb-evidence/ramify-0.3.0-prod/artifact/ramify.ts-0.3.0.tgz --registry https://npm.braimax.com
-  npm view ramify.ts@0.3.0 dist --registry https://npm.braimax.com --json
-  ```
-
-  and verifies the registry's `integrity` and `shasum` against the receipt's
-  (AR-11), then records the addendum this file's brief lists.
+- Step 6: [`handoff.md`](../handoff.md), written after publication. It
+  includes the measured 0.3.0 kind of each file that the toolkit's old
+  `fullAuditPaths` patterns match.
+- Step 7: the gate's two conditions were met and the coordinator published.
+  See the [addendum](#addendum-publication).
 
 ## Deviations
 
@@ -202,7 +197,65 @@ None. The final audit passed on its first run.
 
 ## Remaining gaps
 
-- The handoff, including the measured 0.3.0 kind of each file the old
-  `fullAuditPaths` patterns match.
-- Plan 8's qualification reference, Dan's approval, publication and the
-  registry verification (AR-11).
+- The coordinator's `npm publish` output was not handed to the implementer,
+  so the addendum records the command, the time and the registry state
+  instead.
+- Adoption by the toolkit and ramify-agent is outside this plan; the
+  [handoff](../handoff.md) lists it.
+
+## Addendum: publication
+
+**Date:** 2026-10-06. Recorded after the coordinator's word. No source
+changed and the artifact was not rebuilt.
+
+### Plan 8 qualification reference
+
+ramify-audit Plan 8, iteration 4, qualified the 0.6.0 candidate against this
+iteration's artifact. Verdict **pass**, with no defect in ramify-audit or in
+`ramify.ts` 0.3.0, and no new artifact needed.
+
+| Item | Value |
+| --- | --- |
+| Results commit | `a4483a35f778d24e9ddb617301f315544a0861d7` on `feat/project-boundary`, `/home/app/ramify-audit-pb` |
+| Results file | `docs/plans/08-ignore-paths/iterations/iteration4-results.md` |
+| Artifact digest check (R4-01) | SHA-256, integrity and shasum equal to the receipt's |
+| Candidate | `ramify-audit-0.6.0.tgz` from `543b38e`, SHA-256 `7d57fc781b1b95a43f4379462181a962c76ae7de00b2519f571470471c04e4a3` |
+| Toolkit clone | `63cb7ccf`, the release commit, with qualification commit `6945ae35` (`ignorePaths: ["docs/**", "ramify-agent/**", "scripts/probes/**"]`, the 12 `fullAuditPaths` patterns removed); T4-01 full audit pass, run ref `refs/audited/runs/2026-10-06T17-15-08Z-6945ae352` |
+| Expected toolkit answers | Every kind, `selects`, changed and affected list equals this plan's [expected toolkit table](../contracts.md#expected-toolkit-answers-with-030). Differences: none |
+| Real suite against the artifact | 5 files, 56 tests passed |
+
+### Approval
+
+Dan approved publication on 2026-10-06 ("approved"), conditional on that
+qualification. The coordinator ramify-65 relayed the approval.
+
+### Publish
+
+The coordinator published at 2026-10-06T17:47:14Z, from
+`/home/app/ramify-audit-pb-evidence/ramify-0.3.0-prod/`:
+
+```sh
+npm publish ./artifact/ramify.ts-0.3.0.tgz --registry https://npm.braimax.com
+```
+
+The registry records 0.3.0 at `2026-10-06T17:47:14.544Z`. The coordinator's
+evidence is `publication-view.json` and `registry-download.tgz`, beside
+`RECEIPT.md`.
+
+### Registry verification (AR-11)
+
+Verified independently by the implementer at 2026-10-06T17:49:51Z, with
+`npm view ramify.ts@0.3.0 dist --registry https://npm.braimax.com --json`,
+`sha256sum` and a fresh download (`publication-verify.txt` beside the
+receipt):
+
+| Item | Registry | Receipt | Equal |
+| --- | --- | --- | --- |
+| `dist.integrity` | `sha512-D35L+Mc9tzhxdqZLdBQqAOeAx3spw5hUfEVUoFQoOWbrr9aJe38YlxbbgI2T99uHEzn80eBaKbI6o6V0nR3LGA==` | the same | yes |
+| `dist.shasum` | `521e0f79a174f281345c871aa2a1f824d2ce3932` | the same | yes |
+| Downloaded tarball SHA-256 | `aaaf41272fb1337477a01cf15210283c1e9bed141f57870d7a98e1c6686745d3` (`registry-download.tgz` and a fresh download) | the artifact's | yes |
+| `dist-tags.latest` | `0.3.0` | | |
+
+AR-11 is complete: the qualification is recorded, Dan approved, the registry
+serves the receipt's tarball, and [`handoff.md`](../handoff.md) lists the
+adoption changes. `RECEIPT.md` has a matching "Publication" section.
