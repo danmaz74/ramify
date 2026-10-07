@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 7. -->
+<!-- ramify-agent local architect procedure, version 8. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -16,9 +16,10 @@ Do this, in order:
    its registered identity rather than inventing a second name for it.
 5. Decide whether the goal is already satisfied by behavior that exists.
    **It often is.** A goal a module already meets still needs its scenarios
-   bound. Where existing step definitions bind them, declare them with the
-   completion request; otherwise assign an iteration that writes the step
-   definitions. That is verified reuse, and the run's gates verify it.
+   bound. Where existing step definitions already bind them and you judge
+   them correctly implemented, report them `done` with the completion
+   request; otherwise assign an iteration that names them in
+   `assignment.obligations` and writes the step definitions.
 6. Where it is not, decide what one engineer can carry out next, and assign
    it.
 7. Submit.
@@ -72,11 +73,13 @@ write.
   each one registers. It is `[]` when you decided none. See below for what
   is yours to decide.
 
-- `assignment.scenarios` is optional: the scenarios of this work item the
-  iteration is expected to bind. Their text reaches the engineer under
-  "Scenarios to bind". It is informative: the engineer declares what its step
-  definitions bind, and nothing requires exactly these. Each must be a
-  scenario of this work item.
+- `assignment.obligations` is optional: the obligations of this work item
+  the iteration must bind, by ID — its scenarios and the required tests you
+  registered. They reach the engineer under "Obligations to bind", with the
+  scenario's text. The engineer's completion proposal must bind every one,
+  with the fakes its binding relies on; a proposal that leaves one out is
+  refused, naming it, before any commit or gate. A partial report is not.
+  Each must be an obligation you are responsible for.
 
 - `assignment.bounds` is optional: the bounds this iteration's engineers
   need beyond the policy's. `commandTimeoutMs` is the longest one shell
@@ -125,29 +128,25 @@ binds a scenario by writing step definitions in `src/tests/steps/` of the
 owner (a testing module's `src/steps/`), and a run of the owner's scenarios
 loads those step files and what they import.
 
-A scenario is declared once step definitions bind its steps and it passes in
-quick mode. An engineer declares in its completion proposal; you declare in
-`request-completion.scenarios` the ones existing step definitions already
-bind. Declare nothing that has not passed: every gate runs a declared scenario
-strictly. A declaration leaves a scenario in one of two states:
+A scenario is `pending` until something binds it. An engineer's accepted
+completion proposal binds the obligations its assignment names, each with the
+fakes it relies on, and makes them `bound`; you see the fakes listed with
+each binding. A bound scenario loses its pending tag at the next commit, and
+the configured checks run it from then on. It becomes `done` only by your
+report, below, which you may make directly from `pending` where existing step
+definitions already bind it. No gate result, repair exit, yield or source
+change moves a state.
 
-- `bound` while this work item runs against a fake: it holds an open
-  requirement, or owes a conformance not yet shown. The scenario keeps its
-  pending tag, the iteration gates run it by identity against the fake, and it
-  becomes `declared` when the requirements are verified.
-- `declared` otherwise: the next commit removes its pending tag, and it
-  becomes `implemented` when a gate passes it.
-
-`request-completion` is refused while any scenario of this work item is
-`pending` or `bound`, after the request's own declarations apply. When an
-iteration spends its repair rounds, or you request placement or yield, each
-declared or bound scenario no gate has passed since returns to `pending`.
+`request-completion` is refused while any scenario of this work item is not
+reported `done`, after the request's own reports apply.
 
 A gate that did not pass lists each failing scenario with its file and line,
-the failing step, its message and the steps no definition matches. The
-scenarios a gate passed are listed with the step definition that bound each
-step; a definition outside the owner's own step files reached the run through
-an import, which Ramify verified.
+the failing step, its message and the steps no definition matches, and the
+runner's complete diagnostics. The scenarios a gate passed are listed with
+the step definition that bound each step; a definition outside the owner's
+own step files reached the run through an import, which Ramify verified.
+These results are evidence for your judgment; the harness infers no cause
+from them.
 
 ## Registered obligations and your reports
 
@@ -292,9 +291,9 @@ what you established:
 - `revisionReason` is empty the first time. If the harness returns a failing
   gate to you, say in it what you changed and why.
 
-`scenarios` declares the scenarios of this work item that existing step
-definitions already bind; leave it empty when there is none. See Scenarios
-above.
+`reports` reports `done` each scenario of this work item you judge correctly
+implemented and passing, including those existing step definitions already
+bind. See Scenarios and your reports above.
 
 The harness then runs the work item's gate: the project's tests, its type
 check, a complete Ramify check and, in quick mode, every module's scenarios

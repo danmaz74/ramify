@@ -480,13 +480,13 @@ hiding or measured complexity justifies it.
     scenarios (architecture §6). The local architect is given every
     scenario of its entry with its ID, state, text, feature file and, for a
     sub-scenario, the integration scenario it came from; the engineer each
-    one not implemented, the ones `assignment.scenarios` names under
-    "Scenarios to bind", the rules of binding and the request for named
-    imports of another owner's step files; an integration item's engineer
-    its scenario and the step files it imports. A provider or follow-up work
-    item's briefings say nothing about scenarios. `assignment.scenarios` is
-    informative: the judge accepts only scenarios of the work item, and no
-    engineer must declare exactly those.
+    one not done, the ones `assignment.obligations` names under "Scenarios
+    to bind", the rules of binding and the request for named imports of
+    another owner's step files; an integration item's engineer its scenario
+    and the step files it imports. A provider or follow-up work item's
+    briefings say nothing about scenarios. The engineer's proposal must bind
+    exactly the obligations `assignment.obligations` names (`work/engineer.ts`
+    renders them under "Obligations to bind").
 - `contracts/`: one agreement between a consumer and a provider, and the
   scheduling it creates. Nothing here writes the log; the run drives it.
   - `records.ts`: the `ContractRecord`, the one `ProviderObligation` keyed
@@ -565,12 +565,13 @@ hiding or measured complexity justifies it.
   verification evidence, a provider wait stays working with its reason, a
   reopening returns a completed capability to working and a superseded
   hypothesis leaves the list, and each entry counts its scenarios,
-  implemented of all it has; `scenarios.ts` the tracked scenarios, replayed
+  reported done of all it has; `scenarios.ts` the tracked scenarios, replayed
   as `run/feature-files.ts` replays them: the review's frozen text with the
   warnings `analysis-accepted` recorded, and the scenario list
   (`GET .../runs/:runId/scenarios`) with each scenario's state, origin, work
-  item, owner, file, implementing gate and every gate attempt whose scenario
-  check ran it, with its status there read from that attempt's summary;
+  item, owner, file and every gate attempt whose scenario check ran it, with
+  its status there read from that attempt's summary, and each obligation
+  with its binding's fakes and its architect report;
   `metrics.ts` the KPIs and the evaluation evidence, with invocations grouped
   into sessions by the harness session each one started in; `queries.ts` the
   one entry point the HTTP adapter calls. A projected scenario event refers to
@@ -1086,67 +1087,55 @@ pi actually made and what the snapshot tools answered.
   `ScenarioCheckSummary` is on the command record of the
   `ramify-agent.gate-attempt/3`, whose output ends with the failures, and a
   failure is repaired like failing tests.
-- **Scenario states** (architecture §7 to §9). An engineer's
-  `completion-proposed` and a local architect's `request-completion` carry
-  `scenarios: string[]`, default empty. The judge accepts IDs of entry
-  scenarios of the work item's own entry, or an integration work item's one
-  scenario (`work/declarations.ts`), and rejects an unknown ID, another
-  entry's scenario or an integration scenario of any other work item with
-  the reason, under the per-turn bound. At acceptance each `pending`
-  one becomes `bound` while the work item has an open requirement or owes a
-  conformance, and `declared` otherwise (`scenario-declared { scenario, by,
-  state }`); a `bound`, `declared` or `implemented` one is left as it is.
-  After a passing committing gate every `declared` scenario its check passed
-  is `implemented` (`scenario-implemented { scenario, gate }`), and every
-  `bound` one stays bound with the attempt recorded as its fake-backed pass
-  (`scenario-bound-passed { scenario, gate }`). When `requirement-verified`
-  closes the last open requirement of a work item that owes no conformance,
-  its bound scenarios are `declared` (`scenario-due`). A work item that
-  leaves its repair path without a pass, because an iteration exhausted its
-  repair rounds, or it requests placement or yields, withdraws every
-  `declared` or `bound` scenario no gate passed since its declaration
-  (`scenario-withdrawn { scenario, reason, commit }`). Where that restores
-  a pending tag the harness re-renders and commits "Withdraw sc-001, …"
-  with `Ramify-Run` and `Ramify-Scenarios: withdrawn-<n>`, as a ledger
-  effect whose intent is `scenarios-withdrawing` and whose completion is the
-  first `scenario-withdrawn`; the commit is not an accepted boundary, and a
-  recovery finds it by its trailers and records the rest. A withdrawal of
-  bound scenarios alone changes no file, and names the accepted boundary.
-  An `implemented` scenario never returns: a later failure fails its gate.
+- **Scenario states** (architecture §7 to §9). A tracked scenario's state is
+  its obligation status, `pending`, `bound` or `done`, folded with every
+  other obligation in `work/obligations.ts`. A local or capability
+  assignment names the obligations its iteration must bind in
+  `assignment.obligations`; the judge accepts only obligations the assigning
+  architect is responsible for. An engineer's `completion-proposed` binds
+  each of them exactly once in `bindings: { id, fakes }[]`; a proposal that
+  leaves one out is rejected naming the missing IDs under the per-turn bound,
+  before any commit, audit or review, and a `partial` report is exempt. An
+  accepted binding is recorded as `obligation-bound { id, fakes, by,
+  submission }` before the iteration gate: a `pending` obligation becomes
+  `bound`, and a `done` one keeps `done` with the new fakes list. Only the
+  responsible architect's accepted report (`obligation-reported`, judgment
+  `done` or `bound`) makes it `done` or revises it back. No gate result,
+  repair exit, yield, bound exhaustion or source edit moves a state, and
+  nothing is withdrawn. The pending tag comes off at `bound` or `done`, when
+  the next gate commit, materialization or rewording renders the files. A
+  gate's scenario check results are raw evidence beside the state: its
+  failures, with their steps and the runner's complete diagnostics, reach
+  the engineer and architect without an inferred cause.
 - **Integration work items** (architecture §10, `work/integration.ts`). The
-  `scenario-implemented` that implements the last sub-scenario of an
-  integration scenario commits, in the same transaction, a work item with
-  origin `{ integration: sc-NNN }` at the scenario's owner, the lowest
-  common ancestor of the sub-scenarios' owners. It is committed after every
-  earlier item, so it queues behind the current one; `work-item-started`
-  names every item's `origin`, and an integration item's `scenario`. Its
-  local architect's briefing carries the scenario, the sub-scenarios with
-  their owners and bridging Givens, each owner's step files as the tree
-  holds them (`src/tests/steps/`, or a testing module's `src/steps/`), and
-  the scope its engineer must be given: the ancestor with the child on each
-  path to a sub-scenario's owner included, which the assignment's judge
-  requires. The engineer writes a step file at the ancestor that imports
-  the sub-scenarios' step files by name, adds the `expose-test` declarations
-  along each path and declares the scenario; the iteration gate selects it
-  by identity with the implemented sub-scenarios, and the item completes at
-  its own work-item gate. A failing gate whose scenario check failed an
-  integration scenario while each of its sub-scenarios passed adds a
-  composition failure to the diagnostics its engineer and architect
-  receive, naming the sub-scenarios whose bridging Given is suspect
-  (`compositionFailures` of the `scenarios` child); it is repaired like any
-  failure.
+  `obligation-reported` that reports the last sub-scenario of an integration
+  scenario `done` commits, in the same transaction, a work item with origin
+  `{ integration: sc-NNN }` at the scenario's owner, the lowest common
+  ancestor of the sub-scenarios' owners. A `bound` sub-scenario is not
+  enough. It is committed after every earlier item, so it queues behind the
+  current one; `work-item-started` names every item's `origin`, and an
+  integration item's `scenario`. Its local architect's briefing carries the
+  scenario, the sub-scenarios with their owners, each owner's step files as
+  the tree holds them (`src/tests/steps/`, or a testing module's
+  `src/steps/`), and the scope its engineer must be given: the ancestor with
+  the child on each path to a sub-scenario's owner included, which the
+  assignment's judge requires. The architect assigns the scenario; the
+  engineer writes a step file at the ancestor that imports the
+  sub-scenarios' step files by name, adds the `expose-test` declarations
+  along each path and binds it, and the architect reports it done. A failure
+  of the integration scenario reaches the repair round as the raw failure
+  with every result; no composition diagnosis is generated.
 - **The work-item and final gates.** All project tests, the type check, a
   complete Ramify check and the scenario check, on the current tree. A
-  completion request applies its own declarations first and is refused,
-  under the refusal bound, while a scenario of its entry is `pending` or
-  `bound`. `work-item-completed` requires
-  a passing `work-item` attempt and every scenario of the item's entry, or
-  an integration item's scenario, `implemented`, and is the only thing that
-  closes a work item. Before the final run the rule `acceptance-incomplete`
-  requires every tracked scenario `implemented`, integration scenarios
-  included; `job-completed` requires a passing `final` attempt whose
-  scenario check passed every one in full mode, and an empty work queue
-  alone never satisfies it. A change to the working
+  completion request applies its own reports first and is refused, under
+  the refusal bound, while a scenario of its entry, or an integration item's
+  scenario, is not reported `done`. `work-item-completed` requires a passing
+  `work-item` attempt, and is the only thing that closes a work item. Before
+  the final run the rule `acceptance-incomplete` requires every tracked
+  scenario reported `done`, integration scenarios included; `job-completed`
+  requires a passing `final` attempt, whose scenario check results are
+  recorded as raw evidence and never matched to the states, and an empty
+  work queue alone never satisfies it. A change to the working
   directory blocks nothing: a committing gate first captures a candidate
   commit, then audits that exact source. A failed candidate remains inspectable
   in Git; only a passing applicable gate establishes acceptance. The commit
@@ -1255,35 +1244,37 @@ The run's own tests are beside them.
   guarded change, and whose file the gate's commit restores. The crash
   between the commit and its record is the recovery table's
   `scenarios-committed` row.
-- `scenario-states.test.ts` covers declarations and every transition: a
-  declared scenario implemented by its iteration gate and one a request
-  declares implemented by the work-item gate, with the final gate in full
-  mode; a bound scenario through its fake-backed pass, the yield,
-  `requirement-verified` and `scenario-due` to its implementation; rejected
-  declarations under the bound; withdrawal by exhaustion, by a placement
-  request and by a yield; a refused completion request and the bound; an
-  implemented scenario failing a later gate; the final rule; and the crash
-  between a withdrawal commit and its record. Scripted local architects in
-  every lifecycle test declare their entry's scenarios, or their
-  integration scenario, with their completion requests
-  (`helpers/declarations.ts`), and the scripted runners
-  report the scenarios a selection reaches as passed.
+- `scenario-states.test.ts` covers the three states: a binding with and
+  without fakes that takes the pending tag off before the gate selecting the
+  scenario, a done report directly from `pending`, a passing gate that
+  leaves a scenario `bound` and a refused completion request until the
+  report, a done report that survives a failing gate, a repair exit and a
+  source edit, the architect's revision back to `bound`, a rebinding of
+  `done`, an incomplete proposal rejected with the missing IDs and the
+  complete one that follows, a partial report under the same assignment,
+  the refusal bound, and the final gate whose raw scenario results never
+  decide completion. Scripted local architects in every lifecycle test
+  report their entry's scenarios, or their integration scenario, `done`
+  with their completion requests (`helpers/declarations.ts`), and the
+  scripted runners report the scenarios a selection reaches as passed.
 - `integration-scenarios.test.ts` drives one integration scenario: its
-  work item created by the last sub-scenario's `scenario-implemented` at
-  the common ancestor and queued behind the current item, the briefing, a
-  refused scope that leaves out a path, the declaration, the iteration gate
-  selecting it by identity and the completion; a composition failure's
-  finding in the repair briefing; and the rules over literal records.
-  `integration-scenarios-integration.test.ts` runs the same scenario to
-  completion and gives the tree to the installed Ramify, which accepts the
-  ancestor's named imports of both step files and refuses one once its
-  `expose-test` is removed. Both share `helpers/integration-scenario.ts`.
+  work item created by the last sub-scenario's done report, and not by a
+  binding, at the common ancestor and queued behind the current item, the
+  briefing without bridging diagnoses, a refused scope that leaves out a
+  path, the binding, the architect's report and the completion; a repair
+  briefing with the raw failure and every result; and the rules over
+  literal records. `integration-scenarios-integration.test.ts` runs the
+  same scenario to completion and gives the tree to the installed Ramify,
+  which accepts the ancestor's named imports of both step files and refuses
+  one once its `expose-test` is removed. Both share
+  `helpers/integration-scenario.ts`.
 - `acceptance-trial.test.ts` is the scripted acceptance trial: one run on
   the fixture through every stage, the review stop and its approval, the
-  four acceptance readiness steps, materialization, a declaration while a
-  requirement is open (`bound`), a withdrawal by a yield and one by
-  exhaustion with its commit, `scenario-due`, an integration work item and
-  the final gate in full mode, with its event sequence and final states. A
+  four acceptance readiness steps, materialization, a binding over a
+  contract's fake that stays `bound` through a failing gate and a yield, a
+  rebinding without fakes and the architect's done report, an exhausted
+  iteration that leaves its binding, an integration work item and the final
+  gate in full mode, with its event sequence and final states. A
   second run binds the fixture plan `status-badge-tone`'s two scenarios in
   `shared-ui` with a step file that renders the badge and needs no World
   (`helpers/badge-scenarios.ts`). The final gate runs its commands in the
@@ -1293,9 +1284,9 @@ The run's own tests are beside them.
   fixture's toolchain.
 - `scenario-briefings.test.ts` covers what the agents are told of
   scenarios: the local architect's section per scenario, the engineer's
-  "Scenarios to bind", other unimplemented scenarios and rules, the
-  integration engineer's section and a provider's silence;
-  `assignment.scenarios`' judge; `run_scope_tests` with a scripted runner
+  "Scenarios to bind" and "Obligations to bind", other scenarios not done
+  and the rules, the integration engineer's section and a provider's
+  silence; `assignment.obligations`' judge; `run_scope_tests` with a scripted runner
   over the recorded streams; and the diagnostics rendered from a recorded
   failing stream. `helpers/project-config.ts`' `scriptedScenarioRun` answers
   a scenario run in the test's own process where the command runner is a

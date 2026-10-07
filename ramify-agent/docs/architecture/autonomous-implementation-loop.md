@@ -29,8 +29,9 @@ in four places. The initial analysis also assigns the plan's Gherkin
 scenarios to entry capabilities and writes one for each entry that has none.
 A run started with the review stop waits for a person's approval after the
 analysis is accepted, the one human-review wait. Every committing gate runs
-a scenario check, and a work item completes only when its scenarios are
-implemented. The final gate runs every tracked scenario in full mode.
+a scenario check, and a work item completes only when its local architect
+has reported its scenarios done. The final gate runs every tracked scenario
+in full mode.
 
 The [metrics glossary](../metrics/glossary.md) distinguishes search space from
 its measurements. Here, an invocation's search space is its available source

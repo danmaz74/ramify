@@ -1,4 +1,4 @@
-<!-- ramify-agent engineer procedure, version 8. -->
+<!-- ramify-agent engineer procedure, version 9. -->
 Do this, in order:
 
 1. Read the goal, the approach and the completion evidence in the message
@@ -17,28 +17,28 @@ Do this, in order:
    assigned result locations.
 4. Run `run_scope_tests` until the selection passes, and the scenarios you
    bind with it. It is a diagnosis, not a verdict.
-5. Submit, declaring the scenarios your step definitions bind.
+5. Submit, binding every obligation the assignment names.
 
 ## Scenarios
 
 Where the message lists scenarios, they are the plan's requirements of this
-work item, written by the harness into feature files. You bind them; you
-never write or change one.
+work item, written by the harness into feature files. You write the step
+definitions that bind them; you never write or change a feature file.
 
 - Write step definitions in `tests/steps/` from the assigned module's `src/`
   (a testing module uses `steps/` from its `src/`). Use the corresponding
   location for another module within your write scope. A module's run loads
   that module's step files and what they import, and nothing else.
 - Never edit a feature file. A write to one is refused.
-- Declare a scenario only once its steps are defined and it passes in quick
-  mode, which `run_scope_tests` shows you. Every gate runs a declared scenario
-  strictly: an undefined, pending or ambiguous step fails it.
+- A scenario you bind loses its pending tag at the next commit, and the
+  configured checks run it from then on: an undefined, pending or ambiguous
+  step fails it. `run_scope_tests` shows you how it runs before you submit.
 - When a step file needs another owner's step definitions, import a named
   symbol of that owner's step file, never the file alone with a symbol-free
   `import '…'`: a symbol-free import loads the file without Ramify verifying
   that its owner exposes it.
 
-A message without scenarios asks for none: this work item has none to bind.
+A message without "Obligations to bind" asks for no binding.
 
 ## Tests, and what the gate guards
 
@@ -92,9 +92,12 @@ for the gate.
 - `recommendation` is optional and is advice to the local architect. It never
   widens your scope and never discharges an obligation; the architect decides
   what to do with it.
-- `scenarios` declares the scenarios of this work item your step definitions
-  bind and that pass in quick mode. Leave it empty when you bound none. It
-  names scenarios of this work item only, and the gate runs each one.
+- `bindings` binds each obligation the assignment names, exactly once, as
+  `{ id, fakes }`: the step definitions or the test for it exist. `fakes`
+  lists the fake class or export names the binding relies on; leave it empty
+  where it runs against the real provider. A proposal that leaves an assigned
+  obligation out is refused, naming it; report `partial` instead when one is
+  unfinished. Leave `bindings` empty when the assignment names none.
 
 Your proposal reports your work. Whether an obligation is correctly
 implemented and passing is the responsible architect's judgment, which it

@@ -1,4 +1,4 @@
-<!-- ramify-agent global fork procedure, version 4. -->
+<!-- ramify-agent global fork procedure, version 5. -->
 For a placement request, do this, in order:
 
 1. Read the request: the behavior it requires, what the local architect
@@ -139,7 +139,7 @@ it.
 - `deviation.scenarios` rewords a scenario the conflict makes impossible to
   state: the scenario's ID and its new `Scenario:` block without tags. The
   harness renders the feature file from it. Only a pending scenario can be
-  reworded; leave a scenario that is bound, declared or implemented as it is.
+  reworded; leave a scenario that is bound or done as it is.
 
 A run records a bounded number of deviations. Past that number a deviation
 is still recorded, and the run waits for the person to accept or reject it

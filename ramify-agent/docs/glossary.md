@@ -334,5 +334,5 @@ An **identity tag** is `@ramify-sc-NNN`, the tag that names one tracked
 ## Pending tag
 
 The **pending tag** is `@ramify-pending`, which the harness keeps on a
-[scenario](#scenario) while it is `pending` or `bound`, so that only a run
-that selects it by [identity tag](#identity-tag) runs it.
+[scenario](#scenario) while it is `pending`, so that only a run that selects
+it by [identity tag](#identity-tag) runs it.

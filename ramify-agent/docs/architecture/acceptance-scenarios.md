@@ -4,21 +4,23 @@
 [Plan 10](../plans/10-acceptance-scenarios/main-plan.md); see its
 [results](../plans/10-acceptance-scenarios/results.md).
 
+**Scenario state since Plan 21.** Iteration 6 of
+[Plan 21](../plans/21-project-boundary-adoption/main-plan.md) replaced the
+declaration states with the architect-owned obligation states of its
+[scenario contract](../plans/21-project-boundary-adoption/contracts.md#10-scenario-state-delegation-and-agent-judgment).
+Sections 6 to 11 and the events table below describe that model; the
+decisions at the end record the v1 choices as they were made.
+
 **Where the implementation differs from this text.** The results record
 every deviation; these change what the document says:
 
-- The log has three events beyond the events table:
-  `scenarios-materializing` and `scenarios-withdrawing`, the intents of the
-  harness's own commits, and `scenario-bound-passed { scenario, gate }`, a
-  bound scenario's pass against its fakes, which changes no state.
-- The harness's own commits carry `Ramify-Scenarios` beside `Ramify-Run`:
-  `materialized` on the feature files' commit, `withdrawn-<n>` on the run's
-  nth withdrawal. The materialization commit is an accepted boundary; a
-  withdrawal commit is not, and a withdrawal of bound scenarios alone makes
-  no commit.
-- The integration work item is committed with the `scenario-implemented`
-  that makes it due; `work-item-started` marks its turn and carries its
-  `origin` and `scenario`.
+- The log has one event beyond the events table:
+  `scenarios-materializing`, the intent of the materialization commit.
+- The materialization commit carries `Ramify-Scenarios: materialized`
+  beside `Ramify-Run` and is an accepted boundary.
+- The integration work item is committed with the `obligation-reported`
+  that reports its last sub-scenario done; `work-item-started` marks its
+  turn and carries its `origin` and `scenario`.
 - `acceptance-incomplete` is a run failure checked before the final gate,
   not a rule of the final attempt.
 - The untracked counts are `{ passed, skipped, failed }`.
@@ -60,17 +62,17 @@ and `unresolved` run states do not exist there yet.
   from its own records. Materialization is a pure function of the records
   and the scenario states, so it is idempotent and any drift is a guarded
   change.
-- **Every tracked scenario has one of four states:** `pending`, `bound`,
-  `declared`, `implemented`. The `@ramify-pending` tag marks the first two in
-  the source. Only the harness moves a state and only the harness edits a
-  feature file.
-- **An engineer declares** the scenarios its iteration bound, in its
-  completion proposal. A local architect may declare scenarios that existing
-  step definitions already bind, in its completion request. The next gate
-  verifies every declaration strictly.
-- **A declaration made while the work item has an open requirement** makes
-  the scenario `bound`, not `declared`: it passed against a fake. It becomes
-  `declared` by itself when the item's last requirement is verified.
+- **Every tracked scenario has one of three states,** its obligation status:
+  `pending`, `bound`, `done`. The `@ramify-pending` tag marks only the first
+  in the source. Each state is entered by one accepted submission, and only
+  the harness edits a feature file.
+- **An engineer binds** the obligations its assignment names, in its
+  completion proposal, each with the fakes the binding relies on. A proposal
+  that leaves one out is refused, naming it.
+- **The responsible local architect reports a scenario `done`**, directly
+  from `pending` where existing step definitions bind it, and only that
+  architect's revision moves it back to `bound`. No gate result, repair exit,
+  yield or source change moves a state.
 - **One Cucumber run per owner module, in the target project's own scenario
   harness.** A project configuration file, `ramify-agent.json`, declares the
   command of each execution mode and the support code that loads the world,
@@ -82,16 +84,17 @@ and `unresolved` run states do not exist there yet.
   selected by identity tag; work-item gates run every module with untagged
   scenarios in quick mode; the final gate runs them all in full mode.
 - **An integration scenario gets a work item at the common ancestor** once
-  its sub-scenarios are implemented. Its engineer imports the sub-scenarios'
-  step definitions there, through `expose-test`, and a composition failure is
-  that work item's to resolve.
+  its sub-scenarios are reported done. Its engineer imports the
+  sub-scenarios' step definitions there, through `expose-test`, and a failure
+  of the scenario is that work item's to resolve.
 - **The harness reads Cucumber's message stream itself**, as a registered
   check inside ramify-audit, and derives each scenario's result and the step
   definitions that bound it.
 - **A plan is finished** when every tracked scenario, integration scenarios
-  included, is `implemented`, carries no pending tag, matches its recorded
-  text, and passes in full mode at the final gate, beside the project's
-  tests, its type check and a complete Ramify check.
+  included, is reported `done` and carries no pending tag, and the final
+  gate, which runs every scenario in full mode beside the project's tests,
+  its type check and a complete Ramify check, passes. Its scenario results
+  are raw evidence, never matched to the states.
   Completion can await user review of non-functional plan deviations before
   that exact candidate is merge-ready. A CheckFinding decision cannot make a
   failed scenario or required gate pass.
@@ -106,7 +109,7 @@ They are defined in the [glossary](../glossary.md).
 | Plan scenario | A scenario written in the plan, extracted by the harness. Its authority is the plan's. |
 | Architect scenario | A scenario the initial architect writes for one entry. Its authority is the person's review. |
 | Entry scenario | A scenario assigned to exactly one entry capability. Every plan scenario that is not an integration scenario, and every architect scenario, is one. |
-| Integration scenario | A plan scenario that combines several entries. It has sub-scenarios, and an integration work item at their owners' common ancestor binds it once they are implemented. |
+| Integration scenario | A plan scenario that combines several entries. It has sub-scenarios, and an integration work item at their owners' common ancestor binds it once they are reported done. |
 | Sub-scenario | An entry scenario the architect derived from an integration scenario, ideally by picking its steps verbatim. |
 | Bridging Given | A `Given` in a sub-scenario that replaces another entry's action with the state it leaves. |
 | Step definition | The TypeScript that Cucumber matches a step's text to. Agents write step definitions; they never write scenarios. |
@@ -440,7 +443,7 @@ readiness-passed -> createBranch -> materialize -> commit "Scenarios of <planId>
 
 The commit carries the `Ramify-Run` trailer and no `Ramify-Gate`; nothing
 ran over it, and the attempt history says so by having no attempt. It is the
-one commit of a run that is neither a gate's nor a withdrawal's.
+one commit of a run that is not a gate's, apart from a deviation's rewording.
 
 **Layout.** One file per entry, in the entry owner's test area, and one file
 per common ancestor for integration scenarios:
@@ -460,7 +463,7 @@ of the same name apart, and makes each file's provenance visible.
 # Written by ramify-agent for plan send-customer-email, run 20260923T1200Z-1a2b3c.
 # The scenarios are the plan's requirements. Agents never edit this file;
 # step definitions bind it from src/tests/steps/. @ramify-pending marks a
-# scenario the harness has not yet declared due.
+# scenario that nothing has bound or reported done yet.
 
 Feature: send-customer-email
   A user activates email sending for a customer, and that customer receives
@@ -476,7 +479,7 @@ Feature: send-customer-email
 The feature name is the entry's capability slug and the description its
 recorded description. Scenario source lines are written verbatim from the
 record. The identity tag is `@ramify-` followed by the scenario ID. The
-pending tag is present exactly when the scenario is `pending` or `bound`.
+pending tag is present exactly when the scenario is `pending`.
 
 **Idempotence.** Every later change to a feature file is a re-rendering: the
 harness computes the expected content of every tracked file from the current
@@ -494,148 +497,122 @@ profiles stay guarded as `cucumber.js` is today, although no gate reads them.
 
 The local architect's briefing gains a section per entry scenario of its work
 item: ID, state, text, file path and, for a sub-scenario, the integration
-scenario it came from. Its procedure changes in one place. Step 5, "a goal a
-module already meets needs no iteration", becomes: a goal a module already
-meets still needs its scenarios bound; where existing step definitions bind
-them, declare them with the completion request; otherwise assign an iteration
-that writes the step definitions.
+scenario it came from, and lists every obligation it is responsible for with
+its status, revision, binding fakes and last report. Its procedure changes in
+one place. Step 5, "a goal a module already meets needs no iteration",
+becomes: a goal a module already meets still needs its scenarios bound; where
+existing step definitions already bind them, report them `done` with the
+completion request; otherwise assign an iteration that binds them.
 
-`assignment` gains an optional `scenarios: string[]`, the scenario IDs the
-iteration is expected to bind. It is informative: it puts the text in the
-engineer's briefing under "Scenarios to bind", and the harness never requires
-that the engineer declare exactly those.
+`assignment.obligations` is optional: the IDs of the obligations the
+iteration must bind, scenarios and registered tests of the assigning
+architect alike. They reach the engineer under "Obligations to bind", and a
+scenario's text under "Scenarios to bind". The assignment is binding, not
+informative: the engineer's completion proposal must bind every one.
 
 The engineer's briefing carries, for each scenario of its work item's entry
-that is not `implemented`, the text, the feature file's path, the state, and
-three rules: write step definitions in `src/tests/steps/` of a module within
-the write scope; never edit a feature file; declare a scenario only once its
-steps are defined and pass in quick mode, which `run_scope_tests` can show it
-by running the scenario check for its scope. Provider work items have no
-scenarios, and their briefings say nothing about them.
+that is not `done`, the text, the feature file's path, the state, and three
+rules: write step definitions in `src/tests/steps/` of a module within the
+write scope; never edit a feature file; bind each assigned scenario in the
+proposal, naming the fakes it relies on, which `run_scope_tests` can show
+running in quick mode. Provider work items have no scenarios, and their
+briefings say nothing about them.
 
-### 7. Declaring, and the iteration gate
+### 7. Binding, and the iteration gate
 
-`completion-proposed` gains `scenarios: string[]`, default empty, and so does
-`request-completion`. Both are declarations. The harness accepts a
-declaration when every ID names an entry scenario of this work item's entry
-that is `pending` or `bound`; an `implemented` or `declared` ID is accepted
-and ignored, so a repeated submission is harmless. An unknown ID, another
-entry's scenario or an integration scenario is a rejected submission with the
-reason, under the existing per-turn bound.
+`completion-proposed` carries `bindings: { id, fakes }[]`. The harness
+accepts a proposal only when it binds every ID of `assignment.obligations`
+exactly once and nothing else; a proposal that leaves one out is a rejected
+submission naming the missing IDs, under the existing per-turn bound, before
+any commit, audit or review. A `partial` report is exempt. `fakes` names the
+fake class or export names the binding relies on, possibly none.
 
-At acceptance, each declared scenario moves:
-
-| Work item has an open requirement, or owes a conformance | New state | Pending tag |
-| --- | --- | --- |
-| Yes | `bound` | Kept |
-| No | `declared` | Removed |
+An accepted binding is recorded (`obligation-bound { id, fakes, by,
+submission }`) before the iteration gate. A `pending` obligation becomes
+`bound`; a `done` one stays `done` and records the new list. The architect
+sees each binding's fakes with its provenance.
 
 Then the gate runs as today: the harness compares guarded files, re-renders
-the feature files, commits, and the audit runs the checkpoint's checks over
-that commit. The scenario check is one of them, described
+the feature files, so a bound scenario loses its pending tag in the gate's
+own commit, commits, and the audit runs the checkpoint's checks over that
+commit. The scenario check is one of them, described
 [below](#the-scenario-check). For the `iteration` and `contract` checkpoints
-it selects, by identity tag, every scenario in state `bound`, `declared` or
-`implemented` whose owner is one of the scope's owners, and runs them strictly
-in quick mode. A `bound` scenario therefore runs although it carries the
-pending tag, because the selection names it.
+it selects, by identity tag, the scope's owners' scenarios without a pending
+tag and the pending ones the assignment names, and runs them strictly in
+quick mode.
 
-On a pass, every `declared` scenario of the gate becomes `implemented`
-(`scenario-implemented { scenario, gate }`), and every `bound` one stays
-`bound` with the attempt recorded as its fake-backed pass. On a failure the
-ordinary repair rounds apply, and the scenario stays where it is while they
-run. When the work item leaves the repair path without a pass, by exhaustion,
-a placement request or a yield, every `declared` or `bound` scenario that has
-not passed a gate since its declaration is withdrawn to `pending`
-(`scenario-withdrawn { scenario, reason }`), the files are re-rendered, and a
-commit "Withdraw sc-003" restores the tag at once. Restoring it at the next
-gate instead would leave an untagged failing scenario in the tree for the next
-gate that runs its owner.
-
-An `implemented` scenario never returns to `pending`. When it fails a later
-gate it fails that gate, as any regression does.
+A pass leaves every state as it is: a bound scenario stays `bound` until its
+architect reports it. On a failure the ordinary repair rounds apply, and the
+repair briefing carries the raw failures, every result and the runner's
+complete diagnostics, with no cause inferred. Exhaustion, a placement request
+or a yield leaves every state as it is; nothing is withdrawn.
 
 ### 8. Providers, fakes and bound scenarios
 
 A consumer's first iteration usually binds its scenarios against the fake it
 implements against, and the fake stands until the provider conforms and a
-verification iteration passes. The `bound` state records exactly that
-situation instead of refusing the declaration and asking a later engineer to
-repeat it. Decided by Dan, 2026-09-23: a declared scenario keeps its pending
-tag while it would run against a fake, and the tag is removed only when it
-would run without one.
-
-When `requirement-verified` closes the last open requirement of a work item,
-and no conformance is owed, the harness moves every `bound` scenario of that
-item to `declared` (`scenario-due { scenario, cause: requirements-verified }`).
-The next commit removes their tags and the next gate runs them untagged. In
-the common order that is the work item's own gate, since the verification
-iteration's gate is what produced `requirement-verified`; the scenario has
-then run twice against the real provider, once selected as `bound` and once
-as `declared`, and `implemented` is the second.
+verification iteration passes. The binding records that situation as its
+`fakes` list. Its scenario loses the pending tag at the binding, and the
+configured checks run it against the fake from then on. The verification
+iteration binds it again without fakes, and the architect reports it `done`
+when it judges the scenario correctly implemented. No requirement or audit
+event moves its state.
 
 ### 9. Work-item completion
 
 `request-completion` is refused, with the existing refusal path and bound,
-while any entry scenario of the item is `pending` or `bound`. Its own
-declarations are applied first, so a completion request that declares the
-last scenario is not refused for it. The `work-item` gate then runs every
-module that has feature files, one quick run each with `not @ramify-pending`,
-strictly, and every `declared` scenario it passes becomes `implemented`.
-`work-item-completed` requires every entry scenario of the item
-`implemented`, beside what it requires today.
+while any entry scenario of the item, or an integration item's scenario, is
+not reported `done`. Its own reports are applied first, so a completion
+request that reports the last scenario done is not refused for it. The
+`work-item` gate then runs every module that has feature files, one quick run
+each with `not @ramify-pending`, strictly, and `work-item-completed` requires
+that gate's pass.
 
 Those runs include the project's own scenarios and every earlier work item's
-implemented ones, so each work-item gate is also the regression acceptance of
-the whole project in quick mode.
+bound and done ones, so each work-item gate is also the regression acceptance
+of the whole project in quick mode. A failure fails the gate and leaves every
+state as it is.
 
 ### 10. Integration scenarios
 
-An integration scenario is `pending` until every sub-scenario is
-`implemented`. At the `scenario-implemented` event that makes that true, the
-harness creates an **integration work item** at the scenario's owner, the
-lowest common ancestor of the sub-scenarios' owners, with the goal of binding
-that one scenario. It is a work item like any other, with origin
+An integration scenario is due once every sub-scenario is reported `done`; a
+`bound` sub-scenario is not enough. With the `obligation-reported` that makes
+that true, the harness creates an **integration work item** at the scenario's
+owner, the lowest common ancestor of the sub-scenarios' owners, with the goal
+of binding that one scenario. It is a work item like any other, with origin
 `integration` and the scenario's ID in place of an entry capability, and it
 queues behind the current work item, since work items run one at a time.
 
-Its local architect assigns an engineer whose scope is the ancestor with the
-children on the paths to the sub-scenarios' owners included. The engineer
-writes a step file at the ancestor that imports, by name, the step files the
-sub-scenarios' owners wrote, adds the `expose-test` declarations along each
-path, and declares the scenario. The verbatim rule guarantees that those
-imported definitions bind every step, so the ancestor's file defines no step
-of its own; bridging Givens occur only in sub-scenarios. The iteration gate
-runs the ancestor's feature files with the scenario selected by identity, the
-scenario becomes `implemented` on a pass, and the work item completes at its
-own work-item gate.
+Its local architect assigns the scenario to an engineer whose scope is the
+ancestor with the children on the paths to the sub-scenarios' owners
+included. The engineer writes a step file at the ancestor that imports, by
+name, the step files the sub-scenarios' owners wrote, adds the `expose-test`
+declarations along each path, and binds the scenario. The verbatim rule
+guarantees that those imported definitions bind every step, so the
+ancestor's file defines no step of its own. The architect reports the
+scenario `done`, and the work item completes at its own work-item gate.
 
 Decided by Dan, 2026-09-23: a module's step definitions live in that module,
 and definitions another module needs, such as an integration scenario's, are
-shared through the testing tag. That decision is why v1 has this work item.
-The analysis had deferred it, with the composition failure returned to
-whichever work item's gate found it; sharing through `expose-test` needs an
-agent's work at the common ancestor, so the work item exists, in this minimal
-form: one per integration scenario, created when it becomes due, with no
-other composition duty.
+shared through the testing tag. That decision is why v1 has this work item:
+one per integration scenario, created when it becomes due.
 
-When the scenario fails while its sub-scenarios pass, it is a composition
-failure: a bridging Given assumed what the real behavior does not do. The
-finding names the sub-scenario whose Given it is. The failure is this work
-item's to resolve through the ordinary repair rounds, then the local
+When the scenario fails, the failure reaches the work item's repair rounds
+raw, with every result and the runner's complete diagnostics; the harness
+generates no composition diagnosis and names no suspect step. The agents
+investigate it, through the ordinary repair rounds, then the local
 architect's placement and delegation paths, or `unresolved`. The run cannot
 complete around it: the work item must complete like every other.
 
 ### 11. The final gate
 
 The `final` checkpoint runs every module's feature files in full mode, one
-run per module, with no tag filter and strictly. Its harness rules require
-that no tracked scenario is `pending`, `bound` or `declared` before the run.
-Once every work item has completed, integration work items included, that
-rule cannot fail; it is kept as a consistency rule, and its failure,
+run per module, with no tag filter and strictly. Its harness rule requires
+that every tracked scenario is reported `done` before the run; its failure,
 `acceptance-incomplete`, fails the run with evidence rather than returning
-anywhere. `job-completed` then requires, beside its present conditions, every
-tracked scenario `implemented` and the final attempt's scenario check passed
-in full mode.
+anywhere. `job-completed` then requires, beside its present conditions, a
+passing final attempt. Its scenario check results are recorded as raw
+evidence and never matched to the states.
 
 ### 12. Stop, crash and recovery
 
@@ -645,9 +622,9 @@ in full mode.
   their tags as the states were. Continuing from that branch is future work.
 - **A crash between a state change and its commit** is recovered by
   re-rendering: the states are in the ledger, the rendering is pure, and the
-  commit is retried. `scenarios-materialized` and each withdrawal commit are
-  recorded as effects with an intent line first, as gate commits are, so a
-  crash between the commit and the record finds the commit by its trailer.
+  commit is retried. `scenarios-materialized` is recorded as an effect with
+  an intent line first, as gate commits are, so a crash between the commit
+  and the record finds the commit by its trailer.
 - **A crash during the scenario check** is the audit's interrupted attempt,
   as today, and the retry audits the same commit.
 
@@ -784,25 +761,24 @@ derives from them:
 | `review-requested` | | phase `awaiting-review` |
 | `analysis-approved` | `reviewer`, `note`, `duringRun` | phase `readiness`, or no phase change during a run |
 | `scenarios-materialized` | `commit`, `files` | |
-| `scenario-declared` | `scenario`, `by` invocation, `state: bound \| declared` | `pending -> bound \| declared` |
-| `scenario-due` | `scenario`, `cause: requirements-verified` | `bound -> declared` |
-| `work-item-started` | gains origin `integration` with `scenario` | creates the integration work item when the last sub-scenario is implemented |
-| `scenario-implemented` | `scenario`, `gate` | `declared -> implemented` |
-| `scenario-withdrawn` | `scenario`, `reason`, `commit` | `bound \| declared -> pending` |
+| `obligation-bound` | `id`, `fakes`, `by` invocation, `submission` hash | `pending -> bound`; `done` stays `done` |
+| `obligation-reported` | `id`, `judgment: done \| bound`, `basedOnRevision`, `revision`, `where?`, `by`, `submission` | `pending \| bound -> done`, `done -> bound`; the last sub-scenario's done report commits the integration work item |
+| `work-item-started` | gains origin `integration` with `scenario` | |
 
 `GateAttempt` becomes `ramify-agent.gate-attempt/3` with the `scenarios`
 command kind, the summary above under its command record, and the path of
 the profile it ran. `RunRecord` carries `reviewStop` and the captured
 `ramify-agent.project/1` configuration, so a run is reproducible from
 `job.json` as it is for the policy today. `RunSnapshot` gains `review` and
-`counts.scenarios: { pending, bound, declared, implemented }`.
+`counts.scenarios: { pending, bound, done }`.
 
 **Projections.** Capability progress gains, per entry,
-`scenarios: { implemented, total }`, the measure the
+`scenarios: { done, total }`, the measure the
 [capability registry analysis](../analysis/2026-09-23-capability-registry-analysis.md#for-the-progress-projection-now)
 notes it lacks. A new query, `GET /api/v1/plans/:planId/runs/:runId/scenarios`,
 lists every tracked scenario with its state, origin, entry, file and the
-gates it ran in. The web shows that list on the run page, the review section
+gates it ran in, and every obligation with its binding's fakes and its
+architect report. The web shows that list on the run page, the review section
 on the analysis page, and the `Approve` action with the `reviewStop` option
 on `start-run`.
 
@@ -833,7 +809,7 @@ on `start-run`.
 | Change | Where |
 | --- | --- |
 | Gherkin parsing, plan scenario extraction, form rules, feature rendering, the message-stream reducer, the per-module profiles | A new module `subs/harness/subs/scenarios`, pure functions with no I/O, the one importer of `@cucumber/gherkin` and `@cucumber/messages`. The harness receives its exports, as it receives the audit adapter's. |
-| Integration work items | `work/records.ts` gains the origin; `run/service.ts` creates the item on the last `scenario-implemented` of its sub-scenarios and briefs its local architect with the scenario, its sub-scenarios and their owners' step files. |
+| Integration work items | `work/records.ts` gains the origin; `run/service.ts` creates the item with the done report of its last sub-scenario and briefs its local architect with the scenario, its sub-scenarios and their owners' step files. |
 | The project configuration: schema, reading, validation, capture into `job.json` | A new `run/project-config.ts` in the harness, with the schema in `run/records.ts` beside the run policy; `subs/evidence` reads the file. |
 | Plan capture | `run/service.ts` where `input/plan.md` is written; the plan scenarios join the analysis briefing in `analysisMessage`. |
 | Submission `/2`, validation, acceptance | `analysis/submission.ts`, `analysis/accept.ts`; the records under a new `scenarios/` layout entry in `run/records.ts`. |
@@ -842,7 +818,7 @@ on `start-run`.
 | The Cucumber profile written per attempt | The `scenarios` module builds it; `checks/execution.ts` and the audit executor write it into the attempt's directory. |
 | Materialization and the two non-gate commits | `run/service.ts` after `createBranch`; `subs/evidence` for the git calls. |
 | Guarded and denied files | `work/scope.ts`, `subs/evidence/src/guarded-files.ts`, `guard/write-guard.ts`. |
-| Declarations | `work/engineer.ts`, `work/submission.ts`, and the acceptance paths in `run/service.ts`. |
+| Bindings and reports | `work/engineer.ts`, `work/obligations.ts`, `work/submission.ts`, and the acceptance paths in `run/service.ts`. |
 | The check kind, its policy and command | `checks/checkpoint.ts`, `checks/records.ts`, `checks/verify.ts`, `run/policy.ts`, `checks/execution.ts` for the in-place runner, `subs/audit/src/check-execution.ts` for the executor. |
 | State transitions at gates and events | `run/service.ts`, `run/log.ts`. |
 | Briefings and procedures | `src/prompts/*` at version 2 for the initial architect, local architect and engineer; `work/session.ts`, `work/engineer.ts`. |
