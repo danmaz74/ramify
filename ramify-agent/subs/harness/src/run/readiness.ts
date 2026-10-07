@@ -1,7 +1,7 @@
 import { mkdir, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { GateCommandStarted } from '../checks/execution.js';
-import { configuredFullRecovery, type ConfiguredAuditPort, type ConfiguredFullAuditResult } from '../../subs/audit/src/check-execution.js';
+import { configuredFullRecovery, type CommittedAuditConfiguration, type ConfiguredAuditPort, type ConfiguredFullAuditResult } from '../../subs/audit/src/check-execution.js';
 import { installOperation, setupChecks } from '../checks/checkpoint.js';
 import { checkCommand, checkCommandEnvironment } from '../checks/records.js';
 import type { GateAttempt } from '../checks/records.js';
@@ -22,12 +22,10 @@ import {
 /*
  * Execution readiness. Before any work is assigned, the harness verifies the
  * project it will work in: that it is there, that it is a clean git
- * repository, that the compiler configuration, the test runner, the
- * project's configuration, its scenario harness and the independent nested
- * packages are present and installed, that tests are
- * discovered, that Ramify answers, and that the project's own baseline
- * passes: its tests, type check and Ramify check, its own scenarios in quick
- * mode, and its full mode loaded or run.
+ * repository, that the compiler and project configuration and scenario
+ * harness are available, and that Ramify answers. It then prepares the
+ * committed audit workspace declarations in the run working tree and asks
+ * the installed provider for one configured full audit of HEAD.
  *
  * Missing dependencies or a nonexistent command are readiness failures, not
  * code-repair assignments. A failure that a bounded preparation can repair
@@ -78,6 +76,7 @@ export interface ReadinessResult {
 export async function runReadiness(execution: ConfiguredAuditPort, request: ReadinessRequest): Promise<ReadinessResult> {
   const { projectRoot, policy } = request;
   const steps: StepResult[] = [];
+  if (request.signal?.aborted) return cancelledReadiness(request, steps);
 
   steps.push(await projectRootStep(projectRoot));
   steps.push(await scratchCleanupStep(projectRoot, request.git ?? gitService, steps[0]!.outcome));
@@ -86,22 +85,28 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
   steps.push(await projectConfigStep(projectRoot, request.projectConfig, request.index ?? null));
   steps.push(await acceptanceRunnerStep(projectRoot, request.projectConfig));
   steps.push(await ramifyDaemonStep(request));
+  if (request.signal?.aborted) return cancelledReadiness(request, steps);
 
   const captured = request.auditConfiguration;
   let current: Awaited<ReturnType<ConfiguredAuditPort['read']>> | null = null;
+  let config: CommittedAuditConfiguration | null = null;
   if (captured === undefined || 'invalid' in captured) {
     steps.push({ step: 'audit-config', outcome: 'failed', detail: captured?.invalid ?? 'No committed audit configuration was captured' });
   } else {
     try {
       current = await execution.read(projectRoot, request.head, request.signal);
-      steps.push(JSON.stringify(current) === JSON.stringify(captured.config)
-        ? { step: 'audit-config', outcome: 'passed', detail: `${current.path} blob ${current.blob} at ${request.head}` }
+      const compatible = JSON.stringify({ ...captured.config, sourceCommit: current.sourceCommit }) === JSON.stringify(current);
+      if (compatible) config = current;
+      steps.push(compatible
+        ? { step: 'audit-config', outcome: 'passed', detail: `${current.path} blob ${current.blob} at ${request.head}; captured at ${captured.config.sourceCommit}` }
         : { step: 'audit-config', outcome: 'failed', detail: `Captured audit policy conflicts with ${current.path} at ${request.head}; reconcile the configuration and start a new run` });
     } catch (error) {
-      steps.push({ step: 'audit-config', outcome: 'failed', detail: `Committed audit configuration is unavailable: ${error instanceof Error ? error.message : String(error)}` });
+      steps.push(request.signal?.aborted
+        ? { step: 'audit-config', outcome: 'not-verified', detail: 'committed audit configuration read was cancelled' }
+        : { step: 'audit-config', outcome: 'failed', detail: `Committed audit configuration is unavailable: ${error instanceof Error ? error.message : String(error)}` });
     }
   }
-  const config = captured !== undefined && 'config' in captured ? captured.config : null;
+  if (request.signal?.aborted) return cancelledReadiness(request, steps);
   const nested = config?.workspace.packageDirectories.map(directory => ({
     directory, manifest: directory === '' ? 'package.json' : `${directory}/package.json`, installed: false, testScript: null,
   })) ?? [];
@@ -114,6 +119,7 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
   }
   steps.push(unsafePackage === null ? declaredPackagesStep(nested, config)
     : { step: 'declared-packages', outcome: 'failed', detail: `Unsafe declared package directory: ${unsafePackage}` });
+  if (request.signal?.aborted) return cancelledReadiness(request, steps, nested);
 
   const blocked = steps.find(step => step.outcome !== 'passed');
   if (blocked !== undefined) {
@@ -124,6 +130,7 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
   }
   const prepared = await declaredPreparationStep(request, config!);
   steps.push(prepared);
+  if (request.signal?.aborted) return cancelledReadiness(request, steps, nested);
   if (prepared.outcome !== 'passed') {
     steps.push({ step: 'configured-full-audit', outcome: 'not-verified', detail: 'not reached: declared preparation did not pass' });
     steps.push({ step: 'run-branch', outcome: 'not-verified', detail: 'not reached: declared preparation did not pass' });
@@ -148,6 +155,7 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
   const gate = configuredGate(request, audit);
   steps.push({ step: 'configured-full-audit', outcome: audit.status === 'completed' ? audit.verdict === 'pass' ? 'passed' : 'failed' : 'not-verified',
     detail: `${audit.detail}; requested ${audit.requestedSourceCommit}, audited ${audit.auditedSourceCommit ?? 'none'}` });
+  if (request.signal?.aborted) return cancelledReadiness(request, steps, nested, gate, audit);
 
   // The run branch is created last, once the repository is clean and the
   // baseline passed, so a readiness that fails leaves the project on its own
@@ -161,9 +169,20 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
   return { attempt: attemptRecord(request, steps, nested, gate, audit), gate };
 }
 
+/** Retain the interrupted step and name every later readiness step as unverified. */
+function cancelledReadiness(request: ReadinessRequest, steps: StepResult[], nested: ReadinessAttempt['nested'] = [],
+  gate: GateAttempt | null = null, audit?: ConfiguredFullAuditResult): ReadinessResult {
+  const order: ReadinessStep[] = ['project-root', 'scratch-cleanup', 'git-clean', 'compiler-config', 'project-config',
+    'acceptance-runner', 'ramify-daemon', 'audit-config', 'declared-packages', 'declared-preparation', 'configured-full-audit', 'run-branch'];
+  for (const step of order) {
+    if (!steps.some(entry => entry.step === step)) steps.push({ step, outcome: 'not-verified', detail: 'not reached: readiness was cancelled' });
+  }
+  return { attempt: attemptRecord(request, steps, nested, gate, audit), gate };
+}
+
 function declaredPackagesStep(
   packages: ReadinessAttempt['nested'],
-  configuration: import('./records.js').CommittedAuditConfigurationRecord | null,
+  configuration: CommittedAuditConfiguration | null,
 ): StepResult {
   if (configuration === null) return { step: 'declared-packages', outcome: 'not-verified', detail: 'committed audit configuration unavailable' };
   const required = configuration.workspace.packageDirectoriesDeclared && configuration.workspace.linkNodeModules;
@@ -176,8 +195,9 @@ function declaredPackagesStep(
 /** Run the committed preparation in the engineer's working tree, even when the audit reuses evidence. */
 async function declaredPreparationStep(
   request: ReadinessRequest,
-  configuration: import('./records.js').CommittedAuditConfigurationRecord,
+  configuration: CommittedAuditConfiguration,
 ): Promise<StepResult> {
+  if (request.signal?.aborted) return { step: 'declared-preparation', outcome: 'not-verified', detail: 'declared preparation was cancelled' };
   const commands = configuration.workspace.setupCommands;
   for (const command of commands) {
     try { await containedDirectory(request.projectRoot, command.cwd); }
@@ -201,6 +221,7 @@ async function declaredPreparationStep(
   if (refused !== null) return { step: 'declared-preparation', outcome: 'failed', detail: refused };
   await mkdir(request.gateDirectory, { recursive: true });
   for (const [index, check] of setup.entries()) {
+    if (request.signal?.aborted) return { step: 'declared-preparation', outcome: 'not-verified', detail: 'declared preparation was cancelled' };
     const outputFile = join(request.gateDirectory, `${String(index + 1).padStart(2, '0')}-preparation.log`);
     await request.started?.({ kind: 'setup', ...(check.name === undefined ? {} : { name: check.name }), position: index + 1, total: setup.length });
     const run = await runCommand({ argv: check.command.argv, cwd: check.command.cwd,
@@ -223,7 +244,7 @@ function configuredGate(request: ReadinessRequest, audit: ConfiguredFullAuditRes
     head: request.head, commit: null, audited: audit.auditedSourceCommit,
     evidence: audit.reportCommit !== null && audit.runRef !== null && audit.treeRef !== null
       ? { reportCommit: audit.reportCommit, runRef: audit.runRef, treeRef: audit.treeRef } : null,
-    auditOverall: audit.verdict, provider: { result: audit.provider, checks: audit.status === 'completed' &&
+    provider: { result: audit.provider, checks: audit.status === 'completed' &&
       typeof audit.provider === 'object' && audit.provider !== null && 'summary' in audit.provider
       ? (audit.provider.summary as { checks?: unknown }).checks ?? {} : {} },
     guardedChanges: [], commands: [], verdict,
@@ -345,6 +366,7 @@ async function gitCleanStep(projectRoot: string, signal: AbortSignal | undefined
       ? { step: 'git-clean', outcome: 'passed', detail: 'the working tree is clean' }
       : { step: 'git-clean', outcome: 'failed', detail: 'the working tree has uncommitted changes; a run starts from a clean repository so that every accepted boundary is its own commit' };
   } catch (error) {
+    if (signal?.aborted) return { step: 'git-clean', outcome: 'not-verified', detail: 'Git clean check was cancelled' };
     const detail = error instanceof GitError ? error.message : error instanceof Error ? error.message : String(error);
     return { step: 'git-clean', outcome: 'failed', detail: `the execution directory is not a git repository the harness can read: ${detail}` };
   }
@@ -434,10 +456,12 @@ async function acceptanceRunnerStep(projectRoot: string, captured: CapturedProje
 
 /** The run branch created and checked out, or found where an earlier attempt of the run created it. */
 export async function runBranchStep(projectRoot: string, runId: string, signal: AbortSignal | undefined, git: GitService): Promise<StepResult> {
+  if (signal?.aborted) return { step: 'run-branch', outcome: 'not-verified', detail: 'readiness was cancelled before branch creation' };
   try {
     const { branch, created } = await git.createRunBranch(projectRoot, runId, signal);
     return { step: 'run-branch', outcome: 'passed', detail: `${branch} was ${created ? 'created and' : 'found and'} checked out` };
   } catch (error) {
+    if (signal?.aborted) return { step: 'run-branch', outcome: 'not-verified', detail: 'readiness was cancelled before branch creation' };
     if (!(error instanceof GitError)) throw error;
     const said = error.detail.output.trim();
     return {
@@ -449,7 +473,12 @@ export async function runBranchStep(projectRoot: string, runId: string, signal: 
 }
 
 async function ramifyDaemonStep(request: ReadinessRequest): Promise<StepResult> {
-  const run = await request.ramify.run(['--version'], request.projectRoot, request.signal);
+  let run: Awaited<ReturnType<RamifyCli['run']>>;
+  try { run = await request.ramify.run(['--version'], request.projectRoot, request.signal); }
+  catch (error) {
+    if (request.signal?.aborted) return { step: 'ramify-daemon', outcome: 'not-verified', detail: 'Ramify preflight was cancelled' };
+    throw error;
+  }
   if (run.code !== 0) {
     const detail = `${run.stderr}\n${run.stdout}`.trim();
     return { step: 'ramify-daemon', outcome: 'failed', detail: `the Ramify command line did not answer: \`ramify --version\` exited with ${run.code}${detail === '' ? '' : `: ${detail.slice(-400)}`}` };
@@ -516,10 +545,18 @@ export async function performRecovery(request: RecoveryRequest): Promise<Infrast
   const evidence: string[] = [];
   let outcome: InfrastructureRecovery['outcome'] = 'failed';
 
+  if (request.signal?.aborted) {
+    evidence.push('readiness recovery was cancelled before it started');
+    return infrastructureRecoverySchema.parse({ schema: 'ramify-agent.infrastructure-recovery/1', id: request.id,
+      subject: { readiness: request.attempt }, cause: request.plan.cause, action: request.plan.action,
+      attempt: request.count, outcome, evidence });
+  }
+
   switch (request.plan.action) {
     case 'reinstall-nested': {
       const results: boolean[] = [];
       for (const directory of request.plan.directories) {
+        if (request.signal?.aborted) { evidence.push('readiness recovery was cancelled'); results.push(false); break; }
         try { await containedDirectory(request.projectRoot, directory); }
         catch (error) { evidence.push(`${directory}: ${error instanceof Error ? error.message : String(error)}`); results.push(false); continue; }
         const command = request.auditConfiguration !== undefined && 'config' in request.auditConfiguration

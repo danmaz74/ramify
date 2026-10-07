@@ -5,6 +5,7 @@ import { expect } from 'vitest';
 import { scenariosCommit, scriptedGit } from './scripted-git.js';
 import { fixtureScratchGit } from './mock-git.js';
 import { commandResult } from './command-result.js';
+import { scriptedConfiguredAudit } from './runs.js';
 import { createMappedCheckExecution } from './direct-check-execution.js';
 import { protocolScript, notesDirectory, draftsDirectory, outsidePath, longOutputBytes } from './protocol.js';
 import type { CommandRequest } from '../../../subs/evidence/src/run-command.js';
@@ -28,6 +29,7 @@ export function protocolPorts(root: string) {
   const script = protocolScript(root);
   return {
     git, candidates: final.candidates,
+    configuredAudit: scriptedConfiguredAudit(root, {}),
     script: (spec: SessionSpec) => {
       const steps = typeof script === 'function' ? script(spec) : script;
       if (steps.some(step => step.kind === 'tool' && ['write', 'edit'].includes(step.tool))) git.givenWrites();

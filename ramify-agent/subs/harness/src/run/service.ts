@@ -224,7 +224,7 @@ import { declaredModuleDirectories } from './project-config.js';
 import { assertScratchSafe, ensureScratchRule, releasableScratchModules, removeScratchDirectories, scratchSafetyRule, ScratchIgnoreConflictError } from '../work/scratch.js';
 import {
   gateAttemptId, gateAttemptSchema, invocationId, invocationOutcomeSchema, invocationSchema, lineEventSummarySchema,
-  measurementSnapshotSchema, recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
+  measurementSnapshotSchema, readinessAttemptSchema, recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
   type GateOperation, type Invocation, type InvocationOutcome, type LineEventSummary, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
   type ArchitectRef, type ReviewKind, type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
   type RequestRelation, type SessionFinishReason, type SessionId,
@@ -641,6 +641,8 @@ class Run {
   readonly orienting = new Map<string, Promise<ReviewOrientation>>();
   /** The commit-and-audit effect in flight, which the run's terminal event waits for. */
   gating: Promise<unknown> | undefined;
+  /** Owned readiness work: stopping aborts it and awaits process settlement before a terminal event. */
+  readiness: { controller: AbortController; settled: Promise<void> } | undefined;
   /** The writer of the run; one at a time, and the log says which. */
   readonly writer: WriterOwnership;
   index: ArchitectIndex | null = null;
@@ -795,7 +797,7 @@ export class RunService {
     // committed before anything ends the run, as when the mutex held it.
     await run.gating?.catch(() => undefined);
     return run.mutex.run(async () => {
-      if (run.log.terminal) return 'ended';
+      if (run.log.terminal || this.closed || (run.stopRequested && terminal.type !== 'job-stopped')) return 'ended';
       const sessions = this.sessionsOf(run);
       for (const session of sessions?.values() ?? []) {
         const reason = session.state === 'suspended' ? 'run-ended' : session.state === 'live' && session.awaiting === null ? opening : null;
@@ -3133,6 +3135,7 @@ export class RunService {
     });
     // A driver waiting at the review stop has no session to stop; it reads
     // the stop and returns, and the run is stopped with nothing written.
+    run.readiness?.controller.abort();
     run.notify();
     const driving = run.done;
     const stopping = this.endStopped(run).catch(error => this.warn(`Run ${jobId}: ${message(error)}`));
@@ -3149,6 +3152,16 @@ export class RunService {
   private async endStopped(run: Run): Promise<void> {
     const grace = this.options.stopGraceMs ?? run.record.policy.limits.stopSettleMs;
     const settled = await this.stopReaders(run, 'stopped', grace, true);
+    const readiness = run.readiness;
+    if (readiness !== undefined) {
+      let timer: NodeJS.Timeout | undefined;
+      const finished = await Promise.race([
+        readiness.settled.then(() => true),
+        new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), grace); }),
+      ]);
+      clearTimeout(timer);
+      if (!finished) throw new Error(`Readiness did not settle within ${grace} ms; refusing to publish job-stopped`);
+    }
     if (this.closed) return;
     await this.endRun(run, { type: 'job-stopped', data: { settled } });
   }
@@ -10262,6 +10275,19 @@ export class RunService {
    * none and ends the run at once with the step that failed.
    */
   private async reachReadiness(run: Run): Promise<boolean> {
+    const controller = new AbortController();
+    let markSettled!: () => void;
+    const settled = new Promise<void>(resolve => { markSettled = resolve; });
+    run.readiness = { controller, settled };
+    try {
+      return await this.reachReadinessOwned(run, controller.signal);
+    } finally {
+      markSettled();
+      if (run.readiness?.controller === controller) run.readiness = undefined;
+    }
+  }
+
+  private async reachReadinessOwned(run: Run, signal: AbortSignal): Promise<boolean> {
     if (run.log.find('readiness-passed')) return true;
     const bound = run.record.policy.limits.readinessRecoveries;
 
@@ -10280,7 +10306,7 @@ export class RunService {
         async read(): Promise<never> { throw new Error('The configured audit provider is unavailable'); },
         async runFull(): Promise<never> { throw new Error('The configured audit provider is unavailable'); },
       };
-      const result = await runReadiness(configuredAudit, {
+      let result = await runReadiness(configuredAudit, {
         runId: run.record.jobId,
         attempt: attemptNumber,
         projectRoot: this.projectRoot,
@@ -10293,11 +10319,23 @@ export class RunService {
         ramify: this.options.ramify,
         git: this.git,
         head,
+        signal,
         started: this.commandStarted(run, gateId, 'readiness'),
         waiting: this.commandWaiting(run, gateId, 'readiness'),
       });
 
-      if (result.attempt.verdict === 'passed' && result.gate !== null) {
+      // A stop can be accepted between the last readiness step and this
+      // record. Keep the attempt, but never publish a readiness pass then.
+      if ((signal.aborted || this.ignoring(run)) && result.attempt.verdict === 'passed') {
+        result = { ...result, attempt: readinessAttemptSchema.parse({ ...result.attempt,
+          steps: result.attempt.steps.map(step => step.step === 'run-branch'
+            ? { ...step, outcome: 'not-verified', detail: 'readiness was cancelled before publication' } : step),
+          verdict: 'failed',
+        }) };
+      }
+      if (this.closed) return false;
+
+      if (result.attempt.verdict === 'passed' && result.gate !== null && !signal.aborted && !this.ignoring(run)) {
         await this.write(run, { type: 'readiness-passed', data: { attempt: attemptNumber, gate: gateId } }, [
           { path: runLayout.gate(gateId), id: gateId, revision: 1, body: result.gate },
           { path: runLayout.readiness(attemptNumber), id: String(attemptNumber), revision: 1, body: result.attempt },
@@ -10307,9 +10345,9 @@ export class RunService {
       }
 
       const step = failingStep(result.attempt);
-      const plan = recoveryFor(result.attempt, result.gate, run.record.policy);
+      const plan = signal.aborted || this.ignoring(run) ? null : recoveryFor(result.attempt, result.gate, run.record.policy);
       const spent = run.log.all('readiness-failed').filter(event => event.data.recovery !== null).length;
-      const recoverable = plan !== null && spent < bound;
+      const recoverable = plan !== null && spent < bound && !signal.aborted && !this.ignoring(run);
 
       let recovery = null;
       if (recoverable) {
@@ -10324,6 +10362,7 @@ export class RunService {
           commandExecution: this.options.commandExecution,
           count: spent + 1,
           directory: run.path('recoveries'),
+          signal,
         });
       }
 
@@ -10339,6 +10378,8 @@ export class RunService {
         data: { attempt: attemptNumber, gate: gateId, step: step?.step ?? 'unknown', detail: step?.detail ?? '', recovery: recovery?.id ?? null, final },
       }, records);
       await this.afterWrite('readiness-attempted', run.record.jobId);
+
+      if (signal.aborted || this.ignoring(run)) return false;
 
       if (final) {
         await this.fail(run, readinessFailureReason(step?.step), `Readiness failed at ${step?.step ?? 'an unknown step'} after ${attemptNumber} attempt${attemptNumber === 1 ? '' : 's'}: ${step?.detail ?? ''}`,
@@ -11339,6 +11380,7 @@ export class RunService {
       const drivers = [...this.runs.values()];
       const active = drivers.filter(run => !run.log.terminal);
       for (const run of active) {
+        run.readiness?.controller.abort();
         run.reviews?.close();
         for (const session of run.sessions()) void session.stop().catch(() => undefined);
         run.notify();

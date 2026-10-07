@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,7 +13,7 @@ import { failingStep, performRecovery, recoveryFor, runReadiness } from '../run/
 import { copyFixture } from './helpers/fixture.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { commandResult } from './helpers/command-result.js';
-import { emptyAnalysis, git, initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { emptyAnalysis, git, initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
 
 /** These scripted provider answers test readiness policy. Installed-provider conformance is separate. */
 const cleanups: Array<() => Promise<void>> = [];
@@ -142,6 +143,95 @@ describe('declared preparation and configured full readiness', () => {
       reused: { attempt: second.attempt, provider: second.gate?.provider?.result },
       workingOutputRecreated: true,
     }, null, 2));
+  }, 120_000);
+
+  test('cancelling a native configured command settles its process and owned audit workspace before readiness returns', async () => {
+    const evidenceDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-native-cancel-'));
+    cleanups.push(() => rm(evidenceDirectory, { recursive: true, force: true }));
+    const marker = join(evidenceDirectory, 'command.pid');
+    const command = `require('fs').writeFileSync(${JSON.stringify(marker)},String(process.pid));setInterval(()=>{},1000)`;
+    const fixture = await project(async root => {
+      await writeFile(join(root, 'ramify-audit.json'), JSON.stringify({
+        checks: [{ id: 'waiting-command', name: 'Waiting command', description: 'Cancellation witness',
+          scope: 'both', category: 'deterministic', onFailure: 'record', executor: { kind: 'command', commands: [
+            { name: 'wait', cmd: 'node', args: ['-e', command], parser: 'none', timeoutMs: 60_000 },
+          ] } }], ignorePaths: [], workspace: { preparation: 'nodejs', options: { packageDirectories: [''], setupCommands: [] } },
+      }));
+    });
+    const intended: string[] = [];
+    const cleaned: string[] = [];
+    const configured = createConfiguredAudit({ workspaceOwnership: {
+      async recordIntendedWorkspace(workspace) { intended.push(workspace.worktreePath); },
+      async recoverAbandonedWorkspaces() {},
+      async recordWorkspaceCleaned(workspace) { cleaned.push(workspace.worktreePath); },
+    }, testLock: { lockPath: join(evidenceDirectory, 'machine-test.lock') } });
+    const captured = await configured.read(fixture.root, fixture.head);
+    const controller = new AbortController();
+    const running = runReadiness(configured, {
+      runId: 'native-cancel', attempt: 1, projectRoot: fixture.root, gateDirectory: join(evidenceDirectory, 'gate'), gateId: 'ga-0001',
+      policy: defaultRunPolicy({ projectRoot: fixture.root }), projectConfig: await captureProjectConfig(fixture.root),
+      auditConfiguration: { config: committedAuditConfigurationSchema.parse(captured) },
+      index: null, ramify: new FakeRamifyCli(), git: gitService, head: fixture.head, signal: controller.signal,
+    });
+    await until(() => existsSync(marker));
+    const pid = Number(await readFile(marker, 'utf8'));
+    controller.abort();
+    const result = await running;
+    expect(result.attempt.verdict).toBe('failed');
+    expect(result.attempt.steps.find(entry => entry.step === 'configured-full-audit')).toMatchObject({ outcome: 'not-verified' });
+    expect(result.attempt.steps.find(entry => entry.step === 'run-branch')).toMatchObject({ outcome: 'not-verified' });
+    expect(intended).toHaveLength(1);
+    expect(cleaned).toEqual(intended);
+    expect(() => process.kill(pid, 0)).toThrow();
+    expect((await git(fixture.root, 'branch', '--show-current')).trim()).toBe('main');
+  }, 120_000);
+
+  test('a scratch-only successor keeps captured audit policy while a committed policy change refuses native readiness', async () => {
+    const fixture = await project(async root => {
+      await writeFile(join(root, 'ramify-audit.json'), JSON.stringify({
+        checks: [{ id: 'configured-command', name: 'Configured command', description: 'Committed successor',
+          scope: 'both', category: 'deterministic', onFailure: 'record', executor: { kind: 'command', commands: [
+            { name: 'source', cmd: 'node', args: ['-e', 'process.exit(0)'], parser: 'none', timeoutMs: 30_000 },
+          ] } }], ignorePaths: [], workspace: { preparation: 'nodejs', options: { packageDirectories: [''], setupCommands: [] } },
+      }));
+    });
+    const evidenceDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-config-successor-'));
+    cleanups.push(() => rm(evidenceDirectory, { recursive: true, force: true }));
+    const ownership = { async recordIntendedWorkspace() {}, async recoverAbandonedWorkspaces() {}, async recordWorkspaceCleaned() {} };
+    const configured = createConfiguredAudit({ workspaceOwnership: ownership,
+      testLock: { lockPath: join(evidenceDirectory, 'machine-test.lock') } });
+    const captured = await configured.read(fixture.root, fixture.head);
+    const ignore = await readFile(join(fixture.root, '.gitignore'), 'utf8');
+    await writeFile(join(fixture.root, '.gitignore'), `${ignore}\n.plan20-scratch/\n`);
+    await git(fixture.root, 'add', '.gitignore');
+    await git(fixture.root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-m', 'Guard scratch');
+    const successor = (await git(fixture.root, 'rev-parse', 'HEAD')).trim();
+    const current = await configured.read(fixture.root, successor);
+    expect(current.blob).toBe(captured.blob);
+    expect(current.sourceCommit).not.toBe(captured.sourceCommit);
+    const request = async (head: string, id: string) => runReadiness(configured, {
+      runId: id, attempt: 1, projectRoot: fixture.root, gateDirectory: join(evidenceDirectory, id), gateId: 'ga-0001',
+      policy: defaultRunPolicy({ projectRoot: fixture.root }), projectConfig: await captureProjectConfig(fixture.root),
+      auditConfiguration: { config: committedAuditConfigurationSchema.parse(captured) },
+      index: null, ramify: new FakeRamifyCli(), git: gitService, head,
+    });
+    const passed = await request(successor, 'scratch-successor');
+    expect(passed.attempt.verdict).toBe('passed');
+    expect(passed.attempt.audit).toMatchObject({ requestedSourceCommit: successor, auditedSourceCommit: successor });
+    await writeFile(join(fixture.root, 'ramify-audit.json'), JSON.stringify({
+      checks: [{ id: 'changed-command', name: 'Changed command', description: 'Committed policy change',
+        scope: 'both', category: 'deterministic', onFailure: 'record', executor: { kind: 'command', commands: [
+          { name: 'source', cmd: 'node', args: ['-e', 'process.exit(0)'], parser: 'none', timeoutMs: 30_000 },
+        ] } }], ignorePaths: [], workspace: { preparation: 'nodejs', options: { packageDirectories: [''], setupCommands: [] } },
+    }));
+    await git(fixture.root, 'add', 'ramify-audit.json');
+    await git(fixture.root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-m', 'Change audit policy');
+    const changed = (await git(fixture.root, 'rev-parse', 'HEAD')).trim();
+    const refused = await request(changed, 'changed-successor');
+    expect(refused.attempt.verdict).toBe('failed');
+    expect(refused.attempt.steps.find(entry => entry.step === 'audit-config')).toMatchObject({ outcome: 'failed', detail: expect.stringContaining('conflicts') });
+    expect(refused.gate).toBeNull();
+    expect((await git(fixture.root, 'branch', '--show-current')).trim()).toBe('ramify-agent-run/scratch-successor');
   }, 120_000);
 
   test('a setup-only deep package is required; an undeclared manifest creates no check', async () => {
@@ -369,5 +459,80 @@ describe('declared preparation and configured full readiness', () => {
     expect(result.failures).toMatchObject([{ step: 'ramify-daemon', recovery: 'rec-0001', final: true }]);
     expect(result.recoveries).toMatchObject([{ action: 'restart-daemon', outcome: 'failed', attempt: 1 }]);
     expect(configured.calls).not.toContain(`full:${fixture.head}`);
+  }, 120_000);
+
+  test('RunService stop aborts active readiness, records the cancelled attempt, and waits for provider settlement before job-stopped', async () => {
+    const fixture = await project();
+    const config = configuration(fixture.head);
+    const base = port(config).adapter;
+    let entered = false;
+    let aborted = false;
+    let release!: () => void;
+    const processSettled = new Promise<void>(resolve => { release = resolve; });
+    const configured: ConfiguredAuditPort = { read: base.read, async runFull(input) {
+      entered = true;
+      await new Promise<void>(resolve => {
+        if (input.signal?.aborted) { aborted = true; resolve(); }
+        else input.signal?.addEventListener('abort', () => { aborted = true; resolve(); }, { once: true });
+      });
+      await processSettled;
+      return { status: 'cancelled', requestedSourceCommit: input.sourceCommit, auditedSourceCommit: null,
+        reused: false, verdict: null, reportCommit: null, runRef: null, treeRef: null,
+        detail: 'provider command cancelled and settled', provider: { status: 'cancelled', reason: 'signal' } };
+    } };
+    const { service } = await openRuns(fixture.root, { git: gitService,
+      script: [{ kind: 'submit', input: emptyAnalysis() }], configuredAudit: configured });
+    cleanups.push(() => service.close());
+    const receipt = await service.execute(startRun('review-notes'));
+    await until(() => entered);
+    await service.execute(stopRun('review-notes', receipt.jobId, service.getRun('review-notes', receipt.jobId)!.version));
+    await until(() => aborted);
+    expect((await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId)).some(event => event.type === 'job-stopped')).toBe(false);
+    release();
+    await service.settled('review-notes', receipt.jobId);
+    const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
+    const stopIndex = events.findIndex(event => event.type === 'stop-requested');
+    const failedIndex = events.findIndex(event => event.type === 'readiness-failed');
+    const terminalIndex = events.findIndex(event => event.type === 'job-stopped');
+    expect(stopIndex).toBeGreaterThanOrEqual(0);
+    expect(failedIndex).toBeGreaterThan(stopIndex);
+    expect(terminalIndex).toBeGreaterThan(failedIndex);
+    expect(terminalIndex).toBe(events.length - 1);
+    const cancelled = JSON.parse(await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.readiness(1)), 'utf8')) as ReadinessAttempt;
+    expect(cancelled.steps.find(entry => entry.step === 'configured-full-audit')).toMatchObject({ outcome: 'not-verified' });
+    expect(cancelled.steps.find(entry => entry.step === 'run-branch')).toMatchObject({ outcome: 'not-verified' });
+    expect((await git(fixture.root, 'branch', '--show-current')).trim()).toBe('main');
+    expect(onlyRun(service, 'review-notes').state).toBe('stopped');
+  }, 120_000);
+
+  test('closing during readiness aborts and waits for settlement without writing a terminal event', async () => {
+    const fixture = await project();
+    const base = port(configuration(fixture.head)).adapter;
+    let entered = false;
+    let aborted = false;
+    let release!: () => void;
+    const processSettled = new Promise<void>(resolve => { release = resolve; });
+    const configured: ConfiguredAuditPort = { read: base.read, async runFull(input) {
+      entered = true;
+      await new Promise<void>(resolve => input.signal?.addEventListener('abort', () => { aborted = true; resolve(); }, { once: true }));
+      await processSettled;
+      return { status: 'cancelled', requestedSourceCommit: input.sourceCommit, auditedSourceCommit: null,
+        reused: false, verdict: null, reportCommit: null, runRef: null, treeRef: null,
+        detail: 'provider command cancelled and settled', provider: { status: 'cancelled', reason: 'signal' } };
+    } };
+    const { service } = await openRuns(fixture.root, { git: gitService,
+      script: [{ kind: 'submit', input: emptyAnalysis() }], configuredAudit: configured });
+    cleanups.push(() => service.close());
+    const receipt = await service.execute(startRun('review-notes'));
+    await until(() => entered);
+    let closed = false;
+    const closing = service.close().then(() => { closed = true; });
+    await until(() => aborted);
+    expect(closed).toBe(false);
+    release();
+    await closing;
+    const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
+    expect(events.some(event => event.type === 'job-stopped' || event.type === 'job-failed')).toBe(false);
+    expect((await git(fixture.root, 'branch', '--show-current')).trim()).toBe('main');
   }, 120_000);
 });

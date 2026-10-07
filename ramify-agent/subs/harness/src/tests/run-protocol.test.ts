@@ -27,7 +27,7 @@ import {
   draftsDirectory, drafts, fileHashes, longOutputBytes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
 } from './helpers/protocol.js';
 import {
-  emptyAnalysis, installTestRunner, openRuns as openRealRuns, runEventsOnDisk, runPath, startRun, testPolicy, until,
+  emptyAnalysis, installTestRunner, openRuns as openRealRuns, runEventsOnDisk, runPath, scriptedConfiguredAudit, startRun, testPolicy, until,
 } from './helpers/runs.js';
 import { copyFixture } from './helpers/fixture.js';
 import { fixtureScratchGit } from './helpers/mock-git.js';
@@ -132,7 +132,8 @@ async function serve(
       inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
       ...extra.runs,
       ...(ports ?? { git: fixtureScratchGit(unchangedGit(root, unchangedCheckpoints, unchangedCheckpoints.length ? 4 : 0)),
-        candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates,  checkExecution: createPassingCheckExecution() }),
+        candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, checkExecution: createPassingCheckExecution(),
+        configuredAudit: scriptedConfiguredAudit(root, {}) }),
     },
   });
 }
