@@ -178,6 +178,18 @@ describe('installed Ramify hook dispositions', () => {
       expect([findings.exitCode, findings.outcome]).toEqual([1, 'findings']);
       expect(disposition(findings, 'docs/readme.md')).toMatchObject({ disposition: 'not-analyzed', reason: 'owned-unwired' });
       expect((findings.report as { findings: unknown[] }).findings).toHaveLength(1);
+      // Exit 1 is the project's verdict, not the excluded path's: the complete
+      // check reports the same finding and analyzes nothing under docs/.
+      const complete = await ramify.checkComplete(root);
+      expect([complete.exitCode, complete.outcome, complete.unsupported]).toEqual([1, 'findings', null]);
+      const errors = (report: unknown, key: string) => ((report as Record<string, Array<{ id: string; code: string; severity?: string; location: { file: string } }>>)[key] ?? [])
+        .filter(item => item.code === 'project-boundary-import').map(item => [item.id, item.code, item.location.file]);
+      expect(errors(complete.report, 'diagnostics')).toEqual(errors(findings.report, 'findings'));
+      expect(JSON.stringify(complete.report)).not.toContain('docs/readme.md');
+      {
+        const { timings: _timings, ...document } = complete.report as Record<string, unknown>;
+        captured['complete-excluded-only-findings'] = { paths: [], exitCode: complete.exitCode, document: JSON.parse(JSON.stringify(document).replaceAll(root, '<root>')) };
+      }
 
       await write('src/index.ts', 'export const app = 2;\n');
       const mixed = await check('mixed-pass-findings', ['src/index.ts', 'docs/readme.md', 'fixture/src/f.ts'], 30_000);

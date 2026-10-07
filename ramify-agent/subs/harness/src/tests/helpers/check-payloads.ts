@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import type { RamifyCheckResult } from '../../../subs/evidence/src/ramify-cli.js';
 
 /*
- * Real `ramify check --changed` payloads, and scripted results in the same
- * shape.
+ * Real `ramify check --changed` payloads, one complete-check payload for
+ * comparison, and scripted results in the same shape.
  *
  * `ramify-check-payloads.json` holds what the installed CLI printed for each
  * case of the evidence owner's provider fixture (`project-boundary.test.ts`,

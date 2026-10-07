@@ -51,7 +51,7 @@
         "schemaVersion": "ramify.check/3",
         "root": "<root>",
         "revision": {
-          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:1",
+          "id": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:1",
           "sequence": 1,
           "path": "cold"
         },
@@ -127,11 +127,11 @@
         "schemaVersion": "ramify.check/3",
         "root": "<root>",
         "revision": {
-          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:2",
+          "id": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:2",
           "sequence": 2,
           "path": "source"
         },
-        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:1",
+        "since": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:1",
         "paths": [
           {
             "path": "scripts/probe.ts",
@@ -193,11 +193,11 @@
         "schemaVersion": "ramify.check/3",
         "root": "<root>",
         "revision": {
-          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:2",
+          "id": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:2",
           "sequence": 2,
           "path": "source"
         },
-        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:1",
+        "since": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:1",
         "paths": [
           {
             "path": "docs/readme.md",
@@ -253,6 +253,344 @@
         "exitCode": 1
       }
     },
+    "complete-excluded-only-findings": {
+      "paths": [],
+      "exitCode": 1,
+      "document": {
+        "schemaVersion": "ramify.analysis/3",
+        "runId": "7a576857-c40b-47ae-b51a-adde29c45850",
+        "inputId": "input/1:f26f69070ce222ff78541582da48765710ff702d472ba7937f39be42884f4901",
+        "request": {
+          "project": {
+            "cwd": "<root>",
+            "root": "<root>",
+            "configuration": "discover",
+            "scope": "whole-project"
+          },
+          "registry": {
+            "id": "registry/1:[[\"browser\",\"required-symbol\",null],[\"dispatch\",\"required-importer\",null],[\"testing\",\"required-importer\",null],[\"ui\",\"required-importer\",null]]",
+            "definitions": [
+              {
+                "name": "browser",
+                "kind": "required-symbol"
+              },
+              {
+                "name": "dispatch",
+                "kind": "required-importer"
+              },
+              {
+                "name": "testing",
+                "kind": "required-importer"
+              },
+              {
+                "name": "ui",
+                "kind": "required-importer"
+              }
+            ],
+            "isDefault": true
+          },
+          "capabilities": [
+            "registry",
+            "layout",
+            "metadata",
+            "descriptions",
+            "source-catalog",
+            "exposure-linking",
+            "static-access",
+            "tags-origin",
+            "namespace-access",
+            "lazy-access",
+            "symbol-free-access",
+            "resource-access",
+            "coverage"
+          ],
+          "limits": {
+            "acquisition": {
+              "attempts": 3,
+              "maxFiles": 50000,
+              "maxApplicationFiles": 20000,
+              "maxFileBytes": 8388608,
+              "maxInputBytes": 268435456,
+              "maxApplicationBytes": 67108864,
+              "maxOwners": 1000,
+              "maxDepth": 128,
+              "deadlineMs": 30000
+            },
+            "source": {
+              "maxExports": 250000,
+              "maxAccesses": 250000,
+              "maxSelections": 1000000,
+              "maxForwardingDepth": 256,
+              "deadlineMs": 90000
+            },
+            "maxExposurePairs": 1000000,
+            "maxDiagnostics": 100000,
+            "maxReportBytes": 100663296,
+            "disposeTimeoutMs": 5000,
+            "deadlineMs": 120000
+          }
+        },
+        "scope": {
+          "root": "<root>",
+          "invokedFrom": "<root>",
+          "selection": "given",
+          "configuration": "<root>/tsconfig.json",
+          "walkedAreas": [
+            "src",
+            "src/tests",
+            "subs/web/src",
+            "subs/web/src/tests"
+          ],
+          "ownership": {
+            "modules": [
+              {
+                "id": "app",
+                "parent": null,
+                "directory": "."
+              },
+              {
+                "id": "app/web",
+                "parent": "app",
+                "directory": "subs/web"
+              }
+            ],
+            "exclusions": [
+              {
+                "kind": "owned-unwired",
+                "directory": "docs",
+                "owner": "app"
+              },
+              {
+                "kind": "owned-nested-project",
+                "directory": "fixture",
+                "owner": "app"
+              },
+              {
+                "kind": "scratch",
+                "directory": "src/tmp",
+                "owner": "app"
+              },
+              {
+                "kind": "scratch",
+                "directory": "subs/web/src/tmp",
+                "owner": "app/web"
+              },
+              {
+                "kind": "external",
+                "directory": "vendor",
+                "owner": null
+              }
+            ]
+          }
+        },
+        "registry": {
+          "id": "registry/1:[[\"browser\",\"required-symbol\",null],[\"dispatch\",\"required-importer\",null],[\"testing\",\"required-importer\",null],[\"ui\",\"required-importer\",null]]",
+          "definitions": [
+            {
+              "name": "browser",
+              "kind": "required-symbol"
+            },
+            {
+              "name": "dispatch",
+              "kind": "required-importer"
+            },
+            {
+              "name": "testing",
+              "kind": "required-importer"
+            },
+            {
+              "name": "ui",
+              "kind": "required-importer"
+            }
+          ],
+          "isDefault": true
+        },
+        "capabilities": [
+          {
+            "capability": "registry",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "layout",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "metadata",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "descriptions",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "source-catalog",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "exposure-linking",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "static-access",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "tags-origin",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "namespace-access",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "lazy-access",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "symbol-free-access",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "resource-access",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "coverage",
+            "available": true,
+            "requested": true,
+            "executed": true
+          },
+          {
+            "capability": "browser-verification",
+            "available": false,
+            "requested": false,
+            "executed": false
+          }
+        ],
+        "stages": [
+          {
+            "stage": "registry",
+            "status": "completed",
+            "blockedBy": [],
+            "diagnosticIds": []
+          },
+          {
+            "stage": "acquisition",
+            "status": "completed",
+            "blockedBy": [],
+            "diagnosticIds": []
+          },
+          {
+            "stage": "parse",
+            "status": "completed",
+            "blockedBy": [],
+            "diagnosticIds": []
+          },
+          {
+            "stage": "catalog",
+            "status": "completed",
+            "blockedBy": [],
+            "diagnosticIds": []
+          },
+          {
+            "stage": "link",
+            "status": "completed",
+            "blockedBy": [],
+            "diagnosticIds": []
+          },
+          {
+            "stage": "access",
+            "status": "completed",
+            "blockedBy": [],
+            "diagnosticIds": []
+          },
+          {
+            "stage": "decide",
+            "status": "completed",
+            "blockedBy": [],
+            "diagnosticIds": [
+              "source-diagnostic/1:9d5719d3f0c1a090adb553a49e951b69e1bbb4cd2b32c6a2e2ce6226eeedd2e7"
+            ]
+          },
+          {
+            "stage": "report",
+            "status": "completed",
+            "blockedBy": [],
+            "diagnosticIds": []
+          }
+        ],
+        "outcome": {
+          "execution": "completed",
+          "check": "failed",
+          "coverage": "complete"
+        },
+        "snapshot": null,
+        "diagnostics": [
+          {
+            "id": "source-diagnostic/1:9d5719d3f0c1a090adb553a49e951b69e1bbb4cd2b32c6a2e2ce6226eeedd2e7",
+            "category": "import",
+            "code": "project-boundary-import",
+            "message": "'../fixture/src/f.js' resolves to fixture/src/f.ts in the declared owned-nested-project tree fixture; an import into a declared tree must use package resolution",
+            "location": {
+              "file": "scripts/probe.ts",
+              "start": 9,
+              "end": 10,
+              "line": 1,
+              "column": 10
+            },
+            "related": [],
+            "importer": {
+              "owner": "app",
+              "kind": "ordinary",
+              "root": "src",
+              "profile": []
+            },
+            "original": null,
+            "accessId": "access/1:08d47faef6dfc29b74e30a9e057f4e868b309170d1862247c2c24188dfb7f117"
+          }
+        ],
+        "warnings": [],
+        "coverage": [],
+        "summary": {
+          "complete": true,
+          "owners": 2,
+          "sourceFiles": 3,
+          "resources": 0,
+          "originals": 3,
+          "accesses": 1,
+          "allowed": 0,
+          "denied": 1,
+          "errors": 1,
+          "warnings": 0,
+          "coverageNotes": 0,
+          "external": 0
+        }
+      }
+    },
     "mixed-pass-findings": {
       "paths": [
         "src/index.ts",
@@ -264,11 +602,11 @@
         "schemaVersion": "ramify.check/3",
         "root": "<root>",
         "revision": {
-          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:3",
+          "id": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:3",
           "sequence": 3,
           "path": "broad"
         },
-        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:2",
+        "since": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:2",
         "paths": [
           {
             "path": "src/index.ts",
@@ -356,9 +694,9 @@
         "schemaVersion": "ramify.check/3",
         "root": "<root>",
         "revision": {
-          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:4",
-          "sequence": 4,
-          "path": "unchanged-surface"
+          "id": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:3",
+          "sequence": 3,
+          "path": "broad"
         },
         "since": null,
         "paths": [
@@ -408,11 +746,11 @@
         "schemaVersion": "ramify.check/3",
         "root": "<root>",
         "revision": {
-          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:6",
-          "sequence": 6,
+          "id": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:5",
+          "sequence": 5,
           "path": "broad"
         },
-        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:5",
+        "since": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:4",
         "paths": [
           {
             "path": "scripts/probe.ts",
@@ -454,11 +792,11 @@
         "schemaVersion": "ramify.check/3",
         "root": "<root>",
         "revision": {
-          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:8",
-          "sequence": 8,
+          "id": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:7",
+          "sequence": 7,
           "path": "broad"
         },
-        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:7",
+        "since": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:6",
         "paths": [
           {
             "path": "src/tmp/scratch.ts",
@@ -518,11 +856,11 @@
         "schemaVersion": "ramify.check/3",
         "root": "<root>",
         "revision": {
-          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:8",
-          "sequence": 8,
+          "id": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:7",
+          "sequence": 7,
           "path": "broad"
         },
-        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:7",
+        "since": "rev/1:a38b8e3c-0d58-42a9-81e5-c97a7e1ab26b:6",
         "paths": [
           {
             "path": "tsconfig.json",
