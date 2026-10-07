@@ -1,0 +1,566 @@
+{
+  "provider": "0.4.1",
+  "cases": {
+    "cold": {
+      "paths": [
+        "src/index.ts",
+        "docs/readme.md"
+      ],
+      "exitCode": 2,
+      "document": {
+        "schemaVersion": "ramify.check/3",
+        "root": "<root>",
+        "revision": null,
+        "since": null,
+        "paths": [
+          {
+            "path": "src/index.ts",
+            "disposition": "not-checked",
+            "module": null,
+            "exclusion": null,
+            "reason": "cold"
+          },
+          {
+            "path": "docs/readme.md",
+            "disposition": "not-checked",
+            "module": null,
+            "exclusion": null,
+            "reason": "cold"
+          }
+        ],
+        "outcome": "not-checked",
+        "reason": "cold",
+        "execution": null,
+        "findings": [],
+        "removed": [],
+        "warnings": [],
+        "coverage": [],
+        "checked": null,
+        "exitCode": 2
+      }
+    },
+    "excluded-only-pass": {
+      "paths": [
+        "docs/readme.md",
+        "fixture/src/f.ts",
+        "vendor/lib.ts",
+        "notes.txt"
+      ],
+      "exitCode": 0,
+      "document": {
+        "schemaVersion": "ramify.check/3",
+        "root": "<root>",
+        "revision": {
+          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:1",
+          "sequence": 1,
+          "path": "cold"
+        },
+        "since": null,
+        "paths": [
+          {
+            "path": "docs/readme.md",
+            "disposition": "not-analyzed",
+            "module": "app",
+            "exclusion": {
+              "kind": "owned-unwired",
+              "directory": "docs",
+              "owner": "app"
+            },
+            "reason": "owned-unwired"
+          },
+          {
+            "path": "fixture/src/f.ts",
+            "disposition": "not-analyzed",
+            "module": "app",
+            "exclusion": {
+              "kind": "owned-nested-project",
+              "directory": "fixture",
+              "owner": "app"
+            },
+            "reason": "owned-nested-project"
+          },
+          {
+            "path": "vendor/lib.ts",
+            "disposition": "not-analyzed",
+            "module": null,
+            "exclusion": {
+              "kind": "external",
+              "directory": "vendor",
+              "owner": null
+            },
+            "reason": "external"
+          },
+          {
+            "path": "notes.txt",
+            "disposition": "not-analyzed",
+            "module": "app",
+            "exclusion": null,
+            "reason": "owned-non-source"
+          }
+        ],
+        "outcome": "checked",
+        "reason": null,
+        "execution": "completed",
+        "findings": [],
+        "removed": [],
+        "warnings": [],
+        "coverage": [],
+        "checked": {
+          "path": "cold",
+          "files": [
+            "scripts/probe.ts",
+            "src/index.ts",
+            "subs/web/src/internal.ts"
+          ],
+          "accesses": 0,
+          "modelRebuilt": true
+        },
+        "exitCode": 0
+      }
+    },
+    "auxiliary-boundary-violation": {
+      "paths": [
+        "scripts/probe.ts"
+      ],
+      "exitCode": 1,
+      "document": {
+        "schemaVersion": "ramify.check/3",
+        "root": "<root>",
+        "revision": {
+          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:2",
+          "sequence": 2,
+          "path": "source"
+        },
+        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:1",
+        "paths": [
+          {
+            "path": "scripts/probe.ts",
+            "disposition": "checked",
+            "module": "app",
+            "exclusion": null,
+            "reason": "content",
+            "sha256": "4a555680c50d66a526868ba6d769eeb7f0e050f24ab62088b7efca504471e6f8"
+          }
+        ],
+        "outcome": "checked",
+        "reason": null,
+        "execution": "completed",
+        "findings": [
+          {
+            "id": "source-diagnostic/1:9d5719d3f0c1a090adb553a49e951b69e1bbb4cd2b32c6a2e2ce6226eeedd2e7",
+            "category": "import",
+            "code": "project-boundary-import",
+            "message": "'../fixture/src/f.js' resolves to fixture/src/f.ts in the declared owned-nested-project tree fixture; an import into a declared tree must use package resolution",
+            "location": {
+              "file": "scripts/probe.ts",
+              "start": 9,
+              "end": 10,
+              "line": 1,
+              "column": 10
+            },
+            "related": [],
+            "importer": {
+              "owner": "app",
+              "kind": "ordinary",
+              "root": "src",
+              "profile": []
+            },
+            "original": null,
+            "accessId": "access/1:08d47faef6dfc29b74e30a9e057f4e868b309170d1862247c2c24188dfb7f117",
+            "new": true
+          }
+        ],
+        "removed": [],
+        "warnings": [],
+        "coverage": [],
+        "checked": {
+          "path": "source",
+          "files": [
+            "scripts/probe.ts"
+          ],
+          "accesses": 1,
+          "modelRebuilt": false
+        },
+        "exitCode": 1
+      }
+    },
+    "excluded-only-findings": {
+      "paths": [
+        "docs/readme.md"
+      ],
+      "exitCode": 1,
+      "document": {
+        "schemaVersion": "ramify.check/3",
+        "root": "<root>",
+        "revision": {
+          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:2",
+          "sequence": 2,
+          "path": "source"
+        },
+        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:1",
+        "paths": [
+          {
+            "path": "docs/readme.md",
+            "disposition": "not-analyzed",
+            "module": "app",
+            "exclusion": {
+              "kind": "owned-unwired",
+              "directory": "docs",
+              "owner": "app"
+            },
+            "reason": "owned-unwired"
+          }
+        ],
+        "outcome": "checked",
+        "reason": null,
+        "execution": "completed",
+        "findings": [
+          {
+            "id": "source-diagnostic/1:9d5719d3f0c1a090adb553a49e951b69e1bbb4cd2b32c6a2e2ce6226eeedd2e7",
+            "category": "import",
+            "code": "project-boundary-import",
+            "message": "'../fixture/src/f.js' resolves to fixture/src/f.ts in the declared owned-nested-project tree fixture; an import into a declared tree must use package resolution",
+            "location": {
+              "file": "scripts/probe.ts",
+              "start": 9,
+              "end": 10,
+              "line": 1,
+              "column": 10
+            },
+            "related": [],
+            "importer": {
+              "owner": "app",
+              "kind": "ordinary",
+              "root": "src",
+              "profile": []
+            },
+            "original": null,
+            "accessId": "access/1:08d47faef6dfc29b74e30a9e057f4e868b309170d1862247c2c24188dfb7f117",
+            "new": true
+          }
+        ],
+        "removed": [],
+        "warnings": [],
+        "coverage": [],
+        "checked": {
+          "path": "source",
+          "files": [
+            "scripts/probe.ts"
+          ],
+          "accesses": 1,
+          "modelRebuilt": false
+        },
+        "exitCode": 1
+      }
+    },
+    "mixed-pass-findings": {
+      "paths": [
+        "src/index.ts",
+        "docs/readme.md",
+        "fixture/src/f.ts"
+      ],
+      "exitCode": 1,
+      "document": {
+        "schemaVersion": "ramify.check/3",
+        "root": "<root>",
+        "revision": {
+          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:3",
+          "sequence": 3,
+          "path": "broad"
+        },
+        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:2",
+        "paths": [
+          {
+            "path": "src/index.ts",
+            "disposition": "checked",
+            "module": "app",
+            "exclusion": null,
+            "reason": "content",
+            "sha256": "84e0f028a91e47f7fff27bd2d1459b15d1f0dd6f5d052e342f7b99052891a11b"
+          },
+          {
+            "path": "docs/readme.md",
+            "disposition": "not-analyzed",
+            "module": "app",
+            "exclusion": {
+              "kind": "owned-unwired",
+              "directory": "docs",
+              "owner": "app"
+            },
+            "reason": "owned-unwired"
+          },
+          {
+            "path": "fixture/src/f.ts",
+            "disposition": "not-analyzed",
+            "module": "app",
+            "exclusion": {
+              "kind": "owned-nested-project",
+              "directory": "fixture",
+              "owner": "app"
+            },
+            "reason": "owned-nested-project"
+          }
+        ],
+        "outcome": "checked",
+        "reason": null,
+        "execution": "completed",
+        "findings": [
+          {
+            "id": "source-diagnostic/1:9d5719d3f0c1a090adb553a49e951b69e1bbb4cd2b32c6a2e2ce6226eeedd2e7",
+            "category": "import",
+            "code": "project-boundary-import",
+            "message": "'../fixture/src/f.js' resolves to fixture/src/f.ts in the declared owned-nested-project tree fixture; an import into a declared tree must use package resolution",
+            "location": {
+              "file": "scripts/probe.ts",
+              "start": 9,
+              "end": 10,
+              "line": 1,
+              "column": 10
+            },
+            "related": [],
+            "importer": {
+              "owner": "app",
+              "kind": "ordinary",
+              "root": "src",
+              "profile": []
+            },
+            "original": null,
+            "accessId": "access/1:08d47faef6dfc29b74e30a9e057f4e868b309170d1862247c2c24188dfb7f117",
+            "new": false
+          }
+        ],
+        "removed": [],
+        "warnings": [],
+        "coverage": [],
+        "checked": {
+          "path": "broad",
+          "files": [
+            "scripts/probe.ts",
+            "src/index.ts",
+            "subs/web/src/internal.ts"
+          ],
+          "accesses": 1,
+          "modelRebuilt": true
+        },
+        "exitCode": 1
+      }
+    },
+    "mixed-deadline": {
+      "paths": [
+        "src/index.ts",
+        "docs/readme.md",
+        "scripts/probe.ts"
+      ],
+      "exitCode": 2,
+      "document": {
+        "schemaVersion": "ramify.check/3",
+        "root": "<root>",
+        "revision": {
+          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:4",
+          "sequence": 4,
+          "path": "unchanged-surface"
+        },
+        "since": null,
+        "paths": [
+          {
+            "path": "src/index.ts",
+            "disposition": "not-checked",
+            "module": "app",
+            "exclusion": null,
+            "reason": "deadline-exceeded"
+          },
+          {
+            "path": "docs/readme.md",
+            "disposition": "not-analyzed",
+            "module": "app",
+            "exclusion": {
+              "kind": "owned-unwired",
+              "directory": "docs",
+              "owner": "app"
+            },
+            "reason": "owned-unwired"
+          },
+          {
+            "path": "scripts/probe.ts",
+            "disposition": "not-checked",
+            "module": "app",
+            "exclusion": null,
+            "reason": "deadline-exceeded"
+          }
+        ],
+        "outcome": "not-checked",
+        "reason": "deadline-exceeded",
+        "execution": null,
+        "findings": [],
+        "removed": [],
+        "warnings": [],
+        "coverage": [],
+        "checked": null,
+        "exitCode": 2
+      }
+    },
+    "source-deletion": {
+      "paths": [
+        "scripts/probe.ts"
+      ],
+      "exitCode": 0,
+      "document": {
+        "schemaVersion": "ramify.check/3",
+        "root": "<root>",
+        "revision": {
+          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:6",
+          "sequence": 6,
+          "path": "broad"
+        },
+        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:5",
+        "paths": [
+          {
+            "path": "scripts/probe.ts",
+            "disposition": "checked",
+            "module": "app",
+            "exclusion": null,
+            "reason": "deleted",
+            "sha256": null
+          }
+        ],
+        "outcome": "checked",
+        "reason": null,
+        "execution": "completed",
+        "findings": [],
+        "removed": [
+          "source-diagnostic/1:9d5719d3f0c1a090adb553a49e951b69e1bbb4cd2b32c6a2e2ce6226eeedd2e7"
+        ],
+        "warnings": [],
+        "coverage": [],
+        "checked": {
+          "path": "broad",
+          "files": [
+            "src/index.ts",
+            "subs/web/src/internal.ts"
+          ],
+          "accesses": 0,
+          "modelRebuilt": true
+        },
+        "exitCode": 0
+      }
+    },
+    "compiler-selected-scratch": {
+      "paths": [
+        "src/tmp/scratch.ts",
+        "src/index.ts"
+      ],
+      "exitCode": 0,
+      "document": {
+        "schemaVersion": "ramify.check/3",
+        "root": "<root>",
+        "revision": {
+          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:8",
+          "sequence": 8,
+          "path": "broad"
+        },
+        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:7",
+        "paths": [
+          {
+            "path": "src/tmp/scratch.ts",
+            "disposition": "not-analyzed",
+            "module": "app",
+            "exclusion": {
+              "kind": "scratch",
+              "directory": "src/tmp",
+              "owner": "app"
+            },
+            "reason": "scratch"
+          },
+          {
+            "path": "src/index.ts",
+            "disposition": "checked",
+            "module": "app",
+            "exclusion": null,
+            "reason": "content",
+            "sha256": "6b3048d09041cdb2f8db507c47d364a9268f4d8c69d62f59403f5b54c5de58ef"
+          }
+        ],
+        "outcome": "checked",
+        "reason": null,
+        "execution": "completed",
+        "findings": [],
+        "removed": [],
+        "warnings": [
+          {
+            "code": "compiler-selected-scratch",
+            "path": "src/tmp",
+            "message": "1 compiler-selected file in the scratch directory of module app, which Ramify does not analyze; exclude the directory from the compiler configuration",
+            "files": [
+              "src/tmp/scratch.ts"
+            ],
+            "count": 1
+          }
+        ],
+        "coverage": [],
+        "checked": {
+          "path": "broad",
+          "files": [
+            "src/index.ts",
+            "subs/web/src/internal.ts"
+          ],
+          "accesses": 0,
+          "modelRebuilt": true
+        },
+        "exitCode": 0
+      }
+    },
+    "configuration": {
+      "paths": [
+        "tsconfig.json"
+      ],
+      "exitCode": 0,
+      "document": {
+        "schemaVersion": "ramify.check/3",
+        "root": "<root>",
+        "revision": {
+          "id": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:8",
+          "sequence": 8,
+          "path": "broad"
+        },
+        "since": "rev/1:86258ae2-ed7f-474a-9639-01de12e6fbcc:7",
+        "paths": [
+          {
+            "path": "tsconfig.json",
+            "disposition": "checked",
+            "module": "app",
+            "exclusion": null,
+            "reason": "content",
+            "sha256": "5753862c78a81c4946f6471ebbbf18cde571f1389d44b9f0338a810eab2beb87"
+          }
+        ],
+        "outcome": "checked",
+        "reason": null,
+        "execution": "completed",
+        "findings": [],
+        "removed": [],
+        "warnings": [
+          {
+            "code": "compiler-selected-scratch",
+            "path": "src/tmp",
+            "message": "1 compiler-selected file in the scratch directory of module app, which Ramify does not analyze; exclude the directory from the compiler configuration",
+            "files": [
+              "src/tmp/scratch.ts"
+            ],
+            "count": 1
+          }
+        ],
+        "coverage": [],
+        "checked": {
+          "path": "broad",
+          "files": [
+            "src/index.ts",
+            "subs/web/src/internal.ts"
+          ],
+          "accesses": 0,
+          "modelRebuilt": true
+        },
+        "exitCode": 0
+      }
+    }
+  }
+}

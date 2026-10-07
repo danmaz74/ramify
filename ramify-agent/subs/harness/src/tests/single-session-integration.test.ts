@@ -50,21 +50,30 @@ async function stubRamify(): Promise<RamifyCli> {
   const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-session-process-'));
   cleanups.push(() => rm(directory, { recursive: true, force: true }));
   const executable = join(directory, 'ramify');
-  const finding = '{"schemaVersion":"ramify.check/1","outcome":"findings","findings":[{"code":"not-visible","category":"import",'
-    + '"message":"collection-review:interfaces/protocol.ts#ToolResult: not-visible","location":{"file":"%s","line":1,"column":1},'
-    + '"importer":{"owner":"collection-review/workspace/reviews/notes"},'
-    + '"original":{"kind":"code","owner":"collection-review","file":"interfaces/protocol.ts","binding":"ToolResult"}}]}';
+  // A `ramify.check/3` document that checked every named path, with the
+  // finding where a named file holds the forbidden import.
   await writeFile(executable, [
-    '#!/bin/sh',
-    'if [ "$1" = "--version" ]; then echo "ramify 0.0.0 (the session integration stub)"; exit 0; fi',
-    'if [ "$1" = "materialize" ]; then exit 0; fi',
-    'if [ "$1" = "check" ] && [ "$2" = "--changed" ]; then',
-    `  if grep -q FORBIDDEN "$3" 2>/dev/null; then printf '${finding}\\n' "$3"; exit 1; fi`,
-    '  echo \'{"schemaVersion":"ramify.check/1","outcome":"checked","findings":[]}\'',
-    '  exit 0',
-    'fi',
-    'echo \'{"schemaVersion":"ramify.cli/1","status":"unavailable","reason":"stub","exitCode":2}\'',
-    'exit 2',
+    '#!/usr/bin/env node',
+    "const { readFileSync, existsSync } = require('node:fs');",
+    "const { join } = require('node:path');",
+    'const args = process.argv.slice(2);',
+    "if (args[0] === '--version') { console.log('ramify 0.0.0 (the session integration stub)'); process.exit(0); }",
+    "if (args[0] === 'materialize') process.exit(0);",
+    "if (args[0] === 'check' && args[1] === '--changed') {",
+    "  const paths = args.slice(2, args.indexOf('--format'));",
+    "  const forbidden = paths.filter(path => existsSync(join(process.cwd(), path)) && readFileSync(join(process.cwd(), path), 'utf8').includes('FORBIDDEN'));",
+    "  const findings = forbidden.map(file => ({ id: 'source-diagnostic/1:' + file, category: 'import', code: 'not-visible', new: true,",
+    "    message: 'collection-review:interfaces/protocol.ts#ToolResult: not-visible', location: { file, start: 0, end: 1, line: 1, column: 1 },",
+    "    related: [], importer: { owner: 'collection-review/workspace/reviews/notes' }, accessId: null,",
+    "    original: { kind: 'code', owner: 'collection-review', file: 'interfaces/protocol.ts', binding: 'ToolResult' } }));",
+    "  const code = findings.length > 0 ? 1 : 0;",
+    "  console.log(JSON.stringify({ schemaVersion: 'ramify.check/3', root: process.cwd(), revision: { id: 'rev/1:stub:1', sequence: 1, path: 'source' }, since: null,",
+    "    paths: paths.map(path => ({ path, disposition: 'checked', module: 'stub', exclusion: null, reason: 'content', sha256: '0'.repeat(64) })),",
+    "    outcome: 'checked', reason: null, execution: 'completed', findings, removed: [], warnings: [], coverage: [], checked: null, timings: {}, exitCode: code }));",
+    '  process.exit(code);',
+    '}',
+    "console.log(JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable', reason: 'stub', exitCode: 2 }));",
+    'process.exit(2);',
     '',
   ].join('\n'));
   await chmod(executable, 0o755);

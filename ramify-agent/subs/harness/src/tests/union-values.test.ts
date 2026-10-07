@@ -287,7 +287,7 @@ describe('the observation log', () => {
     ]);
     const kinds = [
       'unguarded-shell', 'changed-paths-unknown', 'usage-unavailable', 'context-unavailable',
-      'observation-truncated', 'unsupported-runner', 'transcript-incomplete',
+      'observation-truncated', 'unsupported-runner', 'transcript-incomplete', 'unsupported-check-result',
     ];
     for (const kind of kinds) {
       expect(observationSchema.safeParse({ n: 1, at: '2026-09-20T10:15:00.000Z', type: 'coverage-gap', data: { kind, detail: 'why' } }).success).toBe(true);
@@ -316,18 +316,33 @@ describe('the observation log', () => {
     }
   });
 
-  test('every hook-check mode and outcome, and the excursion an outside read is', () => {
+  test('every hook-check mode, outcome and path disposition, and the excursion an outside read is', () => {
     for (const mode of ['changed', 'complete']) {
       for (const outcome of ['passed', 'findings', 'not-checked']) {
         expect(observationSchema.safeParse({
           n: 1, at: '2026-09-20T10:15:00.000Z', type: 'hook-check',
-          data: { paths: ['a.ts'], mode, outcome, reason: null, newFindings: 0, log: null },
+          data: { paths: ['a.ts'], mode, outcome, reason: null, newFindings: 0, log: null, provider: null, dispositions: [] },
         }).success).toBe(true);
       }
     }
+    const dispositions = [
+      { path: 'a.ts', disposition: 'checked', reason: 'content', module: 'app', exclusion: null, sha256: 'a'.repeat(64) },
+      { path: 'gone.ts', disposition: 'checked', reason: 'deleted', module: 'app', exclusion: null, sha256: null },
+      { path: 'docs/a.md', disposition: 'not-analyzed', reason: 'owned-unwired', module: 'app', exclusion: { kind: 'owned-unwired', directory: 'docs', owner: 'app' }, sha256: null },
+      { path: 'b.ts', disposition: 'not-checked', reason: 'deadline-exceeded', module: 'app', exclusion: null, sha256: null },
+    ];
     expect(observationSchema.safeParse({
       n: 1, at: '2026-09-20T10:15:00.000Z', type: 'hook-check',
-      data: { paths: [], mode: 'partial', outcome: 'passed', reason: null, newFindings: 0, log: null },
+      data: { paths: ['a.ts'], mode: 'changed', outcome: 'not-checked', reason: 'deadline-exceeded', newFindings: 0, log: null, provider: { schema: 'ramify.check/3', revision: 'rev/1:x:1' }, dispositions },
+    }).success).toBe(true);
+    expect(observationSchema.safeParse({
+      n: 1, at: '2026-09-20T10:15:00.000Z', type: 'hook-check',
+      data: { paths: [], mode: 'partial', outcome: 'passed', reason: null, newFindings: 0, log: null, provider: null, dispositions: [] },
+    }).success).toBe(false);
+    // A path is never recorded as having passed: there is no such disposition.
+    expect(observationSchema.safeParse({
+      n: 1, at: '2026-09-20T10:15:00.000Z', type: 'hook-check',
+      data: { paths: ['a.ts'], mode: 'changed', outcome: 'passed', reason: null, newFindings: 0, log: null, provider: null, dispositions: [{ ...dispositions[0], disposition: 'passed' }] },
     }).success).toBe(false);
     expect(observationSchema.safeParse({
       n: 1, at: '2026-09-20T10:15:00.000Z', type: 'excursion',

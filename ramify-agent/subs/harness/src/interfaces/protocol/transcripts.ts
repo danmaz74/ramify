@@ -175,6 +175,17 @@ const postWriteCheck = z.object({
     reason: z.string().nullable(),
     newFindings: count,
     log: transcriptBodySchema.nullable(),
+    /** The decoded provider document's schema and revision; null where none was decoded. */
+    provider: z.object({ schema: z.string(), revision: z.string().nullable() }).strict().nullable(),
+    /** Each named path's own analysis status, apart from the check's project verdict in `outcome`. */
+    dispositions: z.array(z.object({
+      path: z.string(),
+      disposition: z.enum(['checked', 'not-analyzed', 'not-checked']),
+      reason: z.string(),
+      module: z.string().nullable(),
+      exclusion: z.object({ kind: z.string(), directory: z.string(), owner: z.string().nullable() }).strict().nullable(),
+      sha256: z.string().nullable(),
+    }).strict()),
   }).strict()),
   /** What the call's result was told; null where it was told nothing. */
   text: transcriptBodySchema.nullable(),

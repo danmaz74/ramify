@@ -40,14 +40,20 @@ that what it ran is in the record. A captured command that names no
 executable is not a command. Of the environment it captures the names only;
 the values come from the allowlist again when the command runs.
 
-`checkComplete` and `checkChanged` are Ramify's two check forms, read from
-their exit codes alone: 0 is checked with no findings, 1 is findings or an
-invalid revision, and 2 is not checked with the CLI's reason. Exit 2 is never
-a pass. `checkChanged` is the bounded hook check and never falls back to a
-complete one; a cold daemon, an expired deadline or a named configuration
-file is answered at once as not checked, which permits continued editing.
-A caller that needs a verdict runs `checkComplete`, rather than claiming hook
-coverage.
+`checkComplete` and `checkChanged` are Ramify's two check forms. The exit
+code gives the project verdict: 0 is checked with no findings, 1 is findings
+or an invalid revision, and 2 is not checked with the CLI's reason. Exit 2 is
+never a pass. The printed document is decoded strictly, `ramify.check/3` for
+the changed form and `ramify.analysis/3` for the complete one: its root must
+be the checked project, the changed form must name each requested path once,
+and its outcome must agree with the exit code. Each named path keeps its
+disposition with module, exclusion, reason and, where checked, its content or
+deletion identity, beside the covering revision and the findings it no longer
+reports. Any other answer is `unsupported` and not checked. `checkChanged` is
+the bounded hook check and never falls back to a complete one; a cold daemon,
+an expired deadline or an uncovered configuration change is answered as not
+checked, which permits continued editing. A caller that needs a verdict runs
+`checkComplete`, rather than claiming hook coverage.
 
 ## Running one of the project's own commands
 

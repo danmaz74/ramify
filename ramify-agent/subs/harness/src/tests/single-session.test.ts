@@ -104,20 +104,27 @@ async function session(
   const answers = boundaries.ramify ?? [];
   let answerIndex = 0;
   const ramify = new FakeRamifyCli();
-  const answer = async (form: 'changed' | 'complete'): Promise<RamifyCheckResult> => {
+  // A scripted verdict checked every named path; a scripted not-checked is
+  // an unavailable answer that printed no check document.
+  const answer = async (form: 'changed' | 'complete', paths: readonly string[]): Promise<RamifyCheckResult> => {
     const scripted = answers[answerIndex];
     expect(scripted, `no Ramify ${form} answer was scripted at index ${answerIndex}`).toBeDefined();
     expect(scripted!.form).toBe(form);
     answerIndex += 1;
     const report = scripted!.outcome === 'findings' ? { findings: [finding()] } : { findings: [] };
+    const verdict = scripted!.outcome !== 'not-checked';
     return {
       form, exitCode: scripted!.outcome === 'checked' ? 0 : scripted!.outcome === 'findings' ? 1 : 2,
-      outcome: scripted!.outcome, reason: scripted!.outcome === 'not-checked' ? 'scripted unavailable' : null,
+      outcome: scripted!.outcome, reason: verdict ? null : 'scripted unavailable',
       report, stdout: JSON.stringify(report), stderr: '',
+      provider: verdict ? { schema: form === 'changed' ? 'ramify.check/3' : 'ramify.analysis/3', revision: 'scripted' } : null,
+      execution: verdict ? 'completed' : null,
+      paths: verdict ? paths.map(path => ({ path, disposition: 'checked' as const, module: 'scripted', exclusion: null, reason: 'content' as const, sha256: '0'.repeat(64) })) : [],
+      removed: [], unsupported: null,
     };
   };
-  vi.spyOn(ramify, 'checkChanged').mockImplementation(async () => answer('changed'));
-  vi.spyOn(ramify, 'checkComplete').mockImplementation(async () => answer('complete'));
+  vi.spyOn(ramify, 'checkChanged').mockImplementation(async paths => answer('changed', paths));
+  vi.spyOn(ramify, 'checkComplete').mockImplementation(async () => answer('complete', []));
   const checkExecution = createDirectCheckExecution({ script: boundaries.gate ?? [] });
   const result = await runSingleSession({
     projectRoot: root,

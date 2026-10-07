@@ -1,6 +1,7 @@
 import { finalCandidate } from './helpers/final-candidate.js';
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { changedResult } from './helpers/check-payloads.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { scenariosCommit, scriptedGit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { commandResult } from './helpers/command-result.js';
@@ -387,14 +388,11 @@ describe('a Ramify module violation in a run', () => {
       importer: { owner: 'collection-review/workspace/reviews/notes', kind: 'ordinary' },
       original: { kind: 'code', owner: 'collection-review', file: 'interfaces/protocol.ts', binding: 'ToolResult' }, new: true,
     };
-    const answer = (findings: unknown[]) => ({
-      form: 'changed' as const, exitCode: findings.length ? 1 : 0,
-      outcome: findings.length ? 'findings' as const : 'checked' as const, reason: null,
-      report: { schemaVersion: 'ramify.check/1', outcome: findings.length ? 'findings' : 'checked', findings }, stdout: '', stderr: '',
-    });
+    // Each answer is a `ramify.check/3` result that checked every named path.
+    const answer = (findings: Record<string, unknown>[]) => async (paths: readonly string[]) => changedResult(root, paths, findings);
     const checked = vi.spyOn(ramify, 'checkChanged')
-      .mockResolvedValueOnce(answer([finding])).mockResolvedValueOnce(answer([finding]))
-      .mockResolvedValue(answer([]));
+      .mockImplementationOnce(answer([finding])).mockImplementationOnce(answer([finding]))
+      .mockImplementation(answer([]));
     const { service, agent } = await openRunsWithGit(root, {
       inputs: treeInputs(), git, candidates: finalCandidate(root, 'fixed-source').candidates, ramify,
       // The engineer's writes are what Git reports once the feature files are committed.

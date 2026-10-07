@@ -10,7 +10,7 @@ import type { ProjectCommands } from '../checks/checkpoint.js';
 import type { TestSelectionPolicy } from '../checks/records.js';
 import { blockExplanation, decideWrite, type GuardedScope } from '../guard/write-guard.js';
 import {
-  completionCheckDeadlineMs, completionCheckFileLimit, FindingsSeen, runHookCheck, type HookFinding,
+  completionCheckDeadlineMs, completionCheckFileLimit, FindingsSeen, runHookCheck, type HookCheck, type HookFinding,
 } from '../hooks/post-write.js';
 import { ownerOf } from '../kpi/lines.js';
 import type { ObservationLog } from '../run/observations.js';
@@ -352,14 +352,14 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
         }).catch(error => ({
           checks: [{
             paths: paths ?? [], mode: 'changed' as const, outcome: 'not-checked' as const,
-            reason: `the hook check could not be run: ${message(error)}`, newFindings: 0, log: null,
-          }],
+            reason: `the hook check could not be run: ${message(error)}`, newFindings: 0, log: null, provider: null, dispositions: [],
+          }] satisfies HookCheck[],
           gaps: [],
           text: `Ramify hook check: it could not be run (${message(error)}). Nothing was verified.`,
         }));
         hookChecks += hook.checks.filter(check => check.log !== null).length;
         for (const check of hook.checks) {
-          await session.observations.record({ type: 'hook-check', data: { ...check, paths: [...check.paths] } });
+          await session.observations.record({ type: 'hook-check', data: observedCheck(check) });
         }
         for (const gap of hook.gaps) await session.observations.record({ type: 'coverage-gap', data: gap });
         const reminders = session.reminders();
@@ -386,17 +386,13 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     const claimed = typeof input === 'object' && input !== null ? (input as { readonly kind?: unknown }).kind : undefined;
     if (claimed !== 'completion-proposed' || standing === undefined || session === undefined) return standing?.open() ?? [];
 
-    const record = async (check: {
-      readonly paths: readonly string[]; readonly mode: 'changed' | 'complete';
-      readonly outcome: 'passed' | 'findings' | 'not-checked'; readonly reason: string | null;
-      readonly newFindings: number; readonly log: string | null;
-    }) => {
-      await session.observations.record({ type: 'hook-check', data: { ...check, paths: [...check.paths], atCompletion: true } });
+    const record = async (check: HookCheck) => {
+      await session.observations.record({ type: 'hook-check', data: { ...observedCheck(check), atCompletion: true } });
       session.transcript?.note({ kind: 'post-write-check', callId: null, atCompletion: true, checks: [check], text: null });
     };
     const notChecked = async (reason: string): Promise<readonly HookFinding[]> => {
       completion = { kind: 'not-checked', reason };
-      await record({ paths: [], mode: 'changed', outcome: 'not-checked', reason, newFindings: 0, log: null });
+      await record({ paths: [], mode: 'changed', outcome: 'not-checked', reason, newFindings: 0, log: null, provider: null, dispositions: [] });
       return standing.open();
     };
 
@@ -488,5 +484,15 @@ export function heldCommands(runner: CommandRunner, hold: ((timeoutMs: number) =
     } finally {
       release();
     }
+  };
+}
+
+/** One hook check as its observation records it: the project verdict, and each named path's own disposition. */
+function observedCheck(check: HookCheck) {
+  return {
+    ...check,
+    paths: [...check.paths],
+    provider: check.provider === null ? null : { ...check.provider },
+    dispositions: check.dispositions.map(path => ({ ...path, exclusion: path.exclusion === null ? null : { ...path.exclusion } })),
   };
 }

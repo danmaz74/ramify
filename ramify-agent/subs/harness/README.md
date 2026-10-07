@@ -616,11 +616,18 @@ hiding or measured complexity justifies it.
   writer is released.
 - `hooks/`: the post-write hook check the harness installs itself, because
   the adapter disables automatic extension discovery. After each settled
-  mutation it runs `ramify check --changed` over the paths that mutation
-  named. Exit 2 is not checked, with the CLI's reason; it permits continued
-  editing and is never a pass. Where the changed set cannot be established,
-  or where a changed path is a named configuration file that no changed
-  check covers, the harness answers that at once as not checked and runs a
+  mutation it runs `ramify check --changed` over every path that mutation
+  named, configuration included: the provider classifies each path, so no
+  filename list decides what the hook covers. Its exit code is the project
+  verdict, and each named path keeps the provider's own disposition in the
+  `hook-check` record and the transcript: `checked` with its content or
+  deletion identity, `not-analyzed` with its owner and exclusion, or
+  `not-checked` with its reason. A not-analyzed path is told as such
+  whatever the verdict, never as passing source checks. Exit 2 is not
+  checked, with the CLI's reason; it permits continued editing and is never
+  a pass, and findings it still carries are reported. An answer the adapter
+  cannot decode is an `unsupported-check-result` gap, never a pass. Only
+  where the changed set cannot be established does the harness run a
   complete check instead of claiming hook coverage. That complete check is
   then the one that speaks: where it answered, the changed form it replaced
   is not reported as a gap, because saying nothing was verified when the
@@ -628,8 +635,13 @@ hiding or measured complexity justifies it.
   learns to ignore the hook ignores the one message that matters. Only a
   complete check that could not run itself leaves a gap to state. A finding
   this invocation has already been told about is not newly introduced, so it
-  is not reported at the engineer twice, and a check that no longer reports
-  one says in a line that what was reported no longer stands.
+  is not reported at the engineer twice. A finding clears only on the
+  provider's coverage: a check that analyzed its file, or that file's
+  deletion, and no longer reports it, or a covering revision that lists it
+  as removed; naming a not-analyzed or not-checked path clears nothing.
+  A check that clears one says so in a line. Warnings and analysis limits
+  on files this invocation wrote are relayed with Ramify's own code and
+  message, as not blocking.
 
   A claimed completion is checked afresh over the whole write scope before
   it is judged, because the hook checks saw only the mutations they covered:
