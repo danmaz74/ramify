@@ -329,15 +329,16 @@ export async function writeArchitectTreeFixture(root: string): Promise<void> {
   const directory = join(root, '.ramify-architect');
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, '_meta.json'), JSON.stringify({
-    schema: 'ramify.architect-view/1',
+    schema: 'ramify.architect-view/3',
     revision: tree.revision,
     input: tree.input,
     modules: tree.modules.size,
     dependencies: 'measured',
+    dependencyScope: 'production',
   }));
   for (const module of tree.modules.values()) {
     const target = join(directory, ...module.module.split('/'));
     await mkdir(target, { recursive: true });
-    await writeFile(join(target, 'module.json'), JSON.stringify(module));
+    await writeFile(join(target, 'module.json'), JSON.stringify({ schema: 'ramify.architect-module/3', ...module }));
   }
 }

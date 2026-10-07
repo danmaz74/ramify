@@ -92,9 +92,9 @@ test('HTTP reports a tree refresh across pages and still answers old routes', as
   expect(first.tree.status).toBe('unavailable');
   const view = join(root, '.ramify-architect');
   await mkdir(view);
-  await writeFile(join(view, '_meta.json'), JSON.stringify({ schema: 'ramify.architect-view/1',
-    revision: 'rev-2', input: 'input-2', modules: 1, dependencies: 'measured' }));
-  await writeFile(join(view, 'module.json'), JSON.stringify({ module: 'collection-review', dir: '', parent: null,
+  await writeFile(join(view, '_meta.json'), JSON.stringify({ schema: 'ramify.architect-view/3',
+    revision: 'rev-2', input: 'input-2', modules: 1, dependencies: 'measured', dependencyScope: 'production' }));
+  await writeFile(join(view, 'module.json'), JSON.stringify({ schema: 'ramify.architect-module/3', module: 'collection-review', dir: '', parent: null,
     children: [], tags: [], areas: ['src'] }));
   const stale = await get(origin, protocolPaths.runExecutionMap('review-notes', runId, 1, first.nextCursor!, 10));
   expect(stale.status).toBe(409);

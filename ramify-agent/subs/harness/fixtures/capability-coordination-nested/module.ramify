@@ -1,4 +1,4 @@
 ramify 1
-module capability-coordination
+root module capability-coordination
 expose-sub readFact from b to descendants
 expose-sub normalizeSource from c to descendants

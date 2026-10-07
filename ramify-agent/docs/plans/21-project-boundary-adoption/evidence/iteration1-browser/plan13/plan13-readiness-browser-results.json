@@ -1,0 +1,45 @@
+{
+  "revision": "c9995df2a51eb2991ba9ffefec867acadde1ef61",
+  "dirtyAtStart": true,
+  "chromium": "/usr/bin/chromium",
+  "fixture": {
+    "path": "plan13-readiness-fixture.json",
+    "sha256": "b499cb076852310b8b8a5eb8465470e9245853716edfc0bb9130132dcdb8b42f"
+  },
+  "trial": {
+    "runId": "20261007T110553Z-ed2e76",
+    "catalogHash": "f599a04d919f28d0f8acf369a26276a000c5bb4e45d8cc31e7312d80132d9451",
+    "roundsClosed": 3,
+    "assessments": 3,
+    "candidate": "cand-003",
+    "tree": "e14e64aeaa7425e9a70e9fd607c0fc4a918666b4",
+    "finalGate": "ga-0002",
+    "gateCommit": "a15223145dadb5b22c6d19f3a295f1d8dcfe3920",
+    "deviations": 1,
+    "acceptedAndRevokedCommands": 2
+  },
+  "checks": [
+    "fixture identifies a real ledger integration test",
+    "pending has the projected pending-review verdict",
+    "accepted has the projected ready verdict",
+    "rejected has the projected rejected verdict",
+    "gate-failed has the projected gate-failed verdict",
+    "source-unavailable has the projected unavailable verdict",
+    "pending renders its authoritative verdict",
+    "the NFR CheckFinding keeps the exact captured quote and source path",
+    "the actual CheckFinding detail projection opens with its report history",
+    "accepted renders its authoritative verdict",
+    "rejected renders its authoritative verdict",
+    "gate-failed renders its authoritative verdict",
+    "source-unavailable renders its authoritative verdict",
+    "Chromium reports no page exceptions"
+  ],
+  "screenshots": [
+    "plan13-readiness-pending.png",
+    "plan13-readiness-accepted.png",
+    "plan13-readiness-rejected.png",
+    "plan13-readiness-gate-failed.png",
+    "plan13-readiness-source-unavailable.png"
+  ],
+  "failure": null
+}

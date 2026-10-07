@@ -1,0 +1,26 @@
+{
+  "revision": "c9995df2a51eb2991ba9ffefec867acadde1ef61",
+  "dirtyAtStart": true,
+  "chromium": "/usr/bin/chromium",
+  "fixture": "RunQueries.analysis projection from analysis-plan-evidence.test.ts; actual PlanAndEntries component; local static Vite build",
+  "checks": [
+    "the fixture came from an accepted harness analysis projection",
+    "the fixture holds the intake's non-functional requirement and recommendation",
+    "the element shows its text and source path",
+    "stated and inferred conditions stay labelled",
+    "the recommendation is shown under its own heading with its notice",
+    "no requirement heading holds the recommendation",
+    "the checkers' findings are shown",
+    "unclear missing reference shows target, source path and exact excerpt",
+    "the incorporation judgment is shown",
+    "an empty catalog is distinct from an unavailable one",
+    "an unavailable catalog carries its reason",
+    "the narrow review remains inside the viewport",
+    "Chromium reports no page exceptions"
+  ],
+  "screenshots": [
+    "catalog-review-1440x900.png",
+    "catalog-review-480x800.png"
+  ],
+  "failure": null
+}

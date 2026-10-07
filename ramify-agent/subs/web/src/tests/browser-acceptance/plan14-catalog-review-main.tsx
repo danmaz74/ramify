@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { AnalysisResponse } from '../../subs/harness/src/interfaces/protocol/runs.js';
-import type { ProtocolClient } from '../../subs/web/src/client.js';
-import { PlanAndEntries } from '../../subs/web/src/run-page.js';
-import '../../subs/web/src/styles.css';
+import type { AnalysisResponse } from '../../../../harness/src/interfaces/protocol/runs.js';
+import type { ProtocolClient } from '../../client.js';
+import { PlanAndEntries } from '../../run-page.js';
+import '../../styles.css';
 
 type EvidenceMode = 'accepted' | 'empty' | 'unavailable';
 

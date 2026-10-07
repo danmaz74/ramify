@@ -20,10 +20,11 @@
 
 Dan's amended decision is `owned-unwired "docs"` plus
 `ignorePaths: ["docs/**"]`. P1 is withdrawn. The current adoption pair is
-published `ramify.ts` 0.4.0 and `ramify-audit` 0.7.0, with affected CLI/answer
+published `ramify.ts` 0.4.0 and `ramify-audit` 0.7.1, with affected CLI/answer
 `/4`, analysis/check `/3`, architect projection/module/view `/3`, IPC `/2`,
 modularity `/3` and audit evidence schema 4. See the three-kind
-[handoff](/home/app/ramify-nested-kinds/docs/plans/nested-tree-kinds/handoff.md).
+[handoff](/home/app/ramify-nested-kinds/docs/plans/nested-tree-kinds/handoff.md)
+and the [0.7.1 qualification receipt](provider-receipt.md).
 The earlier Plan 8 and affected-rule target versions above remain historical
 planning inputs and do not override these released pins.
 
@@ -39,8 +40,8 @@ removed-field assumptions into the new adapter.
 | ID | Required contract | Current evidence / required action |
 | --- | --- | --- |
 | P1 | Withdrawn by Dan's three-kind decision | Declare docs owned-unwired and ignorePaths docs/**; retain PB3-A02 installed-provider witnesses, with no new provider docs classifier |
-| P2 | Audit consumes that answer and supplies the final ignore/reuse policy | Published 0.7.0 consumes affected /4; the three-kind qualification passes actual partial selection, full reuse and configuration fan-out. Verify the agent adapter and committed policy against that pair |
-| P3 | A public operation reads and validates committed audit configuration for a specified repository, project root and source commit | `src/cli-configuration.ts::requestFromCommittedConfiguration` exists in inspected audit source but is not exported from `src/index.ts`; confirmed still internal in published 0.7.0. Prefer exposing this existing operation and its contract in the release after 0.7.0, which iteration 0 obtains and iteration 1 pins as the single bump (Dan, 2026-10-07). A demonstrated public alternative is acceptable; copying the parser or importing `dist/cli-configuration.js` is not |
+| P2 | Audit consumes that answer and supplies the final ignore/reuse policy | Published 0.7.1 consumes affected /4; the three-kind qualification passes actual partial selection, full reuse and configuration fan-out. Verify the agent adapter and committed policy against the adopted pair |
+| P3 | A public operation reads and validates committed audit configuration for a specified repository, project root and source commit | Published 0.7.1 exposes `requestFromCommittedConfiguration` through its public entry. Iteration 0's installed F3 witness verifies the requested commit, configuration blob and refusal cases; iteration 2 integrates it. Published 0.7.0 lacked this export and remains historical inspection evidence |
 | P4 | Public configured committed test execution retains truthful source identity, completeness and complete producer results | Earlier assignment/scenario certification is withdrawn. Recheck `createAuditService`, `dispatchCheck` and the public CLI against actual agent needs. Demonstrate existing paths first; require a provider extension only for a named execution gap. Settle this before adoption; integrate final delivery in iteration 9 |
 | P5 | Final `nested: true` result preserves every project and discovery result | Already present in `AuditRequest`, `AuditResult.projects`, `discovery` and `createAuditService`; qualify through the installed release with the agent adapter and cancellation/recovery |
 
@@ -103,13 +104,14 @@ as limitations, not new agent full-audit heuristics.
 
 ## Current convergence findings, amended 2026-10-06
 
-Ramify 0.4.0 and audit 0.7.0 are published and qualified together. The
-three-kind handoff binds exact artifacts, integrity values and complete release
-gates. P1 is withdrawn; all-extension docs behavior follows the explicit
-owned-unwired declaration. The earlier inspection found P3 unexported and left P4
-assignment composition unsettled. P3 needs a refreshed public configuration
-witness. P4 now needs only the revised execution witnesses above; the former
-assignment composition is withdrawn, not a remaining release blocker. Historical
+Ramify 0.4.0 and audit 0.7.1 are the published, qualified adoption pair. The
+three-kind handoff and [provider receipt](provider-receipt.md) bind their exact
+artifacts, integrities and release gates. P1 is withdrawn; all-extension docs
+behavior follows the explicit owned-unwired declaration. The earlier inspection
+found P3 unexported in 0.7.0 and left P4 assignment composition unsettled.
+Installed 0.7.1 passed the public P3 configuration witness and the revised P4
+configured-execution witnesses; the former assignment composition is withdrawn.
+Historical
 inspection revisions and original observations remain in the provider receipt.
 PB3-A02 must still verify docs with source-like extensions and new/deleted
 paths through the actual installed agent providers; no runtime agent adoption

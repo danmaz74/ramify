@@ -138,7 +138,7 @@ describe('the pi adapter', () => {
     // The built-in read ran for real on the working directory, and the echo tool's result reached the model.
     const toolResults = harness.scripted.requests[2]!.messages.filter(message => message.role === 'toolResult');
     expect(JSON.stringify(toolResults)).toContain('echo hello');
-    expect(JSON.stringify(harness.scripted.requests[1]!.messages)).toContain('module demo');
+    expect(JSON.stringify(harness.scripted.requests[1]!.messages)).toContain('root module demo');
   });
 
   test('returns a rejection to the same session, which corrects its submission', async () => {

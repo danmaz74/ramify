@@ -1,7 +1,7 @@
 ramify 1
 // The application root: the Node entry, the configured protocol runtimes, and
 // the assembly that mounts the adapters its descendants relay upward.
-module collection-review tagged [dispatch]
+root module collection-review tagged [dispatch]
 
 // The neutral protocol vocabulary a feature needs to build an adapter. It
 // reaches every descendant, but only dispatch-classified source can import it:

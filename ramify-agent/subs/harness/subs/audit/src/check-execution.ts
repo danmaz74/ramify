@@ -321,7 +321,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
       const unexpected = unexpectedCompletedAudit(result, request.context.sourceCommit);
       if (unexpected !== null) return executionFailure(await infrastructureRecords(checks, request, unexpected));
       const selected = new Set(result.summary.coverage.selection.selectedCheckIds);
-      const noExecution = result.summary.evidenceSchemaVersion === 3 && result.summary.noExecution === true;
+      const noExecution = result.summary.evidenceSchemaVersion === 4 && result.summary.noExecution === true;
       const prepared = noExecution
         ? { records: await omittedRecords(checks.slice(0, setupCount), request, 0) }
         : await preparedSetupRecords(checks, request, result, setup, baseGit, mapping.repositoryRoot);

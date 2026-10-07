@@ -1,5 +1,8 @@
 ramify 1
 module harness
+owned-nested-project "fixtures/capability-coordination"
+owned-nested-project "fixtures/capability-coordination-nested"
+owned-nested-project "fixtures/collection-review"
 
 // The server for one project, which the root starts with the web client's
 // build output. Runs, their records, plan discovery, the evidence the

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { CheckFindingDetail, CheckFindingListResponse } from '../../subs/harness/src/interfaces/protocol/check-findings.js';
-import type { MergeReadinessResponse, ProjectedRunEvent, RunSnapshot } from '../../subs/harness/src/interfaces/protocol/runs.js';
-import { RunPage } from '../../subs/web/src/run-page.js';
-import { checkFindingKey, StubClient } from '../../subs/web/src/tests/helpers/stub-client.js';
-import '../../subs/web/src/styles.css';
+import type { CheckFindingDetail, CheckFindingListResponse } from '../../../../harness/src/interfaces/protocol/check-findings.js';
+import type { MergeReadinessResponse, ProjectedRunEvent, RunSnapshot } from '../../../../harness/src/interfaces/protocol/runs.js';
+import { RunPage } from '../../run-page.js';
+import { checkFindingKey, StubClient } from '../helpers/stub-client.js';
+import '../../styles.css';
 
 type Mode = 'pending' | 'accepted' | 'rejected' | 'gate-failed' | 'source-unavailable';
 interface Case {

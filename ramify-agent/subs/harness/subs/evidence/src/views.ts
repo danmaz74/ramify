@@ -28,8 +28,10 @@ const exceptionalCounts = ['unknownShapes', 'cut', 'detailsUnavailable', 'dynami
 
 export async function readArchitectMeta(projectRoot: string): Promise<ArchitectMeta> {
   const meta = JSON.parse(await readFile(join(projectRoot, architectViewDirectory, '_meta.json'), 'utf8')) as ArchitectMeta;
-  if (meta.schema !== 'ramify.architect-view/1' || typeof meta.revision !== 'string' || typeof meta.input !== 'string') {
-    throw new Error(`${architectViewDirectory}/_meta.json is not a ramify.architect-view/1 document`);
+  if (meta.schema !== 'ramify.architect-view/3' || typeof meta.revision !== 'string' || !meta.revision ||
+      typeof meta.input !== 'string' || !meta.input || !Number.isInteger(meta.modules) || meta.modules < 1 ||
+      !['measured', 'unavailable'].includes(meta.dependencies) || meta.dependencyScope !== 'production') {
+    throw new Error(`${architectViewDirectory}/_meta.json is not a valid ramify.architect-view/3 document`);
   }
   return meta;
 }
@@ -63,6 +65,7 @@ export interface ModuleEntry {
 
 /** One module as the architect view's `module.json` records what this reader needs. */
 interface ModuleDocument {
+  readonly schema: string;
   readonly module: string;
   readonly dir: string;
   readonly parent: string | null;
@@ -77,6 +80,13 @@ export function isTestingModule(entry: ModuleEntry): boolean {
 }
 
 function entryOf(document: ModuleDocument): ModuleEntry {
+  if (document.schema !== 'ramify.architect-module/3' || typeof document.module !== 'string' ||
+      typeof document.dir !== 'string' || (document.parent !== null && typeof document.parent !== 'string') ||
+      !Array.isArray(document.children) || !document.children.every(item => typeof item === 'string') ||
+      !Array.isArray(document.tags) || !document.tags.every(item => typeof item === 'string') ||
+      !Array.isArray(document.areas) || !document.areas.every(item => item === 'src' || item === 'src/tests')) {
+    throw new Error('Invalid ramify.architect-module/3 document');
+  }
   return {
     module: document.module,
     dir: document.dir,
@@ -200,14 +210,18 @@ export interface ApiViewSnapshot {
 export async function readApiView(projectRoot: string, entry: ModuleEntry, area: SourceArea): Promise<ApiViewSnapshot | undefined> {
   const path = [entry.dir, area, '.ramify'].filter(Boolean).join('/');
   const directory = join(projectRoot, path);
-  let meta: { schema: string; module: string; revision: string; coverage?: number };
+  let meta: { schema: string; module: string; area: string; revision: string; coverage?: number; detailsUnavailable?: number; truncated?: number };
   try {
     meta = JSON.parse(await readFile(join(directory, '_meta.json'), 'utf8')) as typeof meta;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw error;
   }
-  if (meta.schema !== 'ramify.api-view/1') throw new Error(`${path}/_meta.json is not a ramify.api-view/1 document`);
+  if (meta.schema !== 'ramify.api-view/1' || meta.module !== entry.module ||
+      meta.area !== (area === 'src' ? 'ordinary' : 'tests') || typeof meta.revision !== 'string' || !meta.revision ||
+      [meta.coverage, meta.detailsUnavailable, meta.truncated].some(value => value !== undefined && (!Number.isInteger(value) || value < 0))) {
+    throw new Error(`${path}/_meta.json is not a valid ramify.api-view/1 document for ${entry.module} ${area}`);
+  }
   const files = new Map<string, { definingFile: string; names: Map<string, { typeOnly: boolean }> }>();
   for (const category of ['external', 'children']) {
     const base = join(directory, category);

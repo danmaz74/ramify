@@ -84,8 +84,8 @@ export async function apiViewsOf(
       if (!source.isDirectory()) throw new Error('the source area is not a directory');
       const snapshot: ApiViewSnapshot | undefined = await readApiView(projectRoot, entry, area);
       if (!snapshot) throw new Error('materialization reported success but the existing source area has no generated API metadata');
-      if (snapshot.module !== entry.module || typeof snapshot.revision !== 'string' || snapshot.revision.length === 0) {
-        throw new Error('the generated API metadata has no valid module/revision identity');
+      if (snapshot.revision !== index.revision) {
+        throw new Error(`the generated API revision ${snapshot.revision} differs from the architect revision ${index.revision}`);
       }
       views.push({ area: snapshot.area, path: snapshot.path, revision: snapshot.revision, coverage: snapshot.coverage });
     } catch (error) {

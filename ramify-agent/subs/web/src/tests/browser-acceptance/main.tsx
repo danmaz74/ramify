@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../../subs/web/src/styles.css';
-import { ExecutionMapArea } from '../../subs/web/src/execution-map.js';
-import { loadExecutionMapPages, type ExecutionMapSnapshot } from '../../subs/web/src/execution-map-client.js';
-import type { ProtocolClient } from '../../subs/web/src/client.js';
-import type { ExecutionCapabilityDetail, ExecutionMapPage, ExecutionNode, ExecutionScenarioDetail } from '../../subs/harness/src/interfaces/protocol/execution-map.js';
-import { canvasMap, capabilityDetail, scenarioDetail } from '../../subs/web/src/tests/helpers/execution-map-canvas.js';
-import { page, reply, sessionView } from '../../subs/web/src/tests/helpers/sessions.js';
+import '../../styles.css';
+import { ExecutionMapArea } from '../../execution-map.js';
+import { loadExecutionMapPages, type ExecutionMapSnapshot } from '../../execution-map-client.js';
+import type { ProtocolClient } from '../../client.js';
+import type { ExecutionCapabilityDetail, ExecutionMapPage, ExecutionNode, ExecutionScenarioDetail } from '../../../../harness/src/interfaces/protocol/execution-map.js';
+import { canvasMap, capabilityDetail, scenarioDetail } from '../helpers/execution-map-canvas.js';
+import { page, reply, sessionView } from '../helpers/sessions.js';
 
 /* A browser-safe protocol fixture. Durable scripted-run evidence is tested separately. */
 const source = { kind: 'run-event' as const, id: 'ev-browser', sequence: 42, revision: null };
@@ -91,6 +91,10 @@ const client = {
   getExecutionScenario: async (_plan: string, _run: string, scenario: string) => window.plan11Durable
     ? window.plan11Durable.scenarios[scenario]! : ({ ...scenarioDetail, runVersion: map.runVersion,
     detail: scenarioDetail.detail.state === 'available' ? { ...scenarioDetail.detail, gates: scenarioHistory } : scenarioDetail.detail }),
+  getCapabilityTasks: async (_plan: string, _run: string, version: number) => ({
+    schema: 'capability-tasks/1' as const, version,
+    terminal: { state: 'running' as const, reason: null, message: null }, requests: [], tasks: [], stack: [],
+  }),
   getGate: async () => ({ commit: 'commit-failed', audited: 'commit-failed', evidence: null, commands: [] }),
   getRunSession: async (_plan: string, _run: string, id: string) => ({ version: 42,
     session: sessionView(id, { role: id === 'ses-0002' ? 'local-architect' : id === 'ses-0004' ? 'global-fork' :

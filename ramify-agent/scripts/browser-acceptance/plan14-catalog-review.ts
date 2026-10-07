@@ -21,6 +21,7 @@ import { build } from 'vite';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const agent = resolve(here, '../..');
+const fixtureRoot = resolve(agent, 'subs/web/src/tests/browser-acceptance');
 const artifacts = resolve(agent, 'docs/plans/14-unified-evidence-packages/evidence');
 const browserPath = process.env.CHROMIUM_PATH ?? '/usr/bin/chromium';
 const temp = await mkdtemp(join(tmpdir(), 'plan14-catalog-review-'));
@@ -48,8 +49,8 @@ try {
     projection.analysis.planEvidence.elements.some(item => item.id === 'rec-001' && item.text === 'Use Redis if practical.'));
 
   await build({
-    configFile: false, root: here, base: '/', plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] },
-    build: { outDir: output, emptyOutDir: true, rollupOptions: { input: resolve(here, 'plan14-catalog-review.html') } },
+    configFile: false, root: fixtureRoot, base: '/', plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] },
+    build: { outDir: output, emptyOutDir: true, rollupOptions: { input: resolve(fixtureRoot, 'plan14-catalog-review.html') } },
     logLevel: 'error',
   });
   await writeFile(join(output, 'review-data.json'), JSON.stringify(projection));

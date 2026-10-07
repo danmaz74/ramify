@@ -98,14 +98,14 @@ describe('the module tree, through the one load the comparison shares', () => {
       const view = join(fixture.root, '.ramify-architect');
       await mkdir(view);
       await writeFile(join(view, '_meta.json'), '{"schema":"ramify.architect-view/0"}');
-      expect(await tree()).toEqual({ status: 'unavailable', message: expect.stringMatching(/^The architect view cannot be read: .*not a ramify\.architect-view\/1 document/) });
+      expect(await tree()).toEqual({ status: 'unavailable', message: expect.stringMatching(/^The architect view cannot be read: .*not a valid ramify\.architect-view\/3 document/) });
 
       // The view's module.json carries more than the protocol's module: the
       // children, tags and areas stay behind.
-      await writeFile(join(view, '_meta.json'), JSON.stringify({ schema: 'ramify.architect-view/1', revision: 'rev/3:x:1', input: 'input/3:abc', modules: 2, dependencies: 'measured' }));
-      await writeFile(join(view, 'module.json'), JSON.stringify({ module: 'collection-review', dir: '', parent: null, children: ['collection-review/workspace'], tags: [], areas: ['src'] }));
+      await writeFile(join(view, '_meta.json'), JSON.stringify({ schema: 'ramify.architect-view/3', revision: 'rev/3:x:1', input: 'input/3:abc', modules: 2, dependencies: 'measured', dependencyScope: 'production' }));
+      await writeFile(join(view, 'module.json'), JSON.stringify({ schema: 'ramify.architect-module/3', module: 'collection-review', dir: '', parent: null, children: ['collection-review/workspace'], tags: [], areas: ['src'] }));
       await mkdir(join(view, 'workspace'));
-      await writeFile(join(view, 'workspace', 'module.json'), JSON.stringify({ module: 'collection-review/workspace', dir: 'subs/workspace', parent: 'collection-review', children: [], tags: ['ui'], areas: ['src', 'src/tests'] }));
+      await writeFile(join(view, 'workspace', 'module.json'), JSON.stringify({ schema: 'ramify.architect-module/3', module: 'collection-review/workspace', dir: 'subs/workspace', parent: 'collection-review', children: [], tags: ['ui'], areas: ['src', 'src/tests'] }));
       expect(await tree()).toEqual({
         status: 'available', revision: 'rev/3:x:1', input: 'input/3:abc',
         modules: [

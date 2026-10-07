@@ -11,6 +11,7 @@ import { executionCapabilityDetailSchema, executionMapPageSchema, executionScena
 
 const here = dirname(fileURLToPath(import.meta.url));
 const agent = resolve(here, '../..');
+const fixtureRoot = resolve(agent, 'subs/web/src/tests/browser-acceptance');
 const artifacts = resolve(agent, 'docs/plans/11-plan-execution-map/evidence');
 const checks: string[] = [];
 const check = (name: string, condition: unknown) => { assert.ok(condition, name); checks.push(name); };
@@ -20,6 +21,7 @@ const exec = promisify(execFile);
 await mkdir(artifacts, { recursive: true });
 const buildDir = resolve(agent, 'dist/browser-acceptance');
 const durablePath = resolve(agent, 'dist/browser-acceptance-durable.json');
+await mkdir(dirname(durablePath), { recursive: true });
 await exec(resolve(agent, 'node_modules/.bin/vitest'), ['run', 'subs/harness/src/tests/acceptance-trial.test.ts',
   '-t', 'passes the review stop', '--maxWorkers=1'], { cwd: agent, timeout: 120_000,
   env: { ...process.env, PLAN11_EXECUTION_EXPORT: durablePath } });
@@ -36,9 +38,9 @@ check('exported run has two roots, one lower provider and verified consumer requ
   durableNodes.filter(node => node.kind === 'capability' && node.level === 'entry').length === 2 &&
   durableNodes.some(node => node.key === 'capability:note-limit') &&
   durableNodes.some(node => node.key === 'requirement:rq-001' && node.kind === 'requirement' && node.state === 'verified'));
-await build({ configFile: false, root: here, plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] },
+await build({ configFile: false, root: fixtureRoot, plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] },
   base: './', build: { outDir: buildDir, emptyOutDir: true }, logLevel: 'error' });
-const server = await preview({ configFile: false, root: here, build: { outDir: buildDir },
+const server = await preview({ configFile: false, root: fixtureRoot, build: { outDir: buildDir },
   preview: { host: '127.0.0.1', port: 0, strictPort: false }, logLevel: 'error' });
 const address = server.httpServer?.address();
 if (!address || typeof address === 'string') throw new Error('Vite did not bind a TCP port');
@@ -50,7 +52,10 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${address.port}`, { waitUntil: 'networkidle' });
   const canvas = page.getByLabel('Zoomable execution canvas');
-  await canvas.waitFor();
+  try { await canvas.waitFor({ timeout: 5_000 }); }
+  catch (error) {
+    throw new Error(`Execution canvas did not render; page: ${(await page.content()).slice(0, 3000)}; page errors: ${errors.join('; ')}`, { cause: error });
+  }
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
   check('desktop 1440x900: two entry roots and one canonical provider',
     await canvas.getByRole('button', { name: /status-badge, capability/ }).count() === 1 &&

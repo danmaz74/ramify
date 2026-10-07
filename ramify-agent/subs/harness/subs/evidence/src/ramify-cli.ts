@@ -4,7 +4,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { AffectedDocument } from 'ramify.ts/cli';
 import { childEnvironment, outputCapBytes } from './run-command.js';
+import { decodeOwnershipAnswer } from './ownership.js';
 
 /** The `ramify` executable this package depends on. */
 export const ramifyExecutable = fileURLToPath(new URL('../../../../../node_modules/.bin/ramify', import.meta.url));
@@ -115,6 +117,17 @@ export class RamifyCli {
   async checkComplete(projectRoot: string, signal?: AbortSignal): Promise<RamifyCheckResult> {
     const args = ['check', '--batch', '--root', projectRoot, '--format', 'json', '--no-snapshot'];
     return answer('complete', args, await this.run(args, projectRoot, signal));
+  }
+
+  /** The installed provider's current ownership topology, tied to one batch input identity. */
+  async queryOwnership(projectRoot: string, paths: readonly string[] = ['.'], signal?: AbortSignal): Promise<AffectedDocument> {
+    const args = ['affected', '--batch', '--root', projectRoot, '--format', 'json', ...paths.flatMap(path => ['--path', path])];
+    const result = await this.run(args, projectRoot, signal);
+    if (result.code !== 0) throw new Error(`ramify ownership query exited with ${result.code}: ${result.stderr || result.stdout}`);
+    let value: unknown;
+    try { value = JSON.parse(result.stdout); }
+    catch { throw new Error('ramify ownership query did not return JSON'); }
+    return decodeOwnershipAnswer(value, projectRoot);
   }
 
   /**

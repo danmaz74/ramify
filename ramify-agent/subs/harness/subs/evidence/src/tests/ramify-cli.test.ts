@@ -2,6 +2,7 @@ import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RamifyCli } from '../ramify-cli.js';
+import { decodeOwnershipAnswer } from '../ownership.js';
 import { temporaryDirectory } from './helpers/temporary.js';
 
 /**
@@ -97,5 +98,44 @@ describe('the Ramify check forms', () => {
 
     expect(result.exitCode).toBe(9);
     expect(result.outcome).toBe('not-checked');
+  });
+});
+
+describe('the released ownership answer', () => {
+  const root = '/project';
+  const answer = () => ({
+    schemaVersion: 'ramify.affected-cli/4', root, mode: 'batch', revision: { sequence: null, inputId: 'input/1:abc' }, ramifyVersion: '0.4.0',
+    selection: {
+      schemaVersion: 'ramify.affected/4', inputId: 'input/1:abc', selection: 'dependency-closure', widening: [], analysisCheck: 'passed',
+      coverage: { status: 'complete', notes: [] }, changedModules: [], affectedModules: [], testModules: [],
+      scope: { root, selection: 'given', invokedFrom: root, configuration: `${root}/tsconfig.json`, walkedAreas: ['src'],
+        ownership: { modules: [{ id: 'app', parent: null, directory: '.' }, { id: 'app/web', parent: 'app', directory: 'subs/web' }],
+          exclusions: [{ kind: 'owned-unwired', directory: 'docs', owner: 'app' }] } },
+      paths: [{ path: 'docs/example.mjs', status: 'owned', module: 'app', basis: 'containment', kind: 'ignored', selects: [] as string[],
+        exclusion: { kind: 'owned-unwired', directory: 'docs', owner: 'app' } }],
+    },
+  });
+
+  it('accepts the exact source identity and owned exclusion', () => {
+    expect(decodeOwnershipAnswer(answer(), root).selection.paths[0]).toMatchObject({ module: 'app', kind: 'ignored' });
+  });
+
+  it('refuses old versions, mismatched input and project identities', () => {
+    const old = answer(); old.schemaVersion = 'ramify.affected-cli/3';
+    expect(() => decodeOwnershipAnswer(old, root)).toThrow('schema, root or mode');
+    const input = answer(); input.selection.inputId = 'input/1:other';
+    expect(() => decodeOwnershipAnswer(input, root)).toThrow('selection identity');
+    expect(() => decodeOwnershipAnswer(answer(), '/another')).toThrow('schema, root or mode');
+  });
+
+  it('refuses contradictory owner parents, directories and path selections', () => {
+    const parent = answer(); parent.selection.scope.ownership.modules[1]!.parent = 'missing';
+    expect(() => decodeOwnershipAnswer(parent, root)).toThrow('ownership parent');
+    const directory = answer(); directory.selection.scope.ownership.modules[1]!.directory = '.';
+    expect(() => decodeOwnershipAnswer(directory, root)).toThrow('duplicate ownership module or directory');
+    const selected = answer(); selected.selection.paths[0]!.selects.push('app/web');
+    expect(() => decodeOwnershipAnswer(selected, root)).toThrow('nonselecting path');
+    const foreign = answer(); foreign.selection.paths[0]!.module = 'app/web';
+    expect(() => decodeOwnershipAnswer(foreign, root)).toThrow('owned excluded path');
   });
 });

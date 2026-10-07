@@ -1,5 +1,5 @@
 {
-  "enclosingProject": "ignore",
+  "ignorePaths": ["docs/**"],
   "checks": [
     {
       "id": "patch-integrity",

@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": { "rootDir": "../..", "lib": ["ES2022", "DOM"] },
-  "include": ["*.ts", "*.tsx", "*.d.ts"],
+  "include": ["*.ts", "../../subs/web/src/tests/browser-acceptance/*.tsx", "../../subs/web/src/tests/browser-acceptance/*.d.ts"],
   "exclude": []
 }

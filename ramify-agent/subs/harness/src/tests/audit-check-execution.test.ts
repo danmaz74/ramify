@@ -176,7 +176,7 @@ describe('audit-backed gate execution', () => {
     expect(record.overall).toBe('indeterminate');
   });
 
-  it('narrows a registered Vitest run to Ramify-selected source after a full root', { timeout: 60_000 }, async () => {
+  it('keeps a registered Vitest run indeterminate when configured discovery is unavailable', { timeout: 60_000 }, async () => {
     const fixture = await repository({
       'module.ramify': rootDescription('"fixture"', "expose-sub value from producer to descendants\n"),
       'package.json': '{"name":"fixture","private":true,"type":"module","scripts":{"test":"vitest run"}}',
@@ -200,7 +200,11 @@ describe('audit-backed gate execution', () => {
       requiresTests: true,
     }];
     const full = (await auditGate(fixture, checks, 'ga-vitest-full', { checkpoint: 'final', auditAllTests })).attempt;
-    expect(full.auditOverall).toBe('pass');
+    // Registered commands execute, but the released provider cannot discover
+    // their configured file set; completeness and composition remain unknown.
+    expect(full.auditOverall).toBe('indeterminate');
+    expect((full.provider as { result: { summary: { coverage: { expectedFiles: { status: string; reason: string } }; overall: string } } }).result.summary)
+      .toMatchObject({ overall: 'pass', coverage: { expectedFiles: { status: 'unavailable', reason: expect.stringContaining('discovery-unsupported') } } });
     const fullChecks = (full.provider as { checks: Record<string, { vitest?: { reason: string; files: Array<{ path: string; state: string }> } }> }).checks;
     expect(fullChecks['check-01-tests']?.vitest).toMatchObject({ reason: 'passed' });
     expect(fullChecks['check-01-tests']?.vitest?.files).toEqual(expect.arrayContaining([
@@ -213,13 +217,12 @@ describe('audit-backed gate execution', () => {
     git(fixture.repositoryRoot, ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--no-gpg-sign', '-m', 'change value']);
     const changed = { ...fixture, commit: git(fixture.repositoryRoot, ['rev-parse', 'HEAD']) };
     const partial = (await auditGate(changed, checks, 'ga-vitest-partial', { auditAllTests })).attempt;
-    expect(partial.auditOverall).toBe('pass');
+    expect(partial.auditOverall).toBe('indeterminate');
     const summary = JSON.parse(git(fixture.repositoryRoot, ['show', `${partial.evidence!.reportCommit}:reports/audit/summary.json`])) as {
       mode: { requestedMode: string; executedMode: string };
       coverage: { selectedModules?: Array<{ id: string }> };
     };
-    expect(summary.mode, JSON.stringify(summary.mode)).toMatchObject({ requestedMode: 'ramify-partial', executedMode: 'ramify-partial' });
-    expect(summary.coverage.selectedModules?.map(module => module.id)).toContain('fixture/consumer');
+    expect(summary.mode, JSON.stringify(summary.mode)).toMatchObject({ requestedMode: 'ramify-partial', executedMode: 'full', fallbackReason: expect.stringContaining('baseline-indeterminate') });
     expect(partial.commands[0]?.command.argv.at(-1)).toBe('subs/producer/src/tests/value.test.ts');
 
     await mkdir(join(fixture.projectRoot, 'docs'), { recursive: true });
@@ -227,10 +230,10 @@ describe('audit-backed gate execution', () => {
     git(fixture.repositoryRoot, ['add', 'docs/first.md']);
     git(fixture.repositoryRoot, ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--no-gpg-sign', '-m', 'documentation without tests']);
     const unselected = (await auditGate({ ...fixture, commit: git(fixture.repositoryRoot, ['rev-parse', 'HEAD']) }, checks, 'ga-vitest-unselected', { auditAllTests })).attempt;
-    expect(unselected.auditOverall).toBe('pass');
-    expect(unselected.commands[0]).toMatchObject({ outcome: 'not-verified', notVerified: 'audit-unselected', exitCode: null });
-    expect(unselected.verdict).toBe('passed');
-    expect(unselected.commands[0]?.output.bytes).toBe(0);
+    expect(unselected.auditOverall).toBe('indeterminate');
+    expect(unselected.commands[0]).toMatchObject({ outcome: 'passed', exitCode: 0 });
+    expect(unselected.verdict).toBe('not-verified');
+    expect(unselected.commands[0]?.output.bytes).toBeGreaterThan(0);
 
     const failedFile = 'subs/consumer/src/tests/compute.test.ts';
     await writeFile(join(fixture.projectRoot, failedFile),
@@ -250,8 +253,8 @@ describe('audit-backed gate execution', () => {
       mode: { executedMode: string };
       coverage: { carriedFailures?: Array<{ path: string }> };
     };
-    expect(rerunSummary.mode.executedMode).toBe('ramify-partial');
-    expect(rerunSummary.coverage.carriedFailures?.map(failure => failure.path)).toContain(failedFile);
+    expect(rerunSummary.mode.executedMode).toBe('full');
+    expect(rerun.auditOverall).toBe('fail');
   });
 
   it('defaults committing gates to partial mode and requests full mode for final', async () => {
