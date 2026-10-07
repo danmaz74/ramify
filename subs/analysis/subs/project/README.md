@@ -104,9 +104,10 @@ table: the modules, each module's scratch directory `src/tmp`, the compiler
 configuration's output directories and the declared nested trees, byte-ordered
 by directory. `classifyProjectPath` answers the owner of one canonical
 project-relative path from that table alone, without reads or existence checks:
-the first exclusion reached from the root wins, owned nested and scratch paths
-keep their owner, and repository, package and generated segments are excluded
-wherever they occur. Declarations are decoded and normalized against their
+the first unowned exclusion reached from the root wins. Owned nested and scratch
+paths keep their owner unless a hard exclusion occurs farther along the path;
+repository, package and generated segments are excluded wherever they occur.
+Declarations are decoded and normalized against their
 module; one that escapes, lies in a child module, overlaps another, places an
 external tree under `src/` or names an always-excluded path contributes no
 exclusion. Acquisition reports each such declaration as
