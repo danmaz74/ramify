@@ -431,6 +431,7 @@ async function projected<T>(query: () => Promise<T>): Promise<T> {
     return await query();
   } catch (error) {
     if (error instanceof ProjectionError) throw new ProtocolFailure(error.code, error.message, error.currentVersion, error.evidence);
+    if (error instanceof CommandRejection) throw new ProtocolFailure(error.code, error.message, error.currentVersion, error.evidence);
     if (error instanceof ExecutionPageError) throw new ProtocolFailure(error.code, error.message, error.currentVersion);
     throw error;
   }

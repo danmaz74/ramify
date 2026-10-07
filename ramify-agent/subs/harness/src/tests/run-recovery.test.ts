@@ -12,7 +12,7 @@ import { workLayout } from '../work/records.js';
 import { type IterationAssignment, iterationLayout } from '../work/iterations.js';
 import {
   addModule, assign, byRole, byWork, completionProposed, installMiniRunner, outline, shell,
-  submit as submitStep, treeInputs,
+  submit as submitStep, treeInputs, write,
 } from './helpers/iterations.js';
 import { analysisLayout } from '../analysis/records.js';
 import { contractsLayout } from '../contracts/records.js';
@@ -28,6 +28,7 @@ import { scriptedCandidates } from './helpers/candidates.js';
 import { declaringScenarios } from './helpers/declarations.js';
 import type { OpenRunsOptions } from './helpers/runs.js';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
+import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import type { RunWrite } from '../run/service.js';
 import type { RunEvent } from '../run/log.js';
@@ -150,10 +151,10 @@ async function crashAfter(
 
     ...(commandExecution === undefined ? {} : { commandExecution }),
     ...(agent === undefined ? { script: script ?? [{ kind: 'submit', input: emptyAnalysis() }] } : { agent }),
-    ...(inputs === undefined ? {} : { inputs }),
+    ...(inputs === undefined ? changeTree ? { inputs: treeInputs() } : {} : { inputs }),
     afterWrite: async (current, runId) => {
       void runId;
-      if (changeTree && current === 'readiness-attempted') {
+      if (changeTree && current === 'iteration-assigned') {
         await writeFile(join(root, 'src', 'late.ts'), 'export const late = true;\n');
       }
       if (freezeAt === undefined ? current === write : freezeAt(current)) {
@@ -282,13 +283,16 @@ async function eventTypes(path: string): Promise<string[]> {
 }
 
 /** One entry capability, one hypothesis, and a local architect that asks for completion. */
-function oneWorkItem(): OpenRunsOptions['script'] {
+function oneWorkItem(assignRoot = false): OpenRunsOptions['script'] {
   const submitted = analysis(
     [entry('reviewer-note', 'collection-review/workspace/reviews')],
     [{ id: 'note-storage', capability: 'note-storage', change: 'reuse' as const, changesExistingSymbols: false, suggestedOwner: 'collection-review/workspace/reviews',
       anticipatedConsumers: [], involvedModules: [], dependsOn: [], confidence: 'medium' as const,
       rationale: 'A note may already have somewhere to live.', assumptions: [], uncertainties: [], citations: [] }],
   );
+  if (assignRoot) return byRole({ 'initial-architect': [submitStep(submitted)],
+    'local-architect': [submitStep(assign('collection-review', {}, outline())), submitStep(requestCompletion())],
+    engineer: [submitStep(completionProposed('Added the root-owned late source.'), write('late.ts', 'export const late = true;\n'))] });
   // The catalog extractor's turns are the default ones.
   return (spec: SessionSpec) => spec.role === 'catalog-extractor' ? []
     : [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? submitted : requestCompletion() }];
@@ -563,10 +567,40 @@ describe('the recovery table', () => {
     expect(agent.sessions.filter(session => session.spec.submission.name === 'submit_work_item_result')).toHaveLength(1);
   }, 180_000);
 
+  test.each(['unassigned-dirt', 'new-external-declaration'] as const)('PB3: pending gate intent refuses %s on restart before rendering or making a commit', async variant => {
+    const root = await target(lateCommit, [{ gate: 'ga-0002', answers: [null] }], source(1));
+    const git = gitOf(root);
+    const { runId } = await crashAfter(root, 'gate-attempted', true, oneWorkItem(true));
+    const beforeHead = git.head();
+    const beforeCommits = [...git.commits()];
+    const late = await readFile(join(root, 'src/late.ts'), 'utf8');
+    const outside = 'subs/workspace/subs/reviews/src/unassigned.ts';
+    const changed = vi.mocked(git.changedPaths).getMockImplementation()!;
+    if (variant === 'unassigned-dirt') {
+      await writeFile(join(root, outside), 'unassigned source must remain pending\n');
+      vi.spyOn(git, 'changedPaths').mockImplementation(async (project, base) => [...await changed(project, base), outside]);
+    } else {
+      const declaration = join(root, 'module.ramify');
+      await writeFile(declaration, `${await readFile(declaration, 'utf8')}\nexternal "src/late.ts"\n`);
+    }
+    const ramify = new FakeRamifyCli();
+    const query = vi.spyOn(ramify, 'queryOwnership');
+    const restarting = openRuns(root, { git, ramify });
+    await expect(restarting).rejects.toThrow('Recovered gate candidate has no current captured authority');
+    await expect(restarting).rejects.toThrow(variant === 'unassigned-dirt' ? outside : 'src/late.ts');
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(git.head()).toBe(beforeHead);
+    expect(git.commits()).toEqual(beforeCommits);
+    expect(await readFile(join(root, 'src/late.ts'), 'utf8')).toBe(late);
+    if (variant === 'unassigned-dirt') expect(await readFile(join(root, outside), 'utf8')).toBe('unassigned source must remain pending\n');
+    else expect(await readFile(join(root, 'module.ramify'), 'utf8')).toContain('external "src/late.ts"');
+    expect((await runEventsOnDisk(root, 'review-notes', runId)).filter(event => event.type === 'gate-attempted')).toHaveLength(0);
+  }, 180_000);
+
   test('a crash between the commit intent and the commit performs the effect again and makes one commit', async () => {
     const root = await target(lateCommit, lateRecovery, source(1));
     const git = gitOf(root);
-    const { runId } = await crashAfter(root, 'gate-attempted', true, oneWorkItem());
+    const { runId } = await crashAfter(root, 'gate-attempted', true, oneWorkItem(true));
 
     // The verified operation is durable and no commit was made for it.
     expect(git.commits()).toEqual([{ gate: 'scenarios', commit: materialized }]);
@@ -593,7 +627,7 @@ describe('the recovery table', () => {
   test('a crash after the commit, before its completion line, finds the commit and makes no second one', async () => {
     const root = await target(lateCommit, lateRecovery, source(1));
     const git = gitOf(root);
-    const { runId } = await crashAfter(root, 'gate-committing', true, oneWorkItem());
+    const { runId } = await crashAfter(root, 'gate-committing', true, oneWorkItem(true));
 
     // The commit was made before the crash, and its attempt is not written.
     const before = [...git.commits()];
@@ -614,7 +648,7 @@ describe('the recovery table', () => {
   test('a crash after the complete attempt leaves the commit alone and appends the interruption only', async () => {
     const root = await target(lateCommit, lateRecovery, source(1));
     const git = gitOf(root);
-    const { runId } = await crashAfter(root, 'gate-committed', true, oneWorkItem());
+    const { runId } = await crashAfter(root, 'gate-committed', true, oneWorkItem(true));
 
     const before = [...git.commits()];
     const { recovery } = await reopen(root);

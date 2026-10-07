@@ -28,6 +28,7 @@ import {
   addModule, assign, byRole, completionProposed, installMiniRunner, outline, partialReport, submit, treeInputs, write,
 } from './helpers/iterations.js';
 import { mockGit } from './helpers/mock-git.js';
+import { scriptedCandidates } from './helpers/candidates.js';
 import { forkDecision, localDecision, registryChange, requestPlacement, decision } from './helpers/placement.js';
 import { freeze, onlyRun, openRuns, runEventsOnDisk, runPath, staleCrashLock, startRun, until } from './helpers/runs.js';
 
@@ -852,8 +853,12 @@ describe('§12: a crash between the withdrawal commit and its record', () => {
         return 'revision-02';
       },
       async currentHead() { return 'revision-02'; },
+      async changedPaths() { return []; },
+      async commitNameStatus() { return [{ status: 'M', path: feature }]; },
     });
-    const reopened = await openRuns(root, { git: recoveryGit, inputs: treeInputs(), });
+    const expectedFeature = await readFile(join(root, feature), 'utf8');
+    const recoveredSource = scriptedCandidates(root, { 'revision-02': { tree: 'a'.repeat(40), base: 'revision-01', files: { [feature]: expectedFeature }, changes: [{ status: 'M', path: feature }] } });
+    const reopened = await openRuns(root, { git: recoveryGit, candidates: recoveredSource, inputs: treeInputs(), });
     cleanups.push(() => reopened.service.close());
     expect(reopened.recovery.effects).toEqual([`${plan}/${runId}: the withdrawal commit of sc-001`]);
     expect(lookups).toEqual([`Ramify-Run: ${runId}, Ramify-Scenarios: withdrawn-1`]);

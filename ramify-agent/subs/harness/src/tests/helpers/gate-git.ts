@@ -65,6 +65,8 @@ export interface GateGitOptions {
   readonly previews?: readonly CandidateTreePreview[] | undefined;
   /** The commit boundaries this scenario reaches, in order. */
   readonly commits: readonly GateCommit[];
+  /** Explicit dirty candidate remaining after the final scripted commit; no commit is authorized for it. */
+  readonly uncommitted?: readonly GitChange[];
   /**
    * What Git reports between two revisions the run asks about across more
    * than one boundary, such as an accepted boundary reached after a failing
@@ -243,13 +245,13 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
       expect(project).toBe(root);
       expectAgainst(base);
       record('changedPaths', base);
-      return (pending()?.changes ?? []).map(change => change.path);
+      return (pending()?.changes ?? options.uncommitted ?? []).map(change => change.path);
     },
     async changedEntries(project, base = 'HEAD') {
       expect(project).toBe(root);
       expectAgainst(base);
       record('changedEntries', base);
-      return [...(pending()?.changes ?? [])];
+      return [...(pending()?.changes ?? options.uncommitted ?? [])];
     },
     async diffNameStatus(project, from, to) {
       expect(project).toBe(root);

@@ -758,8 +758,7 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
       // the work item's gate and the run's own find nothing changed.
       commits: [
         scenarios,
-        revision('revision-01', `${dirC}/src/outcome.ts`, `${dirC}/src/tests/outcome.test.ts`, 'vitest.config.ts'),
-        revision('revision-02', 'vitest.config.ts'),
+        revision('revision-02', `${dirC}/src/outcome.ts`, `${dirC}/src/tests/outcome.test.ts`, 'vitest.config.ts'),
         unchanged,
         unchanged,
       ],
@@ -782,12 +781,12 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
     expect(refused.guardedChanges[0]!.path).toBe('vitest.config.ts');
     expect(refused.guardedChanges[0]!.authorizedBy).toBeNull();
     expect(refused.guardedChanges[0]!.after).not.toBeNull();
-    expect(refused.commit).not.toBeNull();
-    expect(refused.audited).toBe(refused.commit);
-    expect(refused.evidence).not.toBeNull();
-    // Every command of it passed: the verdict is the harness's finding, not
-    // a failing command.
-    expect(refused.commands.every(command => command.outcome === 'passed')).toBe(true);
+    expect(refused.commit).toBeNull();
+    expect(refused.audited).toBeNull();
+    expect(refused.evidence).toBeNull();
+    expect(refused.rules).toContainEqual(expect.objectContaining({ rule: 'write-scope', outcome: 'failed' }));
+    // The unauthorized candidate is refused before commands or publication.
+    expect(refused.commands.some(command => command.outcome === 'passed')).toBe(false);
     // The guarded write of the same path was refused outright: it lies
     // outside the scope, and only the shell's unguarded write reached it.
     const firstEngineer = agent!.sessions.filter(session => session.spec.role === 'engineer')[0]!;
@@ -816,9 +815,8 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
     const secondEngineer = agent!.sessions.filter(session => session.spec.role === 'engineer')[1]!;
     expect(secondEngineer.denied).toEqual([]);
     expect((await readResult(root, runId, 'wi-001', 2)).outcome).toBe('accepted');
-    // Both attempts committed what they changed before they were judged, so
-    // each verdict names a revision of its own.
-    expect([refused.commit, authorized.commit]).toEqual(['revision-01', 'revision-02']);
+    // Only the recorded authorization permits a source commit.
+    expect([refused.commit, authorized.commit]).toEqual([null, 'revision-02']);
     scripted.assertComplete();
   }, 600_000);
 
@@ -841,15 +839,9 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
           shell(`rm '${join(root, 'vitest.config.ts')}'`)),
       ],
     }, {
-      // The one attempt commits what the iteration left, a deletion
-      // included, and the run stops there.
-      commits: [scenarios, {
-        commit: 'revision-01',
-        changes: [
-          { status: 'M', path: `${dirC}/src/outcome.ts` },
-          { status: 'D', path: 'vitest.config.ts' },
-        ],
-      }],
+      // No committing gate accepts this dirty deletion.
+      commits: [scenarios],
+      uncommitted: [{ status: 'M', path: `${dirC}/src/outcome.ts` }, { status: 'D', path: 'vitest.config.ts' }],
     });
 
     expect(onlyRun(service, plan).state).toBe('failed');
@@ -862,10 +854,11 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
     // an absent file is a change like any other, never a pass.
     expect(existsSync(join(root, 'vitest.config.ts'))).toBe(false);
     expect(await stat(join(root, 'package.json')).then(() => true)).toBe(true);
-    // The deletion was committed with the rest of the attempt, and the
-    // attempt is the one this scenario scripted a revision for.
-    expect(refused.commit).toBe('revision-01');
-    expect(refused.audited).toBe('revision-01');
+    // Candidate authority refuses the deletion before any source commit.
+    expect(refused.commit).toBeNull();
+    expect(refused.audited).toBeNull();
+    expect(refused.evidence).toBeNull();
+    expect(refused.rules).toContainEqual(expect.objectContaining({ rule: 'write-scope', outcome: 'failed' }));
     scripted.assertComplete();
   }, 600_000);
 });

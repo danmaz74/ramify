@@ -48,18 +48,13 @@ describe('the policy a run captures in job.json', () => {
     }
   });
 
-  it('reads a run recorded before the names, keeping the names it mapped and none of its values', () => {
-    const parsed = checkCommandSchema.parse({
-      argv: ['npm', 'test'],
-      cwd: '/project',
-      env: { PATH: '/usr/bin', [secretName]: secretValue },
-      timeoutMs: 1000,
-    });
-
-    expect(parsed.env).toEqual(['PATH', secretName]);
-    expect(parsed.envAdditions).toEqual({});
-    expect(JSON.stringify(parsed)).not.toContain(secretValue);
+  it('refuses a historical environment map instead of executing or migrating it', () => {
+    expect(checkCommandSchema.safeParse({ argv: ['npm', 'test'], cwd: '/project',
+      env: { PATH: '/usr/bin', [secretName]: secretValue }, timeoutMs: 1000 }).success).toBe(false);
+    expect(checkCommandSchema.safeParse({ argv: ['npm', 'test'], cwd: '/project',
+      env: ['PATH'], timeoutMs: 1000 }).success).toBe(false);
   });
+
 });
 
 describe('a gate attempt', () => {

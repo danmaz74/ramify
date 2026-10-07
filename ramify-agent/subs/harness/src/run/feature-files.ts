@@ -215,8 +215,10 @@ export async function commitForMaterialization(
   message: string,
   recovering: boolean,
   git: Pick<GitService, 'findCommitByTrailers' | 'commitAccepted'>,
+  verifyRecovered: (commit: string) => Promise<void>,
+  prepareCommit?: () => Promise<void>,
 ): Promise<string | null> {
-  return commitForScenarios(projectRoot, runId, materializedTrailerValue, message, recovering, git);
+  return commitForScenarios(projectRoot, runId, materializedTrailerValue, message, recovering, git, verifyRecovered, prepareCommit);
 }
 
 /** The trailer value of a run's nth withdrawal commit; the ordinal keeps each one's identity its own. */
@@ -236,14 +238,17 @@ export async function commitForScenarios(
   message: string,
   recovering: boolean,
   git: Pick<GitService, 'findCommitByTrailers' | 'commitAccepted'>,
+  verifyRecovered: (commit: string) => Promise<void>,
+  prepareCommit?: () => Promise<void>,
 ): Promise<string | null> {
   if (recovering) {
     const existing = await git.findCommitByTrailers(projectRoot, [
       { key: runTrailer, value: runId },
       { key: scenariosTrailer, value: trailerValue },
     ]);
-    if (existing !== null) return existing;
+    if (existing !== null) { await verifyRecovered(existing); return existing; }
   }
+  await prepareCommit?.();
   return git.commitAccepted(projectRoot, message);
 }
 

@@ -288,7 +288,7 @@ describe('the materialization commit', () => {
 
   test('a live attempt commits at once, with nothing looked up', async () => {
     const git = mockGit({ commitAccepted: async () => 'made-1' });
-    expect(await commitForMaterialization('/project', 'run-1', message, false, git)).toBe('made-1');
+    expect(await commitForMaterialization('/project', 'run-1', message, false, git, async () => undefined)).toBe('made-1');
     expect(git.commitAccepted).toHaveBeenCalledWith('/project', message);
     expect(git.findCommitByTrailers).not.toHaveBeenCalled();
     expect(message.split('\n')[0]).toBe('Scenarios of demo');
@@ -297,7 +297,7 @@ describe('the materialization commit', () => {
 
   test('a recovery finds the commit by the run and scenario trailers and makes no second one', async () => {
     const git = mockGit({ findCommitByTrailers: async () => 'made-1' });
-    expect(await commitForMaterialization('/project', 'run-1', message, true, git)).toBe('made-1');
+    expect(await commitForMaterialization('/project', 'run-1', message, true, git, async () => undefined)).toBe('made-1');
     expect(git.findCommitByTrailers).toHaveBeenCalledWith('/project', [
       { key: 'Ramify-Run', value: 'run-1' },
       { key: 'Ramify-Scenarios', value: 'materialized' },
@@ -307,7 +307,7 @@ describe('the materialization commit', () => {
 
   test('a recovery that finds none makes the commit', async () => {
     const git = mockGit({ findCommitByTrailers: async () => null, commitAccepted: async () => null });
-    expect(await commitForMaterialization('/project', 'run-1', message, true, git)).toBeNull();
+    expect(await commitForMaterialization('/project', 'run-1', message, true, git, async () => undefined)).toBeNull();
     expect(git.commitAccepted).toHaveBeenCalledWith('/project', message);
   });
 });

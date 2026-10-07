@@ -267,7 +267,7 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
     // accepted, and not when the work-item gate failed over it.
     expect(git.bases('changedEntries')).toEqual(['scenarios-of-review-notes', 'revision-01']);
     expect(git.bases('diffNameStatus')).toEqual(['scenarios-of-review-notes', 'revision-01']);
-    expect(git.bases('changedPaths').at(-1)).toBe('revision-01');
+    expect(git.bases('changedPaths').at(-1)).toBe('revision-02');
     git.assertAnswered();
   }, 60_000);
 });
@@ -384,7 +384,7 @@ describe('adding work leaves every completed piece completed', () => {
     // observation was taken against the feature files' commit until
     // the repaired attempt was accepted, and against that one afterwards.
     expect(git.bases('changedPaths')).not.toContain('revision-01');
-    expect(git.bases('changedPaths').at(-1)).toBe('revision-02');
+    expect(git.bases('changedPaths').at(-1)).toBe('revision-03');
     expect(git.bases('changedEntries')).toEqual(['scenarios-of-review-notes', 'scenarios-of-review-notes', 'revision-02']);
     expect(git.bases('diffNameStatus')).toEqual(['scenarios-of-review-notes', 'revision-02']);
     git.assertAnswered();

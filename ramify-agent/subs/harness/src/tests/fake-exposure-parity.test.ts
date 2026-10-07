@@ -505,6 +505,7 @@ describe('the rule at a run\'s contract gate', () => {
       { rule: 'fake-naming', outcome: 'passed', violations: [] },
       { rule: 'fake-exposure-parity', outcome: 'passed', violations: [] },
       { rule: 'scratch-safety', outcome: 'passed', violations: [] },
+      { rule: 'write-scope', outcome: 'passed', violations: [] },
     ]);
 
     // The registered agreement names what the fake stands for.
@@ -519,6 +520,7 @@ describe('the rule at a run\'s contract gate', () => {
     expect(providerGate.rules).toEqual([
       { rule: 'fake-exposure-parity', outcome: 'passed', violations: [] },
       { rule: 'scratch-safety', outcome: 'passed', violations: [] },
+      { rule: 'write-scope', outcome: 'passed', violations: [] },
     ]);
     git.assertAnswered();
   }, 120_000);

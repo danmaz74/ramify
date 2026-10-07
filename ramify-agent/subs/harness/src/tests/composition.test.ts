@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { runEventSchema } from '../run/log.js';
 import type { GateAttempt } from '../checks/records.js';
@@ -162,6 +163,61 @@ describe('the composed runs', () => {
       }
       dirty.mockRestore(); query.mockRestore(); commit.mockRestore();
     } finally { await run.dispose(); }
+  });
+
+  test('PB3: equal captured bytes, feature tampering and later render aliases cannot bypass the actual committing gate', async () => {
+    const capturedPackage = 'subs/workspace/subs/reviews/subs/notes/subs/drafts/package.json';
+    const run = await runToEnd({ ...scenarios.iteration, target: async () => {
+      const fixture = await scenarios.iteration.target();
+      await writeFile(join(fixture.root, capturedPackage), '{"private":true}\n');
+      return fixture;
+    } });
+    const external = await mkdtemp(join(tmpdir(), 'pb3-captured-alias-'));
+    try {
+      const active = run.service['runs'].get(`${plan}/${run.runId}`)!;
+      const query = vi.spyOn(run.service['options'].ramify, 'queryOwnership');
+      const git = run.service['git'];
+      const dirty = vi.spyOn(git, 'changedPaths');
+      const commit = vi.spyOn(git, 'commitAccepted');
+      const before = commit.mock.calls.length;
+      const config = 'ramify-agent.json';
+      const bytes = await readFile(join(run.root, config));
+      await writeFile(join(external, 'same-config.json'), bytes);
+      await rm(join(run.root, config)); await symlink(join(external, 'same-config.json'), join(run.root, config));
+      const feature = run.service['writtenFeatures'](active)[0]!;
+      const declaration = join(run.root, 'subs/workspace/subs/reviews/subs/notes/module.ramify');
+      const originalDeclaration = await readFile(declaration, 'utf8');
+      const variants = [config, feature.path, feature.path, feature.path, capturedPackage];
+      for (const [index, path] of variants.entries()) {
+        if (index === 1) {
+          await rm(join(run.root, config)); await writeFile(join(run.root, config), bytes);
+          await writeFile(join(run.root, feature.path), 'tampered ledger feature bytes\n');
+        } else if (index === 2) {
+          await writeFile(join(external, 'external.feature'), 'external bytes must survive\n');
+          await rm(join(run.root, feature.path)); await symlink(join(external, 'external.feature'), join(run.root, feature.path));
+        } else if (index === 3) {
+          await rm(join(run.root, feature.path)); await writeFile(join(run.root, feature.path), feature.content);
+          await writeFile(declaration, `${originalDeclaration}\nexternal "${feature.path.slice('subs/workspace/subs/reviews/subs/notes/'.length)}"\n`);
+        } else if (index === 4) {
+          // Exact captured package bytes remain regular and unchanged, but a
+          // newly declared independent tree requires its own included entry.
+          await writeFile(declaration, `${originalDeclaration}\nowned-nested-project "subs/drafts"\n`);
+          const assignment = JSON.parse(await readFile(join(runDirectory(run.root, run.runId), 'work-items/wi-001/iterations/01/assignment.json'), 'utf8'));
+          expect(assignment.guarded).toContainEqual({ path: capturedPackage, hash: expect.any(String) });
+        }
+        dirty.mockResolvedValue([path]); query.mockClear();
+        const id = `ga-091${index}`;
+        const attempt = await run.service['committingCheckpoint'](active, {
+          id, runId: run.runId, checkpoint: 'work-item', projectRoot: run.root,
+          directory: active.path(`gates/${id}`), head: 'source-01', policy: active.record.policy, subject: { workItem: 'wi-001' },
+        });
+        expect(attempt.rules?.find(rule => rule.rule === 'write-scope')?.outcome).toBe('failed');
+        expect(attempt.commit).toBeNull(); expect(query).toHaveBeenCalledTimes(1);
+        expect(commit.mock.calls).toHaveLength(before);
+      }
+      expect(await readFile(join(external, 'external.feature'), 'utf8')).toBe('external bytes must survive\n');
+      dirty.mockRestore(); query.mockRestore(); commit.mockRestore();
+    } finally { await run.dispose(); await rm(external, { recursive: true, force: true }); }
   });
 
   test('each scenario runs to the end it is written for, and asks Git exactly what it states', () => {

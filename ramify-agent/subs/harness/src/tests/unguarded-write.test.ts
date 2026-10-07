@@ -11,17 +11,16 @@ import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import {
   addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, read, shell, submit, treeInputs,
 } from './helpers/iterations.js';
-import { git, initRepository, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
+import { git, initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 
 /*
  * The guard this plan names: a write the guard cannot see appears in
  * `git status` when the writer settles and in `outsideScope`.
  *
- * The shell is unguarded by design. Nothing here blocks it, and nothing here
- * claims it was blocked. What the harness owes instead is the record: the
- * command, the coverage gap, the tree afterwards, and the paths of it that
- * lie outside the scope the assignment recorded.
+ * The shell mutation reaches disk without interception. Its command, coverage
+ * gap and outside paths remain observable; committing checkpoints reject
+ * candidate bytes that have no originating captured and current authority.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -58,7 +57,7 @@ async function observationsOf(root: string, runId: string, invocation: string): 
 }
 
 describe('X6: an unguarded shell mutation and an outside read make the MVP\'s limits visible', () => {
-  test('the write is reported and not blocked: it is in git status, in outsideScope and in the coverage gap', async () => {
+  test('the shell write reaches disk and is recorded, while candidate gates refuse to commit it', async () => {
     const root = await target();
     const { service } = await openRuns(root, {
       git: gitService,
@@ -73,7 +72,7 @@ describe('X6: an unguarded shell mutation and an outside read make the MVP\'s li
           read(join(root, 'subs/workspace/subs/reviews/src/session.ts')),
           // The guarded write, inside the scope.
           edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
-          // The unguarded write, outside it. Nothing refuses this.
+          // The shell writes outside the scope; the later commit gate refuses it.
           shell(`printf 'export const outside = true;\\n' > '${join(root, outsidePath)}'`),
         )],
       }),
@@ -82,7 +81,7 @@ describe('X6: an unguarded shell mutation and an outside read make the MVP\'s li
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
     const runId = receipt.jobId;
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(onlyRun(service, 'review-notes').state).toBe('failed');
 
     // The write happened. The guard did not see it and did not stop it.
     expect((await stat(join(root, outsidePath))).isFile()).toBe(true);
@@ -141,11 +140,16 @@ describe('X6: an unguarded shell mutation and an outside read make the MVP\'s li
     expect(lines.coverage).toBe('partial');
     expect(lines.gaps.some(gap => gap.startsWith('unguarded-shell'))).toBe(true);
 
-    // The harness never resets or reverts: the iteration's accepted commit
-    // carries what the shell wrote, and the record is what says it was
-    // outside the scope. The work-item gate's commit after it holds the
-    // feature file its completion request declared.
-    const committed = await git(root, 'show', '--name-only', '--format=', result.commit!);
-    expect(committed).toContain(outsidePath);
+    expect(result.commit).toBeNull();
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    const gateEvents = events.filter(event => event.type === 'gate-attempted');
+    expect(gateEvents.length).toBeGreaterThan(0);
+    for (const event of gateEvents) {
+      const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate(event.data.gate)), 'utf8'));
+      expect(attempt.commit).toBeNull();
+      expect(attempt.rules).toContainEqual(expect.objectContaining({ rule: 'write-scope', outcome: 'failed',
+        violations: expect.arrayContaining([expect.objectContaining({ path: outsidePath })]) }));
+    }
+    expect(await git(root, 'log', '--all', '--format=%s')).not.toContain('wi-001.i01');
   }, 300_000);
 });

@@ -330,6 +330,7 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
       { rule: 'fake-naming', outcome: 'passed', violations: [] },
       { rule: 'fake-exposure-parity', outcome: 'passed', violations: [], limits: [expect.stringContaining('the architect view records no such original')] },
       { rule: 'scratch-safety', outcome: 'passed', violations: [] },
+      { rule: 'write-scope', outcome: 'passed', violations: [] },
     ]);
 
     // The provider's gate ran the same suite, and its assignment carried the

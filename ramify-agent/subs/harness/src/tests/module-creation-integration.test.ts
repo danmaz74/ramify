@@ -140,7 +140,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
     // The bootstrap authority came from the accepted registry entry, and it
     // reaches a directory that did not exist.
     expect(assignment.scope.bootstrap.map(entry => entry.directory)).toEqual([notesDirectory]);
-    expect(assignment.scope.resolved.roots.some(path => path.endsWith(`${notesDirectory}/src`))).toBe(true);
+    expect(assignment.scope.resolved.roots.some(path => path.endsWith(notesDirectory))).toBe(true);
 
     const result = await readResult(root, runId, 1);
     expect(result.outcome).toBe('accepted');

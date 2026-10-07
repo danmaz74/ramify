@@ -270,6 +270,12 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
       check(() => expect(from, `the revision ${to} was asked against`).toBe(responses.commits[index]!.against));
       return responses.commits[index]!.changes?.map(change => ({ status: change.status, path: change.path })) ?? [];
     },
+    async commitNameStatus(project, commit) {
+      asked('commitNameStatus', project);
+      const response = responses.commits.find(response => response.commit === commit);
+      if (response === undefined) unanswered(`No commit entries are stated for ${commit}`);
+      return response?.changes?.map(change => ({ ...change })) ?? [];
+    },
     async worktreeLineChanges(project, base = 'HEAD') {
       asked('worktreeLineChanges', project);
       check(() => expect(base, 'the accepted boundary the line measurement was asked against').toBe(responses.commits[cursor]?.against ?? responses.after ?? responses.head));

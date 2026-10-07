@@ -110,7 +110,7 @@ describe('G8: one small work item completes in one iteration', () => {
       checkpoint: 'iteration',
       tests: { policy: 'owned-by-scope', exactOwners: [notes], subtrees: [], extraSuites: [] },
     });
-    expect(assignment.scope.resolved.roots.some(path => path.endsWith(`${notesDirectory}/src`))).toBe(true);
+    expect(assignment.scope.resolved.roots.some(path => path.endsWith(notesDirectory))).toBe(true);
     expect(assignment.guarded.map(file => file.path)).toContain('package.json');
 
     const result = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;

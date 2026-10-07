@@ -541,7 +541,7 @@ test('CM19: a failed run says failed at run level only; a capability keeps its l
         outlines: [],
         iterations: [{
           id: 'wi-001.i02', kind: 'implementation', stage: 0, goal: 'Send the note', approach: 'non-breaking',
-          scope: { modules: ['collection-review/workspace/reviews'], includedChildren: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
+          scope: { modules: ['collection-review/workspace/reviews'], included: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
           checkpoint: 'iteration', completionEvidence: 'Its tests pass.', authorizations: [],
           result: { outcome: 'exhausted', gate: 'ga-0005', commit: null, findings: [], changedAssumptions: [], recommendation: null, failure: null },
           gates: [{ id: 'ga-0005', checkpoint: 'iteration', verdict: 'failed', cause: 'in-scope', next: 'exhausted', repairRound: 3 }],
@@ -584,7 +584,7 @@ test('an iteration whose engineer ended without a result shows the digest and th
         outlines: [],
         iterations: [{
           id: 'wi-001.i01', kind: 'ordinary', stage: 0, goal: 'Send the note', approach: 'Change the source.',
-          scope: { modules: ['collection-review/workspace/reviews'], includedChildren: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
+          scope: { modules: ['collection-review/workspace/reviews'], included: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
           checkpoint: 'iteration', completionEvidence: 'Its tests pass.', authorizations: [],
           result: {
             outcome: 'partial', gate: null, commit: null, changedAssumptions: [], recommendation: null,
@@ -820,7 +820,7 @@ test('an iteration shows the assignment package its engineer received, or why it
   const text = '# Package\n\n## Functional requirements\n\n- fr-001: A reviewer can attach a note to a review.\n';
   const iteration = (id: string, extra: Record<string, unknown>) => ({
     id, kind: 'ordinary', stage: 0, goal: 'Send the note', approach: 'Change the source.',
-    scope: { modules: ['collection-review/workspace/reviews'], includedChildren: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
+    scope: { modules: ['collection-review/workspace/reviews'], included: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
     checkpoint: 'iteration', completionEvidence: 'Its tests pass.', authorizations: [], result: null, gates: [], invocations: [], ...extra,
   });
   const run: StubRun = {

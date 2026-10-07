@@ -24,7 +24,7 @@ import { commandResult } from './command-result.js';
 import { scriptedScenarioRun } from './project-config.js';
 import { announcingCheckExecution, createPassingCheckExecution } from './direct-check-execution.js';
 import { deleted, modified, scenarioGit, untracked, type GitResponses, type ScenarioGit } from './recovery-git.js';
-import { scriptedCandidates } from './candidates.js';
+import { scriptedCandidates, type ScriptedCommit } from './candidates.js';
 import {
   staleCrashLock, freeze, installTestRunner, openRuns, shapeOnlyInputs, startRun, stopRun, testPolicy,
   type OpenRunsOptions,
@@ -950,11 +950,11 @@ export function compositionGit(root: string, scenario: Scenario): ScenarioGit {
 }
 
 /** Only the revision audited by a completed scenario has a scripted candidate tree. */
-export function compositionCandidates(root: string, scenario: Scenario) {
+export function compositionCandidates(root: string, scenario: Scenario, producers: Readonly<Record<string, ScriptedCommit>> = {}) {
   const final = scenario.finalCandidate;
-  return scriptedCandidates(root, final === undefined ? {} : {
+  return scriptedCandidates(root, { ...(final === undefined ? {} : {
     [final.head]: { tree: final.tree, files: {}, base: scenario.git.head, changes: [] },
-  });
+  }), ...producers });
 }
 
 /**

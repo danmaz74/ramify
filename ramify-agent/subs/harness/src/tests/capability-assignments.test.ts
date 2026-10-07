@@ -267,3 +267,26 @@ async function stopAfterArchitectYield(service: Awaited<ReturnType<typeof openCa
   }
   throw new Error('The architect did not yield a stable stop version');
 }
+
+
+test('PB3: unreadable inherited directory bytes cannot be captured as absent authority', async () => {
+  const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
+  await initRepository(fixture.root); await installMiniRunner(fixture.root);
+  const baseScript = script([]);
+  let unreadableCandidate = false;
+  const git = Object.assign(Object.create(gitService), {
+    changedPaths: async (root: string, base?: string) => unreadableCandidate ? ['subs/a/src'] : gitService.changedPaths(root, base),
+  });
+  const opened = await openCapabilityRuns(fixture.root, { git, inputs: treeInputs(), script: spec => {
+    const steps = typeof baseScript === 'function' ? baseScript(spec) : baseScript;
+    if (spec.role === 'capability-architect' && steps.some(step => step.kind === 'submit' && (step.input as { kind?: string }).kind === 'assign')) unreadableCandidate = true;
+    return steps;
+  } });
+  cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('need'));
+  await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'), 60_000);
+  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  const failure = events.find(event => event.type === 'job-failed');
+  expect(failure?.data).toMatchObject({ reason: 'internal', message: expect.stringContaining('EISDIR') });
+  expect(events.filter(event => event.type === 'capability-assigned')).toEqual([]);
+}, 90_000);

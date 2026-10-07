@@ -38,6 +38,14 @@ describe('the accepted source boundary', () => {
     expect(acceptedCommit(entries, 'base')).toBe('B');
   });
 
+  test('a completed exact producer reword advances the boundary while an unfinished effect does not', () => {
+    const materialized: AcceptedBoundaryLine = { transaction: { event: { type: 'scenarios-materialized', data: { commit: 'features' } }, records: [] } };
+    const intent: AcceptedBoundaryLine = { transaction: { event: { type: 'scenarios-rewording', data: {} }, records: [] } };
+    const completion: AcceptedBoundaryLine = { transaction: { event: { type: 'scenarios-reworded', data: { commit: 'reworded' } }, records: [] } };
+    expect(acceptedCommit([materialized, intent], 'base')).toBe('features');
+    expect(acceptedCommit([materialized, intent, completion], 'base')).toBe('reworded');
+  });
+
   test('a passed committing attempt must name what it audited', () => {
     expect(() => acceptedCommit([line('ga-0001', 'iteration', 'passed', null, null)], 'base'))
       .toThrow('Passed committing gate ga-0001 has no audited commit');

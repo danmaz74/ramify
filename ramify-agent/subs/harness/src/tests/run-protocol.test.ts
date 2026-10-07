@@ -156,7 +156,7 @@ describe('C1: a run completes with no client, and a client attached afterwards r
     await opened.service.settled(plan, runId);
     await opened.service.close();
     const onDisk = await runEventsOnDisk(root, plan, runId);
-    expect(onDisk.at(-1)!.type).toBe('job-completed');
+    expect(onDisk.at(-1)!.type, JSON.stringify(onDisk.slice(-20))).toBe('job-completed');
     fixtures.get(root)!.git.assertComplete();
 
     // A client attaches afterwards, to a harness that has just loaded the run.
@@ -243,6 +243,7 @@ describe('every query of a completed run, over HTTP', () => {
     const decisions = decisionListResponseSchema.parse((await get(server, protocolPaths.runDecisions(plan, runId))).body);
     expect(decisions.decisions.filter(decision => decision.kind === 'scope').map(decision => decision.kind === 'scope' && [decision.iteration, decision.modules])).toEqual([
       ['wi-001.i01', [notes]],
+      ['wi-001.i02', ['collection-review/workspace/reviews']],
       ['wi-002.i01', [drafts]],
     ]);
     // Each outline revision is a plan decision: the one the assignment came
@@ -257,8 +258,9 @@ describe('every query of a completed run, over HTTP', () => {
       ['wi-002', 'completed', 'note-drafts'],
     ]);
     const detail = workItemResponseSchema.parse((await get(server, protocolPaths.runWorkItem(plan, runId, 'wi-001'))).body);
-    expect(detail.iterations).toHaveLength(1);
-    expect(detail.iterations[0]!.result?.outcome).toBe('accepted');
+    expect(detail.iterations).toHaveLength(2);
+    expect(detail.iterations[0]!.result?.outcome).toBe('partial');
+    expect(detail.iterations[1]!.result?.outcome).toBe('accepted');
     const engineer = detail.iterations[0]!.invocations.find(invocation => invocation.role === 'engineer')!;
     expect(engineer.outsideScope).toContain(outsidePath);
 
@@ -558,7 +560,9 @@ describe('a record of an unsupported version', () => {
     expect(status).toBe(422);
     const error = errorResponseSchema.parse(body).error;
     expect(error.code).toBe('unsupported-version');
-    expect(error.evidence).toEqual([`plans/${plan}/.harness/jobs/${runId}/job.json`, 'declares ramify-agent.job/4']);
+    expect(error.message).toContain('(missing policy)');
+    expect(error.message).toContain('run-policy/7');
+    expect(error.message).toContain('fresh run is required');
     for (const path of [protocolPaths.runEvents(plan, runId, 0), protocolPaths.runMetrics(plan, runId), protocolPaths.runGate(plan, runId, 'ga-0001')]) {
       expect(errorResponseSchema.parse((await get(server, path)).body).error.code).toBe('unsupported-version');
     }
@@ -566,7 +570,7 @@ describe('a record of an unsupported version', () => {
     const list = runListResponseSchema.parse((await get(server, protocolPaths.runs(plan))).body);
     expect(list.unserved).toEqual([{
       jobId: runId, path: `plans/${plan}/.harness/jobs/${runId}/job.json`, code: 'unsupported-version',
-      message: expect.stringContaining('ramify-agent.job/4'),
+      message: expect.stringContaining('fresh run is required'),
     }]);
 
     // A run that does not exist is `not-found`; the difference is the point.

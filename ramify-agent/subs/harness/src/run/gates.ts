@@ -186,12 +186,14 @@ export async function commitForGate(
   message: string,
   signal?: AbortSignal,
   git: Pick<GitService, 'findCommitByTrailers' | 'commitAccepted'> = gitService,
+  prepareCommit?: () => Promise<void>,
 ): Promise<string | null> {
   const existing = await git.findCommitByTrailers(projectRoot, [
     { key: runTrailer, value: runId },
     { key: gateTrailer, value: gateId },
   ], signal);
   if (existing !== null) return existing;
+  await prepareCommit?.();
   return git.commitAccepted(projectRoot, message, signal);
 }
 

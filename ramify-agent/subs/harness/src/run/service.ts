@@ -2409,7 +2409,7 @@ export class RunService {
 
   private refuseEarlierPolicy(planId: string, runId: string): void {
     const recorded = this.refusedPolicies.get(key(planId, runId));
-    if (recorded !== undefined) throw new CommandRejection('conflict', `Run policy ${recorded} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
+    if (recorded !== undefined) throw new CommandRejection('unsupported-version', `Run policy ${recorded} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`, undefined, [`plans/${planId}/.harness/jobs/${runId}/${runLayout.record}`]);
   }
 
   private async load(): Promise<RunRecoveryReport> {
@@ -6559,10 +6559,10 @@ export class RunService {
       intent: { event: run.log.next({ type: 'scenarios-rewording', data }), records: [...records] },
       perform: async () => {
         const tracked = trackedScenarios(run.log.ledger.replay());
-        await rerenderFeatureFiles(this.projectRoot, expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }));
+        const expected = expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId });
         const message = rewordingMessage({ runId: run.record.jobId, rewording: data.rewording, deviation: data.deviation, scenarios: data.scenarios, files: data.files });
         await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
-        const commit = await commitForScenarios(this.projectRoot, run.record.jobId, rewordedTrailerValue(data.rewording), message, recovering, this.git);
+        const commit = await commitForScenarios(this.projectRoot, run.record.jobId, rewordedTrailerValue(data.rewording), message, recovering, this.git, commit => this.verifyProducerCommit(expected, commit), () => this.renderProducerFeatures(run, expected));
         return { commit: commit ?? await this.git.currentHead(this.projectRoot) };
       },
       complete: result => ({ event: run.log.next({ type: 'scenarios-reworded', data: { deviation: data.deviation, commit: result.commit } }), records: [] }),
@@ -8054,7 +8054,10 @@ export class RunService {
       }
       const startingTree = (await this.previewCandidateTree()).tree;
       const startingPaths = await Promise.all((await this.git.changedPaths(this.projectRoot, this.accepted(run)))
-        .map(async path => ({ path, hash: await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(() => null) })));
+        .map(async path => ({ path, hash: await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(error => {
+          if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+          throw error;
+        }) })));
       assignment = await this.buildIterationAssignment(run, {
         id, item, basis: planRef,
         coordination: { kind: 'capability-task', id: task.id, sequence, plan: planRef, startingTree, startingPaths },
@@ -10604,63 +10607,7 @@ export class RunService {
     const typeCheckOutput = 'config' in captured ? captured.config.typeCheck?.output : undefined;
     const setup = 'config' in captured ? captured.config.setup : undefined;
     const scratch = await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
-    const ledger = run.log.ledger.replay();
-    const committed = committedRecords(ledger);
-    const assignments = request.subject?.iteration !== undefined
-      ? [committed.assignments.get(request.subject.iteration)].filter((entry): entry is IterationAssignment => entry !== undefined)
-      : [...committed.assignments.values()].filter(entry => request.subject?.workItem === undefined || entry.workItem === request.subject.workItem || (entry.coordination?.kind === 'capability-task' && entry.coordination.id === request.subject.workItem));
-    // Only authority co-committed with actual run assignments can cover a
-    // later checkpoint. A rejected iteration's dirty files get no shortcut.
-    const origins: Array<{ scope: WriteScope; guarded: readonly { path: string; hash: string | null }[];
-      authorizations: readonly { path: string }[]; inherited: readonly { path: string; hash: string | null }[] }> = assignments.map(assignment => ({
-        scope: assignment.scope, guarded: assignment.guarded, authorizations: assignment.authorizations,
-        inherited: assignment.coordination?.kind === 'capability-task' ? assignment.coordination.startingPaths : [],
-      }));
-    if (request.checkpoint === 'final') {
-      for (const entry of ledger) {
-        if (entry.transaction.event.type !== 'nonfunctional-repair-assigned') continue;
-        const event = entry.transaction.event;
-        const records = entry.transaction.records.filter(record => record.path === runLayout.nonfunctionalRepairAssignment(event.data.assignment)
-          && record.id === event.data.assignment && record.revision === 1);
-        if (records.length !== 1) throw new Error('Final checkpoint has an unavailable committed repair authority');
-        const repair = nonfunctionalRepairAssignmentSchema.parse(records[0]!.body);
-        origins.push({ scope: repair.scope, guarded: repair.guarded, authorizations: [], inherited: [] });
-      }
-    }
-    const scopeRules: GateRuleRecord[] = [];
-    try {
-      const changed = await this.git.changedPaths(this.projectRoot, this.accepted(run));
-      const paths = await placementPaths(this.projectRoot, changed);
-      // One decoded answer and input identity for the entire gate, including
-      // logical aliases and their real targets across every captured origin.
-      const current = changed.length === 0 ? undefined : await this.options.ramify.queryOwnership(this.projectRoot, paths);
-      const permitted = new Set<string>();
-      const harnessDenied = await this.deniedFiles(run);
-      for (const origin of origins) {
-        const guard = guardedScopeOf(origin.scope, await deniedFiles(this.projectRoot,
-          [...harnessDenied, ...origin.guarded.filter(file => !origin.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify, current);
-        const candidate: string[] = [];
-        for (const path of changed) {
-          const prior = origin.inherited.find(entry => entry.path === path);
-          const capturedFile = origin.guarded.find(entry => entry.path === path);
-          const hash = prior === undefined && capturedFile === undefined ? undefined : await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(error => {
-            if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
-            throw error;
-          });
-          // Exact unchanged captured harness effects and inherited parent bytes
-          // are not this writer's changes; null means actual absence only.
-          if ((prior !== undefined && hash === prior.hash) || (capturedFile !== undefined && hash === capturedFile.hash)) permitted.add(path);
-          else candidate.push(path);
-        }
-        const outside = new Set(await outsideScope(this.projectRoot, guard, candidate));
-        for (const path of candidate) if (!outside.has(path)) permitted.add(path);
-      }
-      const outside = changed.filter(path => !permitted.has(path));
-      scopeRules.push({ rule: 'write-scope', outcome: outside.length === 0 ? 'passed' : 'failed',
-        violations: outside.map(path => ({ rule: 'write-scope', path, detail: 'Candidate change has no originating captured and current write authority' })) });
-    } catch (error) {
-      scopeRules.push({ rule: 'write-scope', outcome: 'failed', violations: [{ rule: 'write-scope', path: '.', detail: `Candidate ownership is unavailable: ${message(error)}` }] });
-    }
+    const { rules: scopeRules, ownership } = await this.candidateAuthority(run, request);
     const prepared = await prepareCheckpoint({
       ...request,
       rules: [...(request.rules ?? []), scratch, ...scopeRules],
@@ -10676,7 +10623,104 @@ export class RunService {
       await this.afterWrite('gate-committed', run.record.jobId);
       return prepared;
     }
-    return this.commitGate(run, prepared, summary, modules, goal, undefined, binding);
+    return this.commitGate(run, prepared, summary, modules, goal, undefined, binding, ownership);
+  }
+
+  /** The same captured/current origin authority guards live and restarted candidate commits. */
+  private async candidateAuthority(run: Run, request: Pick<CheckpointRequest, 'checkpoint' | 'subject'>) {
+    const ledger = run.log.ledger.replay();
+    const committed = committedRecords(ledger);
+    const assignments = request.subject?.iteration !== undefined
+      ? [committed.assignments.get(request.subject.iteration)].filter((entry): entry is IterationAssignment => entry !== undefined)
+      : [...committed.assignments.values()].filter(entry => request.subject?.workItem === undefined || entry.workItem === request.subject.workItem || (entry.coordination?.kind === 'capability-task' && entry.coordination.id === request.subject.workItem));
+    // Only authority co-committed with actual run assignments can cover a
+    // later checkpoint. A rejected iteration's dirty files get no shortcut.
+    const origins: Array<{ scope: WriteScope; guarded: readonly { path: string; hash: string | null }[];
+      authorizations: readonly { path: string }[]; inherited: readonly { path: string; hash: string | null }[]; parent?: IterationAssignment }> = assignments.map(assignment => {
+        const task = assignment.coordination?.kind === 'capability-task' ? committed.capabilityTasks.get(assignment.coordination.id) : undefined;
+        const parent = task === undefined ? undefined : committed.assignments.get(task.originatingAssignment);
+        const related = task !== undefined && parent !== undefined && (task.parent.kind === 'work-item' ? parent.workItem === task.parent.id : parent.coordination?.kind === 'capability-task' && parent.coordination.id === task.parent.id);
+        return ({
+        scope: assignment.scope, guarded: assignment.guarded, authorizations: assignment.authorizations,
+        inherited: assignment.coordination?.kind === 'capability-task' ? assignment.coordination.startingPaths : [],
+        ...(related ? { parent } : {}),
+      }); });
+    if (request.checkpoint === 'final') {
+      for (const entry of ledger) {
+        if (entry.transaction.event.type !== 'nonfunctional-repair-assigned') continue;
+        const event = entry.transaction.event;
+        const records = entry.transaction.records.filter(record => record.path === runLayout.nonfunctionalRepairAssignment(event.data.assignment)
+          && record.id === event.data.assignment && record.revision === 1);
+        if (records.length !== 1) throw new Error('Final checkpoint has an unavailable committed repair authority');
+        const repair = nonfunctionalRepairAssignmentSchema.parse(records[0]!.body);
+        origins.push({ scope: repair.scope, guarded: repair.guarded, authorizations: [], inherited: [] });
+      }
+    }
+    const scopeRules: GateRuleRecord[] = [];
+    let ownership: Awaited<ReturnType<RamifyCli['queryOwnership']>> | undefined;
+    try {
+      const changed = await this.git.changedPaths(this.projectRoot, this.accepted(run));
+      const paths = await placementPaths(this.projectRoot, [...changed, ...this.expectedFeatures(run).map(file => file.path)]);
+      // One decoded answer and input identity for the entire gate, including
+      // logical aliases and their real targets across every captured origin.
+      const current = paths.length === 0 ? undefined : await this.options.ramify.queryOwnership(this.projectRoot, paths);
+      ownership = current;
+      await this.validateFeatureTargets(this.expectedFeatures(run), current);
+      const permitted = new Set<string>();
+      // Only exact regular canonical bytes from the ledger's last producer
+      // rendering are harness effects; arbitrary feature edits remain denied.
+      const rendered = new Map(expectedFeatureHashes(this.writtenFeatures(run)).map(file => [file.path, file.hash]));
+      for (const path of changed) {
+        const expected = rendered.get(path);
+        if (expected !== undefined && await this.renderedFeatureAllowed(path, expected, current)) permitted.add(path);
+      }
+      const harnessDenied = await this.deniedFiles(run);
+      for (const origin of origins) {
+        const guard = guardedScopeOf(origin.scope, await deniedFiles(this.projectRoot,
+          [...harnessDenied, ...origin.guarded.filter(file => !origin.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify, current);
+        const candidate: string[] = [];
+        for (const path of changed) {
+          const prior = origin.inherited.find(entry => entry.path === path);
+          const capturedFile = origin.guarded.find(entry => entry.path === path);
+          const hash = prior === undefined && capturedFile === undefined ? undefined : await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(error => {
+            if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+            throw error;
+          });
+          // Exact unchanged captured harness effects and inherited parent bytes
+          // are not this writer's changes; null means actual absence only.
+          const unchangedBytes = (prior !== undefined && hash === prior.hash) || (capturedFile !== undefined && hash === capturedFile.hash);
+          const physical = unchangedBytes ? await resolveRealTarget(this.projectRoot, path) : undefined;
+          const info = unchangedBytes ? await lstat(join(this.projectRoot, path)).catch(error => {
+            if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+            throw error;
+          }) : undefined;
+          const unchangedIdentity = unchangedBytes && physical?.ok && physical.resolved === resolve(this.projectRoot, path)
+            && (hash === null ? info === null : info?.isFile() === true);
+          let unchangedAuthority = false;
+          if (unchangedIdentity && capturedFile !== undefined && hash === capturedFile.hash) {
+            // The exact captured input is a harness effect, while current
+            // nested/excluded topology still narrows that file's permission.
+            const input = { ...origin.scope, resolved: { ...origin.scope.resolved, files: [...origin.scope.resolved.files, resolve(this.projectRoot, path)] } };
+            unchangedAuthority = (await outsideScope(this.projectRoot, guardedScopeOf(input, [], this.options.ramify, current), [path])).length === 0;
+          }
+          if (unchangedIdentity && !unchangedAuthority && prior !== undefined && hash === prior.hash && origin.parent !== undefined) {
+            const parent = origin.parent;
+            const parentGuard = guardedScopeOf(parent.scope, await deniedFiles(this.projectRoot, [...harnessDenied, ...parent.guarded.filter(file => !parent.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify, current);
+            unchangedAuthority = (await outsideScope(this.projectRoot, parentGuard, [path])).length === 0;
+          }
+          if (unchangedAuthority) permitted.add(path);
+          else candidate.push(path);
+        }
+        const outside = new Set(await outsideScope(this.projectRoot, guard, candidate));
+        for (const path of candidate) if (!outside.has(path)) permitted.add(path);
+      }
+      const outside = changed.filter(path => !permitted.has(path));
+      scopeRules.push({ rule: 'write-scope', outcome: outside.length === 0 ? 'passed' : 'failed',
+        violations: outside.map(path => ({ rule: 'write-scope', path, detail: 'Candidate change has no originating captured and current write authority' })) });
+    } catch (error) {
+      scopeRules.push({ rule: 'write-scope', outcome: 'failed', violations: [{ rule: 'write-scope', path: '.', detail: `Candidate ownership is unavailable: ${message(error)}` }] });
+    }
+    return { rules: scopeRules, ownership };
   }
 
   /**
@@ -10702,6 +10746,7 @@ export class RunService {
     goal?: string,
     recordedMessage?: string,
     binding?: { candidateId: string; assessment: Assessment },
+    ownership?: Awaited<ReturnType<RamifyCli['queryOwnership']>>,
   ): Promise<GateAttempt> {
     const identity = prepared.request;
     // A reader, a reviewer or a failure analyst, contributed nothing to the
@@ -10734,14 +10779,22 @@ export class RunService {
         // The feature files go into the gate's commit as the states now
         // render them; the guarded comparison before this effect judged the
         // tree against the rendering the assignment captured.
-        const rendering = await this.rerenderScenarios(run);
-        if (binding !== undefined) {
-          if (rendering.written.length > 0) throw new CandidateDriftError('Final gate rendering changed the assessed candidate');
-          const current = await this.previewCandidateTree();
-          if (current.tree !== binding.assessment.candidate.tree) throw new CandidateDriftError('Final gate source changed after assessment');
-        }
-        await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
-        const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git);
+        const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git, async () => {
+          let currentOwnership = ownership;
+          if (recordedMessage !== undefined) {
+            const candidate = await this.candidateAuthority(run, { checkpoint: prepared.checkpoint, subject: identity.subject });
+            const refusal = candidate.rules.find(rule => rule.outcome !== 'passed');
+            if (refusal !== undefined) throw new Error(`Recovered gate candidate has no current captured authority: ${refusal.violations.map(entry => `${entry.path}: ${entry.detail}`).join('; ')}`);
+            currentOwnership = candidate.ownership;
+          }
+          const rendering = await this.rerenderScenarios(run, currentOwnership);
+          if (binding !== undefined) {
+            if (rendering.written.length > 0) throw new CandidateDriftError('Final gate rendering changed the assessed candidate');
+            const current = await this.previewCandidateTree();
+            if (current.tree !== binding.assessment.candidate.tree) throw new CandidateDriftError('Final gate source changed after assessment');
+          }
+          await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+        });
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;
         const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit,
@@ -11034,17 +11087,70 @@ export class RunService {
       intent: { event: run.log.next({ type: 'scenarios-materializing', data: { files } }), records: [] },
       perform: async () => {
         await this.afterWrite('scenarios-materializing', run.record.jobId);
-        await rerenderFeatureFiles(this.projectRoot, expected);
         const message = materializationMessage({
           planId: run.record.planId, runId: run.record.jobId, files, scenarios: trackedScenarios(run.log.ledger.replay()).records.length,
         });
         await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
-        const commit = await commitForMaterialization(this.projectRoot, run.record.jobId, message, recovering, this.git);
+        const commit = await commitForMaterialization(this.projectRoot, run.record.jobId, message, recovering, this.git, commit => this.verifyProducerCommit(expected, commit), () => this.renderProducerFeatures(run, expected));
         await this.afterWrite('scenarios-committed', run.record.jobId);
         return { commit, files };
       },
       complete: result => ({ event: run.log.next({ type: 'scenarios-materialized', data: result }), records: [] }),
     }));
+  }
+
+  /** Recovery proves producer content from Git objects, not merely matching trailers. */
+  private async verifyProducerCommit(files: readonly RenderedFeatureFile[], commit: string): Promise<void> {
+    const expected = new Map(files.map(file => [file.path, file.content]));
+    const changed = await this.git.commitNameStatus(this.projectRoot, commit, undefined, { requireSingleParent: true });
+    if (changed.some(change => !expected.has(change.path) || change.status === 'D')) throw new Error(`Recovered scenario producer commit ${commit} includes unrelated paths`);
+    const entries = await this.candidates.treeEntries(this.projectRoot, commit);
+    for (const [path, content] of expected) {
+      if (!entries.some(entry => entry.path === path && ['file', 'executable'].includes(entry.kind)) ||
+          await this.candidates.readBlob(this.projectRoot, commit, path) !== content) throw new Error(`Recovered scenario producer commit ${commit} does not contain exact rendered bytes: ${path}`);
+    }
+  }
+
+  /** Exact ledger-owned feature bytes cannot borrow authority through an alias. */
+  private async renderedFeatureAllowed(path: string, hash: string, answer?: Awaited<ReturnType<RamifyCli['queryOwnership']>>): Promise<boolean> {
+    const logical = resolve(this.projectRoot, path);
+    const target = await resolveRealTarget(this.projectRoot, path);
+    if (!target.ok || target.resolved !== logical || !(await lstat(logical).catch(() => null))?.isFile()) return false;
+    const seed = answer?.selection.paths.find(seed => seed.path === path);
+    if (seed?.status !== 'owned' || seed.exclusion !== null) return false;
+    return sha256(await readFile(logical)) === hash;
+  }
+
+  /** Every producer write uses canonical ordinary targets from one coherent public answer. */
+  private async validateFeatureTargets(expected: readonly RenderedFeatureFile[], ownership?: Awaited<ReturnType<RamifyCli['queryOwnership']>>) {
+    const paths = expected.map(file => file.path);
+    const answer = ownership ?? (paths.length === 0 ? undefined : await this.options.ramify.queryOwnership(this.projectRoot, await placementPaths(this.projectRoot, paths)));
+    for (const path of paths) {
+      const target = await resolveRealTarget(this.projectRoot, path);
+      const seed = answer?.selection.paths.find(seed => seed.path === path);
+      const info = await lstat(resolve(this.projectRoot, path)).catch(error => {
+        if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+        throw error;
+      });
+      if (!target.ok || target.resolved !== resolve(this.projectRoot, path) || (info !== null && !info.isFile()) || seed?.status !== 'owned' || seed.exclusion !== null) {
+        throw new Error(`Scenario producer target is unavailable or outside ordinary ownership: ${path}`);
+      }
+    }
+    return answer;
+  }
+
+  /** Standalone producer effects refuse all dirt except their exact rendered files. */
+  private async renderProducerFeatures(run: Run, expected: readonly RenderedFeatureFile[]): Promise<void> {
+    const answer = await this.validateFeatureTargets(expected);
+    await rerenderFeatureFiles(this.projectRoot, [...expected]);
+    const changed = await this.git.changedPaths(this.projectRoot, await this.git.currentHead(this.projectRoot));
+    const hashes = new Map(expectedFeatureHashes(expected).map(file => [file.path, file.hash]));
+    const unrelated: string[] = [];
+    for (const path of changed) {
+      const hash = hashes.get(path);
+      if (hash === undefined || !await this.renderedFeatureAllowed(path, hash, answer)) unrelated.push(path);
+    }
+    if (unrelated.length > 0) throw new Error(`Scenario producer commit refuses unrelated candidate changes: ${unrelated.join('; ')}`);
   }
 
   /** Every tracked feature file's expected content under the states the ledger holds now. */
@@ -11057,9 +11163,11 @@ export class RunService {
    * those that differ from the states' rendering and reports whether a
    * commit is needed. Before materialization it writes nothing.
    */
-  private async rerenderScenarios(run: Run): Promise<FeatureRerendering> {
+  private async rerenderScenarios(run: Run, ownership?: Awaited<ReturnType<RamifyCli['queryOwnership']>>): Promise<FeatureRerendering> {
     if (run.log.find('scenarios-materialized') === undefined) return { files: [], written: [], commitNeeded: false };
-    return rerenderFeatureFiles(this.projectRoot, this.expectedFeatures(run));
+    const expected = this.expectedFeatures(run);
+    await this.validateFeatureTargets(expected, ownership);
+    return rerenderFeatureFiles(this.projectRoot, expected);
   }
 
   /**
@@ -11367,11 +11475,11 @@ export class RunService {
       intent: { event: run.log.next({ type: 'scenarios-withdrawing', data }), records: [] },
       perform: async () => {
         const tracked = withStates(trackedScenarios(run.log.ledger.replay()), new Map(data.scenarios.map(id => [id, 'pending' as const])));
-        await rerenderFeatureFiles(this.projectRoot, expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }));
+        const expected = expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId });
         const files = [...new Set(tracked.records.filter(record => data.scenarios.includes(record.id)).map(record => record.file))].sort();
         const message = withdrawalMessage({ runId: run.record.jobId, withdrawal: data.withdrawal, workItem: data.workItem, scenarios: data.scenarios, reason: data.reason, files });
         await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
-        const commit = await commitForScenarios(this.projectRoot, run.record.jobId, withdrawnTrailerValue(data.withdrawal), message, recovering, this.git);
+        const commit = await commitForScenarios(this.projectRoot, run.record.jobId, withdrawnTrailerValue(data.withdrawal), message, recovering, this.git, commit => this.verifyProducerCommit(expected, commit), () => this.renderProducerFeatures(run, expected));
         return { commit: commit ?? await this.git.currentHead(this.projectRoot) };
       },
       complete: result => ({

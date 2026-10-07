@@ -8,6 +8,7 @@ import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { observationSchema } from '../run/observations.js';
 import { runSingleSession, type SessionProgress } from '../sessions/single.js';
 import { copyFixture } from './helpers/fixture.js';
+import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { addModule, completionProposed, installMiniRunner, readDeclaredTree, shell } from './helpers/iterations.js';
 import { initRepository, testPolicy } from './helpers/runs.js';
 
@@ -67,7 +68,10 @@ async function stubRamify(): Promise<RamifyCli> {
     '',
   ].join('\n'));
   await chmod(executable, 0o755);
-  return new RamifyCli({ executable, timeoutMs: 30_000 });
+  class ProcessCheckWithScriptedOwnership extends RamifyCli {
+    override queryOwnership = new FakeRamifyCli().queryOwnership;
+  }
+  return new ProcessCheckWithScriptedOwnership({ executable, timeoutMs: 30_000 });
 }
 
 describe('a standalone session process boundary', () => {

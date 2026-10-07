@@ -381,6 +381,15 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     const committedBefore = committedGates(git);
     const askedBefore = { made: git.commits().length, found: git.recovered().length };
     const jobRecord = await readFile(join(runDirectory(root, runId), 'job.json'), 'utf8');
+    // A producer recovery needs explicit immutable Git-object answers from
+    // this boundary's stated committed paths and captured rendered bytes.
+    const producers: Record<string, import('./candidates.js').ScriptedCommit> = {};
+    if (row.name === 'scenarios-committed') {
+      const producer = scenario.git.commits.find(commit => commit.commit === materialized)!;
+      const files = Object.fromEntries(await Promise.all((producer.changes ?? []).map(async change => [change.path, await readFile(join(root, change.path), 'utf8')] as const)));
+      producers[materialized] = { tree: 'a'.repeat(40), base: producer.against, changes: producer.changes ?? [], files };
+    }
+    const recoveredCandidates = compositionCandidates(root, scenario, producers);
     await removeRecordFiles(root, runId, frozen);
     const sessionsBefore = agent.sessions.length;
 
@@ -395,7 +404,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     // The same Git answers the restart: the commit the interrupted run made
     // is the one this one finds by the attempt's identity trailers.
     const first = await openRuns(root, {
-      agent, git, candidates: compositionCandidates(root, scenario),
+      agent, git, candidates: recoveredCandidates,
       // Recovery runs no command; one it ran would fail here rather than
       // starting a process.
       commandExecution: statedCommands(root, []),
@@ -495,7 +504,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     reopened.pop();
     const askedAgain = { made: git.commits().length, found: git.recovered().length };
     const second = await openRuns(root, {
-      agent, git, candidates: compositionCandidates(root, scenario),
+      agent, git, candidates: recoveredCandidates,
       commandExecution: statedCommands(root, []),
       inputs: scenario.inputs(),
     });

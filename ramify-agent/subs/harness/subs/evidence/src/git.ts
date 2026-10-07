@@ -437,7 +437,12 @@ export async function commitNameStatus(
   root: string,
   commit: string,
   signal?: AbortSignal,
+  options?: { readonly requireSingleParent?: boolean },
 ): Promise<Array<{ readonly status: string; readonly path: string }>> {
+  if (options?.requireSingleParent === true) {
+    const ancestry = await gitOk(root, ['rev-list', '--parents', '--max-count=1', commit], signal);
+    if (ancestry.stdout.trim().split(/\s+/u).length !== 2) throw new Error(`Commit ${commit} is not a single-parent producer commit`);
+  }
   const run = await gitOk(root, ['show', '--name-status', '--format=', '-z', '--no-renames', commit], signal);
   const fields = run.stdout.split('\0');
   const changes: Array<{ status: string; path: string }> = [];

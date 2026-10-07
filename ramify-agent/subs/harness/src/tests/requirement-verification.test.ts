@@ -459,10 +459,10 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
     expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02']);
     expect(contractGates.map(attempt => attempt.commit)).toEqual(['revision-01', null, null]);
     expect(contractGates.slice(1).map(attempt => attempt.head)).toEqual(['revision-01', 'revision-01']);
-    // No attempt at the agreement was ever accepted, so every observation
-    // the run made was taken against the feature files' commit it worked
-    // from: a failed attempt's commit is not a boundary.
-    expect([...new Set(git.bases('changedPaths'))]).toEqual(['scenarios-of-review-notes']);
+    // Failed contract commits never advance the accepted boundary. Producer
+    // preparation observes the initial head; the shared final authority guard
+    // observes the later accepted repair boundary.
+    expect([...new Set(git.bases('changedPaths'))]).toEqual(['revision-00', 'scenarios-of-review-notes', 'revision-02']);
     expect([...new Set(git.bases('changedEntries'))]).toEqual(['scenarios-of-review-notes']);
     expect(git.bases('diffNameStatus')).toEqual(['scenarios-of-review-notes']);
     git.assertAnswered();
