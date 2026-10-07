@@ -1,0 +1,64 @@
+{
+  "label": "Configured exact-file focus terminal PASS; ownership and ramify-check scripted, real filesystem/Git/Vitest/tsc/Cucumber as declared; no installed F1 claim",
+  "command": "node_modules/.bin/vitest run --project node --maxWorkers=1 --reporter=verbose subs/harness/src/tests/capability-acceptance.integration.test.ts",
+  "cwd": "/home/app/ramify-plan21-project-boundary-adoption/ramify-agent",
+  "start": "2026-10-07T19:25:41Z",
+  "terminal": true,
+  "exitCode": 0,
+  "testFilesPassed": 1,
+  "testsPassed": 12,
+  "testsFailed": 0,
+  "testsSkipped": 0,
+  "wallSecondsReported": 928.01,
+  "caseSecondsReported": 925.81,
+  "cases": [
+    {
+      "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision",
+      "elapsedMs": 82375
+    },
+    {
+      "title": "CA28: deferred B entry receives accepted handback and replans from current source",
+      "elapsedMs": 90819
+    },
+    {
+      "title": "CA31: source drift after a passing combined gate cannot be handed back",
+      "elapsedMs": 76657
+    },
+    {
+      "title": "CA17 CA19 CA28 CA30: restart after handback continues the original A assignment once",
+      "elapsedMs": 78287
+    },
+    {
+      "title": "CA17 CA20 CA30: restart after verification reuses the accepted gate and review for one handback",
+      "elapsedMs": 73372
+    },
+    {
+      "title": "CA20 CA30: restart after the passing gate reuses its audited candidate",
+      "elapsedMs": 74795
+    },
+    {
+      "title": "CA19: in-flight combined capability gate intent recovers one audited commit and handback",
+      "elapsedMs": 75276
+    },
+    {
+      "title": "CA19: in-flight combined capability gate commit recovers one audited commit and handback",
+      "elapsedMs": 76249
+    },
+    {
+      "title": "CA20 CA30: restart after the passing review reuses the same gate and review",
+      "elapsedMs": 75299
+    },
+    {
+      "title": "CA19: accepted reviewer submissions replay before their combined review record",
+      "elapsedMs": 71860
+    },
+    {
+      "title": "CA19: a submitted reviewer concern replays into one exact pending attempt and CheckFinding",
+      "elapsedMs": 73365
+    },
+    {
+      "title": "CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback",
+      "elapsedMs": 77452
+    }
+  ]
+}

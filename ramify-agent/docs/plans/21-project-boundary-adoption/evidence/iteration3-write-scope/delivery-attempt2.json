@@ -1,0 +1,137 @@
+{
+  "attemptTiming": {
+    "argv": [
+      "ramify-agent/node_modules/.bin/ramify-audit",
+      "audit",
+      "--project-root",
+      "ramify-agent",
+      "--cwd",
+      ".",
+      "--json"
+    ],
+    "cwd": "/home/app/ramify-plan21-project-boundary-adoption",
+    "sourceCommit": "035e62eb91e7bd4b5ce81ec99bbaa52e2058a0c5",
+    "sourceTree": "0ed4449e26e92f612aefcc08e0271174dc265655",
+    "start": "2026-10-07T18:34:33.662735+00:00",
+    "end": "2026-10-07T18:55:48.273108+00:00",
+    "wallSeconds": 1274.6103657186031,
+    "exitCode": 1,
+    "ramifyVersion": "0.4.1",
+    "auditVersion": "0.7.2",
+    "status": "terminal"
+  },
+  "raw": {
+    "path": "/tmp/pb3-delivery-attempt2-audit.json",
+    "bytes": 445036,
+    "sha256": "7e981493fcad671de0f96f69c1f743f4e4f1476cfe8d6875eaad6635e234eb48"
+  },
+  "result": {
+    "status": "completed",
+    "requestId": "a47c2ec2-5080-4932-a691-3b176b82dab2",
+    "runId": "855c981e-da11-4597-ba7e-9290fafe5496",
+    "producer": {
+      "name": "ramify-audit",
+      "version": "0.7.2"
+    },
+    "evidenceSchemaVersion": 4,
+    "mode": {
+      "requestedMode": "ramify-partial",
+      "resolution": "defaulted",
+      "executedMode": "full",
+      "fallbackReason": "drift-cap: 34 distinct paths selected a module since the full audit at 9de371d2c6bdd7e30fb66512f3a8f182ee844835 (limit 25)"
+    },
+    "overall": "fail",
+    "sourceCommit": "035e62eb91e7bd4b5ce81ec99bbaa52e2058a0c5",
+    "sourceTree": "0ed4449e26e92f612aefcc08e0271174dc265655",
+    "auditedAt": "2026-10-07T18:55:47.440Z",
+    "durationSeconds": 1273.625,
+    "ownershipAnswer": {
+      "ramifyVersion": "0.4.1",
+      "cliSchema": "ramify.affected-cli/4",
+      "selectionSchema": "ramify.affected/4",
+      "binaryPath": "ramify-agent/node_modules/.bin/ramify",
+      "modules": 12,
+      "exclusions": 17
+    },
+    "selection": {
+      "kind": "full",
+      "selectedCheckIds": [
+        "agent-structure",
+        "agent-tests",
+        "agent-typecheck",
+        "agent-web-build",
+        "patch-integrity"
+      ],
+      "omittedCheckIds": [],
+      "selectedTestUnitIds": [
+        "agent-check-self",
+        "agent-typecheck",
+        "agent-vitest",
+        "agent-web-build",
+        "git-diff-check"
+      ],
+      "omittedTestUnitIds": []
+    },
+    "expectedFiles": {
+      "contract": "runner-configured-files/1",
+      "source": "partial-answer",
+      "expected": 254,
+      "run": 0,
+      "status": "missing",
+      "missingCount": 254,
+      "missingFirst5": [
+        "src/tests/cli.test.ts",
+        "src/tests/session-command.test.ts",
+        "subs/harness/src/tests/acceptance-trial.test.ts",
+        "subs/harness/src/tests/accepted-boundary.test.ts",
+        "subs/harness/src/tests/accepted-commit.test.ts"
+      ],
+      "reason": "expected-files-missing: 254 files (src/tests/cli.test.ts, src/tests/session-command.test.ts, subs/harness/src/tests/acceptance-trial.test.ts, subs/harness/src/tests/accepted-boundary.test.ts, subs/har"
+    },
+    "checks": {
+      "agent-structure": {
+        "status": "pass",
+        "durationSeconds": 52.441
+      },
+      "agent-tests": {
+        "status": "fail",
+        "durationSeconds": 1200.53
+      },
+      "agent-typecheck": {
+        "status": "pass",
+        "durationSeconds": 5.871
+      },
+      "agent-web-build": {
+        "status": "pass",
+        "durationSeconds": 1.858
+      },
+      "patch-integrity": {
+        "status": "pass",
+        "durationSeconds": 0.023
+      }
+    },
+    "vitest": {
+      "counts": null,
+      "summary": "Timed out",
+      "skippedFiles": null,
+      "invocationGroups": 1
+    },
+    "failureLedger": {
+      "completeness": "indeterminate",
+      "entries": []
+    },
+    "refs": {
+      "reportCommit": "cb6f6b1552ea5a61f62d60fcb584c3aa51c0653d",
+      "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-07T18-55-47Z-035e62eb9",
+      "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/0ed4449e26e92f612aefcc08e0271174dc265655"
+    },
+    "composition": {
+      "verdict": "fail",
+      "scoped": false,
+      "chainDepth": 0,
+      "reportCommit": "cb6f6b1552ea5a61f62d60fcb584c3aa51c0653d",
+      "outstandingFailures": 0,
+      "reason": "a check of the full audit failed"
+    }
+  }
+}

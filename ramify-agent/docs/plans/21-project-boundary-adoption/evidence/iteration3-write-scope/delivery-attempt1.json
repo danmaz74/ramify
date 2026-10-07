@@ -1,0 +1,301 @@
+{
+  "attemptTiming": {
+    "argv": [
+      "ramify-agent/node_modules/.bin/ramify-audit",
+      "audit",
+      "--project-root",
+      "ramify-agent",
+      "--cwd",
+      ".",
+      "--json"
+    ],
+    "cwd": "/home/app/ramify-plan21-project-boundary-adoption",
+    "sourceCommit": "9de371d2c6bdd7e30fb66512f3a8f182ee844835",
+    "sourceTree": "bf8baa9bac87e9654510a2b46baf97848795c4a7",
+    "start": "2026-10-07T17:12:43.598242+00:00",
+    "end": "2026-10-07T17:29:46.697579+00:00",
+    "wallSeconds": 1023.0993317775428,
+    "exitCode": 1,
+    "ramifyVersion": "0.4.1",
+    "auditVersion": "0.7.2",
+    "status": "terminal"
+  },
+  "raw": {
+    "path": "/tmp/pb3-delivery-attempt1-audit.json",
+    "bytes": 792593,
+    "sha256": "d78244ee1df7cf7dfa634e2abefe56d9b68f34e9a29733e53d5acf8a9270b524"
+  },
+  "result": {
+    "status": "completed",
+    "requestId": "10413f05-eb19-4d2e-98c2-f6fdfd83b11d",
+    "runId": "3f103180-ecd7-4e94-a95a-4fa5cdbff744",
+    "producer": {
+      "name": "ramify-audit",
+      "version": "0.7.2"
+    },
+    "evidenceSchemaVersion": 4,
+    "mode": {
+      "requestedMode": "ramify-partial",
+      "resolution": "defaulted",
+      "executedMode": "full",
+      "fallbackReason": "preparation-input: package-lock.json, package.json"
+    },
+    "overall": "fail",
+    "sourceCommit": "9de371d2c6bdd7e30fb66512f3a8f182ee844835",
+    "sourceTree": "bf8baa9bac87e9654510a2b46baf97848795c4a7",
+    "auditedAt": "2026-10-07T17:29:46.131Z",
+    "durationSeconds": 1022.386,
+    "ownershipAnswer": {
+      "ramifyVersion": "0.4.1",
+      "cliSchema": "ramify.affected-cli/4",
+      "selectionSchema": "ramify.affected/4",
+      "binaryPath": "ramify-agent/node_modules/.bin/ramify",
+      "modules": 12,
+      "exclusions": 17
+    },
+    "selection": {
+      "kind": "full",
+      "selectedCheckIds": [
+        "agent-structure",
+        "agent-tests",
+        "agent-typecheck",
+        "agent-web-build",
+        "patch-integrity"
+      ],
+      "omittedCheckIds": [],
+      "selectedTestUnitIds": [
+        "agent-check-self",
+        "agent-typecheck",
+        "agent-vitest",
+        "agent-web-build",
+        "git-diff-check"
+      ],
+      "omittedTestUnitIds": []
+    },
+    "expectedFiles": {
+      "contract": "runner-configured-files/1",
+      "source": "ownership-answer",
+      "expected": 254,
+      "run": 254,
+      "status": "complete",
+      "missingCount": 0,
+      "missingFirst5": [],
+      "reason": null
+    },
+    "checks": {
+      "agent-structure": {
+        "status": "pass",
+        "durationSeconds": 52.604
+      },
+      "agent-tests": {
+        "status": "fail",
+        "durationSeconds": 948.689
+      },
+      "agent-typecheck": {
+        "status": "pass",
+        "durationSeconds": 5.933
+      },
+      "agent-web-build": {
+        "status": "pass",
+        "durationSeconds": 2.509
+      },
+      "patch-integrity": {
+        "status": "pass",
+        "durationSeconds": 0.035
+      }
+    },
+    "vitest": {
+      "counts": {
+        "files": {
+          "failed": 19,
+          "passed": 233,
+          "skipped": 2,
+          "total": 254
+        },
+        "tests": {
+          "failed": 29,
+          "passed": 1980,
+          "skipped": 6,
+          "total": 2015
+        }
+      },
+      "summary": "files 233 passed, 19 failed, 2 skipped; tests 1980 passed, 29 failed, 6 skipped",
+      "skippedFiles": [
+        {
+          "path": "ramify-agent/subs/harness/src/tests/fixture-acceptance.test.ts",
+          "project": "node",
+          "state": "skipped"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/fixture-trials.test.ts",
+          "project": "node",
+          "state": "skipped"
+        }
+      ],
+      "invocationGroups": 1
+    },
+    "failureLedger": {
+      "completeness": "complete",
+      "entries": [
+        {
+          "path": "ramify-agent/subs/harness/src/tests/breaking-work.test.ts",
+          "project": "node",
+          "testId": "K6: the gate is not satisfied by weakening what it checks > a deleted guarded file is recorded as after: null and does not pass as an absent file"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/breaking-work.test.ts",
+          "project": "node",
+          "testId": "K6: the gate is not satisfied by weakening what it checks > an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/check-findings-projection.test.ts",
+          "project": "node",
+          "testId": "CheckFinding lists > a run whose policy requested no reviews reports its coverage as unavailable, never clean, and still lists its CheckFindings"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/contract-delegation-integration.test.ts",
+          "project": "node",
+          "testId": "P1: one consumer delegates, resumes after provider conformance and verifies against the real provider > K4: the contract gate runs the suite against the fake and the provider gate runs it against the real provider"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/contract-delegation.test.ts",
+          "project": "node",
+          "testId": "X1b: a contract sub-session that returns incomplete registers nothing > no contract and no obligation are committed, and its caller accounts for the partial work"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/contract-delegation.test.ts",
+          "project": "node",
+          "testId": "a contract sub-session that fails registers nothing, and its caller goes on > the contract iteration closes partial with the failure, and the run continues"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/fake-exposure-parity.test.ts",
+          "project": "node",
+          "testId": "the rule at a run's contract gate > a contract that re-exposes its fake where the real export will not be fails the gate in scope, and a repair that removes it passes"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/iterations-integration.test.ts",
+          "project": "node",
+          "testId": "G8: one small work item completes in one iteration > a local architect assigns it, an engineer works it, the gate accepts it and the harness commits"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/module-creation-integration.test.ts",
+          "project": "node",
+          "testId": "G9: an accepted proposed entry owner reaches implementation > a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/no-rewind.test.ts",
+          "project": "node",
+          "testId": "K2: a failure outside the last engineer's scope > the work-item gate returns it to the local architect, who assigns the owner that failed"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/no-rewind.test.ts",
+          "project": "node",
+          "testId": "adding work leaves every completed piece completed > a second iteration, a repair round and a second work item rewrite nothing"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/plan-deviations.test.ts",
+          "project": "node",
+          "testId": "a deviation that rewords a pending scenario > the harness renders the feature file from it, commits it, and the finding shows the old and the new text"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/recorded-environment.test.ts",
+          "project": "node",
+          "testId": "the policy a run captures in job.json > reads a run recorded before the names, keeping the names it mapped and none of its values"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/requirement-verification.test.ts",
+          "project": "node",
+          "testId": "P2: the contract gate rejects a fake under a production-looking name > a file without .fake, an export without Fake and a re-export that drops it each fail the gate"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/run-git.integration.test.ts",
+          "project": "node",
+          "testId": "run-to-Git integration > a passing final gate over a changed tree makes exactly one commit, with the gate as its trailer"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/run-git.integration.test.ts",
+          "project": "node",
+          "testId": "run-to-Git integration > recovery finds the real commit by both trailers and does not create a duplicate"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/run-protocol-materialization.integration.test.ts",
+          "project": "node",
+          "testId": "the module-capability comparison of a completed scripted run, over HTTP > initial and current placements, the compared identities and coverage, and no file or event changed"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/run-protocol.test.ts",
+          "project": "node",
+          "testId": "C1: a run completes with no client, and a client attached afterwards reads the same state and events > driven while only the file system is watched; read over HTTP, and again after two restarts"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/run-protocol.test.ts",
+          "project": "node",
+          "testId": "a record of an unsupported version > surfaces as unsupported-version with evidence, never as an absent run"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/run-protocol.test.ts",
+          "project": "node",
+          "testId": "every query of a completed run, over HTTP > answers what the records hold: analysis, decisions, work items, capabilities, gates and metrics"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/run-recovery.test.ts",
+          "project": "node",
+          "testId": "the recovery table > a crash after the commit, before its completion line, finds the commit and makes no second one"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/run-recovery.test.ts",
+          "project": "node",
+          "testId": "the recovery table > a crash after the complete attempt leaves the commit alone and appends the interruption only"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/run-recovery.test.ts",
+          "project": "node",
+          "testId": "the recovery table > a crash between the commit intent and the commit performs the effect again and makes one commit"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/scenario-states.test.ts",
+          "project": "node",
+          "testId": "\u00a77: declaring, and the iteration gate > with no open requirement a declaration is declared, the gate implements it, a request declares what existing steps bind, and the final gate runs every scenario in full mode"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/single-session-integration.test.ts",
+          "project": "node",
+          "testId": "a standalone session process boundary > a violation written through the shell, which no hook check saw, is caught when completion is proposed"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/unguarded-write.test.ts",
+          "project": "node",
+          "testId": "X6: an unguarded shell mutation and an outside read make the MVP's limits visible > the write is reported and not blocked: it is in git status, in outsideScope and in the coverage gap"
+        },
+        {
+          "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+          "project": "web",
+          "testId": "CM19: a failed run says failed at run level only; a capability keeps its literal state and links to its work-item history"
+        },
+        {
+          "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+          "project": "web",
+          "testId": "an iteration shows the assignment package its engineer received, or why it cannot be rendered"
+        },
+        {
+          "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+          "project": "web",
+          "testId": "an iteration whose engineer ended without a result shows the digest and the analysis its architect read"
+        }
+      ]
+    },
+    "refs": {
+      "reportCommit": "e5e12b3dd260fcf75e00412882c05f70b8fcd573",
+      "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-07T17-29-46Z-9de371d2c",
+      "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/bf8baa9bac87e9654510a2b46baf97848795c4a7"
+    },
+    "composition": {
+      "verdict": "fail",
+      "scoped": false,
+      "chainDepth": 0,
+      "reportCommit": "e5e12b3dd260fcf75e00412882c05f70b8fcd573",
+      "outstandingFailures": 29,
+      "reason": "a check of the full audit failed"
+    }
+  }
+}
