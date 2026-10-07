@@ -33,6 +33,10 @@ describe('current generated view readers', () => {
     await expect(loadArchitectIndex(f.root)).rejects.toThrow('ramify.architect-module/3');
     await f.write('.ramify-architect/_meta.json', { ...architect, schema: 'ramify.architect-view/2' });
     await expect(readArchitectMeta(f.root)).rejects.toThrow('ramify.architect-view/3');
+    const missingSchema: Record<string, unknown> = { ...architect };
+    delete missingSchema.schema;
+    await f.write('.ramify-architect/_meta.json', missingSchema);
+    await expect(readArchitectMeta(f.root)).rejects.toThrow('ramify.architect-view/3');
   });
 
   test('ordinary and testing API areas have separate exact metadata and reject mismatches', async () => {
@@ -48,7 +52,11 @@ describe('current generated view readers', () => {
     await expect(readApiView(f.root, entry, 'src/tests')).rejects.toThrow('ramify.api-view/1');
     await f.write('src/tests/.ramify/_meta.json', { schema: 'ramify.api-view/1', module: 'other', area: 'tests', revision: 'rev/1:test' });
     await expect(readApiView(f.root, entry, 'src/tests')).rejects.toThrow('app src/tests');
+    await f.write('src/tests/.ramify/_meta.json', { schema: 'ramify.api-view/1', area: 'tests', revision: 'rev/1:test' });
+    await expect(readApiView(f.root, entry, 'src/tests')).rejects.toThrow('app src/tests');
     await f.write('src/tests/.ramify/_meta.json', { schema: 'ramify.api-view/1', module: 'app', area: 'tests', revision: '' });
+    await expect(readApiView(f.root, entry, 'src/tests')).rejects.toThrow('app src/tests');
+    await f.write('src/tests/.ramify/_meta.json', { schema: 'ramify.api-view/1', module: 'app', area: 'tests' });
     await expect(readApiView(f.root, entry, 'src/tests')).rejects.toThrow('app src/tests');
   });
 });

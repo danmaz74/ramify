@@ -33,16 +33,10 @@ interface CheckReport {
 }
 
 /**
- * The two warnings the fixture's own compiler configuration entails: it
- * includes `vite.config.ts` and `vitest.config.ts`, which lie outside every
- * module's `src/`. Ramify warns about compiler-selected source outside a
- * module without failing the check. They are named rather than counted, so
- * that any other warning fails this guard.
+ * Current Ramify treats the fixture's config files as auxiliary source under
+ * its marked project root. The complete check should have no warnings.
  */
-const configurationWarnings = [
-  'outside-module-source vite.config.ts',
-  'outside-module-source vitest.config.ts',
-];
+const configurationWarnings: string[] = [];
 
 describe('the collection-review fixture satisfies Ramify\'s rules', () => {
   test('a fresh copy checks with no error and no warning beyond its configuration files', async () => {

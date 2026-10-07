@@ -92,7 +92,7 @@ symbols. `readApiView` reads one module's ordinary or testing API view, and
 `findInView` answers whether a named original is available to that requester.
 
 `measure.ts` holds `readMeasurement`, which runs `ramify measure --format
-json`, validates the `ramify.measure/1` document and answers its per-module
+json`, validates the `ramify.measure/2` document and answers its per-module
 buckets with the producer's own bytes beside them. A producer that cannot be
 run, a document of another version and a document the format rejects are each
 unavailable with that reason, never a zero.

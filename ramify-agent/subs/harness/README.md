@@ -635,7 +635,7 @@ hiding or measured complexity justifies it.
   either: the submission proceeds, the acceptance says the check could not
   run, and the gate's own complete check answers. A completion is not held
   back for a check the harness could not get an answer from.
-- `kpi/`: measurement capture. A snapshot holds one `ramify.measure/1`
+- `kpi/`: measurement capture. A snapshot holds one `ramify.measure/2`
   document verbatim with its hash, and `scopeSize` is the `S_s` recipe over
   it. A missing component makes the total unavailable with its known
   subtotal beside it, never a zero, and a module that does not exist yet has

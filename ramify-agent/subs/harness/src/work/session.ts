@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { architectViewDirectory, findModule, readApiView, type ApiViewSnapshot, type ArchitectIndex, type SourceArea } from '../../subs/evidence/src/views.js';
+import { architectViewDirectory, findModule, readApiView, readArchitectMeta, type ApiViewSnapshot, type ArchitectIndex, type SourceArea } from '../../subs/evidence/src/views.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ApiViewEvidence } from '../interfaces/protocol/jobs.js';
 import type { RegistryEntry, Hypothesis } from '../analysis/records.js';
@@ -72,6 +72,15 @@ export async function apiViewsOf(
   if (!entry) return { evidence: null, unavailable: `"${module}" is not a module of the architect view, so it has no API view yet` };
   const result = await ramify.materialize(projectRoot, entry.dir);
   if (!result.ok) return { evidence: null, unavailable: `the API view could not be materialized: ${result.message}` };
+  // Materialization refreshes the architect and API views together. A run's
+  // earlier index remains useful for module selection, but its revision may
+  // correctly predate edits made during the run.
+  let current;
+  try {
+    current = await readArchitectMeta(projectRoot);
+  } catch (error) {
+    return { evidence: null, unavailable: `the materialized architect view could not be read: ${error instanceof Error ? error.message : String(error)}` };
+  }
   const views: ApiViewEvidence['views'][number][] = [];
   const unavailable: string[] = [];
   for (const area of ['src', 'src/tests'] as const satisfies readonly SourceArea[]) {
@@ -84,8 +93,8 @@ export async function apiViewsOf(
       if (!source.isDirectory()) throw new Error('the source area is not a directory');
       const snapshot: ApiViewSnapshot | undefined = await readApiView(projectRoot, entry, area);
       if (!snapshot) throw new Error('materialization reported success but the existing source area has no generated API metadata');
-      if (snapshot.revision !== index.revision) {
-        throw new Error(`the generated API revision ${snapshot.revision} differs from the architect revision ${index.revision}`);
+      if (snapshot.revision !== current.revision) {
+        throw new Error(`the generated API revision ${snapshot.revision} differs from the architect revision ${current.revision}`);
       }
       views.push({ area: snapshot.area, path: snapshot.path, revision: snapshot.revision, coverage: snapshot.coverage });
     } catch (error) {

@@ -50,7 +50,14 @@ class RecoveringRamify extends FakeRamifyCli {
     if (this.apiFrom.length === 1) return { ok: false, message: failure };
     const directory = join(projectRoot, apiFrom, 'src', '.ramify');
     await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, '_meta.json'), JSON.stringify({ schema: 'ramify.api-view/1', module: notes, revision: 'rev/1:x:2' }));
+    const revision = 'rev/1:x:2';
+    const architectDirectory = join(projectRoot, '.ramify-architect');
+    await mkdir(architectDirectory, { recursive: true });
+    await writeFile(join(architectDirectory, '_meta.json'), JSON.stringify({
+      schema: 'ramify.architect-view/3', revision, input: 'input/1:test', modules: 1,
+      dependencies: 'measured', dependencyScope: 'production',
+    }));
+    await writeFile(join(directory, '_meta.json'), JSON.stringify({ schema: 'ramify.api-view/1', module: notes, area: 'ordinary', revision }));
     return { ok: true, output: '' };
   }
 }
@@ -101,7 +108,8 @@ describe('the API view of a local architect\'s continued turns', () => {
     expect(second).not.toContain(failure);
     const moduleSource = join(fixture.root, notesDirectory, 'src');
     expect(directories).toEqual([moduleSource, moduleSource]);
-    expect(second).toContain(`- API view (src): \`${moduleSource}/.ramify/\`, revision \`rev/1:x:2\``);
+    const architectMeta = JSON.parse(await readFile(join(fixture.root, '.ramify-architect', '_meta.json'), 'utf8')) as { revision: string };
+    expect(second).toContain(`- API view (src): \`${moduleSource}/.ramify/\`, revision \`${architectMeta.revision}\``);
     expect(first).toContain(`- Onboarding (\`${join(fixture.root, notesDirectory, 'README.md')}\`)`);
     expect(first).toContain(`- The architect view is at \`${fixture.root}/.ramify-architect/\``);
     expect(first).toContain(`- Working directory: \`${moduleSource}\``);

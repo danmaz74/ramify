@@ -34,6 +34,7 @@ describe('readMeasurement', () => {
     root: '/project',
     views: 'measured',
     ownershipRule: 'kept verbatim',
+    files: [],
     modules: [{
       id: 'project/harness',
       dir: 'subs/harness',
@@ -68,6 +69,22 @@ describe('readMeasurement', () => {
       .toEqual(['measure', '--root', directory.path, '--format', 'json']);
   });
 
+  it('keeps unavailable API-view bytes unavailable in the current document', async () => {
+    const module = document.modules[0]!;
+    const exact = { production: module.exact.production, tests: module.exact.tests, documentation: module.exact.documentation };
+    const subtree = { production: module.subtree.production, tests: module.subtree.tests, documentation: module.subtree.documentation };
+    const ramify = await producer(JSON.stringify({
+      ...document,
+      views: { state: 'unavailable', reason: 'analysis-failed' },
+      modules: [{ ...module, exact, subtree }],
+    }));
+    const read = await readMeasurement(ramify, directory.path);
+    expect(read.available).toBe(true);
+    if (!read.available) return;
+    expect(read.document.views).toEqual({ state: 'unavailable', reason: 'analysis-failed' });
+    expect(read.document.modules[0]?.exact.views).toBeUndefined();
+  });
+
   it('is unavailable with its reason when the producer cannot be run', async () => {
     const ramify = await producer('no measurement here', 2);
 
@@ -90,13 +107,13 @@ describe('readMeasurement', () => {
   });
 
   it('is unavailable when the document declares another version', async () => {
-    const ramify = await producer(JSON.stringify({ ...document, schema: 'ramify.measure/2' }));
+    const ramify = await producer(JSON.stringify({ ...document, schema: 'ramify.measure/1' }));
 
     const read = await readMeasurement(ramify, directory.path);
 
     expect(read.available).toBe(false);
     if (read.available) return;
-    expect(read.unavailable).toContain('ramify.measure/2');
+    expect(read.unavailable).toContain('ramify.measure/1');
     expect(read.unavailable).toContain(measureSchemaVersion);
   });
 

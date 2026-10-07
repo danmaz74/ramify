@@ -234,7 +234,7 @@ afterEach(async () => {
   repositories.clear();
 });
 
-describe('ramify-audit 0.2.1 conformance', () => {
+describe('ramify-audit 0.7.1 conformance', () => {
   it('fact 1: command summaries preserve status and runner errors but never an exit code', async () => {
     const repository = await createRepository();
     const request = auditRequest(repository, [commandCheck('commands', [
@@ -587,7 +587,7 @@ describe('ramify-audit 0.2.1 conformance', () => {
 
   it('fact 13: an audit of already audited code is reused unless forced, and names the audited commit', async () => {
     const repository = await createRepository({ 'source.txt': 'source\n', 'docs/guide.md': 'guide\n' });
-    const unforced = { ...auditRequest(repository), force: false };
+    const unforced = { ...auditRequest(repository), force: false, full: true, ignorePaths: ['docs/**'] };
     const first = await runPassing(repository, unforced);
     expect(first).toMatchObject({ status: 'completed', summary: { overall: 'pass', sourceCommit: repository.commit } });
     if (first.status !== 'completed') return;

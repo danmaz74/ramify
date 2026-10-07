@@ -87,8 +87,18 @@ test('failed refresh never presents leftover views as current; a missing expecte
   const missing = await iterationApiViews(ramify, root, index, { module: 'app/analysis', includedChildren: [] });
   expect(missing[0]!.views.map(view => view.area)).toEqual(['src']);
   expect(missing[0]!.unavailable).toContain('src/tests/.ramify: materialization reported success');
+  const ordinaryMetaPath = join(root, 'subs/analysis/src/.ramify/_meta.json');
+  const ordinaryMeta = JSON.parse(await readFile(ordinaryMetaPath, 'utf8')) as Record<string, unknown>;
+  await writeFile(ordinaryMetaPath, JSON.stringify({ ...ordinaryMeta, revision: 'rev/1:wrong' }));
+  expect((await apiViewsOf(ramify, root, index, 'app/analysis')).unavailable)
+    .toContain('differs from the architect revision');
+  await writeFile(ordinaryMetaPath, JSON.stringify(ordinaryMeta));
   await rm(join(root, 'subs/analysis/src/tests'), { recursive: true });
   expect((await apiViewsOf(ramify, root, index, 'app/analysis')).unavailable).toBeNull();
+  await rm(join(root, '.ramify-architect/_meta.json'));
+  expect(await apiViewsOf(ramify, root, index, 'app/analysis')).toMatchObject({
+    evidence: null, unavailable: expect.stringContaining('the materialized architect view could not be read'),
+  });
 }, 60_000);
 
 test('an included child prepares all descendant owners, while a broad scope retains its exact modules', async () => {

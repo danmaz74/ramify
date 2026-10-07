@@ -508,7 +508,7 @@ export const measurementSnapshotSchema = z.object({
   policy: z.literal('scope-size/1'),
   /** The run branch's head when it was taken. */
   head: z.string(),
-  /** The captured `ramify.measure/1` document, verbatim, with its revision. */
+  /** The captured `ramify.measure/2` document, verbatim, with its revision. */
   measure: z.union([
     z.object({ revision: z.string(), document: z.unknown(), hash: sha256Schema }).strict(),
     z.object({ unavailable: text }).strict(),
