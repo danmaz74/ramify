@@ -23,16 +23,16 @@ their own work. Considering them does not by itself coordinate their execution.
 ### Every Agent Scope Is a Cut on the Module Tree
 
 A module assignment covers its owned contents, including configuration,
-documentation and scratch, except its owned-ignored trees. Child subtrees and
-owned-ignored trees require explicit inclusion, each as a whole. External
-trees are never writable in the enclosing run. Guarded configuration remains
+documentation, scratch and owned-unwired trees, except its
+owned-nested-project trees. Child subtrees and owned-nested-project trees
+require explicit inclusion, each as a whole. External trees are never
+writable in the enclosing run. Guarded configuration remains
 an authorization restriction within ownership; owning a file does not waive
 that restriction.
 
 The issuing architect names each included tree with a reason and instructions
-for its meaning. The tree is excluded from Ramify source checks; the owner's
-tests and README define its use. Where it is a project, its own instructions
-and commands apply from its root. Substantial work on that project belongs in
+for its meaning. An included owned-nested-project tree is excluded from Ramify
+source checks; its own instructions and commands apply from its root. Substantial work on that project belongs in
 a run rooted there. An engineer needing a scope expansion asks its architect;
 excluded analysis never creates write authority.
 

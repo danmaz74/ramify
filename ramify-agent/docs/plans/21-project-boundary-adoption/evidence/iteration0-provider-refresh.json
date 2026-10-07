@@ -1,0 +1,57 @@
+[
+  {
+    "repository": "/home/app/ramify-audit-pb",
+    "head": "627389ea6fe9a61352dfd012028056e9365b9f85",
+    "status": [
+      " M README.md",
+      " M package.json",
+      " M src/audit-service.ts",
+      " M src/baseline.ts",
+      " M src/branch-applicability.ts",
+      " M src/cli-configuration.ts",
+      " M src/cli-support.ts",
+      " M src/composition.ts",
+      " M src/contracts.ts",
+      " M src/coverage.ts",
+      " M src/evidence.ts",
+      " M src/partial-selection.ts",
+      " M src/undetected-config-files.ts",
+      " M src/worker-protocol.ts",
+      " M test/audit-service.test.ts",
+      " M test/audit-worker.test.ts",
+      " M test/cli.test.ts",
+      " M test/contracts.test.ts",
+      " M test/evidence-v4.test.ts",
+      " M test/evidence.test.ts",
+      " M test/helpers/partial-repository.ts",
+      " M test/helpers/real-ramify.ts",
+      " M test/helpers/v4-evidence.ts",
+      " M test/installed-entrypoints.test.ts",
+      " M test/undetected-config-files.test.ts",
+      "?? src/ignore-paths.ts",
+      "?? test/fixtures/v4/full-root-with-ignore-paths.json",
+      "?? test/helpers/packed-package.ts",
+      "?? test/ignore-paths.test.ts",
+      "?? test/real/plan8-ignore-paths.real.ts"
+    ],
+    "documents": {
+      "docs/2026-10-06-ignore-list-analysis.md": "9cc5f768a4fd264f4df8b103b0d5e88fd322234f1a361b6a257f07f039ace692",
+      "docs/2026-10-06-ramify-only-partial-audits.md": "5eddf6632e025592418118d8daf8f4ddbff9fcbf4dcec1eff50a115287544806",
+      "docs/plans/08-ignore-paths/main-plan.md": "ae7778eb69d80598579c4293188417265993985d8b77530038508c5bbca91dc8",
+      "docs/plans/08-ignore-paths/contracts.md": "8c9faeac788ccd3871027ffae0b6d254da945d23ce87eb98aba0f4fefbcb899f",
+      "src/index.ts": "5f84a53a403e2a5af815e702d4ef1183abf44c5a9163417b5fe28a03780b429b",
+      "src/cli-configuration.ts": "7b62b8c59d152ac95bbbde7c906d95db4f65884eeb00ef6c33619255a39bfecf",
+      "src/contracts.ts": "5fd46b8d10ccae3537d17f7b5eb21c872da0d4f43b5485973f0e12518b7666e4",
+      "src/audit-service.ts": "d88c1f97f67905823ee0a2084617cfdf9a70b0a589cf925e8c768e31e91fd12c"
+    }
+  },
+  {
+    "repository": "/home/app/ramify-affected",
+    "head": "cb2926844cf4b4331f34c6bf498510edefe32ccd",
+    "status": [],
+    "documents": {
+      "docs/plans/affected-rule-selection/main-plan.md": "a1c9ca979f1763eebafeb8e58475cf96b037693bc884b9355aa3b3b739031817",
+      "docs/plans/affected-rule-selection/contracts.md": "c55dc7c007ca6f7f7c38a177db0495da026f723064813821028f655c6d83c187"
+    }
+  }
+]

@@ -7,6 +7,12 @@ implemented check or an implementation plan.
 cover both `.principles.md` and `.spec.md` files. Cucumber-viz sealing is
 deprecated for Ramify projects. This decision does not establish implementation.
 
+**Decision, 2026-10-07:** the sealed-files plan also replaces the harness's
+hard-coded guarded configuration list (`work/scope.ts`) with the set the
+committed audit definition names through P3, its preparation inputs and
+runner configurations, plus `ramify-agent.json`, so that the seal set and the
+guarded set are defined together. Plan 21 keeps the current list until then.
+
 The [CheckFinding architecture](../architecture/check-findings.md) defines the
 shared issue lifecycle and work-item assessment used by this follow-up. Its
 proposed findings child owns disposition rules; seal hooks and save policy

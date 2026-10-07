@@ -3,6 +3,14 @@
 Design documents for the separate agent harness:
 
 - [Harness principles](harness.principles.md)
+- [Agent declarations and automated audit evidence](analysis/2026-10-07-agent-declarations-and-audit-responsibilities.md),
+  desired responsibility boundary and issues in the current implementation and
+  Plan 21, with relevant principles, adopted decisions and remaining design
+  questions
+- [Plan 21: provider adoption and architect-owned completion](plans/21-project-boundary-adoption/main-plan.md),
+  expanded Phase 3 migration with eleven serial iterations; current provider
+  adoption, architect declarations, delegation handback, bounded clarification,
+  recovery and independent full-audit final verification; implementation unstarted
 - [Harness specification](harness.spec.md), scope, verification, scratch,
   preparation, session behavior and pending specification discovery and sealing
 - [CheckFinding principles](check-findings.principles.md), proposed rules for
