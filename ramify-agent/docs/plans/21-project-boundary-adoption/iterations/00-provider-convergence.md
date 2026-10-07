@@ -2,8 +2,9 @@
 
 **Plan:** [Plan 21](../main-plan.md). **Prerequisites:** none for inspection.
 **Owners:** harness coordinator; provider repairs remain in their own projects.
-**Status:** in progress, incomplete. Earlier [results](iteration0-results.md)
-retain their original witnesses; expanded prerequisites have not passed.
+**Status:** provider and responsibility witnesses recorded. Final delivery-HEAD
+applicability and protected-file comparison are recorded at handoff. Earlier
+[results](iteration0-results.md) retain their original witnesses.
 
 ## Goal
 

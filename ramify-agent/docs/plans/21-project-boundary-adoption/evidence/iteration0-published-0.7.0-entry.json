@@ -1,0 +1,16 @@
+{
+  "package": "ramify-audit",
+  "version": "0.7.0",
+  "publicEntry": "/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/index.js",
+  "publicEntrySha256": "a5ab86cd6858aa3b4bf38a932472b5841305066346827ab309c79ef102e15ed5",
+  "exports": {
+    "requestFromCommittedConfiguration": "undefined",
+    "createAuditService": "function",
+    "dispatchCheck": "function",
+    "runAudit": "function",
+    "findCompletedAuditRequest": "function",
+    "getApplicableBranchAudit": "function",
+    "resolveAuditComposition": "function",
+    "createNodeGitExecutor": "function"
+  }
+}

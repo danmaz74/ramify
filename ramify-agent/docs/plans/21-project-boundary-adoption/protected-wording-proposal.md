@@ -135,6 +135,32 @@ presumed necessary merely to select record fields. If an existing foundational
 statement conflicts with the adopted responsibility boundary, identify it and
 propose only the necessary clarification for Dan's review.
 
+### Authorized outcome-protocol sentence, 2026-10-07
+
+The live `docs/harness.spec.md` section "A Small Closed Set of Outcomes Is the
+Whole Protocol" says:
+
+> An accepted submission changes the orchestration; it does not claim that
+> implementation is accepted.
+
+This generalizes the engineer-proposal rule to an architect's accepted done
+report and conflicts with Dan's adopted responsibility allocation. The
+coordinator authorized replacing only that sentence with:
+
+> An accepted engineer completion proposal advances orchestration to
+> verification; it does not establish correct implementation. An authorized
+> architect's accepted done report records that architect's judgment that its
+> registered obligation is correctly implemented and passing. The harness
+> trusts the report and does not infer that judgment from gate results.
+
+The baseline `docs/harness.spec.md` SHA-256 is
+`f3635d7e25b8b6d175e543197be9c7d12356048f92266fbf1c5df6431ff948bc`.
+The role list and following Read/plan-update/prevalidation/current-gates
+sentences remain intact. This patch and the whole verification-section
+replacement above are the only new protected authorizations recorded for
+later iterations; neither is applied in iteration 0. They align iteration 5/6
+declaration authority and tests with the accepted actor boundary.
+
 A coordinator applies protected changes only with exact named authorization
 under [execution](execution.md). Passing tests cannot authorize them. Iteration 0
 records accepted patches or keeps the affected work blocked; plan drafting

@@ -387,13 +387,20 @@ display: retain raw runner diagnostics, not requirement-to-result mappings in
 the harness. Freeze the smallest compatible rendering contract in iteration 0;
 don't delete useful authoring tools by default.
 
-A completion proposal is structurally complete only when it declares every
-scenario its assignment names, where the declaration rules already accept the
-ID. A proposal missing one is a rejected submission naming the missing IDs,
-under the existing per-turn bound, and the turn returns to the engineer; no
+A new-policy assignment names one `obligations` list, chosen by its responsible
+architect from the registered IDs it delegates to that engineer. The engineer's
+`completion-proposed.bindings` supplies `{ id, fakes? }` for each named ID;
+`fakes` defaults to an empty list. This replaces the old `assignment.scenarios`
+and `completion-proposed.scenarios` fields at the one run-policy boundary, for
+local and capability assignments alike. A default delegated outcome is bound
+only when explicitly named in an assignment. A completion proposal is
+structurally complete only when its bindings name every assigned obligation,
+including every assigned scenario. A proposal missing one is a rejected
+submission naming the missing IDs under the existing per-turn bound, and the
+turn returns to the engineer; no
 candidate commit, audit or review runs on it. Partial work remains the
-honest exit and is never rejected for an undeclared scenario. The harness
-verifies declared IDs structurally; it still judges nothing about whether
+honest exit and is never rejected for an undeclared assigned obligation. The
+harness verifies declared IDs structurally; it still judges nothing about whether
 the declared binding is correct, which the gate's audit and the architect do.
 
 An integration scenario's work item is due when every sub-scenario is `done`;

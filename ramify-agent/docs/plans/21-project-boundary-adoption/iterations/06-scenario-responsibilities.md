@@ -19,7 +19,8 @@ integration scheduling and current architecture documents.
 ## Deliverables
 
 - Implement the three states `pending`, `bound` and `done` from the
-  [scenario contract](../contracts.md#10-scenario-state-delegation-and-agent-judgment),
+  [scenario contract](../contracts.md#10-scenario-state-delegation-and-agent-judgment)
+  and [iteration 0 freeze](iteration0-contract-freeze.md),
   for scenarios and registered tests alike. The engineer's proposal binds, with
   an optional per-ID `fakes` list recorded with provenance and shown to the
   architect; the architect's declaration moves to `done` and can revise back.
@@ -33,7 +34,10 @@ integration scheduling and current architecture documents.
 - Apply iteration 0's explicit agent feature-generation/eligibility contract.
   Pending tags and renderer effects must not derive from audit outcomes or
   automatic withdrawal; keep idempotent file publication and scratch safety.
-- Reject a completion proposal that omits a scenario its assignment names,
+- Replace the old scenario-only fields with the frozen
+  `assignment.obligations` and `completion-proposed.bindings` fields under the
+  new policy, in both local and capability assignments. Reject a completion
+  proposal that omits any assigned obligation, including a named scenario,
   naming the missing IDs under the existing per-turn bound, before the gate
   commits, audits or schedules review. Accept a complete proposal and any
   partial report as today. Update the architecture's statement that assigned

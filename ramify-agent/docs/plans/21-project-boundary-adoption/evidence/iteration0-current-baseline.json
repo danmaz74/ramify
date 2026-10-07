@@ -1,0 +1,23 @@
+{
+  "checkedSource": "1c8764a85ed605893b1fde908d905e4d5aa3383c",
+  "auditedSource": "a2a4ad7d35790598f8d0b069f3aa552bdc7d2788",
+  "projectRoot": "ramify-agent",
+  "notesRef": "refs/notes/audit-projects/ramify-agent-f25e9a298228",
+  "auditKind": "exact-tree",
+  "auditStillApplies": true,
+  "auditPassed": true,
+  "composition": {
+    "verdict": "pass",
+    "scoped": false,
+    "chainDepth": 0,
+    "reportCommit": "7beb7e62d5c55b5066f2f3d40e81a02e362648ab",
+    "outstandingFailures": 0
+  },
+  "producer": {
+    "name": "ramify-audit",
+    "version": "0.3.2"
+  },
+  "originalReport": "7beb7e62d5c55b5066f2f3d40e81a02e362648ab",
+  "originalRunRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-04T11-29-28Z-a2a4ad7d3",
+  "reason": "The last audit still applies and all recorded checks passed."
+}

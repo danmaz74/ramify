@@ -1,0 +1,741 @@
+{
+  "fixture": "/tmp/plan21-iteration0-f2",
+  "installedAuditVersion": "0.7.1",
+  "installedRamifyVersion": "0.4.0",
+  "runs": [
+    {
+      "case": "full",
+      "status": "completed",
+      "sourceCommit": "91171a132b47b9f0fd53d5d42a088463854a2301",
+      "sourceTree": "cfe5f341b5e2536d7721b26f700f79443b3c5b77",
+      "reportCommit": "940badd75b0600dca08b346d4de6e1d6a1ac5551",
+      "runRef": "refs/audited/runs/2026-10-07T10-43-32Z-91171a132",
+      "runId": "34e1614e-dc3c-4331-86e7-c373b3003e86",
+      "producer": {
+        "name": "ramify-audit",
+        "version": "0.7.1"
+      },
+      "overall": "pass",
+      "composition": {
+        "verdict": "pass",
+        "scoped": false,
+        "chainDepth": 0,
+        "reportCommit": "940badd75b0600dca08b346d4de6e1d6a1ac5551",
+        "outstandingFailures": 0
+      },
+      "mode": {
+        "requestedMode": "full",
+        "resolution": "requested",
+        "executedMode": "full"
+      },
+      "selection": {
+        "kind": "full",
+        "selectedCheckIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "omittedCheckIds": [],
+        "selectedTestUnitIds": [
+          "aux",
+          "source"
+        ],
+        "omittedTestUnitIds": []
+      },
+      "expectedFiles": {
+        "contract": "runner-configured-files/1",
+        "source": "ownership-answer",
+        "expected": 5,
+        "run": 5,
+        "missing": [],
+        "status": "complete",
+        "runnerConfigFiles": [
+          "vitest.aux.config.mjs",
+          "vitest.source.config.mjs"
+        ]
+      },
+      "checks": {
+        "aux-vitest": {
+          "status": "pass",
+          "commands": {
+            "aux": {
+              "status": "pass",
+              "counts": {
+                "files": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                },
+                "tests": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                }
+              },
+              "files": [
+                "checks/aux.test.ts"
+              ],
+              "groups": [
+                {
+                  "group": 1,
+                  "appendedArguments": [],
+                  "status": "pass",
+                  "files": [
+                    "checks/aux.test.ts"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "source-vitest": {
+          "status": "pass",
+          "commands": {
+            "source": {
+              "status": "pass",
+              "counts": {
+                "files": {
+                  "failed": 0,
+                  "passed": 4,
+                  "skipped": 0,
+                  "total": 4
+                },
+                "tests": {
+                  "failed": 0,
+                  "passed": 4,
+                  "skipped": 0,
+                  "total": 4
+                }
+              },
+              "files": [
+                "src/tests/root.check.ts",
+                "subs/a/src/tests/child.check.ts",
+                "subs/a-extra/src/tests/collision.check.ts",
+                "subs/a/subs/grand/src/tests/grand.check.ts"
+              ],
+              "groups": [
+                {
+                  "group": 1,
+                  "appendedArguments": [],
+                  "status": "pass",
+                  "files": [
+                    "src/tests/root.check.ts",
+                    "subs/a/src/tests/child.check.ts",
+                    "subs/a-extra/src/tests/collision.check.ts",
+                    "subs/a/subs/grand/src/tests/grand.check.ts"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "partial",
+      "status": "completed",
+      "sourceCommit": "9970c42913090bb1774110f40e2519a878155079",
+      "sourceTree": "f6f6f374e6de0bbba47a957cac165139c49077fb",
+      "reportCommit": "a67baa160aa0789234b685b8ea68d67ee09583e4",
+      "runRef": "refs/audited/runs/2026-10-07T10-44-12Z-9970c4291",
+      "runId": "a9b84e24-4739-4bbe-a977-fcb4c650cb90",
+      "producer": {
+        "name": "ramify-audit",
+        "version": "0.7.1"
+      },
+      "overall": "pass",
+      "composition": {
+        "scoped": true,
+        "chainDepth": 1,
+        "reportCommit": "a67baa160aa0789234b685b8ea68d67ee09583e4",
+        "rootReportCommit": "940badd75b0600dca08b346d4de6e1d6a1ac5551",
+        "outstandingFailures": 0,
+        "verdict": "pass"
+      },
+      "mode": {
+        "requestedMode": "ramify-partial",
+        "resolution": "defaulted",
+        "executedMode": "ramify-partial"
+      },
+      "selection": {
+        "kind": "scoped",
+        "selectedCheckIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "omittedCheckIds": [],
+        "selectedTestUnitIds": [
+          "aux",
+          "source"
+        ],
+        "omittedTestUnitIds": []
+      },
+      "expectedFiles": {
+        "contract": "runner-configured-files/1",
+        "source": "partial-answer",
+        "expected": 5,
+        "run": 5,
+        "missing": [],
+        "status": "complete",
+        "runnerConfigFiles": [
+          "vitest.aux.config.mjs",
+          "vitest.source.config.mjs"
+        ]
+      },
+      "checks": {
+        "aux-vitest": {
+          "status": "pass",
+          "commands": {
+            "aux": {
+              "status": "pass",
+              "counts": {
+                "files": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                },
+                "tests": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                }
+              },
+              "files": [
+                "checks/aux.test.ts"
+              ],
+              "groups": [
+                {
+                  "group": 1,
+                  "appendedArguments": [
+                    "--exclude",
+                    "**/.git/**",
+                    "--exclude",
+                    "**/.ramify-architect.old-?*/**",
+                    "--exclude",
+                    "**/.ramify-architect.tmp-?*/**",
+                    "--exclude",
+                    "**/.ramify-architect/**",
+                    "--exclude",
+                    "**/.ramify.old-?*/**",
+                    "--exclude",
+                    "**/.ramify.tmp-?*/**",
+                    "--exclude",
+                    "**/.ramify/**",
+                    "--exclude",
+                    "**/bower_components/**",
+                    "--exclude",
+                    "**/jspm_packages/**",
+                    "--exclude",
+                    "**/node_modules/**",
+                    "--exclude",
+                    "src/tmp/**",
+                    "--exclude",
+                    "subs/a-extra/**",
+                    "--exclude",
+                    "subs/a-extra/src/tmp/**",
+                    "--exclude",
+                    "subs/a/**",
+                    "--exclude",
+                    "subs/a/src/tmp/**",
+                    "--exclude",
+                    "subs/a/subs/grand/src/tmp/**",
+                    "--passWithNoTests"
+                  ],
+                  "status": "pass",
+                  "files": [
+                    "checks/aux.test.ts"
+                  ]
+                },
+                {
+                  "group": 2,
+                  "appendedArguments": [
+                    "subs/a/subs/grand/",
+                    "--exclude",
+                    "**/.git/**",
+                    "--exclude",
+                    "**/.ramify-architect.old-?*/**",
+                    "--exclude",
+                    "**/.ramify-architect.tmp-?*/**",
+                    "--exclude",
+                    "**/.ramify-architect/**",
+                    "--exclude",
+                    "**/.ramify.old-?*/**",
+                    "--exclude",
+                    "**/.ramify.tmp-?*/**",
+                    "--exclude",
+                    "**/.ramify/**",
+                    "--exclude",
+                    "**/bower_components/**",
+                    "--exclude",
+                    "**/jspm_packages/**",
+                    "--exclude",
+                    "**/node_modules/**",
+                    "--exclude",
+                    "subs/a/subs/grand/src/tmp/**",
+                    "--passWithNoTests"
+                  ],
+                  "status": "pass",
+                  "files": []
+                }
+              ]
+            }
+          }
+        },
+        "source-vitest": {
+          "status": "pass",
+          "commands": {
+            "source": {
+              "status": "pass",
+              "counts": {
+                "files": {
+                  "failed": 0,
+                  "passed": 4,
+                  "skipped": 0,
+                  "total": 4
+                },
+                "tests": {
+                  "failed": 0,
+                  "passed": 4,
+                  "skipped": 0,
+                  "total": 4
+                }
+              },
+              "files": [
+                "src/tests/new-root.check.ts",
+                "src/tests/root.check.ts",
+                "subs/a/subs/grand/src/tests/grand.check.ts",
+                "subs/a/subs/grand/src/tests/new-grand.check.ts"
+              ],
+              "groups": [
+                {
+                  "group": 1,
+                  "appendedArguments": [
+                    "--exclude",
+                    "**/.git/**",
+                    "--exclude",
+                    "**/.ramify-architect.old-?*/**",
+                    "--exclude",
+                    "**/.ramify-architect.tmp-?*/**",
+                    "--exclude",
+                    "**/.ramify-architect/**",
+                    "--exclude",
+                    "**/.ramify.old-?*/**",
+                    "--exclude",
+                    "**/.ramify.tmp-?*/**",
+                    "--exclude",
+                    "**/.ramify/**",
+                    "--exclude",
+                    "**/bower_components/**",
+                    "--exclude",
+                    "**/jspm_packages/**",
+                    "--exclude",
+                    "**/node_modules/**",
+                    "--exclude",
+                    "src/tmp/**",
+                    "--exclude",
+                    "subs/a-extra/**",
+                    "--exclude",
+                    "subs/a-extra/src/tmp/**",
+                    "--exclude",
+                    "subs/a/**",
+                    "--exclude",
+                    "subs/a/src/tmp/**",
+                    "--exclude",
+                    "subs/a/subs/grand/src/tmp/**",
+                    "--passWithNoTests"
+                  ],
+                  "status": "pass",
+                  "files": [
+                    "src/tests/new-root.check.ts",
+                    "src/tests/root.check.ts"
+                  ]
+                },
+                {
+                  "group": 2,
+                  "appendedArguments": [
+                    "subs/a/subs/grand/",
+                    "--exclude",
+                    "**/.git/**",
+                    "--exclude",
+                    "**/.ramify-architect.old-?*/**",
+                    "--exclude",
+                    "**/.ramify-architect.tmp-?*/**",
+                    "--exclude",
+                    "**/.ramify-architect/**",
+                    "--exclude",
+                    "**/.ramify.old-?*/**",
+                    "--exclude",
+                    "**/.ramify.tmp-?*/**",
+                    "--exclude",
+                    "**/.ramify/**",
+                    "--exclude",
+                    "**/bower_components/**",
+                    "--exclude",
+                    "**/jspm_packages/**",
+                    "--exclude",
+                    "**/node_modules/**",
+                    "--exclude",
+                    "subs/a/subs/grand/src/tmp/**",
+                    "--passWithNoTests"
+                  ],
+                  "status": "pass",
+                  "files": [
+                    "subs/a/subs/grand/src/tests/grand.check.ts",
+                    "subs/a/subs/grand/src/tests/new-grand.check.ts"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "failure",
+      "status": "completed",
+      "sourceCommit": "82a4922364123b66df8cc1717987805a041642fa",
+      "sourceTree": "cc451de47c80be30475aa062aaeb93b55f87bd92",
+      "reportCommit": "1c6186db499f15910d0985669807c0ac07827da1",
+      "runRef": "refs/audited/runs/2026-10-07T10-45-02Z-82a492236",
+      "runId": "eb8d11ce-a4fc-40a9-92ab-6b05e9c80557",
+      "producer": {
+        "name": "ramify-audit",
+        "version": "0.7.1"
+      },
+      "overall": "fail",
+      "composition": {
+        "verdict": "fail",
+        "scoped": false,
+        "chainDepth": 0,
+        "reportCommit": "1c6186db499f15910d0985669807c0ac07827da1",
+        "outstandingFailures": 0,
+        "reason": "a check of the full audit failed"
+      },
+      "mode": {
+        "requestedMode": "ramify-partial",
+        "resolution": "defaulted",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline 9970c42913090bb1774110f40e2519a878155079 (report a67baa160aa0789234b685b8ea68d67ee09583e4) ran other check definitions (sha256:3af66430fd0f43e2aec4587adf595e614e4bb00f130aea85dbae4c77914e75dd, now sha256:0acffe675578dc6403b5dc79b4f7d0e6952f82137354445f8b057e248bb83355)"
+      },
+      "selection": {
+        "kind": "full",
+        "selectedCheckIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "omittedCheckIds": [],
+        "selectedTestUnitIds": [
+          "aux",
+          "source"
+        ],
+        "omittedTestUnitIds": []
+      },
+      "expectedFiles": {
+        "contract": "runner-configured-files/1",
+        "source": "ownership-answer",
+        "expected": null,
+        "run": 1,
+        "missing": [],
+        "status": "unavailable",
+        "reason": "expected-files-unavailable: discovery-failed (source-vitest/source: the reporter wrote no discovery; the discovery exited 9: node: bad option: --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js | Command failed: node ...)",
+        "runnerConfigFiles": [
+          "vitest.aux.config.mjs"
+        ]
+      },
+      "checks": {
+        "aux-vitest": {
+          "status": "pass",
+          "commands": {
+            "aux": {
+              "status": "pass",
+              "counts": {
+                "files": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                },
+                "tests": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                }
+              },
+              "files": [
+                "checks/aux.test.ts"
+              ],
+              "groups": [
+                {
+                  "group": 1,
+                  "appendedArguments": [],
+                  "status": "pass",
+                  "files": [
+                    "checks/aux.test.ts"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "source-vitest": {
+          "status": "fail",
+          "commands": {
+            "source": {
+              "status": "fail",
+              "counts": null,
+              "files": [],
+              "groups": [
+                {
+                  "group": 1,
+                  "appendedArguments": [],
+                  "status": "fail",
+                  "files": []
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "deletion",
+      "status": "completed",
+      "sourceCommit": "e5ddbc3e267141238d90bb345968796799ad278c",
+      "sourceTree": "697420cb448d89f1185fd0e2d0db22ccd46fd04a",
+      "reportCommit": "0b940bab71689dff36be521cd12576c3952b1875",
+      "runRef": "refs/audited/runs/2026-10-07T10-48-35Z-e5ddbc3e2",
+      "runId": "6b266e9b-2ee5-43fb-9ae4-d84b85cd3435",
+      "requestId": "7eaa45f7-c7e2-4900-b97f-cc34a08dd92f",
+      "producer": {
+        "name": "ramify-audit",
+        "version": "0.7.1"
+      },
+      "overall": "pass",
+      "composition": {
+        "scoped": true,
+        "chainDepth": 2,
+        "reportCommit": "0b940bab71689dff36be521cd12576c3952b1875",
+        "rootReportCommit": "940badd75b0600dca08b346d4de6e1d6a1ac5551",
+        "outstandingFailures": 0,
+        "verdict": "pass"
+      },
+      "mode": {
+        "requestedMode": "ramify-partial",
+        "resolution": "defaulted",
+        "executedMode": "ramify-partial"
+      },
+      "selection": {
+        "kind": "scoped",
+        "selectedCheckIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "omittedCheckIds": [],
+        "selectedTestUnitIds": [
+          "aux",
+          "source"
+        ],
+        "omittedTestUnitIds": []
+      },
+      "expectedFiles": {
+        "contract": "runner-configured-files/1",
+        "source": "partial-answer",
+        "expected": 2,
+        "run": 2,
+        "missing": [],
+        "status": "complete",
+        "runnerConfigFiles": [
+          "vitest.aux.config.mjs",
+          "vitest.source.config.mjs"
+        ]
+      },
+      "checks": {
+        "aux-vitest": {
+          "status": "pass",
+          "commands": {
+            "aux": {
+              "status": "pass",
+              "counts": {
+                "files": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                },
+                "tests": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                }
+              },
+              "files": [
+                "checks/aux.test.ts"
+              ]
+            }
+          }
+        },
+        "source-vitest": {
+          "status": "pass",
+          "commands": {
+            "source": {
+              "status": "pass",
+              "counts": {
+                "files": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                },
+                "tests": {
+                  "failed": 0,
+                  "passed": 1,
+                  "skipped": 0,
+                  "total": 1
+                }
+              },
+              "files": [
+                "src/tests/root.check.ts"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "empty",
+      "status": "completed",
+      "sourceCommit": "46db62a7c96e3029501e99552d1f1318276543d6",
+      "sourceTree": "f077ae43b4830eb4bd1682de38d06a9a614893fa",
+      "reportCommit": "cbf484d21b613002d2952e7cdee64d5ab4a4af01",
+      "runRef": "refs/audited/runs/2026-10-07T10-48-47Z-46db62a7c",
+      "runId": "37ec754f-bf38-46e7-bc27-aee811f1aa61",
+      "requestId": "d38bb0c4-3c7c-4031-91a0-e1943b20400b",
+      "producer": {
+        "name": "ramify-audit",
+        "version": "0.7.1"
+      },
+      "overall": "pass",
+      "composition": {
+        "scoped": true,
+        "chainDepth": 2,
+        "reportCommit": "cbf484d21b613002d2952e7cdee64d5ab4a4af01",
+        "rootReportCommit": "940badd75b0600dca08b346d4de6e1d6a1ac5551",
+        "outstandingFailures": 0,
+        "verdict": "pass"
+      },
+      "mode": {
+        "requestedMode": "ramify-partial",
+        "resolution": "defaulted",
+        "executedMode": "ramify-partial"
+      },
+      "selection": {
+        "kind": "scoped",
+        "selectedCheckIds": [],
+        "omittedCheckIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "selectedTestUnitIds": [],
+        "omittedTestUnitIds": [
+          "aux",
+          "source"
+        ]
+      },
+      "expectedFiles": {
+        "contract": "runner-configured-files/1",
+        "source": "partial-answer",
+        "expected": 0,
+        "run": 0,
+        "missing": [],
+        "status": "complete",
+        "runnerConfigFiles": [
+          "vitest.aux.config.mjs",
+          "vitest.source.config.mjs"
+        ]
+      },
+      "checks": {}
+    }
+  ],
+  "recovery": [
+    {
+      "name": "full",
+      "requestId": "5cbbf873-e9ca-41e7-be63-a55ceda584d6",
+      "sourceCommit": "91171a132b47b9f0fd53d5d42a088463854a2301",
+      "found": true,
+      "sameRunId": true,
+      "sameReport": true
+    },
+    {
+      "name": "partial",
+      "requestId": "eb44b3f3-6851-45e8-b107-6390e28b80c0",
+      "sourceCommit": "9970c42913090bb1774110f40e2519a878155079",
+      "found": true,
+      "sameRunId": true,
+      "sameReport": true
+    },
+    {
+      "name": "failure",
+      "requestId": "d432fac5-9e61-4fde-9bfb-1b0f213061d4",
+      "sourceCommit": "82a4922364123b66df8cc1717987805a041642fa",
+      "found": true,
+      "sameRunId": true,
+      "sameReport": true
+    },
+    {
+      "name": "deletion",
+      "requestId": "7eaa45f7-c7e2-4900-b97f-cc34a08dd92f",
+      "sourceCommit": "e5ddbc3e267141238d90bb345968796799ad278c",
+      "found": true,
+      "sameRunId": true,
+      "sameReport": true
+    },
+    {
+      "name": "empty",
+      "requestId": "d38bb0c4-3c7c-4031-91a0-e1943b20400b",
+      "sourceCommit": "46db62a7c96e3029501e99552d1f1318276543d6",
+      "found": true,
+      "sameRunId": true,
+      "sameReport": true
+    }
+  ],
+  "preStartCancellation": {
+    "sourceCommit": "9970c42913090bb1774110f40e2519a878155079",
+    "requestId": "73da37f2-89e3-4c65-b413-eedf6e91b71c",
+    "result": {
+      "status": "cancelled",
+      "requestId": "73da37f2-89e3-4c65-b413-eedf6e91b71c",
+      "runId": "71cc49df-c4ce-470d-99c4-f1f41b042071",
+      "reason": "Plan 21 pre-start cancellation witness"
+    },
+    "refsUnchanged": true,
+    "completedLookupFound": false
+  },
+  "runningCancellation": {
+    "sourceCommit": "55c8175fa53d128953e89aab6eae0271e27a15c0",
+    "requestId": "7ffbfbf3-1e38-47e1-acb0-3af28c2dc72d",
+    "result": {
+      "status": "cancelled",
+      "requestId": "7ffbfbf3-1e38-47e1-acb0-3af28c2dc72d",
+      "runId": "c8857c1a-dcc6-444b-977b-6fa747c3efc9",
+      "reason": "Cancelled after configured process marker"
+    },
+    "markerSeen": true,
+    "childPid": 3469001,
+    "childAliveAfterSettlement": false,
+    "events": [
+      "run.started",
+      "source.resolved",
+      "workspace.preparing",
+      "workspace.ready",
+      "check.started",
+      "run.cancelled"
+    ],
+    "refsUnchanged": true,
+    "completedLookupFound": false
+  }
+}

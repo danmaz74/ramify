@@ -1,0 +1,91 @@
+{
+  "probe": "/tmp/plan21-iteration0-adoption-probe",
+  "commit": "537061eac008b8c3dca27b4990c31325676cdd61",
+  "ramifyVersion": "0.4.0",
+  "check": {
+    "outcome": {
+      "execution": "completed",
+      "check": "passed",
+      "coverage": "complete"
+    },
+    "ownership": {
+      "modules": [
+        {
+          "id": "probe",
+          "parent": null,
+          "directory": "."
+        }
+      ],
+      "exclusions": [
+        {
+          "kind": "owned-unwired",
+          "directory": "docs",
+          "owner": "probe"
+        },
+        {
+          "kind": "scratch",
+          "directory": "src/tmp",
+          "owner": "probe"
+        }
+      ]
+    }
+  },
+  "affected": [
+    {
+      "schemaVersion": "ramify.affected-cli/4",
+      "selectionSchema": "ramify.affected/4",
+      "path": {
+        "path": "docs/example.ts",
+        "status": "owned",
+        "module": "probe",
+        "basis": "containment",
+        "exclusion": {
+          "kind": "owned-unwired",
+          "directory": "docs",
+          "owner": "probe"
+        },
+        "kind": "ignored",
+        "selects": []
+      },
+      "changedModules": [],
+      "affectedModules": [],
+      "testModules": [],
+      "coverage": {
+        "status": "complete",
+        "notes": []
+      }
+    },
+    {
+      "schemaVersion": "ramify.affected-cli/4",
+      "selectionSchema": "ramify.affected/4",
+      "path": {
+        "path": "scripts/aux.ts",
+        "status": "owned",
+        "module": "probe",
+        "basis": "inventory",
+        "exclusion": null,
+        "kind": "auxiliary-source",
+        "selects": [
+          "probe"
+        ]
+      },
+      "changedModules": [
+        {
+          "id": "probe",
+          "directory": "."
+        }
+      ],
+      "affectedModules": [],
+      "testModules": [
+        {
+          "id": "probe",
+          "directory": "."
+        }
+      ],
+      "coverage": {
+        "status": "complete",
+        "notes": []
+      }
+    }
+  ]
+}

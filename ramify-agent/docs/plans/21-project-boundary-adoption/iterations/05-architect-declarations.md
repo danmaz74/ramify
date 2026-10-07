@@ -12,6 +12,7 @@ obligations and report correct implementation/passing status, with optional `whe
 ## Read first
 
 [Contracts 9–12](../contracts.md#9-registration-and-architect-declarations),
+[iteration 0's reviewed protocol](iteration0-contract-freeze.md),
 [analysis](../../../analysis/2026-10-07-agent-declarations-and-audit-responsibilities.md),
 local and capability submissions, `run/service.ts`, scenario records/states,
 capability records and the existing ledger/effect discipline. Search generated
