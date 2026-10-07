@@ -1,0 +1,16 @@
+
+> ramify-agent@0.0.0 check:self
+> ramify check --batch --root .
+
+[... 320 'Analysis limit' lines omitted; full log at /home/app/pb3-it5-scratch/check-self.log. The one new limit:]
+Analysis limit [signature-inferred] subs/harness/src/interfaces/protocol/runs.ts:1210:14: `obligationViewSchema` is exposed and its declared signature leaves a type to inference; the companions of an inferred type are not verified
+Root: ramify-agent (given)
+Configuration: ramify-agent/tsconfig.json
+Mode: batch
+Execution: completed; check: passed; coverage: partial
+Stages: registry=completed, acquisition=completed, parse=completed, catalog=completed, link=completed, access=completed, decide=completed, report=completed
+Requested capabilities: registry=executed, layout=executed, metadata=executed, descriptions=executed, source-catalog=executed, exposure-linking=executed, static-access=executed, tags-origin=executed, namespace-access=executed, lazy-access=executed, symbol-free-access=executed, resource-access=executed, coverage=executed
+Completed scope: 12 owners, 586 source files, 56 resources, 11736 accesses
+Findings: 0 errors, 0 warnings, 320 analysis limits; 8774 allowed, 0 denied, 2962 external
+Walked source areas: src, src/tests, subs/harness/src, subs/harness/src/tests, subs/harness/subs/agent/src, subs/harness/subs/agent/src/tests, subs/harness/subs/agent/subs/pi/src, subs/harness/subs/agent/subs/pi/src/tests, subs/harness/subs/audit/src, subs/harness/subs/audit/src/tests, subs/harness/subs/check-findings/src, subs/harness/subs/check-findings/src/tests, subs/harness/subs/evidence/src, subs/harness/subs/evidence/src/tests, subs/harness/subs/ledger/src, subs/harness/subs/ledger/src/tests, subs/harness/subs/nonfunctional/src, subs/harness/subs/nonfunctional/src/tests, subs/harness/subs/plan-evidence/src, subs/harness/subs/plan-evidence/src/tests, subs/harness/subs/scenarios/src, subs/harness/subs/scenarios/src/tests, subs/web/src, subs/web/src/tests
+check:self exit=0
