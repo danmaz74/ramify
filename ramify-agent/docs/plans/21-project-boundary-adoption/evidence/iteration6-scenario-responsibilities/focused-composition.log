@@ -1,0 +1,31 @@
+# HEAD 5f18be0d; files:
+# subs/harness/src/tests/composition.test.ts
+# subs/harness/src/tests/composition-recovery.test.ts
+# subs/harness/src/tests/composition-recovery-chains.test.ts
+# subs/harness/src/tests/composition-recovery-delegation.test.ts
+# subs/harness/src/tests/scenario-briefings.test.ts
+# subs/harness/src/tests/scenario-states.test.ts
+# subs/harness/src/tests/scenario-check-integration.test.ts
+# subs/harness/src/tests/integration-scenarios.test.ts
+# subs/harness/src/tests/integration-scenarios-integration.test.ts
+# subs/harness/src/tests/scenario-findings-run.test.ts
+# subs/harness/src/tests/acceptance-trial.test.ts
+# subs/harness/src/tests/iteration-source-delivery.test.ts
+# subs/harness/src/tests/engineer-briefing.test.ts
+# subs/harness/src/tests/scenario-check.test.ts
+# subs/harness/src/tests/scenario-projections.test.ts
+# subs/harness/src/tests/local-architect-submission.test.ts
+# subs/harness/src/tests/capability-submission.test.ts
+# subs/harness/src/tests/materialization.test.ts
+# subs/harness/src/tests/protocol-contract.test.ts
+# subs/harness/src/tests/union-values.test.ts
+
+ RUN  v4.1.11 /home/app/ramify-plan21-project-boundary-adoption/ramify-agent
+
+················································································································--·················································································································································································
+
+ Test Files  20 passed (20)
+      Tests  289 passed | 2 skipped (291)
+   Start at  23:50:39
+   Duration  20.18s (transform 11.86s, setup 351ms, import 26.79s, tests 137.99s, environment 3ms)
+

@@ -1,0 +1,12 @@
+# Run from the uncommitted working tree before the run_scope_tests pending-selection restoration; the files that change touches were rerun at HEAD in focused-composition.log. Files: accepted-boundary, analysis-submission, context-selection-delivery, engineer-briefing, capability-* (except capability-submission), scenario-states, scenario-briefings, scenario-projections, scenario-findings-run, scenario-findings, scenario-check, scenario-check-integration, integration-scenarios, iteration-source-delivery, plan13-composed-functional, fixture-trials, execution-map-*, work-items, review-stop, progress, run-protocol, and subs/harness/subs/scenarios/src/tests.
+
+ RUN  v4.1.11 /home/app/ramify-plan21-project-boundary-adoption/ramify-agent
+
+······················································································································································································································································································································································--····················································
+
+ Test Files  41 passed | 1 skipped (42)
+      Tests  394 passed | 2 skipped (396)
+   Start at  23:12:58
+   Duration  1014.18s (transform 13.00s, setup 574ms, import 39.68s, tests 1818.69s, environment 7ms)
+
+exit 0
