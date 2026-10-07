@@ -16,7 +16,7 @@ import { openRunsWithoutProcesses } from './external-tools.js';
 import { assign, byRole, completionProposed, outline, read, submit, treeInputs } from './iterations.js';
 import { forkDecision, registryChange, requestPlacement } from './placement.js';
 import { sharedUi, writeArchitectTreeFixture } from './progress-fixture.js';
-import { emptyAnalysis, runPath, startRun, stopRun, testPolicy, until } from './runs.js';
+import { emptyAnalysis, runPath, scriptedConfiguredAudit, startRun, stopRun, testPolicy, until } from './runs.js';
 import { declaringScenarios } from './declarations.js';
 import { scenariosCommit, scriptedGit, type ScriptedGit } from './scripted-git.js';
 import { runSessionScenario } from './session-scenario.js';
@@ -294,6 +294,7 @@ export function liveRunSettings(root: string, pacer: Pacer, checkExecution: Chec
       candidates: final.candidates,
 
       checkExecution,
+      configuredAudit: scriptedConfiguredAudit(root, {}),
       policy: projectRoot => testPolicy(projectRoot),
       stopGraceMs: 500,
       warn: () => undefined,

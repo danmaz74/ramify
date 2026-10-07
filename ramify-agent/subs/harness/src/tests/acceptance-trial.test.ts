@@ -318,11 +318,11 @@ async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
   expect(trial.waiting).toEqual({ phase: 'awaiting-review', branch: null, commits: 0 });
   expect(snapshot.review).toMatchObject({ reviewer: 'dana@example.com', duringRun: false });
 
-  // The four readiness steps of the scenario harness.
+  // The scenario harness is available, and configured audit readiness passed.
   const readiness = JSON.parse(await readFile(runPath(root, plan, trial.runId, runLayout.readiness(1)), 'utf8')) as ReadinessAttempt;
   const steps = new Map(readiness.steps.map(step => [step.step, step.outcome]));
-  expect(['project-config', 'acceptance-runner', 'baseline-acceptance', 'acceptance-full'].map(step => `${step} ${steps.get(step as never)}`))
-    .toEqual(['project-config passed', 'acceptance-runner passed', 'baseline-acceptance passed', 'acceptance-full passed']);
+  expect(['project-config', 'acceptance-runner', 'audit-config', 'configured-full-audit'].map(step => `${step} ${steps.get(step as never)}`))
+    .toEqual(['project-config passed', 'acceptance-runner passed', 'audit-config passed', 'configured-full-audit passed']);
 
   // The course of the run.
   expect(course(log)).toEqual([

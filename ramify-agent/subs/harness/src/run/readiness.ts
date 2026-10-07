@@ -60,6 +60,8 @@ export interface ReadinessRequest {
   /** The commit readiness ran on. */
   readonly head: string;
   readonly signal?: AbortSignal | undefined;
+  /** Owned process boundary for local preparation; production uses the process-backed runner. */
+  readonly commandExecution?: CommandRunner | undefined;
   /** Called as each command of the baseline gate starts. */
   readonly started?: GateCommandStarted | undefined;
   readonly waiting?: import('../checks/gate.js').GateRequest['waiting'];
@@ -224,7 +226,7 @@ async function declaredPreparationStep(
     if (request.signal?.aborted) return { step: 'declared-preparation', outcome: 'not-verified', detail: 'declared preparation was cancelled' };
     const outputFile = join(request.gateDirectory, `${String(index + 1).padStart(2, '0')}-preparation.log`);
     await request.started?.({ kind: 'setup', ...(check.name === undefined ? {} : { name: check.name }), position: index + 1, total: setup.length });
-    const run = await runCommand({ argv: check.command.argv, cwd: check.command.cwd,
+    const run = await (request.commandExecution ?? runCommand)({ argv: check.command.argv, cwd: check.command.cwd,
       env: checkCommandEnvironment(check.command), timeoutMs: check.command.timeoutMs, outputFile,
       ...(request.signal === undefined ? {} : { signal: request.signal }) });
     if (run.outcome.kind !== 'completed' || run.outcome.exitCode !== 0) {

@@ -23,7 +23,7 @@ import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { copyFixture } from './helpers/fixture.js';
 import { byRole, submit, treeInputs } from './helpers/iterations.js';
 import {
-  approveRun, emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until,
+  approveRun, emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, scriptedConfiguredAudit, staleCrashLock, startRun, stopRun, testPolicy, until,
 } from './helpers/runs.js';
 import { unchangedGit } from './helpers/unchanged-run.js';
 import { fixtureScratchGit } from './helpers/mock-git.js';
@@ -501,7 +501,8 @@ describe('over HTTP', () => {
       agent: createScriptedAgent(withDefaultTurns(script)),
       runs: {
         inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
-        git: fixtureScratchGit(unchangedGit(root, [finalVerification], 4)), candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates,  checkExecution: createPassingCheckExecution(),
+        git: fixtureScratchGit(unchangedGit(root, [finalVerification], 4)), candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates,
+        checkExecution: createPassingCheckExecution(), configuredAudit: scriptedConfiguredAudit(root, {}),
       },
     });
   }

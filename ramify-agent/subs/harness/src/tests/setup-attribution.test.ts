@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { gateDiagnostics } from '../checks/diagnostics.js';
 import { runGate } from '../checks/gate.js';
 import { setupChecks } from '../checks/checkpoint.js';
-import { checkCommand, type GateAttempt } from '../checks/records.js';
+import { checkCommand, checkCommandEnvironment, type GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
 import { runLayout } from '../run/records.js';
 import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
@@ -14,6 +14,7 @@ import { mockGit } from './helpers/mock-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { createMappedCheckExecution, type DirectCheckStep } from './helpers/direct-check-execution.js';
+import { commandResult } from './helpers/command-result.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
@@ -154,6 +155,16 @@ describe('the declared setup over a run', () => {
       .mockResolvedValue(null);
     const opened = await openRuns(root, {
       inputs: treeInputs(), git, candidates: final.candidates,
+      commandExecution: request => {
+        expect(request.argv).toEqual(['node', 'scripts/build.mjs']);
+        expect(request.cwd).toBe(root);
+        expect(request.env).toEqual(checkCommandEnvironment(setupChecks([
+          { name: 'build', command: ['node', 'scripts/build.mjs'] },
+        ], root)[0]!.command));
+        expect(request.timeoutMs).toBe(600_000);
+        expect(request.signal).toBeInstanceOf(AbortSignal);
+        return commandResult(request, {});
+      },
       // The engineer's first change breaks the build; its repair builds.
       checkScript: ({ check, context }) => check.kind === 'setup' && context.sourceCommit === 'broken-build'
         ? { stderr: `${buildError}\n`, outcome: { kind: 'completed', exitCode: 2 } }
@@ -171,10 +182,12 @@ describe('the declared setup over a run', () => {
     const receipt = await opened.service.execute(startRun('review-notes'));
     await opened.service.settled('review-notes', receipt.jobId);
     const runId = receipt.jobId;
-    expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');
+    const snapshot = onlyRun(opened.service, 'review-notes');
+    expect(snapshot.state, JSON.stringify(snapshot.failure)).toBe('completed');
     expect(previewIndex).toBe(final.previews.length);
 
     const events = await runEventsOnDisk(root, 'review-notes', runId);
+    expect(events.some(event => event.type === 'gate-command-started' && event.data.kind === 'setup')).toBe(true);
     const ids = [...new Set(events.filter(event => event.type === 'gate-attempted').map(event => (event.data as { gate: string }).gate))];
     const attempts = await Promise.all(ids.map(async id =>
       JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate(id)), 'utf8')) as GateAttempt));

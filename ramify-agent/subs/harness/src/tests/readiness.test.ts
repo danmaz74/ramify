@@ -402,6 +402,7 @@ describe('declared preparation and configured full readiness', () => {
       commandExecution: request => commandResult(request, {}),
     });
     expect(result.snapshot.state).toBe('failed');
+    expect(result.snapshot.failure?.reason).toBe('readiness-failed');
     expect(result.failures).toHaveLength(1);
     expect(result.failures[0]).toMatchObject({ step: 'declared-packages', recovery: 'rec-0001', final: true });
     expect(result.recoveries).toMatchObject([{ action: 'reinstall-nested', outcome: 'failed', attempt: 1 }]);
@@ -415,6 +416,7 @@ describe('declared preparation and configured full readiness', () => {
     } } } });
     const result = await readinessLifecycle(fixture.root, timedOut.adapter);
     expect(result.snapshot.state).toBe('failed');
+    expect(result.snapshot.failure?.reason).toBe('readiness-failed');
     expect(result.failures.map(entry => entry.recovery)).toEqual(['rec-0001', 'rec-0002', null]);
     expect(result.recoveries.map(entry => [entry.cause, entry.action, entry.attempt]))
       .toEqual([['timeout', 'rerun-command', 1], ['timeout', 'rerun-command', 2]]);
@@ -457,7 +459,7 @@ describe('declared preparation and configured full readiness', () => {
     const result = await readinessLifecycle(fixture.root, configured.adapter, { ramify: new RamifyCli({ executable, timeoutMs: 30_000 }) });
     expect(result.snapshot.state).toBe('failed');
     expect(result.failures).toMatchObject([{ step: 'ramify-daemon', recovery: 'rec-0001', final: true }]);
-    expect(result.recoveries).toMatchObject([{ action: 'restart-daemon', outcome: 'failed', attempt: 1 }]);
+    expect(result.recoveries).toMatchObject([{ cause: 'daemon-unavailable', action: 'restart-daemon', outcome: 'failed', attempt: 1 }]);
     expect(configured.calls).not.toContain(`full:${fixture.head}`);
   }, 120_000);
 

@@ -325,7 +325,9 @@
         {
           "file": "subs/harness/src/tests/readiness.test.ts",
           "titles": [
-            "the three causes a readiness failure can have"
+            "RunService repairs a missing declared installation once and then completes readiness",
+            "provider failure and captured-policy conflict stop before branch creation",
+            "RunService reruns once after configured timeout and stops on failing tests without recovery"
           ]
         }
       ]

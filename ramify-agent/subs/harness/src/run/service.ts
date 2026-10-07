@@ -797,7 +797,7 @@ export class RunService {
     // committed before anything ends the run, as when the mutex held it.
     await run.gating?.catch(() => undefined);
     return run.mutex.run(async () => {
-      if (run.log.terminal || this.closed || (run.stopRequested && terminal.type !== 'job-stopped')) return 'ended';
+      if (run.log.terminal || this.closed || (run.stopRequested && terminal.type !== 'job-stopped' && terminal.type !== 'job-interrupted')) return 'ended';
       const sessions = this.sessionsOf(run);
       for (const session of sessions?.values() ?? []) {
         const reason = session.state === 'suspended' ? 'run-ended' : session.state === 'live' && session.awaiting === null ? opening : null;
@@ -10320,6 +10320,7 @@ export class RunService {
         git: this.git,
         head,
         signal,
+        commandExecution: this.options.commandExecution,
         started: this.commandStarted(run, gateId, 'readiness'),
         waiting: this.commandWaiting(run, gateId, 'readiness'),
       });
