@@ -7,7 +7,6 @@ import { runLayout } from '../../run/records.js';
 import { analysis, entry, requestCompletion } from './analysis.js';
 import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged, type CommitResponse } from './contracts-git.js';
 import type { DirectCheckScript } from './direct-check-execution.js';
-import { directReadinessExecution } from './external-tools.js';
 import { copyFixture } from './fixture.js';
 import { addModule, assign, byWork, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './iterations.js';
 import { openRuns, runPath, startRun } from './runs.js';
@@ -201,7 +200,7 @@ export async function runIntegration(
     script: byWork(script),
     inputs: treeInputs(),
     git, candidates: candidate.candidates,
-    readinessExecution: directReadinessExecution(),
+
     ...(checkScript === undefined ? {} : { checkScript }),
   });
   cleanups.push(() => opened.service.close());

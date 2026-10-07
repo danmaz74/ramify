@@ -10,7 +10,6 @@ import {
   runDirectory, scenarios, source, statedCommands, committedRecords, type CrashPoint, type LogLine, type ScenarioName,
 } from './composition.js';
 import { scenariosCommitName, type GitResponses } from './recovery-git.js';
-import { directReadinessExecution } from './external-tools.js';
 import { onlyRun, openRuns } from './runs.js';
 
 /*
@@ -395,7 +394,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     // The same Git answers the restart: the commit the interrupted run made
     // is the one this one finds by the attempt's identity trailers.
     const first = await openRuns(root, {
-      agent, git, candidates: compositionCandidates(root, scenario), readinessExecution: directReadinessExecution(),
+      agent, git, candidates: compositionCandidates(root, scenario),
       // Recovery runs no command; one it ran would fail here rather than
       // starting a process.
       commandExecution: statedCommands(root, []),
@@ -495,7 +494,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     reopened.pop();
     const askedAgain = { made: git.commits().length, found: git.recovered().length };
     const second = await openRuns(root, {
-      agent, git, candidates: compositionCandidates(root, scenario), readinessExecution: directReadinessExecution(),
+      agent, git, candidates: compositionCandidates(root, scenario),
       commandExecution: statedCommands(root, []),
       inputs: scenario.inputs(),
     });

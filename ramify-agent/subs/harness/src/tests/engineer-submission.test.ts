@@ -1,6 +1,6 @@
 import { finalCandidate } from './helpers/final-candidate.js';
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { scenariosCommit, scriptedGit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { commandResult } from './helpers/command-result.js';
@@ -396,7 +396,7 @@ describe('a Ramify module violation in a run', () => {
       .mockResolvedValueOnce(answer([finding])).mockResolvedValueOnce(answer([finding]))
       .mockResolvedValue(answer([]));
     const { service, agent } = await openRunsWithGit(root, {
-      inputs: treeInputs(), git, candidates: finalCandidate(root, 'fixed-source').candidates, ramify, readinessExecution: directReadinessExecution(),
+      inputs: treeInputs(), git, candidates: finalCandidate(root, 'fixed-source').candidates, ramify,
       // The engineer's writes are what Git reports once the feature files are committed.
       afterWrite: async write => { if (write === 'scenarios-materialized') git.givenWrites(); },
       script: byRole({

@@ -12,7 +12,7 @@ import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs } from './helpers/iterations.js';
 import { mockGit } from './helpers/mock-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { createMappedCheckExecution, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
@@ -153,7 +153,7 @@ describe('the declared setup over a run', () => {
       .mockImplementationOnce(async () => { head = 'repaired-build'; return head; })
       .mockResolvedValue(null);
     const opened = await openRuns(root, {
-      inputs: treeInputs(), git, candidates: final.candidates, readinessExecution: directReadinessExecution(),
+      inputs: treeInputs(), git, candidates: final.candidates,
       // The engineer's first change breaks the build; its repair builds.
       checkScript: ({ check, context }) => check.kind === 'setup' && context.sourceCommit === 'broken-build'
         ? { stderr: `${buildError}\n`, outcome: { kind: 'completed', exitCode: 2 } }

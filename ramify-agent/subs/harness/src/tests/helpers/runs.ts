@@ -18,6 +18,8 @@ import { defaultContextPolicies, defaultRunPolicy } from '../../run/policy.js';
 import type { RunPolicy } from '../../run/records.js';
 import type { RunInputs } from '../../run/inputs.js';
 import { RunService, type RunServiceOptions } from '../../run/service.js';
+import { captureProjectConfig } from '../../run/project-config.js';
+import type { ConfiguredAuditPort, CommittedAuditConfiguration } from '../../../subs/audit/src/check-execution.js';
 import type { CapabilityWorkflow } from '../../capability/workflow.js';
 import { acquireProjectLock, lockPath } from '../../store/lock.js';
 import { FakeRamifyCli } from './fake-ramify.js';
@@ -283,6 +285,7 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
     inputs: shapeOnlyInputs,
     ramify: options.ramify ?? new FakeRamifyCli(),
     checkExecution,
+    configuredAudit: scriptedConfiguredAudit(root, options),
     stopGraceMs: 500,
     ...(production === true ? {} : { policy: (projectRoot: string) => testPolicy(projectRoot) }),
     warn: message => warnings.push(message),
@@ -296,6 +299,31 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
       ? await RunService.openForHistoricalTests(serviceOptions)
       : await RunService.openForCapabilityTests(serviceOptions, capabilityWorkflowFactory);
   return { service, recovery, agent: scripted, lock, warnings };
+}
+
+/** Scripted lifecycle answer only; it is not a provider conformance witness. */
+export function scriptedConfiguredAudit(root: string, options: Partial<OpenRunsOptions>): ConfiguredAuditPort {
+  const read = async (_projectRoot: string, sourceCommit: string): Promise<CommittedAuditConfiguration> => {
+    const policy = options.policy?.(root, []);
+    const packages = policy?.commands.nestedPackages.map(entry => entry.directory) ?? [];
+    const agent = await captureProjectConfig(root);
+    const setup = 'config' in agent ? agent.config.setup ?? [] : [];
+    return {
+      sourceCommit, path: 'ramify-audit.json', blob: 'scripted-lifecycle-configuration', projectRoot: '.',
+      checks: [{ id: 'scripted-lifecycle-check' }], ignorePaths: [], undetectedConfigFilesForcingFullAudit: [],
+      workspace: { preparationId: 'nodejs', packageDirectoriesDeclared: packages.length > 0,
+        linkNodeModules: true, packageDirectories: packages.length > 0 ? packages : [''],
+        setupCommands: setup.map(command => ({ ...(command.name === undefined ? {} : { name: command.name }),
+          argv: [...command.command], cwd: command.cwd ?? '.', env: command.env ?? {}, timeoutMs: command.timeoutMs ?? 600_000 })) },
+    };
+  };
+  return { read, async runFull(input) {
+    const configuration = await read(input.projectRoot, input.sourceCommit);
+    if (JSON.stringify(configuration) !== JSON.stringify(input.configuration)) throw new Error('Scripted configuration mismatch');
+    return { status: 'completed', requestedSourceCommit: input.sourceCommit, auditedSourceCommit: input.sourceCommit,
+      reused: false, verdict: 'pass', reportCommit: 'scripted-report', runRef: 'scripted-ref', treeRef: 'scripted-tree',
+      detail: 'Scripted lifecycle result; no provider ran', provider: { scripted: true } };
+  } };
 }
 
 let commandCount = 0;

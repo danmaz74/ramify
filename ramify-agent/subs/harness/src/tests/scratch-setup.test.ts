@@ -6,8 +6,7 @@ import { runSingleSession } from '../sessions/single.js';
 import { declaredModuleDirectories } from '../run/project-config.js';
 import { copyFixture } from './helpers/fixture.js';
 import { readDeclaredTree, unsuitableScope } from './helpers/iterations.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
-import { createMappedCheckExecution } from './helpers/direct-check-execution.js';
+import { scriptedConfiguredAudit } from './helpers/runs.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { mockGit, type ScratchGitScript } from './helpers/mock-git.js';
 import { scriptedGit, type ScriptedGit } from './helpers/scripted-git.js';
@@ -59,7 +58,7 @@ async function successfulRun(root: string, inputs: { setup: boolean }) {
 
 async function failedRun(root: string, git: ScriptedGit) {
   const opened = await openRuns(root, { git, scratchGit: 'provided', script: [{ kind: 'submit', input: emptyAnalysis() }],
-    readinessExecution: directReadinessExecution() });
+    });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun(plan));
   await opened.service.settled(plan, receipt.jobId);
@@ -176,11 +175,14 @@ describe('scratch setup before a run uses it', () => {
     const before = await readFile(join(root, '.gitignore'));
     const git = scriptedGit(root, { head: source, checkpoints: [{ subject: `final verification of plan "${plan}"`, commit: null, changes: [] }],
       previews: Array.from({ length: 3 }, () => ({ repositoryRoot: root, head: source, tree: 'a'.repeat(40) })) });
-    let tests = 0;
-    const readinessExecution = createMappedCheckExecution({ script: ({ check }) => check.kind === 'tests' && ++tests === 1
-      ? { outcome: { kind: 'completed', exitCode: 1 } } : {} });
+    let audits = 0;
+    const base = scriptedConfiguredAudit(root, {});
+    const configuredAudit = { ...base, async runFull(input: Parameters<typeof base.runFull>[0]) {
+      const result = await base.runFull(input);
+      return ++audits === 1 ? { ...result, verdict: 'fail' as const, detail: 'Scripted first baseline failed' } : result;
+    } };
     const opened = await openRuns(root, { git, script: [{ kind: 'submit', input: emptyAnalysis() }],
-      readinessExecution });
+      configuredAudit });
     cleanups.push(() => opened.service.close());
     const first = await opened.service.execute(startRun(plan));
     await opened.service.settled(plan, first.jobId);
@@ -203,13 +205,13 @@ describe('scratch setup before a run uses it', () => {
         recoveredScratch: [boundary === 'scratch-rule-appended' ? null : setupCommit] });
       let frozen = false;
       const first = await openRuns(root, { git, script: [{ kind: 'submit', input: emptyAnalysis() }],
-        readinessExecution: directReadinessExecution(), afterWrite: async write => {
+         afterWrite: async write => {
           if (write === boundary) { frozen = true; await freeze(); }
         } });
       const receipt = await first.service.execute(startRun(plan));
       await until(() => frozen);
       await staleCrashLock(root);
-      const restarted = await openRuns(root, { git, readinessExecution: directReadinessExecution() });
+      const restarted = await openRuns(root, { git, });
       cleanups.push(() => restarted.service.close());
       expect(restarted.recovery.effects).toContain(`${plan}/${receipt.jobId}: the scratch ignore rule setup`);
       expect(git.commits().filter(entry => entry.message.includes('Ramify-Scratch: setup'))).toHaveLength(1);

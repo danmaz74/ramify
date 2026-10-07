@@ -6,7 +6,6 @@ import { gitService } from '../../subs/evidence/src/git.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { initRepository, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -50,7 +49,7 @@ test('CA04 CA06 CA16: a pending question is durable and the retained A session a
     return [];
   };
   const opened = await openCapabilityRuns(fixture.root, { git: gitService, script, inputs: treeInputs(),
-    readinessExecution: directReadinessExecution() });
+    });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
   await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>

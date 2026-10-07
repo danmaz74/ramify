@@ -22,7 +22,6 @@ import {
 import { decision as decisionBody, forkDecision, forkPartial, localDecision, registryChange, requestPlacement } from './placement.js';
 import { commandResult } from './command-result.js';
 import { scriptedScenarioRun } from './project-config.js';
-import { directReadinessExecution } from './external-tools.js';
 import { announcingCheckExecution, createPassingCheckExecution } from './direct-check-execution.js';
 import { deleted, modified, scenarioGit, untracked, type GitResponses, type ScenarioGit } from './recovery-git.js';
 import { scriptedCandidates } from './candidates.js';
@@ -975,7 +974,7 @@ export async function runToEnd(scenario: Scenario, watch?: (service: RunService,
     git,
     candidates: compositionCandidates(target.root, scenario),
     // Every gate announces its commands, as the real executors do.
-    readinessExecution: announcingCheckExecution(directReadinessExecution()),
+
     checkExecution: announcingCheckExecution(createPassingCheckExecution()),
     commandExecution: commands,
     inputs: scenario.inputs(),
@@ -1040,7 +1039,7 @@ export async function crashAt(scenario: Scenario, point: CrashPoint) {
     git,
     candidates: compositionCandidates(target.root, scenario),
     // Every gate announces its commands, as the real executors do.
-    readinessExecution: announcingCheckExecution(directReadinessExecution()),
+
     checkExecution: announcingCheckExecution(createPassingCheckExecution()),
     commandExecution: commands,
     inputs: scenario.inputs(),

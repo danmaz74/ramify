@@ -20,7 +20,6 @@ import {
 import { createLocalCommandCheckExecution } from './helpers/direct-check-execution.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 
 /*
  * Breaking work and gate integrity.
@@ -391,7 +390,7 @@ async function run(
     inputs: treeInputs(),
     git: scripted.git,
     ...(final === undefined ? {} : { candidates: final.candidates }),
-    readinessExecution: directReadinessExecution(),
+
     policy: projectRoot => { const policy = testPolicy(projectRoot); return { ...policy, commands: { ...policy.commands,
       allTests: checkCommand({ argv: [join(projectRoot, 'node_modules/.bin/vitest'), 'run',
         `${dirA}/src/tests/adapters.test.ts`, `${dirC}/src/tests/outcome.test.ts`,
@@ -678,7 +677,7 @@ describe('the broad scope is a planned exception', () => {
     const { service, runId, agent } = await openRuns(root, {
       inputs: treeInputs(),
       git: scripted.git,
-      readinessExecution: directReadinessExecution(),
+
       script: byRole({
         'initial-architect': [submit(analysis([entry('reviewer-identity', attribution)]))],
         'local-architect': [

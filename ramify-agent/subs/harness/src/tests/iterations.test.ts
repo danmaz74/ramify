@@ -12,7 +12,7 @@ import {
   addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write,
 } from './helpers/iterations.js';
 import { gateGit, scenariosCommit, operationsOf, type GateCommit } from './helpers/gate-git.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
@@ -98,7 +98,7 @@ async function run(root: string, plan: Parameters<typeof byRole>[0], commits: re
     inputs: treeInputs(),
     git: scripted.git,
     candidates: scriptedCandidates(root, { [after]: { tree, base: before, files: {}, changes: [] } }),
-    readinessExecution: directReadinessExecution(),
+
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));

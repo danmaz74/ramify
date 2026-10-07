@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, expect, test } from 'vitest';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { copyCapabilityFixture } from './helpers/capability.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { initRepository, openRuns, runEventsOnDisk, runPath, startRun, until } from './helpers/runs.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -16,7 +15,7 @@ test('CA24: production restart preserves an incomplete historical run and refuse
   const historical = await openRuns(fixture.root, {
     git: gitService,
     script: spec => spec.role === 'initial-architect' ? [{ kind: 'wait', ms: 60_000 }] : [],
-    readinessExecution: directReadinessExecution(),
+
   });
   cleanups.push(() => historical.service.close());
   const receipt = await historical.service.execute(startRun('need'));
@@ -28,7 +27,7 @@ test('CA24: production restart preserves an incomplete historical run and refuse
 
   const reopened = await openRuns(fixture.root, {
     production: true, git: gitService, script: () => [],
-    readinessExecution: directReadinessExecution(),
+
   });
   cleanups.push(() => reopened.service.close());
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);

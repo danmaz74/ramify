@@ -191,6 +191,8 @@ describe('the files only the harness writes', () => {
     await mkdir(join(root, 'subs/orders/src/tests/features/notes'), { recursive: true });
     await writeFile(join(root, feature), 'Feature: add-note\n');
     await writeFile(join(root, 'ramify-agent.json'), '{}\n');
+    await writeFile(join(root, 'ramify-audit.json'), '{"checks":[]}\n');
+    await writeFile(join(root, 'subs/orders/package.json'), '{"name":"orders"}\n');
     const resolved = await resolveWriteScope({
       projectRoot: root, index, view: { status: 'placeholder' }, revision: 3,
       // The whole project, so that only the denial stands between the agent and the two files.
@@ -198,7 +200,8 @@ describe('the files only the harness writes', () => {
     });
     const denied = await deniedFiles(root, [feature, 'subs/orders/src/tests/features/notes/not-written-yet.feature']);
     expect(denied).toEqual([
-      join(root, 'ramify-agent.json'), join(root, feature), join(root, 'subs/orders/src/tests/features/notes/not-written-yet.feature'),
+      join(root, 'ramify-agent.json'), join(root, feature),
+      join(root, 'subs/orders/src/tests/features/notes/not-written-yet.feature'),
     ]);
     const scope = guardedScopeOf(resolved, denied);
 
@@ -211,6 +214,7 @@ describe('the files only the harness writes', () => {
     expect((await decideWrite(scope, root, writing('subs/orders/src/tests/steps/add-note.steps.ts'))).verdict).toBe('allowed');
     expect(await readFile(join(root, feature), 'utf8')).toBe('Feature: add-note\n');
     expect(await readFile(join(root, 'ramify-agent.json'), 'utf8')).toBe('{}\n');
+    expect(await decideWrite(scope, root, writing('ramify-audit.json'))).toMatchObject({ verdict: 'allowed' });
     // Without the denial the same scope allows both.
     expect((await decideWrite(guardedScopeOf(resolved), root, writing(feature))).verdict).toBe('allowed');
   });

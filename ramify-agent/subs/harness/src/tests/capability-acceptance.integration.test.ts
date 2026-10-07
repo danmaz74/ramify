@@ -10,7 +10,6 @@ import { createLocalCommandCheckExecution, createMappedCheckExecution } from './
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { rootDescription } from './helpers/root-description.js';
 import { testReviewPolicy } from './helpers/candidates.js';
 import { freeze, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
@@ -201,7 +200,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     : {} });
   const gateContexts: string[] = [];
   const options = { git: gitService, script: scripted, inputs: treeInputs(),
-    readinessExecution: directReadinessExecution(),
+
     checkExecution: mode === 'repair-exhaustion' ? { run: (checks: Parameters<typeof realChecks.run>[0],
       request: Parameters<typeof realChecks.run>[1]) => {
         gateContexts.push(`${request.context.attemptId}:${request.context.checkpoint}`);

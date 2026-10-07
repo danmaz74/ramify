@@ -8,7 +8,6 @@ import type { CheckExecutionPort } from '../../checks/execution.js';
 import { reviewLayout, type ReviewAttempt } from '../../reviews/records.js';
 import { analysis, entry, requestCompletion } from './analysis.js';
 import { scriptedCandidates, testReviewPolicy, type ScriptedCandidates, type ScriptedCommit } from './candidates.js';
-import { directReadinessExecution } from './external-tools.js';
 import { copyFixture } from './fixture.js';
 import { gateGit, scenariosCommit, type GateCommit } from './gate-git.js';
 import { addModule, assign, byRole, byWork, outline, submit, treeInputs } from './iterations.js';
@@ -184,7 +183,7 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
     inputs: treeInputs(),
     git: git.git,
     candidates: source,
-    readinessExecution: directReadinessExecution(),
+
     policy: projectRoot => {
       const policy = testPolicy(projectRoot, { reviews: testReviewPolicy(scenario.policy) });
       return { ...policy, limits: { ...policy.limits, ...scenario.limits } };

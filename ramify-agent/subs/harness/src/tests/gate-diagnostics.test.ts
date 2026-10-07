@@ -2,7 +2,7 @@ import { mockGit } from './helpers/mock-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
 import { localArchitectToolName } from '../work/submission.js';
 import { engineerToolName } from '../work/engineer.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -246,7 +246,7 @@ describe('a module violation at the iteration gate, over a run', () => {
       .mockImplementationOnce(async (_root, message) => { expect(message).toMatch(/^Scenarios of /u); head = 'scenarios'; return head; })
       .mockImplementationOnce(async () => { head = 'repaired-source'; return head; }).mockResolvedValue(null);
     const opened = await openRuns(root, {
-      inputs: treeInputs(), git, candidates: final.candidates, readinessExecution: directReadinessExecution(),
+      inputs: treeInputs(), git, candidates: final.candidates,
       checkScript: ({ check, context }) => check.kind === 'ramify-check' && context.attemptId === 'ga-0002'
         ? { stdout: checkReport([notVisible(source, 13)]), outcome: { kind: 'completed', exitCode: 1 } }
         : {},

@@ -12,7 +12,7 @@ import { runLayout } from '../../run/records.js';
 import { readTranscript } from '../../transcripts/writer.js';
 import { analysis, entry, hypothesis, requestCompletion } from './analysis.js';
 import { createPassingCheckExecution } from './direct-check-execution.js';
-import { directReadinessExecution, openRunsWithoutProcesses } from './external-tools.js';
+import { openRunsWithoutProcesses } from './external-tools.js';
 import { assign, byRole, completionProposed, outline, read, submit, treeInputs } from './iterations.js';
 import { forkDecision, registryChange, requestPlacement } from './placement.js';
 import { sharedUi, writeArchitectTreeFixture } from './progress-fixture.js';
@@ -292,7 +292,7 @@ export function liveRunSettings(root: string, pacer: Pacer, checkExecution: Chec
       inputs: treeInputs(),
       git: fixtureScratchGit(git),
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
       checkExecution,
       policy: projectRoot => testPolicy(projectRoot),
       stopGraceMs: 500,

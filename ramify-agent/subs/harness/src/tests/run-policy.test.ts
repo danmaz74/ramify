@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
 import { checkpointPolicies, allProjectChecks } from '../checks/checkpoint.js';
-import { commandTimeouts, defaultLimits, defaultRunPolicy, discoverNestedPackages, nestedPackageDepth } from '../run/policy.js';
+import { commandTimeouts, defaultLimits, defaultRunPolicy } from '../run/policy.js';
 import { runPolicySchema } from '../run/records.js';
 import { RunService, type RunServiceOptions } from '../run/service.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -97,44 +97,16 @@ describe('the captured commands', () => {
   });
 });
 
-describe('nested-package discovery', () => {
-  test('does not enter a module scratch directory holding a package manifest', async () => {
+describe('new-run policy does not infer packages', () => {
+  test('an unrelated manifest and a deep setup-only manifest do not add test commands', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
-    await write(join(fixture.root, 'src/tmp'), { scripts: { test: 'vitest run' } }, false);
-    await write(join(fixture.root, 'subs/workspace/src/tmp'), { scripts: { test: 'vitest run' } }, false);
-    expect(await discoverNestedPackages(fixture.root)).toEqual([]);
+    for (const directory of ['subs/unrelated', 'subs/a/subs/b/subs/c/subs/d/tools']) {
+      await mkdir(join(fixture.root, directory), { recursive: true });
+      await writeFile(join(fixture.root, directory, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }));
+    }
+    expect(defaultRunPolicy({ projectRoot: fixture.root }).commands.nestedPackages).toEqual([]);
   }, 60_000);
-
-  test('finds an independent package, skips node_modules and the harness\'s own directories', async () => {
-    const fixture = await copyFixture();
-    cleanups.push(fixture.remove);
-    const root = fixture.root;
-
-    await write(join(root, 'subs/workspace/subs/catalog/tools'), { scripts: { test: 'vitest run' } }, true);
-    await write(join(root, 'node_modules/some-package'), {}, false);
-    await write(join(root, 'plans/review-notes/.harness'), {}, false);
-    await writeFile(join(root, 'plans/review-notes/.harness/tsconfig.json'), '{ "files": [] }\n');
-
-    const found = await discoverNestedPackages(root);
-    expect(found.map(entry => entry.directory)).toEqual(['subs/workspace/subs/catalog/tools']);
-    expect(found[0]).toMatchObject({ manifest: 'subs/workspace/subs/catalog/tools/package.json', installed: true, testScript: 'vitest run' });
-    expect(nestedPackageDepth).toBeGreaterThanOrEqual(5);
-  }, 60_000);
-
-  test('a package with no test script is recorded with none, and the root manifest is not one', async () => {
-    const fixture = await copyFixture();
-    cleanups.push(fixture.remove);
-    await write(join(fixture.root, 'subs/docs'), { name: 'docs' }, false);
-    const found = await discoverNestedPackages(fixture.root);
-    expect(found).toEqual([{ directory: 'subs/docs', manifest: 'subs/docs/package.json', installed: false, testScript: null }]);
-  }, 60_000);
-
-  async function write(directory: string, manifest: Record<string, unknown>, installed: boolean) {
-    await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, 'package.json'), `${JSON.stringify({ name: 'nested', private: true, ...manifest }, null, 2)}\n`);
-    if (installed) await mkdir(join(directory, 'node_modules'), { recursive: true });
-  }
 });
 
 describe('the checkpoint policy', () => {

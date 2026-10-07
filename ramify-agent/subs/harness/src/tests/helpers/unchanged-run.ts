@@ -1,4 +1,3 @@
-import { directReadinessExecution } from './external-tools.js';
 import { openRuns, type OpenRunsOptions } from './runs.js';
 import { scriptedGit, type GitCheckpoint, type GitScript, type ScriptedGit } from './scripted-git.js';
 import { scriptedCandidates } from './candidates.js';
@@ -58,7 +57,7 @@ export async function openUnchangedRuns(root: string, options: UnchangedRunsOpti
   const candidates = audited === null ? undefined : scriptedCandidates(root, {
     [audited]: { tree: fixtureTree, files: {}, base: before, changes: [] },
   });
-  return { ...await openRuns(root, { git, readinessExecution: directReadinessExecution(),
+  return { ...await openRuns(root, { git,
     ...(candidates === undefined ? {} : { candidates }), ...runs }), git };
 }
 

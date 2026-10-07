@@ -6,7 +6,6 @@ import { gitService } from '../../subs/evidence/src/git.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { git, initRepository, openRuns, runEventsOnDisk, runPath, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { capabilityPolicyFrom } from '../capability/policy.js';
 import { captureProvisionalSource } from '../capability/source.js';
@@ -94,7 +93,7 @@ test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and kee
   const starts: string[] = [];
   const capabilityPrompts: string[] = [];
   const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService, script: script(starts, capabilityPrompts), inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    git: gitService, script: script(starts, capabilityPrompts), inputs: treeInputs(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -176,7 +175,7 @@ test('an unsafe scratch override refuses capability source capture until the sam
         submitted,
       ];
     },
-    inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    inputs: treeInputs(),
     afterWrite: async current => { if (current === 'capability-source-captured') captured += 1; },
   });
   cleanups.push(() => opened.service.close());
@@ -215,7 +214,7 @@ test('a capability architect budget return reconstructs a fresh session with the
   const prompts: string[] = [];
   const opened = await openCapabilityRuns(fixture.root, {
     git: gitService, script: script(starts, prompts, 'placement', 1, true), inputs: treeInputs(),
-    readinessExecution: directReadinessExecution(),
+
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -262,7 +261,7 @@ test('exhausted capability architect budget returns leave the task unfinished wi
   const starts: string[] = [];
   const opened = await openCapabilityRuns(fixture.root, {
     git: gitService, script: script(starts, [], 'placement', 6), inputs: treeInputs(),
-    readinessExecution: directReadinessExecution(),
+
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -308,7 +307,7 @@ for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port
       return Array.from({ length: 2 }, () => ({ kind: 'submit' as const, input: incomplete }));
     };
     const opened = await openCapabilityRuns(fixture.root, {
-      git: gitService, script: scripted, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+      git: gitService, script: scripted, inputs: treeInputs(),
       policy: root => ({ ...testPolicy(root), limits: { ...testPolicy(root).limits, rejectedSubmissionsPerTurn: 2 } }),
     });
     cleanups.push(() => opened.service.close());
@@ -364,7 +363,7 @@ test('historical test composition cannot create a policy/6 run', async () => {
   await initRepository(fixture.root);
   await installMiniRunner(fixture.root);
   const opened = await openRuns(fixture.root, { git: gitService, script: script([]),
-    readinessExecution: directReadinessExecution(),
+
     policy: root => capabilityPolicyFrom(testPolicy(root)) });
   cleanups.push(() => opened.service.close());
   await expect(opened.service.execute(startRun('need'))).rejects.toThrow('historical test workflow cannot create');
@@ -377,7 +376,7 @@ test('CA33: production composition captures policy/6 and delegates without contr
   await installMiniRunner(fixture.root);
   const opened = await openRuns(fixture.root, {
     production: true, git: gitService, script: script([]), inputs: treeInputs(),
-    readinessExecution: directReadinessExecution(),
+
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -402,7 +401,7 @@ test('an unresolved qualification returns through the global architect and the s
   await installMiniRunner(fixture.root);
   const starts: string[] = [];
   const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService, script: script(starts, [], 'unresolved'), inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    git: gitService, script: script(starts, [], 'unresolved'), inputs: treeInputs(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -459,7 +458,7 @@ test('CA02: local architect finds an existing API and the same engineer verifies
     return [];
   };
   const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService, script: scripted, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    git: gitService, script: scripted, inputs: treeInputs(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));

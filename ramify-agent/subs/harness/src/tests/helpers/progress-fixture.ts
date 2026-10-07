@@ -8,7 +8,6 @@ import { forkDecision, registryChange, requestPlacement } from './placement.js';
 import { installTestRunner, openRuns, startRun } from './runs.js';
 import { scenariosCommit, scriptedGit, type GitCheckpoint } from './scripted-git.js';
 import { FakeRamifyCli } from './fake-ramify.js';
-import { directReadinessExecution } from './external-tools.js';
 import { createPassingCheckExecution } from './direct-check-execution.js';
 
 /*
@@ -278,7 +277,7 @@ export async function progressFixture(): Promise<ProgressFixture> {
         inputs: treeInputs(),
         git, ...(final ? { candidates: final.candidates } : {}),
         ramify,
-        readinessExecution: directReadinessExecution(),
+
         checkExecution: createPassingCheckExecution(),
       });
       try {

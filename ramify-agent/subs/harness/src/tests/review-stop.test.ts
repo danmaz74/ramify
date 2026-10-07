@@ -1,6 +1,6 @@
 import { finalCandidate } from './helpers/final-candidate.js';
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -501,7 +501,7 @@ describe('over HTTP', () => {
       agent: createScriptedAgent(withDefaultTurns(script)),
       runs: {
         inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
-        git: fixtureScratchGit(unchangedGit(root, [finalVerification], 4)), candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution(),
+        git: fixtureScratchGit(unchangedGit(root, [finalVerification], 4)), candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates,  checkExecution: createPassingCheckExecution(),
       },
     });
   }

@@ -9,7 +9,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
@@ -97,7 +97,7 @@ async function run(
     script: byRole(plan),
     inputs: treeInputs(),
     git: scripted.git, candidates: candidate.candidates,
-    readinessExecution: directReadinessExecution(),
+
     ...options,
   });
   cleanups.push(() => opened.service.close());
@@ -364,7 +364,7 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
       }),
       inputs: treeInputs(),
       git: scripted.git, candidates: candidate.candidates,
-      readinessExecution: directReadinessExecution(),
+
       checkScript: ({ check, context }) => {
         if (context.checkpoint !== 'iteration') return {};
         firstIteration ??= context.attemptId;

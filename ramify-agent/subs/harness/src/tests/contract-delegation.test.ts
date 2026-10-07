@@ -10,7 +10,7 @@ import {
 } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import type { RunEvent } from '../run/log.js';
 import { contractsLayout, type ConsumerRequirement, type ContractRecord, type ProviderObligation } from '../contracts/records.js';
 import { workLayout, type WorkItem } from '../work/records.js';
@@ -184,7 +184,7 @@ async function run(
     previews: [before, before, before, after].map(head => ({ repositoryRoot: root, head, tree })) });
   const opened = await openRuns(root, {
     script: byRole(plan), inputs: treeInputs(), git,
-    candidates: scriptedCandidates(root, { [after]: { tree, base: before, files: {}, changes: [] } }), readinessExecution: directReadinessExecution(), ...options,
+    candidates: scriptedCandidates(root, { [after]: { tree, base: before, files: {}, changes: [] } }),  ...options,
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));

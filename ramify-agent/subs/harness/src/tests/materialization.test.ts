@@ -17,7 +17,7 @@ import { initialScenarioStates } from '../../subs/scenarios/src/states.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { statedCommands } from './helpers/composition.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
-import { expectNoProcesses, forgetExternalTools, directReadinessExecution } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
 import { gateGit, scenariosCommit as gateScenariosCommit, type GateCommit } from './helpers/gate-git.js';
 import {
@@ -313,6 +313,28 @@ describe('the materialization commit', () => {
 });
 
 describe('the guarded list', () => {
+  test('captures declared audit and package inputs, and a changed package manifest fails the candidate gate', async () => {
+    const directory = await temporaryDirectory();
+    cleanups.push(directory.remove);
+    const deep = 'subs/a/subs/b/subs/c/subs/d/tools';
+    await mkdir(join(directory.path, deep), { recursive: true });
+    await writeFile(join(directory.path, 'ramify-audit.json'), '{"checks":[]}\n');
+    await writeFile(join(directory.path, deep, 'package.json'), '{"name":"tools"}\n');
+    await writeFile(join(directory.path, deep, 'package-lock.json'), '{"lockfileVersion":3}\n');
+    const guarded = await captureGuardedFiles(directory.path, [], {}, [
+      'ramify-audit.json', `${deep}/package.json`, `${deep}/package-lock.json`,
+    ]);
+    expect(guarded.map(file => file.path)).toEqual(['ramify-audit.json', `${deep}/package-lock.json`, `${deep}/package.json`]);
+    await writeFile(join(directory.path, deep, 'package.json'), '{"name":"changed"}\n');
+    const attempt = await runGate(createPassingCheckExecution(), 'iteration', {
+      id: 'ga-0002', projectRoot: directory.path, directory: join(directory.path, '.gates', 'ga-0002'),
+      head: 'a'.repeat(40), checks: [{ kind: 'type-check', command: checkCommand({ argv: ['true'], cwd: directory.path, timeoutMs: 30_000 }) }],
+      guarded,
+    });
+    expect(attempt).toMatchObject({ verdict: 'failed', cause: 'guarded-change' });
+    expect(attempt.guardedChanges.map(change => change.path)).toEqual([`${deep}/package.json`]);
+  });
+
   test('holds the configuration, the support files as they stand and each feature file at the hash of its expected rendering', async () => {
     const directory = await temporaryDirectory();
     cleanups.push(directory.remove);
@@ -428,7 +450,7 @@ describe('an engineer and the feature files', () => {
       inputs: treeInputs(),
       git: scripted.git,
       candidates: finalEvidence.candidates,
-      readinessExecution: directReadinessExecution(),
+
       commandExecution: commands,
     });
     cleanups.push(() => opened.service.close());

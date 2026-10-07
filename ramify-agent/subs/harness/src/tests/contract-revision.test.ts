@@ -8,7 +8,7 @@ import { addModule, assign, byWork, completionProposed, installMiniRunner, outli
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -90,7 +90,7 @@ async function run(root: string, plan: Parameters<typeof byWork>[0], commits: re
   const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits],
     ...(final === undefined ? {} : { previews: final.previews }) });
   const opened = await openRuns(root, {
-    script: byWork(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+    script: byWork(plan), inputs: treeInputs(), git,
     ...(final === undefined ? {} : { candidates: final.candidates }),
   });
   cleanups.push(() => opened.service.close());

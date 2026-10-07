@@ -349,6 +349,28 @@ export const capturedProjectConfigSchema = z.union([
 ]);
 export type CapturedProjectConfig = z.infer<typeof capturedProjectConfigSchema>;
 
+/** Provider-validated committed policy, retained in the harness's own durable vocabulary. */
+export const committedAuditConfigurationSchema = z.object({
+  sourceCommit: text,
+  path: text,
+  blob: text,
+  projectRoot: text,
+  checks: z.array(z.unknown()),
+  ignorePaths: z.array(z.string()),
+  undetectedConfigFilesForcingFullAudit: z.array(z.string()),
+  workspace: z.object({
+    preparationId: z.literal('nodejs'),
+    packageDirectoriesDeclared: z.boolean(),
+    linkNodeModules: z.boolean(),
+    packageDirectories: z.array(z.string()),
+    setupCommands: z.array(z.object({
+      name: z.string().optional(), argv: z.array(z.string()).min(1), cwd: z.string(),
+      env: z.record(z.string(), z.string()), timeoutMs: z.int().positive(),
+    }).strict()),
+  }).strict(),
+}).strict();
+export type CommittedAuditConfigurationRecord = z.infer<typeof committedAuditConfigurationSchema>;
+
 /** A committed record at one revision; `hash` is the SHA-256 of the file's bytes. */
 export const recordRefSchema = z.object({ id: z.string(), revision: z.int().nonnegative(), hash: sha256Schema }).strict();
 export type RecordRef = z.infer<typeof recordRefSchema>;
@@ -367,6 +389,11 @@ export const runRecordSchema = z.object({
   policy: runPolicySchema,
   /** The project's `ramify-agent.json`, validated or with the reason it is not. */
   projectConfig: capturedProjectConfigSchema,
+  /** Absent only in records made before configured readiness. */
+  auditConfiguration: z.union([
+    z.object({ config: committedAuditConfigurationSchema }).strict(),
+    z.object({ invalid: z.string() }).strict(),
+  ]).optional(),
   /** The frozen measurement baseline B, or the reason the producer gave none. */
   baseline: z.union([
     z.object({ measurement: recordRefSchema }).strict(),
@@ -451,6 +478,7 @@ export const readinessSteps = [
   'project-root', 'scratch-cleanup', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
   'baseline-acceptance', 'acceptance-full', 'nested-packages',
   'test-discovery', 'ramify-daemon', 'baseline-setup', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
+  'audit-config', 'declared-packages', 'declared-preparation', 'configured-full-audit',
   'run-branch',
 ] as const;
 export const readinessStepSchema = z.enum(readinessSteps);
@@ -471,11 +499,16 @@ export const readinessAttemptSchema = z.object({
   }).strict()),
   /** Independent nested packages found, and what each one answered. */
   nested: z.array(z.object({
-    directory: text,
+    directory: z.string(),
     manifest: text,
     installed: z.boolean(),
     testScript: z.string().nullable(),
   }).strict()),
+  /** Present on a configured full request; the requested and audited sources may differ on reuse. */
+  audit: z.object({
+    requestedSourceCommit: text, auditedSourceCommit: text.nullable(), reused: z.boolean(),
+    reportCommit: text.nullable(), runRef: text.nullable(),
+  }).strict().optional(),
   verdict: z.enum(['passed', 'failed']),
   /** The recovery attempted after a failure; null when the failure was not recoverable. */
   recovery: z.string().nullable(),

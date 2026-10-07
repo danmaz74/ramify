@@ -20,7 +20,6 @@ import {
 } from './helpers/contracts.js';
 import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged, withdrawn, type CommitResponse } from './helpers/contracts-git.js';
 import { createLocalCommandCheckExecution, createMappedCheckExecution, passingScenarioSummary, type DirectCheckStep } from './helpers/direct-check-execution.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { copyFixture } from './helpers/fixture.js';
 import {
   ancestorSteps, bindAtAncestor, bindTurn, integrationFeature, integrationAnalysis, noteFeature, noteSteps, noteStepFile, notes, notesDirectory,
@@ -188,7 +187,7 @@ async function reviewedRun(root: string, planId: string, script: Parameters<type
     inputs: treeInputs(),
     git,
     candidates: final.candidates,
-    readinessExecution: directReadinessExecution(),
+
     checkExecution: trialExecution(failing),
     stopGraceMs: 30_000,
   });

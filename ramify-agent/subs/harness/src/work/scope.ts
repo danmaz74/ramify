@@ -26,7 +26,20 @@ import type { IterationKind, WriteScope } from './iterations.js';
 export const guardedConfigurationFiles = [
   'package.json', 'tsconfig.json', 'vitest.config.ts', 'vitest.config.js', 'vitest.config.mts',
   'vite.config.ts', 'vite.config.js', 'cucumber.js', 'ramify-agent.json',
+  'ramify-audit.json',
 ] as const;
+
+/** Project-relative audit and preparation inputs from one captured committed definition. */
+export function auditPreparationPaths(configuration: { readonly path: string; readonly projectRoot: string;
+  readonly workspace: { readonly packageDirectories: readonly string[] } }): string[] {
+  const prefix = configuration.projectRoot === '.' ? '' : `${configuration.projectRoot.replace(/\/$/u, '')}/`;
+  if (prefix !== '' && !configuration.path.startsWith(prefix)) {
+    throw new Error(`Audit configuration ${configuration.path} is outside the audited project ${configuration.projectRoot}`);
+  }
+  const path = prefix === '' ? configuration.path : configuration.path.slice(prefix.length);
+  return [path, ...configuration.workspace.packageDirectories.flatMap(directory =>
+    ['package.json', 'package-lock.json', 'npm-shrinkwrap.json'].map(name => directory === '' ? name : `${directory}/${name}`))];
+}
 
 /** The project-relative source area of a module's own contents. */
 function ownArea(dir: string): string {
@@ -250,11 +263,13 @@ export async function captureGuardedFiles(
   projectRoot: string,
   requiredArtifacts: readonly string[] = [],
   scenarios: GuardedScenarioFiles = {},
+  declaredAuditConfiguration: readonly string[] = [],
 ): Promise<Array<{ path: string; hash: string }>> {
   const expected = scenarios.expected ?? [];
   const rendered = new Set(expected.map(file => file.path));
-  const hashed = await guardedFilesHash(projectRoot, [...guardedConfigurationFiles, ...requiredArtifacts, ...(scenarios.support ?? [])]
-    .filter(path => !rendered.has(path)));
+  const hashed = await guardedFilesHash(projectRoot, [...new Set([
+    ...guardedConfigurationFiles, ...declaredAuditConfiguration, ...requiredArtifacts, ...(scenarios.support ?? []),
+  ])].filter(path => !rendered.has(path)));
   return [
     ...hashed.flatMap(file => (file.hash === null ? [] : [{ path: file.path, hash: file.hash }])),
     ...expected.map(file => ({ path: file.path, hash: file.hash })),

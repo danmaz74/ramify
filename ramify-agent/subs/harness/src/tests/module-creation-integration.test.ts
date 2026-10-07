@@ -12,7 +12,6 @@ import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
 import { localArchitectToolName } from '../work/submission.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
@@ -120,7 +119,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
       inputs: viewedInputs(daemon.ramify, message => unavailable.push(message)),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));

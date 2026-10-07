@@ -597,10 +597,10 @@ export const runEventSchema = z.discriminatedUnion('type', [
     position: z.int().positive(),
     total: z.int().positive(),
   }).strict()),
-  /** A test command is queued for the machine lock. Its line is the provider's own wording. */
+  /** A provider test/check is queued for the machine lock; readiness projects native check progress here. */
   event('gate-command-waiting', z.object({
     gate: text, checkpoint: text,
-    kind: z.enum(['tests', 'scenarios']),
+    kind: z.enum(['tests', 'scenarios', 'conformance']),
     position: z.int().positive(), total: z.int().positive(), line: text,
   }).strict()),
   /**

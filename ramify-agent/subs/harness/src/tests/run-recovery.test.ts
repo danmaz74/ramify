@@ -6,7 +6,7 @@ import { copyFixture } from './helpers/fixture.js';
 import {
   staleCrashLock, emptyAnalysis, freeze, installTestRunner, onlyRun, openRuns,
   runEventsOnDisk, runPath, startRun, until } from './helpers/runs.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { modified, scenarioGit, untracked, type CommitResponse, type RecoveredCommit, type ScenarioGit } from './helpers/recovery-git.js';
 import { workLayout } from '../work/records.js';
 import { type IterationAssignment, iterationLayout } from '../work/iterations.js';
@@ -147,7 +147,7 @@ async function crashAfter(
   let frozenAtBoundary = false;
   const { service } = await openRuns(root, {
     git: gitOf(root),
-    readinessExecution: directReadinessExecution(),
+
     ...(commandExecution === undefined ? {} : { commandExecution }),
     ...(agent === undefined ? { script: script ?? [{ kind: 'submit', input: emptyAnalysis() }] } : { agent }),
     ...(inputs === undefined ? {} : { inputs }),
@@ -298,7 +298,7 @@ function oneWorkItem(): OpenRunsOptions['script'] {
 async function reopen(root: string, agent?: OpenRunsOptions['agent']) {
   const reopened = await openRuns(root, {
     git: gitOf(root),
-    readinessExecution: directReadinessExecution(),
+
     ...(agent === undefined ? {} : { agent }),
   });
   cleanups.push(() => reopened.service.close());
@@ -400,7 +400,7 @@ describe('the recovery table', () => {
     expect((await runEventsOnDisk(root, 'review-notes', runId)).some(event => event.type === 'analysis-accepted')).toBe(false);
     // The fresh run's intake reads a non-functional requirement the crashed
     // one did not, so its catalog, and the file it is staged in, differ.
-    const resumed = await openRuns(root, { git: gitOf(root), readinessExecution: directReadinessExecution(),
+    const resumed = await openRuns(root, { git: gitOf(root),
       script: spec => spec.submission.name === intakeToolName
         ? [{ kind: 'submit', input: { goal: 'Keep reviewer notes on a review run.', elements: [
           { key: 'bounded', kind: 'non-functional', document: 'doc-001', text: 'Reviewer notes stay bounded.', conditions: [], uncertainty: '' },
@@ -636,7 +636,7 @@ describe('the recovery table', () => {
     const git = gitOf(root);
     const { service } = await openRuns(root, {
       git, candidates: scriptedCandidates(root, { [base]: { tree, base, files: {}, changes: [] } }),
-      readinessExecution: directReadinessExecution(),
+
       script: [{ kind: 'submit', input: emptyAnalysis() }],
     });
     const receipt = await service.execute(startRun('review-notes'));
@@ -725,7 +725,7 @@ describe('the recovery table', () => {
 
     const { service, recovery, warnings } = await openRuns(root, {
       git: gitOf(root),
-      readinessExecution: directReadinessExecution(),
+
       script: [{ kind: 'submit', input: emptyAnalysis() }],
     });
     cleanups.push(() => service.close());

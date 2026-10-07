@@ -16,7 +16,6 @@ import { RunLog } from '../run/log.js';
 import { copyCapabilityFixture, fixturePlan, fixtureRequest, fixtureTask, openCapabilityRuns } from './helpers/capability.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { freeze, initRepository, runEventsOnDisk, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { decision, forkDecision, forkPartial } from './helpers/placement.js';
 
@@ -206,7 +205,7 @@ test('CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while
       }
       return [];
     };
-    const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    const options = { git: gitService, script, inputs: treeInputs(),
       afterWrite: async (write: string) => {
         if (write === 'capability-source-captured' && ++sourceCaptures === 2) closing = closeFirst?.();
         if (write === 'invocation-ended' && childReturned && engineerTurns >= 3 && resumedScratchObserved === '') {
@@ -353,7 +352,7 @@ test(`CA21 CA32: nested ${boundary} returns a global decision before child deleg
       }
       return [];
     };
-    const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    const options = { git: gitService, script, inputs: treeInputs(),
       afterWrite: async (write: string, runId: string) => {
         if (frozen) return;
         if (restartBoundary === 'placement-intent' && write === 'placement-requested') { frozen = true; await freeze(); }
@@ -504,7 +503,7 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
       }
       return [];
     };
-    const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    const options = { git: gitService, script, inputs: treeInputs(),
       checkExecution: createLocalCommandCheckExecution(),
       afterWrite: async (event: string, runId: string) => {
         const last = service?.events('need', runId)?.at(-1);

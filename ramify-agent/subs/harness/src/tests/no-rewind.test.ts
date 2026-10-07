@@ -13,7 +13,7 @@ import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } fro
 import { createMappedCheckExecution, type DirectCheckInvocation, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { accepted, answeredGit, modified, scenariosCommitted, unchanged } from './helpers/contracts-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -220,7 +220,7 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
       inputs: treeInputs(),
       policy: wholeProject,
       checkExecution,
-      readinessExecution: directReadinessExecution(),
+
       git,
       candidates: final.candidates,
     });
@@ -328,7 +328,7 @@ describe('adding work leaves every completed piece completed', () => {
       inputs: treeInputs(),
       policy: wholeProject,
       checkExecution,
-      readinessExecution: directReadinessExecution(),
+
       git,
       candidates: final.candidates,
       afterWrite: async (write, runId) => {

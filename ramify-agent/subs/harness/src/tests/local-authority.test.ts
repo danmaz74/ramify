@@ -13,7 +13,7 @@ import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRu
 import { runLayout } from '../run/records.js';
 import { answeredGit, scenariosCommitted, unchanged } from './helpers/contracts-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -155,7 +155,7 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
     });
     const opened = await openRuns(project, {
       agent, inputs: treeInputs(), git, candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));

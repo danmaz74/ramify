@@ -10,12 +10,8 @@ import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execut
 import { runGate } from '../checks/gate.js';
 import type { Checkpoint, GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
-import { captureProjectConfig } from '../run/project-config.js';
-import { failingStep, recoveryFor, runReadiness } from '../run/readiness.js';
+import { captureProjectConfig, scenarioModules } from '../run/project-config.js';
 import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
-import { FakeRamifyCli } from './helpers/fake-ramify.js';
-import { testPolicy } from './helpers/runs.js';
-import { scriptedGit } from './helpers/scripted-git.js';
 import { expectedFeatureFiles } from '../run/feature-files.js';
 import { scenarioRecordSchema, scenarioSourceHash } from '../../subs/scenarios/src/records.js';
 import { initialScenarioStates } from '../../subs/scenarios/src/states.js';
@@ -26,8 +22,8 @@ import { initialScenarioStates } from '../../subs/scenarios/src/states.js';
  * binds or has a step no definition matches, and one scenario of the
  * project's own. The in-place runner runs it in the project; the audit's
  * executor in its worktree of the committed project, with the profiles and
- * streams in the attempt's directory outside both. Readiness runs its two
- * acceptance steps over the same project through the in-place runner.
+ * streams in the attempt's directory outside both. The final suite exercises the retained legacy scenario-gate adapter directly;
+ * it is not production readiness evidence.
  */
 
 const packageModules = fileURLToPath(new URL('../../../../node_modules', import.meta.url));
@@ -213,9 +209,9 @@ describe('a materialized feature file with the real cucumber-js', () => {
   }, 60_000);
 });
 
-describe('readiness\'s acceptance steps with the real cucumber-js', () => {
-  /** What readiness needs beyond the scenario harness: modules, a test script and a discoverable test. */
-  function readinessFiles(full: Record<string, unknown>, steps = ''): Record<string, string> {
+describe('retained legacy scenario-gate adapter with the real cucumber-js', () => {
+  /** Minimal legacy gate fixture, including its historical test-script inputs. */
+  function legacyGateFiles(full: Record<string, unknown>, steps = ''): Record<string, string> {
     return {
       'package.json': '{ "name": "scenario-project", "private": true, "type": "module", "scripts": { "test": "vitest run" } }\n',
       'tsconfig.json': '{}\n',
@@ -236,56 +232,46 @@ describe('readiness\'s acceptance steps with the real cucumber-js', () => {
   /** A command that records that it ran by writing `marker` at the project root. */
   const marking = (marker: string) => [process.execPath, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, '')`];
 
-  async function readiness(fixture: { root: string; commit: string }) {
+  async function legacyScenarioGate(fixture: { root: string; commit: string }) {
     const gateDirectory = await directory('ramify-agent-scenario-readiness-');
-    const result = await runReadiness(inPlaceCheckExecution, {
-      runId: 'run-readiness',
-      attempt: 1,
-      projectRoot: fixture.root,
-      gateDirectory,
-      gateId: 'ga-0001',
-      policy: testPolicy(fixture.root),
-      projectConfig: await captureProjectConfig(fixture.root),
-      index: null,
-      ramify: new FakeRamifyCli(),
-      git: scriptedGit(fixture.root, { head: fixture.commit, checkpoints: [], scratch: { trackedPaths: [[], []] } }),
-      head: fixture.commit,
+    const captured = await captureProjectConfig(fixture.root);
+    if (!('config' in captured)) throw new Error(captured.invalid);
+    const inputs = { harness: captured.config.acceptance, modules: await scenarioModules(fixture.root, null), scenarios: [] };
+    const quick = planScenarioCheck('readiness', inputs, { projectRoot: fixture.root });
+    const full = planScenarioCheck('readiness', inputs, { projectRoot: fixture.root, mode: 'full',
+      dryRun: captured.config.acceptance.modes.full.readiness === 'dry-run' });
+    if (!('check' in quick) || !('check' in full)) throw new Error('The fixture has no scenario check');
+    const result = await runGate(inPlaceCheckExecution, 'readiness', {
+      id: 'ga-0001', projectRoot: fixture.root, directory: gateDirectory, head: fixture.commit,
+      checks: [quick.check, full.check],
     });
-    const step = (name: string) => result.attempt.steps.find(entry => entry.step === name)!;
-    expect(result.gate, JSON.stringify(result.attempt.steps.filter(entry => entry.outcome !== 'passed'))).not.toBeNull();
-    const scenarioCommands = result.gate!.commands.filter(command => command.kind === 'scenarios');
-    return { result, step, scenarioCommands };
+    return { result, scenarioCommands: result.commands.filter(command => command.kind === 'scenarios') };
   }
 
   test('by default full mode is loaded with --dry-run, running no setup, and all four acceptance steps pass', async () => {
     const full = { command: ['node_modules/.bin/cucumber-js'], setup: marking('setup-ran'), teardown: marking('teardown-ran') };
-    const fixture = await project('Then the shelf lists 1 book', readinessFiles(full));
-    const { result, step, scenarioCommands } = await readiness(fixture);
+    const fixture = await project('Then the shelf lists 1 book', legacyGateFiles(full));
+    const { result, scenarioCommands } = await legacyScenarioGate(fixture);
 
-    expect(result.attempt.verdict).toBe('passed');
-    for (const name of ['project-config', 'acceptance-runner', 'baseline-acceptance', 'acceptance-full']) expect(step(name).outcome).toBe('passed');
-    expect(step('baseline-acceptance').gate).toBe('ga-0001');
-    expect(step('baseline-acceptance').detail).toContain('the project\'s own scenarios: 2 passed');
-    expect(step('acceptance-full').detail).toMatch(/^full mode, loaded with --dry-run: passed/);
+    expect(result.verdict).toBe('passed');
     const [quick, dry] = scenarioCommands;
     expect(quick!.scenarios).toMatchObject({ mode: 'quick', selection: { kind: 'all-untagged' }, dryRun: false, setup: null, teardown: null });
     expect(dry!.scenarios).toMatchObject({ mode: 'full', selection: { kind: 'all-untagged' }, dryRun: true, setup: null, teardown: null, untracked: { passed: 0, skipped: 2, failed: 0 } });
     await expect(access(join(fixture.root, 'setup-ran'))).rejects.toThrow();
   }, 60_000);
 
-  test('with readiness: run, full mode executes strictly between its setup and teardown', async () => {
+  test('the legacy full-mode gate executes strictly between its setup and teardown', async () => {
     const full = { command: ['node_modules/.bin/cucumber-js'], setup: marking('setup-ran'), teardown: marking('teardown-ran'), readiness: 'run' };
-    const fixture = await project('Then the shelf lists 1 book', readinessFiles(full));
-    const { result, step, scenarioCommands } = await readiness(fixture);
+    const fixture = await project('Then the shelf lists 1 book', legacyGateFiles(full));
+    const { result, scenarioCommands } = await legacyScenarioGate(fixture);
 
-    expect(result.attempt.verdict).toBe('passed');
-    expect(step('acceptance-full').detail).toMatch(/^the project's own scenarios in full mode: passed/);
+    expect(result.verdict).toBe('passed');
     expect(scenarioCommands[1]!.scenarios).toMatchObject({ mode: 'full', dryRun: false, setup: { exit: 0 }, teardown: { exit: 0 }, untracked: { passed: 2, skipped: 0, failed: 0 } });
     await access(join(fixture.root, 'setup-ran'));
     await access(join(fixture.root, 'teardown-ran'));
   }, 60_000);
 
-  test('a full mode whose dry run finds an undefined step fails acceptance-full as a baseline fails, with no recovery', async () => {
+  test('the legacy full-mode gate fails when dry run finds an undefined step', async () => {
     // Full mode loads the steps without the shelf's own definition of its
     // last step, which only quick mode's process defines.
     const steps = [
@@ -294,14 +280,11 @@ describe('readiness\'s acceptance steps with the real cucumber-js', () => {
       '',
     ].join('\n');
     const full = { command: ['sh', '-c', 'SCENARIO_MODE=full exec node_modules/.bin/cucumber-js "$@"', 'full'] };
-    const fixture = await project('Then the shelf is dusted', readinessFiles(full, steps));
-    const { result, step } = await readiness(fixture);
+    const fixture = await project('Then the shelf is dusted', legacyGateFiles(full, steps));
+    const { result, scenarioCommands } = await legacyScenarioGate(fixture);
 
-    expect(result.attempt.verdict).toBe('failed');
-    expect(step('baseline-acceptance').outcome).toBe('passed');
-    expect(step('acceptance-full').outcome).toBe('failed');
-    expect(step('acceptance-full').detail).toContain('failed');
-    expect(failingStep(result.attempt)?.step).toBe('acceptance-full');
-    expect(recoveryFor(result.attempt, result.gate, testPolicy(fixture.root))).toBeNull();
+    expect(result.verdict).toBe('failed');
+    expect(scenarioCommands[0]!.outcome).toBe('passed');
+    expect(scenarioCommands[1]!.outcome).toBe('failed');
   }, 60_000);
 });

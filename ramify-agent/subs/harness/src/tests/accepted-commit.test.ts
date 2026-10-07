@@ -14,7 +14,7 @@ import { addModule, assign, byRole, completionProposed, edit, outline, submit, t
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { RunQueries } from '../projections/queries.js';
 import {
   staleCrashLock, freeze, installTestRunner, onlyRun, openRuns,
@@ -124,7 +124,7 @@ describe('a change to the working directory blocks nothing', () => {
     const opened = await openRuns(root, {
       script: byRole(onePass([write('tmp/draft.txt', 'temporary evidence\n'), storeWrite])),
       inputs: treeInputs(), git: scripted.git, candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
       afterWrite: async current => {
         if (current === 'gate-attempted' && scripted.messages.length === 1) {
           expect(await readFile(temporary, 'utf8')).toBe('temporary evidence\n');
@@ -151,7 +151,7 @@ describe('a change to the working directory blocks nothing', () => {
       commits: [scenarios, { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }] });
     const crashed = await openRuns(root, {
       script: byRole(onePass([write('tmp/recovery.txt', 'recover me\n'), storeWrite])),
-      inputs: treeInputs(), git: scripted.git, readinessExecution: directReadinessExecution(),
+      inputs: treeInputs(), git: scripted.git,
       afterWrite: async current => { if (current === 'iteration-closed') await freeze(); },
     });
     const receipt = await crashed.service.execute(startRun('review-notes'));
@@ -160,7 +160,7 @@ describe('a change to the working directory blocks nothing', () => {
     await staleCrashLock(root);
     const recoveryGit = gateGit(root, { head: 'revision-01', commits: [] });
     const reopened = await openRuns(root, { inputs: treeInputs(), git: recoveryGit.git,
-      readinessExecution: directReadinessExecution() });
+      });
     cleanups.push(() => reopened.service.close());
     await expect(readFile(scratch)).rejects.toMatchObject({ code: 'ENOENT' });
     recoveryGit.assertComplete();
@@ -192,7 +192,7 @@ describe('a change to the working directory blocks nothing', () => {
         submit(completionProposed('Repaired ignore exception.'), edit('tmp/draft.txt', 'draft', 'kept'), write('.gitignore', ''), storeWrite),
       ] }),
       inputs: treeInputs(), git, scratchGit: 'provided', candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -228,7 +228,7 @@ describe('a change to the working directory blocks nothing', () => {
         submit(completionProposed('Candidate with indexed scratch.'), write('tmp/indexed.txt', 'indexed\n'), write('tmp/other.txt', 'other\n')),
         submit({ kind: 'partial', done: ['Source inspected'], unfinished: ['Remove indexed scratch'], findings: [] }),
       ] }),
-      inputs: treeInputs(), git, scratchGit: 'provided', readinessExecution: directReadinessExecution(),
+      inputs: treeInputs(), git, scratchGit: 'provided',
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -266,7 +266,7 @@ describe('a change to the working directory blocks nothing', () => {
       inputs: treeInputs(),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
       afterWrite: async current => {
         // A late write lands after verification and before the commit. It
         // blocks nothing and joins the revision the audit checks.
@@ -334,7 +334,7 @@ describe('a change to the working directory blocks nothing', () => {
         script: byRole(onePass([storeWrite])),
         inputs: treeInputs(),
         git: crashedGit.git,
-        readinessExecution: directReadinessExecution(),
+
         afterWrite: async current => {
           if (current === row.boundary) await freeze();
         },
@@ -374,7 +374,7 @@ describe('a change to the working directory blocks nothing', () => {
       const reopened = await openRuns(root, {
         inputs: treeInputs(),
         git: recoveryGit.git,
-        readinessExecution: directReadinessExecution(),
+
       });
       cleanups.push(() => reopened.service.close());
       expect(onlyRun(reopened.service, 'review-notes').state).toBe('interrupted');
@@ -424,7 +424,7 @@ describe('a change to the working directory blocks nothing', () => {
       inputs: treeInputs(),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -514,7 +514,7 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
       inputs: treeInputs(),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
       checkExecution,
     });
     cleanups.push(() => opened.service.close());

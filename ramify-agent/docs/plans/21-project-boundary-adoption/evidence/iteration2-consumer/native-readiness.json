@@ -1,0 +1,595 @@
+{
+  "schema": "plan21.iteration2.native-readiness/1",
+  "providerVersion": "ramify-audit@0.7.1",
+  "configuration": {
+    "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+    "path": "ramify-audit.json",
+    "blob": "fd40ee12f17b2b93d79854dc5f8f28051297cb84",
+    "projectRoot": ".",
+    "checks": [
+      {
+        "id": "configured-command",
+        "name": "Configured command",
+        "description": "Native full execution",
+        "scope": "both",
+        "category": "deterministic",
+        "onFailure": "record",
+        "executor": {
+          "kind": "command",
+          "commands": [
+            {
+              "name": "source",
+              "cmd": "node",
+              "args": [
+                "-e",
+                "process.exit(0)"
+              ],
+              "parser": "none",
+              "timeoutMs": 30000
+            }
+          ]
+        }
+      }
+    ],
+    "ignorePaths": [],
+    "undetectedConfigFilesForcingFullAudit": [],
+    "workspace": {
+      "preparationId": "nodejs",
+      "packageDirectoriesDeclared": true,
+      "linkNodeModules": true,
+      "packageDirectories": [
+        "subs/a/subs/b/subs/c/subs/d/tools"
+      ],
+      "setupCommands": [
+        {
+          "name": "prepare-deep",
+          "argv": [
+            "node",
+            "-e",
+            "require('fs').mkdirSync('.cache',{recursive:true});require('fs').writeFileSync('.cache/generated','ready')"
+          ],
+          "cwd": "subs/a/subs/b/subs/c/subs/d/tools",
+          "env": {},
+          "timeoutMs": 600000
+        }
+      ]
+    }
+  },
+  "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+  "first": {
+    "attempt": {
+      "schema": "ramify-agent.readiness-attempt/1",
+      "attempt": 1,
+      "head": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+      "steps": [
+        {
+          "step": "project-root",
+          "outcome": "passed",
+          "detail": "/tmp/ramify-agent-jn8nmV/collection-review, with its package.json"
+        },
+        {
+          "step": "scratch-cleanup",
+          "outcome": "passed",
+          "detail": "stale scratch removed from 15 modules"
+        },
+        {
+          "step": "git-clean",
+          "outcome": "passed",
+          "detail": "the working tree is clean"
+        },
+        {
+          "step": "compiler-config",
+          "outcome": "passed",
+          "detail": "tsconfig.json"
+        },
+        {
+          "step": "project-config",
+          "outcome": "passed",
+          "detail": "ramify-agent.json validates against ramify-agent.project/1; its support code is subs/integration-tests/src/support/world.ts, subs/integration-tests/src/support/hooks.ts; full mode's readiness is dry-run"
+        },
+        {
+          "step": "acceptance-runner",
+          "outcome": "passed",
+          "detail": "node_modules/.bin/cucumber-js is installed; quick mode runs `npm run acceptance:quick --`, full mode `npm run acceptance:full --`"
+        },
+        {
+          "step": "ramify-daemon",
+          "outcome": "passed",
+          "detail": "the Ramify command line answers: ramify 0.0.0 (the boundary spike's fake command line)"
+        },
+        {
+          "step": "audit-config",
+          "outcome": "passed",
+          "detail": "ramify-audit.json blob fd40ee12f17b2b93d79854dc5f8f28051297cb84 at b889016a52fc166d464ceb2b96dffd80b0d77515"
+        },
+        {
+          "step": "declared-packages",
+          "outcome": "passed",
+          "detail": "1 declared package directories; all installed"
+        },
+        {
+          "step": "declared-preparation",
+          "outcome": "passed",
+          "detail": "1 committed setup command passed in the run working tree"
+        },
+        {
+          "step": "configured-full-audit",
+          "outcome": "passed",
+          "detail": "pass; requested b889016a52fc166d464ceb2b96dffd80b0d77515, audited b889016a52fc166d464ceb2b96dffd80b0d77515",
+          "gate": "ga-0001"
+        },
+        {
+          "step": "run-branch",
+          "outcome": "passed",
+          "detail": "ramify-agent-run/native-first was created and checked out"
+        }
+      ],
+      "nested": [
+        {
+          "directory": "subs/a/subs/b/subs/c/subs/d/tools",
+          "manifest": "subs/a/subs/b/subs/c/subs/d/tools/package.json",
+          "installed": true,
+          "testScript": null
+        }
+      ],
+      "audit": {
+        "requestedSourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "auditedSourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "reused": false,
+        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212",
+        "runRef": "refs/audited/runs/2026-10-07T12-58-23Z-b889016a5"
+      },
+      "verdict": "passed",
+      "recovery": null
+    },
+    "provider": {
+      "status": "completed",
+      "requestId": "native-first:ga-0001",
+      "runId": "8b89b304-6c3a-4b96-8b2f-5d0499057f3a",
+      "summary": {
+        "evidenceSchemaVersion": 4,
+        "execution": {
+          "requestId": "native-first:ga-0001",
+          "runId": "8b89b304-6c3a-4b96-8b2f-5d0499057f3a"
+        },
+        "producer": {
+          "name": "ramify-audit",
+          "version": "0.7.1"
+        },
+        "undetectedConfigFilesForcingFullAudit": [],
+        "coverage": {
+          "status": "declared",
+          "selector": {
+            "id": "full",
+            "version": "1",
+            "config": {},
+            "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "universe": {
+            "id": "project:.",
+            "digest": "sha256:5c2daa5cd2dc216ba6ac9fed5703d35d56e0e4af8a6f1064f187cae8d2f435ea",
+            "checkIds": [
+              "configured-command"
+            ],
+            "testUnitIds": [
+              "source"
+            ]
+          },
+          "selection": {
+            "kind": "full",
+            "selectedCheckIds": [
+              "configured-command"
+            ],
+            "omittedCheckIds": [],
+            "selectedTestUnitIds": [
+              "source"
+            ],
+            "omittedTestUnitIds": []
+          },
+          "claim": {
+            "configuration": {
+              "blob": "fd40ee12f17b2b93d79854dc5f8f28051297cb84",
+              "path": "ramify-audit.json",
+              "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515"
+            },
+            "scope": "repository"
+          },
+          "projectRoot": ".",
+          "expectedFiles": {
+            "contract": "runner-configured-files/1",
+            "source": "not-needed",
+            "expected": 0,
+            "run": 0,
+            "missing": [],
+            "status": "complete",
+            "runnerConfigFiles": []
+          }
+        },
+        "mode": {
+          "requestedMode": "full",
+          "resolution": "requested",
+          "executedMode": "full"
+        },
+        "overall": "pass",
+        "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "sourceTree": "3ee20756de676fdccec66b8c48f59d78f37e6711",
+        "sourceBranch": "main",
+        "auditedAt": "2026-10-07T12:58:23.542Z",
+        "durationSeconds": 0.116,
+        "checks": {
+          "configured-command": {
+            "commands": {
+              "source": {
+                "durationSeconds": 0.021,
+                "output": "Command completed with no output",
+                "passed": true,
+                "status": "pass",
+                "summary": "Command completed with no output"
+              }
+            },
+            "durationSeconds": 0.022,
+            "output": "### source [PASS]\nCommand completed with no output",
+            "passed": true,
+            "status": "pass",
+            "summary": "source: PASS"
+          }
+        },
+        "workspacePreparation": {
+          "preparationId": "nodejs",
+          "payload": {
+            "linkedPackageDirectories": [
+              "subs/a/subs/b/subs/c/subs/d/tools"
+            ],
+            "projectPrefix": "",
+            "setupCommands": [
+              {
+                "command": [
+                  "node",
+                  "-e",
+                  "require('fs').mkdirSync('.cache',{recursive:true});require('fs').writeFileSync('.cache/generated','ready')"
+                ],
+                "cwd": "subs/a/subs/b/subs/c/subs/d/tools",
+                "durationMs": 25,
+                "exitCode": 0,
+                "index": 1,
+                "name": "prepare-deep",
+                "origin": "setupCommands",
+                "outputBytes": 0,
+                "outputPath": "reports/audit/workspace-preparation/setup-01.txt",
+                "outputTruncated": false,
+                "signal": null,
+                "status": "passed",
+                "timeoutMs": 600000
+              }
+            ]
+          }
+        },
+        "definitions": {
+          "digest": "sha256:53842a11bedc1f73efe97198a070df189e71b93839bb16ab3ff0f7581f9d23c8",
+          "manifest": {
+            "manifestVersion": 1,
+            "workingDirectory": ".",
+            "checks": [
+              {
+                "id": "configured-command",
+                "dependsOn": [],
+                "requiresPackageScripts": [],
+                "executor": {
+                  "kind": "command",
+                  "parallel": false,
+                  "mutex": false,
+                  "continueOnFailure": false,
+                  "commands": [
+                    {
+                      "name": "source",
+                      "cmd": "node",
+                      "args": [
+                        "-e",
+                        "process.exit(0)"
+                      ],
+                      "parser": "none",
+                      "contracts": null,
+                      "timeoutMs": 30000,
+                      "env": {}
+                    }
+                  ]
+                }
+              }
+            ],
+            "workspacePreparation": {
+              "preparationId": "nodejs",
+              "optionsDigest": "sha256:eddf7939f4227c0091ca21d228ee07b2a4e5d43ef422cbce0aa022248ebdde32"
+            }
+          }
+        }
+      },
+      "refs": {
+        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212",
+        "runRef": "refs/audited/runs/2026-10-07T12-58-23Z-b889016a5",
+        "treeRef": "refs/audited/by-tree/3ee20756de676fdccec66b8c48f59d78f37e6711"
+      },
+      "retrievalCommands": [
+        "git notes --ref=audit show b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "git show refs/audited/runs/2026-10-07T12-58-23Z-b889016a5:reports/audit/summary.json"
+      ],
+      "composition": {
+        "verdict": "pass",
+        "scoped": false,
+        "chainDepth": 0,
+        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212"
+      }
+    }
+  },
+  "reused": {
+    "attempt": {
+      "schema": "ramify-agent.readiness-attempt/1",
+      "attempt": 1,
+      "head": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+      "steps": [
+        {
+          "step": "project-root",
+          "outcome": "passed",
+          "detail": "/tmp/ramify-agent-jn8nmV/collection-review, with its package.json"
+        },
+        {
+          "step": "scratch-cleanup",
+          "outcome": "passed",
+          "detail": "stale scratch removed from 15 modules"
+        },
+        {
+          "step": "git-clean",
+          "outcome": "passed",
+          "detail": "the working tree is clean"
+        },
+        {
+          "step": "compiler-config",
+          "outcome": "passed",
+          "detail": "tsconfig.json"
+        },
+        {
+          "step": "project-config",
+          "outcome": "passed",
+          "detail": "ramify-agent.json validates against ramify-agent.project/1; its support code is subs/integration-tests/src/support/world.ts, subs/integration-tests/src/support/hooks.ts; full mode's readiness is dry-run"
+        },
+        {
+          "step": "acceptance-runner",
+          "outcome": "passed",
+          "detail": "node_modules/.bin/cucumber-js is installed; quick mode runs `npm run acceptance:quick --`, full mode `npm run acceptance:full --`"
+        },
+        {
+          "step": "ramify-daemon",
+          "outcome": "passed",
+          "detail": "the Ramify command line answers: ramify 0.0.0 (the boundary spike's fake command line)"
+        },
+        {
+          "step": "audit-config",
+          "outcome": "passed",
+          "detail": "ramify-audit.json blob fd40ee12f17b2b93d79854dc5f8f28051297cb84 at b889016a52fc166d464ceb2b96dffd80b0d77515"
+        },
+        {
+          "step": "declared-packages",
+          "outcome": "passed",
+          "detail": "1 declared package directories; all installed"
+        },
+        {
+          "step": "declared-preparation",
+          "outcome": "passed",
+          "detail": "1 committed setup command passed in the run working tree"
+        },
+        {
+          "step": "configured-full-audit",
+          "outcome": "passed",
+          "detail": "pass; requested b889016a52fc166d464ceb2b96dffd80b0d77515, audited b889016a52fc166d464ceb2b96dffd80b0d77515",
+          "gate": "ga-0001"
+        },
+        {
+          "step": "run-branch",
+          "outcome": "passed",
+          "detail": "ramify-agent-run/native-second was created and checked out"
+        }
+      ],
+      "nested": [
+        {
+          "directory": "subs/a/subs/b/subs/c/subs/d/tools",
+          "manifest": "subs/a/subs/b/subs/c/subs/d/tools/package.json",
+          "installed": true,
+          "testScript": null
+        }
+      ],
+      "audit": {
+        "requestedSourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "auditedSourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "reused": true,
+        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212",
+        "runRef": "refs/audited/runs/2026-10-07T12-58-23Z-b889016a5"
+      },
+      "verdict": "passed",
+      "recovery": null
+    },
+    "provider": {
+      "status": "completed",
+      "requestId": "native-second:ga-0001",
+      "runId": "bd35086f-5ab8-4b41-95b8-1e76aee67b97",
+      "summary": {
+        "auditedAt": "2026-10-07T12:58:23.542Z",
+        "checks": {
+          "configured-command": {
+            "commands": {
+              "source": {
+                "durationSeconds": 0.021,
+                "output": "Command completed with no output",
+                "passed": true,
+                "status": "pass",
+                "summary": "Command completed with no output"
+              }
+            },
+            "durationSeconds": 0.022,
+            "output": "### source [PASS]\nCommand completed with no output",
+            "passed": true,
+            "status": "pass",
+            "summary": "source: PASS"
+          }
+        },
+        "coverage": {
+          "claim": {
+            "configuration": {
+              "blob": "fd40ee12f17b2b93d79854dc5f8f28051297cb84",
+              "path": "ramify-audit.json",
+              "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515"
+            },
+            "scope": "repository"
+          },
+          "expectedFiles": {
+            "contract": "runner-configured-files/1",
+            "expected": 0,
+            "missing": [],
+            "run": 0,
+            "runnerConfigFiles": [],
+            "source": "not-needed",
+            "status": "complete"
+          },
+          "projectRoot": ".",
+          "selection": {
+            "kind": "full",
+            "omittedCheckIds": [],
+            "omittedTestUnitIds": [],
+            "selectedCheckIds": [
+              "configured-command"
+            ],
+            "selectedTestUnitIds": [
+              "source"
+            ]
+          },
+          "selector": {
+            "config": {},
+            "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "id": "full",
+            "version": "1"
+          },
+          "status": "declared",
+          "universe": {
+            "checkIds": [
+              "configured-command"
+            ],
+            "digest": "sha256:5c2daa5cd2dc216ba6ac9fed5703d35d56e0e4af8a6f1064f187cae8d2f435ea",
+            "id": "project:.",
+            "testUnitIds": [
+              "source"
+            ]
+          }
+        },
+        "definitions": {
+          "digest": "sha256:53842a11bedc1f73efe97198a070df189e71b93839bb16ab3ff0f7581f9d23c8",
+          "manifest": {
+            "checks": [
+              {
+                "dependsOn": [],
+                "executor": {
+                  "commands": [
+                    {
+                      "args": [
+                        "-e",
+                        "process.exit(0)"
+                      ],
+                      "cmd": "node",
+                      "contracts": null,
+                      "env": {},
+                      "name": "source",
+                      "parser": "none",
+                      "timeoutMs": 30000
+                    }
+                  ],
+                  "continueOnFailure": false,
+                  "kind": "command",
+                  "mutex": false,
+                  "parallel": false
+                },
+                "id": "configured-command",
+                "requiresPackageScripts": []
+              }
+            ],
+            "manifestVersion": 1,
+            "workingDirectory": ".",
+            "workspacePreparation": {
+              "optionsDigest": "sha256:eddf7939f4227c0091ca21d228ee07b2a4e5d43ef422cbce0aa022248ebdde32",
+              "preparationId": "nodejs"
+            }
+          }
+        },
+        "durationSeconds": 0.116,
+        "evidenceSchemaVersion": 4,
+        "execution": {
+          "requestId": "native-first:ga-0001",
+          "runId": "8b89b304-6c3a-4b96-8b2f-5d0499057f3a"
+        },
+        "mode": {
+          "executedMode": "full",
+          "requestedMode": "full",
+          "resolution": "requested"
+        },
+        "overall": "pass",
+        "producer": {
+          "name": "ramify-audit",
+          "version": "0.7.1"
+        },
+        "sourceBranch": "main",
+        "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "sourceTree": "3ee20756de676fdccec66b8c48f59d78f37e6711",
+        "undetectedConfigFilesForcingFullAudit": [],
+        "workspacePreparation": {
+          "payload": {
+            "linkedPackageDirectories": [
+              "subs/a/subs/b/subs/c/subs/d/tools"
+            ],
+            "projectPrefix": "",
+            "setupCommands": [
+              {
+                "command": [
+                  "node",
+                  "-e",
+                  "require('fs').mkdirSync('.cache',{recursive:true});require('fs').writeFileSync('.cache/generated','ready')"
+                ],
+                "cwd": "subs/a/subs/b/subs/c/subs/d/tools",
+                "durationMs": 25,
+                "exitCode": 0,
+                "index": 1,
+                "name": "prepare-deep",
+                "origin": "setupCommands",
+                "outputBytes": 0,
+                "outputPath": "reports/audit/workspace-preparation/setup-01.txt",
+                "outputTruncated": false,
+                "signal": null,
+                "status": "passed",
+                "timeoutMs": 600000
+              }
+            ]
+          },
+          "preparationId": "nodejs"
+        }
+      },
+      "refs": {
+        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212",
+        "runRef": "refs/audited/runs/2026-10-07T12-58-23Z-b889016a5",
+        "treeRef": "refs/audited/by-tree/3ee20756de676fdccec66b8c48f59d78f37e6711"
+      },
+      "retrievalCommands": [
+        "git notes --ref=audit show b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "git show refs/audited/runs/2026-10-07T12-58-23Z-b889016a5:reports/audit/summary.json"
+      ],
+      "reused": {
+        "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "auditedCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "ignoredChangedPaths": [],
+        "requestedMode": "full",
+        "resolution": "requested"
+      },
+      "composition": {
+        "verdict": "pass",
+        "scoped": false,
+        "chainDepth": 0,
+        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212"
+      }
+    }
+  },
+  "workingOutputRecreated": true
+}

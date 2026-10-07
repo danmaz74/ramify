@@ -16,11 +16,12 @@ import { inputsHash, loadPromptPackages, renderEngineerPrompt, sha256 } from '..
 import { ExcursionWatcher } from '../run/excursions.js';
 import { runCheckpoint } from '../run/gates.js';
 import { captureProjectConfig } from '../run/project-config.js';
+import { readCommittedAuditConfiguration } from '../../subs/audit/src/check-execution.js';
 import { declaredModuleDirectories } from '../run/project-config.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { recordSettledSnapshot } from '../run/mutations.js';
 import { ObservationLog } from '../run/observations.js';
-import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages } from '../run/policy.js';
+import { contextPolicyOf, defaultRunPolicy } from '../run/policy.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from '../run/port-events.js';
 import { gateAttemptId, gateAttemptSchema, type InvocationOutcome, type RunPolicy } from '../run/records.js';
 import { SubmissionJudge } from '../run/submissions.js';
@@ -37,7 +38,7 @@ import {
   type EngineerSubmission,
 } from '../work/engineer.js';
 import type { IterationAssignment } from '../work/iterations.js';
-import { captureGuardedFiles, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
+import { auditPreparationPaths, captureGuardedFiles, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
 import { iterationApiViews } from '../work/session.js';
 import {
   sessionLayout, sessionOutcomeSchema, sessionRecordSchema, sessionsDirectory,
@@ -287,19 +288,25 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   if (typeof workingDirectory !== 'string') return notStarted(`The engineer cannot start in the module's src directory: ${workingDirectory.error}`);
   let scratchSettled = false;
   try {
-  // The project's configuration for the harness is never an agent's to write.
+  // A standalone session guards the same committed preparation inputs where a definition exists.
+  const head = await git.currentHead(projectRoot);
+  const auditExists = await stat(join(projectRoot, 'ramify-audit.json')).then(found => found.isFile(), () => false);
+  let auditPaths: string[] = [];
+  if (auditExists) {
+    try { auditPaths = auditPreparationPaths(await readCommittedAuditConfiguration(projectRoot, head)); }
+    catch (error) { return notStarted(`Committed audit configuration cannot be guarded: ${message(error)}`); }
+  }
   const guarded: GuardedScope = guardedScopeOf(scope, await deniedFiles(projectRoot, []));
   const tests = testPolicyOf('ordinary', base, []);
 
-  const policy = options.policy ?? defaultRunPolicy({ projectRoot, nested: await discoverNestedPackages(projectRoot) });
+  const policy = options.policy ?? defaultRunPolicy({ projectRoot });
   const { limits } = policy;
   const { packages } = await loadPromptPackages();
   const loaded = packages.get('engineer');
   if (loaded === undefined) return notStarted('No prompt package is loaded for the engineer.');
 
   const views = await iterationApiViews(ramify, projectRoot, initial, scope.base);
-  const head = await git.currentHead(projectRoot);
-  const guardedFiles = await captureGuardedFiles(projectRoot);
+  const guardedFiles = await captureGuardedFiles(projectRoot, [], {}, auditPaths);
 
   const id = sessionId();
   const records = join(projectRoot, sessionsDirectory, id);

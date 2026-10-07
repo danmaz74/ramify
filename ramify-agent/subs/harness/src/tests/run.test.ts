@@ -1,5 +1,5 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit, unchangedGit } from './helpers/unchanged-run.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { GitError } from '../../subs/evidence/src/git.js';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -149,7 +149,7 @@ describe('an implementation run with no entry capabilities', () => {
         });
       },
     };
-    const { service } = await openRunsWithGit(root, { git, readinessExecution: directReadinessExecution(), script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const { service } = await openRunsWithGit(root, { git,  script: [{ kind: 'submit', input: emptyAnalysis() }] });
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun('review-notes'));

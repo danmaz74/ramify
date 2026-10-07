@@ -7,7 +7,6 @@ import { gitService } from '../../subs/evidence/src/git.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, edit, installMiniRunner, outline, runScopeTests, submit, treeInputs, write } from './helpers/iterations.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { initRepository, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import { decision, forkDecision } from './helpers/placement.js';
@@ -122,7 +121,7 @@ test('an explicit partial capability result returns its cross-owner blocker to t
   const seen: string[] = [], prompts: string[] = [];
   const opened = await openCapabilityRuns(fixture.root, { git: gitService,
     script: script(seen, 'partial-blocker', prompts), inputs: treeInputs(),
-    readinessExecution: directReadinessExecution() });
+    });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
   await until(() => {
@@ -155,7 +154,7 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
   await initRepository(fixture.root); await installMiniRunner(fixture.root);
   const seen: string[] = [];
   const opened = await openCapabilityRuns(fixture.root, { git: gitService, script: script(seen), inputs: treeInputs(),
-    readinessExecution: directReadinessExecution() });
+    });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
   await until(() => { const events = opened.service.events('need', receipt.jobId) ?? []; return events.filter(event => event.type === 'capability-assignment-settled').length >= 4 || events.some(event => event.type === 'job-failed'); }, 120_000)
@@ -231,7 +230,7 @@ test('CA10: a wider boundary decision returns to the same capability architect',
   await initRepository(fixture.root); await installMiniRunner(fixture.root);
   const seen: string[] = [];
   const opened = await openCapabilityRuns(fixture.root, { git: gitService, script: script(seen, 'boundary'),
-    inputs: treeInputs(), readinessExecution: directReadinessExecution() });
+    inputs: treeInputs(), });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
   await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>

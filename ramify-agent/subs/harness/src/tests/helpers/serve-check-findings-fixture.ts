@@ -10,7 +10,6 @@ import { scriptedCandidates, testReviewPolicy, type ScriptedCommit } from './can
 import { concern, disposition, reconcile, review, submission } from './check-findings-composition.js';
 import { declaringScenarios } from './declarations.js';
 import { createPassingCheckExecution } from './direct-check-execution.js';
-import { directReadinessExecution } from './external-tools.js';
 import { FakeRamifyCli } from './fake-ramify.js';
 import { gateGit, scenariosCommit } from './gate-git.js';
 import { completionProposed, submit, treeInputs, write } from './iterations.js';
@@ -114,7 +113,7 @@ const server = await startServerWith({
     inputs: treeInputs(),
     git: git.git,
     candidates: scriptedCandidates(root, commits()),
-    readinessExecution: directReadinessExecution(),
+
     checkExecution: createPassingCheckExecution(),
     policy: projectRoot => testPolicy(projectRoot, { reviews: testReviewPolicy({ kinds: ['code', 'scope', 'design'], concurrency: 1, settleMs: 120_000 }) }),
     stopGraceMs: 500,

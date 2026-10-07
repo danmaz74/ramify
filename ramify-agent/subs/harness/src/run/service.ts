@@ -9,7 +9,8 @@ import { projectConfigurationFile } from '../../subs/evidence/src/project-config
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { Checkpoint, GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
 import { acceptedCommit } from '../checks/accepted.js';
-import { inPlaceCheckExecution, type CheckExecutionPort, type GateCommandStarted } from '../checks/execution.js';
+import { type CheckExecutionPort, type GateCommandStarted } from '../checks/execution.js';
+import type { ConfiguredAuditPort } from '../../subs/audit/src/check-execution.js';
 import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
 import { resolveTestSelection, testArea } from '../checks/selection.js';
 import {
@@ -187,7 +188,7 @@ import {
 } from '../work/failure.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
+  auditPreparationPaths, captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
   type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
@@ -205,7 +206,7 @@ import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './lo
 import type { Transaction } from '../../subs/ledger/src/ledger.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder, type CallInFlight } from './port-events.js';
-import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages, engineerBoundsOf, withProjectTimeouts, type EngineerBounds } from './policy.js';
+import { contextPolicyOf, defaultRunPolicy, engineerBoundsOf, withProjectTimeouts, type EngineerBounds, type NestedPackage } from './policy.js';
 import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
 import {
   commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
@@ -341,15 +342,10 @@ export interface RunServiceOptions {
   readonly candidates?: CandidateSource | undefined;
   /** How committing checkpoint commands run. */
   readonly checkExecution: CheckExecutionPort;
-  /**
-   * How readiness commands run: in place by default, which is what a run
-   * over a real project does. A lifecycle test whose subject is the run's
-   * state machine, and which must start no process, supplies a direct port;
-   * readiness discovery, classification and recovery are unaffected.
-   */
-  readonly readinessExecution?: CheckExecutionPort | undefined;
+  /** Provider-owned committed configuration and configured full execution. */
+  readonly configuredAudit?: ConfiguredAuditPort | undefined;
   /** The policy the run captures. Without one it is the hardcoded default over this project. */
-  readonly policy?: ((projectRoot: string, nested: Awaited<ReturnType<typeof discoverNestedPackages>>) => RunPolicy) | undefined;
+  readonly policy?: ((projectRoot: string, nested: readonly NestedPackage[]) => RunPolicy) | undefined;
   /** The module the baseline is frozen over; the architect view's root by default. */
   readonly rootModule?: string | undefined;
   /** How long a stop waits for the session before the run is marked stopped anyway. */
@@ -3013,6 +3009,11 @@ export class RunService {
     // with its reason; readiness reports it, and the start is not refused.
     // The gate command timeouts it declares replace the policy's own.
     const projectConfig = await captureProjectConfig(this.projectRoot);
+    const sourceCommit = await this.git.currentHead(this.projectRoot);
+    const auditConfiguration = sourceCommit === '' ? { invalid: 'No committed HEAD is available for audit configuration' }
+      : await this.options.configuredAudit?.read(this.projectRoot, sourceCommit)
+      .then(config => ({ config }), error => ({ invalid: `Committed audit configuration at ${sourceCommit}: ${message(error)}` }))
+      ?? { invalid: 'The configured audit provider is unavailable' };
     const record = runRecordSchema.parse({
       schema: jobSchemaVersion,
       jobId: runId,
@@ -3024,6 +3025,7 @@ export class RunService {
       prompts: Object.fromEntries([...packages].map(([role, loaded]) => [role, { package: loaded.package, hash: loaded.hash }])),
       policy: withProjectTimeouts(policy, projectConfig),
       projectConfig,
+      auditConfiguration,
       baseline: baseline.reference,
       // The plan's own scenarios, extracted once from the captured bytes. A
       // block that does not parse is a limitation, never a refusal.
@@ -3067,8 +3069,7 @@ export class RunService {
       if (error instanceof EvidenceUnavailableError) throw new CommandRejection('unavailable', error.message);
       throw error;
     }
-    const nested = await discoverNestedPackages(this.projectRoot);
-    const policy = (this.options.policy ?? ((root, found) => defaultRunPolicy({ projectRoot: root, nested: found })))(this.projectRoot, nested);
+    const policy = (this.options.policy ?? ((root: string) => defaultRunPolicy({ projectRoot: root })))(this.projectRoot, []);
     if (policy.version === capabilityRunPolicyVersion && this.workflow === null) {
       throw new CommandRejection('conflict', 'The historical test workflow cannot create a capability-coordination run');
     }
@@ -5209,6 +5210,7 @@ export class RunService {
         this.projectRoot,
         this.requiredArtifacts(current).map(artifact => artifact.path),
         scenarioFiles,
+        this.auditPreparationPaths(run),
       )).map(file => file.path).filter(path => !harnessOnly.has(path)));
       const conformed = new Set(run.log.all('provider-conformed').map(event => conformanceKey(event.data.obligation, event.data.revision)));
       // A provider's report reaches this architect once, here, even while
@@ -6665,7 +6667,7 @@ export class RunService {
       externalCapabilities: externalCapabilities ?? body.externalCapabilities,
       completionEvidence: body.completionEvidence, evidenceObligations,
       gate: { checkpoint: checkpointOf(body.kind), tests: testPolicyOf(body.kind, scope.base, evidenceObligations, scope.extra) },
-      guarded: await captureGuardedFiles(this.projectRoot, guardedPaths, await this.guardedScenarioFiles(run)),
+      guarded: await captureGuardedFiles(this.projectRoot, guardedPaths, await this.guardedScenarioFiles(run), this.auditPreparationPaths(run)),
       authorizations,
       ...(revisesContract === undefined ? {} : { revisesContract }),
       ...(body.scenarios === undefined || body.scenarios.length === 0 ? {} : { scenarios: [...body.scenarios] }),
@@ -8742,7 +8744,7 @@ export class RunService {
       completionEvidence: `${item.module}'s own tests pass against the fake, and the fake passes the conformance suite.`,
       evidenceObligations: [],
       gate: { checkpoint: 'contract', tests: testPolicyOf('contract', base, []) },
-      guarded: await captureGuardedFiles(this.projectRoot, subArtifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run)),
+      guarded: await captureGuardedFiles(this.projectRoot, subArtifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run), this.auditPreparationPaths(run)),
       authorizations: subArtifacts.map(artifact => ({
         path: artifact.path,
         rationale: `The agreement ${artifact.contract.id} is this iteration's to write.`,
@@ -10274,7 +10276,11 @@ export class RunService {
       // baseline passed; a branch git refuses fails readiness there.
       const head = await this.git.currentHead(this.projectRoot);
       await this.write(run, { type: 'gate-started', data: { gate: gateId, checkpoint: 'readiness' } });
-      const result = await runReadiness(this.options.readinessExecution ?? inPlaceCheckExecution, {
+      const configuredAudit = this.options.configuredAudit ?? {
+        async read(): Promise<never> { throw new Error('The configured audit provider is unavailable'); },
+        async runFull(): Promise<never> { throw new Error('The configured audit provider is unavailable'); },
+      };
+      const result = await runReadiness(configuredAudit, {
         runId: run.record.jobId,
         attempt: attemptNumber,
         projectRoot: this.projectRoot,
@@ -10282,6 +10288,7 @@ export class RunService {
         gateId,
         policy: run.record.policy,
         projectConfig: run.record.projectConfig,
+        auditConfiguration: run.record.auditConfiguration,
         index: run.index,
         ramify: this.options.ramify,
         git: this.git,
@@ -10312,6 +10319,7 @@ export class RunService {
           plan,
           projectRoot: this.projectRoot,
           policy: run.record.policy,
+          auditConfiguration: run.record.auditConfiguration,
           ramify: this.options.ramify,
           commandExecution: this.options.commandExecution,
           count: spent + 1,
@@ -10753,7 +10761,7 @@ export class RunService {
 
   private commandWaiting(run: Run, gate: string, checkpoint: Checkpoint): NonNullable<import('../checks/gate.js').GateRequest['waiting']> {
     return async (command, line) => {
-      if (command.kind !== 'tests' && command.kind !== 'scenarios') return;
+      if (command.kind !== 'tests' && command.kind !== 'scenarios' && !(checkpoint === 'readiness' && command.kind === 'conformance')) return;
       try {
         await this.write(run, { type: 'gate-command-waiting', data: {
           gate, checkpoint, kind: command.kind, position: command.position, total: command.total, line,
@@ -10941,6 +10949,13 @@ export class RunService {
       ? (await readCapturedDocuments(run.directory, run.record.manifest)).manifest.documents.map(document => document.path)
       : [];
     return deniedFiles(this.projectRoot, [...features, ...documents]);
+  }
+
+  /** Committed audit preparation inputs, converted to paths in this project. */
+  private auditPreparationPaths(run: Run): string[] {
+    const audit = run.record.auditConfiguration;
+    if (audit === undefined || !('config' in audit)) return [];
+    return auditPreparationPaths(audit.config);
   }
 
   // Scenario states, architecture §7 to §9

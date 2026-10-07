@@ -6,7 +6,6 @@ import { scenariosCommit, scriptedGit } from './scripted-git.js';
 import { fixtureScratchGit } from './mock-git.js';
 import { commandResult } from './command-result.js';
 import { createMappedCheckExecution } from './direct-check-execution.js';
-import { directReadinessExecution } from './external-tools.js';
 import { protocolScript, notesDirectory, draftsDirectory, outsidePath, longOutputBytes } from './protocol.js';
 import type { CommandRequest } from '../../../subs/evidence/src/run-command.js';
 import type { SessionSpec } from '../../../subs/agent/src/interfaces/port.js';
@@ -34,7 +33,7 @@ export function protocolPorts(root: string) {
       if (steps.some(step => step.kind === 'tool' && ['write', 'edit'].includes(step.tool))) git.givenWrites();
       return steps;
     },
-    readinessExecution: directReadinessExecution(),
+
     checkExecution: createMappedCheckExecution({ script: ({ check, context }) =>
       context.checkpoint === 'final' && check.kind === 'tests'
         ? { stdout: 'x'.repeat(longOutputBytes - 12) + '\nall passed\n' } : {} }),

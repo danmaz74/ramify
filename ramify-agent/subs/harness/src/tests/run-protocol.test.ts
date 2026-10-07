@@ -5,7 +5,7 @@ import { protocolPorts } from './helpers/protocol-ports.js';
 import { openUnchangedRuns, unchangedGit, assertUnchangedGit, type UnchangedRunsOptions } from './helpers/unchanged-run.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -132,7 +132,7 @@ async function serve(
       inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
       ...extra.runs,
       ...(ports ?? { git: fixtureScratchGit(unchangedGit(root, unchangedCheckpoints, unchangedCheckpoints.length ? 4 : 0)),
-        candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution() }),
+        candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates,  checkExecution: createPassingCheckExecution() }),
     },
   });
 }

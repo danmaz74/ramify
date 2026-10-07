@@ -13,7 +13,7 @@ import { treeCandidates, type ScriptedCandidates } from './helpers/candidates.js
 import { finalCandidate } from './helpers/final-candidate.js';
 import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged, type CommitResponse } from './helpers/contracts-git.js';
 import { passingScenarioSummary, type DirectCheckScript, type DirectCheckStep } from './helpers/direct-check-execution.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { copyFixture } from './helpers/fixture.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { mockGit } from './helpers/mock-git.js';
@@ -99,7 +99,7 @@ async function run(root: string, script: Parameters<typeof byRole>[0], commits: 
     inputs: treeInputs(),
     git,
     candidates,
-    readinessExecution: directReadinessExecution(),
+
     checkScript: options.checkScript,
   });
   if (options.detached !== true) cleanups.push(() => opened.service.close());
@@ -421,7 +421,7 @@ describe('a crash inside the promoting gate', () => {
     const reopened = await openRuns(root, {
       git: recoveryGit,
       inputs: treeInputs(),
-      readinessExecution: directReadinessExecution(),
+
       candidates: treeCandidates(root),
       checkScript: ({ check }) => (check.kind === 'scenarios' ? failing(check) : {}),
     });

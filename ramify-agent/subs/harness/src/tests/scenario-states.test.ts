@@ -20,7 +20,7 @@ import {
   accepted, added, answeredGit, modified, unchanged, withdrawn, scenariosCommitted, type AnsweredGit, type CommitResponse,
 } from './helpers/contracts-git.js';
 import { passingScenarioSummary, type DirectCheckScript, type DirectCheckStep } from './helpers/direct-check-execution.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { copyFixture } from './helpers/fixture.js';
 import { treeCandidates } from './helpers/candidates.js';
 import { finalCandidate } from './helpers/final-candidate.js';
@@ -151,7 +151,7 @@ async function run(root: string, script: Parameters<typeof byRole>[0], commits: 
     script: byRole(script),
     inputs: treeInputs(),
     git,
-    readinessExecution: directReadinessExecution(),
+
     candidates,
     ...(options.checkScript === undefined ? {} : { checkScript: options.checkScript }),
   });
@@ -853,7 +853,7 @@ describe('§12: a crash between the withdrawal commit and its record', () => {
       },
       async currentHead() { return 'revision-02'; },
     });
-    const reopened = await openRuns(root, { git: recoveryGit, inputs: treeInputs(), readinessExecution: directReadinessExecution() });
+    const reopened = await openRuns(root, { git: recoveryGit, inputs: treeInputs(), });
     cleanups.push(() => reopened.service.close());
     expect(reopened.recovery.effects).toEqual([`${plan}/${runId}: the withdrawal commit of sc-001`]);
     expect(lookups).toEqual([`Ramify-Run: ${runId}, Ramify-Scenarios: withdrawn-1`]);

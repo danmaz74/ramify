@@ -10,7 +10,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, outline, read, submit, treeInputs, write } from './helpers/iterations.js';
 import { gateGit, scenariosCommit, type GateCommit } from './helpers/gate-git.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { installTestRunner, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
 
@@ -95,7 +95,7 @@ describe('the API view of a local architect\'s continued turns', () => {
       inputs: treeInputs(),
       ramify,
       git: scripted.git, candidates: finalCandidate(fixture.root, 'revision-01').candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));

@@ -4,12 +4,9 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { inPlaceCheckExecution } from '../checks/execution.js';
 import { runCheckpoint } from '../run/gates.js';
 import { captureProjectConfig, scenarioModules } from '../run/project-config.js';
-import { runReadiness } from '../run/readiness.js';
 import type { ScenarioCheckInputs } from '../checks/checkpoint.js';
-import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { copyFixture } from './helpers/fixture.js';
 import { initRepository, testPolicy } from './helpers/runs.js';
-import { scriptedGit } from './helpers/scripted-git.js';
 
 /*
  * The `collection-review` fixture's own scenario harness under the scenario
@@ -51,30 +48,6 @@ describe.runIf(enabled)('the fixture\'s scenario harness with its toolchain inst
     if (!('config' in captured)) throw new Error(captured.invalid);
     return { harness: captured.config.acceptance, modules: await scenarioModules(root, null), scenarios: [] };
   }
-
-  test('readiness passes all four acceptance steps', async () => {
-    const result = await runReadiness(inPlaceCheckExecution, {
-      runId: 'run-readiness',
-      attempt: 1,
-      projectRoot: root,
-      gateDirectory: `${root}/plans/.harness-readiness`,
-      gateId: 'ga-0001',
-      policy: testPolicy(root),
-      projectConfig: await captureProjectConfig(root),
-      index: null,
-      ramify: new FakeRamifyCli(),
-      git: scriptedGit(root, { head, checkpoints: [] }),
-      head,
-    });
-    const steps = new Map(result.attempt.steps.map(step => [step.step, step]));
-    for (const step of ['project-config', 'acceptance-runner', 'baseline-acceptance', 'acceptance-full']) {
-      expect(steps.get(step as never), `${step}: ${steps.get(step as never)?.detail}`).toMatchObject({ outcome: 'passed' });
-    }
-    expect(result.attempt.verdict).toBe('passed');
-    const [quick, dry] = result.gate!.commands.filter(command => command.kind === 'scenarios');
-    expect(quick!.scenarios).toMatchObject({ mode: 'quick', runs: [{ module: 'collection-review/integration-tests', exit: 0 }], untracked: { passed: 1, skipped: 0, failed: 0 } });
-    expect(dry!.scenarios).toMatchObject({ mode: 'full', dryRun: true, untracked: { passed: 0, skipped: 1, failed: 0 } });
-  }, 300_000);
 
   test.each([
     ['work-item', 'quick'],

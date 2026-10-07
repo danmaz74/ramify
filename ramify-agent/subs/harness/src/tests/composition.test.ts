@@ -34,7 +34,6 @@ import { crashAt, fileHashes, logLines, plan, runDirectory, runToEnd, scenarios,
 import { allRows, machineNames, type Machine } from './helpers/recovery-table.js';
 import { observeValues, unionInventory } from './helpers/unions.js';
 import { openRuns, startRun, stopRun } from './helpers/runs.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { scenarioGit } from './helpers/recovery-git.js';
 import { copyFixture } from './helpers/fixture.js';
 
@@ -90,7 +89,7 @@ beforeAll(async () => {
   await writeFile(join(jobs, '20260921T000000Z-000002', 'job.json'), `${JSON.stringify({ schema: 'ramify-agent.job/9' })}\n`);
   const unserving = await openRuns(project.root, {
     git: scenarioGit(project.root, { head: 'source-00', commits: [] }),
-    readinessExecution: directReadinessExecution(),
+
     inputs: scenarios.iteration.inputs(),
   });
   answeredWhileRunning.push({ schema: runListResponseSchema, value: await new RunQueries(unserving.service).list(plan) });
@@ -102,7 +101,7 @@ beforeAll(async () => {
   const reopened = await openRuns(crashed.root, {
     agent: crashed.agent,
     git: crashed.git,
-    readinessExecution: directReadinessExecution(),
+
     inputs: scenarios.iteration.inputs(),
   });
   const queries = new RunQueries(reopened.service);

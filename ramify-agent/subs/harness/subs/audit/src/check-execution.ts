@@ -11,9 +11,11 @@ import {
   createNodeProcessExecutor,
   createNodeRepositoryExecutionLease,
   findCompletedAuditRequest,
+  requestFromCommittedConfiguration,
   readRawCheckResults,
   resolveRepositoryExecutionLeaseIdentity,
   type AuditCheckSummary,
+  type AuditEvent,
   type AuditRequest,
   type AuditResult,
   type CheckDefinition,
@@ -26,7 +28,7 @@ import {
 import { childEnvironment, outputTailBytes, runCommand } from '../../evidence/src/run-command.js';
 import type { CommandOutcome, CommandRun } from '../../evidence/src/run-command.js';
 import { checkOutputPath, commandStart, notRun } from '../../../src/checks/execution.js';
-import type { CheckExecutionPort, CheckExecutionRequest } from '../../../src/checks/execution.js';
+import type { CheckExecutionPort, CheckExecutionRequest, GateCommandStart, GateCommandStarted } from '../../../src/checks/execution.js';
 import type { CheckExecutionResult } from '../../../src/checks/execution.js';
 import { checkCommandEnvironment } from '../../../src/checks/records.js';
 import type { GateCommandRecord } from '../../../src/checks/records.js';
@@ -81,6 +83,307 @@ export interface AuditCheckExecutionOptions {
   readonly workspaceOwnership: AuditWorkspaceOwnershipRecorder;
   /** Tests substitute a private lock so they never take the machine lock. */
   readonly testLock?: TestLockOverride;
+}
+
+/** The harness's durable view of a committed audit definition. Provider types stay in this child. */
+export interface CommittedAuditConfiguration {
+  readonly sourceCommit: string;
+  readonly path: string;
+  readonly blob: string;
+  readonly projectRoot: string;
+  readonly checks: readonly unknown[];
+  readonly ignorePaths: readonly string[];
+  readonly undetectedConfigFilesForcingFullAudit: readonly string[];
+  readonly workspace: {
+    readonly preparationId: string;
+    readonly packageDirectoriesDeclared: boolean;
+    readonly linkNodeModules: boolean;
+    readonly packageDirectories: readonly string[];
+    readonly setupCommands: readonly {
+      readonly name?: string;
+      readonly argv: readonly string[];
+      readonly cwd: string;
+      readonly env: Readonly<Record<string, string>>;
+      readonly timeoutMs: number;
+    }[];
+  };
+}
+
+export interface ConfiguredFullAuditResult {
+  readonly status: 'completed' | 'failed' | 'cancelled';
+  readonly requestedSourceCommit: string;
+  readonly auditedSourceCommit: string | null;
+  readonly reused: boolean;
+  readonly verdict: 'pass' | 'fail' | 'indeterminate' | null;
+  readonly reportCommit: string | null;
+  readonly runRef: string | null;
+  readonly treeRef: string | null;
+  readonly detail: string;
+  readonly provider: unknown;
+}
+
+/** Only machine-readable producer failures qualify a bounded readiness rerun. */
+export function configuredFullRecovery(provider: unknown): 'timeout' | 'infrastructure' | null {
+  if (typeof provider !== 'object' || provider === null || !('status' in provider)) return null;
+  const result = provider as AuditResult;
+  if (result.status === 'failed') {
+    if (result.error.code === 'timeout' || result.error.code === 'test-lock-wait-exceeded' ||
+      (result.error.code === 'setup-command-timed-out' && result.error.details?.['cause'] === 'environment')) return 'timeout';
+    if (result.error.retryable === true && result.error.code !== 'discovery-failed') return 'infrastructure';
+    return null;
+  }
+  if (result.status !== 'completed') return null;
+  const commands = Object.values(result.summary.checks).flatMap(check => [check, ...Object.values(check.commands ?? {})]);
+  if (commands.some(command => (command.termination as { reason?: unknown } | undefined)?.reason === 'timeout' || command.runnerError?.kind === 'timeout')) return 'timeout';
+  return null;
+}
+
+export interface ConfiguredAuditPort {
+  read(projectRoot: string, sourceCommit: string, signal?: AbortSignal): Promise<CommittedAuditConfiguration>;
+  runFull(input: Omit<Parameters<typeof runConfiguredFullAudit>[0], 'workspaceOwnership'>): Promise<ConfiguredFullAuditResult>;
+}
+
+export function createConfiguredAudit(options: AuditCheckExecutionOptions): ConfiguredAuditPort {
+  return {
+    read: readCommittedAuditConfiguration,
+    runFull: input => runConfiguredFullAudit({ ...input, workspaceOwnership: options.workspaceOwnership, testLock: options.testLock }),
+  };
+}
+
+/** Read only the exact committed definition through the installed public provider. */
+export async function readCommittedAuditConfiguration(projectRoot: string, sourceCommit: string, signal?: AbortSignal): Promise<CommittedAuditConfiguration> {
+  const git = gitWithHarnessEnvironment();
+  const mapping = await resolvePathMapping(projectRoot, git, signal ?? new AbortController().signal);
+  const request = await requestFromCommittedConfiguration({
+    git, repositoryPath: mapping.repositoryRoot, sourceCommit, projectRoot: mapping.projectPrefix || '.', full: true, force: false,
+  });
+  const configuration = (request.coverageClaim as { configuration?: { path?: string; sourceCommit?: string; blob?: string } } | undefined)?.configuration;
+  if (configuration?.sourceCommit !== sourceCommit || typeof configuration.path !== 'string' || typeof configuration.blob !== 'string') {
+    throw new Error(`The audit provider did not bind the committed definition to ${sourceCommit}`);
+  }
+  if (request.workspaceMode === 'existing-worktree' || request.workspacePreparation?.preparationId !== preparationId) {
+    throw new Error(`${configuration.path} must declare supported nodejs preparation for a harness run`);
+  }
+  const options = request.workspacePreparation.options ?? {};
+  const projectPrefix = options['projectPrefix'];
+  if (projectPrefix !== undefined && projectPrefix !== mapping.projectPrefix && projectPrefix !== (mapping.projectPrefix || '.')) {
+    throw new Error(`${configuration.path} workspace.options.projectPrefix must equal the audited project root ${mapping.projectPrefix || '.'}`);
+  }
+  const linkNodeModules = options['linkNodeModules'] ?? true;
+  if (typeof linkNodeModules !== 'boolean') throw new Error(`${configuration.path} workspace.options.linkNodeModules must be boolean`);
+  const directories = options['packageDirectories'];
+  const setup = options['setupCommands'];
+  if (directories !== undefined && (!Array.isArray(directories) || directories.some(value => typeof value !== 'string'))) {
+    throw new Error(`${configuration.path} workspace.options.packageDirectories must be string paths`);
+  }
+  if (directories !== undefined && linkNodeModules === false) throw new Error(`${configuration.path} cannot list packageDirectories with linkNodeModules: false`);
+  const relativeDirectory = (value: string) => value.replaceAll('\\', '/').split('/').every(segment => segment !== '..') &&
+    !value.startsWith('/') && !/^[A-Za-z]:/u.test(value);
+  if ((directories ?? []).some(value => typeof value !== 'string' || !relativeDirectory(value))) {
+    throw new Error(`${configuration.path} workspace packageDirectories must remain inside the project`);
+  }
+  if (setup !== undefined && !Array.isArray(setup)) {
+    throw new Error(`${configuration.path} workspace.options.setupCommands must be an ordered command array`);
+  }
+  const commands = (setup ?? []).map((value: unknown, index: number) => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error(`${configuration.path} setup command ${index + 1} must be an object`);
+    const item = value as Record<string, unknown>;
+    if (typeof item['cmd'] !== 'string' || item['cmd'] === '' || !Array.isArray(item['args']) || item['args'].some(arg => typeof arg !== 'string') ||
+      (item['cwd'] !== undefined && typeof item['cwd'] !== 'string') ||
+      (item['env'] !== undefined && (typeof item['env'] !== 'object' || item['env'] === null || Array.isArray(item['env']) || Object.values(item['env']).some(entry => typeof entry !== 'string'))) ||
+      (item['timeoutMs'] !== undefined && (!Number.isInteger(item['timeoutMs']) || (item['timeoutMs'] as number) <= 0))) {
+      throw new Error(`${configuration.path} setup command ${index + 1} has unsupported argv, cwd, env or timeout`);
+    }
+    return {
+      ...(typeof item['name'] === 'string' ? { name: item['name'] } : {}),
+      argv: [item['cmd'], ...item['args']] as string[],
+      cwd: typeof item['cwd'] === 'string' ? item['cwd'] : '.',
+      env: (item['env'] ?? {}) as Record<string, string>,
+      timeoutMs: typeof item['timeoutMs'] === 'number' ? item['timeoutMs'] : 600_000,
+    };
+  });
+  const build = options['build'] === undefined ? setup === undefined : options['build'];
+  if (typeof build !== 'boolean') throw new Error(`${configuration.path} workspace.options.build must be boolean`);
+  if (build) {
+    const manifest = await gitText(git, mapping.repositoryRoot,
+      ['show', `${sourceCommit}:${mapping.projectPrefix === '' ? '' : `${mapping.projectPrefix}/`}package.json`], signal ?? new AbortController().signal).catch(() => null);
+    let scripts: unknown;
+    try { scripts = manifest === null ? undefined : (JSON.parse(manifest) as { scripts?: unknown }).scripts; }
+    catch { scripts = undefined; }
+    if (typeof scripts === 'object' && scripts !== null && typeof (scripts as Record<string, unknown>)['build'] === 'string') {
+      commands.unshift({ name: 'build', argv: ['npm', 'run', 'build'], cwd: '.', env: {}, timeoutMs: 120_000 });
+    }
+  }
+  return {
+    sourceCommit, path: configuration.path, blob: configuration.blob, projectRoot: mapping.projectPrefix || '.',
+    checks: structuredClone(request.checks), ignorePaths: request.ignorePaths ?? [],
+    undetectedConfigFilesForcingFullAudit: request.undetectedConfigFilesForcingFullAudit ?? [],
+    workspace: { preparationId, packageDirectoriesDeclared: directories !== undefined, linkNodeModules,
+      packageDirectories: (directories ?? ['']) as string[], setupCommands: commands },
+  };
+}
+
+/** Execute the provider's native configured full suite with durable workspace ownership. */
+export async function runConfiguredFullAudit(input: {
+  readonly projectRoot: string;
+  readonly sourceCommit: string;
+  readonly configuration: CommittedAuditConfiguration;
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly workspaceOwnership: AuditWorkspaceOwnershipRecorder;
+  readonly testLock?: TestLockOverride;
+  readonly signal?: AbortSignal;
+  readonly started?: GateCommandStarted;
+  readonly waiting?: (command: import('../../../src/checks/execution.js').GateCommandStart, line: string) => Promise<void>;
+  readonly lockAcquired?: () => void;
+}): Promise<ConfiguredFullAuditResult> {
+  const baseGit = gitWithHarnessEnvironment();
+  const signal = input.signal ?? new AbortController().signal;
+  const mapping = await resolvePathMapping(input.projectRoot, baseGit, signal);
+  const current = await readCommittedAuditConfiguration(input.projectRoot, input.sourceCommit, signal);
+  if (JSON.stringify(current) !== JSON.stringify(input.configuration)) {
+    throw new Error(`Captured audit policy conflicts with ${current.path} at ${input.sourceCommit}; start a new run after reconciling the configuration`);
+  }
+  const request = await requestFromCommittedConfiguration({
+    git: baseGit, repositoryPath: mapping.repositoryRoot, sourceCommit: input.sourceCommit,
+    projectRoot: mapping.projectPrefix || '.', full: true, force: false,
+  });
+  request.requestId = `${input.runId}:${input.attemptId}`;
+  const repository = await resolveRepositoryExecutionLeaseIdentity(mapping.repositoryRoot, { git: baseGit });
+  const identity = await createNodeExecutionLeaseProcessLookup().lookup(process.pid);
+  if (identity.status !== 'alive') throw new Error('The audit process identity could not be established before workspace creation');
+  let workspace: IntendedAuditWorkspace | null = null;
+  const git = recordingGit({
+    base: baseGit, mapping, repository, sourceCommit: input.sourceCommit, attemptId: input.attemptId,
+    runId: input.runId, processIdentity: identity.startMarker, recorder: input.workspaceOwnership,
+    recorded: value => { workspace = value; },
+  });
+  const baseLease = createNodeRepositoryExecutionLease({ git: baseGit });
+  const executionLease = {
+    async acquire(value: Parameters<typeof baseLease.acquire>[0]) {
+      const ownership = await baseLease.acquire(value);
+      try {
+        await input.workspaceOwnership.recoverAbandonedWorkspaces({
+          repositoryRoot: mapping.repositoryRoot,
+          gitCommonDirectory: repository.gitCommonDirectory,
+          repositoryId: repository.repositoryId,
+        });
+        return ownership;
+      } catch (error) {
+        await ownership.release();
+        throw error;
+      }
+    },
+    validateOwnership: baseLease.validateOwnership.bind(baseLease),
+  };
+  const recovered = await findCompletedAuditRequest({ repositoryPath: mapping.repositoryRoot,
+    projectRoot: mapping.projectPrefix || '.', requestId: request.requestId, sourceCommit: input.sourceCommit, git: baseGit });
+  if (recovered?.status === 'completed' && !configuredFullResultMatches(recovered, input.configuration)) {
+    throw new Error(`Completed audit request ${request.requestId} does not contain compatible configured full evidence for ${input.sourceCommit}`);
+  }
+  if (recovered?.status === 'completed') {
+    const ownership = await executionLease.acquire({ repositoryPath: mapping.repositoryRoot,
+      operation: 'audit-readiness-recovery', metadata: { requestId: request.requestId }, signal });
+    await ownership.release();
+  }
+  const checkStarts = new Map(request.checks.map((check, index) => [check.id, {
+    kind: 'conformance' as const, name: check.name, position: index + 1, total: request.checks.length,
+  }]));
+  const progress = configuredAuditProgress(checkStarts, input);
+  const result = recovered ?? await createAuditService({ git, processExecutor: configuredProcessExecutor(input.configuration), executionLease,
+    ...(input.testLock === undefined ? {} : { machineTestLock: input.testLock }),
+    eventSink: { emit: progress.emit },
+  }).run(request, signal).finally(progress.settleAll);
+  if (workspace !== null) await input.workspaceOwnership.recordWorkspaceCleaned(workspace);
+  if (result.status !== 'completed') return {
+    status: result.status, requestedSourceCommit: input.sourceCommit, auditedSourceCommit: null,
+    reused: false, verdict: null, reportCommit: null, runRef: null, treeRef: null,
+    detail: result.status === 'failed' ? `${result.error.code}: ${result.error.message}` : result.reason,
+    provider: result,
+  };
+  if (!configuredFullResultMatches(result, input.configuration)) {
+    throw new Error(`Audit request ${request.requestId} returned incompatible configured full evidence for ${input.sourceCommit}`);
+  }
+  return {
+    status: 'completed', requestedSourceCommit: input.sourceCommit,
+    auditedSourceCommit: result.summary.sourceCommit, reused: result.reused !== undefined,
+    verdict: result.composition.verdict, reportCommit: result.refs.reportCommit, runRef: result.refs.runRef, treeRef: result.refs.treeRef,
+    detail: result.composition.reason ?? result.summary.overall,
+    provider: result,
+  };
+}
+
+/** Project provider check events into existing run progress without command records. */
+export function configuredAuditProgress(
+  checks: ReadonlyMap<string, GateCommandStart>,
+  callbacks: { readonly started?: GateCommandStarted; readonly waiting?: (command: GateCommandStart, line: string) => Promise<void>;
+    readonly lockAcquired?: () => void },
+): { emit(event: AuditEvent): Promise<void>; settleAll(): void } {
+  const waits = new Set<string>();
+  let activeWait = false;
+  const releaseIfIdle = () => { if (activeWait && waits.size === 0) { activeWait = false; callbacks.lockAcquired?.(); } };
+  return {
+    async emit(event) {
+      if (event.type === 'check.started') {
+        const command = checks.get(event.checkId);
+        if (command !== undefined) await callbacks.started?.(command);
+      }
+      if (event.type === 'check.waiting') {
+        const command = checks.get(event.checkId);
+        if (command !== undefined) {
+          waits.add(`${event.checkId}\0${event.command}`);
+          activeWait = true;
+          await callbacks.waiting?.(command, `Waiting for audit test lock ${event.lockPath}`);
+        }
+      }
+      if (event.type === 'check.lock-acquired') {
+        if (waits.delete(`${event.checkId}\0${event.command}`)) releaseIfIdle();
+      }
+      if (event.type === 'check.completed') {
+        for (const key of waits) if (key.startsWith(`${event.checkId}\0`)) waits.delete(key);
+        releaseIfIdle();
+      }
+    },
+    settleAll() { waits.clear(); releaseIfIdle(); },
+  };
+}
+
+/** Keep the harness's inherited environment boundary while retaining declared/provider-added values. */
+export function configuredProcessExecutor(configuration: CommittedAuditConfiguration): ProcessExecutorPort {
+  const node = createNodeProcessExecutor();
+  const commands: Array<{ command: string; args: readonly string[]; cwd: string; env: Readonly<Record<string, string>> }> =
+    configuration.workspace.setupCommands.map(command => ({ command: command.argv[0]!, args: command.argv.slice(1),
+      cwd: command.cwd, env: command.env }));
+  for (const check of configuration.checks) {
+    if (typeof check !== 'object' || check === null) continue;
+    const executor = (check as { executor?: { kind?: string; commands?: Array<{ cmd: string; args: string[]; cwd?: string; env?: Record<string, string> }> } }).executor;
+    if (executor?.kind !== 'command') continue;
+    for (const command of executor.commands ?? []) commands.push({ command: command.cmd, args: command.args,
+      cwd: command.cwd ?? '.', env: command.env ?? {} });
+  }
+  const declaredNames = new Set(commands.flatMap(command => Object.keys(command.env)));
+  return { execute(request, signal) {
+    const allowed = childEnvironment();
+    const environment = { ...allowed };
+    const matches = commands.filter(command => command.command === request.command && command.args.every((arg, index) => request.args[index] === arg)
+      && (command.cwd === '.' || request.workingDirectory.replaceAll('\\', '/').endsWith(`/${command.cwd.replaceAll('\\', '/')}`)));
+    const specificity = Math.max(0, ...matches.map(command => command.args.length * 1000 + command.cwd.length));
+    const exact = matches.filter(command => command.args.length * 1000 + command.cwd.length === specificity);
+    if (exact.length === 0 && Object.keys(request.environment ?? {}).some(name => declaredNames.has(name))) {
+      throw new Error(`No committed command identity matches ${request.command} ${request.args.join(' ')}; its declared environment cannot be projected safely`);
+    }
+    const signature = new Set(exact.map(command => JSON.stringify(command.env)));
+    if (signature.size > 1) throw new Error(`Ambiguous declared environment for configured audit command ${request.command} ${request.args.join(' ')}`);
+    const declared = exact[0]?.env ?? {};
+    for (const [name, value] of Object.entries(declared)) {
+      if (request.environment?.[name] !== value) throw new Error(`The provider did not preserve declared environment ${name} for ${request.command}`);
+    }
+    for (const [name, value] of Object.entries(request.environment ?? {})) {
+      if (name in allowed || name.startsWith('RAMIFY_AUDIT_') || name === 'CUCUMBER_SUMMARY_FILE') environment[name] = value;
+      else if (declared[name] !== undefined) environment[name] = declared[name];
+    }
+    return node.execute({ ...request, environment }, signal);
+  } };
 }
 
 /**
@@ -251,7 +554,8 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         base: baseGit,
         mapping,
         repository,
-        request,
+        sourceCommit: request.context.sourceCommit,
+        attemptId: request.context.attemptId,
         runId,
         processIdentity: identity.startMarker,
         recorder: options.workspaceOwnership,
@@ -423,6 +727,20 @@ async function readCommandReceipts(request: CheckExecutionRequest, checks: reado
     found.set(id, body.record);
   }
   return found;
+}
+
+/** Internal recovery predicate: only compatible executed-full evidence may complete readiness. */
+export function configuredFullResultMatches(result: Extract<AuditResult, { status: 'completed' }>, configuration: CommittedAuditConfiguration): boolean {
+  const claim = result.summary.coverage.claim['configuration'];
+  const identity = typeof claim === 'object' && claim !== null && !Array.isArray(claim) ? claim as Record<string, unknown> : {};
+  const expected = configuration.checks.flatMap(check => typeof check === 'object' && check !== null && 'id' in check && typeof check.id === 'string' ? [check.id] : []);
+  return result.summary.evidenceSchemaVersion === 4 && result.summary.producer.name === 'ramify-audit' &&
+    result.summary.mode.executedMode === 'full' && !result.composition.scoped &&
+    result.summary.coverage.projectRoot === configuration.projectRoot &&
+    result.summary.coverage.selection.kind === 'full' &&
+    identity['path'] === configuration.path && identity['blob'] === configuration.blob &&
+    expected.length === configuration.checks.length &&
+    JSON.stringify([...result.summary.coverage.universe.checkIds].sort()) === JSON.stringify([...expected].sort());
 }
 
 async function readAuditReceipt(checks: readonly PlannedCheck[], request: CheckExecutionRequest): Promise<CheckExecutionResult | null> {
@@ -827,7 +1145,8 @@ function recordingGit(input: {
   readonly base: GitExecutorPort;
   readonly mapping: PathMapping;
   readonly repository: Awaited<ReturnType<typeof resolveRepositoryExecutionLeaseIdentity>>;
-  readonly request: CheckExecutionRequest;
+  readonly sourceCommit: string;
+  readonly attemptId: string;
   readonly runId: string;
   readonly processIdentity: string;
   readonly recorder: AuditWorkspaceOwnershipRecorder;
@@ -842,8 +1161,8 @@ function recordingGit(input: {
         if (worktreePath === undefined || sourceCommit === undefined) {
           throw new Error('git worktree add did not name its intended directory and source commit');
         }
-        if (sourceCommit !== input.request.context.sourceCommit) {
-          throw new Error(`git worktree add selected ${sourceCommit}, expected ${input.request.context.sourceCommit}`);
+        if (sourceCommit !== input.sourceCommit) {
+          throw new Error(`git worktree add selected ${sourceCommit}, expected ${input.sourceCommit}`);
         }
         const workspace: IntendedAuditWorkspace = {
           repositoryRoot: input.mapping.repositoryRoot,
@@ -853,7 +1172,7 @@ function recordingGit(input: {
           worktreePath,
           sourceCommit,
           runId: input.runId,
-          attemptId: input.request.context.attemptId,
+          attemptId: input.attemptId,
           process: { id: process.pid, startMarker: input.processIdentity },
         };
         await input.recorder.recordIntendedWorkspace(workspace);

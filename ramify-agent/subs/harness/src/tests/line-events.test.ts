@@ -1,7 +1,7 @@
 import { mockGit } from './helpers/mock-git.js';
 import { scenariosCommit, scriptedGit } from './helpers/scripted-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import type { LineChange } from '../kpi/lines.js';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -209,7 +209,7 @@ describe('a run captures each writer\'s line events when the observation happens
         lines(`${notesDirectory}/src/notes.ts`, 1, 1), lines(`${notesDirectory}/src/store.ts`, 1),
       ]);
     const { service } = await openRuns(root, {
-      git, candidates: final.candidates, readinessExecution: directReadinessExecution(),
+      git, candidates: final.candidates,
       // The engineer's writes are what Git reports once the feature files are committed.
       afterWrite: async write => { if (write === 'scenarios-materialized') git.givenWrites(); },
       script: byRole({

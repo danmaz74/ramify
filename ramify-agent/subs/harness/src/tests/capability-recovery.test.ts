@@ -12,7 +12,6 @@ import { committedRecords } from '../work/committed.js';
 import { copyCapabilityFixture, fixtureRequest, openCapabilityRuns } from './helpers/capability.js';
 import { temporaryDirectory } from './helpers/fixture.js';
 import { assign, edit, installMiniRunner, outline, shell, submit, treeInputs } from './helpers/iterations.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { freeze, git, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { nodeProcessGroups } from '../run/writer.js';
 
@@ -52,7 +51,7 @@ test('CA20: a registered real process group survives a service crash and is sett
     return [];
   };
   const first = await openCapabilityRuns(fixture.root, {
-    git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    git: gitService, script, inputs: treeInputs(),
     afterWrite: async write => { if (write === 'writer-process-registered' && !frozen) { frozen = true; await freeze(); } },
   });
   const receipt = await first.service.execute(startRun('need'));
@@ -67,7 +66,7 @@ test('CA20: a registered real process group survives a service crash and is sett
 
   await staleCrashLock(fixture.root);
   const second = await openCapabilityRuns(fixture.root, {
-    git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    git: gitService, script, inputs: treeInputs(),
   });
   cleanups.push(() => second.service.close());
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
@@ -175,7 +174,7 @@ async function lostBWriterCase(restartBeforeSettlement: boolean): Promise<void> 
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { git: gitService, script, inputs: treeInputs(),
     ...(restartBeforeSettlement ? {
       policy: (root: string) => ({ ...testPolicy(root), limits: {
         ...testPolicy(root).limits, sessionReconstructionsPerWork: 1,
@@ -267,7 +266,7 @@ test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect wit
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { git: gitService, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'capability-coordinator-resumed' || frozen) return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -338,7 +337,7 @@ test('a restart after a capability architect budget return reconstructs from com
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { git: gitService, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'capability-coordinator-resumed' || frozen) return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -397,7 +396,7 @@ test('CA19: accepted qualification before delegation replays one decision after 
     if (spec.role === 'capability-architect') return [{ kind: 'wait', ms: 60_000 }];
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { git: gitService, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'invocation-ended' || frozen) return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -464,7 +463,7 @@ test('CA19: accepted assign action before its effect replays without a second co
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { git: gitService, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'capability-coordinator-resumed' || frozen) return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -536,7 +535,7 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { git: gitService, script, inputs: treeInputs(),
     afterWrite: async (write: string) => {
       if (write === boundary && (boundary !== 'invocation-ended' || engineerTurns === 2) && closing === undefined) closing = closeFirst?.();
     } };
@@ -622,7 +621,7 @@ test('CA19: accepted B completion before assignment settlement replays without a
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { git: gitService, script, inputs: treeInputs(),
     afterWrite: async (write: string) => {
       if (write === 'invocation-ended' && engineerTurns === 2 && closing === undefined) closing = closeFirst?.();
     } };
@@ -685,7 +684,7 @@ test('CA20 CA32: restart with a B writer lacking confirmed release stops the sta
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { git: gitService, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'writer-acquired') return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -744,7 +743,7 @@ test('CA19 CA30: service restart adopts a source snapshot before its request led
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { git: gitService, script, inputs: treeInputs(),
     afterWrite: async (write: string) => {
       if (write === 'capability-source-captured' && closing === undefined) closing = closeFirst?.();
     } };
@@ -811,7 +810,7 @@ for (const boundary of ['capability-exchange-opened', 'capability-exchange-answe
       }
       return [];
     };
-    const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    const options = { git: gitService, script, inputs: treeInputs(),
       afterWrite: async (write: string) => { if (write === boundary && closing === undefined) closing = closeFirst?.(); } };
     const first = await openCapabilityRuns(fixture.root, options);
     closeFirst = () => first.service.close();
