@@ -543,7 +543,6 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   // it broken, and readiness running one in place produce them.
   { union: 'record ramify-agent.gate-attempt/3.commands[].kind', values: ['setup'], file: 'subs/harness/src/tests/setup-attribution.test.ts', test: 'the build the engineer broke fails its iteration gate in scope, and the engineer repairs it from the build\'s own output' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['setup-failed'], file: 'subs/harness/src/tests/setup-attribution.test.ts', test: 'the build the engineer broke fails its iteration gate in scope, and the engineer repairs it from the build\'s own output' },
-  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['audit-unselected'], file: 'subs/harness/src/tests/audit-check-execution.test.ts', test: 'keeps a registered Vitest run indeterminate when configured discovery is unavailable' },
   { union: 'record ramify-agent.gate-operation/1.request.checks[].kind', values: ['setup'], file: 'subs/harness/src/tests/setup-attribution.test.ts', test: 'the build the engineer broke fails its iteration gate in scope, and the engineer repairs it from the build\'s own output' },
   { union: 'run log[gate-command-started].data.kind', values: ['setup'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'runs first, at the project root, so the baseline reads what it built, and is announced and recorded as a gate command' },
   { union: 'run log.type', values: ['gate-command-waiting'], file: 'subs/harness/src/tests/gate-progress.test.ts', test: 'a composed readiness records the provider wait for tests and scenarios before their commands start' },
@@ -672,6 +671,7 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  * a producer, so the list can neither hide a new gap nor outlive a closed one.
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
+  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['audit-unselected'], reason: 'The current legacy registered executor falls back to a full audit when configured discovery is unavailable. An actual configured empty-selection consumer witness awaits iteration 9; iteration 0 only qualified the provider.' },
   { union: 'query work-item.iterations[].gates[].cause', values: ['in-scope'], reason: 'Historical iterations may project the former in-scope cause; new ordinary gates record the neutral check-failed cause without owner attribution.' },
   { union: 'record ramify-agent.gate-attempt/3.cause', values: ['in-scope', 'outside-assignment'], reason: 'Historical gates retain this inferred attribution, but current gates no longer assign failure ownership from locations or scope probes.' },
   { union: 'run log.type', values: ['capability-candidate-accepted', 'capability-review-recorded', 'capability-assignment-interrupted'],
