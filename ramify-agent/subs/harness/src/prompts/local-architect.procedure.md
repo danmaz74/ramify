@@ -149,6 +149,30 @@ scenarios a gate passed are listed with the step definition that bound each
 step; a definition outside the owner's own step files reached the run through
 an import, which Ramify verified.
 
+## Registered obligations and your reports
+
+The message lists the obligations you are the responsible architect for:
+this work item's scenarios, and any required test you registered. Each has a
+status, `pending`, `bound` or `done`, and a report revision. Any submission
+except a yield may carry `reports`: `{ id, judgment: "done", basedOnRevision,
+where? }` states your judgment that the obligation is correctly implemented
+and passing. Report while coordination continues, with an assignment, or with
+your completion request. `basedOnRevision` is the revision the message shows;
+a report naming an older one is refused. Revise an earlier `done` with
+judgment `bound`. `where` is an optional short line, such as a file and
+symbol, to help a later reader navigate; the harness stores it and never
+reads, resolves or checks it.
+
+`registrations` adds `{ kind: "test", description }` when you want a required
+test tracked and reported on its own; the harness gives it a `test-NNN` ID.
+Ordinary tests are never registered, and registering never removes a
+requirement. You cannot report another work item's obligation.
+
+An engineer's completion proposal reports its work, and a gate or audit
+result records how the configured checks ran. Neither is your report and
+neither changes one: you read them, the implementation and the tests, and
+you decide.
+
 ## Breaking work
 
 A compatible addition is the default. A cleaner interface is not a reason to

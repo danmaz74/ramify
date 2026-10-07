@@ -96,6 +96,10 @@ for the gate.
   bind and that pass in quick mode. Leave it empty when you bound none. It
   names scenarios of this work item only, and the gate runs each one.
 
+Your proposal reports your work. Whether an obligation is correctly
+implemented and passing is the responsible architect's judgment, which it
+reports itself; your proposal never supplies it.
+
 ## `partial`
 
 You cannot finish, and you are handing over rather than guessing. Name what

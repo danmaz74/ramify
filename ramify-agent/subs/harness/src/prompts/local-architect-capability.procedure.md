@@ -25,6 +25,16 @@ through its coordinator. Fakes may help a scoped implementation, but are
 optional; passing a fake never substitutes for real provider and consumer
 checks. Do not assign a contract iteration or yield for provider obligations.
 
+You report on the obligations you are responsible for: this work item's
+scenarios and any test you registered. Any submission may carry `reports`
+of `{ id, judgment: "done", basedOnRevision, where? }`, your judgment that an
+obligation is correctly implemented and passing, and `registrations` of
+`{ kind: "test", description }` for a required test you want tracked on its
+own. Name the revision the message shows; revise an earlier `done` with
+`bound`. `where` is optional navigation text the harness never reads. An
+engineer's completion proposal and a gate or audit result are separate facts
+you assess, never your report.
+
 Use `request-placement` when reuse, ownership or responsibility boundaries
 remain uncertain. A decision may add an owner; refresh the affected context
 before assigning it. Use `unresolved` with concrete evidence when the plan
