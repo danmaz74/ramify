@@ -357,7 +357,8 @@ export function configuredProcessExecutor(configuration: CommittedAuditConfigura
   const node = createNodeProcessExecutor();
   const providerEnvironment = new Set([
     TEST_LOCK_HELD_ENVIRONMENT, 'RAMIFY_AUDIT_VITEST_SUMMARY', 'RAMIFY_AUDIT_VITEST_ROOT',
-    'RAMIFY_AUDIT_VITEST_DISCOVERY', 'RAMIFY_AUDIT_CUCUMBER_SELECTION', 'CUCUMBER_SUMMARY_FILE',
+    'RAMIFY_AUDIT_VITEST_DISCOVERY', 'RAMIFY_AUDIT_VITEST_EXCLUDES',
+    'RAMIFY_AUDIT_CUCUMBER_SELECTION', 'CUCUMBER_SUMMARY_FILE',
   ]);
   const commands: Array<{ command: string; args: readonly string[]; cwd: string; env: Readonly<Record<string, string>> }> =
     configuration.workspace.setupCommands.map(command => ({ command: command.argv[0]!, args: command.argv.slice(1),

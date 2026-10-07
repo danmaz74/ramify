@@ -14,6 +14,28 @@ approved the bounded provider public export, qualification and publication on
 2026-10-07; the published adoption pair is `ramify.ts` 0.4.0 and
 `ramify-audit` 0.7.1, as [iteration 0](iterations/iteration0-results.md) records.
 
+On 2026-10-07, after iteration 2's normal partial audit exposed a provider
+Vitest grouping defect, Dan said, “yes. I pre-approve all these” for the
+qualified provider publication, exact consumer pin adoption and branch pushes
+needed by the remaining Plan 21 iterations. This authorization does not change
+the protected-document rule below or make a failing audit acceptable. The
+historical iteration 0 and 1 receipts retain their actual 0.7.1 identities.
+
+**Iteration 2 provider prerequisite and deviation:** released
+`ramify-audit@0.7.1` marked the clean `8b15ce53` partial result failed after
+running 254 unique Vitest files against 211 expected and repeating ten files
+in two groups. The provider owner corrected inline-project exclusions without
+changing `ramify-module-ownership-groups/2` or evidence schema 4, qualified
+source `4003d70d158777b3f97965853ac921d2063b9685`, and published exact
+`ramify-audit@0.7.2`. Its provider receipt is
+`/home/app/ramify-audit-vpe/docs/2026-10-07-vitest-project-exclusions.md`;
+the consumer records its source, artifact and
+registry identities in the iteration 2 receipt. Provider GitHub push was
+still pending at adoption and must be verified separately before it is claimed.
+Iteration 2 adopts the exact registry pin, then needs a new normal clean-source
+audit result; the failed 0.7.1 result is retained as evidence, never treated
+as passing.
+
 ## Iteration discipline
 
 Execute the [manifest](iterations/manifest.json) in order, one iteration at a

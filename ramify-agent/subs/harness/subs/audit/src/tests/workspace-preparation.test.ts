@@ -101,8 +101,8 @@ it('reads the installed provider F3 committed A/B definitions despite malformed 
 
 it('keeps a declared credential-style variable in command A and scrubs its ambient value from command B', () => {
   const source = fileURLToPath(new URL('../check-execution.ts', import.meta.url));
-  const commandA = "if(process.env.PLAN21_TEST_CREDENTIAL!=='declared'||process.env.RAMIFY_AUDIT_API_KEY!==undefined)process.exit(7)";
-  const commandB = 'if(process.env.PLAN21_TEST_CREDENTIAL!==undefined||process.env.RAMIFY_AUDIT_API_KEY!==undefined)process.exit(9)';
+  const commandA = "if(process.env.PLAN21_TEST_CREDENTIAL!=='declared'||process.env.RAMIFY_AUDIT_API_KEY!==undefined||process.env.RAMIFY_AUDIT_VITEST_EXCLUDES!==undefined)process.exit(7)";
+  const commandB = "if(process.env.PLAN21_TEST_CREDENTIAL!==undefined||process.env.RAMIFY_AUDIT_API_KEY!==undefined||process.env.RAMIFY_AUDIT_VITEST_EXCLUDES!=='provider-selected-exclusions')process.exit(9)";
   const configuration = {
     sourceCommit: 'test', path: 'ramify-audit.json', blob: 'test', projectRoot: '.', checks: [{ executor: { kind: 'command', commands: [
       { cmd: process.execPath, args: ['-e', commandA], env: { PLAN21_TEST_CREDENTIAL: 'declared' } },
@@ -115,7 +115,7 @@ it('keeps a declared credential-style variable in command A and scrubs its ambie
     `const port = configuredProcessExecutor(${JSON.stringify(configuration)}, () => process.cwd());`,
     `const a = await port.execute({ command: process.execPath, args: ['-e', ${JSON.stringify(commandA)}], workingDirectory: process.cwd(), environment: { ...process.env, PLAN21_TEST_CREDENTIAL: 'declared' } });`,
     `const discovery = await port.execute({ command: process.execPath, args: ['-e', ${JSON.stringify(commandA)}, '--', '--reporter=provider-added'], workingDirectory: process.cwd(), environment: { ...process.env, PLAN21_TEST_CREDENTIAL: 'declared', RAMIFY_AUDIT_VITEST_DISCOVERY: '/tmp/producer-discovery.json' } });`,
-    `const b = await port.execute({ command: process.execPath, args: ['-e', ${JSON.stringify(commandB)}], workingDirectory: process.cwd(), environment: { ...process.env } });`,
+    `const b = await port.execute({ command: process.execPath, args: ['-e', ${JSON.stringify(commandB)}], workingDirectory: process.cwd(), environment: { ...process.env, RAMIFY_AUDIT_VITEST_EXCLUDES: 'provider-selected-exclusions' } });`,
     'process.stdout.write(JSON.stringify([a.exitCode, discovery.exitCode, b.exitCode]));',
   ].join('\n');
   const answer = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], {
