@@ -2,7 +2,7 @@
   "schema": "plan21.iteration2.native-readiness/1",
   "providerVersion": "ramify-audit@0.7.1",
   "configuration": {
-    "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+    "sourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
     "path": "ramify-audit.json",
     "blob": "fd40ee12f17b2b93d79854dc5f8f28051297cb84",
     "projectRoot": ".",
@@ -55,17 +55,17 @@
       ]
     }
   },
-  "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+  "sourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
   "first": {
     "attempt": {
       "schema": "ramify-agent.readiness-attempt/1",
       "attempt": 1,
-      "head": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+      "head": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
       "steps": [
         {
           "step": "project-root",
           "outcome": "passed",
-          "detail": "/tmp/ramify-agent-jn8nmV/collection-review, with its package.json"
+          "detail": "/tmp/ramify-agent-Tl7zQ9/collection-review, with its package.json"
         },
         {
           "step": "scratch-cleanup",
@@ -100,7 +100,7 @@
         {
           "step": "audit-config",
           "outcome": "passed",
-          "detail": "ramify-audit.json blob fd40ee12f17b2b93d79854dc5f8f28051297cb84 at b889016a52fc166d464ceb2b96dffd80b0d77515"
+          "detail": "ramify-audit.json blob fd40ee12f17b2b93d79854dc5f8f28051297cb84 at e271f2120ad90eab96d1754f76bda5924b90ddb3"
         },
         {
           "step": "declared-packages",
@@ -115,7 +115,7 @@
         {
           "step": "configured-full-audit",
           "outcome": "passed",
-          "detail": "pass; requested b889016a52fc166d464ceb2b96dffd80b0d77515, audited b889016a52fc166d464ceb2b96dffd80b0d77515",
+          "detail": "pass; requested e271f2120ad90eab96d1754f76bda5924b90ddb3, audited e271f2120ad90eab96d1754f76bda5924b90ddb3",
           "gate": "ga-0001"
         },
         {
@@ -133,11 +133,11 @@
         }
       ],
       "audit": {
-        "requestedSourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
-        "auditedSourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "requestedSourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
+        "auditedSourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
         "reused": false,
-        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212",
-        "runRef": "refs/audited/runs/2026-10-07T12-58-23Z-b889016a5"
+        "reportCommit": "9d28148df3daf496ef65edd73cf6715b9f87cd8b",
+        "runRef": "refs/audited/runs/2026-10-07T13-02-53Z-e271f2120"
       },
       "verdict": "passed",
       "recovery": null
@@ -145,12 +145,12 @@
     "provider": {
       "status": "completed",
       "requestId": "native-first:ga-0001",
-      "runId": "8b89b304-6c3a-4b96-8b2f-5d0499057f3a",
+      "runId": "21492b0f-99e2-4d47-a47b-82eb7c9cea3c",
       "summary": {
         "evidenceSchemaVersion": 4,
         "execution": {
           "requestId": "native-first:ga-0001",
-          "runId": "8b89b304-6c3a-4b96-8b2f-5d0499057f3a"
+          "runId": "21492b0f-99e2-4d47-a47b-82eb7c9cea3c"
         },
         "producer": {
           "name": "ramify-audit",
@@ -190,7 +190,7 @@
             "configuration": {
               "blob": "fd40ee12f17b2b93d79854dc5f8f28051297cb84",
               "path": "ramify-audit.json",
-              "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515"
+              "sourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3"
             },
             "scope": "repository"
           },
@@ -211,23 +211,23 @@
           "executedMode": "full"
         },
         "overall": "pass",
-        "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "sourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
         "sourceTree": "3ee20756de676fdccec66b8c48f59d78f37e6711",
         "sourceBranch": "main",
-        "auditedAt": "2026-10-07T12:58:23.542Z",
-        "durationSeconds": 0.116,
+        "auditedAt": "2026-10-07T13:02:53.672Z",
+        "durationSeconds": 0.123,
         "checks": {
           "configured-command": {
             "commands": {
               "source": {
-                "durationSeconds": 0.021,
+                "durationSeconds": 0.025,
                 "output": "Command completed with no output",
                 "passed": true,
                 "status": "pass",
                 "summary": "Command completed with no output"
               }
             },
-            "durationSeconds": 0.022,
+            "durationSeconds": 0.025,
             "output": "### source [PASS]\nCommand completed with no output",
             "passed": true,
             "status": "pass",
@@ -304,19 +304,19 @@
         }
       },
       "refs": {
-        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212",
-        "runRef": "refs/audited/runs/2026-10-07T12-58-23Z-b889016a5",
+        "reportCommit": "9d28148df3daf496ef65edd73cf6715b9f87cd8b",
+        "runRef": "refs/audited/runs/2026-10-07T13-02-53Z-e271f2120",
         "treeRef": "refs/audited/by-tree/3ee20756de676fdccec66b8c48f59d78f37e6711"
       },
       "retrievalCommands": [
-        "git notes --ref=audit show b889016a52fc166d464ceb2b96dffd80b0d77515",
-        "git show refs/audited/runs/2026-10-07T12-58-23Z-b889016a5:reports/audit/summary.json"
+        "git notes --ref=audit show e271f2120ad90eab96d1754f76bda5924b90ddb3",
+        "git show refs/audited/runs/2026-10-07T13-02-53Z-e271f2120:reports/audit/summary.json"
       ],
       "composition": {
         "verdict": "pass",
         "scoped": false,
         "chainDepth": 0,
-        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212"
+        "reportCommit": "9d28148df3daf496ef65edd73cf6715b9f87cd8b"
       }
     }
   },
@@ -324,12 +324,12 @@
     "attempt": {
       "schema": "ramify-agent.readiness-attempt/1",
       "attempt": 1,
-      "head": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+      "head": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
       "steps": [
         {
           "step": "project-root",
           "outcome": "passed",
-          "detail": "/tmp/ramify-agent-jn8nmV/collection-review, with its package.json"
+          "detail": "/tmp/ramify-agent-Tl7zQ9/collection-review, with its package.json"
         },
         {
           "step": "scratch-cleanup",
@@ -364,7 +364,7 @@
         {
           "step": "audit-config",
           "outcome": "passed",
-          "detail": "ramify-audit.json blob fd40ee12f17b2b93d79854dc5f8f28051297cb84 at b889016a52fc166d464ceb2b96dffd80b0d77515"
+          "detail": "ramify-audit.json blob fd40ee12f17b2b93d79854dc5f8f28051297cb84 at e271f2120ad90eab96d1754f76bda5924b90ddb3"
         },
         {
           "step": "declared-packages",
@@ -379,7 +379,7 @@
         {
           "step": "configured-full-audit",
           "outcome": "passed",
-          "detail": "pass; requested b889016a52fc166d464ceb2b96dffd80b0d77515, audited b889016a52fc166d464ceb2b96dffd80b0d77515",
+          "detail": "pass; requested e271f2120ad90eab96d1754f76bda5924b90ddb3, audited e271f2120ad90eab96d1754f76bda5924b90ddb3",
           "gate": "ga-0001"
         },
         {
@@ -397,11 +397,11 @@
         }
       ],
       "audit": {
-        "requestedSourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
-        "auditedSourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "requestedSourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
+        "auditedSourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
         "reused": true,
-        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212",
-        "runRef": "refs/audited/runs/2026-10-07T12-58-23Z-b889016a5"
+        "reportCommit": "9d28148df3daf496ef65edd73cf6715b9f87cd8b",
+        "runRef": "refs/audited/runs/2026-10-07T13-02-53Z-e271f2120"
       },
       "verdict": "passed",
       "recovery": null
@@ -409,21 +409,21 @@
     "provider": {
       "status": "completed",
       "requestId": "native-second:ga-0001",
-      "runId": "bd35086f-5ab8-4b41-95b8-1e76aee67b97",
+      "runId": "448faf8c-a93d-42d3-b92a-dda451092907",
       "summary": {
-        "auditedAt": "2026-10-07T12:58:23.542Z",
+        "auditedAt": "2026-10-07T13:02:53.672Z",
         "checks": {
           "configured-command": {
             "commands": {
               "source": {
-                "durationSeconds": 0.021,
+                "durationSeconds": 0.025,
                 "output": "Command completed with no output",
                 "passed": true,
                 "status": "pass",
                 "summary": "Command completed with no output"
               }
             },
-            "durationSeconds": 0.022,
+            "durationSeconds": 0.025,
             "output": "### source [PASS]\nCommand completed with no output",
             "passed": true,
             "status": "pass",
@@ -435,7 +435,7 @@
             "configuration": {
               "blob": "fd40ee12f17b2b93d79854dc5f8f28051297cb84",
               "path": "ramify-audit.json",
-              "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515"
+              "sourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3"
             },
             "scope": "repository"
           },
@@ -516,11 +516,11 @@
             }
           }
         },
-        "durationSeconds": 0.116,
+        "durationSeconds": 0.123,
         "evidenceSchemaVersion": 4,
         "execution": {
           "requestId": "native-first:ga-0001",
-          "runId": "8b89b304-6c3a-4b96-8b2f-5d0499057f3a"
+          "runId": "21492b0f-99e2-4d47-a47b-82eb7c9cea3c"
         },
         "mode": {
           "executedMode": "full",
@@ -533,7 +533,7 @@
           "version": "0.7.1"
         },
         "sourceBranch": "main",
-        "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "sourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
         "sourceTree": "3ee20756de676fdccec66b8c48f59d78f37e6711",
         "undetectedConfigFilesForcingFullAudit": [],
         "workspacePreparation": {
@@ -568,17 +568,17 @@
         }
       },
       "refs": {
-        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212",
-        "runRef": "refs/audited/runs/2026-10-07T12-58-23Z-b889016a5",
+        "reportCommit": "9d28148df3daf496ef65edd73cf6715b9f87cd8b",
+        "runRef": "refs/audited/runs/2026-10-07T13-02-53Z-e271f2120",
         "treeRef": "refs/audited/by-tree/3ee20756de676fdccec66b8c48f59d78f37e6711"
       },
       "retrievalCommands": [
-        "git notes --ref=audit show b889016a52fc166d464ceb2b96dffd80b0d77515",
-        "git show refs/audited/runs/2026-10-07T12-58-23Z-b889016a5:reports/audit/summary.json"
+        "git notes --ref=audit show e271f2120ad90eab96d1754f76bda5924b90ddb3",
+        "git show refs/audited/runs/2026-10-07T13-02-53Z-e271f2120:reports/audit/summary.json"
       ],
       "reused": {
-        "sourceCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
-        "auditedCommit": "b889016a52fc166d464ceb2b96dffd80b0d77515",
+        "sourceCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
+        "auditedCommit": "e271f2120ad90eab96d1754f76bda5924b90ddb3",
         "ignoredChangedPaths": [],
         "requestedMode": "full",
         "resolution": "requested"
@@ -587,7 +587,7 @@
         "verdict": "pass",
         "scoped": false,
         "chainDepth": 0,
-        "reportCommit": "28fa2f57fdc0b5e91626c76fad6d0ffe16f08212"
+        "reportCommit": "9d28148df3daf496ef65edd73cf6715b9f87cd8b"
       }
     }
   },

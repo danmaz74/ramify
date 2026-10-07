@@ -14,6 +14,7 @@ import {
   requestFromCommittedConfiguration,
   readRawCheckResults,
   resolveRepositoryExecutionLeaseIdentity,
+  TEST_LOCK_HELD_ENVIRONMENT,
   type AuditCheckSummary,
   type AuditEvent,
   type AuditRequest,
@@ -290,7 +291,10 @@ export async function runConfiguredFullAudit(input: {
     kind: 'conformance' as const, name: check.name, position: index + 1, total: request.checks.length,
   }]));
   const progress = configuredAuditProgress(checkStarts, input);
-  const result = recovered ?? await createAuditService({ git, processExecutor: configuredProcessExecutor(input.configuration), executionLease,
+  const result = recovered ?? await createAuditService({ git, processExecutor: configuredProcessExecutor(input.configuration, () => {
+    if (workspace === null) throw new Error('The configured audit workspace was not recorded before process execution');
+    return mapping.projectRootIn(workspace.worktreePath);
+  }), executionLease,
     ...(input.testLock === undefined ? {} : { machineTestLock: input.testLock }),
     eventSink: { emit: progress.emit },
   }).run(request, signal).finally(progress.settleAll);
@@ -349,8 +353,12 @@ export function configuredAuditProgress(
 }
 
 /** Keep the harness's inherited environment boundary while retaining declared/provider-added values. */
-export function configuredProcessExecutor(configuration: CommittedAuditConfiguration): ProcessExecutorPort {
+export function configuredProcessExecutor(configuration: CommittedAuditConfiguration, projectRoot: () => string): ProcessExecutorPort {
   const node = createNodeProcessExecutor();
+  const providerEnvironment = new Set([
+    TEST_LOCK_HELD_ENVIRONMENT, 'RAMIFY_AUDIT_VITEST_SUMMARY', 'RAMIFY_AUDIT_VITEST_ROOT',
+    'RAMIFY_AUDIT_VITEST_DISCOVERY', 'RAMIFY_AUDIT_CUCUMBER_SELECTION', 'CUCUMBER_SUMMARY_FILE',
+  ]);
   const commands: Array<{ command: string; args: readonly string[]; cwd: string; env: Readonly<Record<string, string>> }> =
     configuration.workspace.setupCommands.map(command => ({ command: command.argv[0]!, args: command.argv.slice(1),
       cwd: command.cwd, env: command.env }));
@@ -366,9 +374,9 @@ export function configuredProcessExecutor(configuration: CommittedAuditConfigura
     const allowed = childEnvironment();
     const environment = { ...allowed };
     const matches = commands.filter(command => command.command === request.command && command.args.every((arg, index) => request.args[index] === arg)
-      && (command.cwd === '.' || request.workingDirectory.replaceAll('\\', '/').endsWith(`/${command.cwd.replaceAll('\\', '/')}`)));
-    const specificity = Math.max(0, ...matches.map(command => command.args.length * 1000 + command.cwd.length));
-    const exact = matches.filter(command => command.args.length * 1000 + command.cwd.length === specificity);
+      && resolve(projectRoot(), command.cwd) === resolve(request.workingDirectory));
+    const longestArgs = Math.max(0, ...matches.map(command => command.args.length));
+    const exact = matches.filter(command => command.args.length === longestArgs);
     if (exact.length === 0 && Object.keys(request.environment ?? {}).some(name => declaredNames.has(name))) {
       throw new Error(`No committed command identity matches ${request.command} ${request.args.join(' ')}; its declared environment cannot be projected safely`);
     }
@@ -379,7 +387,7 @@ export function configuredProcessExecutor(configuration: CommittedAuditConfigura
       if (request.environment?.[name] !== value) throw new Error(`The provider did not preserve declared environment ${name} for ${request.command}`);
     }
     for (const [name, value] of Object.entries(request.environment ?? {})) {
-      if (name in allowed || name.startsWith('RAMIFY_AUDIT_') || name === 'CUCUMBER_SUMMARY_FILE') environment[name] = value;
+      if (name in allowed || providerEnvironment.has(name)) environment[name] = value;
       else if (declared[name] !== undefined) environment[name] = declared[name];
     }
     return node.execute({ ...request, environment }, signal);

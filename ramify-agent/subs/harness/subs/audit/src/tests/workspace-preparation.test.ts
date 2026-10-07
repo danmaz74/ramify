@@ -101,8 +101,8 @@ it('reads the installed provider F3 committed A/B definitions despite malformed 
 
 it('keeps a declared credential-style variable in command A and scrubs its ambient value from command B', () => {
   const source = fileURLToPath(new URL('../check-execution.ts', import.meta.url));
-  const commandA = "if(process.env.PLAN21_TEST_CREDENTIAL!=='declared')process.exit(7)";
-  const commandB = 'if(process.env.PLAN21_TEST_CREDENTIAL!==undefined)process.exit(9)';
+  const commandA = "if(process.env.PLAN21_TEST_CREDENTIAL!=='declared'||process.env.RAMIFY_AUDIT_API_KEY!==undefined)process.exit(7)";
+  const commandB = 'if(process.env.PLAN21_TEST_CREDENTIAL!==undefined||process.env.RAMIFY_AUDIT_API_KEY!==undefined)process.exit(9)';
   const configuration = {
     sourceCommit: 'test', path: 'ramify-audit.json', blob: 'test', projectRoot: '.', checks: [{ executor: { kind: 'command', commands: [
       { cmd: process.execPath, args: ['-e', commandA], env: { PLAN21_TEST_CREDENTIAL: 'declared' } },
@@ -112,7 +112,7 @@ it('keeps a declared credential-style variable in command A and scrubs its ambie
   };
   const script = [
     `const { configuredProcessExecutor } = await import(${JSON.stringify(source)});`,
-    `const port = configuredProcessExecutor(${JSON.stringify(configuration)});`,
+    `const port = configuredProcessExecutor(${JSON.stringify(configuration)}, () => process.cwd());`,
     `const a = await port.execute({ command: process.execPath, args: ['-e', ${JSON.stringify(commandA)}], workingDirectory: process.cwd(), environment: { ...process.env, PLAN21_TEST_CREDENTIAL: 'declared' } });`,
     `const discovery = await port.execute({ command: process.execPath, args: ['-e', ${JSON.stringify(commandA)}, '--', '--reporter=provider-added'], workingDirectory: process.cwd(), environment: { ...process.env, PLAN21_TEST_CREDENTIAL: 'declared', RAMIFY_AUDIT_VITEST_DISCOVERY: '/tmp/producer-discovery.json' } });`,
     `const b = await port.execute({ command: process.execPath, args: ['-e', ${JSON.stringify(commandB)}], workingDirectory: process.cwd(), environment: { ...process.env } });`,
@@ -120,9 +120,40 @@ it('keeps a declared credential-style variable in command A and scrubs its ambie
   ].join('\n');
   const answer = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], {
     cwd: fileURLToPath(new URL('../../../../../../', import.meta.url)), encoding: 'utf8',
-    env: childEnvironment({ PLAN21_TEST_CREDENTIAL: 'ambient-secret' }),
+    env: childEnvironment({ PLAN21_TEST_CREDENTIAL: 'ambient-secret', RAMIFY_AUDIT_API_KEY: 'ambient-secret' }),
   });
   expect(JSON.parse(answer)).toEqual([0, 0, 0]);
+}, 30_000);
+
+it('binds identical root and nested argv to their exact working directories before projecting declared environment', () => {
+  const source = fileURLToPath(new URL('../check-execution.ts', import.meta.url));
+  const command = "if(process.env.PLAN21_TEST_CREDENTIAL!==(process.cwd().endsWith('/tools/tools')?'nested':'root'))process.exit(7)";
+  const configuration = {
+    sourceCommit: 'test', path: 'ramify-audit.json', blob: 'test', projectRoot: '.', checks: [{ executor: { kind: 'command', commands: [
+      { cmd: process.execPath, args: ['-e', command], cwd: '.', env: { PLAN21_TEST_CREDENTIAL: 'root' } },
+      { cmd: process.execPath, args: ['-e', command], cwd: 'tools', env: { PLAN21_TEST_CREDENTIAL: 'nested' } },
+    ] } }], ignorePaths: [], undetectedConfigFilesForcingFullAudit: [],
+    workspace: { preparationId: 'nodejs', packageDirectoriesDeclared: false, linkNodeModules: false, packageDirectories: [''], setupCommands: [] },
+  };
+  const script = [
+    `const { configuredProcessExecutor } = await import(${JSON.stringify(source)});`,
+    "const { mkdtempSync, mkdirSync, rmSync } = await import('node:fs');",
+    "const { tmpdir } = await import('node:os');",
+    "const { join } = await import('node:path');",
+    "const parent = mkdtempSync(join(tmpdir(), 'plan21-exact-cwd-'));",
+    "const root = join(parent, 'tools'); mkdirSync(join(root, 'tools'), { recursive: true });",
+    `const port = configuredProcessExecutor(${JSON.stringify(configuration)}, () => root);`,
+    "try {",
+    `  const rootResult = await port.execute({ command: process.execPath, args: ['-e', ${JSON.stringify(command)}], workingDirectory: root, environment: { ...process.env, PLAN21_TEST_CREDENTIAL: 'root' } });`,
+    `  const nestedResult = await port.execute({ command: process.execPath, args: ['-e', ${JSON.stringify(command)}], workingDirectory: join(root, 'tools'), environment: { ...process.env, PLAN21_TEST_CREDENTIAL: 'nested' } });`,
+    "  process.stdout.write(JSON.stringify([rootResult.exitCode, nestedResult.exitCode]));",
+    "} finally { rmSync(parent, { recursive: true, force: true }); }",
+  ].join('\n');
+  const answer = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], {
+    cwd: fileURLToPath(new URL('../../../../../../', import.meta.url)), encoding: 'utf8',
+    env: childEnvironment({ PLAN21_TEST_CREDENTIAL: 'root' }),
+  });
+  expect(JSON.parse(answer)).toEqual([0, 0]);
 }, 30_000);
 
 it('keeps the readiness wait paused until every parallel provider command has acquired or settled', async () => {
