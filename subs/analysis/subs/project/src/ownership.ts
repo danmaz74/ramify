@@ -187,9 +187,10 @@ const invalid = (path: string, reason: string): PathOwnership =>
  * table. It reads nothing and checks no existence, so absent, new and deleted
  * paths classify alike. A path is `'.'`, a `/`-separated relative path without
  * empty, `.` or `..` segments, or such a path after leading `..` segments,
- * which is outside the project. Walking from the root, the first exclusion
- * reached wins, as discovery would stop there; otherwise the nearest module
- * owns the path.
+ * which is outside the project. The first unowned exclusion reached wins.
+ * An owned exclusion retains its owner but does not hide a hard exclusion
+ * farther along the path. This scans containment facts without entering the
+ * excluded tree; otherwise the nearest module owns the path.
  */
 export function classifyProjectPath(scope: ProjectScope, path: string): PathOwnership {
   if (typeof path !== 'string' || path === '') return invalid(String(path), 'is empty');
@@ -205,18 +206,21 @@ export function classifyProjectPath(scope: ProjectScope, path: string): PathOwne
 
   const index = indexOf(scope.ownership);
   let owner = index.modules.get('.') ?? null;
+  let ownedExclusion: ProjectExclusion | null = null;
   for (let depth = 1; depth <= segments.length; depth++) {
     const prefix = segments.slice(0, depth).join('/');
     const reserved = reservedSegmentKind(segments[depth - 1]!);
     const exclusion = index.exclusions.get(prefix) ?? (reserved ? freeze({ kind: reserved, directory: prefix, owner: null }) : null);
     if (exclusion) {
       if (exclusion.owner === null) return { status: 'excluded', module: null, exclusion };
-      const holder = index.byId.get(exclusion.owner) ?? owner;
-      if (!holder) return invalid(path, 'has no owning module in this scope');
-      return { status: 'owned', module: holder.id, directory: holder.directory, exclusion };
+      if (ownedExclusion === null) {
+        owner = index.byId.get(exclusion.owner) ?? owner;
+        if (!owner) return invalid(path, 'has no owning module in this scope');
+        ownedExclusion = exclusion;
+      }
     }
-    owner = index.modules.get(prefix) ?? owner;
+    if (ownedExclusion === null) owner = index.modules.get(prefix) ?? owner;
   }
   if (!owner) return invalid(path, 'has no owning module in this scope');
-  return { status: 'owned', module: owner.id, directory: owner.directory, exclusion: null };
+  return { status: 'owned', module: owner.id, directory: owner.directory, exclusion: ownedExclusion };
 }

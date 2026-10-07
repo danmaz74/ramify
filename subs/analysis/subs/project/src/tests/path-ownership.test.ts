@@ -183,11 +183,38 @@ describe('reserved exclusions', () => {
     expect(classifyProjectPath(scope, path)).toEqual(expected);
   });
 
-  it('stops at the first exclusion reached from the root, as discovery would', () => {
-    expect(classifyProjectPath(scope, 'fixture-project/node_modules/x.js')).toEqual(owned('app', '.', fixtureProject));
+  it('keeps the first unowned exclusion, while hard descendants override owned exclusions', () => {
+    expect(classifyProjectPath(scope, 'fixture-project/node_modules/x.js')).toEqual(excluded('packages', 'fixture-project/node_modules'));
     expect(classifyProjectPath(scope, 'subs/a/fixtures/sample/src/tmp/x.ts')).toEqual(owned('app/a', 'subs/a', aSample));
     expect(classifyProjectPath(scope, 'external-project/.git/HEAD')).toEqual(excluded('external', 'external-project'));
     expect(classifyProjectPath(scope, 'node_modules/pkg/subs/a/src/x.ts')).toEqual(excluded('packages', 'node_modules'));
+  });
+});
+
+describe('hard exclusions beneath owned trees', () => {
+  const built = buildProjectOwnership([module('app', null, '.', [tree(0, 'owned-unwired', 'docs'),
+    tree(1, 'owned-nested-project', 'fixture')])], ['fixture/output']);
+  const scope = scopeOf(built.ownership);
+  for (const [directory, kind] of [['docs', 'owned-unwired'], ['fixture', 'owned-nested-project'], ['src/tmp', 'scratch']] as const) {
+    it.each([
+      ['.git/config', 'repository', '.git'], ['node_modules/new.ts', 'packages', 'node_modules'],
+      ['bower_components/new.js', 'packages', 'bower_components'], ['jspm_packages/new.js', 'packages', 'jspm_packages'],
+      ['src/.ramify/new', 'generated', 'src/.ramify'], ['.ramify-architect/new', 'generated', '.ramify-architect'],
+      ['.ramify.tmp-staging/new', 'generated', '.ramify.tmp-staging'], ['.ramify-architect.old-backup/new', 'generated', '.ramify-architect.old-backup'],
+    ] as const)(`${directory}/%s stays unowned even when absent`, (suffix, hardKind, prefix) => {
+      expect(classifyProjectPath(scope, `${directory}/${suffix}`)).toEqual(excluded(hardKind, `${directory}/${prefix}`));
+    });
+    it.each(['module.ramify', 'new.ts', 'new.mts', 'new.mjs', 'README.md', 'dist/new', 'src/tmp/new',
+      '.gitignore', 'node_modules.txt', 'src/.ramify-other/new'])(`${directory}/%s retains its owned boundary`, suffix => {
+      expect(classifyProjectPath(scope, `${directory}/${suffix}`)).toEqual(owned('app', '.', { kind, directory, owner: 'app' }));
+    });
+  }
+  it('honors an enclosing configured output beneath a declared tree and retains it in topology', () => {
+    const output = { kind: 'output', directory: 'fixture/output', owner: null } as const;
+    expect(built.ownership.exclusions).toContainEqual(output);
+    expect(classifyProjectPath(scope, 'fixture/output/new.ts')).toEqual({ status: 'excluded', module: null, exclusion: output });
+    expect(classifyProjectPath(JSON.parse(JSON.stringify(scope)) as ProjectScope, 'fixture/output/new.ts'))
+      .toEqual({ status: 'excluded', module: null, exclusion: output });
   });
 });
 
