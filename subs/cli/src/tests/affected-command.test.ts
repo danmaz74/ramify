@@ -70,6 +70,42 @@ async function expectReleased(quick: QuickEnvironment): Promise<void> {
 }
 
 describe('affected command through the real resident service (A7-10)', { timeout: 60_000 }, () => {
+  it('reports hard exclusions beneath owned trees without interpreting the independent project', async () => {
+    const f = await fixture();
+    try {
+      await writeFile(join(f.root, 'module.ramify'), files['module.ramify'] + 'owned-unwired "docs"\nowned-nested-project "fixture"\n');
+      await mkdir(join(f.root, 'fixture'));
+      await writeFile(join(f.root, 'fixture/module.ramify'), 'ramify 1\nroot module independent\n');
+      await writeFile(join(f.root, 'fixture/tsconfig.json'), '{"compilerOptions":{"outDir":"child-output"}}');
+      await writeFile(join(f.root, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
+        module: 'ESNext', moduleResolution: 'Bundler', types: [], skipLibCheck: true, outDir: 'fixture/output' }, include: ['src', 'subs'] }));
+      const hard = [
+        { path: 'docs/.git/config', kind: 'repository', directory: 'docs/.git' },
+        { path: 'docs/node_modules/new', kind: 'packages', directory: 'docs/node_modules' },
+        { path: 'fixture/src/.ramify/new', kind: 'generated', directory: 'fixture/src/.ramify' },
+        { path: 'fixture/.git/config', kind: 'repository', directory: 'fixture/.git' },
+        { path: 'fixture/node_modules/new', kind: 'packages', directory: 'fixture/node_modules' },
+        { path: 'fixture/output/new', kind: 'output', directory: 'fixture/output' },
+        { path: 'src/tmp/.git/config', kind: 'repository', directory: 'src/tmp/.git' },
+      ];
+      const ordinary = ['docs/module.ramify', 'fixture/module.ramify', 'fixture/new.mts', 'fixture/dist/new',
+        'fixture/child-output/new', 'src/tmp/module.ramify'];
+      const result = await invoke(f.root, f.quick.connect, ['affected', '--format', 'json',
+        ...[...hard.map(row => row.path), ...ordinary].flatMap(path => ['--path', path])]);
+      expect([result.exit, result.stderr, result.batchCalls]).toEqual([0, '', 0]);
+      const document = JSON.parse(result.stdout) as AffectedDocument;
+      expect(document.selection.scope.ownership.modules.map(module => module.id)).not.toContain('independent');
+      expect(document.selection.scope.ownership.exclusions).toContainEqual({ kind: 'output', directory: 'fixture/output', owner: null });
+      for (const { path, kind, directory } of hard) expect(document.selection.paths.find(seed => seed.path === path), path)
+        .toEqual({ path, status: 'excluded', module: null, basis: 'excluded', kind: null, selects: [], exclusion: { kind, directory, owner: null } });
+      for (const path of ordinary) expect(document.selection.paths.find(seed => seed.path === path), path)
+        .toMatchObject({ path, status: 'owned', module: 'example', basis: 'containment', kind: 'ignored', selects: [] });
+      expect(document.selection.changedModules).toEqual([]);
+      expect(document.selection.testModules).toEqual([]);
+      await expectReleased(f.quick);
+    } finally { await f.dispose(); }
+  });
+
   it('A7-10:json-document: prints one ramify.affected-cli/4 document with root, resident mode, revision and selection', async () => {
     const f = await fixture();
     try {
