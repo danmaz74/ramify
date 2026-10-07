@@ -181,6 +181,8 @@ export const runQueryLimits = {
   capabilities: 500,
   /** Tracked scenarios of the scenario list and of the analysis's review. */
   scenarios: 500,
+  /** Registered obligations of the scenario list: scenarios, delegated outcomes and registered cases and tests. */
+  obligations: 1000,
   /** Module-capability rows of one comparison, of the capabilities kept whole within `capabilities`. */
   moduleCapabilityRows: 2000,
   /** Bytes of a gate command's output a client receives; the complete output stays a file of the run. */
@@ -1199,13 +1201,49 @@ export const scenarioViewSchema = z.object({
 export type ScenarioView = z.infer<typeof scenarioViewSchema>;
 
 /**
+ * One registered obligation and its responsible architect's latest report.
+ * Its status is moved by accepted architect submissions alone: an engineer's
+ * work report and a gate or audit result are separate facts, shown beside it
+ * and never folded into it. `where` is the architect's navigation text, shown
+ * as written and never resolved.
+ */
+export const obligationViewSchema = z.object({
+  id: text,
+  /** An analysis scenario or a registered case, a delegated outcome, or a registered test. */
+  kind: z.enum(['scenario', 'outcome', 'test']),
+  /** Who reports on it; an integration scenario is held by its key until its work item exists. */
+  responsible: z.object({ kind: z.enum(['work-item', 'capability-task', 'integration-scenario']), id: text }).strict(),
+  status: z.enum(['pending', 'bound', 'done']),
+  /** The report revision a next report names: 0 until the first accepted report. */
+  revision: count,
+  case: text.nullable(),
+  description: text.nullable(),
+  /** The explicit registration; null for an analysis scenario or a delegated outcome. */
+  registeredBy: z.object({ invocation: text, submission: text }).strict().nullable(),
+  /** The responsible architect's latest accepted report; null while there is none. */
+  report: z.object({
+    judgment: z.enum(['done', 'bound']),
+    revision: z.int().positive(),
+    basedOnRevision: count,
+    where: text.nullable(),
+    invocation: text,
+    submission: text,
+    sequence: z.int().positive(),
+    at: timestamp,
+  }).strict().nullable(),
+}).strict();
+export type ObligationView = z.infer<typeof obligationViewSchema>;
+
+/**
  * `GET /api/v1/plans/:planId/runs/:runId/scenarios`: every tracked scenario,
  * at most 500, entry scenarios first, then integration scenarios. Empty until
- * the analysis is accepted.
+ * the analysis is accepted. Beside them, every registered obligation with its
+ * architect's report, in registration order.
  */
 export const scenarioListResponseSchema = z.object({
   scenarios: z.array(scenarioViewSchema).max(runQueryLimits.scenarios),
   total: count,
+  obligations: z.array(obligationViewSchema).max(runQueryLimits.obligations),
 }).strict();
 export type ScenarioListResponse = z.infer<typeof scenarioListResponseSchema>;
 

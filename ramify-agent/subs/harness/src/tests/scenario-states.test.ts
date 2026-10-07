@@ -11,6 +11,8 @@ import { declarationErrors } from '../work/declarations.js';
 import { validateEngineer } from '../work/engineer.js';
 import { iterationLayout } from '../work/iterations.js';
 import { scenarioRecordSchema, scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
+import { reduceScenarioStates, scenarioEventTypes, type ScenarioEvent } from '../../subs/scenarios/src/states.js';
+import { fixtureProjection, line, reported, submissionHash } from './helpers/obligations.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import {
   consumerAgainstReal, consumerStub, consumerTest, contractNeeded, contractWrites, established, paths, providerWrites,
@@ -893,3 +895,28 @@ function record(id: string, kind: 'entry' | 'integration', entryName: string | n
     file: kind === 'entry' ? featureOf(notesDirectory, entryName!) : `${notesDirectory}/src/tests/features/${plan}/integration.feature`,
   });
 }
+
+describe('PB3-D04: obligation reports beside the scenario states', () => {
+  test('PB3-D04 an architect report and a scenario declaration or gate pass each leave the other projection unchanged', () => {
+    const scenarioEvents: ScenarioEvent[] = [
+      { type: 'scenario-declared', data: { scenario: 'sc-001', by: 'inv-0003', state: 'declared' } },
+      { type: 'scenario-implemented', data: { scenario: 'sc-001', gate: 'ga-0004' } },
+    ];
+    const gate = line('gate-passed', { gate: 'ga-0004', kind: 'iteration' });
+    const report = reported({ id: 'sc-002', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0005', submission: submissionHash('d') });
+
+    // Scenario declarations and gate results move no obligation.
+    const withoutReport = fixtureProjection([...scenarioEvents.map(event => line(event.type, event.data)), gate]).obligations;
+    expect([...withoutReport.values()].map(one => [one.id, one.status, one.revision])).toEqual([
+      ['sc-001', 'pending', 0], ['sc-002', 'pending', 0], ['sc-003', 'pending', 0], ['cap-001', 'pending', 0],
+    ]);
+    // An architect report moves its obligation alone.
+    const withReport = fixtureProjection([...scenarioEvents.map(event => line(event.type, event.data)), gate, report]).obligations;
+    expect([withReport.get('sc-001')?.status, withReport.get('sc-002')?.status, withReport.get('sc-002')?.revision]).toEqual(['pending', 'done', 1]);
+
+    // A report is no scenario event: the tracked states do not see it.
+    expect(scenarioEventTypes).not.toContain(report.type);
+    const states = reduceScenarioStates(['sc-001', 'sc-002', 'sc-003'], scenarioEvents);
+    expect(states.ok && [...states.states]).toEqual([['sc-001', 'implemented'], ['sc-002', 'pending'], ['sc-003', 'pending']]);
+  });
+});

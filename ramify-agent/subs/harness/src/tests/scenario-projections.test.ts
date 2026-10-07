@@ -234,7 +234,35 @@ describe('over constructed records', () => {
     expect(list.scenarios[0]!.origin).toEqual({ kind: 'architect', refs: ['fr-002'] });
     expect(list.scenarios[4]!.origin).toEqual({ kind: 'plan', planScenario: 'ps-01', lines: [12, 16] });
     // Before the analysis is accepted there is nothing to list.
-    expect(scenarioListOf(runView(constructedRun(lines.slice(0, 1))))).toEqual({ scenarios: [], total: 0 });
+    expect(scenarioListOf(runView(constructedRun(lines.slice(0, 1))))).toEqual({ scenarios: [], total: 0, obligations: [] });
+  });
+
+  test('PB3-D04 the list carries each obligation with its responsible owner, its architect report and its where text, apart from the scenario states', () => {
+    const hash = 'c'.repeat(64);
+    const where = 'subs/workspace/subs/reviews/src/notes.ts — writeNote';
+    const obligationLines: Line[] = [
+      ...lines,
+      { type: 'capability-delegated', data: { task: 'cap-001', request: 'need-001', parent: 'wi-002', invocation: 'inv-0006', planRevision: 1 } },
+      { type: 'obligation-registered', data: { id: 'test-001', kind: 'test', responsible: { kind: 'work-item', id: 'wi-001' }, by: 'inv-0007', submission: hash, description: 'A note written twice is kept once' } },
+      { type: 'obligation-reported', data: { id: 'sc-001', judgment: 'done', basedOnRevision: 0, revision: 1, where, by: 'inv-0007', submission: hash } },
+      { type: 'obligation-reported', data: { id: 'cap-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0008', submission: 'd'.repeat(64) } },
+      { type: 'obligation-reported', data: { id: 'cap-001', judgment: 'bound', basedOnRevision: 1, revision: 2, by: 'inv-0009', submission: 'e'.repeat(64) } },
+    ];
+    const list = scenarioListResponseSchema.parse(scenarioListOf(runView(constructedRun(obligationLines))));
+    expect(list.obligations.map(one => [one.id, one.kind, one.responsible, one.status, one.revision, one.report?.judgment ?? null, one.report?.where ?? null])).toEqual([
+      ['sc-001', 'scenario', { kind: 'work-item', id: 'wi-001' }, 'done', 1, 'done', where],
+      ['sc-002', 'scenario', { kind: 'work-item', id: 'wi-002' }, 'pending', 0, null, null],
+      ['sc-003', 'scenario', { kind: 'work-item', id: 'wi-002' }, 'pending', 0, null, null],
+      ['sc-004', 'scenario', { kind: 'work-item', id: 'wi-002' }, 'pending', 0, null, null],
+      ['sc-005', 'scenario', { kind: 'integration-scenario', id: 'sc-005' }, 'pending', 0, null, null],
+      ['cap-001', 'outcome', { kind: 'capability-task', id: 'cap-001' }, 'bound', 2, 'bound', null],
+      ['test-001', 'test', { kind: 'work-item', id: 'wi-001' }, 'pending', 0, null, null],
+    ]);
+    expect(list.obligations.find(one => one.id === 'test-001')).toMatchObject({ description: 'A note written twice is kept once', registeredBy: { invocation: 'inv-0007', submission: hash } });
+    // The scenario states are the declarations' and the gates' alone: no report moved them.
+    expect(list.scenarios.map(one => [one.id, one.state])).toEqual([
+      ['sc-001', 'implemented'], ['sc-002', 'bound'], ['sc-003', 'declared'], ['sc-004', 'pending'], ['sc-005', 'pending'],
+    ]);
   });
 
   test('the review carries the warnings of the acceptance, and each entry counts its own scenarios only', () => {

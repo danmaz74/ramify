@@ -10,7 +10,7 @@ import { parseModuleHeader } from '../../run/module-header.js';
 import type { AssignmentBody } from '../../work/assignment.js';
 import type { z } from 'zod';
 import type { engineerSubmissionSchema } from '../../work/engineer.js';
-import type { LocalArchitectSubmission } from '../../work/submission.js';
+import type { LocalArchitectSubmission, LocalArchitectSubmissionInput } from '../../work/submission.js';
 import { defaultTurn } from './declarations.js';
 import type { FailureCause } from '../../interfaces/protocol/runs.js';
 import type { FailureAnalysisSubmission } from '../../work/failure.js';
@@ -40,7 +40,7 @@ export function assign(
   module: string,
   extra: Partial<AssignmentBody> = {},
   outline?: Extract<LocalArchitectSubmission, { kind: 'request-completion' }>['outline'],
-): Extract<LocalArchitectSubmission, { kind: 'assign' }> {
+): Extract<LocalArchitectSubmissionInput, { kind: 'assign' }> {
   const scope = extra.scope ?? { base: { module, included: [] }, extra: [], read: [], rationale: 'The work is in this module.' };
   return {
     kind: 'assign',

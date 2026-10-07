@@ -1,5 +1,5 @@
 import type { DecisionBody, ForkSubmission, LocalDecisionBody, PlacementRequestBody, RegistryChange } from '../../architecture/submission.js';
-import type { LocalArchitectSubmission } from '../../work/submission.js';
+import type { LocalArchitectSubmission, LocalArchitectSubmissionInput } from '../../work/submission.js';
 
 /*
  * The submissions of the placement chain, as a test writes them. Nothing
@@ -65,7 +65,7 @@ export function placementRequest(extra: Partial<PlacementRequestBody> = {}): Pla
 }
 
 /** A local architect asking the global architect where a capability belongs. */
-export function requestPlacement(extra: Partial<PlacementRequestBody> = {}): LocalArchitectSubmission {
+export function requestPlacement(extra: Partial<PlacementRequestBody> = {}): LocalArchitectSubmissionInput {
   return { kind: 'request-placement', request: placementRequest(extra) };
 }
 
@@ -78,7 +78,7 @@ export function localDecision(body: Partial<DecisionBody>, registry: readonly Re
 export function unresolved(
   conflict = 'The comparison cannot be served as an MCP tool: the project has no MCP surface to serve it from.',
   evidence: readonly string[] = ['plans/revision-diff/plan.md, lines 11–12, ask for an MCP tool `catalog.compare`.'],
-): LocalArchitectSubmission {
+): LocalArchitectSubmissionInput {
   return { kind: 'unresolved', conflict, evidence: [...evidence] };
 }
 

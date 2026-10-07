@@ -193,6 +193,10 @@ import {
   type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
+import {
+  obligationBriefingLines, obligationEventsToRecord, obligationsOf, obligationsOwnedBy,
+  type ObligationActor, type ObligationProjection, type ObligationRegistration, type ObligationReport,
+} from '../work/obligations.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
 import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
@@ -4554,6 +4558,7 @@ export class RunService {
       const action: Extract<CapabilityAction, { kind: 'consult-consumer' }> = {
         kind: 'consult-consumer', task: task.id, planRevision: exchange.planRevision, invocation: opened.data.invocation,
         question: exchange.question, references: [...exchange.references], sections: ['Recovered pending consultation'],
+        registrations: [], reports: [],
       };
       return await this.consultCapabilityConsumer(run, agent, packages, task, request, plan, action,
         opened.data.invocation, { point: request.continuation.point, session: request.continuation.session }, exchange) !== null;
@@ -4567,6 +4572,7 @@ export class RunService {
       }
       const action: Extract<CapabilityAction, { kind: 'assign' }> = {
         kind: 'assign', task: task.id, planRevision: plan.revision, invocation: assigned.data.invocation,
+        registrations: [], reports: [],
         assignment: assignmentBodySchema.parse({ stage: assignment.stage, kind: assignment.kind,
           goal: assignment.goal, approach: assignment.approach,
           scope: { base: assignment.scope.base, extra: assignment.scope.extra,
@@ -5372,6 +5378,8 @@ export class RunService {
         return null;
       }
       if (packageInPrompt) prompt = `${prompt}\n\n# Your work-item package\n\n${contextPackage!.text}`;
+      const owned = obligationBriefingLines(obligationsOwnedBy(this.obligationProjection(run), { kind: 'work-item', id: item.id }));
+      if (owned.length > 0) prompt = `${prompt}\n\n${owned.join('\n')}`;
       if (attempt === 1 && this.workflow !== null) {
         const intervening = [...current.capabilityHandbacks.values()].flatMap(handback => {
           const task = current.capabilityTasks.get(handback.task);
@@ -5446,6 +5454,7 @@ export class RunService {
           ...(integration === undefined ? {} : { integration: integration.scope }),
           bounds: engineerBoundsOf(run.record.policy.limits),
           ...(contextPackage === undefined ? {} : { package: new Set(contextPackage.citation.elements) }),
+          obligations: { actor: { kind: 'work-item', id: item.id }, projection: this.obligationProjection(run) },
         }),
         scope: {
           write: null,
@@ -5466,6 +5475,12 @@ export class RunService {
         );
         return null;
       }
+
+      // The architect's registrations and reports apply on acceptance, before
+      // its action and whatever the action leads to: reporting continues
+      // alongside coordination, and no gate or audit outcome edits them.
+      if (result.value.kind !== 'yield-for-providers'
+        && !await this.recordObligations(run, { kind: 'work-item', id: item.id }, result.id, result.value)) return null;
 
       if (result.value.kind === 'unresolved') {
         // The request cannot be met as stated. The global architect answers
@@ -7328,11 +7343,14 @@ export class RunService {
     let consumerPoint = answerOutcome?.session?.ref ?? request.continuation.point;
     let consumerSession: SessionId | undefined = answerStart?.data.session ?? request.continuation.session;
     for (let attempt = resume?.attempt ?? 1; attempt <= task.limits.maxInvocations; attempt += 1) {
+    // The task's architect may register a case of its current plan revision.
+    const capabilityActor = (): ObligationActor => ({ kind: 'capability-task', id: task.id, useCases: new Set(plan.useCases.map(useCase => useCase.id)) });
     const currentBasis = () => {
       const state = replayCapabilityState(run.log.events).tasks.get(task.id);
       return state === undefined ? null : { task: task.id, planRevision: state.planRevision,
         coordinatorInvocation: state.coordinatorInvocation, state: state.status,
-        openAssignment: state.activeAssignment, openChild: state.activeChild };
+        openAssignment: state.activeAssignment, openChild: state.activeChild,
+        obligations: { actor: capabilityActor(), projection: this.obligationProjection(run) } };
     };
     const validateActionInput = (input: unknown) => {
       const basis = currentBasis();
@@ -7393,6 +7411,7 @@ export class RunService {
           ...(progress === '' ? [] : [`Progress from the last turn: ${progress}`]),
         ] : [`Selected plan package ${selectedHash} was delivered in full in the earlier turn; it is unchanged.`,
           `Current plan: ${JSON.stringify(plan)}`, `Progress from the last turn: ${progress}`]),
+        ...[obligationBriefingLines(obligationsOwnedBy(this.obligationProjection(run), { kind: 'capability-task', id: task.id })).join('\n')].filter(section => section !== ''),
         `Inspect current source and Git directly. The latest task assignment results are ${[...records.results.values()].filter(result => result.coordination?.kind === 'capability-task' && result.coordination.id === task.id).map(result => `${result.iteration}: ${result.outcome}, gate ${result.gate ?? '(none)'}, commit ${result.commit ?? '(none)'}, findings ${result.findings.join('; ')}`).join(' | ') || '(none)'}. Gate reports are under ${runLayout.gateOutput('ga-0001').replace(/ga-0001.*/, '')}; inspect the named gate and review artifacts when needed. Request handback only after the bounded provider and consumer behavior is verified.`,
       ].join('\n\n'),
       start: coordinatorPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: coordinatorPoint },
@@ -7448,6 +7467,9 @@ export class RunService {
       return null;
     }
     const chosen = action.value;
+    // Registrations and reports apply on acceptance, before the action; a
+    // replayed accepted action finds them recorded and applies nothing again.
+    if (!await this.recordObligations(run, capabilityActor(), action.id, chosen)) return null;
     if (chosen.kind === 'partial') {
       progress = `${chosen.progress}; unfinished: ${chosen.unfinished.join('; ')}`;
       coordinatorPoint = action.ref || undefined;
@@ -11265,6 +11287,32 @@ export class RunService {
   // Scenario states, architecture §7 to §9
 
   /** The work item's entry or integration scenario and the run's tracked scenarios, which a declaration is judged against. */
+  /** The one obligation projection: scenario records, delegated outcomes and the accepted registrations and reports. */
+  private obligationProjection(run: Run): ObligationProjection {
+    const lines = run.log.ledger.replay();
+    return obligationsOf({ scenarios: trackedScenarios(lines).records, workItems: committedRecords(lines).workItems, events: run.log.events });
+  }
+
+  /**
+   * Records an accepted architect submission's registrations and reports,
+   * each as its own event naming the invocation and the submission's hash.
+   * What the same accepted submission already recorded is not recorded
+   * again, so a replayed action applies each effect once.
+   */
+  private async recordObligations(run: Run, actor: ObligationActor, invocation: string,
+    submission: { readonly registrations: readonly ObligationRegistration[]; readonly reports: readonly ObligationReport[] }): Promise<boolean> {
+    if (submission.registrations.length === 0 && submission.reports.length === 0) return true;
+    const hash = run.log.all('invocation-ended').find(event => event.data.invocation === invocation)?.data.submission ?? null;
+    if (hash === null) {
+      await this.fail(run, 'internal', `Invocation ${invocation} reported obligations without a recorded accepted submission`, [runLayout.outcome(invocation)]);
+      return false;
+    }
+    for (const input of obligationEventsToRecord(submission, actor, { by: invocation, submission: hash }, this.obligationProjection(run), run.log.events)) {
+      if (await this.write(run, input) === 'ended') return false;
+    }
+    return !this.ignoring(run);
+  }
+
   private declarationContext(run: Run, item: WorkItem): DeclarationContext {
     return {
       entry: 'entry' in item.origin ? item.origin.entry : null,

@@ -300,14 +300,31 @@ describe('the acceptance scenarios a client reads', () => {
   });
 
   test('the scenario list: a scenario with its origin, work item and gates, strictly', () => {
-    const list = { scenarios: [scenario], total: 1 };
+    const list = { scenarios: [scenario], total: 1, obligations: [] };
     expect(scenarioListResponseSchema.parse(list)).toEqual(list);
     const architect = { ...scenario, kind: 'entry', entry: 'show-note', partOf: 'sc-005', subScenarios: [], origin: { kind: 'architect', refs: ['fr-002', 'fr-003'] } };
-    expect(scenarioListResponseSchema.safeParse({ scenarios: [architect], total: 1 }).success).toBe(true);
-    expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, state: 'failed' }], total: 1 }).success).toBe(false);
-    expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, extra: 1 }], total: 1 }).success).toBe(false);
-    expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, gates: [{ ...gateResult, binding: [] }] }], total: 1 }).success).toBe(false);
-    expect(scenarioListResponseSchema.safeParse({ scenarios: Array.from({ length: 501 }, () => scenario), total: 501 }).success).toBe(false);
+    expect(scenarioListResponseSchema.safeParse({ scenarios: [architect], total: 1, obligations: [] }).success).toBe(true);
+    expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, state: 'failed' }], total: 1, obligations: [] }).success).toBe(false);
+    expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, extra: 1 }], total: 1, obligations: [] }).success).toBe(false);
+    expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, gates: [{ ...gateResult, binding: [] }] }], total: 1, obligations: [] }).success).toBe(false);
+    expect(scenarioListResponseSchema.safeParse({ scenarios: Array.from({ length: 501 }, () => scenario), total: 501, obligations: [] }).success).toBe(false);
+  });
+
+  test('PB3-D04: an obligation carries its architect report and optional where text apart from any gate result', () => {
+    const hash = 'b'.repeat(64);
+    const reported = {
+      id: 'sc-003', kind: 'scenario', responsible: { kind: 'work-item', id: 'wi-003' }, status: 'done', revision: 1,
+      case: null, description: null, registeredBy: null,
+      report: { judgment: 'done', revision: 1, basedOnRevision: 0, where: 'subs/missing/src/nowhere.ts — notAFunction', invocation: 'inv-0007', submission: hash, sequence: 41, at: '2026-10-07T12:00:00.000Z' },
+    };
+    const test = { ...reported, id: 'test-001', kind: 'test', status: 'pending', revision: 0, description: 'The duplicate send regression test',
+      registeredBy: { invocation: 'inv-0007', submission: hash }, report: null };
+    const list = { scenarios: [scenario], total: 1, obligations: [reported, test, { ...reported, id: 'cap-001', kind: 'outcome', responsible: { kind: 'capability-task', id: 'cap-001' }, report: { ...reported.report, where: null } }] };
+    expect(scenarioListResponseSchema.parse(list)).toEqual(list);
+    // The declaration is its own fact: no gate, verdict or audit field rides on it.
+    expect(scenarioListResponseSchema.safeParse({ ...list, obligations: [{ ...reported, verdict: 'passed' }] }).success).toBe(false);
+    expect(scenarioListResponseSchema.safeParse({ ...list, obligations: [{ ...reported, status: 'implemented' }] }).success).toBe(false);
+    expect(scenarioListResponseSchema.safeParse({ ...list, obligations: [{ ...reported, report: { ...reported.report, judgment: 'passed' } }] }).success).toBe(false);
   });
 
   test('the review: the accepted analysis carries each scenario\'s text and the warnings, and counts the scenarios', () => {

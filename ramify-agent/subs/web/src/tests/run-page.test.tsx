@@ -223,6 +223,7 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         scenarioView('sc-004', null, 'pending', { kind: 'integration', origin: { kind: 'plan', planScenario: 'ps-02', lines: [20, 25] }, subScenarios: ['sc-002', 'sc-003'], owner: 'shop', workItem: null }),
       ],
       total: 4,
+      obligations: [],
     }),
     metrics: metricsResponseSchema.parse({
       policyVersion: 'kpi/1', measurementPolicy: 'scope-size/1',
@@ -723,7 +724,7 @@ test('the Scenarios area lists every tracked scenario with its state, origin, wo
 });
 
 test('before the analysis is accepted the Scenarios area says nothing is tracked', async () => {
-  render(<RunPage client={clientWith({ ...stubRun(), scenarios: { scenarios: [], total: 0 } })} planId="review-notes" runId={runId} interval={60_000} />);
+  render(<RunPage client={clientWith({ ...stubRun(), scenarios: { scenarios: [], total: 0, obligations: [] } })} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Scenarios' }));
   expect(await screen.findByText(/No scenario is tracked yet/)).toBeTruthy();
 });

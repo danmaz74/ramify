@@ -1,13 +1,14 @@
 import type { ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import {
   runQueryLimits,
-  type AnalysisScenario, type ScenarioCheckView, type ScenarioGateResult, type ScenarioListResponse, type ScenarioOriginView,
+  type AnalysisScenario, type ObligationView, type ScenarioCheckView, type ScenarioGateResult, type ScenarioListResponse, type ScenarioOriginView,
   type ScenarioView, type ScenarioWarningView,
 } from '../interfaces/protocol/runs.js';
 import type { ScenarioCheckSummary } from '../checks/records.js';
 import { trackedScenarios, type TrackedScenarios } from '../run/feature-files.js';
 import { capabilityOf } from '../work/frontier.js';
 import { integrationScenarioOf } from '../work/records.js';
+import { obligationsOf } from '../work/obligations.js';
 import type { RunView } from './inputs.js';
 
 /*
@@ -137,7 +138,27 @@ export function scenarioListOf(view: RunView): ScenarioListResponse {
       gates: gates.get(record.id) ?? [],
     };
   });
-  return { scenarios: all.slice(0, runQueryLimits.scenarios), total: all.length };
+  return { scenarios: all.slice(0, runQueryLimits.scenarios), total: all.length, obligations: obligationViewsOf(view, tracked) };
+}
+
+/** Every registered obligation, folded from the records and accepted submissions exactly as the harness folds them. */
+export function obligationViewsOf(view: RunView, tracked: TrackedScenarios = scenariosOf(view)): ObligationView[] {
+  const { obligations } = obligationsOf({ scenarios: tracked.records, workItems: view.records.workItems, events: view.events });
+  return [...obligations.values()].slice(0, runQueryLimits.obligations).map(obligation => ({
+    id: obligation.id,
+    kind: obligation.kind,
+    responsible: { ...obligation.responsible },
+    status: obligation.status,
+    revision: obligation.revision,
+    case: obligation.case,
+    description: obligation.description,
+    registeredBy: obligation.registeredBy === null ? null : { invocation: obligation.registeredBy.by, submission: obligation.registeredBy.submission },
+    report: obligation.report === null ? null : {
+      judgment: obligation.report.judgment, revision: obligation.report.revision, basedOnRevision: obligation.report.basedOnRevision,
+      where: obligation.report.where, invocation: obligation.report.by, submission: obligation.report.submission,
+      sequence: obligation.report.sequence, at: obligation.report.at,
+    },
+  }));
 }
 
 /** Each entry's scenarios: how many are implemented of how many it has. */

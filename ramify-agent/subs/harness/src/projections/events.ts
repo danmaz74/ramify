@@ -15,6 +15,8 @@ import { snapshotOf } from './snapshot.js';
 
 type Ref = { kind: RunEventRefKind; id: string };
 const ref = (kind: RunEventRefKind, id: string | null | undefined): Ref[] => (id === null || id === undefined ? [] : [{ kind, id }]);
+/** A scenario or a delegated outcome is a record of its own kind; a registered case or test is named in the sentence alone. */
+const obligationRef = (id: string): Ref[] => /^sc-\d{3,}$/.test(id) ? ref('scenario', id) : /^cap-\d{3,}$/.test(id) ? ref('capability-task', id) : [];
 
 /** Each kind of gate command, as a sentence names it. */
 const commandLabels: Record<RunEventOf<'gate-command-started'>['data']['kind'], string> = {
@@ -234,6 +236,16 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`${counted(event.data.scenarios.length, 'scenario is', 'scenarios are')} being withdrawn to pending: ${event.data.scenarios.join(', ')} (${event.data.reason})`, [...ref('work-item', event.data.workItem), ...event.data.scenarios.flatMap(scenario => ref('scenario', scenario))]];
     case 'scenario-withdrawn':
       return [`Scenario ${event.data.scenario} was withdrawn to pending (${event.data.reason})`, [...ref('scenario', event.data.scenario), ...ref('commit', event.data.commit)]];
+    case 'obligation-registered':
+      return [
+        `${event.data.responsible.kind === 'work-item' ? 'The local architect of' : 'The capability architect of'} ${event.data.responsible.id} registered ${event.data.id}: ${event.data.kind === 'test' ? `required test "${event.data.description ?? ''}"` : `case ${event.data.case ?? ''}`}`,
+        [...ref(event.data.responsible.kind === 'work-item' ? 'work-item' : 'capability-task', event.data.responsible.id), ...ref('invocation', event.data.by)],
+      ];
+    case 'obligation-reported':
+      return [
+        `The responsible architect reported ${event.data.id} ${event.data.judgment} at revision ${event.data.revision}${event.data.where === undefined ? '' : ` (where: ${event.data.where})`}`,
+        [...obligationRef(event.data.id), ...ref('invocation', event.data.by)],
+      ];
     case 'gate-started':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) started`, ref('gate', event.data.gate)];
     case 'gate-committing':

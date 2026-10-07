@@ -14,6 +14,7 @@ import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
 import {
   scenarioDeclaredDataSchema, scenarioDueDataSchema, scenarioImplementedDataSchema, scenarioWithdrawnDataSchema,
 } from '../../subs/scenarios/src/states.js';
+import { obligationRegisteredDataSchema, obligationReportedDataSchema } from '../work/obligations.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
 import type { LedgerFileSystem } from '../../subs/ledger/src/fs.js';
 import { replayCheckFindingEvents } from '../../subs/check-findings/src/replay.js';
@@ -313,6 +314,19 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * one, with the commit that restored its pending tag.
    */
   event('scenario-withdrawn', scenarioWithdrawnDataSchema),
+  /**
+   * A responsible architect's accepted registration of an obligation it
+   * chose to track independently: a capability-plan case or a required test.
+   * It enters `pending` at report revision 0. Ordinary tests never register.
+   */
+  event('obligation-registered', obligationRegisteredDataSchema),
+  /**
+   * A responsible architect's accepted report: its judgment that the
+   * obligation is `done`, or an explicit revision of a `done` back to
+   * `bound`. Only an accepted architect submission appends one; no gate,
+   * audit or source change does.
+   */
+  event('obligation-reported', obligationReportedDataSchema),
   /**
    * The work item's turn begins; it licenses its local architect. It names
    * the item's origin, and an integration work item's scenario.

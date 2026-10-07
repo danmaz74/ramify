@@ -14,6 +14,7 @@ import { declarationErrors, type DeclarationContext } from './declarations.js';
 import type { IntegrationScope } from './integration.js';
 import { decompositionSchema } from './records.js';
 import type { EngineerBounds } from '../run/policy.js';
+import { obligationSubmissionErrors, obligationSubmissionFields, type ObligationContext } from './obligations.js';
 
 /*
  * What a local architect submits at a coordination point. This iteration
@@ -49,6 +50,13 @@ import type { EngineerBounds } from '../run/policy.js';
  * request. The global architect answers it with a placement fix, a plan
  * deviation the work item goes on under, or nothing possible, which ends
  * the run.
+ *
+ * `assign`, `request-placement`, `request-completion` and `unresolved` may
+ * each carry `registrations` and `reports`: a required test this architect
+ * chooses to track independently, and its judgment that an obligation it
+ * is responsible for is correctly implemented and passing. They apply when
+ * the submission is accepted, before its action, and an engineer's report
+ * never supplies them.
  *
  * The fields the harness already knows are absent: the work item, the
  * revision, the invocation and the hypothesis revisions it delivered are the
@@ -88,10 +96,12 @@ export const localArchitectSubmissionSchema = z.discriminatedUnion('kind', [
     /** Placement this architect decided within its own authority, with what it registers. */
     localDecisions: z.array(localDecisionSchema),
     assignment: assignmentBodySchema,
+    ...obligationSubmissionFields,
   }).strict(),
   z.object({
     kind: z.literal('request-placement'),
     request: placementRequestBodySchema,
+    ...obligationSubmissionFields,
   }).strict(),
   z.object({
     kind: z.literal('request-completion'),
@@ -103,6 +113,7 @@ export const localArchitectSubmissionSchema = z.discriminatedUnion('kind', [
      * is judged, and the work-item gate verifies them.
      */
     scenarios: z.array(text).default([]),
+    ...obligationSubmissionFields,
   }).strict(),
   z.object({
     kind: z.literal('yield-for-providers'),
@@ -114,9 +125,12 @@ export const localArchitectSubmissionSchema = z.discriminatedUnion('kind', [
     kind: z.literal('unresolved'),
     conflict: text,
     evidence: z.array(text),
+    ...obligationSubmissionFields,
   }).strict(),
 ]);
 export type LocalArchitectSubmission = z.infer<typeof localArchitectSubmissionSchema>;
+/** A submission as an agent writes it, before the defaults apply. */
+export type LocalArchitectSubmissionInput = z.input<typeof localArchitectSubmissionSchema>;
 
 /** The members this iteration's package offers the role. */
 export const localArchitectSubmissionKinds = ['assign', 'request-placement', 'request-completion', 'yield-for-providers', 'unresolved'] as const;
@@ -161,6 +175,8 @@ export interface WorkEvidence {
   readonly bounds?: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } | undefined;
   /** The element IDs of the work item's current package, which an assignment's `citedElements` is judged against. */
   readonly package?: ReadonlySet<string> | undefined;
+  /** This work item's architect and the run's obligations, which registrations and reports are judged against. */
+  readonly obligations?: ObligationContext | undefined;
 }
 
 /** The same evidence, as the placement rules read it. */
@@ -182,6 +198,29 @@ function placementEvidence(evidence: WorkEvidence): PlacementEvidence {
 export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): SubmissionValidation<LocalArchitectSubmission> {
   const shape = validateAgainst(localArchitectSubmissionSchema, input);
   if (!shape.ok) return shape;
+  const checked = validateKind(shape.value, evidence);
+  const reporting = shape.value.kind === 'yield-for-providers' ? [] : obligationErrors(shape.value, evidence);
+  if (reporting.length === 0) return checked;
+  return { ok: false, errors: [...(checked.ok ? [] : checked.errors), ...reporting] };
+}
+
+/**
+ * Registrations and reports are judged against the run's obligations and
+ * this work item's authority. Without that context nothing may be named:
+ * an unknown context never licenses a report.
+ */
+function obligationErrors(
+  value: Exclude<LocalArchitectSubmission, { kind: 'yield-for-providers' }>, evidence: WorkEvidence,
+): SubmissionError[] {
+  if (value.registrations.length === 0 && value.reports.length === 0) return [];
+  if (evidence.obligations === undefined) {
+    return [{ path: 'reports', message: 'This turn has no obligation context, so it registers and reports nothing', expected: 'empty registrations and reports' }];
+  }
+  return obligationSubmissionErrors(value, evidence.obligations);
+}
+
+function validateKind(value: LocalArchitectSubmission, evidence: WorkEvidence): SubmissionValidation<LocalArchitectSubmission> {
+  const shape = { ok: true as const, value };
   if (shape.value.kind === 'unresolved') return shape;
   if (shape.value.kind === 'request-placement') {
     const errors = placementRequestErrors(shape.value.request, placementEvidence(evidence), 'request');
