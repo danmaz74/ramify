@@ -267,8 +267,8 @@ export interface ScenarioPlanningOptions {
   readonly include?: readonly string[] | undefined;
 }
 
-/** A state whose scenario an identity selection names: it was declared, so it runs although it may carry the pending tag. */
-const selectedByIdentity: readonly ScenarioState[] = ['bound', 'declared', 'implemented'];
+/** A state whose scenario an identity selection names: an accepted binding or report took its pending tag off. */
+const selectedByIdentity: readonly ScenarioState[] = ['bound', 'done'];
 
 /**
  * The scenario check of one checkpoint, per the architecture's table. An

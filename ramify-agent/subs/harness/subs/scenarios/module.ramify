@@ -22,9 +22,7 @@ expose-src ScenarioRecord, scenarioRecordSchema, ScenarioId, scenarioIdSchema fr
 expose-src scenarioSourceHash, scenarioIdOf, lowestCommonAncestor, featureDirectoryOf from "records.ts" to parent
 
 expose-src ScenarioState, scenarioStateSchema, ScenarioEvent, scenarioEventTypes from "states.ts" to parent
-expose-src scenarioDeclaredDataSchema, scenarioDueDataSchema from "states.ts" to parent
-expose-src scenarioImplementedDataSchema, scenarioWithdrawnDataSchema from "states.ts" to parent
-expose-src ScenarioStates, ScenarioTransition, initialScenarioStates, applyScenarioEvent from "states.ts" to parent
+expose-src ScenarioStates, initialScenarioStates, applyScenarioEvent, boundState, reportedState from "states.ts" to parent
 expose-src reduceScenarioStates, countScenarioStates, carriesPendingTag from "states.ts" to parent
 
 expose-src renderFeatureFiles, FeatureRenderingRun, RenderedFeatureFile from "rendering.ts" to parent
@@ -38,4 +36,3 @@ expose-src TrackedScenario, ScenarioRunSummary, scenarioRunSummarySchema from "m
 expose-src ScenarioRunResult, scenarioRunResultSchema, ScenarioRunStatus, scenarioRunStatusSchema from "messages.ts" to parent
 expose-src untrackedScenarioCountsSchema from "messages.ts" to parent
 
-expose-src compositionFailures, bridgingGivens, CompositionFailure, CompositionSuspect from "composition.ts" to parent

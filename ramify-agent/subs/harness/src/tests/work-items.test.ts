@@ -98,18 +98,18 @@ describe('a run whose work items need no change', () => {
       'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended',
       'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'gate-started', 'readiness-passed', 'scratch-setting-up', 'scratch-setup-complete', 'scenarios-materializing', 'scenarios-materialized',
-      // Each completion request declares its entry's scenario, and the
-      // work item's gate implements it.
+      // Each completion request reports its entry's scenario done before
+      // the work item's gate runs.
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
       'work-orientation-recorded', 'session-opened', 'invocation-started', 'invocation-ended', 'context-selection-recorded',
       // The package is appended to the session once; the organizing turn names it by hash.
       'context-package-append-requested', 'context-package-appended', 'invocation-started', 'invocation-ended',
-      'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed', 'session-finished',
+      'obligation-reported', 'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed', 'session-finished',
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
       'work-orientation-recorded', 'session-opened', 'invocation-started', 'invocation-ended', 'context-selection-recorded',
       // The package is appended to the session once; the organizing turn names it by hash.
       'context-package-append-requested', 'context-package-appended', 'invocation-started', 'invocation-ended',
-      'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed', 'session-finished',
+      'obligation-reported', 'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed', 'session-finished',
       'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
       'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-completed',
     ]);

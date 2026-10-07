@@ -46,9 +46,8 @@ export interface TrackedScenarios {
 
 /**
  * Replays the ledger into the tracked scenarios. Every scenario starts
- * `pending` at `analysis-accepted`, and each scenario event applies in
- * order. The harness commits no transition the events table rejects, so a
- * rejected one leaves the states as they were, as in the snapshot.
+ * `pending` at `analysis-accepted`, and each accepted binding and report
+ * applies in order, as the obligation projection applies them.
  */
 export function trackedScenarios(lines: readonly ScenarioLedgerLine[]): TrackedScenarios {
   const { written: _written, ...tracked } = replayScenarios(lines);
@@ -58,9 +57,9 @@ export function trackedScenarios(lines: readonly ScenarioLedgerLine[]): TrackedS
 /**
  * The tracked scenarios with the states the tree holds them in: the states
  * as of the harness's latest rendering, which is the materialization, a
- * gate's commit or a withdrawal commit. A declaration or a scenario falling
- * due changes a state at once and the tree only at the next of those, so a
- * gate compares the tree against this rendering, not the current one.
+ * gate's commit or a rewording commit. An accepted binding or report
+ * changes a state at once and the tree only at the next of those, so a gate
+ * compares the tree against this rendering, not the current one.
  */
 export function writtenScenarios(lines: readonly ScenarioLedgerLine[]): TrackedScenarios {
   const { written, ...tracked } = replayScenarios(lines);
@@ -87,19 +86,11 @@ function replayScenarios(lines: readonly ScenarioLedgerLine[]): TrackedScenarios
         entries = entryAssignmentsSchema.parse(record.body).entries.map(entry => ({ capability: entry.capability, description: entry.description }));
       }
     }
-    const event = line.transaction.event as { readonly type: string; readonly data?: { readonly scenarios?: readonly string[] } };
+    const event = line.transaction.event as { readonly type: string };
     if (event.type === 'analysis-accepted') states = initialScenarioStates(records.map(record => record.id));
-    if ((scenarioEventTypes as readonly string[]).includes(event.type)) {
-      const applied = applyScenarioEvent(states, event as unknown as ScenarioEvent);
-      if (applied.ok) states = applied.states;
-    }
+    if ((scenarioEventTypes as readonly string[]).includes(event.type)) states = applyScenarioEvent(states, event as unknown as ScenarioEvent);
     // The points where the harness renders the files into the tree.
     if (event.type === 'scenarios-materializing' || event.type === 'gate-committing' || event.type === 'scenarios-rewording') written = states;
-    if (event.type === 'scenarios-withdrawing') {
-      const withdrawn = new Map(states);
-      for (const id of event.data?.scenarios ?? []) withdrawn.set(id, 'pending');
-      written = withdrawn;
-    }
   }
   return { records, states, entries, written };
 }
@@ -113,15 +104,16 @@ export interface IncompleteScenario {
 }
 
 /**
- * The harness rule `acceptance-incomplete`, architecture §11: before the
- * final run no tracked scenario, integration scenarios included, may be
- * `pending`, `bound` or `declared`. Every one that is, with its record as
- * evidence.
+ * The harness rule `acceptance-incomplete`: before the final run every
+ * tracked scenario, integration scenarios included, has its responsible
+ * architect's `done` report. Every one that has none, with its record as
+ * evidence. No execution result enters this: the final audit's verdict is a
+ * separate fact.
  */
 export function incompleteScenarios(tracked: TrackedScenarios): IncompleteScenario[] {
   return tracked.records
     .map(record => ({ id: record.id, entry: record.entry, state: tracked.states.get(record.id) ?? 'pending', evidence: join('scenarios', `${record.id}.json`) }))
-    .filter(scenario => scenario.state !== 'implemented');
+    .filter(scenario => scenario.state !== 'done');
 }
 
 /** Every tracked file's expected content under the current states, ordered by path. */
@@ -192,7 +184,7 @@ export function materializationMessage(parts: { readonly planId: string; readonl
     `Scenarios of ${parts.planId}`,
     '',
     `The ${parts.scenarios} acceptance scenario${parts.scenarios === 1 ? '' : 's'} of the accepted analysis, written by ramify-agent`,
-    'with the pending tag until the harness declares each due. Agents never edit these files.',
+    'with the pending tag until each is bound or reported done. Agents never edit these files.',
     '',
     ...parts.files.map(file => `  ${file}`),
     '',
@@ -221,11 +213,6 @@ export async function commitForMaterialization(
   return commitForScenarios(projectRoot, runId, materializedTrailerValue, message, recovering, git, verifyRecovered, prepareCommit);
 }
 
-/** The trailer value of a run's nth withdrawal commit; the ordinal keeps each one's identity its own. */
-export function withdrawnTrailerValue(withdrawal: number): string {
-  return `withdrawn-${withdrawal}`;
-}
-
 /**
  * The commit of one of the harness's own scenario commits, identified by its
  * `Ramify-Scenarios` value beside `Ramify-Run`: the live attempt commits at
@@ -250,40 +237,6 @@ export async function commitForScenarios(
   }
   await prepareCommit?.();
   return git.commitAccepted(projectRoot, message);
-}
-
-/**
- * The message of a withdrawal commit, "Withdraw sc-003" or "Withdraw sc-003,
- * sc-004", written mechanically from the intent: which work item left its
- * repair path, why, and the files whose pending tags return.
- */
-export function withdrawalMessage(parts: {
-  readonly runId: string;
-  readonly withdrawal: number;
-  readonly workItem: string;
-  readonly scenarios: readonly string[];
-  readonly reason: string;
-  readonly files: readonly string[];
-}): string {
-  return [
-    `Withdraw ${parts.scenarios.join(', ')}`,
-    '',
-    `${parts.workItem} left its repair path without a passing gate (${parts.reason}), so the`,
-    `scenario${parts.scenarios.length === 1 ? ' returns' : 's return'} to pending and carr${parts.scenarios.length === 1 ? 'ies' : 'y'} the pending tag again.`,
-    '',
-    ...parts.files.map(file => `  ${file}`),
-    '',
-    `${runTrailer}: ${parts.runId}`,
-    `${scenariosTrailer}: ${withdrawnTrailerValue(parts.withdrawal)}`,
-    '',
-  ].join('\n');
-}
-
-/** The tracked scenarios with some states replaced: what a withdrawal renders before its events are in the log. */
-export function withStates(tracked: TrackedScenarios, states: ReadonlyMap<string, ScenarioState>): TrackedScenarios {
-  const next = new Map(tracked.states);
-  for (const [id, state] of states) next.set(id, state);
-  return { ...tracked, states: next };
 }
 
 /** The trailer value of a run's nth rewording commit. */

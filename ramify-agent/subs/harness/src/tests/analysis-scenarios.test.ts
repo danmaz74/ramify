@@ -227,11 +227,10 @@ describe('acceptance', () => {
     expect(accepted.records.map(entry => entry.path)).toEqual(expect.arrayContaining([runLayout.entries, 'work-items/wi-001/item.json']));
 
     // Every record was committed pending. Each work item's completion request
-    // then declared its entry's scenarios and its gate implemented them; the
-    // implementation of the last sub-scenario created the integration work
-    // item at the common ancestor, whose request declared the integration
-    // scenario, and its gate implemented it.
-    expect(onlyRun(service, 'review-notes').counts.scenarios).toEqual({ pending: 0, bound: 0, declared: 0, implemented: 4 });
+    // then reported its entry's scenarios done; the done report of the last
+    // sub-scenario created the integration work item at the common ancestor,
+    // whose request reported the integration scenario done.
+    expect(onlyRun(service, 'review-notes').counts.scenarios).toEqual({ pending: 0, bound: 0, done: 4 });
     const started = (await runEventsOnDisk(project, 'review-notes', runId)).filter(event => event.type === 'work-item-started').map(event => event.data);
     expect(started).toEqual([
       { workItem: 'wi-001', module: reviews, origin: 'entry' },
@@ -420,7 +419,7 @@ describe('a form rule broken in a run', () => {
 
     const snapshot = onlyRun(service, 'review-notes');
     expect([snapshot.state, snapshot.failure?.reason]).toEqual(['failed', 'invalid-submission']);
-    expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, declared: 0, implemented: 0 });
+    expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, done: 0 });
     const outcome = JSON.parse(await readFile(runPath(project, 'review-notes', receipt.jobId, runLayout.outcome('inv-0002')), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'invalid-submission', rejectedSubmissions: 3 });
     const events = await runEventsOnDisk(project, 'review-notes', receipt.jobId);
@@ -436,16 +435,15 @@ describe('the snapshot\'s scenario counts', () => {
     const accepted = line('analysis-accepted', { invocation: 'inv-0001', entries: 1, hypotheses: 0, registry: 1, workItems: 1, scenarios: 3, warnings: [] });
     const record = constructedRecord();
     type Events = Parameters<typeof runSnapshot>[1];
-    expect(runSnapshot(record, [] as unknown as Events).counts.scenarios).toEqual({ pending: 0, bound: 0, declared: 0, implemented: 0 });
-    expect(runSnapshot(record, [accepted] as unknown as Events).counts.scenarios).toEqual({ pending: 3, bound: 0, declared: 0, implemented: 0 });
-    // The events a later iteration writes move states by the table; one it rejects moves nothing.
+    expect(runSnapshot(record, [] as unknown as Events).counts.scenarios).toEqual({ pending: 0, bound: 0, done: 0 });
+    expect(runSnapshot(record, [accepted] as unknown as Events).counts.scenarios).toEqual({ pending: 3, bound: 0, done: 0 });
+    // An engineer's binding and an architect's report move states; a gate result moves none.
     const moved = [
       accepted,
-      line('scenario-declared', { scenario: 'sc-001', by: 'inv-0003', state: 'declared' }),
-      line('scenario-declared', { scenario: 'sc-002', by: 'inv-0003', state: 'bound' }),
-      line('scenario-implemented', { scenario: 'sc-001', gate: 'ga-0004' }),
-      line('scenario-implemented', { scenario: 'sc-003', gate: 'ga-0004' }),
+      line('obligation-bound', { id: 'sc-001', fakes: [], by: 'inv-0003', submission: 'a'.repeat(64) }),
+      line('obligation-bound', { id: 'sc-002', fakes: ['createLimitFake'], by: 'inv-0003', submission: 'a'.repeat(64) }),
+      line('obligation-reported', { id: 'sc-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0004', submission: 'b'.repeat(64) }),
     ];
-    expect(runSnapshot(record, moved as unknown as Events).counts.scenarios).toEqual({ pending: 1, bound: 1, declared: 0, implemented: 1 });
+    expect(runSnapshot(record, moved as unknown as Events).counts.scenarios).toEqual({ pending: 1, bound: 1, done: 1 });
   });
 });

@@ -287,15 +287,15 @@ describe('the acceptance scenarios a client reads', () => {
     mode: 'quick', dryRun: false, status: 'failed', failure: { step: 'Then it is shown', message: 'expected one' }, undefined: [],
   };
   const scenario = {
-    id: 'sc-003', kind: 'integration', name: 'A note is shown with its tag', state: 'declared', origin: plan,
+    id: 'sc-003', kind: 'integration', name: 'A note is shown with its tag', state: 'bound', origin: plan,
     entry: null, partOf: null, subScenarios: ['sc-001', 'sc-002'], workItem: 'wi-003', owner: 'app/reviews',
-    file: 'subs/reviews/src/tests/features/p/integration.feature', implementedBy: null, gates: [gateResult],
+    file: 'subs/reviews/src/tests/features/p/integration.feature', gates: [gateResult],
   };
 
   test('the path, the bound and every state and status', () => {
     expect(protocolPaths.runScenarios('p', 'r 1')).toBe('/api/v1/plans/p/runs/r%201/scenarios');
     expect(runQueryLimits.scenarios).toBe(500);
-    expect(trackedScenarioStateSchema.options).toEqual(['pending', 'bound', 'declared', 'implemented']);
+    expect(trackedScenarioStateSchema.options).toEqual(['pending', 'bound', 'done']);
     expect(scenarioStatusSchema.options).toEqual(['passed', 'failed', 'undefined', 'pending', 'ambiguous', 'skipped']);
   });
 
@@ -314,11 +314,11 @@ describe('the acceptance scenarios a client reads', () => {
     const hash = 'b'.repeat(64);
     const reported = {
       id: 'sc-003', kind: 'scenario', responsible: { kind: 'work-item', id: 'wi-003' }, status: 'done', revision: 1,
-      case: null, description: null, registeredBy: null,
+      case: null, description: null, registeredBy: null, binding: { fakes: ['FakeNoteStore'], invocation: 'inv-0006', submission: hash, sequence: 30, at: '2026-10-07T11:00:00.000Z' },
       report: { judgment: 'done', revision: 1, basedOnRevision: 0, where: 'subs/missing/src/nowhere.ts — notAFunction', invocation: 'inv-0007', submission: hash, sequence: 41, at: '2026-10-07T12:00:00.000Z' },
     };
     const test = { ...reported, id: 'test-001', kind: 'test', status: 'pending', revision: 0, description: 'The duplicate send regression test',
-      registeredBy: { invocation: 'inv-0007', submission: hash }, report: null };
+      registeredBy: { invocation: 'inv-0007', submission: hash }, binding: null, report: null };
     const list = { scenarios: [scenario], total: 1, obligations: [reported, test, { ...reported, id: 'cap-001', kind: 'outcome', responsible: { kind: 'capability-task', id: 'cap-001' }, report: { ...reported.report, where: null } }] };
     expect(scenarioListResponseSchema.parse(list)).toEqual(list);
     // The declaration is its own fact: no gate, verdict or audit field rides on it.
@@ -344,7 +344,7 @@ describe('the acceptance scenarios a client reads', () => {
 
   test('an entry counts its scenarios; any other capability has no count', () => {
     const progress = { capability: 'show-note', owner: 'app', entry: true, tentative: false, state: 'working', reason: 'r', dependsOn: [], workItems: [], evidence: [] };
-    expect(capabilityProgressSchema.safeParse({ ...progress, scenarios: { implemented: 1, total: 2 } }).success).toBe(true);
+    expect(capabilityProgressSchema.safeParse({ ...progress, scenarios: { done: 1, total: 2 } }).success).toBe(true);
     expect(capabilityProgressSchema.safeParse({ ...progress, entry: false, scenarios: null }).success).toBe(true);
     expect(capabilityProgressSchema.safeParse(progress).success).toBe(false);
   });
@@ -381,7 +381,7 @@ describe('the acceptance scenarios a client reads', () => {
   });
 
   test('a projected event may refer to a scenario', () => {
-    const event = { sequence: 4, at: '2026-09-23T08:00:00.000Z', transition: 'scenario-implemented', summary: 'Scenario sc-001 is implemented', refs: [{ kind: 'scenario', id: 'sc-001' }, { kind: 'gate', id: 'ga-0003' }] };
+    const event = { sequence: 4, at: '2026-09-23T08:00:00.000Z', transition: 'obligation-reported', summary: 'The responsible architect reported sc-001 done at revision 1', refs: [{ kind: 'scenario', id: 'sc-001' }, { kind: 'invocation', id: 'inv-0003' }] };
     expect(projectedRunEventSchema.parse(event)).toEqual(event);
   });
 });

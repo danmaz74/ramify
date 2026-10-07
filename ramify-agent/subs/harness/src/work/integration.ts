@@ -7,17 +7,19 @@ import { workItemId, workItemSchema, type WorkItem } from './records.js';
 /*
  * Integration work items, architecture §10.
  *
- * An integration scenario is pending until every sub-scenario is
- * implemented. The `scenario-implemented` that makes that true commits one
- * work item for it at the scenario's owner, the lowest common ancestor of its
- * sub-scenarios' owners, with the goal of binding that one scenario. Its
- * engineer's scope is the ancestor with the children on the paths to the
+ * An integration scenario's work item is due when every sub-scenario is
+ * `done`. The responsible architect's accepted `done` report that makes that
+ * true commits one work item for it, exactly once, at the scenario's owner,
+ * the lowest common ancestor of its sub-scenarios' owners, with the goal of
+ * binding that one scenario. The done reports are the only trigger: no gate
+ * result, local or fake-backed success or separate readiness decision is.
+ * Its engineer's scope is the ancestor with the children on the paths to the
  * sub-scenarios' owners included: it writes a step file at the ancestor that
  * imports the sub-scenarios' step files by name, adds the `expose-test`
- * declarations along each path, and declares the scenario.
+ * declarations along each path, and binds the scenario.
  */
 
-/** The integration scenarios due a work item: every sub-scenario implemented, and no work item for it yet. */
+/** The integration scenarios due a work item: every sub-scenario done, and no work item for it yet. */
 export function dueIntegrations(
   records: readonly ScenarioRecord[],
   states: ScenarioStates,
@@ -27,7 +29,7 @@ export function dueIntegrations(
   return records.filter(record => record.kind === 'integration'
     && !bound.has(record.id)
     && record.subScenarios.length > 0
-    && record.subScenarios.every(id => states.get(id) === 'implemented'));
+    && record.subScenarios.every(id => states.get(id) === 'done'));
 }
 
 /** The work item one due integration scenario gets, numbered after the `count` already committed. */
@@ -123,8 +125,6 @@ export interface IntegrationBriefing {
     readonly owner: string;
     readonly file: string;
     readonly source: readonly string[];
-    /** Its context steps that appear in no step of the integration scenario. */
-    readonly bridging: readonly string[];
   }>;
   /** Each sub-scenario owner's step directory and the step files it holds now. */
   readonly owners: ReadonlyArray<{ readonly module: string; readonly directory: string; readonly files: readonly string[] }>;
@@ -136,7 +136,6 @@ export async function integrationBriefing(
   projectRoot: string,
   record: ScenarioRecord,
   records: readonly ScenarioRecord[],
-  bridging: (sub: ScenarioRecord) => readonly string[],
 ): Promise<IntegrationBriefing> {
   const subs = record.subScenarios.flatMap(id => records.filter(candidate => candidate.id === id));
   const owners: Array<{ module: string; directory: string; files: string[] }> = [];
@@ -147,7 +146,7 @@ export async function integrationBriefing(
   }
   return {
     scenario: { id: record.id, name: record.name, owner: record.owner, file: record.file, source: record.source, steps: stepDirectoryOf(record.file) },
-    subScenarios: subs.map(sub => ({ id: sub.id, name: sub.name, owner: sub.owner, file: sub.file, source: sub.source, bridging: bridging(sub) })),
+    subScenarios: subs.map(sub => ({ id: sub.id, name: sub.name, owner: sub.owner, file: sub.file, source: sub.source })),
     owners,
     scope: integrationScopeOf(record, records),
   };

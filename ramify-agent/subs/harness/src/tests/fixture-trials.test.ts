@@ -213,14 +213,14 @@ describe.runIf(selected.includes('status-badge-tone'))('the status-badge-tone tr
       // step file in the badge's own test area.
       'initial-architect': [submit(await badgeAnalysis())],
       'local-architect': [
-        submit(assign(sharedUi, { goal: 'Give the status badge a tone, with tests of its own.' }, outline({
+        submit(assign(sharedUi, { goal: 'Give the status badge a tone, with tests of its own.', obligations: ['sc-001', 'sc-002'] }, outline({
           changes: 'The badge takes an optional tone and carries it as data-tone; it reads as neutral without one.',
           decomposition: { kind: 'single-iteration', rationale: 'One component and its tests; nothing else changes and nothing depends on the change.' },
         }))),
         submit(requestCompletion({ changes: 'The tone is there and its tests pass.', revisionReason: 'The one iteration is accepted.' })),
       ],
       engineer: [submit(
-        completionProposed('The badge carries its tone, neutral by default, with its own tests; both scenarios bind to its step file.', { scenarios: ['sc-001', 'sc-002'] }),
+        completionProposed('The badge carries its tone, neutral by default, with its own tests; both scenarios bind to its step file.', { bindings: [{ id: 'sc-001' }, { id: 'sc-002' }] }),
         ...writes(stage), write(badgeSteps, badgeStepFile), runScopeTests(),
       )],
     }, async result => {
@@ -230,7 +230,8 @@ describe.runIf(selected.includes('status-badge-tone'))('the status-badge-tone tr
       expect((await result.outline(1)).decomposition.kind).toBe('single-iteration');
       expect((await result.result(1)).outcome).toBe('accepted');
       expect(types.filter(type => type === 'work-item-completed')).toHaveLength(1);
-      expect(types.filter(type => type === 'scenario-implemented')).toHaveLength(2);
+      expect(types.filter(type => type === 'obligation-bound')).toHaveLength(2);
+      expect(result.events.filter(event => event.type === 'obligation-reported' && (event.data as { judgment: string }).judgment === 'done')).toHaveLength(2);
       const readiness = result.events.find(event => event.type === 'readiness-passed')!.data as { gate: string };
       expectRealGatePassed(await result.gate(readiness.gate), 'readiness');
       const final = result.events.find(event => event.type === 'job-completed')!.data as { gate: string };

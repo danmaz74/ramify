@@ -19,7 +19,7 @@ import { capabilityOfItem } from './work.js';
  *   follow-up work item is open, and the earlier completion stays history.
  * - A superseded hypothesis leaves the list without becoming `completed`;
  *   a live one is listed as tentative, a forecast and never a commitment.
- * - An entry also counts its acceptance scenarios, implemented of all it
+ * - An entry also counts its acceptance scenarios, done of all it
  *   has; the count is beside its state and does not decide it.
  */
 
@@ -118,7 +118,7 @@ export function capabilityProgressOf(view: RunView): CapabilityProgress[] {
       dependsOn: dependsOnOf(entry.capability),
       workItems: items.map(item => item.id),
       evidence: judged.evidence,
-      scenarios: entry.origin === 'entry' ? { ...(scenarioCounts.get(entry.capability) ?? { implemented: 0, total: 0 }) } : null,
+      scenarios: entry.origin === 'entry' ? { ...(scenarioCounts.get(entry.capability) ?? { done: 0, total: 0 }) } : null,
     });
   }
 

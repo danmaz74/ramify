@@ -130,10 +130,9 @@ export const runFailureReasonSchema = z.enum([
   /** Repair rounds were spent without a passing gate. */
   'repair-exhausted',
   /**
-   * A tracked scenario was not `implemented` before the final gate, or the
-   * final gate's scenario check did not pass every one in full mode, or a
-   * work item asked for completion with a scenario of its entry unfinished
-   * more often than the bound allows.
+   * A tracked scenario had no `done` report from its responsible architect
+   * before the final gate, or a work item asked for completion with a
+   * scenario of its own not reported done more often than the bound allows.
    */
   'acceptance-incomplete',
   /** Infrastructure recoveries were spent without a running check. */
@@ -327,7 +326,7 @@ export const runSnapshotSchema = z.object({
     readinessAttempts: count,
     gateAttempts: count,
     /** The tracked acceptance scenarios in each state. */
-    scenarios: z.object({ pending: count, bound: count, declared: count, implemented: count }).strict(),
+    scenarios: z.object({ pending: count, bound: count, done: count }).strict(),
     /** Invocations whose executor started otherwise than the harness asked: a continuation or fork made fresh. */
     degradedStarts: count,
   }).strict(),
@@ -485,11 +484,12 @@ export const scenarioOriginViewSchema = z.discriminatedUnion('kind', [
 export type ScenarioOriginView = z.infer<typeof scenarioOriginViewSchema>;
 
 /**
- * A tracked scenario's state: `pending` and `bound` keep the pending tag in
- * the source, `declared` waits for a gate to verify it, `implemented` passed
- * one. Only the harness moves a state.
+ * A tracked scenario's state, which is its obligation status: `pending`
+ * keeps the pending tag in the source, `bound` was bound by an engineer's
+ * accepted proposal, `done` was reported by its responsible architect. Only
+ * an accepted submission moves a state; a gate or audit result never does.
  */
-export const trackedScenarioStateSchema = z.enum(['pending', 'bound', 'declared', 'implemented']);
+export const trackedScenarioStateSchema = z.enum(['pending', 'bound', 'done']);
 export type TrackedScenarioState = z.infer<typeof trackedScenarioStateSchema>;
 
 /** One scenario's result in one Cucumber run: the worst of its steps. */
@@ -877,8 +877,8 @@ export const capabilityProgressSchema = z.object({
   dependsOn: z.array(z.object({ capability: text, tentative: z.boolean() }).strict()),
   workItems: z.array(text),
   evidence: z.array(text),
-  /** An entry's scenarios: how many are implemented of all it has. Null for a capability that is not an entry. */
-  scenarios: z.object({ implemented: count, total: count }).strict().nullable(),
+  /** An entry's scenarios: how many its architect reported done of all it has. Null for a capability that is not an entry. */
+  scenarios: z.object({ done: count, total: count }).strict().nullable(),
 }).strict();
 export type CapabilityProgress = z.infer<typeof capabilityProgressSchema>;
 
@@ -1189,22 +1189,22 @@ export const scenarioViewSchema = z.object({
   subScenarios: z.array(text),
   /**
    * The work item that binds it: its entry's, or for an integration scenario
-   * the integration work item, null until its sub-scenarios are implemented.
+   * the integration work item, null until its sub-scenarios are all done.
    */
   workItem: text.nullable(),
   owner: text,
   file: text,
-  /** The gate whose pass made it `implemented`; null while it is not. */
-  implementedBy: text.nullable(),
+  /** Execution evidence beside the state, never folded into it. */
   gates: z.array(scenarioGateResultSchema),
 }).strict();
 export type ScenarioView = z.infer<typeof scenarioViewSchema>;
 
 /**
- * One registered obligation and its responsible architect's latest report.
- * Its status is moved by accepted architect submissions alone: an engineer's
- * work report and a gate or audit result are separate facts, shown beside it
- * and never folded into it. `where` is the architect's navigation text, shown
+ * One registered obligation, its latest engineer binding and its
+ * responsible architect's latest report. Its status is moved by accepted
+ * submissions alone: a binding makes it `bound`, a report sets the
+ * architect's judgment, and a gate or audit result is a separate fact,
+ * shown beside it and never folded into it. `where` is the architect's navigation text, shown
  * as written and never resolved.
  */
 export const obligationViewSchema = z.object({
@@ -1220,6 +1220,14 @@ export const obligationViewSchema = z.object({
   description: text.nullable(),
   /** The explicit registration; null for an analysis scenario or a delegated outcome. */
   registeredBy: z.object({ invocation: text, submission: text }).strict().nullable(),
+  /** The latest accepted engineer binding and the fakes it relies on; null while there is none. */
+  binding: z.object({
+    fakes: z.array(text),
+    invocation: text,
+    submission: text,
+    sequence: z.int().positive(),
+    at: timestamp,
+  }).strict().nullable(),
   /** The responsible architect's latest accepted report; null while there is none. */
   report: z.object({
     judgment: z.enum(['done', 'bound']),

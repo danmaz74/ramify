@@ -65,7 +65,7 @@ const rootFeature = `src/tests/features/${plan}/note-in-panel.feature`;
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 
 describe('materializing the feature files', () => {
-  test('a scripted run commits every tracked file once readiness has passed, and each work-item gate implements the scenario its request declared', async () => {
+  test('a scripted run commits every tracked file once readiness has passed, and each work item\'s completion request reports its scenario done', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
@@ -119,7 +119,7 @@ describe('materializing the feature files', () => {
       `Scenarios of ${plan}`,
       '',
       'The 2 acceptance scenarios of the accepted analysis, written by ramify-agent',
-      'with the pending tag until the harness declares each due. Agents never edit these files.',
+      'with the pending tag until each is bound or reported done. Agents never edit these files.',
       '',
       `  ${rootFeature}`,
       `  ${reviewsFeature}`,
@@ -137,13 +137,13 @@ describe('materializing the feature files', () => {
 
     // The content is the rendering of the records: each scenario tagged by
     // its identity, its source verbatim. Each work item's completion request
-    // declared its scenario, so the pending tag is gone from both.
+    // reported its scenario done, so the pending tag is gone from both.
     const reviewsText = await readFile(join(project, reviewsFeature), 'utf8');
     expect(reviewsText.split('\n').slice(0, 9)).toEqual([
       `# Written by ramify-agent for plan ${plan}, run ${receipt.jobId}.`,
       '# The scenarios are the plan\'s requirements. Agents never edit this file;',
       '# step definitions bind it from src/tests/steps/. @ramify-pending marks a',
-      '# scenario the harness has not yet declared due.',
+      '# scenario that nothing has bound or reported done yet.',
       '',
       'Feature: reviewer-note',
       '  A reviewer can attach one note to a completed review run.',
@@ -251,7 +251,7 @@ describe('re-rendering', () => {
     cleanups.push(directory.remove);
     const before = expectedFeatureFiles(tracked(), { planId: 'demo', runId: 'run-1' });
     await rerenderFeatureFiles(directory.path, before);
-    const after = expectedFeatureFiles({ ...tracked(), states: new Map([['sc-001', 'declared'], ['sc-002', 'pending']]) }, { planId: 'demo', runId: 'run-1' });
+    const after = expectedFeatureFiles({ ...tracked(), states: new Map([['sc-001', 'bound'], ['sc-002', 'pending']]) }, { planId: 'demo', runId: 'run-1' });
     const rendered = await rerenderFeatureFiles(directory.path, after);
     expect(rendered.written).toEqual(['subs/shelf/src/tests/features/demo/shelve-book.feature']);
     expect(await readFile(join(directory.path, rendered.written[0]!), 'utf8')).toContain('  @ramify-sc-001\n  Scenario: A book is shelved');
@@ -275,10 +275,10 @@ describe('re-rendering', () => {
         ] } },
         { body: one }, { body: two },
       ] } },
-      { transaction: { event: { type: 'scenario-declared', data: { scenario: 'sc-002', by: 'inv-0004', state: 'declared' } } as { type: string }, records: [] } },
+      { transaction: { event: { type: 'obligation-bound', data: { id: 'sc-002', fakes: [], by: 'inv-0004', submission: 'a'.repeat(64) } } as { type: string }, records: [] } },
     ]);
     expect(replayed.records.map(record => record.id)).toEqual(['sc-001', 'sc-002']);
-    expect([...replayed.states]).toEqual([['sc-001', 'pending'], ['sc-002', 'declared']]);
+    expect([...replayed.states]).toEqual([['sc-001', 'pending'], ['sc-002', 'bound']]);
     expect(replayed.entries).toEqual([{ capability: 'shelve-book', description: 'A book can be shelved.' }]);
   });
 });

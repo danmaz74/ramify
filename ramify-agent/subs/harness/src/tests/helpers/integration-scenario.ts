@@ -155,22 +155,23 @@ export async function integrationProject(cleanups: Cleanups): Promise<string> {
 /** The turns of the two entries' work items: each binds its own sub-scenario in one iteration. */
 export const entryTurns = {
   'initial-architect': [submit(integrationAnalysis())],
-  'local-architect:wi-001': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
-  'engineer:wi-001': [submit(completionProposed('The note\'s sub-scenario is bound.', { scenarios: ['sc-001'] }), write('tests/steps/review-note.steps.ts', noteStepFile))],
-  'local-architect:wi-002': [submit(assign(tags, {}, outline())), submit(requestCompletion())],
-  'engineer:wi-002': [submit(completionProposed('The tags\' sub-scenario is bound.', { scenarios: ['sc-002'] }), write('tests/steps/review-tags.steps.ts', tagStepFile))],
+  'local-architect:wi-001': [submit(assign(notes, { obligations: ['sc-001'] }, outline())), submit(requestCompletion())],
+  'engineer:wi-001': [submit(completionProposed('The note\'s sub-scenario is bound.', { bindings: [{ id: 'sc-001' }] }), write('tests/steps/review-note.steps.ts', noteStepFile))],
+  'local-architect:wi-002': [submit(assign(tags, { obligations: ['sc-002'] }, outline())), submit(requestCompletion())],
+  'engineer:wi-002': [submit(completionProposed('The tags\' sub-scenario is bound.', { bindings: [{ id: 'sc-002' }] }), write('tests/steps/review-tags.steps.ts', tagStepFile))],
 };
 
 /** The integration work item's assignment: the ancestor, with both children on the paths to the owners. */
 export const bindAtAncestor = assign(reviews, {
   goal: 'Bind sc-003 at the common ancestor.',
+  obligations: ['sc-003'],
   approach: 'Import both step files by name, and expose them to this module with expose-test.',
   scope: { base: { module: reviews, included: [notes, tags].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) }, extra: [], read: [], rationale: 'The ancestor and both paths down to the owners.' },
 }, outline());
 
-/** The engineer that binds it: the ancestor's step file, the two exposures, and the declaration. */
+/** The engineer that binds it: the ancestor's step file, the two exposures, and the binding. */
 export const bindTurn = submit(
-  completionProposed('The integration scenario binds to both sub-scenarios\' definitions.', { scenarios: ['sc-003'] }),
+  completionProposed('The integration scenario binds to both sub-scenarios\' definitions.', { bindings: [{ id: 'sc-003' }] }),
   write('tests/steps/integration.steps.ts', ancestorStepFile),
   write('../subs/notes/module.ramify', exposing('notes', 'reviewNoteSteps', 'review-note.steps.ts')),
   write('../subs/tags/module.ramify', exposing('tags', 'reviewTagsSteps', 'review-tags.steps.ts')),

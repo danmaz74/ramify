@@ -10,7 +10,6 @@ import {
   type PlacementEvidence,
 } from '../architecture/submission.js';
 import { assignmentBodySchema, assignmentErrors, type AssignmentBody } from './assignment.js';
-import { declarationErrors, type DeclarationContext } from './declarations.js';
 import type { IntegrationScope } from './integration.js';
 import { decompositionSchema } from './records.js';
 import type { EngineerBounds } from '../run/policy.js';
@@ -107,12 +106,6 @@ export const localArchitectSubmissionSchema = z.discriminatedUnion('kind', [
     kind: z.literal('request-completion'),
     summary: text,
     outline: outlineBodySchema,
-    /**
-     * Scenarios of this work item's entry that existing step definitions
-     * already bind, declared with the request. They apply before the request
-     * is judged, and the work-item gate verifies them.
-     */
-    scenarios: z.array(text).default([]),
     ...obligationSubmissionFields,
   }).strict(),
   z.object({
@@ -167,8 +160,6 @@ export interface WorkEvidence {
   readonly guardedPaths?: ReadonlySet<string> | undefined;
   /** The files only the harness writes: its configuration for the project and the tracked feature files. */
   readonly harnessOnly?: ReadonlySet<string> | undefined;
-  /** The work item's entry and the run's tracked scenarios, which a declaration's IDs are judged against. */
-  readonly scenarios?: DeclarationContext | undefined;
   /** For an integration work item: the scope its engineer must be given. */
   readonly integration?: IntegrationScope | undefined;
   /** The policy's engineer bounds and their ceilings, which an assignment's `bounds` is judged against. */
@@ -227,10 +218,7 @@ function validateKind(value: LocalArchitectSubmission, evidence: WorkEvidence): 
     return errors.length === 0 ? shape : { ok: false, errors };
   }
   if (shape.value.kind === 'request-completion') {
-    const errors = [
-      ...outlineErrors(shape.value.outline, evidence),
-      ...declarationErrors(shape.value.scenarios, evidence.scenarios ?? { entry: null, records: [] }),
-    ];
+    const errors = outlineErrors(shape.value.outline, evidence);
     return errors.length === 0 ? shape : { ok: false, errors };
   }
   if (shape.value.kind === 'yield-for-providers') {
@@ -266,7 +254,7 @@ function validateKind(value: LocalArchitectSubmission, evidence: WorkEvidence): 
       ...(evidence.guardedPaths === undefined ? {} : { guardedPaths: evidence.guardedPaths }),
       ...(evidence.harnessOnly === undefined ? {} : { harnessOnly: evidence.harnessOnly }),
       ...(evidence.integration === undefined ? {} : { integration: evidence.integration }),
-      ...(evidence.scenarios === undefined ? {} : { scenarios: evidence.scenarios }),
+      ...(evidence.obligations === undefined ? {} : { obligations: { ...evidence.obligations, registrations: shape.value.registrations } }),
       ...(evidence.bounds === undefined ? {} : { bounds: evidence.bounds }),
       ...(evidence.package === undefined ? {} : { package: evidence.package }),
     }),

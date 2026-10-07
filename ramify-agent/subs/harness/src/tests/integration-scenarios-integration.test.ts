@@ -17,7 +17,7 @@ import { onlyRun, realRamify, runEventsOnDisk } from './helpers/runs.js';
  * checker, architecture §10.
  *
  * The scripted run of `helpers/integration-scenario.ts` completes with its
- * integration scenario implemented: the integration work item's engineer
+ * integration scenario bound and reported done: the integration work item's engineer
  * wrote a step file at the common ancestor that imports both sub-scenarios'
  * step files by name, and exposed each to its parent with `expose-test`.
  * The run's own gates use the direct executor, so what the engineer wrote
@@ -32,7 +32,7 @@ afterEach(async () => {
 });
 
 describe('AS08: an integration scenario bound through expose-test', () => {
-  test('the scripted run completes with the integration scenario implemented, and the real checker accepts the ancestor\'s imports only through the exposures', async () => {
+  test('the scripted run completes with the integration scenario done, and the real checker accepts the ancestor\'s imports only through the exposures', async () => {
     const root = await integrationProject(cleanups);
     const { service, runId, git } = await runIntegration(cleanups, root, {
       ...entryTurns,
@@ -43,9 +43,10 @@ describe('AS08: an integration scenario bound through expose-test', () => {
     const snapshot = onlyRun(service, plan);
     expect(snapshot.failure).toBeNull();
     expect(snapshot.state).toBe('completed');
-    expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, declared: 0, implemented: 3 });
+    expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, done: 3 });
     const log = await runEventsOnDisk(root, plan, runId);
-    expect(log.find(event => event.type === 'scenario-implemented' && (event.data as { scenario: string }).scenario === 'sc-003')).toBeDefined();
+    expect(log.find(event => event.type === 'obligation-bound' && event.data.id === 'sc-003')).toBeDefined();
+    expect(log.find(event => event.type === 'obligation-reported' && event.data.id === 'sc-003' && event.data.judgment === 'done')).toBeDefined();
     expect(log.at(-1)!.type).toBe('job-completed');
     git.assertAnswered();
 

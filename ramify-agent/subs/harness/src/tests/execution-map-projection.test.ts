@@ -47,8 +47,7 @@ function recordedRun(extra: Line[] = []) {
       { path: 'scenarios/sc-001.json', body: scenario },
       { path: 'work-items/wi-001/item.json', body: item('wi-001', { entry: 'full-description' }) },
     ] },
-    { type: 'scenario-declared', data: { scenario: 'sc-001', by: 'inv-001', state: 'declared' } },
-    { type: 'scenario-implemented', data: { scenario: 'sc-001', gate: 'ga-before' } },
+    { type: 'obligation-reported', data: { id: 'sc-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-001', submission: 'a'.repeat(64) } },
     ...extra,
   ]);
 }
@@ -126,7 +125,7 @@ describe('execution core from committed run records', () => {
     expect(index.nodes.filter(node => node.kind === 'gate').map(node => node.key)).toEqual([
       'gate:ga-dry', 'gate:ga-real', 'gate:ga-later', 'gate:ga-ready',
     ]);
-    expect(index.nodes.find(node => node.key === 'scenario:sc-001')).toMatchObject({ state: 'implemented', latestRealResult: 'failed' });
+    expect(index.nodes.find(node => node.key === 'scenario:sc-001')).toMatchObject({ state: 'done', latestRealResult: 'failed' });
     expect(index.nodes.find(node => node.key === 'capability:full-description')).toMatchObject({ scenarios: { failed: 1, passed: 0 } });
     expect(index.nodes.find(node => node.key === 'gate:ga-later')).toMatchObject({ verdict: 'failed', audit: 'unavailable', evidencePresent: true,
       cause: 'in-scope', subject: { workItem: 'wi-001', iteration: 'wi-001.i01' } });

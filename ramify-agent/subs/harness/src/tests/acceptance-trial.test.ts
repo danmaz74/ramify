@@ -18,7 +18,7 @@ import {
 import {
   consumerAgainstReal, consumerStub, consumerTest, contractNeeded, contractWrites, established, paths, providerWrites, type Seam,
 } from './helpers/contracts.js';
-import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged, withdrawn, type CommitResponse } from './helpers/contracts-git.js';
+import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged, type CommitResponse } from './helpers/contracts-git.js';
 import { createLocalCommandCheckExecution, createMappedCheckExecution, passingScenarioSummary, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { copyFixture } from './helpers/fixture.js';
 import {
@@ -40,15 +40,17 @@ import { finalCandidate } from './helpers/final-candidate.js';
  * are materialized. The plan states one integration scenario over two
  * entries, a note and its tags, which the analysis decomposes into one
  * sub-scenario each. The note's work item needs a limit it does not own: a
- * contract gives it a fake, and it declares its sub-scenario while the
- * requirement is open, so the scenario is `bound`. Its first gate fails the
- * scenario, the work item yields, and the scenario is withdrawn. The
- * provider implements the limit, the note's verification declares it
- * again, it passes against the real provider, is due when the requirement
- * is verified and implemented by the work item's gate. The tags' work item
- * binds its own; the second sub-scenario implemented creates the
- * integration work item at their common ancestor, which binds the
- * integration scenario through `expose-test`. The final gate runs every
+ * contract gives it a fake, and its engineer binds the sub-scenario against
+ * that fake, so the scenario is `bound` with the fake on record. Its first
+ * gate fails the scenario, the work item yields, and the scenario stays
+ * `bound`: no gate or yield moves a state. The provider implements the
+ * limit, the note's verification binds the sub-scenario again with no fake,
+ * and the local architect reports it `done`. The tags' work item spends its
+ * repair rounds with the scenario still `bound`, binds it again in a repair
+ * iteration, and its architect reports it done; the second sub-scenario
+ * reported done creates the integration work item at their common
+ * ancestor, which binds the integration scenario through `expose-test`. The
+ * final gate runs every
  * module's scenarios in full mode.
  *
  * Git is answered from the trial's own data. Every gate but the final one
@@ -233,13 +235,11 @@ function course(log: readonly RunEvent[]): string[] {
       case 'provider-conformed': return [`provider-conformed ${String(data['workItem'])}`];
       case 'iteration-closed': return data['outcome'] === 'accepted' ? [] : [`iteration-closed ${String(data['iteration'])} ${String(data['outcome'])}`];
       case 'requirement-verified': return [`requirement-verified ${String(data['requirement'])}`];
-      case 'scenario-declared': return [`scenario-declared ${String(data['scenario'])} ${String(data['state'])}`];
-      case 'scenario-bound-passed':
-      case 'scenario-implemented':
-        return [`${event.type} ${String(data['scenario'])}`];
-      case 'scenario-due': return [`scenario-due ${String(data['scenario'])} (${String(data['cause'])})`];
-      case 'scenarios-withdrawing': return [`scenarios-withdrawing ${(data['scenarios'] as string[]).join(',')} (${String(data['reason'])})`];
-      case 'scenario-withdrawn': return [`scenario-withdrawn ${String(data['scenario'])} (${String(data['reason'])})`];
+      case 'obligation-bound': {
+        const fakes = data['fakes'] as string[];
+        return [`bound ${String(data['id'])} (${fakes.length === 0 ? 'no fakes' : fakes.join(', ')})`];
+      }
+      case 'obligation-reported': return [`reported ${String(data['id'])} ${String(data['judgment'])}`];
       default: return [];
     }
   });
@@ -249,34 +249,35 @@ function course(log: readonly RunEvent[]): string[] {
 const trialScript = (root: string) => ({
   'initial-architect': [submit(integrationAnalysis())],
   // wi-001, the note: a contract for the limit, the sub-scenario bound
-  // against its fake, a yield, and the verification that binds it for real.
+  // against its fake, a yield, and the verification that rebinds it for real.
   'local-architect:wi-001': [
     submit({ ...assign(notes, {}, outline()), localDecisions: [placeTheLimit] }),
-    submit(assign(notes, { goal: 'Bind the note\'s sub-scenario against the fake.', scenarios: ['sc-001'] })),
+    submit(assign(notes, { goal: 'Bind the note\'s sub-scenario against the fake.', obligations: ['sc-001'] })),
     submit({ kind: 'yield-for-providers', requirements: ['rq-001'], summary: 'This work item runs against its fake and waits for the real limit.' }),
-    submit(assign(notes, { kind: 'verification', goal: 'Replace the fake with the real limit, and bind the sub-scenario.' })),
+    submit(assign(notes, { kind: 'verification', goal: 'Replace the fake with the real limit, and bind the sub-scenario.', obligations: ['sc-001'] })),
     submit(requestCompletion()),
   ],
   'engineer:wi-001': [
     submit(contractNeeded(noteLimit)),
-    submit(completionProposed('The sub-scenario runs against the fake.', { scenarios: ['sc-001'] }), write('tests/steps/review-note.steps.ts', noteStepFile)),
+    submit(completionProposed('The sub-scenario runs against the fake.', { bindings: [{ id: 'sc-001', fakes: [`create${noteLimit.name}Fake`] }] }),
+      write('tests/steps/review-note.steps.ts', noteStepFile)),
     submit(partialReport(['the step file'], ['the last step'])),
-    submit(completionProposed('The notes use the real limit, and the sub-scenario is bound.', { scenarios: ['sc-001'] }),
+    submit(completionProposed('The notes use the real limit, and the sub-scenario is bound.', { bindings: [{ id: 'sc-001' }] }),
       write('notes.ts', consumerAgainstReal(noteLimit))),
   ],
   'contract-engineer': [submit(established(noteLimit), ...contractWrites(noteLimit))],
-  // wi-002, the tags: the first iteration spends its repair rounds and
-  // withdraws its declaration; a second one binds the sub-scenario.
+  // wi-002, the tags: the first iteration spends its repair rounds and the
+  // scenario stays bound; a repair iteration binds it again.
   'local-architect:wi-002': [
-    submit(assign(tags, {}, outline())),
-    submit(assign(tags, { kind: 'repair', goal: 'Bind the last step of the tags\' sub-scenario for real.' })),
+    submit(assign(tags, { obligations: ['sc-002'] }, outline())),
+    submit(assign(tags, { kind: 'repair', goal: 'Bind the last step of the tags\' sub-scenario for real.', obligations: ['sc-002'] })),
     submit(requestCompletion()),
   ],
   'engineer:wi-002': [
-    submit(completionProposed('The tags\' sub-scenario is bound, I believe.', { scenarios: ['sc-002'] }), write('tests/steps/review-tags.steps.ts', tagStepFile)),
-    submit(completionProposed('Bound, I still believe.', { scenarios: ['sc-002'] })),
-    submit(completionProposed('Bound, once more.', { scenarios: ['sc-002'] })),
-    submit(completionProposed('The tags\' sub-scenario is bound.', { scenarios: ['sc-002'] }), write('tests/steps/review-tags.steps.ts', `${tagStepFile}// bound\n`)),
+    submit(completionProposed('The tags\' sub-scenario is bound, I believe.', { bindings: [{ id: 'sc-002' }] }), write('tests/steps/review-tags.steps.ts', tagStepFile)),
+    submit(completionProposed('Bound, I still believe.', { bindings: [{ id: 'sc-002' }] })),
+    submit(completionProposed('Bound, once more.', { bindings: [{ id: 'sc-002' }] })),
+    submit(completionProposed('The tags\' sub-scenario is bound.', { bindings: [{ id: 'sc-002' }] }), write('tests/steps/review-tags.steps.ts', `${tagStepFile}// bound\n`)),
   ],
   // wi-003, the limit's provider.
   'local-architect:wi-003': [submit(assign(limits, {}, outline({ changes: 'Implement the agreed limit.' }))), submit(requestCompletion())],
@@ -288,18 +289,17 @@ const trialScript = (root: string) => ({
 
 const trialCommits: CommitResponse[] = [
   accepted('wi-001.i02', 'revision-01', [...added(note.contract, note.fake, note.subjects, note.conformance), ...modified(note.consumer)]),
-  accepted('wi-001.i03', 'revision-02', added(noteSteps)),
+  accepted('wi-001.i03', 'revision-02', [...added(noteSteps), ...modified(noteFeature)]),
   accepted('wi-003.i01', 'revision-03', [...added(note.real), ...modified(note.subjects)]),
   unchanged('wi-003'),
   accepted('wi-001.i04', 'revision-04', modified(note.consumer)),
-  accepted('wi-001', 'revision-05', modified(noteFeature)),
-  accepted('wi-002.i01', 'revision-06', [...added(tagSteps), ...modified(tagFeature)]),
+  unchanged('wi-001'),
+  accepted('wi-002.i01', 'revision-05', [...added(tagSteps), ...modified(tagFeature)]),
   unchanged('wi-002.i01'),
   unchanged('wi-002.i01'),
-  withdrawn(['sc-002'], 'revision-07', [tagFeature]),
-  accepted('wi-002.i02', 'revision-08', [...modified(tagSteps), ...modified(tagFeature)]),
+  accepted('wi-002.i02', 'revision-06', modified(tagSteps)),
   unchanged('wi-002'),
-  accepted('wi-004.i01', 'revision-09', [...added(ancestorSteps), ...modified(notesModule, tagsModule, integrationFeature)]),
+  accepted('wi-004.i01', 'revision-07', [...added(ancestorSteps), ...modified(notesModule, tagsModule, integrationFeature)]),
   unchanged('wi-004'),
   unchanged(finalSubject(plan)),
 ];
@@ -334,31 +334,28 @@ async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
     'work-item-started wi-001 (entry)',
     'iteration-closed wi-001.i01 partial',
     'contract-registered rq-001 (provider wi-003)',
-    'scenario-declared sc-001 bound',
+    'bound sc-001 (createNoteLimitFake)',
     'iteration-closed wi-001.i03 partial',
-    'scenario-withdrawn sc-001 (yielded)',
     'work-item-yielded wi-001',
     'work-item-started wi-003 (obligation)',
     'provider-conformed wi-003',
     'work-item-completed wi-003',
     'work-item-resumed wi-001',
-    'scenario-declared sc-001 bound',
-    'scenario-bound-passed sc-001',
+    'bound sc-001 (no fakes)',
     'requirement-verified rq-001',
-    'scenario-due sc-001 (requirements-verified)',
-    'scenario-implemented sc-001',
+    'reported sc-001 done',
     'work-item-completed wi-001',
     'work-item-started wi-002 (entry)',
-    'scenario-declared sc-002 declared',
+    'bound sc-002 (no fakes)',
+    'bound sc-002 (no fakes)',
+    'bound sc-002 (no fakes)',
     'iteration-closed wi-002.i01 exhausted',
-    'scenarios-withdrawing sc-002 (repair-exhausted)',
-    'scenario-withdrawn sc-002 (repair-exhausted)',
-    'scenario-declared sc-002 declared',
-    'scenario-implemented sc-002',
+    'bound sc-002 (no fakes)',
+    'reported sc-002 done',
     'work-item-completed wi-002',
     'work-item-started wi-004 (integration sc-003)',
-    'scenario-declared sc-003 declared',
-    'scenario-implemented sc-003',
+    'bound sc-003 (no fakes)',
+    'reported sc-003 done',
     'work-item-completed wi-004',
     'job-completed',
   ]);
@@ -366,21 +363,17 @@ async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
   // The feature files were committed once, before the first work item.
   expect(trial.git.subjects()[0]).toBe(`Scenarios of ${plan}`);
   expect(trial.git.messages()[0]).toContain('\nRamify-Scenarios: materialized');
-  // The exhausted iteration's withdrawal restored the tag in a commit of its
-  // own; the yield's withdrew a bound scenario, whose tag never left, and
-  // committed nothing.
-  const withdrawal = trial.git.messages().filter(message => message.startsWith('Withdraw'));
-  expect(withdrawal.map(message => message.split('\n')[0])).toEqual(['Withdraw sc-002']);
-  expect(withdrawal[0]).toContain(`\nRamify-Run: ${trial.runId}\nRamify-Scenarios: withdrawn-1\n`);
+  // No gate, yield or exhausted iteration restored a tag: nothing was withdrawn.
+  expect(trial.git.messages().filter(message => message.startsWith('Withdraw'))).toEqual([]);
 
-  // The final states: every scenario implemented, untagged in its file, and
+  // The final states: every scenario reported done, untagged in its file, and
   // passed in full mode by the final gate.
-  expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, declared: 0, implemented: 3 });
+  expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, done: 3 });
   const list = scenarioListResponseSchema.parse(await new RunQueries(service).scenarios(plan, trial.runId));
   expect(list.scenarios.map(scenario => `${scenario.id} ${scenario.kind} ${scenario.state} ${scenario.workItem} ${scenario.owner}`)).toEqual([
-    `sc-001 entry implemented wi-001 ${notes}`,
-    `sc-002 entry implemented wi-002 ${tags}`,
-    `sc-003 integration implemented wi-004 ${reviews}`,
+    `sc-001 entry done wi-001 ${notes}`,
+    `sc-002 entry done wi-002 ${tags}`,
+    `sc-003 integration done wi-004 ${reviews}`,
   ]);
   for (const [file, id] of [[noteFeature, 'sc-001'], [tagFeature, 'sc-002'], [integrationFeature, 'sc-003']] as const) {
     expect(readFileSync(join(root, file), 'utf8')).toContain(`  @ramify-${id}\n`);
@@ -458,13 +451,13 @@ async function badgeRun(root: string): Promise<Trial> {
   return reviewedRun(root, badgePlan, {
     'initial-architect': [submit(await badgeAnalysis())],
     'local-architect:wi-001': [
-      submit(assign(sharedUi, { goal: 'Give the status badge a tone, with tests of its own, and bind the plan\'s two scenarios.' }, outline({
+      submit(assign(sharedUi, { goal: 'Give the status badge a tone, with tests of its own, and bind the plan\'s two scenarios.', obligations: ['sc-001', 'sc-002'] }, outline({
         changes: 'The badge takes an optional tone and carries it as data-tone; it reads as neutral without one.',
       }))),
       submit(requestCompletion()),
     ],
     'engineer:wi-001': [submit(
-      completionProposed('The badge carries its tone, neutral by default, and both scenarios bind to its step file.', { scenarios: ['sc-001', 'sc-002'] }),
+      completionProposed('The badge carries its tone, neutral by default, and both scenarios bind to its step file.', { bindings: [{ id: 'sc-001' }, { id: 'sc-002' }] }),
       ...Object.entries(implementation).map(([path, content]) => write(join(root, path), content)),
       write(join(root, badgeSteps), badgeStepFile),
     )],
@@ -485,8 +478,8 @@ async function expectBadgeRun(trial: Trial, toolchain: Toolchain): Promise<void>
   expect(course(trial.log)).toEqual([
     'analysis-accepted 2 scenarios', 'review-requested', 'analysis-approved by dana@example.com', 'readiness-passed', 'scenarios-materialized',
     'work-item-started wi-001 (entry)',
-    'scenario-declared sc-001 declared', 'scenario-declared sc-002 declared',
-    'scenario-implemented sc-001', 'scenario-implemented sc-002',
+    'bound sc-001 (no fakes)', 'bound sc-002 (no fakes)',
+    'reported sc-001 done', 'reported sc-002 done',
     'work-item-completed wi-001', 'job-completed',
   ]);
   // The plan's own text, in the badge owner's feature file.
@@ -509,7 +502,7 @@ async function expectBadgeRun(trial: Trial, toolchain: Toolchain): Promise<void>
 describe('the scripted acceptance trial, with the scripted cucumber-js', () => {
   const toolchain: Toolchain = { kind: 'scripted' };
 
-  test('passes the review stop, readiness, materialization, a bound declaration, due, a withdrawal, an integration work item and the final gate in full mode', async () => {
+  test('passes the review stop, readiness, materialization, a binding over a fake, done reports, an exhausted iteration that leaves a binding, an integration work item and the final gate in full mode', async () => {
     const root = await trialProject(toolchain);
     await expectTrial(await reviewedRun(root, plan, trialScript(root), trialCommits, trialFailures), toolchain);
   }, 120_000);

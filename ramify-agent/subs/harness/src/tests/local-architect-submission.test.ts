@@ -481,7 +481,7 @@ describe('a rejected submission in a run', () => {
     const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
     // The briefing names what this architect reports on, apart from engineer and audit results.
     expect(local.spec.prompt).toContain('# Registered obligations');
-    expect(local.spec.prompt).toContain('- sc-001 (scenario): pending, revision 0; no report yet');
+    expect(local.spec.prompt).toContain('- sc-001 (scenario): pending, revision 0; not bound; no report yet');
     const answer = JSON.parse((local.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string; message: string }> };
     expect(answer.errors.map(error => error.path)).toEqual(['reports.0.id', 'reports.1.judgment']);
     expect(answer.errors[0]!.message).toBe('"sc-404" is no registered obligation of this run');
@@ -504,7 +504,7 @@ describe('a rejected submission in a run', () => {
     // The hint names a path that does not exist; it is kept as written and decides nothing.
     expect(existsSync(join(root, 'subs/nowhere'))).toBe(false);
 
-    // Reopened from disk, the projection folds the same facts; the scenario's gate state is a separate fact.
+    // Reopened from disk, the projection folds the same facts, and the scenario's state is its obligation status.
     const log = await RunLog.open(runPath(root, 'review-notes', runId, runLayout.events), runId);
     const lines = log.ledger.replay();
     const tracked = trackedScenarios(lines);
@@ -512,7 +512,7 @@ describe('a rejected submission in a run', () => {
     expect([...projection.obligations.values()].map(one => [one.id, one.status, one.revision, one.report?.where ?? null])).toEqual([
       ['sc-001', 'done', 1, missing], ['test-001', 'done', 1, null],
     ]);
-    expect(tracked.states.get('sc-001')).not.toBe('done');
+    expect(tracked.states.get('sc-001')).toBe('done');
   }, 300_000);
 
   test('a broken schema returns every error to the same session, and a corrected input is accepted', async () => {

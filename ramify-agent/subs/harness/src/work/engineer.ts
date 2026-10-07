@@ -18,7 +18,7 @@ import { validateAgainst, type SubmissionError, type SubmissionValidation } from
 import { openFindingsMessage, type HookFinding } from '../hooks/post-write.js';
 import { needAsBehaviorSchema } from '../contracts/submission.js';
 import { capabilityNeedInputSchema } from '../capability/records.js';
-import { declarationErrors, type DeclarationContext } from './declarations.js';
+import { bindingErrors, obligationBindingSchema } from './obligations.js';
 import type { IterationAssignment } from './iterations.js';
 import { injectionSiteRule, moduleOwning } from './scope.js';
 import { engineerScenarioSection, type EngineerScenarios } from './scenario-briefing.js';
@@ -72,11 +72,13 @@ export const engineerSubmissionSchema = z.discriminatedUnion('kind', [
     findings: z.array(text),
     recommendation: text.optional(),
     /**
-     * The scenarios of this work item's entry whose steps this iteration's
-     * step definitions bind and which pass in quick mode. A declaration is
-     * a claim: the next gate runs every one strictly.
+     * One binding for every obligation the assignment names, each once, with
+     * the fake class or export names the binding relies on (none by
+     * default). A binding is the engineer's declaration that its step
+     * definitions or test exist; whether they are right is the gate's audit
+     * and the architect's to find. It is never the architect's report.
      */
-    scenarios: z.array(text).default([]),
+    bindings: z.array(obligationBindingSchema).default([]),
   }).strict(),
   z.object({
     kind: z.literal('partial'),
@@ -182,8 +184,8 @@ export interface EngineerEvidence {
    * where the session can still act on it.
    */
   readonly openFindings?: readonly HookFinding[] | undefined;
-  /** The work item's entry and the run's tracked scenarios, which a declaration's IDs are judged against. */
-  readonly scenarios?: DeclarationContext | undefined;
+  /** The obligations the captured assignment names, which `bindings` must bind exactly once each. */
+  readonly assigned?: readonly string[] | undefined;
   /** What a `contract-needed` injection site is judged against: the view, this module, and the registry's owner of a capability. */
   readonly seams?: {
     readonly index: ArchitectIndex | null;
@@ -296,9 +298,9 @@ export function validateEngineer(input: unknown, evidence: EngineerEvidence = {}
     });
   }
 
-  if (value.kind === 'completion-proposed' && value.scenarios.length > 0) {
-    errors.push(...declarationErrors(value.scenarios, evidence.scenarios ?? { entry: null, records: [] }));
-  }
+  // A completion proposal is structurally complete only when it binds every
+  // assigned obligation; a partial report is the honest exit otherwise.
+  if (value.kind === 'completion-proposed') errors.push(...bindingErrors(value.bindings, evidence.assigned ?? []));
 
   if (value.kind === 'partial' && value.done.length === 0 && value.unfinished.length === 0) {
     errors.push({
@@ -355,7 +357,7 @@ export interface ScopeTestsOptions {
  * The scenario check `run_scope_tests` runs beside the tests: in quick mode,
  * the scope's scenarios selected by identity, the assigned context's pending scenarios
  * included, so an engineer sees whether the scenarios it binds pass before
- * it declares them.
+ * it proposes completion. What it sees is a diagnosis and moves no state.
  */
 export interface ScopeScenarioCheck {
   /** Plans the check anew for each call; undefined where the run tracks no scenario or has no scenario harness. */
@@ -389,7 +391,7 @@ export function createScopeTestsTool(options: ScopeTestsOptions): ToolDefinition
       'assignment\'s selection from the tree as it stands on every call, so a test you have just written',
       'runs. Its result is a diagnosis, never a verdict: only the gate accepts an iteration.',
       ...(options.scenarios === undefined ? [] : [
-        'It also runs your scope\'s scenarios in quick mode, the declared ones and this work item\'s pending',
+        'It also runs your scope\'s scenarios in quick mode, the bound and done ones and this work item\'s pending',
         'ones, and reports each scenario\'s status, its failing step and the steps no definition matches.',
       ]),
     ].join(' '),
@@ -517,7 +519,7 @@ async function runScopeScenarios(options: ScopeTestsOptions, scenarios: ScopeSce
     return {
       observation: { selected: [], passed: [], failures: 0 },
       failed: false,
-      lines: ['Scenarios: none of this scope is declared yet, and this work item has no pending one, so none ran.'],
+      lines: ['Scenarios: none of this scope is bound or done yet, and this work item has no pending one, so none ran.'],
     };
   }
   const { check } = planning;
@@ -577,6 +579,8 @@ export interface IterationBriefing {
   readonly handoff?: { readonly done: readonly string[]; readonly unfinished: readonly string[]; readonly returns: number } | undefined;
   /** The work item's scenarios; absent for a provider or follow-up work item, whose briefing says nothing of them. */
   readonly scenarios?: EngineerScenarios | undefined;
+  /** Every obligation the assignment names, with what the briefing says of it. */
+  readonly obligations?: readonly AssignedObligation[] | undefined;
   /** The assignment package, rendered by the package creator; given to a session once. */
   readonly package?: string | undefined;
 }
@@ -649,12 +653,13 @@ export function iterationMessage(briefing: IterationBriefing): string {
   );
   if (briefing.scenarios !== undefined) {
     lines.push(
-      'It also runs, in quick mode, every scenario of your scope that has been declared, selected by identity.',
+      'It also runs, in quick mode, every scenario of your scope that is bound or done, selected by identity.',
       '`run_scope_tests` runs those and the assigned context\'s pending scenarios.',
       '',
     );
   }
-  lines.push(...engineerScenarioSection(briefing.scenarios, assignment.scenarios ?? []));
+  lines.push(...obligationsToBindSection(briefing.obligations ?? (assignment.obligations ?? []).map(id => ({ id, text: null }))));
+  lines.push(...engineerScenarioSection(briefing.scenarios, assignment.obligations ?? []));
 
   if (assignment.externalCapabilities.length > 0) {
     lines.push('## Capabilities other modules own', '');
@@ -689,6 +694,35 @@ export function iterationMessage(briefing: IterationBriefing): string {
   lines.push(`Work within the scope above and end your turn with \`${engineerToolName}\`.`);
   if (includedInstructions.length > 0) lines.push('', '## Included tree instructions', '', ...includedInstructions);
   return lines.join('\n');
+}
+
+/** One obligation an assignment names, as the engineer is told of it. */
+export interface AssignedObligation {
+  readonly id: string;
+  /** What it is: a scenario's name, a delegated outcome, a registered case or test; null where nothing more is known. */
+  readonly text: string | null;
+}
+
+/**
+ * The obligations to bind, and what a binding is. Nothing for an assignment
+ * that names none, whose completion proposal binds nothing.
+ */
+export function obligationsToBindSection(obligations: readonly AssignedObligation[]): string[] {
+  if (obligations.length === 0) return [];
+  return [
+    '## Obligations to bind',
+    '',
+    'The architect assigned these to this iteration:',
+    '',
+    ...obligations.map(obligation => `- \`${obligation.id}\`${obligation.text === null ? '' : `: ${obligation.text}`}`),
+    '',
+    'Your completion proposal\'s `bindings` names each of them exactly once, as `{ id, fakes }`: a binding declares that',
+    'the step definitions or test for it exist. `fakes` lists the fake class or export names the binding relies on,',
+    'each carrying `Fake`; leave it empty where it runs against the real provider. A proposal that leaves one out is',
+    'refused with the missing IDs; report `partial` with what is unfinished instead. A binding is your report of work,',
+    'never the architect\'s judgment that the obligation is done.',
+    '',
+  ];
 }
 
 function describeBase(assignment: IterationAssignment): string {

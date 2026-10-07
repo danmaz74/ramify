@@ -7,7 +7,7 @@ import { workItemListResponseSchema } from '../interfaces/protocol/runs.js';
 import { RunQueries } from '../projections/queries.js';
 import { runLayout } from '../run/records.js';
 import { assignmentErrors } from '../work/assignment.js';
-import { declarationErrors } from '../work/declarations.js';
+import { assignedObligationErrors, obligationsOf } from '../work/obligations.js';
 import { childrenOnPaths, dueIntegrations, integrationScopeOf, integrationWorkItem, stepDirectoryOf } from '../work/integration.js';
 import { iterationLayout } from '../work/iterations.js';
 import type { WorkItem } from '../work/records.js';
@@ -31,13 +31,13 @@ import { architectIndex, moduleEntry } from './helpers/views.js';
  * `helpers/integration-scenario.ts`: a note is written in one module and
  * tagged in its sibling, and the plan's scenario combines the two.
  *
- * The last sub-scenario's implementation creates the integration work item
- * at their common ancestor, queued behind the item that implemented it. Its
- * local architect is briefed with the scenario, the sub-scenarios, their
- * owners and those owners' step files, and its engineer works at the
- * ancestor with the children on both paths in scope. A failure of the
- * integration scenario while its sub-scenarios pass is a composition
- * failure, reported with the sub-scenario whose bridging Given is suspect.
+ * The done report of the last sub-scenario creates the integration work
+ * item at their common ancestor, queued behind the item whose architect
+ * reported it; no gate or audit result does. Its local architect is briefed
+ * with the scenario, the sub-scenarios, their owners and those owners' step
+ * files, and its engineer works at the ancestor with the children on both
+ * paths in scope. A failure of the integration scenario reaches its engineer
+ * raw, with every result, and with no diagnosis of its cause.
  * No process starts here; the real checker's verdict on what the engineer
  * wrote is `integration-scenarios-integration.test.ts`'s.
  */
@@ -56,6 +56,12 @@ afterEach(async () => {
 const project = () => integrationProject(cleanups);
 const run = (root: string, ...rest: Parameters<typeof runIntegration> extends [Cleanups, string, ...infer R] ? R : never) => runIntegration(cleanups, root, ...rest);
 
+/** The obligation events of the log that name a scenario, as `bound sc` and `reported sc judgment` lines. */
+function obligationLines(log: readonly RunEvent[]): string[] {
+  return log.flatMap(event => (event.type === 'obligation-bound' ? [`bound ${event.data.id}`]
+    : event.type === 'obligation-reported' ? [`reported ${event.data.id} ${event.data.judgment}`] : []));
+}
+
 /** A scenario check whose runs reached the integration scenario and failed it, while everything else passed. */
 function failingIntegration(check: PlannedCheck): DirectCheckStep {
   const passing = passingScenarioSummary(check);
@@ -72,7 +78,7 @@ function failingIntegration(check: PlannedCheck): DirectCheckStep {
 }
 
 describe('the integration work item', () => {
-  test('created by the last sub-scenario\'s implementation at the common ancestor, queued, briefed, bound at the ancestor, implemented by its iteration gate, and completed', async () => {
+  test('PB3-D07 created by the last sub-scenario\'s done report and not before, at the common ancestor, queued, briefed, bound at the ancestor, reported done by its architect, and completed', async () => {
     const root = await project();
     const { service, runId, git, agent } = await run(root, {
       ...entryTurns,
@@ -91,21 +97,25 @@ describe('the integration work item', () => {
     const log = await runEventsOnDisk(root, plan, runId);
     const attempts = await gates(root, runId, log);
 
-    // Creation: the scenario-implemented of sc-002, the last sub-scenario,
-    // committed the work item beside it, and no earlier event did.
+    // Creation: the done report of sc-002, the last sub-scenario, committed
+    // the work item beside it; sc-001's done report and every gate pass
+    // before it committed none.
     const lines = (await readFile(runPath(root, plan, runId, runLayout.events), 'utf8')).split('\n').filter(Boolean)
       .map(line => JSON.parse(line) as { event: RunEvent; records: Array<{ path: string; body: unknown }> });
     const creating = lines.filter(line => line.records.some(record => record.path === 'work-items/wi-003/item.json'));
-    expect(creating.map(line => [line.event.type, (line.event.data as { scenario?: string }).scenario])).toEqual([['scenario-implemented', 'sc-002']]);
-    const tagIterationGate = attempts.find(attempt => attempt.subject.iteration === 'wi-002.i01')!;
-    expect(creating[0]!.event.data).toEqual({ scenario: 'sc-002', gate: tagIterationGate.id });
+    expect(creating.map(line => [line.event.type, (line.event.data as { id?: string; judgment?: string }).id, (line.event.data as { judgment?: string }).judgment]))
+      .toEqual([['obligation-reported', 'sc-002', 'done']]);
+    const tagArchitects = log.flatMap(event => (event.type === 'invocation-started' && event.data.role === 'local-architect'
+      && event.data.work.workItem === 'wi-002' ? [event.data.invocation] : []));
+    expect(tagArchitects).toContain((creating[0]!.event.data as { by: string }).by);
+    expect(at(log, 'obligation-reported', data => data.id === 'sc-001')).toBeLessThan(at(log, 'obligation-reported', data => data.id === 'sc-002'));
     // At the ancestor, with the scenario's ID in place of an entry; its scenario is its acceptance, and it cites no element.
     const item = creating[0]!.records.find(record => record.path === 'work-items/wi-003/item.json')!.body as WorkItem;
     expect(item).toMatchObject({ id: 'wi-003', module: reviews, origin: { integration: 'sc-003' }, requirementRefs: [], acceptanceRefs: [], contextRefs: [], startedFor: null });
 
     // Queueing: the item that implemented the last sub-scenario completed
     // first; the integration work item started after it, with its origin.
-    expect(at(log, 'scenario-implemented', data => data.scenario === 'sc-002')).toBeLessThan(at(log, 'work-item-completed', data => data.workItem === 'wi-002'));
+    expect(at(log, 'obligation-reported', data => data.id === 'sc-002')).toBeLessThan(at(log, 'work-item-completed', data => data.workItem === 'wi-002'));
     expect(at(log, 'work-item-completed', data => data.workItem === 'wi-002')).toBeLessThan(at(log, 'work-item-started', data => data.workItem === 'wi-003'));
     expect(log.filter(event => event.type === 'work-item-started').map(event => event.data)).toEqual([
       { workItem: 'wi-001', module: notes, origin: 'entry' },
@@ -114,15 +124,16 @@ describe('the integration work item', () => {
     ]);
 
     // The briefing: the scenario, its sub-scenarios and their owners, the
-    // bridging Given, the owners' step files as the tree held them, and the
-    // scope the engineer must be given.
+    // owners' step files as the tree held them, and the scope the engineer
+    // must be given; no bridging Given is singled out.
     const sessions = agent!.sessions;
     const briefing = sessions.find(session => session.spec.role === 'local-architect' && session.spec.prompt.startsWith('# Work item wi-003'))!.spec.prompt;
     expect(briefing).toContain(`## The integration scenario sc-003: A written note is shown with its tag`);
     expect(briefing).toContain(['```gherkin', ...planScenario, '```'].join('\n'));
     expect(briefing).toContain(`The harness wrote it into \`${integrationFeature}\``);
     expect(briefing).toContain(`- \`sc-001\` (A note is written for tagging), owned by \`${notes}\`, in \`${noteFeature}\`.\n`);
-    expect(briefing).toContain(`- \`sc-002\` (A written note is tagged), owned by \`${tags}\`, in \`${tagFeature}\`. Its bridging Given, stating what another entry leaves instead of taking its action: "Given a note was written with review-note".`);
+    expect(briefing).toContain(`- \`sc-002\` (A written note is tagged), owned by \`${tags}\`, in \`${tagFeature}\`.\n`);
+    expect(briefing).not.toContain('bridging Given');
     expect(briefing).toContain(`- \`${notes}\`, in \`${notesDirectory}/src/tests/steps/\`: \`${noteSteps}\`.`);
     expect(briefing).toContain(`- \`${tags}\`, in \`${tagsDirectory}/src/tests/steps/\`: \`${tagSteps}\`.`);
     expect(briefing).toContain(`Assign an iteration whose scope base is \`${reviews}\` with the children \`${notes}\`, \`${tags}\` included`);
@@ -133,7 +144,7 @@ describe('the integration work item', () => {
     const entryBriefing = sessions.find(session => session.spec.role === 'local-architect' && session.spec.prompt.startsWith('# Work item wi-001'))!.spec.prompt;
     expect(entryBriefing).toContain('## The scenarios of this work item');
     expect(entryBriefing).toContain(`### sc-001 (pending): A note is written for tagging\n\n- Feature file: \`${noteFeature}\`.\n- A sub-scenario of the integration scenario \`sc-003\``);
-    // Its engineer, each scenario not implemented and the rules; the
+    // Its engineer, each scenario not done and the rules; the
     // integration item's engineer, the scenario and the step files it imports.
     const engineerOf = (iteration: string) => sessions.find(session => session.spec.role === 'engineer' && session.spec.prompt.startsWith(`# Iteration ${iteration}`))!.spec.prompt;
     expect(engineerOf('wi-001.i01')).toContain('### sc-001 (pending): A note is written for tagging');
@@ -153,9 +164,9 @@ describe('the integration work item', () => {
       expected: `the base { module: "${reviews}", included: [{ directory: "subs/workspace/subs/reviews/subs/notes", reason, instructions }, { directory: "subs/workspace/subs/reviews/subs/tags", reason, instructions }] }`,
     }]);
 
-    // The engineer's scope, the declaration, and the iteration gate that ran
+    // The engineer's scope, the binding, and the iteration gate that ran
     // the ancestor's feature file with the scenario selected by identity,
-    // beside the implemented sub-scenarios of its children.
+    // beside the done sub-scenarios of its children.
     const assignment = JSON.parse(await readFile(runPath(root, plan, runId, iterationLayout.assignment('wi-003', 1)), 'utf8')) as { scope: { base: unknown } };
     expect(assignment.scope.base).toEqual({ module: reviews, included: [notes, tags].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) });
     const bindGate = attempts.find(attempt => attempt.subject.iteration === 'wi-003.i01')!;
@@ -163,23 +174,22 @@ describe('the integration work item', () => {
     expect(summaryOf(bindGate)!.runs.map(one => one.module).sort()).toEqual([reviews, notes, tags].sort());
     expect(summaryOf(bindGate)!.scenarios.find(result => result.id === 'sc-003')).toMatchObject({ run: reviews, status: 'passed' });
     const engineer = log.filter(event => event.type === 'invocation-started' && (event.data as { role: string }).role === 'engineer').at(-1)!.data as { invocation: string };
-    expect(log.filter(event => event.type === 'scenario-declared' || event.type === 'scenario-implemented').map(event => `${event.type} ${(event.data as { scenario: string }).scenario}`)).toEqual([
-      'scenario-declared sc-001', 'scenario-implemented sc-001',
-      'scenario-declared sc-002', 'scenario-implemented sc-002',
-      'scenario-declared sc-003', 'scenario-implemented sc-003',
+    expect(obligationLines(log)).toEqual([
+      'bound sc-001', 'reported sc-001 done',
+      'bound sc-002', 'reported sc-002 done',
+      'bound sc-003', 'reported sc-003 done',
     ]);
-    expect(log.find(event => event.type === 'scenario-declared' && (event.data as { scenario: string }).scenario === 'sc-003')!.data)
-      .toEqual({ scenario: 'sc-003', by: engineer.invocation, state: 'declared' });
-    expect(log.find(event => event.type === 'scenario-implemented' && (event.data as { scenario: string }).scenario === 'sc-003')!.data)
-      .toEqual({ scenario: 'sc-003', gate: bindGate.id });
+    expect(log.find(event => event.type === 'obligation-bound' && event.data.id === 'sc-003')!.data)
+      .toMatchObject({ id: 'sc-003', fakes: [], by: engineer.invocation });
+    expect(at(log, 'obligation-reported', data => data.id === 'sc-003')).toBeGreaterThan(at(log, 'gate-passed', data => data.gate === bindGate.id));
 
     // The work item completed at its own work-item gate, and the final gate
-    // ran every scenario in full mode with the integration scenario required.
-    expect(at(log, 'work-item-completed', data => data.workItem === 'wi-003')).toBeGreaterThan(at(log, 'scenario-implemented', data => data.scenario === 'sc-003'));
+    // ran every scenario in full mode.
+    expect(at(log, 'work-item-completed', data => data.workItem === 'wi-003')).toBeGreaterThan(at(log, 'obligation-reported', data => data.id === 'sc-003'));
     const finalGate = attempts.find(attempt => attempt.checkpoint === 'final')!;
     expect(summaryOf(finalGate)!.scenarios.map(result => `${result.id} ${result.status}`).sort()).toEqual(['sc-001 passed', 'sc-002 passed', 'sc-003 passed']);
     expect(log.at(-1)!.type).toBe('job-completed');
-    expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, declared: 0, implemented: 3 });
+    expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, done: 3 });
     // The work items a client reads: the integration one by its origin, with no capability of its own.
     const listed = workItemListResponseSchema.parse(await new RunQueries(service).workItems(plan, runId));
     expect(listed.workItems.map(one => [one.id, one.module, one.origin, one.capability, one.state])).toEqual([
@@ -191,7 +201,7 @@ describe('the integration work item', () => {
     git.assertAnswered();
   }, 120_000);
 
-  test('a composition failure: the integration scenario fails while its sub-scenarios pass, the finding names the bridging Given, and the repair round resolves it', async () => {
+  test('PB3-D07 the integration scenario fails while its sub-scenarios pass: the repair round is given the raw failure and every result, with no composition diagnosis, and resolves it', async () => {
     const root = await project();
     let failed = false;
     const { service, runId, git, agent } = await run(root, {
@@ -199,7 +209,7 @@ describe('the integration work item', () => {
       'local-architect:wi-003': [submit(bindAtAncestor), submit(requestCompletion())],
       'engineer:wi-003': [
         bindTurn,
-        submit(completionProposed('The bridging Given now writes the note the way review-note does.', { scenarios: ['sc-003'] }),
+        submit(completionProposed('The tags\' Given now writes the note the way review-note does.', { bindings: [{ id: 'sc-003' }] }),
           write(tagSteps, tagStepFile.replace("Given('a note was written with review-note', () => {});", "Given('a note was written with review-note', () => { /* write it as review-note does */ });"))),
       ],
     }, [...entryCommits, bindCommit, accepted('wi-003.i01', 'revision-04', modified(tagSteps)), unchanged('wi-003'), unchanged(finalSubject)],
@@ -217,21 +227,20 @@ describe('the integration work item', () => {
     expect(attempts.map(attempt => attempt.verdict)).toEqual(['failed', 'passed']);
     expect(summaryOf(attempts[0]!)!.scenarios.map(result => `${result.id} ${result.status}`)).toEqual(['sc-001 passed', 'sc-002 passed', 'sc-003 failed']);
 
-    // The repair round's briefing carries the finding: the failure is a
-    // composition failure, and the tags' bridging Given is the suspect.
+    // The repair round's briefing carries the failure as the runner reported
+    // it, and no generated diagnosis of its cause or of who repairs it.
     const repair = agent!.sessions.filter(session => session.spec.role === 'engineer' && session.spec.prompt.includes('wi-003')).at(-1)!.spec.prompt;
-    expect(repair).toContain('- composition failure: `sc-003` failed while its sub-scenarios `sc-001`, `sc-002` passed, so their step definitions work one by one and not together.');
-    expect(repair).toContain('  - The bridging Given of `sc-002` is suspect: "Given a note was written with review-note" assumes what the real behavior may not do.');
-    expect(repair).not.toContain('The bridging Given of `sc-001`');
+    expect(repair).not.toContain('composition failure');
+    expect(repair).not.toContain('bridging Given');
+    expect(repair).not.toContain('suspect');
     // And the failing scenario itself, with its name, file, line, step and
     // message; each passing one with its binding.
     expect(repair).toMatch(/ {2}- `sc-003` "A written note is shown with its tag" failed, at `[^`]+\.feature:\d+`:\n {4}- The failing step: `Then the outcome review-tags promises is shown`\.\n {4}- Its message: expected the tag on the note, got no note/);
     expect(repair).toMatch(/ {2}- `sc-001` "A note is written for tagging" passed/);
-    // The scenario stayed declared through the repair and was implemented by the passing attempt.
-    expect(log.filter(event => (event.type === 'scenario-declared' || event.type === 'scenario-implemented') && (event.data as { scenario: string }).scenario === 'sc-003')
-      .map(event => event.type)).toEqual(['scenario-declared', 'scenario-implemented']);
-    expect(log.find(event => event.type === 'scenario-implemented' && (event.data as { scenario: string }).scenario === 'sc-003')!.data)
-      .toEqual({ scenario: 'sc-003', gate: attempts[1]!.id });
+    // The failure moved nothing: the scenario stayed bound through the
+    // repair, and only its architect's report made it done.
+    expect(obligationLines(log).filter(entry => entry.includes('sc-003'))).toEqual(['bound sc-003', 'bound sc-003', 'reported sc-003 done']);
+    expect(at(log, 'obligation-reported', data => data.id === 'sc-003')).toBeGreaterThan(at(log, 'gate-passed', data => data.gate === attempts[1]!.id));
     expect(at(log, 'work-item-completed', data => data.workItem === 'wi-003')).toBeGreaterThan(0);
     git.assertAnswered();
   }, 120_000);
@@ -262,13 +271,14 @@ describe('the rules, over literal records', () => {
     scenario('sc-004', 'integration', reviews, { subScenarios: ['sc-001', 'sc-002'] }),
   ];
 
-  test('an integration scenario is due once every sub-scenario is implemented and it has no work item yet; its item is at its owner', () => {
-    const states = (second: 'declared' | 'implemented') => new Map([['sc-001', 'implemented'], ['sc-002', second], ['sc-003', 'pending'], ['sc-004', 'pending']] as const);
-    expect(dueIntegrations(records, states('declared'), [])).toEqual([]);
-    expect(dueIntegrations(records, states('implemented'), []).map(record => record.id)).toEqual(['sc-004']);
+  test('PB3-D07 an integration scenario is due once every sub-scenario is done and it has no work item yet; bound is not enough; its item is at its owner', () => {
+    const states = (second: 'pending' | 'bound' | 'done') => new Map([['sc-001', 'done'], ['sc-002', second], ['sc-003', 'pending'], ['sc-004', 'pending']] as const);
+    expect(dueIntegrations(records, states('pending'), [])).toEqual([]);
+    expect(dueIntegrations(records, states('bound'), [])).toEqual([]);
+    expect(dueIntegrations(records, states('done'), []).map(record => record.id)).toEqual(['sc-004']);
     const item = integrationWorkItem(records[3]!, 3);
     expect(item).toMatchObject({ id: 'wi-004', module: reviews, origin: { integration: 'sc-004' }, requirementRefs: [], acceptanceRefs: [], contextRefs: [], startedFor: null });
-    expect(dueIntegrations(records, states('implemented'), [item])).toEqual([]);
+    expect(dueIntegrations(records, states('done'), [item])).toEqual([]);
   });
 
   test('the engineer\'s scope is the ancestor with the direct child on each path, and a step directory sits beside its features', () => {
@@ -291,14 +301,19 @@ describe('the rules, over literal records', () => {
     expect(assignmentErrors(body({ module: notes, included: [] }), evidence).map(error => error.path)).toEqual(['assignment.scope.base']);
   });
 
-  test('an integration work item declares its own scenario and nothing else; an entry\'s work item still cannot declare one', () => {
-    const context = { entry: null, integration: 'sc-004', records };
-    expect(declarationErrors(['sc-004', 'sc-004'], context)).toEqual([]);
-    expect(declarationErrors(['sc-001', 'sc-009'], context)).toEqual([
-      { path: 'scenarios.0', message: `sc-001 is an entry scenario of entry-sc-001; this integration work item binds sc-004 alone`, expected: 'IDs among sc-004' },
-      { path: 'scenarios.1', message: '"sc-009" is no tracked scenario of this run', expected: 'IDs among sc-004' },
+  test('an integration work item assigns its own scenario, which no entry\'s work item may assign', () => {
+    const item = (id: string, origin: WorkItem['origin']): WorkItem => ({
+      schema: 'ramify-agent.work-item/1', id, module: reviews, origin, goal: `Carry out ${id}.`,
+      requirementRefs: [], acceptanceRefs: [], contextRefs: [], startedFor: null,
+    });
+    const projection = obligationsOf({ scenarios: records, workItems: [item('wi-001', { entry: 'entry-sc-001' }), item('wi-004', { integration: 'sc-004' })], events: [] });
+    const integrationArchitect = { actor: { kind: 'work-item' as const, id: 'wi-004' }, projection };
+    expect(assignedObligationErrors(['sc-004'], integrationArchitect)).toEqual([]);
+    expect(assignedObligationErrors(['sc-001', 'sc-009'], integrationArchitect)).toEqual([
+      { path: 'assignment.obligations.0', message: 'sc-001 is reported by the local architect of wi-001, so the local architect of wi-004 cannot assign its binding', expected: 'IDs among sc-004' },
+      { path: 'assignment.obligations.1', message: '"sc-009" is no registered obligation of this run', expected: 'IDs among sc-004' },
     ]);
-    expect(declarationErrors(['sc-004'], { entry: 'entry-sc-001', records }).map(error => error.message))
-      .toEqual(['sc-004 is an integration scenario; it is bound by its own integration work item once its sub-scenarios are implemented, never declared by an entry\'s']);
+    expect(assignedObligationErrors(['sc-004'], { actor: { kind: 'work-item', id: 'wi-001' }, projection }).map(error => error.message))
+      .toEqual(['sc-004 is reported by the local architect of wi-004, so the local architect of wi-001 cannot assign its binding']);
   });
 });

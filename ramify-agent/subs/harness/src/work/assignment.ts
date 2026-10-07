@@ -6,7 +6,7 @@ import type { SubmissionError } from '../run/submissions.js';
 import { slugSchema, type RegistryEntry } from '../analysis/records.js';
 import { assignedBoundsSchema, extraPurposeSchema, type AssignedBounds } from './iterations.js';
 import { includedConfigurationPaths, within } from './scope.js';
-import { assignedScenarioErrors, type DeclarationContext } from './declarations.js';
+import { assignedObligationErrors, type ObligationContext, type ObligationRegistration } from './obligations.js';
 import type { IntegrationScope } from './integration.js';
 import type { OutlineBody } from './submission.js';
 import type { EngineerBounds } from '../run/policy.js';
@@ -127,11 +127,12 @@ export const assignmentBodySchema = z.object({
    */
   revisesContract: text.optional(),
   /**
-   * The scenarios of this work item the iteration is expected to bind. It is
-   * informative: their text reaches the engineer under "Scenarios to bind",
-   * and the harness never requires that the engineer declare exactly these.
+   * The registered obligations this architect delegates to the iteration's
+   * engineer: scenarios, delegated outcomes, cases or tests it reports on.
+   * The engineer's completion proposal binds every one, naming the fakes
+   * each binding relies on, or reports partial.
    */
-  scenarios: z.array(text).optional(),
+  obligations: z.array(text).optional(),
   /**
    * Bounds this iteration's engineers need beyond the policy's, each with
    * its reason: the longest one shell command may run, the idle bound and
@@ -166,8 +167,12 @@ export interface AssignmentEvidence {
    * ancestor with the children on the paths to the sub-scenarios' owners.
    */
   readonly integration?: IntegrationScope | undefined;
-  /** The work item's scenarios and the run's tracked ones, which `scenarios` is judged against. */
-  readonly scenarios?: DeclarationContext | undefined;
+  /**
+   * The assigning architect, the run's obligations and the same
+   * submission's registrations, which `obligations` is judged against.
+   * Absent, no obligation can be assigned.
+   */
+  readonly obligations?: (ObligationContext & { readonly registrations?: readonly ObligationRegistration[] | undefined }) | undefined;
   /** The policy's engineer bounds and their ceilings, which `bounds` is judged against. */
   readonly bounds?: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } | undefined;
   /** The element IDs of the work item's package, which `citedElements` is judged against; absent where the run has none. */
@@ -411,10 +416,12 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
     }
   }
 
-  // The scenarios named for the engineer are this work item's: an iteration
-  // binds nothing another work item owns.
-  if (body.scenarios !== undefined && body.scenarios.length > 0) {
-    errors.push(...assignedScenarioErrors(body.scenarios, evidence.scenarios ?? { entry: null, records: [] }));
+  // The obligations named for the engineer are this architect's own: an
+  // iteration binds nothing another architect reports on.
+  if (body.obligations !== undefined && body.obligations.length > 0) {
+    errors.push(...(evidence.obligations === undefined
+      ? [{ path: 'assignment.obligations', message: 'This assignment has no obligation context, so it names no obligation', expected: 'an empty list' }]
+      : assignedObligationErrors(body.obligations, evidence.obligations)));
   }
 
   if (body.bounds !== undefined && evidence.bounds !== undefined) errors.push(...boundsErrors(body.bounds, evidence.bounds));

@@ -236,7 +236,7 @@ it('PB3-D01 PB3-D02 PB3-D04: a capability architect registers a case and a test 
   expect(logged.some(event => event.type === 'capability-assigned')).toBe(true);
   expect(recorded.some(event => event.data.id === 'sc-001')).toBe(false);
   // The next turn's briefing forwards the earlier judgment and its where text as written.
-  expect(prompts[0]).toContain('- cap-001 (delegated outcome): pending, revision 0; no report yet');
-  expect(prompts[1]).toContain(`- cap-001 (delegated outcome): done, revision 1; last report done by ${first}, where: subs/b/src/never-written.ts — readFactWithSource`);
-  expect(prompts[1]).toContain('- test-001 (registered test: B keeps the old text for D): pending, revision 0; no report yet');
+  expect(prompts[0]).toContain('- cap-001 (delegated outcome): pending, revision 0; not bound; no report yet');
+  expect(prompts[1]).toContain(`- cap-001 (delegated outcome): done, revision 1; not bound; last report done by ${first}, where: subs/b/src/never-written.ts — readFactWithSource`);
+  expect(prompts[1]).toContain('- test-001 (registered test: B keeps the old text for D): pending, revision 0; not bound; no report yet');
 }, 300_000);

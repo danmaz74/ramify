@@ -221,25 +221,15 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`${featureFiles(event.data.files.length)} being written onto the run branch`, []];
     case 'scenarios-materialized':
       return [`${featureFiles(event.data.files.length)} on the run branch`, ref('commit', event.data.commit)];
-    case 'scenario-declared':
-      return [
-        `Scenario ${event.data.scenario} was declared and is ${event.data.state}${event.data.state === 'bound' ? ', keeping its pending tag while its work item holds fakes' : ''}`,
-        [...ref('scenario', event.data.scenario), ...ref('invocation', event.data.by)],
-      ];
-    case 'scenario-due':
-      return [`Scenario ${event.data.scenario} is due: its work item's requirements are verified, so it runs without fakes`, ref('scenario', event.data.scenario)];
-    case 'scenario-implemented':
-      return [`Scenario ${event.data.scenario} is implemented`, [...ref('scenario', event.data.scenario), ...ref('gate', event.data.gate)]];
-    case 'scenario-bound-passed':
-      return [`Scenario ${event.data.scenario} passed against its work item's fakes and stays bound`, [...ref('scenario', event.data.scenario), ...ref('gate', event.data.gate)]];
-    case 'scenarios-withdrawing':
-      return [`${counted(event.data.scenarios.length, 'scenario is', 'scenarios are')} being withdrawn to pending: ${event.data.scenarios.join(', ')} (${event.data.reason})`, [...ref('work-item', event.data.workItem), ...event.data.scenarios.flatMap(scenario => ref('scenario', scenario))]];
-    case 'scenario-withdrawn':
-      return [`Scenario ${event.data.scenario} was withdrawn to pending (${event.data.reason})`, [...ref('scenario', event.data.scenario), ...ref('commit', event.data.commit)]];
     case 'obligation-registered':
       return [
         `${event.data.responsible.kind === 'work-item' ? 'The local architect of' : 'The capability architect of'} ${event.data.responsible.id} registered ${event.data.id}: ${event.data.kind === 'test' ? `required test "${event.data.description ?? ''}"` : `case ${event.data.case ?? ''}`}`,
         [...ref(event.data.responsible.kind === 'work-item' ? 'work-item' : 'capability-task', event.data.responsible.id), ...ref('invocation', event.data.by)],
+      ];
+    case 'obligation-bound':
+      return [
+        `An engineer bound ${event.data.id}, relying on ${event.data.fakes.length === 0 ? 'no fakes' : `fakes ${event.data.fakes.join(', ')}`}`,
+        [...obligationRef(event.data.id), ...ref('invocation', event.data.by)],
       ];
     case 'obligation-reported':
       return [

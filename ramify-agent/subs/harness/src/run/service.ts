@@ -175,6 +175,7 @@ import { engineerWorkingDirectory, repairWorkingDirectory } from '../work/engine
 import { createGitInspectionTool } from '../work/git-inspection.js';
 import {
   capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerJsonSchema, engineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
+  type AssignedObligation,
   validateEngineer, type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
@@ -194,8 +195,8 @@ import {
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
 import {
-  obligationBriefingLines, obligationEventsToRecord, obligationsOf, obligationsOwnedBy,
-  type ObligationActor, type ObligationProjection, type ObligationRegistration, type ObligationReport,
+  bindingEventsToRecord, obligationBriefingLines, obligationEventsToRecord, obligationsOf, obligationsOwnedBy,
+  type ObligationActor, type ObligationBinding, type ObligationProjection, type ObligationRegistration, type ObligationReport,
 } from '../work/obligations.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
@@ -215,15 +216,13 @@ import { contextPolicyOf, defaultRunPolicy, engineerBoundsOf, withProjectTimeout
 import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
 import {
   commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
-  incompleteScenarios, rewordedTrailerValue, rewordingMessage, scenarioNameOf, trackedScenarios, withdrawalMessage, withdrawnTrailerValue,
-  withStates, writtenScenarios, type FeatureRerendering,
+  incompleteScenarios, rewordedTrailerValue, rewordingMessage, scenarioNameOf, trackedScenarios,
+  writtenScenarios, type FeatureRerendering,
 } from './feature-files.js';
 import type { ScenarioState } from '../../subs/scenarios/src/states.js';
 import { scenarioRecordSchema, scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
-import { scenariosToDeclare, type DeclarationContext } from '../work/declarations.js';
 import { dueIntegrations, integrationBriefing, integrationWorkItem, type IntegrationBriefing } from '../work/integration.js';
 import { briefed, entryScenariosOf, type EngineerScenarios } from '../work/scenario-briefing.js';
-import { bridgingGivens, compositionFailures } from '../../subs/scenarios/src/composition.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import { declaredModuleDirectories } from './project-config.js';
 import { assertScratchSafe, ensureScratchRule, releasableScratchModules, removeScratchDirectories, scratchSafetyRule, ScratchIgnoreConflictError } from '../work/scratch.js';
@@ -2539,7 +2538,6 @@ export class RunService {
           }
         } else {
         for (const effect of await this.completeEffects(run)) report.effects.push(`${run.key}: ${effect}`);
-        for (const scenario of await this.completeWithdrawals(run)) report.effects.push(`${run.key}: the withdrawal of ${scenario}`);
         for (const decision of await this.completeDeliveries(run)) report.effects.push(`${run.key}: the delivery of decision ${decision}`);
         for (const invocation of await this.closeInterruptedInvocations(run)) report.invocations.push(`${run.key}: ${invocation}`);
         // A request an accepted iteration is owed is recorded once, and
@@ -2702,13 +2700,6 @@ export class RunService {
           complete: result => ({ event: run.log.next({ type: 'reconciliation-brief-appended', data: { reconciliation: id, ...result } }), records: [] }),
         });
         performed.push(`the parent append of reconciliation ${id}`);
-        continue;
-      }
-      if (event.type === 'scenarios-withdrawing') {
-        // The files are re-rendered with the intent's scenarios pending, and
-        // the commit is found by its trailers where the attempt made it.
-        await this.performWithdrawal(run, event.data, true);
-        performed.push(`the withdrawal commit of ${event.data.scenarios.join(', ')}`);
         continue;
       }
       if (event.type === 'scenarios-rewording') {
@@ -4581,7 +4572,7 @@ export class RunService {
           externalCapabilities: assignment.externalCapabilities.map(({ capability, owner, role }) => ({ capability, owner, role })),
           completionEvidence: assignment.completionEvidence,
           authorizations: assignment.authorizations.map(({ path, rationale }) => ({ path, rationale })),
-          ...(assignment.scenarios === undefined ? {} : { scenarios: assignment.scenarios }),
+          ...(assignment.obligations === undefined ? {} : { obligations: assignment.obligations }),
           ...(assignment.bounds === undefined ? {} : { bounds: assignment.bounds }),
         }),
       };
@@ -5450,7 +5441,6 @@ export class RunService {
           contracts: this.contractsConsumedBy(run, current, item.id),
           guardedPaths: guarded,
           harnessOnly,
-          scenarios: this.declarationContext(run, item),
           ...(integration === undefined ? {} : { integration: integration.scope }),
           bounds: engineerBoundsOf(run.record.policy.limits),
           ...(contextPackage === undefined ? {} : { package: new Set(contextPackage.citation.elements) }),
@@ -5486,10 +5476,7 @@ export class RunService {
         // The request cannot be met as stated. The global architect answers
         // it: a placement fix, a plan deviation this work item goes on
         // under, an environment problem the run holds for until the
-        // operator resumes it, or nothing possible, which ends the run. What
-        // the work item declared and never passed is pending again first,
-        // as for a placement question.
-        if (!await this.withdrawScenarios(run, item, 'unresolved-requested')) return null;
+        // operator resumes it, or nothing possible, which ends the run.
         const resolution = await this.resolveUnresolved(run, agent, packages, baseline, item, {
           invocation: result.id, conflict: result.value.conflict, evidence: result.value.evidence,
         });
@@ -5508,9 +5495,8 @@ export class RunService {
       }
 
       if (result.value.kind === 'request-placement') {
-        // The work item leaves its repair path for a placement question, so
-        // what it declared and never passed is pending again first.
-        if (!await this.withdrawScenarios(run, item, 'placement-requested')) return null;
+        // The work item leaves its repair path for a placement question;
+        // what it bound or reported stays as it is.
         const resolution = await this.requestPlacement(run, agent, packages, baseline, item, result.value.request);
         if (resolution === null) return null;
         unresolvedRequest = resolution.kind === 'unresolved'
@@ -5532,9 +5518,7 @@ export class RunService {
       }
 
       if (result.value.kind === 'yield-for-providers') {
-        // A bound scenario that passed against the fakes stays bound; one
-        // that never passed a gate since its declaration is pending again.
-        if (!await this.withdrawScenarios(run, item, 'yielded')) return null;
+        // A yield moves no obligation: what was bound stays bound.
         await this.write(run, {
           type: 'work-item-yielded',
           data: { workItem: item.id, requirements: [...result.value.requirements], invocation: result.id },
@@ -5554,7 +5538,6 @@ export class RunService {
           const revised = await this.reviseContract(run, agent, packages, baseline, item, assigned);
           if (revised === null) return null;
           if (revised.result !== undefined) lastResult = revised.result;
-          if (revised.result?.outcome === 'exhausted' && !await this.withdrawScenarios(run, item, 'repair-exhausted')) return null;
           lastIterationGate = undefined;
           failedGate = undefined;
           if (revised.cycle !== undefined) cycleFinding = revised.cycle;
@@ -5574,10 +5557,8 @@ export class RunService {
           if (outcome === null) return null;
         }
         lastResult = outcome.result;
-        // The iteration spent its repair rounds without a pass: what it
-        // declared is pending again, so no untagged failing scenario stays
-        // in the tree for the next gate that runs its owner.
-        if (outcome.result.outcome === 'exhausted' && !await this.withdrawScenarios(run, item, 'repair-exhausted')) return null;
+        // An iteration that spent its repair rounds moves no obligation:
+        // a binding or a done report stays until a submission changes it.
         lastIterationGate = outcome.returnedGate;
         failedGate = undefined;
         // The provider reported that the agreement cannot be met. This work
@@ -5594,7 +5575,6 @@ export class RunService {
             requestedBy: assigned.id,
           });
           if (contract === null) return null;
-          if (contract.result?.outcome === 'exhausted' && !await this.withdrawScenarios(run, item, 'repair-exhausted')) return null;
           const reported = outcome.result;
           // A contract engineer that ended without a result is reported
           // with its digest and analysis, in place of the need's.
@@ -5609,18 +5589,17 @@ export class RunService {
         continue;
       }
 
-      // The request's own declarations apply first, so a request that
-      // declares the last scenario is not refused for it.
-      if (!await this.declareScenarios(run, item, result.id, result.value.scenarios)) return null;
-
       // Completion is refused while a requirement of this work item is open,
       // and while the obligation it exists for is not conformed: a
       // fake-backed pass never completes a capability, and the gate's verdict
       // on the tests says nothing about which provider ran. It is refused
-      // too while a scenario of its entry is pending or bound.
+      // too while a scenario of its entry is not reported done; the
+      // request's own reports were recorded above, so a request that reports
+      // the last scenario done is not refused for it. (Iteration 8 replaces
+      // this refusal with the general rejected submission.)
       const owing = this.obligationOwedBy(run, item, current);
       const owed = owing !== null && !conformed.has(conformanceKey(owing.id, owing.revision)) ? owing : null;
-      const unbound = this.unfinishedScenarios(run, item, ['pending', 'bound']);
+      const unbound = this.unfinishedScenarios(run, item);
       const capabilityBlockers = this.workflow === null ? [] : this.capabilityBlockers(run, item.id);
       if ((this.workflow === null && (open.length > 0 || owed !== null)) || capabilityBlockers.length > 0 || unbound.length > 0) {
         refusals += 1;
@@ -5683,19 +5662,6 @@ export class RunService {
         gateRound += 1;
         if (gate === null) return null;
         if (gate.verdict !== 'passed') break;
-        // A declared scenario the gate did not pass stays declared, and the
-        // work item cannot complete around it.
-        const unverified = this.unfinishedScenarios(run, item, ['pending', 'bound', 'declared']);
-        if (unverified.length > 0) {
-          refusals += 1;
-          const refusingGate = gate.id;
-          blocked = unverified.map(entry => scenarioRefusal(entry, refusingGate));
-          if (refusals > bound) {
-            await this.refuseCompletion(run, item, refusals, blocked, { open: [], owed: false, scenarios: unverified });
-            return null;
-          }
-          continue turns;
-        }
         const completed = await this.completeWorkItem(run, item, gate, reconciled.basis);
         if (completed === 'ended' || this.ignoring(run)) return null;
         if (completed === 'completed') {
@@ -6749,7 +6715,7 @@ export class RunService {
       guarded: await captureGuardedFiles(this.projectRoot, guardedPaths, await this.guardedScenarioFiles(run), [...await this.auditPreparationPaths(run), ...scopeConfigurationPaths(scope)]),
       authorizations,
       ...(revisesContract === undefined ? {} : { revisesContract }),
-      ...(body.scenarios === undefined || body.scenarios.length === 0 ? {} : { scenarios: [...body.scenarios] }),
+      ...(body.obligations === undefined || body.obligations.length === 0 ? {} : { obligations: [...body.obligations] }),
       ...(body.bounds === undefined || Object.keys(body.bounds).length === 0 ? {} : { bounds: body.bounds }),
     });
   }
@@ -6931,7 +6897,7 @@ export class RunService {
     }
     const assignment = await this.buildIterationAssignment(run, {
       id, item, basis: outlineRef, coordination: { kind: 'work-item', id: item.id },
-      body: revised === undefined ? body : { ...body, scenarios: [] }, scope, source,
+      body: revised === undefined ? body : { ...body, obligations: [] }, scope, source,
       evidenceObligations, authorizations, guardedPaths: artifacts.map(artifact => artifact.path),
       ...(revised === undefined ? {} : {
         externalCapabilities: [{ capability: revised.capability.id, owner: revised.provider, role: 'request' }],
@@ -7362,7 +7328,7 @@ export class RunService {
         outline: null, capabilityCompatibility: plan.compatibility,
         guardedPaths: new Set(this.requiredArtifacts(records).map(entry => entry.path)),
         revising: true, bounds: engineerBoundsOf(run.record.policy.limits),
-        scenarios: this.capabilityScenarioContext(run, checked.value.assignment.scope.base),
+        obligations: { actor: capabilityActor(), projection: this.obligationProjection(run), registrations: checked.value.registrations },
       });
       return problems.length === 0 ? checked : { valid: false as const, issues: problems.map(problem => ({
         path: problem.path.split('.'), message: problem.message, kind: 'state' as const,
@@ -8049,7 +8015,11 @@ export class RunService {
         outline: null, capabilityCompatibility: plan.compatibility,
         guardedPaths: new Set(this.requiredArtifacts(records).map(entry => entry.path)),
         revising: true, bounds: engineerBoundsOf(run.record.policy.limits),
-        scenarios: this.capabilityScenarioContext(run, body.scope.base),
+        // The action's registrations were recorded on acceptance, before it.
+        obligations: {
+          actor: { kind: 'capability-task', id: task.id, useCases: new Set(plan.useCases.map(useCase => useCase.id)) },
+          projection: this.obligationProjection(run),
+        },
       });
       if (problems.length > 0) {
         await this.fail(run, 'invalid-submission', `Capability assignment ${id} is invalid: ${problems.map(entry => `${entry.path}: ${entry.message}`).join('; ')}`);
@@ -8323,8 +8293,11 @@ export class RunService {
         ? (await this.previewCandidateTree()).tree : undefined;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot, [...await this.deniedFiles(run), ...assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify);
+      // A capability-task iteration is told only the obligations its
+      // assignment names; a work item's iteration also sees its scenarios.
       const briefedScenarios = assignment.coordination?.kind === 'capability-task'
-        ? this.capabilityEngineerScenarios(run, assignment) : await this.engineerScenarios(run, item);
+        ? undefined : await this.engineerScenarios(run, item);
+      const assignedObligations = this.assignedObligations(run, assignment.obligations ?? []);
       // The assignment package reaches a session once: a continued session
       // holds it from its first prompt.
       let assignmentPackage: string | undefined;
@@ -8362,6 +8335,7 @@ export class RunService {
           ...(failedGate === undefined ? {} : { failedGate }),
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
           ...(briefedScenarios === undefined ? {} : { scenarios: briefedScenarios }),
+          ...(assignedObligations.length === 0 ? {} : { obligations: assignedObligations }),
           ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
         })}${guidancePending === undefined ? '' : `\n\n# Qualified existing behavior\n\n${guidancePending}`}`,
         start,
@@ -8399,8 +8373,7 @@ export class RunService {
             .find(evidence => evidence.obligation !== undefined && evidence.against === 'real')?.obligation ?? null,
           kind: assignment.kind,
           openFindings: await tools.findingsAtCompletion(input),
-          scenarios: assignment.coordination?.kind === 'capability-task'
-            ? this.capabilityScenarioContext(run, assignment.scope.base) : this.declarationContext(run, item),
+          assigned: assignment.obligations ?? [],
           seams: {
             index: run.index,
             consumer: item.module,
@@ -8544,9 +8517,10 @@ export class RunService {
       }
 
       const proposal = result.value;
-      // The proposal's declarations apply at its acceptance, before the gate
-      // that verifies them: that gate selects them by identity.
-      if (!await this.declareScenarios(run, item, result.id, proposal.scenarios, assignment)) return null;
+      // The proposal's bindings apply at its acceptance, before the gate:
+      // that gate's commit drops a bound scenario's pending tag, and the gate
+      // selects it by identity. No gate outcome undoes a binding.
+      if (!await this.recordBindings(run, result.id, proposal.bindings)) return null;
       let infrastructureAttempt = 0;
       for (;;) {
         const gate = await this.iterationGate(run, item, assignment, result.id, repairRound, infrastructureAttempt, proposal.summary);
@@ -9187,7 +9161,6 @@ export class RunService {
     }
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return null;
-    if (!await this.recordScenarioPasses(run, attempt)) return null;
     return attempt;
   }
 
@@ -9602,7 +9575,6 @@ export class RunService {
     }
 
     const verified = this.verifiedRequirements(run);
-    let closed = false;
     for (const evidence of assignment.evidenceObligations) {
       if (evidence.requirement === undefined) continue;
       if (verified.has(verificationKey(evidence.requirement.id, evidence.requirement.revision))) continue;
@@ -9628,16 +9600,6 @@ export class RunService {
       });
       await this.afterWrite('requirement-verified', run.record.jobId);
       if (this.ignoring(run)) return false;
-      closed = true;
-    }
-    // The last open requirement is verified and no conformance is owed: a
-    // bound scenario of this work item would now run without fakes, so it
-    // is due, and the next commit removes its pending tag.
-    if (closed && !this.holdsFakes(run, item)) {
-      for (const scenario of this.unfinishedScenarios(run, item, ['bound'])) {
-        await this.write(run, { type: 'scenario-due', data: { scenario: scenario.id, cause: 'requirements-verified' } });
-        if (this.ignoring(run)) return false;
-      }
     }
     return true;
   }
@@ -9695,7 +9657,6 @@ export class RunService {
     }
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return null;
-    if (!await this.recordScenarioPasses(run, attempt)) return null;
     return attempt;
   }
 
@@ -10234,7 +10195,6 @@ export class RunService {
           recorded.data.verdict !== 'passed' || recorded.data.audited === null) continue;
         candidate ??= (await this.previewCandidateTree()).tree;
         if (await this.candidates.commitTree(this.projectRoot, recorded.data.audited) !== candidate) continue;
-        if (!await this.recordScenarioPasses(run, recorded.data)) return null;
         return recorded.data;
       }
     }
@@ -10243,7 +10203,7 @@ export class RunService {
     const relevant = taskOwner === undefined ? undefined : new Set(
       [...committedRecords(run.log.ledger.replay()).assignments.values()]
         .filter(assignment => assignment.coordination?.kind === 'capability-task' && assignment.coordination.id === taskOwner)
-        .flatMap(assignment => assignment.scenarios ?? []));
+        .flatMap(assignment => assignment.obligations ?? []));
     const scenarioOwners = relevant === undefined || taskScenarios === undefined ? [] :
       [...new Set(taskScenarios.scenarios.filter(scenario => relevant.has(scenario.id)).map(scenario => scenario.owner))];
     const attempt = await this.committingCheckpoint(run, {
@@ -10270,8 +10230,7 @@ export class RunService {
     }
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return null;
-    // Every declared scenario it ran untagged and passed is implemented.
-    if (!await this.recordScenarioPasses(run, subject)) return null;
+    // A pass moves no obligation: only an accepted submission does.
     return subject;
   }
 
@@ -10503,8 +10462,6 @@ export class RunService {
         incomplete.map(scenario => scenario.evidence));
       return;
     }
-    // Every tracked scenario, integration scenarios included.
-    const required = tracked.records;
     const beforeGate = await this.previewCandidateTree();
     if (beforeGate.tree !== binding.assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed after non-functional assessment', [runLayout.assessment(binding.assessment.id)]);
@@ -10573,14 +10530,6 @@ export class RunService {
 
     if (previousFinal === undefined) await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return;
-    // The final attempt's scenario check ran every tracked scenario in full
-    // mode and passed each one; a pass that did not run one proves nothing
-    // about it.
-    const unproven = finalScenarioGaps(attempt, required.map(record => record.id));
-    if (unproven !== null) {
-      await this.fail(run, 'acceptance-incomplete', `The final gate passed, and its scenario check does not prove the plan's scenarios: ${unproven}`, [runLayout.gate(gateId)]);
-      return;
-    }
     const lateSourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
     if (lateSourceChanges.length > 0) {
       await this.fail(run, 'inputs-changed', `The captured plan evidence changed during final verification: ${lateSourceChanges.join('; ')}`, [runLayout.documentManifest, runLayout.gate(gateId)]);
@@ -11308,57 +11257,58 @@ export class RunService {
       return false;
     }
     for (const input of obligationEventsToRecord(submission, actor, { by: invocation, submission: hash }, this.obligationProjection(run), run.log.events)) {
+      // A done report that makes every sub-scenario of an integration
+      // scenario done commits that scenario's work item with it.
+      const due = input.type === 'obligation-reported' && input.data.judgment === 'done' ? this.integrationItemsDue(run, input.data.id) : [];
+      if (await this.write(run, input, due) === 'ended') return false;
+    }
+    return !this.ignoring(run);
+  }
+
+  /**
+   * Records an accepted engineer proposal's bindings, each as its own
+   * `obligation-bound` event naming the invocation and the submission's hash.
+   * What the same accepted submission already recorded is not recorded
+   * again, so a replayed action applies each binding once.
+   */
+  private async recordBindings(run: Run, invocation: string, bindings: readonly ObligationBinding[]): Promise<boolean> {
+    if (bindings.length === 0) return true;
+    const hash = run.log.all('invocation-ended').find(event => event.data.invocation === invocation)?.data.submission ?? null;
+    if (hash === null) {
+      await this.fail(run, 'internal', `Invocation ${invocation} bound obligations without a recorded accepted submission`, [runLayout.outcome(invocation)]);
+      return false;
+    }
+    for (const input of bindingEventsToRecord(bindings, { by: invocation, submission: hash }, run.log.events)) {
       if (await this.write(run, input) === 'ended') return false;
     }
     return !this.ignoring(run);
   }
 
-  private declarationContext(run: Run, item: WorkItem): DeclarationContext {
-    return {
-      entry: 'entry' in item.origin ? item.origin.entry : null,
-      integration: integrationScenarioOf(item),
-      records: trackedScenarios(run.log.ledger.replay()).records,
-    };
-  }
-
-  /** Real work-item entries within a capability assignment's owners. The
-   * suspended consumer's unrelated entry is never inherited by the task. */
-  private capabilityScenarioContext(run: Run, base: IterationAssignment['scope']['base']): DeclarationContext {
-    const modules = 'module' in base ? [base.module, ...base.included.map(entry => [...run.index?.modules.values() ?? []].find(module => module.dir === entry.directory)?.module).filter((module): module is string => module !== undefined)] : base.modules;
-    const entries = committedRecords(run.log.ledger.replay()).workItems
-      .filter(item => modules.includes(item.module) && 'entry' in item.origin)
-      .map(item => 'entry' in item.origin ? item.origin.entry : null)
-      .filter((entry): entry is string => entry !== null);
-    return { entry: null, entries: [...new Set(entries)], records: trackedScenarios(run.log.ledger.replay()).records };
-  }
-
-  private capabilityEngineerScenarios(run: Run, assignment: IterationAssignment): EngineerScenarios | undefined {
-    const assigned = new Set(assignment.scenarios ?? []);
-    if (assigned.size === 0) return undefined;
-    const tracked = trackedScenarios(run.log.ledger.replay());
-    return { kind: 'entry', scenarios: tracked.records.filter(record => assigned.has(record.id))
-      .map(record => briefed(record, tracked.states.get(record.id) ?? 'pending')) };
+  /**
+   * What each obligation an assignment names is, for the engineer's
+   * briefing: a scenario's name, a delegated outcome, a registered case or a
+   * registered test's description.
+   */
+  private assignedObligations(run: Run, ids: readonly string[]): AssignedObligation[] {
+    const { obligations } = this.obligationProjection(run);
+    const names = new Map(trackedScenarios(run.log.ledger.replay()).records.map(record => [record.id, record.name]));
+    return ids.map(id => {
+      const obligation = obligations.get(id);
+      if (obligation === undefined) return { id, text: null };
+      if (obligation.kind === 'scenario') {
+        const name = names.get(id);
+        return { id, text: name === undefined ? 'scenario' : `scenario "${name}"` };
+      }
+      if (obligation.kind === 'outcome') return { id, text: obligation.case === null ? 'delegated outcome' : `registered case ${obligation.case}` };
+      return { id, text: obligation.description === null ? 'registered test' : `registered test: ${obligation.description}` };
+    });
   }
 
   /**
-   * Whether the work item still runs against fakes: a requirement it holds
-   * is open, or the conformance its obligation owes has not passed.
+   * The work item's scenarios not yet `done`: its entry's, or an integration
+   * work item's one scenario. A provider or follow-up work item has none.
    */
-  private holdsFakes(run: Run, item: WorkItem): boolean {
-    const records = committedRecords(run.log.ledger.replay());
-    if (this.openRequirementsOf(run, records, item.id).length > 0) return true;
-    const owing = this.obligationOwedBy(run, item, records);
-    if (owing === null) return false;
-    const conformed = new Set(run.log.all('provider-conformed').map(event => conformanceKey(event.data.obligation, event.data.revision)));
-    return !conformed.has(conformanceKey(owing.id, owing.revision));
-  }
-
-  /**
-   * The work item's scenarios in the given states: its entry's, or an
-   * integration work item's one scenario. A provider or follow-up work item
-   * has none.
-   */
-  private unfinishedScenarios(run: Run, item: WorkItem, states: readonly ScenarioState[]): Array<{ id: string; state: ScenarioState }> {
+  private unfinishedScenarios(run: Run, item: WorkItem): Array<{ id: string; state: ScenarioState }> {
     const entry = 'entry' in item.origin ? item.origin.entry : null;
     const integration = integrationScenarioOf(item);
     if (entry === null && integration === null) return [];
@@ -11366,7 +11316,7 @@ export class RunService {
     return tracked.records
       .filter(record => (integration === null ? record.kind === 'entry' && record.entry === entry : record.id === integration))
       .map(record => ({ id: record.id, state: tracked.states.get(record.id) ?? 'pending' }))
-      .filter(scenario => states.includes(scenario.state));
+      .filter(scenario => scenario.state !== 'done');
   }
 
   /**
@@ -11380,19 +11330,20 @@ export class RunService {
     const { records } = trackedScenarios(run.log.ledger.replay());
     const record = records.find(candidate => candidate.id === id);
     if (record === undefined) return undefined;
-    return integrationBriefing(this.projectRoot, record, records, sub => bridgingGivens(record, sub));
+    return integrationBriefing(this.projectRoot, record, records);
   }
 
   /**
    * The scenario check an engineer's `run_scope_tests` runs beside its
-   * tests: quick mode, the scope's scenarios selected by identity as an
-   * iteration gate selects them, and this work item's pending ones too, so
-   * the engineer sees the scenarios it binds pass before it declares them.
-   * Planned anew on each call; nothing where the run tracks no scenario or
-   * has no scenario harness.
+   * tests: quick mode, the scope's bound and done scenarios selected by
+   * identity as an iteration gate selects them, and the pending ones too: a
+   * work item's pending scenarios, or the pending ones a capability task's
+   * assignment names, so the engineer sees the scenarios it binds pass before
+   * it binds them. Planned anew on each call; nothing where the run tracks no
+   * scenario or has no scenario harness.
    */
   private scopeScenarioCheck(run: Run, item: WorkItem, scope: TestSelectionPolicy,
-    assignment?: IterationAssignment): EngineerEquipmentInputs['scenarios'] {
+    assignment: IterationAssignment): EngineerEquipmentInputs['scenarios'] {
     const { records } = trackedScenarios(run.log.ledger.replay());
     if (records.length === 0) return undefined;
     return {
@@ -11400,10 +11351,12 @@ export class RunService {
       plan: async () => {
         const inputs = await this.scenarioInputs(run);
         if (inputs === undefined) return undefined;
-        const pending = assignment?.coordination?.kind === 'capability-task'
-          ? (assignment.scenarios ?? [])
-            .filter(id => trackedScenarios(run.log.ledger.replay()).states.get(id) === 'pending')
-          : this.unfinishedScenarios(run, item, ['pending']).map(scenario => scenario.id);
+        const { states } = trackedScenarios(run.log.ledger.replay());
+        const assigned = (assignment.obligations ?? []).filter(id => states.get(id) === 'pending');
+        const pending = assignment.coordination?.kind === 'capability-task' ? assigned : [...new Set([
+          ...this.unfinishedScenarios(run, item).filter(scenario => scenario.state === 'pending').map(scenario => scenario.id),
+          ...assigned,
+        ])];
         return planScenarioCheck('iteration', inputs, {
           projectRoot: this.projectRoot,
           scope: { exactOwners: scope.exactOwners, subtrees: scope.subtrees },
@@ -11416,8 +11369,9 @@ export class RunService {
   /**
    * What an engineer is told of its work item's scenarios: its entry's, or
    * an integration work item's one scenario with its sub-scenarios' step
-   * files. Undefined for a provider or follow-up work item, whose briefing
-   * says nothing about scenarios.
+   * files. Undefined for a provider, follow-up or capability-task
+   * iteration, whose briefing says nothing about scenarios beyond the
+   * obligations its assignment names.
    */
   private async engineerScenarios(run: Run, item: WorkItem): Promise<EngineerScenarios | undefined> {
     const tracked = trackedScenarios(run.log.ledger.replay());
@@ -11431,68 +11385,19 @@ export class RunService {
   }
 
   /**
-   * Applies an accepted declaration: each `pending` scenario it names
-   * becomes `bound` while the work item holds fakes, and `declared`
-   * otherwise. A `bound`, `declared` or `implemented` one is left as it is.
-   * The gate's commit re-renders the files, so a declared scenario loses
-   * its pending tag there.
-   */
-  private async declareScenarios(run: Run, item: WorkItem, invocation: string, ids: readonly string[],
-    assignment?: IterationAssignment): Promise<boolean> {
-    if (ids.length === 0) return true;
-    const moved = scenariosToDeclare(ids, trackedScenarios(run.log.ledger.replay()).states);
-    if (moved.length === 0) return true;
-    const records = committedRecords(run.log.ledger.replay());
-    const tracked = trackedScenarios(run.log.ledger.replay()).records;
-    for (const scenario of moved) {
-      const entry = tracked.find(record => record.id === scenario)?.entry;
-      const owner = assignment?.coordination?.kind === 'capability-task' && entry !== null && entry !== undefined
-        ? records.workItems.find(candidate => 'entry' in candidate.origin && candidate.origin.entry === entry) ?? item
-        : item;
-      const state = this.holdsFakes(run, owner) ? 'bound' : 'declared';
-      await this.write(run, { type: 'scenario-declared', data: { scenario, by: invocation, state } });
-      if (this.ignoring(run)) return false;
-    }
-    return true;
-  }
-
-  /**
-   * What a passing committing gate establishes of the scenarios it ran: a
-   * `declared` one it passed is `implemented`, and a `bound` one it passed
-   * has its fake-backed pass recorded and stays `bound`.
-   */
-  private async recordScenarioPasses(run: Run, attempt: GateAttempt): Promise<boolean> {
-    if (attempt.verdict !== 'passed') return true;
-    const passed = [...new Set(attempt.commands.flatMap(command => (command.kind !== 'scenarios' || command.outcome !== 'passed'
-      ? []
-      : (command.scenarios?.scenarios ?? []).filter(result => result.status === 'passed').map(result => result.id))))].sort();
-    if (passed.length === 0) return true;
-    const { states } = trackedScenarios(run.log.ledger.replay());
-    for (const scenario of passed) {
-      const state = states.get(scenario);
-      if (state === 'declared') await this.write(run, { type: 'scenario-implemented', data: { scenario, gate: attempt.id } }, this.integrationItemsDue(run, scenario));
-      else if (state === 'bound') {
-        if (run.log.all('scenario-bound-passed').some(event => event.data.scenario === scenario && event.data.gate === attempt.id)) continue;
-        await this.write(run, { type: 'scenario-bound-passed', data: { scenario, gate: attempt.id } });
-      }
-      else continue;
-      if (this.ignoring(run)) return false;
-    }
-    return true;
-  }
-
-  /**
-   * The integration work items the implementation of one scenario makes due,
-   * as the records its `scenario-implemented` commits: one per integration
-   * scenario whose last sub-scenario this is (architecture §10). Committed
-   * after every earlier work item, it queues behind the current one, since
-   * work items run one at a time.
+   * The integration work items a done report of one scenario makes due, as
+   * the records its `obligation-reported` commits: one per integration
+   * scenario whose last sub-scenario this is (architecture §10). Only done
+   * reports schedule one; no gate or audit result does. Committed after
+   * every earlier work item, it queues behind the current one, since work
+   * items run one at a time.
    */
   private integrationItemsDue(run: Run, scenario: string): CommitRecord[] {
     const lines = run.log.ledger.replay();
     const tracked = trackedScenarios(lines);
+    if (!tracked.states.has(scenario)) return [];
     const after = new Map(tracked.states);
-    after.set(scenario, 'implemented');
+    after.set(scenario, 'done');
     const items = [...committedRecords(lines).workItems];
     const records: CommitRecord[] = [];
     for (const integration of dueIntegrations(tracked.records, after, items)) {
@@ -11502,103 +11407,6 @@ export class RunService {
       records.push({ path: workLayout.item(item.id), id: item.id, revision: 1, body: item });
     }
     return records;
-  }
-
-  /** Whether a gate passed the scenario since its latest declaration: a fake-backed pass or its implementation. */
-  private passedSinceDeclaration(run: Run, scenario: string): boolean {
-    const declared = run.log.all('scenario-declared').filter(event => event.data.scenario === scenario).at(-1)?.sequence ?? 0;
-    return run.log.events.some(event => event.sequence > declared
-      && (event.type === 'scenario-bound-passed' || event.type === 'scenario-implemented')
-      && event.data.scenario === scenario);
-  }
-
-  /**
-   * Withdrawal: the work item leaves its repair path without a pass, by
-   * exhaustion, a placement request or a yield. Every `declared` or `bound`
-   * scenario of its entry that no gate passed since its declaration returns
-   * to `pending`, and the commit "Withdraw sc-NNN" restores its pending tag
-   * at once, so no untagged failing scenario waits for the next gate that
-   * runs its owner. A bound scenario never lost its tag, so a withdrawal of
-   * bound ones alone changes no file and commits nothing; its events name
-   * the accepted boundary, which carries the tag.
-   */
-  private async withdrawScenarios(run: Run, item: WorkItem, reason: string): Promise<boolean> {
-    const scenarios = this.unfinishedScenarios(run, item, ['bound', 'declared'])
-      .filter(scenario => !this.passedSinceDeclaration(run, scenario.id))
-      .map(scenario => scenario.id);
-    if (scenarios.length === 0) return true;
-    const tracked = trackedScenarios(run.log.ledger.replay());
-    const identity = { planId: run.record.planId, runId: run.record.jobId };
-    const now = expectedFeatureFiles(tracked, identity);
-    const withdrawn = expectedFeatureFiles(withStates(tracked, new Map(scenarios.map(id => [id, 'pending' as const]))), identity);
-    const changes = withdrawn.some((file, index) => file.path !== now[index]?.path || file.content !== now[index]?.content);
-    let commit = this.accepted(run);
-    if (changes) {
-      run.writer.requireSettled('The feature files cannot be written');
-      const performed = await this.performWithdrawal(run, {
-        withdrawal: run.log.count('scenarios-withdrawing') + 1, workItem: item.id, scenarios, reason,
-      }, false);
-      commit = performed.commit;
-    }
-    // The effect's completion withdrew the first; the rest follow with its commit.
-    const states = trackedScenarios(run.log.ledger.replay()).states;
-    for (const scenario of scenarios) {
-      if (states.get(scenario) === 'pending') continue;
-      await this.write(run, { type: 'scenario-withdrawn', data: { scenario, reason, commit } });
-      if (this.ignoring(run)) return false;
-    }
-    return !this.ignoring(run);
-  }
-
-  /**
-   * The withdrawal commit, as an external effect of the ledger:
-   * `scenarios-withdrawing` is its intent and the first scenario's
-   * `scenario-withdrawn` its completion. The files are rendered with the
-   * intent's scenarios pending, from the ledger, so a recovery renders the
-   * same; it finds the commit by its run and `withdrawn-<n>` trailers first.
-   */
-  private async performWithdrawal(
-    run: Run,
-    data: RunEventOf<'scenarios-withdrawing'>['data'],
-    recovering: boolean,
-  ): Promise<{ commit: string }> {
-    return run.mutex.run(() => run.log.ledger.effect<{ commit: string }>({
-      key: `scenarios-withdraw:${data.withdrawal}`,
-      intent: { event: run.log.next({ type: 'scenarios-withdrawing', data }), records: [] },
-      perform: async () => {
-        const tracked = withStates(trackedScenarios(run.log.ledger.replay()), new Map(data.scenarios.map(id => [id, 'pending' as const])));
-        const expected = expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId });
-        const files = [...new Set(tracked.records.filter(record => data.scenarios.includes(record.id)).map(record => record.file))].sort();
-        const message = withdrawalMessage({ runId: run.record.jobId, withdrawal: data.withdrawal, workItem: data.workItem, scenarios: data.scenarios, reason: data.reason, files });
-        await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
-        const commit = await commitForScenarios(this.projectRoot, run.record.jobId, withdrawnTrailerValue(data.withdrawal), message, recovering, this.git, commit => this.verifyProducerCommit(expected, commit), () => this.renderProducerFeatures(run, expected));
-        return { commit: commit ?? await this.git.currentHead(this.projectRoot) };
-      },
-      complete: result => ({
-        event: run.log.next({ type: 'scenario-withdrawn', data: { scenario: data.scenarios[0]!, reason: data.reason, commit: result.commit } }),
-        records: [],
-      }),
-    }));
-  }
-
-  /**
-   * A withdrawal whose commit is recorded and some of whose scenarios have no
-   * `scenario-withdrawn` yet: the harness stopped between them. Each is
-   * written with the recorded commit; nothing is committed again.
-   */
-  private async completeWithdrawals(run: Run): Promise<string[]> {
-    const completed: string[] = [];
-    for (const intent of run.log.all('scenarios-withdrawing')) {
-      const after = run.log.all('scenario-withdrawn').filter(event => event.sequence > intent.sequence);
-      const first = after.find(event => event.data.scenario === intent.data.scenarios[0]);
-      if (first === undefined) continue;
-      for (const scenario of intent.data.scenarios) {
-        if (after.some(event => event.data.scenario === scenario)) continue;
-        await this.write(run, { type: 'scenario-withdrawn', data: { scenario, reason: intent.data.reason, commit: first.data.commit } });
-        completed.push(scenario);
-      }
-    }
-    return completed;
   }
 
   /**
@@ -11620,23 +11428,21 @@ export class RunService {
       return;
     }
     await this.fail(run, 'acceptance-incomplete',
-      `${item.id} asked for completion ${refusals} times with ${integrationScenarioOf(item) === null ? 'scenarios of its entry' : 'its integration scenario'} not implemented: ${blocked.join('; ')}`,
+      `${item.id} asked for completion ${refusals} times with ${integrationScenarioOf(item) === null ? 'scenarios of its entry' : 'its integration scenario'} not reported done: ${blocked.join('; ')}`,
       owing.scenarios.map(scenario => runLayout.scenario(scenario.id)));
   }
 
   /**
    * What a failing gate tells its reader: every command that did not pass
-   * with what it reported, and a composition failure where the gate's
-   * scenario check shows one.
+   * with what it reported, raw. No cause is inferred and no repair owner is
+   * named: what a failure means is the reader's to judge.
    */
   private async diagnosticsOf(run: Run, gate: GateAttempt, audience: GateAudience = 'engineer'): Promise<{ id: string; cause: string | null; summary: string[] }> {
     const { records } = trackedScenarios(run.log.ledger.replay());
     const waiting = new Map(run.log.all('gate-command-waiting')
       .filter(event => event.data.gate === gate.id)
       .map(event => [event.data.position, event.data.line] as const));
-    const diagnostics = await gateDiagnostics(gate, audience, new Map(records.map(record => [record.id, record.name])), waiting);
-    const composition = compositionLines(gate, records);
-    return { ...diagnostics, summary: [...diagnostics.summary, ...composition] };
+    return gateDiagnostics(gate, audience, new Map(records.map(record => [record.id, record.name])), waiting);
   }
 
   /**
@@ -11718,35 +11524,14 @@ export class RunService {
   }
 }
 
-/** Why a completion request is refused for one scenario of its entry, by its state. */
-function scenarioRefusal(scenario: { readonly id: string; readonly state: ScenarioState }, gate?: string): string {
-  switch (scenario.state) {
-    case 'pending':
-      return `${scenario.id} is pending: nothing has declared it; declare it with the request where existing step definitions bind it, or assign an iteration that writes them`;
-    case 'bound':
-      return `${scenario.id} is bound: it passed only against a fake, and becomes due once this work item's requirements are verified`;
-    default:
-      return `${scenario.id} is ${scenario.state}, and the work-item gate${gate === undefined ? '' : ` ${gate}`} did not pass it: its owner's run did not execute it`;
-  }
-}
-
 /**
- * Why a passing final attempt does not prove the plan's scenarios: no
- * scenario check, one not in full mode, one that did not pass, or a tracked
- * scenario it did not pass. Null when it proves every one.
+ * Why a completion request is refused for one scenario of its entry, by its
+ * state: only the architect's done report finishes a scenario.
  */
-function finalScenarioGaps(attempt: GateAttempt, required: readonly string[]): string | null {
-  if (required.length === 0) return null;
-  const check = attempt.commands.find(command => command.kind === 'scenarios');
-  const summary = check?.scenarios;
-  if (check === undefined || summary === undefined) {
-    return `no scenario check ran${attempt.scenarios === 'none-selected' ? ', because no module has feature files' : ''}`;
-  }
-  if (summary.mode !== 'full' || summary.dryRun) return `its scenario check was a ${summary.dryRun ? 'dry run' : 'run'} in ${summary.mode} mode, not a full-mode run`;
-  if (check.outcome !== 'passed') return `its scenario check ${check.outcome === 'failed' ? 'failed' : 'was not verified'}`;
-  const passed = new Set(summary.scenarios.filter(result => result.status === 'passed').map(result => result.id));
-  const missing = required.filter(id => !passed.has(id));
-  return missing.length === 0 ? null : `${missing.join(', ')} did not pass in it`;
+function scenarioRefusal(scenario: { readonly id: string; readonly state: ScenarioState }): string {
+  return scenario.state === 'pending'
+    ? `${scenario.id} is pending and not reported done: report it done in \`reports\` where it holds, or assign an iteration that binds it`
+    : `${scenario.id} is bound and not reported done: report it done in \`reports\` where its binding holds, or assign the work that finishes it`;
 }
 
 /**
@@ -11950,27 +11735,6 @@ function preparedGate(operation: GateOperation): PreparedGate {
     decisive: [],
     timeoutMs: operation.timeoutMs,
   };
-}
-
-/**
- * What a failing gate tells the agent that receives it: its cause, each
- * command that did not pass, and what that command reported. A Ramify
- * check's findings are relayed as findings; anything else is quoted from the
- * end of its own output.
- */
-/**
- * The lines a composition failure adds to a failing gate's diagnostics: the
- * integration scenario that failed while its sub-scenarios passed, and the
- * sub-scenarios whose bridging Given is suspect (architecture §10).
- */
-function compositionLines(gate: GateAttempt, records: readonly ScenarioRecord[]): string[] {
-  const results = gate.commands.flatMap(command => (command.kind === 'scenarios' ? command.scenarios?.scenarios ?? [] : []));
-  return compositionFailures(records, results).flatMap(failure => [
-    `- composition failure: \`${failure.scenario}\` failed while its sub-scenarios ${failure.passed.map(id => `\`${id}\``).join(', ')} passed, so their step definitions work one by one and not together.`,
-    ...(failure.suspects.length === 0
-      ? ['  - No sub-scenario has a bridging Given; look at what the step definitions share between the steps.']
-      : failure.suspects.map(suspect => `  - The bridging Given of \`${suspect.scenario}\` is suspect: ${suspect.givens.map(given => `"${given}"`).join(', ')} assumes what the real behavior may not do.`)),
-  ]);
 }
 
 /** The write scope of one assignment, project-relative, as a gate attributes findings against it. */

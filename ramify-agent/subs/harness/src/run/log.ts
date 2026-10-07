@@ -11,10 +11,7 @@ import {
 import { moduleNoticeSchema } from '../work/iterations.js';
 import { catalogFindingSchema, scenarioWarningSchema } from '../analysis/records.js';
 import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
-import {
-  scenarioDeclaredDataSchema, scenarioDueDataSchema, scenarioImplementedDataSchema, scenarioWithdrawnDataSchema,
-} from '../../subs/scenarios/src/states.js';
-import { obligationRegisteredDataSchema, obligationReportedDataSchema } from '../work/obligations.js';
+import { obligationBoundDataSchema, obligationRegisteredDataSchema, obligationReportedDataSchema } from '../work/obligations.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
 import type { LedgerFileSystem } from '../../subs/ledger/src/fs.js';
 import { replayCheckFindingEvents } from '../../subs/check-findings/src/replay.js';
@@ -274,52 +271,19 @@ export const runEventSchema = z.discriminatedUnion('type', [
    */
   event('scenarios-materialized', z.object({ commit: z.string().nullable(), files: z.array(text) }).strict()),
   /**
-   * An engineer's completion proposal or a local architect's completion
-   * request declared a `pending` scenario of its work item's entry. It is
-   * `bound` while the work item has an open requirement or owes a
-   * conformance, and keeps its pending tag; otherwise `declared`, and the
-   * next commit removes the tag.
-   */
-  event('scenario-declared', scenarioDeclaredDataSchema),
-  /**
-   * The last open requirement of the scenario's work item was verified and
-   * no conformance is owed: a `bound` scenario would now run without fakes,
-   * so it is `declared`.
-   */
-  event('scenario-due', scenarioDueDataSchema),
-  /** A passing gate ran a `declared` scenario, which is now `implemented` for good. */
-  event('scenario-implemented', scenarioImplementedDataSchema),
-  /**
-   * A passing gate ran a `bound` scenario: its pass is against the fakes its
-   * work item still holds, so the state stays `bound`, and the attempt is
-   * recorded as its fake-backed pass. A scenario with one since its
-   * declaration is not withdrawn.
-   */
-  event('scenario-bound-passed', z.object({ scenario: scenarioIdSchema, gate: text }).strict()),
-  /**
-   * The durable intent of a withdrawal commit: the scenarios about to return
-   * to `pending`, why, and the withdrawal's ordinal in the run, which is its
-   * commit's `Ramify-Scenarios: withdrawn-<n>` trailer. The first
-   * `scenario-withdrawn` is its completion.
-   */
-  event('scenarios-withdrawing', z.object({
-    withdrawal: z.int().positive(),
-    workItem: text,
-    scenarios: z.array(scenarioIdSchema).min(1),
-    reason: text,
-  }).strict()),
-  /**
-   * A `declared` or `bound` scenario with no pass since its declaration
-   * returned to `pending` when its work item left the repair path without
-   * one, with the commit that restored its pending tag.
-   */
-  event('scenario-withdrawn', scenarioWithdrawnDataSchema),
-  /**
    * A responsible architect's accepted registration of an obligation it
    * chose to track independently: a capability-plan case or a required test.
    * It enters `pending` at report revision 0. Ordinary tests never register.
    */
   event('obligation-registered', obligationRegisteredDataSchema),
+  /**
+   * An engineer's accepted completion proposal bound an obligation its
+   * assignment named, relying on the fakes it lists, possibly none. A
+   * `pending` obligation is `bound` from here and loses its pending tag at
+   * the next commit; a `done` one records the new list and stays `done`.
+   * It never increments the report revision.
+   */
+  event('obligation-bound', obligationBoundDataSchema),
   /**
    * A responsible architect's accepted report: its judgment that the
    * obligation is `done`, or an explicit revision of a `done` back to

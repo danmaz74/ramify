@@ -112,7 +112,7 @@ test('a selected non-functional element and recommendation reach the runtime pac
     ]);
     if (spec.role === 'initial-architect') return submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core', 'Summarizes a review.')]));
     if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [{ nfr: 'nfr-001', result: 'satisfied', inspectedScope: ['src/'], evidence: ['Fixture timeout inspected'], uncertainty: '' }] });
-    if (spec.role === 'local-architect') return submit({ ...requestCompletion(), scenarios: ['sc-001'] });
+    if (spec.role === 'local-architect') return submit({ ...requestCompletion(), reports: [{ id: 'sc-001', judgment: 'done', basedOnRevision: 0 }] });
     return [];
   }));
   const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(),
@@ -193,7 +193,7 @@ test('lost parent session reconstructs the exact package in a fresh organizing p
     return submit({ selected: [] });
   }, spec => {
     if (spec.role === 'initial-architect') return submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core')]));
-    if (spec.role === 'local-architect') return submit({ ...requestCompletion(), scenarios: ['sc-001'] });
+    if (spec.role === 'local-architect') return submit({ ...requestCompletion(), reports: [{ id: 'sc-001', judgment: 'done', basedOnRevision: 0 }] });
     return [];
   }));
   const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(),

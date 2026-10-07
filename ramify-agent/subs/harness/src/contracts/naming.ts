@@ -35,6 +35,11 @@ export interface NamedFile {
   readonly text: string;
 }
 
+/** Whether an exported name carries the fake designation, as every name a fake file exports must. */
+export function carriesFakeDesignation(name: string): boolean {
+  return designation.test(name);
+}
+
 /** Whether a project-relative path designates a fake implementation file. */
 export function isFakeFile(path: string): boolean {
   return fakeFileName.test(path);

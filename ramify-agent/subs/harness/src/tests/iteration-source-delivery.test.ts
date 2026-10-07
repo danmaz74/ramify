@@ -82,9 +82,9 @@ test('an assigned non-functional element reaches the engineer once per session, 
     ]);
     if (spec.role === 'initial-architect') return submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core', 'Summarizes a review.')]));
     if (spec.submission.name === 'submit_work_item_result') return localTurn++ === 0
-      ? submit(assign('collection-review/workspace/reviews/core', { citedElements: ['fr-001', 'fr-002', 'nfr-001'] }, outline()))
-      : submit({ ...requestCompletion(), scenarios: ['sc-001'] });
-    if (spec.role === 'engineer') return submit(completionProposed('The existing behavior satisfies the assignment.', { scenarios: ['sc-001'] }));
+      ? submit(assign('collection-review/workspace/reviews/core', { citedElements: ['fr-001', 'fr-002', 'nfr-001'], obligations: ['sc-001'] }, outline()))
+      : submit({ ...requestCompletion(), reports: [{ id: 'sc-001', judgment: 'done', basedOnRevision: 0 }] });
+    if (spec.role === 'engineer') return submit(completionProposed('The existing behavior satisfies the assignment.', { bindings: [{ id: 'sc-001' }] }));
     if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [
       { nfr: 'nfr-001', result: 'satisfied', inspectedScope: ['subs/workspace/subs/reviews/subs/core/src'],
         evidence: ['The scripted timeout check passes.'], uncertainty: '' },

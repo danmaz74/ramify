@@ -102,7 +102,7 @@ async function project(lastStep: string, extra: Record<string, string> = {}): Pr
   return { root, commit: git(root, ['rev-parse', 'HEAD']) };
 }
 
-function inputs(state: 'pending' | 'declared'): ScenarioCheckInputs {
+function inputs(state: 'pending' | 'bound'): ScenarioCheckInputs {
   const command = ['node_modules/.bin/cucumber-js'];
   return {
     harness: { support: ['src/tests/support/world.js'], modes: { quick: { command }, full: { command } } },
@@ -112,7 +112,7 @@ function inputs(state: 'pending' | 'declared'): ScenarioCheckInputs {
 }
 
 function check(checkpoint: Checkpoint, root: string): PlannedCheck {
-  const planned = planScenarioCheck(checkpoint, inputs('declared'), { projectRoot: root, scope: { exactOwners: ['demo/shelf'], subtrees: [] } });
+  const planned = planScenarioCheck(checkpoint, inputs('bound'), { projectRoot: root, scope: { exactOwners: ['demo/shelf'], subtrees: [] } });
   if (!('check' in planned)) throw new Error('A scenario check was expected');
   return planned.check;
 }

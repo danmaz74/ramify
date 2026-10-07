@@ -7,7 +7,9 @@ import { carriesPendingTag, type ScenarioStates } from './states.js';
  * drift in the tree is a guarded change. One file per entry in its owner's
  * test area, and one per common ancestor for integration scenarios. Scenario
  * lines are the record's, verbatim; the identity tag names the scenario, and
- * the pending tag is present exactly while it is `pending` or `bound`.
+ * the pending tag is present exactly while it is `pending`: an accepted
+ * binding or a direct `done` report takes it off, and no audit outcome puts
+ * it back.
  */
 
 /** What rendering reads of the run beyond the records and states. */
@@ -80,7 +82,7 @@ function headerComment(run: FeatureRenderingRun, steps: string): string[] {
     `# Written by ramify-agent for plan ${run.planId}, run ${run.runId}.`,
     '# The scenarios are the plan\'s requirements. Agents never edit this file;',
     `# step definitions bind it from ${steps}. @ramify-pending marks a`,
-    '# scenario the harness has not yet declared due.',
+    '# scenario that nothing has bound or reported done yet.',
   ];
 }
 

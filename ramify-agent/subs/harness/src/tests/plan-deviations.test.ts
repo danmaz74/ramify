@@ -422,7 +422,7 @@ describe('an unresolved request answered otherwise', () => {
     const { validateFork } = await import('../architecture/submission.js');
     const evidence = { index: null, registry: new Map(), hypotheses: new Map(), decisions: new Map(), workItems: new Set<string>() };
     expect(validateFork(forkDeviation(), evidence)).toMatchObject({ ok: false, errors: [{ path: 'kind' }] });
-    const question = { kind: 'unresolved' as const, elements: new Set(['fr-001', 'fr-002']), workItems: new Set(['wi-001']), scenarios: new Map([['sc-001', 'implemented']]) };
+    const question = { kind: 'unresolved' as const, elements: new Set(['fr-001', 'fr-002']), workItems: new Set(['wi-001']), scenarios: new Map([['sc-001', 'done']]) };
     expect(validateFork(forkDeviation(), evidence, question).ok).toBe(true);
     const invalid = validateFork(forkDeviation({ amends: ['fr-009', 'ctx-001'], workItems: ['wi-009'], scenarios: [{ scenario: 'sc-001', source: ['Given a thing'] }] }), evidence, question);
     expect(invalid.ok ? [] : invalid.errors.map(error => error.path)).toEqual([

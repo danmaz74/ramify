@@ -411,7 +411,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
   if (delegation?.blocked !== undefined && delegation.blocked.length > 0) {
     lines.push('## Completion was refused', '');
     for (const reason of delegation.blocked) lines.push(`- ${reason}`);
-    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider; a scenario is implemented when a gate passes it after its declaration, so declare with the request the ones existing step definitions bind, and assign an iteration that writes the step definitions for the others.', '');
+    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider; a scenario of this work item counts once you report it `done` in `reports`, which you may do with the request itself where, in your judgment, it is correctly implemented and passing; assign an iteration that binds the others.', '');
   }
 
   if (briefing.unresolvedRequest !== undefined) {
@@ -572,7 +572,7 @@ function integrationSection(integration: IntegrationBriefing): string[] {
     `## The integration scenario ${scenario.id}: ${scenario.name}`,
     '',
     `This work item exists to bind one scenario of the plan, which combines several entries. Its owner is \`${scenario.owner}\`,`,
-    'the lowest common ancestor of its sub-scenarios\' owners, and every sub-scenario is implemented already.',
+    'the lowest common ancestor of its sub-scenarios\' owners, and every sub-scenario is reported done already.',
     `The harness wrote it into \`${scenario.file}\`; no agent edits a feature file.`,
     '',
     '```gherkin',
@@ -583,9 +583,7 @@ function integrationSection(integration: IntegrationBriefing): string[] {
     '',
   ];
   for (const sub of integration.subScenarios) {
-    lines.push(`- \`${sub.id}\` (${sub.name}), owned by \`${sub.owner}\`, in \`${sub.file}\`.${sub.bridging.length === 0
-      ? ''
-      : ` Its bridging Given${sub.bridging.length === 1 ? '' : 's'}, stating what another entry leaves instead of taking its action: ${sub.bridging.map(step => `"${step}"`).join(', ')}.`}`);
+    lines.push(`- \`${sub.id}\` (${sub.name}), owned by \`${sub.owner}\`, in \`${sub.file}\`.`);
   }
   lines.push('', '### The step files of their owners', '');
   for (const owner of integration.owners) {
@@ -599,12 +597,11 @@ function integrationSection(integration: IntegrationBriefing): string[] {
       ? ''
       : ` with the children ${scope.includedChildren.map(child => `\`${child}\``).join(', ')} included`}; the harness refuses any other base.`,
     `Its engineer writes a step file in \`${scenario.steps}/\` that imports, by name, the step files above, adds the`,
-    '`expose-test` declarations along each path so this module receives them, defines no step of its own, and declares',
-    `\`${scenario.id}\` in its completion proposal. Its gate runs this module's feature files with the scenario selected by`,
-    'identity; a pass implements it, and this work item completes at its own work-item gate.',
-    '',
-    'When the scenario fails while its sub-scenarios pass, it is a composition failure: a bridging Given assumed what',
-    'the real behavior does not do. It is this work item\'s to resolve, through repair, placement and delegation, or `unresolved`.',
+    '`expose-test` declarations along each path so this module receives them, and defines no step of its own. Name',
+    `\`${scenario.id}\` in \`assignment.obligations\`; the engineer's proposal binds it. Its gate runs this module's feature`,
+    'files; a failure arrives with the runner\'s own diagnostics, which you and the engineer investigate. The harness',
+    'draws no conclusion about its cause. When, in your judgment, it is correctly implemented and passing, report it',
+    '`done`; this work item completes at its own work-item gate.',
     '',
   );
   return lines;

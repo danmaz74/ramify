@@ -127,14 +127,14 @@ describe('planning per checkpoint', () => {
     expect(planned).toEqual({ none: 'none-selected' });
   });
 
-  test('an iteration gate selects the scope owners\' bound, declared and implemented scenarios by identity, one run per owner', () => {
+  test('an iteration gate selects the scope owners\' bound and done scenarios by identity, one run per owner', () => {
     const scenarios = [
-      scenario('sc-001', 'sample/shelf', 'declared'),
+      scenario('sc-001', 'sample/shelf', 'done'),
       scenario('sc-002', 'sample/shelf', 'pending'),
       scenario('sc-003', 'sample/shelf', 'bound'),
-      scenario('sc-004', 'sample/lending', 'implemented'),
-      scenario('sc-005', 'sample/elsewhere', 'declared'),
-      scenario('sc-010', 'sample/lending/ui', 'implemented', 'subs/lending/subs/ui/src/features/demo-plan/x.feature'),
+      scenario('sc-004', 'sample/lending', 'done'),
+      scenario('sc-005', 'sample/elsewhere', 'bound'),
+      scenario('sc-010', 'sample/lending/ui', 'done', 'subs/lending/subs/ui/src/features/demo-plan/x.feature'),
     ];
     const planned = planScenarioCheck('iteration', inputs(scenarios), {
       projectRoot: '/project',
@@ -194,7 +194,7 @@ describe('planning per checkpoint', () => {
   test('a bounded completion gate runs only its assigned scenario identities', async () => {
     const root = await directory();
     const basis = { checkpoint: 'work-item' as const, projectRoot: root, head: 'head', policy: testPolicy(root),
-      scenarios: inputs([scenario('sc-001', 'sample/shelf', 'bound'), scenario('sc-003', 'sample/acceptance', 'declared')]) };
+      scenarios: inputs([scenario('sc-001', 'sample/shelf', 'bound'), scenario('sc-003', 'sample/acceptance', 'bound')]) };
     const none = await runCheckpoint(createPassingCheckExecution(), { ...basis, id: 'ga-0011', directory: join(root, 'gate-none'),
       scenarios: { ...basis.scenarios, scenarios: [] },
       scenarioScope: { exactOwners: ['sample/shelf'], include: [] } });

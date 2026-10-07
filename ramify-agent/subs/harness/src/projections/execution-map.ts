@@ -134,7 +134,7 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
       const result = latestResult.get(scenario.id) ?? 'no-real-run';
       if (result === 'unavailable') bucket.unavailable++;
       else if (result === 'no-real-run') bucket.noRealRun++;
-      else if (scenarioState(tracked.states.get(scenario.id)) !== 'implemented') bucket.other++;
+      else if (scenarioState(tracked.states.get(scenario.id)) !== 'done') bucket.other++;
       else if (result === 'passed') bucket.passed++;
       else if (result === 'failed') bucket.failed++;
       else bucket.other++;

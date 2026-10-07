@@ -19,7 +19,8 @@ import type { RunView } from './inputs.js';
  *
  * The records and states are replayed from the log as the harness replays
  * them; a gate's status for a scenario is read from that attempt's
- * `ScenarioCheckSummary`, never inferred from its verdict.
+ * `ScenarioCheckSummary`, never inferred from its verdict, and is shown
+ * beside the state, never folded into it.
  */
 
 /** The tracked scenarios of the run: every record in the order it was committed, with its current state. */
@@ -115,10 +116,6 @@ export function scenarioListOf(view: RunView): ScenarioListResponse {
     const scenario = integrationScenarioOf(item);
     if (scenario !== null && !integrationItem.has(scenario)) integrationItem.set(scenario, item.id);
   }
-  const implementedBy = new Map<string, string>();
-  for (const event of view.events) {
-    if (event.type === 'scenario-implemented') implementedBy.set(event.data.scenario, event.data.gate);
-  }
 
   const all: ScenarioView[] = tracked.records.map(record => {
     const state = tracked.states.get(record.id) ?? 'pending';
@@ -134,7 +131,6 @@ export function scenarioListOf(view: RunView): ScenarioListResponse {
       workItem: (record.entry === null ? integrationItem.get(record.id) : entryItem.get(record.entry)) ?? null,
       owner: record.owner,
       file: record.file,
-      implementedBy: state === 'implemented' ? implementedBy.get(record.id) ?? null : null,
       gates: gates.get(record.id) ?? [],
     };
   });
@@ -153,6 +149,10 @@ export function obligationViewsOf(view: RunView, tracked: TrackedScenarios = sce
     case: obligation.case,
     description: obligation.description,
     registeredBy: obligation.registeredBy === null ? null : { invocation: obligation.registeredBy.by, submission: obligation.registeredBy.submission },
+    binding: obligation.binding === null ? null : {
+      fakes: [...obligation.binding.fakes], invocation: obligation.binding.by, submission: obligation.binding.submission,
+      sequence: obligation.binding.sequence, at: obligation.binding.at,
+    },
     report: obligation.report === null ? null : {
       judgment: obligation.report.judgment, revision: obligation.report.revision, basedOnRevision: obligation.report.basedOnRevision,
       where: obligation.report.where, invocation: obligation.report.by, submission: obligation.report.submission,
@@ -161,15 +161,15 @@ export function obligationViewsOf(view: RunView, tracked: TrackedScenarios = sce
   }));
 }
 
-/** Each entry's scenarios: how many are implemented of how many it has. */
-export function entryScenarioCounts(view: RunView): Map<string, { implemented: number; total: number }> {
+/** Each entry's scenarios: how many its architect reported done of how many it has. */
+export function entryScenarioCounts(view: RunView): Map<string, { done: number; total: number }> {
   const tracked = scenariosOf(view);
-  const counts = new Map<string, { implemented: number; total: number }>();
+  const counts = new Map<string, { done: number; total: number }>();
   for (const record of tracked.records) {
     if (record.entry === null) continue;
-    const count = counts.get(record.entry) ?? { implemented: 0, total: 0 };
+    const count = counts.get(record.entry) ?? { done: 0, total: 0 };
     count.total += 1;
-    if (tracked.states.get(record.id) === 'implemented') count.implemented += 1;
+    if (tracked.states.get(record.id) === 'done') count.done += 1;
     counts.set(record.entry, count);
   }
   return counts;

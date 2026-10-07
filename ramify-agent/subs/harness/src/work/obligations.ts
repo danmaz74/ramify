@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type { ScenarioRecord } from '../../subs/scenarios/src/records.js';
+import { boundState, reportedState } from '../../subs/scenarios/src/states.js';
+import { carriesFakeDesignation } from '../contracts/naming.js';
 import type { SubmissionError } from '../run/submissions.js';
 import { integrationScenarioOf, type WorkItem } from './records.js';
 
@@ -14,15 +16,19 @@ import { integrationScenarioOf, type WorkItem } from './records.js';
  * an architect explicitly registered (`test-NNN`). Ordinary tests never
  * register themselves, and registration never removes a requirement.
  *
+ * Each obligation is `pending`, `bound` or `done`, and each state is
+ * entered by one accepted submission: registration, an engineer's binding
+ * that names the fakes it relies on, or the responsible architect's report.
  * A report is the architect's judgment: `done` means correctly implemented
  * and passing in its judgment, and `bound` is only an explicit revision of
- * an earlier `done`. The harness checks the IDs, the actor's authority, the
+ * an earlier `done`. A binding of a `done` obligation records its fakes and
+ * leaves it `done`. The harness checks the IDs, the actor's authority, the
  * report revision and the structure, then records and trusts the judgment.
  * It never reads the optional `where` text, resolves a path, matches a test
  * result or treats an audit outcome as corroboration or retraction.
  *
  * There is no second registry: the one read projection folds the existing
- * scenario records, capability delegations and the two accepted-submission
+ * scenario records, capability delegations and the three accepted-submission
  * events below.
  */
 
@@ -95,6 +101,29 @@ export const obligationReportedDataSchema = z.object({
 });
 export type ObligationReportedData = z.infer<typeof obligationReportedDataSchema>;
 
+/** A fake class or export name an engineer's binding relies on: it carries the fake-naming rule's `Fake` designation. */
+export const fakeNameSchema = text.max(200).refine(carriesFakeDesignation, 'A fake\'s name carries "Fake", as the fake-naming rule requires');
+
+/** One binding of an engineer's completion proposal: an assigned obligation and the fakes it relies on, none by default. */
+export const obligationBindingSchema = z.object({
+  id: text,
+  fakes: z.array(fakeNameSchema).max(100).default([]),
+}).strict();
+export type ObligationBinding = z.infer<typeof obligationBindingSchema>;
+
+/**
+ * `obligation-bound`: one accepted engineer binding, with the fakes it names
+ * and its proposing invocation and submission. The harness never reads the
+ * source to confirm either.
+ */
+export const obligationBoundDataSchema = z.object({
+  id: text,
+  fakes: z.array(fakeNameSchema),
+  by: text,
+  submission: z.string().regex(/^[0-9a-f]{64}$/),
+}).strict();
+export type ObligationBoundData = z.infer<typeof obligationBoundDataSchema>;
+
 export type ObligationStatus = 'pending' | 'bound' | 'done';
 export type ObligationKind = 'scenario' | 'outcome' | 'test';
 
@@ -107,6 +136,15 @@ export type ObligationResponsible =
   | { readonly kind: 'work-item'; readonly id: string }
   | { readonly kind: 'capability-task'; readonly id: string }
   | { readonly kind: 'integration-scenario'; readonly id: string };
+
+/** An accepted engineer binding, as the projection keeps the latest one. */
+export interface RecordedBinding {
+  readonly fakes: readonly string[];
+  readonly by: string;
+  readonly submission: string;
+  readonly sequence: number;
+  readonly at: string;
+}
 
 /** An accepted report, as the projection keeps the latest one. */
 export interface RecordedReport {
@@ -133,14 +171,16 @@ export interface Obligation {
   readonly description: string | null;
   /** The explicit registration; null for an analysis scenario or a delegated outcome, which need none. */
   readonly registeredBy: { readonly by: string; readonly submission: string } | null;
+  /** The latest accepted engineer binding and its fakes; null while none was made. */
+  readonly binding: RecordedBinding | null;
   /** The latest accepted architect report; null while none was made. */
   readonly report: RecordedReport | null;
 }
 
 /**
  * An event line as the run log carries it. The projection reads
- * `capability-delegated`, `obligation-registered` and `obligation-reported`
- * and passes over every other type.
+ * `capability-delegated`, `obligation-registered`, `obligation-bound` and
+ * `obligation-reported` and passes over every other type.
  */
 export interface ObligationEventLine {
   readonly type: string;
@@ -194,13 +234,15 @@ function scenarioResponsible(record: ScenarioRecord, workItems: readonly WorkIte
 /**
  * The one read projection: analysis scenarios and delegated outcomes are
  * `pending` from their own records, explicit registrations from their
- * events, and each accepted report sets the status and revision. Nothing
- * else moves a status: no gate, audit, source change or engineer report.
+ * events; each accepted binding makes one `bound` unless it is `done`, and
+ * records its fakes; each accepted report sets the status and revision.
+ * Nothing else moves a status: no gate, audit, source change, repair exit
+ * or engineer report.
  */
 export function obligationsOf(sources: ObligationSources): ObligationProjection {
   const obligations = new Map<string, Obligation>();
   let tests = 0;
-  const base = { status: 'pending' as const, revision: 0, case: null, description: null, registeredBy: null, report: null };
+  const base = { status: 'pending' as const, revision: 0, case: null, description: null, registeredBy: null, binding: null, report: null };
   for (const record of sources.scenarios) {
     const responsible = scenarioResponsible(record, sources.workItems);
     if (responsible !== null) obligations.set(record.id, { ...base, id: record.id, kind: 'scenario', responsible });
@@ -221,12 +263,22 @@ export function obligationsOf(sources: ObligationSources): ObligationProjection 
       });
       continue;
     }
+    if (line.type === 'obligation-bound') {
+      const data = line.data as ObligationBoundData;
+      const current = obligations.get(data.id);
+      if (current === undefined) continue;
+      obligations.set(data.id, {
+        ...current, status: boundState(current.status),
+        binding: { fakes: [...data.fakes], by: data.by, submission: data.submission, sequence: line.sequence, at: line.at },
+      });
+      continue;
+    }
     if (line.type === 'obligation-reported') {
       const data = line.data as ObligationReportedData;
       const current = obligations.get(data.id);
       if (current === undefined) continue;
       obligations.set(data.id, {
-        ...current, status: data.judgment, revision: data.revision,
+        ...current, status: reportedState(data.judgment), revision: data.revision,
         report: {
           judgment: data.judgment, basedOnRevision: data.basedOnRevision, revision: data.revision,
           where: data.where ?? null, by: data.by, submission: data.submission, sequence: line.sequence, at: line.at,
@@ -357,7 +409,7 @@ export function obligationSubmissionErrors(
     }
     known.set(entry.id, {
       id: entry.id, kind: entry.kind, responsible: entry.responsible, status: 'pending', revision: 0,
-      case: entry.case ?? null, description: entry.description ?? null, registeredBy: null, report: null,
+      case: entry.case ?? null, description: entry.description ?? null, registeredBy: null, binding: null, report: null,
     });
   });
 
@@ -402,6 +454,106 @@ export function obligationSubmissionErrors(
     }
   });
   return errors;
+}
+
+/**
+ * Every reason an assignment's `obligations` cannot name these IDs. Each is
+ * a registered obligation this architect reports on, the registrations of
+ * the same submission included, named once. The list is the architect's
+ * choice of what this engineer binds; nothing about the work is judged.
+ */
+export function assignedObligationErrors(
+  ids: readonly string[],
+  context: ObligationContext & { readonly registrations?: readonly ObligationRegistration[] | undefined },
+  path = 'assignment.obligations',
+): SubmissionError[] {
+  const { actor, projection } = context;
+  const planned = new Set(plannedRegistrations(context.registrations ?? [], actor, projection.tests).map(entry => entry.id));
+  const owned = [...obligationsOwnedBy(projection, actor).map(obligation => obligation.id), ...planned];
+  const expected = owned.length === 0 ? 'an obligation this architect reports on' : `IDs among ${owned.join(', ')}`;
+  const errors: SubmissionError[] = [];
+  const seen = new Set<string>();
+  ids.forEach((id, index) => {
+    const at = `${path}.${index}`;
+    if (seen.has(id)) {
+      errors.push({ path: at, message: `${id} is named twice`, expected: 'each assigned obligation once' });
+      return;
+    }
+    seen.add(id);
+    if (planned.has(id)) return;
+    const obligation = projection.obligations.get(id);
+    if (obligation === undefined) {
+      errors.push({ path: at, message: `"${id}" is no registered obligation of this run`, expected });
+      return;
+    }
+    if (!isResponsible(actor, obligation)) {
+      errors.push({
+        path: at,
+        message: `${id} is reported by ${describeResponsible(obligation.responsible)}, so ${describeActor(actor)} cannot assign its binding`,
+        expected,
+      });
+    }
+  });
+  return errors;
+}
+
+/**
+ * Every reason an engineer's `bindings` cannot be accepted: an ID the
+ * assignment does not name, one named twice, a fake named twice, and every
+ * assigned obligation the proposal leaves out, named together. The check is
+ * structural; whether a declared binding or fake is right is the gate's
+ * audit and the architect's to find, never the harness's.
+ */
+export function bindingErrors(bindings: readonly ObligationBinding[], assigned: readonly string[], path = 'bindings'): SubmissionError[] {
+  const errors: SubmissionError[] = [];
+  const expected = assigned.length === 0 ? 'an empty list: this assignment names no obligation' : `each of ${assigned.join(', ')} once`;
+  const seen = new Set<string>();
+  bindings.forEach((binding, index) => {
+    const at = `${path}.${index}`;
+    if (!assigned.includes(binding.id)) {
+      errors.push({ path: `${at}.id`, message: `${binding.id} is not assigned to this iteration, so this engineer cannot bind it`, expected });
+      return;
+    }
+    if (seen.has(binding.id)) {
+      errors.push({ path: `${at}.id`, message: `${binding.id} is bound twice`, expected });
+      return;
+    }
+    seen.add(binding.id);
+    const fakes = new Set<string>();
+    binding.fakes.forEach((fake, position) => {
+      if (fakes.has(fake)) errors.push({ path: `${at}.fakes.${position}`, message: `${fake} is named twice`, expected: 'each fake once' });
+      fakes.add(fake);
+    });
+  });
+  const missing = assigned.filter(id => !seen.has(id));
+  if (missing.length > 0) {
+    errors.push({
+      path,
+      message: `The assignment names ${missing.join(', ')}, which this proposal does not bind. Bind every assigned obligation, `
+        + 'with the fakes its binding relies on, or report "partial" with what is unfinished',
+      expected,
+    });
+  }
+  return errors;
+}
+
+/**
+ * The `obligation-bound` events an accepted proposal still needs, in its
+ * order. A binding this same accepted submission already recorded is not
+ * recorded again, so a replay applies each once.
+ */
+export function bindingEventsToRecord(
+  bindings: readonly ObligationBinding[],
+  identity: { readonly by: string; readonly submission: string },
+  events: readonly ObligationEventLine[],
+): Array<{ readonly type: 'obligation-bound'; readonly data: ObligationBoundData }> {
+  const recorded = new Set(events.filter(line => line.type === 'obligation-bound')
+    .map(line => line.data as ObligationBoundData)
+    .filter(data => data.by === identity.by && data.submission === identity.submission)
+    .map(data => data.id));
+  return bindings.filter(binding => !recorded.has(binding.id)).map(binding => ({
+    type: 'obligation-bound', data: { id: binding.id, fakes: [...binding.fakes], by: identity.by, submission: identity.submission },
+  }));
 }
 
 /** One run-log write that records part of an accepted submission. */
@@ -464,8 +616,10 @@ export function obligationBriefingLines(owned: readonly Obligation[]): string[] 
     '',
     'You are the responsible architect for these. Report one with `reports: [{ id, judgment: "done", basedOnRevision, where? }]` '
       + 'when, in your judgment, it is correctly implemented and passing; `basedOnRevision` is the revision shown. '
-      + 'An engineer\'s completion proposal reports its work, and a gate or audit result is execution evidence: '
-      + 'neither is your report, and neither changes one. Revise an earlier `done` with judgment "bound". '
+      + 'An engineer\'s accepted binding makes an obligation `bound` and names the fakes it relies on; '
+      + 'a gate or audit result is execution evidence beside the status. Neither is your report, and neither changes one; '
+      + 'your report is accepted whatever the fakes list says. Revise an earlier `done` with judgment "bound". '
+      + 'Name the obligations an iteration binds in `assignment.obligations`. '
       + '`where` is an optional short navigation hint; the harness stores it and never reads it.',
     '',
   ];
@@ -475,7 +629,13 @@ export function obligationBriefingLines(owned: readonly Obligation[]): string[] 
         : obligation.kind === 'outcome' ? 'delegated outcome' : 'scenario';
     const report = obligation.report === null ? 'no report yet'
       : `last report ${obligation.report.judgment} by ${obligation.report.by}${obligation.report.where === null ? '' : `, where: ${obligation.report.where}`}`;
-    lines.push(`- ${obligation.id} (${subject}): ${obligation.status}, revision ${obligation.revision}; ${report}`);
+    lines.push(`- ${obligation.id} (${subject}): ${obligation.status}, revision ${obligation.revision}; ${bindingText(obligation.binding)}; ${report}`);
   }
   return lines;
+}
+
+/** An obligation's latest binding as a briefing line states it. */
+function bindingText(binding: RecordedBinding | null): string {
+  if (binding === null) return 'not bound';
+  return `bound by ${binding.by} ${binding.fakes.length === 0 ? 'with no fakes' : `relying on fakes ${binding.fakes.join(', ')}`}`;
 }

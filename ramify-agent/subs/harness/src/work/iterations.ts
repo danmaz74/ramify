@@ -122,11 +122,11 @@ export const iterationAssignmentSchema = z.object({
   /** A local architect may assign a contract revision directly. */
   revisesContract: recordRefSchema.optional(),
   /**
-   * The scenarios the architect expects this iteration to bind, shown to the
-   * engineer under "Scenarios to bind". Informative: the engineer declares
-   * what its step definitions bind, and nothing requires exactly these.
+   * The registered obligations the architect delegated to this iteration's
+   * engineer, as the assignment named them. Its completion proposal binds
+   * every one; absent, none was named.
    */
-  scenarios: z.array(text).optional(),
+  obligations: z.array(text).optional(),
   /** The bounds the local architect raised for this iteration's engineers; absent, the policy's. */
   bounds: assignedBoundsSchema.optional(),
 }).strict();

@@ -101,7 +101,7 @@ export const executionCountCoverageSchema = z.discriminatedUnion('state', [
 ]);
 export type ExecutionCountCoverage = z.infer<typeof executionCountCoverageSchema>;
 
-/** Only a latest non-dry-run pass of an implemented scenario is green. */
+/** A scenario's latest non-dry-run result, shown beside its reported state; only a pass of a done scenario counts as passed. */
 export const executionScenarioResultSchema = z.enum([
   'no-real-run', ...scenarioStatusSchema.options, 'unavailable',
 ]);

@@ -161,6 +161,14 @@ function listOf(service: RunService, runId: string): CheckFindingSummary[] {
   return [...list.view.items];
 }
 
+/** The obligation events naming a scenario, as `bound sc` and `reported sc judgment` lines. */
+const scenarioObligations = (log: readonly RunEvent[]) => log.flatMap(event => (event.type === 'obligation-bound' ? [`bound ${event.data.id}`]
+  : event.type === 'obligation-reported' ? [`reported ${event.data.id} ${event.data.judgment}`] : []));
+
+/** The index of the first event of a type whose data matches. */
+const at = (log: readonly RunEvent[], type: string, match: (data: Record<string, unknown>) => boolean = () => true) =>
+  log.findIndex(event => event.type === type && match(event.data as Record<string, unknown>));
+
 const reportsOf = (events: readonly CheckFindingEvent[]) => events.flatMap(event => (event.type === 'check-finding-opened' || event.type === 'check-finding-reported' ? [event.data.report] : []));
 
 describe('CF13: a repeated failure is promoted and a passing gate of the same scenario fixes it', () => {
@@ -168,11 +176,11 @@ describe('CF13: a repeated failure is promoted and a passing gate of the same sc
     const root = await fixture();
     const { service, runId, candidates, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
-      'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
+      'local-architect': [submit(assign(notes, { obligations: ['sc-001'] }, outline())), submit(requestCompletion())],
       engineer: [
-        submit(completionProposed('The note scenario is bound.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
-        submit(completionProposed('Bound again.', { scenarios: ['sc-001'] }), write(steps, `${stepFile}// 2\n`)),
-        submit(completionProposed('Bound for real.', { scenarios: ['sc-001'] }), write(steps, `${stepFile}// 3\n`)),
+        submit(completionProposed('The note scenario is bound.', { bindings: [{ id: 'sc-001' }] }), write(steps, stepFile)),
+        submit(completionProposed('Bound again.', { bindings: [{ id: 'sc-001' }] }), write(steps, `${stepFile}// 2\n`)),
+        submit(completionProposed('Bound for real.', { bindings: [{ id: 'sc-001' }] }), write(steps, `${stepFile}// 3\n`)),
       ],
     }, [
       accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
@@ -230,25 +238,27 @@ describe('CF13: a repeated failure is promoted and a passing gate of the same sc
     })]);
     // It was closed before the completion request, so no reconciliation was needed.
     expect(log.filter(event => event.type.startsWith('reconciliation-'))).toEqual([]);
-    expect(log.filter(event => event.type === 'scenario-implemented').map(event => (event.data as { gate: string }).gate)).toEqual([third!.gate]);
+    // The passing gate reported nothing: the scenario stayed bound until its architect's report.
+    expect(scenarioObligations(log)).toEqual(['bound sc-001', 'bound sc-001', 'bound sc-001', 'reported sc-001 done']);
+    expect(at(log, 'obligation-reported')).toBeGreaterThan(at(log, 'gate-passed', data => data.gate === third!.gate));
     git.assertAnswered();
   }, 120_000);
 });
 
 describe('CF13: a pass on the tree that failed is intermittent evidence, and the required gate keeps its own verdict', () => {
-  test('failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it', async () => {
+  test('failed twice and passed on one unchanged tree: the gate passes and the scenario stays bound, the CheckFinding stays open with its classification, and a later changed candidate fixes it', async () => {
     const root = await fixture();
     const { service, runId, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [
-        submit(assign(notes, {}, outline())),
+        submit(assign(notes, { obligations: ['sc-001'] }, outline())),
         submit(assign(notes, { goal: 'Make the note scenario robust.' })),
         submit(requestCompletion()),
       ],
       engineer: [
-        submit(completionProposed('The note scenario is bound.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
-        submit(completionProposed('Nothing to change, it seems.', { scenarios: ['sc-001'] })),
-        submit(completionProposed('Still nothing to change.', { scenarios: ['sc-001'] })),
+        submit(completionProposed('The note scenario is bound.', { bindings: [{ id: 'sc-001' }] }), write(steps, stepFile)),
+        submit(completionProposed('Nothing to change, it seems.', { bindings: [{ id: 'sc-001' }] })),
+        submit(completionProposed('Still nothing to change.', { bindings: [{ id: 'sc-001' }] })),
         submit(completionProposed('The step waits for the note.'), write(steps, `${stepFile}// waits\n`)),
       ],
     }, [
@@ -267,13 +277,14 @@ describe('CF13: a pass on the tree that failed is intermittent evidence, and the
     const [, second, third, fourth] = gates;
     expect(second!.carried).toEqual(['check-finding-opened', 'check-finding-reported']);
     // The third attempt ran on the tree of both failures: the required gate
-    // passes and implements the scenario, and the witness is refused.
+    // passes, the witness is refused, and no state moves.
     expect(third).toEqual({
       gate: third!.gate, verdict: 'passed', carried: [],
       findings: { refused: null, notes: [{ scenario: 'sc-001', checkFinding: 'cf-0001', step: 'witness', code: 'failure-source', classification: 'inconclusive' }] },
     });
     const log = await runEventsOnDisk(root, plan, runId);
-    expect(log.filter(event => event.type === 'scenario-implemented').map(event => (event.data as { gate: string }).gate)).toEqual([third!.gate]);
+    expect(scenarioObligations(log)).toEqual(['bound sc-001', 'bound sc-001', 'bound sc-001', 'reported sc-001 done']);
+    expect(at(log, 'obligation-reported')).toBeGreaterThan(at(log, 'gate-passed', data => data.gate === fourth!.gate));
     expect(log.find(event => event.type === 'iteration-closed' && (event.data as { iteration: string }).iteration === 'wi-001.i01')!.data)
       .toMatchObject({ outcome: 'accepted', gate: third!.gate });
     // The next iteration's gate passes it on a changed candidate, which fixes it.
@@ -301,15 +312,15 @@ describe('CF02 and CF13: an open scenario CheckFinding reaches the work item\'s 
     const { service, runId, agent, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [
-        submit(assign(notes, {}, outline())),
+        submit(assign(notes, { obligations: ['sc-001'] }, outline())),
         submit(requestCompletion()),
         submit(assign(notes, { goal: 'Make the note scenario pass for a reason.', kind: 'repair' })),
         submit(requestCompletion()),
       ],
       engineer: [
-        submit(completionProposed('The note scenario is bound.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
-        submit(completionProposed('Nothing to change, it seems.', { scenarios: ['sc-001'] })),
-        submit(completionProposed('Still nothing to change.', { scenarios: ['sc-001'] })),
+        submit(completionProposed('The note scenario is bound.', { bindings: [{ id: 'sc-001' }] }), write(steps, stepFile)),
+        submit(completionProposed('Nothing to change, it seems.', { bindings: [{ id: 'sc-001' }] })),
+        submit(completionProposed('Still nothing to change.', { bindings: [{ id: 'sc-001' }] })),
         submit(completionProposed('The step waits for the note.'), write(steps, `${stepFile}// waits\n`)),
       ],
     }, [
@@ -358,11 +369,11 @@ describe('the gate is committed when its CheckFinding part cannot be', () => {
     const root = await fixture();
     const { service, runId, warnings } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
-      'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
+      'local-architect': [submit(assign(notes, { obligations: ['sc-001'] }, outline())), submit(requestCompletion())],
       engineer: [
-        submit(completionProposed('The note scenario is bound.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
-        submit(completionProposed('Bound again.', { scenarios: ['sc-001'] }), write(steps, `${stepFile}// 2\n`)),
-        submit(completionProposed('Bound for real.', { scenarios: ['sc-001'] }), write(steps, `${stepFile}// 3\n`)),
+        submit(completionProposed('The note scenario is bound.', { bindings: [{ id: 'sc-001' }] }), write(steps, stepFile)),
+        submit(completionProposed('Bound again.', { bindings: [{ id: 'sc-001' }] }), write(steps, `${stepFile}// 2\n`)),
+        submit(completionProposed('Bound for real.', { bindings: [{ id: 'sc-001' }] }), write(steps, `${stepFile}// 3\n`)),
       ],
     }, [
       accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
@@ -392,10 +403,10 @@ describe('a crash inside the promoting gate', () => {
     let iterationScenarios = 0;
     const { runId } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
-      'local-architect': [submit(assign(notes, {}, outline()))],
+      'local-architect': [submit(assign(notes, { obligations: ['sc-001'] }, outline()))],
       engineer: [
-        submit(completionProposed('The note scenario is bound.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
-        submit(completionProposed('Bound again.', { scenarios: ['sc-001'] }), write(steps, `${stepFile}// 2\n`)),
+        submit(completionProposed('The note scenario is bound.', { bindings: [{ id: 'sc-001' }] }), write(steps, stepFile)),
+        submit(completionProposed('Bound again.', { bindings: [{ id: 'sc-001' }] }), write(steps, `${stepFile}// 2\n`)),
       ],
     }, [
       accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
