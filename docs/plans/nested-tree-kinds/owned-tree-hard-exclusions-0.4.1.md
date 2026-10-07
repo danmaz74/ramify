@@ -1,8 +1,9 @@
 # Ramify 0.4.1: hard exclusions beneath owned trees
 
-The provider correction is qualified and its immutable package is prepared.
-Publication, registry verification, consumer adoption and branch push remain
-with the coordinating agent. This receipt does not claim publication.
+The provider correction is qualified and the coordinator published its exact
+immutable package at `2026-10-07T16:35:04.446Z`. Fresh registry metadata,
+downloaded bytes and installed public behavior match the qualified artifact.
+Consumer adoption and branch push remain with the coordinating agent.
 
 ## Correction and source
 
@@ -122,8 +123,16 @@ Neither `/ramify` nor `/home/app/ramify-nested-kinds` was edited.
 
 The registry's exact 0.4.1 version query returned E404 before preparation;
 raw output remains in `logs/registry-version-before.json`. The coordinator
-must recheck availability and publish this exact qualified tarball, then verify
-registry integrity and downloaded bytes. The prepared command is:
+subsequently published the exact tarball; its
+[publication log](/home/app/ramify-audit-pb-evidence/ramify-0.4.1-prod/logs/publication.log)
+is retained. Fresh [registry metadata](/tmp/ramify-plan21-registry-041-verification/registry.json)
+and an independently downloaded tarball match the qualified SHA-256 and
+integrity. A fresh registry installation passed two public CLI queries and all
+42 path checks with empty stderr; all 492 installed files independently match
+the qualified manifest and its lockfile version/integrity are exact.
+[Registry public smoke](/tmp/ramify-plan21-registry-041-verification/public-smoke.json)
+and [installed manifest verification](/tmp/ramify-plan21-registry-041-verification/installed-manifest-verification.json)
+retain those independent results. The publication used:
 
 ```sh
 npm publish \
