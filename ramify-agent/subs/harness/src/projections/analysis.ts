@@ -183,7 +183,7 @@ export function decisionsOf(view: RunView): DecisionView[] {
       iteration: assignment.id,
       iterationKind: assignment.kind,
       modules: broad ? [...base.modules] : [base.module],
-      includedChildren: broad ? [] : [...base.includedChildren],
+      included: broad ? [] : base.included.map(entry => ({ ...entry })),
       broad,
       rationale: broad ? base.rationale : assignment.scope.rationale,
       extra: assignment.scope.extra.map(extra => ({ path: extra.path, purpose: extra.purpose })),

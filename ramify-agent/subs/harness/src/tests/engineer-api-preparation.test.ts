@@ -70,7 +70,7 @@ test('cold Analysis and Model preparation publishes real separate source-area vi
       expect(text).not.toContain('## `readToken`');
     }
   }
-  const reconstructed = await iterationApiViews(ramify, root, await loadArchitectIndex(root), { module: 'app/analysis', includedChildren: [] });
+  const reconstructed = await iterationApiViews(ramify, root, await loadArchitectIndex(root), { module: 'app/analysis', included: [] });
   expect(reconstructed[0]).toEqual(continued[0]);
 }, 90_000);
 
@@ -84,7 +84,7 @@ test('failed refresh never presents leftover views as current; a missing expecte
   });
   materialize.mockResolvedValue({ ok: true, output: '' });
   await rm(join(root, 'subs/analysis/src/tests/.ramify'), { recursive: true });
-  const missing = await iterationApiViews(ramify, root, index, { module: 'app/analysis', includedChildren: [] });
+  const missing = await iterationApiViews(ramify, root, index, { module: 'app/analysis', included: [] });
   expect(missing[0]!.views.map(view => view.area)).toEqual(['src']);
   expect(missing[0]!.unavailable).toContain('src/tests/.ramify: materialization reported success');
   const ordinaryMetaPath = join(root, 'subs/analysis/src/.ramify/_meta.json');
@@ -104,7 +104,7 @@ test('failed refresh never presents leftover views as current; a missing expecte
 test('an included child prepares all descendant owners, while a broad scope retains its exact modules', async () => {
   const { root, ramify, index } = await fixture(true);
   await expect(readFile(join(root, 'subs/model/subs/detail/src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
-  const selected = await iterationApiViews(ramify, root, index, { module: 'app', includedChildren: ['app/model'] });
+  const selected = await iterationApiViews(ramify, root, index, { module: 'app', included: ['app/model'].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) });
   expect(selected.map(entry => entry.module).sort()).toEqual(['app', 'app/model', 'app/model/detail']);
   const descendant = selected.find(entry => entry.module === 'app/model/detail')!;
   expect(descendant.unavailable).toBeNull();

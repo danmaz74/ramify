@@ -95,11 +95,11 @@ export interface TestSelectionPolicy {
   /** Suites a registered evidence obligation requires; each must be selected. */
   readonly extraSuites: string[];
   /** Paths outside every module whose test files each resolution finds anew and adds to `extraSuites`. */
-  readonly outsideModules?: string[] | undefined;
+
 }
 
 /** A policy resolved against the current tree, recorded on the attempt that ran it. */
-export interface TestSelection extends Omit<TestSelectionPolicy, 'outsideModules'> {
+export interface TestSelection extends TestSelectionPolicy {
   readonly resolved: string[];
 }
 
@@ -161,8 +161,9 @@ export interface GateAttribution {
 
 /**
  * Why a gate did not pass. `check-failed` records a command or rule failure
- * without assigning its location or repair owner. `in-scope` and
- * `outside-assignment` remain readable for historical attempts.
+ * without assigning its location or repair owner. The current scripted
+ * lifecycle engine also retains its location-attribution vocabulary until
+ * Plan21 iteration 9 replaces that execution seam.
  */
 export type GateCause =
   | 'check-failed' | 'in-scope' | 'infrastructure' | 'timeout' | 'invalid-session'
@@ -177,7 +178,7 @@ export type GateNext = 'accept' | 'repair' | 'retry-infrastructure' | 'return-to
  * and what it found is the diagnostics the engineer repairs from.
  */
 export interface GateRuleRecord {
-  readonly rule: 'fake-naming' | 'fake-exposure-parity' | 'scratch-safety';
+  readonly rule: 'fake-naming' | 'fake-exposure-parity' | 'scratch-safety' | 'write-scope';
   readonly outcome: 'passed' | 'failed';
   readonly violations: ReadonlyArray<{ readonly rule: string; readonly path: string; readonly detail: string }>;
   /** What the rule could not establish, or found and did not attribute to this attempt; absent when nothing. */
@@ -287,7 +288,7 @@ export interface GateAttempt {
   /** Exact versioned provider payload and check results. Legacy attempts omit it. */
   readonly provider?: { readonly result: unknown; readonly checks: unknown };
   /** `after: null` is a deletion, which is a change like any other. */
-  readonly guardedChanges: Array<{ readonly path: string; readonly before: string; readonly after: string | null; readonly authorizedBy: RecordReference | null }>;
+  readonly guardedChanges: Array<{ readonly path: string; readonly before: string | null; readonly after: string | null; readonly authorizedBy: RecordReference | null }>;
   /** Rules the harness verified itself. A checkpoint with none records none. */
   readonly rules?: GateRuleRecord[];
   readonly commands: GateCommandRecord[];

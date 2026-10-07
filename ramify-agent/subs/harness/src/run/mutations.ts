@@ -1,5 +1,6 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { isContained } from '../guard/resolve-contained-path.js';
+import { placementDecisions } from '../guard/write-guard.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import type { ObservationLog } from './observations.js';
 
@@ -14,9 +15,8 @@ import type { ObservationLog } from './observations.js';
  * becomes visible. No new machinery is needed for it, and none is added.
  *
  * Comparing that snapshot with the write scope fills
- * `InvocationOutcome.outsideScope`. A path is reported there, never blocked:
- * the shell's writes pass no guard, and the MVP states that limit rather
- * than implying an enforcement it does not have.
+ * `InvocationOutcome.outsideScope`. Shell changes are observed after execution;
+ * the committing gate applies this same boundary before accepting a candidate.
  */
 
 /** What the tree said when the writer settled. */
@@ -52,18 +52,20 @@ export async function takeMutationSnapshot(request: SnapshotRequest): Promise<Mu
   const relatives = [...new Set(paths.map(path => toRelative(request.projectRoot, path)))].sort();
   return {
     paths: relatives,
-    outsideScope: request.scope === undefined ? [...relatives] : outsideScope(request.projectRoot, request.scope, relatives),
+    outsideScope: request.scope === undefined ? [...relatives] : await outsideScope(request.projectRoot, request.scope, relatives),
     failure: null,
   };
 }
 
 /**
- * Which of these paths lie outside the scope. The check is lexical and takes
- * no `realpath`: a path the snapshot names may have been deleted, and a
- * deletion outside the scope is as much an outside change as a write is.
+ * Check logical and resolved physical placement through the provider. A deleted
+ * path resolves through its nearest existing ancestor; deleting outside the
+ * scope is as much an outside change as writing there.
  */
-export function outsideScope(projectRoot: string, scope: GuardedScope, paths: readonly string[]): string[] {
-  return paths.filter(path => {
+export async function outsideScope(projectRoot: string, scope: GuardedScope, paths: readonly string[]): Promise<string[]> {
+  const placements = await placementDecisions(scope, projectRoot, paths);
+  return paths.filter((path, position) => {
+    if (!placements[position]) return true;
     const absolute = resolve(projectRoot, path);
     if (scope.files.includes(absolute)) return false;
     return !scope.roots.some(root => isContained(root, absolute));

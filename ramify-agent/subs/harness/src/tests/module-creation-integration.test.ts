@@ -135,7 +135,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
     // harness could not obtain.
     expect(unavailable).toEqual([]);
     const assignment = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.assignment('wi-001', 1)), 'utf8')) as {
-      scope: { bootstrap: Array<{ directory: string }>; resolved: { roots: string[]; files: string[] } };
+      scope: { bootstrap: Array<{ directory: string }>; resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: string[]; files: string[] } };
     };
     // The bootstrap authority came from the accepted registry entry, and it
     // reaches a directory that did not exist.

@@ -108,7 +108,7 @@ function scopeOf(assignment: IterationAssignment) {
   const broad = 'modules' in base;
   return {
     modules: broad ? [...base.modules] : [base.module],
-    includedChildren: broad ? [] : [...base.includedChildren],
+    included: broad ? [] : base.included.map(entry => ({ ...entry })),
     broad,
     rationale: broad ? base.rationale : assignment.scope.rationale,
     extra: assignment.scope.extra.map(extra => ({ path: extra.path, purpose: extra.purpose })),

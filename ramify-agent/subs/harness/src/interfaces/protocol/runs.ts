@@ -636,7 +636,7 @@ export const decisionViewSchema = z.discriminatedUnion('kind', [
     iteration: text,
     iterationKind: text,
     modules: z.array(text).min(1),
-    includedChildren: z.array(text),
+    included: z.array(z.object({ directory: text, reason: text, instructions: text }).strict()),
     /** An explicitly broad breaking scope, with its rationale. */
     broad: z.boolean(),
     rationale: text,
@@ -730,7 +730,7 @@ const gateSummary = z.object({
 
 const scopeView = z.object({
   modules: z.array(text).min(1),
-  includedChildren: z.array(text),
+  included: z.array(z.object({ directory: text, reason: text, instructions: text }).strict()),
   broad: z.boolean(),
   rationale: text,
   extra: z.array(z.object({ path: text, purpose: text }).strict()),
@@ -1100,7 +1100,7 @@ export const gateViewSchema = z.object({
   next: gateNextSchema,
   guardedChanges: z.array(z.object({
     path: text,
-    before: z.string(),
+    before: z.string().nullable(),
     /** Null is a deletion, which is a change like any other. */
     after: z.string().nullable(),
     authorizedBy: z.object({ id: z.string(), revision: count }).strict().nullable(),

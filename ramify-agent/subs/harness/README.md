@@ -257,7 +257,7 @@ hiding or measured complexity justifies it.
     invalid; and what readiness asks of a valid one: the modules' test areas
     its support code must match, and whether each mode's commands resolve.
     Its optional `typeCheck.output` retains the declared output format for
-    historical configuration compatibility; the harness does not parse error
+    the current captured configuration contract; the harness does not parse error
     locations to assign repair ownership. Its
     optional `timeouts` the gate command timeouts, which `start-run`
     captures into the policy in place of the harness's own
@@ -320,8 +320,9 @@ hiding or measured complexity justifies it.
     session's last assistant text, which a failure digest reads.
   - `mutations.ts`: what a writer changed, read from `git status` when it
     settles. That snapshot is the only observation that sees a write no
-    guard saw; comparing it with the write scope fills `outsideScope`, and
-    a path is reported there rather than blocked.
+    guard saw; comparing it with captured and current provider facts fills
+    `outsideScope`. Shell mutations are observed after execution; the committing
+    gate refuses candidates outside the captured and current boundary.
   - `excursions.ts`: read boundaries, which are soft. The first read into
     another module is one `excursion` observation and one concise reminder;
     a later read of the same module is neither. What Ramify generates is
@@ -436,11 +437,14 @@ hiding or measured complexity justifies it.
     analysis that fails or is invalid is `unavailable`, and never fails the
     run.
   - `scope.ts`: capturing a write scope's real paths. An ordinary assignment
-    reaches the assigned module's own source area and its two declaration
-    files, plus the complete directory of each immediate child it named, plus
-    the locations assigned beyond that base. A bootstrap scope reaches a
-    directory that does not exist yet, through its nearest existing ancestor.
-    The paths are captured once; a later refresh never widens them.
+    reaches the assigned owner's ordinary documents, auxiliary source, scratch
+    and owned unwired contents, plus whole included immediate child subtrees
+    and declared owned nested projects. The one inclusion list carries each
+    directory's reason and instructions; the provider derives kind and owner.
+    Hard exclusions apply before all allowances. Logical and physical paths,
+    including absent targets, are checked against captured and current facts.
+    Configuration creation, changes and deletion need recorded authorization.
+    Captured authority survives current-policy recovery; refresh only narrows.
   - `engineer.ts`: what an engineer submits, its own test tool, and the
     briefing it starts from. `run_scope_tests` takes nothing: the assignment
     and the files its policy selects are the harness's, and it resolves them

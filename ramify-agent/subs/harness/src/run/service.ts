@@ -1,7 +1,7 @@
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
 import { lstat, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart, ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
 import { gitCandidateSource, gitService, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
@@ -39,7 +39,8 @@ import {
   type ReconciliationBasis, type ReconciliationSubmission, type UnresolvedReason,
 } from '../reviews/reconciliation.js';
 import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } from '../reviews/reconciliation-message.js';
-import { recordSettledSnapshot } from './mutations.js';
+import { outsideScope, recordSettledSnapshot } from './mutations.js';
+import { placementPaths } from '../guard/write-guard.js';
 import { captureProvisionalSource } from '../capability/source.js';
 import { capabilityRequestId, capabilityTaskId, capabilityAssignmentId, identifyCapabilityNeed, capabilityLayout,
   type CapabilityNeedInput, type CapabilityRequest, type CapabilityTask, type CapabilityPlan, type CapabilityExchange,
@@ -188,7 +189,7 @@ import {
 } from '../work/failure.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  auditPreparationPaths, captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
+  auditPreparationPaths, scopeConfigurationPaths, captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
   type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
@@ -728,8 +729,8 @@ export class RunService {
     return { service, recovery };
   }
 
-  /** Historical workflow tests remain executable without exposing their path to new production runs. */
-  static async openForHistoricalTests(options: RunServiceOptions): Promise<{ service: RunService; recovery: RunRecoveryReport }> {
+  /** Current-policy scripted lifecycle controls exercise the ordinary and narrow contract paths without launching capability coordination. */
+  static async openForScriptedLifecycleTests(options: RunServiceOptions): Promise<{ service: RunService; recovery: RunRecoveryReport }> {
     const service = new RunService(options, null);
     const recovery = await service.load();
     return { service, recovery };
@@ -1703,6 +1704,7 @@ export class RunService {
 
   /** The run's review requests and coverage, from its log; undefined for an unknown run. */
   reviews(planId: string, runId: string, workItem?: string): { readonly coverage: ReviewCoverage; readonly requests: ReturnType<typeof unsettledRequests> } | undefined {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     if (run === undefined) return undefined;
     const requests = [...reviewStateOf(run.log.events).values()].filter(request => workItem === undefined || request.workItem === workItem);
@@ -2403,6 +2405,13 @@ export class RunService {
     }
   }
 
+  private readonly refusedPolicies = new Map<string, string>();
+
+  private refuseEarlierPolicy(planId: string, runId: string): void {
+    const recorded = this.refusedPolicies.get(key(planId, runId));
+    if (recorded !== undefined) throw new CommandRejection('conflict', `Run policy ${recorded} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
+  }
+
   private async load(): Promise<RunRecoveryReport> {
     const report: RunRecoveryReport = { interrupted: [], rematerialized: [], effects: [], invocations: [], skipped: [], reviews: [] };
     for (const { planId, jobId } of await listJobDirectories(this.projectRoot)) {
@@ -2414,6 +2423,14 @@ export class RunService {
         if (document === undefined) continue;
         const parsed: unknown = JSON.parse(document.toString('utf8'));
         if ((parsed as { kind?: unknown } | null)?.kind !== 'implementation') continue;
+        const policy = (parsed as { policy?: { version?: unknown } }).policy?.version;
+        if (policy !== capabilityRunPolicyVersion) {
+          const recorded = typeof policy === 'string' ? policy : '(missing policy)';
+          this.refusedPolicies.set(key(planId, jobId), recorded);
+          report.skipped.push(key(planId, jobId));
+          this.warn(`Run policy ${recorded} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
+          continue;
+        }
         const record = runRecordSchema.parse(parsed);
         if (record.jobId !== jobId || record.planId !== planId) throw new Error('job.json names another run');
         const log = await RunLog.open(join(directory, runLayout.events), jobId);
@@ -2456,12 +2473,6 @@ export class RunService {
         }
       }
 
-      if (!run.log.terminal && run.record.policy.version !== capabilityRunPolicyVersion && this.workflow !== null) {
-        await this.endRun(run, { type: 'job-interrupted', data: {
-          message: `Unsupported historical workflow ${run.record.policy.version}; its records remain readable. Resume it with the original harness revision that captured its prompt packages, or start a new capability-coordination run.`,
-        } }, 'interrupted');
-        report.interrupted.push(run.key);
-      }
 
       if (!run.log.terminal) {
         if (this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion &&
@@ -2824,17 +2835,20 @@ export class RunService {
   }
 
   getRun(planId: string, runId: string): RunSnapshot | undefined {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     return run && runSnapshot(run.record, run.log.events);
   }
 
   /** The run's events, exactly as its log holds them. */
   events(planId: string, runId: string) {
+    this.refuseEarlierPolicy(planId, runId);
     return this.runs.get(key(planId, runId))?.log.events;
   }
 
   /** The record of one run, for a caller that reads what it was started with. */
   recordOf(planId: string, runId: string): RunRecord | undefined {
+    this.refuseEarlierPolicy(planId, runId);
     return this.runs.get(key(planId, runId))?.record;
   }
 
@@ -2844,6 +2858,7 @@ export class RunService {
    * caller receives the replay, and nothing it does with it reaches the log.
    */
   committed(planId: string, runId: string) {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     return run && { record: run.record, directory: run.directory, entries: run.log.ledger.replay() };
   }
@@ -2859,6 +2874,7 @@ export class RunService {
     runId: string,
     change: { readonly cause: CheckFindingCause; readonly commands: readonly CheckFindingCommand[] },
   ): Promise<CheckFindingCommit | undefined> {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     if (run === undefined) return undefined;
     const committed = await this.commitCheckFindings(run, () => ({
@@ -2876,6 +2892,7 @@ export class RunService {
    * unknown run.
    */
   checkFindings(planId: string, runId: string, query: CheckFindingQueryInput): CheckFindingSelection | undefined {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     return run && selectCheckFindings(checkFindingStateOf(run.log.ledger), query);
   }
@@ -2914,6 +2931,7 @@ export class RunService {
 
   /** Settles when the run's driver has nothing left to do. For tests and shutdown. */
   async settled(planId: string, runId: string): Promise<void> {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     if (run) await run.idle();
   }
@@ -2954,6 +2972,10 @@ export class RunService {
 
   private async start(command: Extract<RunCommand, { type: 'start-run' }>, contentHash: string): Promise<Receipt> {
     const { planId, agent: requested, reviewStop } = command.payload;
+    if (this.options.policy !== undefined) {
+      const policy = this.options.policy(this.projectRoot, []);
+      if (policy.version !== capabilityRunPolicyVersion) throw new CommandRejection('conflict', `Run policy ${policy.version} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
+    }
     this.commands.requireVersion(command, 0, 'A start creates a run, whose version is 0');
     const agent = this.options.agent;
     if (!agent) throw new CommandRejection('unavailable', 'No agent is configured, so no run can start');
@@ -3072,11 +3094,8 @@ export class RunService {
       throw error;
     }
     const policy = (this.options.policy ?? ((root: string) => defaultRunPolicy({ projectRoot: root })))(this.projectRoot, []);
-    if (policy.version === capabilityRunPolicyVersion && this.workflow === null) {
-      throw new CommandRejection('conflict', 'The historical test workflow cannot create a capability-coordination run');
-    }
-    if (this.workflow !== null && policy.version !== capabilityRunPolicyVersion) {
-      throw new CommandRejection('conflict', `New runs require ${capabilityRunPolicyVersion}; policy ${policy.version} is historical`);
+    if (policy.version !== capabilityRunPolicyVersion) {
+      throw new CommandRejection('conflict', `Run policy ${policy.version} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
     }
     return { manifest, packages, promptManifest, policy };
   }
@@ -3120,6 +3139,7 @@ export class RunService {
 
   private async stop(command: Extract<RunCommand, { type: 'stop-job' }>, contentHash: string): Promise<Receipt> {
     const { planId, jobId } = command.payload;
+    this.refuseEarlierPolicy(planId, jobId);
     const run = this.runs.get(key(planId, jobId));
     if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
     const receipt = await run.mutex.run(async () => {
@@ -3211,6 +3231,7 @@ export class RunService {
    */
   private async approve(command: Extract<RunCommand, { type: 'approve-analysis' }>, contentHash: string): Promise<Receipt> {
     const { planId, jobId, reviewer, note } = command.payload;
+    this.refuseEarlierPolicy(planId, jobId);
     const run = this.runs.get(key(planId, jobId));
     if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
     const receipt = await run.mutex.run(async () => {
@@ -3250,6 +3271,7 @@ export class RunService {
    */
   private async checkFindingCommand(command: CheckFindingUserCommand, contentHash: string): Promise<Receipt> {
     const { planId, jobId } = command.payload;
+    this.refuseEarlierPolicy(planId, jobId);
     const run = this.runs.get(key(planId, jobId));
     if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
     const at = this.now();
@@ -3661,11 +3683,17 @@ export class RunService {
     assessment: Assessment, candidateId: string, action: Extract<CoordinatorAction, { kind: 'repair' }>,
   ): Promise<boolean> {
     const id = `nfr-repair-${String(run.log.count('nonfunctional-repair-assigned') + 1).padStart(3, '0')}`;
+    const answer = await this.options.ramify.queryOwnership(this.projectRoot, ['.']);
+    const scope = await resolveWriteScope({ projectRoot: this.projectRoot, ramify: this.options.ramify, index: await this.refreshIndex(run),
+      view: run.record.manifest.architectView, revision: assessment.round,
+      base: { modules: answer.selection.scope.ownership.modules.map(module => module.id), rationale: 'The recorded coordinator authorized one project-wide non-functional repair batch' },
+      extra: [], read: [], bootstrap: [], rationale: action.task });
     const assignment = nonfunctionalRepairAssignmentSchema.parse({
       schema: 'ramify-agent.nonfunctional-repair-assignment/1', id, round: assessment.round,
       assessment: assessment.id, candidate: candidateId, nfrs: action.nfrs,
       startingModule: action.startingModule, task: action.task,
-      evidence: action.evidence, uncertainty: action.uncertainty,
+      evidence: action.evidence, uncertainty: action.uncertainty, scope,
+      guarded: await captureGuardedFiles(this.projectRoot, [], await this.guardedScenarioFiles(run), [...await this.auditPreparationPaths(run), ...scopeConfigurationPaths(scope)]),
     });
     await this.write(run, { type: 'nonfunctional-repair-assigned', data: {
       round: assignment.round, assignment: id, assessment: assessment.id, candidate: candidateId,
@@ -3683,9 +3711,8 @@ export class RunService {
     if (loaded === undefined) throw new Error('Non-functional repair package is unavailable');
     const index = await this.refreshIndex(run);
     const workingDirectory = await repairWorkingDirectory(this.projectRoot, assignment.startingModule, index);
-    const root = await resolveRealTarget(this.projectRoot, '.');
-    if (!root.ok) throw new Error(`Project root cannot be resolved for repair: ${root.reason}`);
-    const guarded: GuardedScope = { revision: 1, roots: [root.resolved], files: [], denied: await this.deniedFiles(run) };
+    const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot,
+      [...await this.deniedFiles(run), ...assignment.guarded.map(file => file.path)]), this.options.ramify);
     const commandTimeoutMs = engineerBoundsOf(run.record.policy.limits).defaults.commandTimeoutMs;
     const tools = this.implementationTools(run, { workingDirectory, scopeRevision: 1, guarded,
       tests: { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites: [] }, commandTimeoutMs });
@@ -3713,11 +3740,34 @@ export class RunService {
       await this.fail(run, 'inputs-changed', `Captured plan evidence changed during repair: ${changed.join('; ')}`);
       return false;
     }
+    if (!await this.repairScopeAllowed(run, assignment)) return false;
     await this.write(run, { type: 'nonfunctional-repair-committed', data: {
       round: assignment.round, invocation: result.id, assignment: assignment.id,
     } });
     await this.afterWrite('nonfunctional-repair-committed', run.record.jobId);
     return true;
+  }
+
+  /** Check the exact captured repair boundary after shell writes and again on restart. */
+  private async repairScopeAllowed(run: Run, assignment: import('./nonfunctional-records.js').NonfunctionalRepairAssignment): Promise<boolean> {
+    try {
+      const guard = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot,
+        [...await this.deniedFiles(run), ...assignment.guarded.map(file => file.path)]), this.options.ramify);
+      const changed = await this.git.changedPaths(this.projectRoot, this.accepted(run));
+      const candidate = [];
+      for (const path of changed) {
+        const captured = assignment.guarded.find(file => file.path === path);
+        const hash = captured === undefined ? undefined : await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(error => {
+          if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+          throw error;
+        });
+        if (captured === undefined || hash !== captured.hash) candidate.push(path);
+      }
+      const outside = await outsideScope(this.projectRoot, guard, candidate);
+      if (outside.length === 0) return true;
+      await this.fail(run, 'inputs-changed', `Repair changed files outside captured and current authority: ${outside.join('; ')}`);
+    } catch (error) { await this.fail(run, 'inputs-changed', `Repair ownership cannot be verified: ${message(error)}`); }
+    return false;
   }
 
   /** A durable assignment may precede the child; a settled submitted child may precede its repair event. */
@@ -3770,6 +3820,7 @@ export class RunService {
       await this.fail(run, 'inputs-changed', `Captured plan evidence changed during repair recovery: ${changed.join('; ')}`);
       return false;
     }
+    if (!await this.repairScopeAllowed(run, assignment)) return false;
     await this.write(run, { type: 'nonfunctional-repair-committed', data: {
       round: assignment.round, invocation, assignment: assignment.id,
     } });
@@ -5223,7 +5274,7 @@ export class RunService {
         this.projectRoot,
         this.requiredArtifacts(current).map(artifact => artifact.path),
         scenarioFiles,
-        this.auditPreparationPaths(run),
+        await this.auditPreparationPaths(run),
       )).map(file => file.path).filter(path => !harnessOnly.has(path)));
       const conformed = new Set(run.log.all('provider-conformed').map(event => conformanceKey(event.data.obligation, event.data.revision)));
       // A provider's report reaches this architect once, here, even while
@@ -6679,8 +6730,8 @@ export class RunService {
       ...(source === undefined ? {} : { source }),
       externalCapabilities: externalCapabilities ?? body.externalCapabilities,
       completionEvidence: body.completionEvidence, evidenceObligations,
-      gate: { checkpoint: checkpointOf(body.kind), tests: testPolicyOf(body.kind, scope.base, evidenceObligations, scope.extra) },
-      guarded: await captureGuardedFiles(this.projectRoot, guardedPaths, await this.guardedScenarioFiles(run), this.auditPreparationPaths(run)),
+      gate: { checkpoint: checkpointOf(body.kind), tests: testPolicyOf(body.kind, scope.base, evidenceObligations, scope.extra, scope.resolved.included) },
+      guarded: await captureGuardedFiles(this.projectRoot, guardedPaths, await this.guardedScenarioFiles(run), [...await this.auditPreparationPaths(run), ...scopeConfigurationPaths(scope)]),
       authorizations,
       ...(revisesContract === undefined ? {} : { revisesContract }),
       ...(body.scenarios === undefined || body.scenarios.length === 0 ? {} : { scenarios: [...body.scenarios] }),
@@ -6771,7 +6822,7 @@ export class RunService {
       : creationAuthority(localRegistry, owner);
     const bootstrap = authority?.proposed === undefined
       ? []
-      : [{ capability: refOf(authority.capability, authority.revision, authority), directory: authority.proposed.directory }];
+      : [{ capability: refOf(authority.capability, authority.revision, authority), owner: authority.owner, parent: authority.proposed.parent, directory: authority.proposed.directory }];
 
     // A direct revision is a contract iteration, and its scope, gate and
     // revision number are the harness's, not the architect's: the agreement
@@ -6802,7 +6853,7 @@ export class RunService {
           .flatMap(requirement => requirement.evidence.fakeInjections),
         rationale: `The revision of ${revised.id}: the contract, its conformance suite, its fake, the files that hold it and this consumer's integration. ${body.scope.rationale}`,
       })
-      : await resolveWriteScope({
+      : await resolveWriteScope({ ramify: this.options.ramify,
         projectRoot: this.projectRoot,
         index,
         view: run.record.manifest.architectView,
@@ -7982,7 +8033,7 @@ export class RunService {
         await this.fail(run, 'invalid-submission', `Capability assignment ${id} is invalid: ${problems.map(entry => `${entry.path}: ${entry.message}`).join('; ')}`);
         return null;
       }
-      const scope = await resolveWriteScope({ projectRoot: this.projectRoot, index,
+      const scope = await resolveWriteScope({ ramify: this.options.ramify, projectRoot: this.projectRoot, index,
         view: run.record.manifest.architectView, revision: sequence,
         base: body.scope.base, extra: body.scope.extra, read: body.scope.read, bootstrap: [],
         rationale: body.scope.rationale });
@@ -8130,7 +8181,7 @@ export class RunService {
     const systemPrompt = renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs, workingDirectory);
     const measurementScope = {
       exactOwners: 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules,
-      subtrees: 'module' in assignment.scope.base ? assignment.scope.base.includedChildren : [],
+      subtrees: 'module' in assignment.scope.base ? assignment.scope.resolved.included.filter(entry => entry.kind === 'child-subtree').map(entry => entry.owner) : [],
       apiViews: true,
       architectView: false,
       supportDocuments: baseline.supplementary.map(entry => entry.path),
@@ -8246,7 +8297,7 @@ export class RunService {
       const beforeTree = assignment.coordination?.kind === 'capability-task'
         ? (await this.previewCandidateTree()).tree : undefined;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
+      const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot, [...await this.deniedFiles(run), ...assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify);
       const briefedScenarios = assignment.coordination?.kind === 'capability-task'
         ? this.capabilityEngineerScenarios(run, assignment) : await this.engineerScenarios(run, item);
       // The assignment package reaches a session once: a continued session
@@ -8722,7 +8773,7 @@ export class RunService {
       return null;
     }
 
-    const base = { module: item.module, includedChildren: [] as string[] };
+    const base = { module: item.module, included: [] as { directory: string; reason: string; instructions: string }[] };
     const scope = await this.contractScope(run, index, {
       revision: number,
       consumer: item.module,
@@ -8757,7 +8808,7 @@ export class RunService {
       completionEvidence: `${item.module}'s own tests pass against the fake, and the fake passes the conformance suite.`,
       evidenceObligations: [],
       gate: { checkpoint: 'contract', tests: testPolicyOf('contract', base, []) },
-      guarded: await captureGuardedFiles(this.projectRoot, subArtifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run), this.auditPreparationPaths(run)),
+      guarded: await captureGuardedFiles(this.projectRoot, subArtifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run), [...await this.auditPreparationPaths(run), ...scopeConfigurationPaths(scope)]),
       authorizations: subArtifacts.map(artifact => ({
         path: artifact.path,
         rationale: `The agreement ${artifact.contract.id} is this iteration's to write.`,
@@ -8816,12 +8867,12 @@ export class RunService {
       readonly rationale: string;
     },
   ) {
-    return resolveWriteScope({
+    return resolveWriteScope({ ramify: this.options.ramify,
       projectRoot: this.projectRoot,
       index,
       view: run.record.manifest.architectView,
       revision: subject.revision,
-      base: { module: subject.consumer, includedChildren: [] },
+      base: { module: subject.consumer, included: [] },
       extra: [
         { path: `${subject.providerDirectory}/src/interfaces`, purpose: 'contract', kind: 'directory' },
         { path: `${subject.providerDirectory}/src/tests`, purpose: 'conformance', kind: 'directory' },
@@ -8879,7 +8930,7 @@ export class RunService {
       if (this.ignoring(run)) return null;
       attempt += 1;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
+      const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot, [...await this.deniedFiles(run), ...assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify);
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
         guarded,
@@ -9238,7 +9289,7 @@ export class RunService {
       workItem: mine?.workItem ?? item.id,
       module: item.module,
       forCapability,
-      tests: mine?.evidence.tests ?? testPolicyOf('ordinary', { module: item.module, includedChildren: [] }, []),
+      tests: mine?.evidence.tests ?? testPolicyOf('ordinary', { module: item.module, included: [] }, []),
       fakeInjections: submission.fakeInjections,
     };
     // Every consumer of the agreement is reopened at the new revision; each
@@ -10553,9 +10604,66 @@ export class RunService {
     const typeCheckOutput = 'config' in captured ? captured.config.typeCheck?.output : undefined;
     const setup = 'config' in captured ? captured.config.setup : undefined;
     const scratch = await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+    const ledger = run.log.ledger.replay();
+    const committed = committedRecords(ledger);
+    const assignments = request.subject?.iteration !== undefined
+      ? [committed.assignments.get(request.subject.iteration)].filter((entry): entry is IterationAssignment => entry !== undefined)
+      : [...committed.assignments.values()].filter(entry => request.subject?.workItem === undefined || entry.workItem === request.subject.workItem || (entry.coordination?.kind === 'capability-task' && entry.coordination.id === request.subject.workItem));
+    // Only authority co-committed with actual run assignments can cover a
+    // later checkpoint. A rejected iteration's dirty files get no shortcut.
+    const origins: Array<{ scope: WriteScope; guarded: readonly { path: string; hash: string | null }[];
+      authorizations: readonly { path: string }[]; inherited: readonly { path: string; hash: string | null }[] }> = assignments.map(assignment => ({
+        scope: assignment.scope, guarded: assignment.guarded, authorizations: assignment.authorizations,
+        inherited: assignment.coordination?.kind === 'capability-task' ? assignment.coordination.startingPaths : [],
+      }));
+    if (request.checkpoint === 'final') {
+      for (const entry of ledger) {
+        if (entry.transaction.event.type !== 'nonfunctional-repair-assigned') continue;
+        const event = entry.transaction.event;
+        const records = entry.transaction.records.filter(record => record.path === runLayout.nonfunctionalRepairAssignment(event.data.assignment)
+          && record.id === event.data.assignment && record.revision === 1);
+        if (records.length !== 1) throw new Error('Final checkpoint has an unavailable committed repair authority');
+        const repair = nonfunctionalRepairAssignmentSchema.parse(records[0]!.body);
+        origins.push({ scope: repair.scope, guarded: repair.guarded, authorizations: [], inherited: [] });
+      }
+    }
+    const scopeRules: GateRuleRecord[] = [];
+    try {
+      const changed = await this.git.changedPaths(this.projectRoot, this.accepted(run));
+      const paths = await placementPaths(this.projectRoot, changed);
+      // One decoded answer and input identity for the entire gate, including
+      // logical aliases and their real targets across every captured origin.
+      const current = changed.length === 0 ? undefined : await this.options.ramify.queryOwnership(this.projectRoot, paths);
+      const permitted = new Set<string>();
+      const harnessDenied = await this.deniedFiles(run);
+      for (const origin of origins) {
+        const guard = guardedScopeOf(origin.scope, await deniedFiles(this.projectRoot,
+          [...harnessDenied, ...origin.guarded.filter(file => !origin.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify, current);
+        const candidate: string[] = [];
+        for (const path of changed) {
+          const prior = origin.inherited.find(entry => entry.path === path);
+          const capturedFile = origin.guarded.find(entry => entry.path === path);
+          const hash = prior === undefined && capturedFile === undefined ? undefined : await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(error => {
+            if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+            throw error;
+          });
+          // Exact unchanged captured harness effects and inherited parent bytes
+          // are not this writer's changes; null means actual absence only.
+          if ((prior !== undefined && hash === prior.hash) || (capturedFile !== undefined && hash === capturedFile.hash)) permitted.add(path);
+          else candidate.push(path);
+        }
+        const outside = new Set(await outsideScope(this.projectRoot, guard, candidate));
+        for (const path of candidate) if (!outside.has(path)) permitted.add(path);
+      }
+      const outside = changed.filter(path => !permitted.has(path));
+      scopeRules.push({ rule: 'write-scope', outcome: outside.length === 0 ? 'passed' : 'failed',
+        violations: outside.map(path => ({ rule: 'write-scope', path, detail: 'Candidate change has no originating captured and current write authority' })) });
+    } catch (error) {
+      scopeRules.push({ rule: 'write-scope', outcome: 'failed', violations: [{ rule: 'write-scope', path: '.', detail: `Candidate ownership is unavailable: ${message(error)}` }] });
+    }
     const prepared = await prepareCheckpoint({
       ...request,
-      rules: [...(request.rules ?? []), scratch],
+      rules: [...(request.rules ?? []), scratch, ...scopeRules],
       ...(scenarios === undefined ? {} : { scenarios }),
       ...(typeCheckOutput === undefined ? {} : { typeCheckOutput }),
       ...(setup === undefined ? {} : { setup }),
@@ -10994,10 +11102,12 @@ export class RunService {
   }
 
   /** Committed audit preparation inputs, converted to paths in this project. */
-  private auditPreparationPaths(run: Run): string[] {
+  private async auditPreparationPaths(run: Run): Promise<string[]> {
     const audit = run.record.auditConfiguration;
-    if (audit === undefined || !('config' in audit)) return [];
-    return auditPreparationPaths(audit.config);
+    const answer = await this.options.ramify.queryOwnership(this.projectRoot, ['.']);
+    const configuration = relative(this.projectRoot, resolve(this.projectRoot, answer.selection.scope.configuration)).split(sep).join('/');
+    if (configuration === '' || configuration === '..' || configuration.startsWith('../')) throw new Error('Provider configuration is outside the captured project');
+    return [...new Set([configuration, ...(audit === undefined || !('config' in audit) ? [] : await auditPreparationPaths(audit.config, this.projectRoot))])];
   }
 
   // Scenario states, architecture §7 to §9
@@ -11014,7 +11124,7 @@ export class RunService {
   /** Real work-item entries within a capability assignment's owners. The
    * suspended consumer's unrelated entry is never inherited by the task. */
   private capabilityScenarioContext(run: Run, base: IterationAssignment['scope']['base']): DeclarationContext {
-    const modules = 'module' in base ? [base.module, ...base.includedChildren] : base.modules;
+    const modules = 'module' in base ? [base.module, ...base.included.map(entry => [...run.index?.modules.values() ?? []].find(module => module.dir === entry.directory)?.module).filter((module): module is string => module !== undefined)] : base.modules;
     const entries = committedRecords(run.log.ledger.replay()).workItems
       .filter(item => modules.includes(item.module) && 'entry' in item.origin)
       .map(item => 'entry' in item.origin ? item.origin.entry : null)

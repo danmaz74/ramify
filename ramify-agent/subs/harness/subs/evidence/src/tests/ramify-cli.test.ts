@@ -128,6 +128,32 @@ describe('the released ownership answer', () => {
     expect(() => decodeOwnershipAnswer(answer(), '/another')).toThrow('schema, root or mode');
   });
 
+  it('accepts renamed child directories and grouping directories, with diagnostic analysis limits', () => {
+    const current = answer();
+    current.selection.scope.ownership.modules[1]!.directory = 'subs/group/physical';
+    current.selection.analysisCheck = 'failed';
+    current.selection.coverage = { status: 'partial', notes: [] };
+    expect(decodeOwnershipAnswer(current, root).selection.scope.ownership.modules[1]!.id).toBe('app/web');
+  });
+
+  it('refuses unsafe paths, duplicate identities, cycles and contradictory excluded placements', () => {
+    for (const path of ['/absolute', '../escape', 'docs/../escape', 'docs//x', 'docs/./x', 'docs\\escape', 'C:/escape']) {
+      const current = answer(); current.selection.paths[0]!.path = path;
+      expect(() => decodeOwnershipAnswer(current, root)).toThrow('selection.path.path');
+    }
+    const duplicate = answer(); duplicate.selection.paths.push(structuredClone(duplicate.selection.paths[0]!));
+    expect(() => decodeOwnershipAnswer(duplicate, root)).toThrow('duplicate path identity');
+    const cycles = answer(); cycles.selection.scope.ownership.modules.push({ id: 'app/web/a', parent: 'app/web/a', directory: 'subs/web/subs/a' });
+    expect(() => decodeOwnershipAnswer(cycles, root)).toThrow('ownership cycle');
+    const incoherent = answer(); incoherent.selection.scope.ownership.modules.push({ id: 'app/other', parent: 'app', directory: 'subs/web/subs/other' });
+    expect(() => decodeOwnershipAnswer(incoherent, root)).toThrow('ownership parent directory');
+    const denied = answer(); denied.selection.scope.ownership.exclusions.push({ kind: 'output', directory: 'docs/output', owner: null } as never);
+    denied.selection.paths[0]!.path = 'docs/output/file';
+    expect(() => decodeOwnershipAnswer(denied, root)).toThrow('owned path crosses hard exclusion');
+    const missing = answer(); missing.selection.paths[0]!.exclusion = null as never;
+    expect(() => decodeOwnershipAnswer(missing, root)).toThrow('missing path exclusion');
+  });
+
   it('refuses contradictory owner parents, directories and path selections', () => {
     const parent = answer(); parent.selection.scope.ownership.modules[1]!.parent = 'missing';
     expect(() => decodeOwnershipAnswer(parent, root)).toThrow('ownership parent');
@@ -136,6 +162,6 @@ describe('the released ownership answer', () => {
     const selected = answer(); selected.selection.paths[0]!.selects.push('app/web');
     expect(() => decodeOwnershipAnswer(selected, root)).toThrow('nonselecting path');
     const foreign = answer(); foreign.selection.paths[0]!.module = 'app/web';
-    expect(() => decodeOwnershipAnswer(foreign, root)).toThrow('owned excluded path');
+    expect(() => decodeOwnershipAnswer(foreign, root)).toThrow(/path owner containment|owned excluded path/u);
   });
 });

@@ -79,7 +79,7 @@ describe('the integration work item', () => {
       // The first assignment leaves out the path to the tags' owner and is
       // refused with the scope the harness expects; the second is accepted.
       'local-architect:wi-003': [
-        submit(bindAtAncestor, { kind: 'submit', input: { ...bindAtAncestor, assignment: { ...bindAtAncestor.assignment, scope: { ...bindAtAncestor.assignment.scope, base: { module: reviews, includedChildren: [notes] } } } } }),
+        submit(bindAtAncestor, { kind: 'submit', input: { ...bindAtAncestor, assignment: { ...bindAtAncestor.assignment, scope: { ...bindAtAncestor.assignment.scope, base: { module: reviews, included: [notes].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) } } } } }),
         submit(requestCompletion()),
       ],
       'engineer:wi-003': [bindTurn],
@@ -148,16 +148,16 @@ describe('the integration work item', () => {
       && session.spec.submission.name === 'submit_work_item_result')!;
     const refused = JSON.parse((architect.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string; message: string; expected: string }> };
     expect(refused.errors).toEqual([{
-      path: 'assignment.scope.base.includedChildren',
+      path: 'assignment.scope.base.included',
       message: `The scope leaves out "${tags}", on the path to a sub-scenario's owner whose step files the scenario imports`,
-      expected: `the base { module: "${reviews}", includedChildren: ["${notes}", "${tags}"] }`,
+      expected: `the base { module: "${reviews}", included: [{ directory: "subs/workspace/subs/reviews/subs/notes", reason, instructions }, { directory: "subs/workspace/subs/reviews/subs/tags", reason, instructions }] }`,
     }]);
 
     // The engineer's scope, the declaration, and the iteration gate that ran
     // the ancestor's feature file with the scenario selected by identity,
     // beside the implemented sub-scenarios of its children.
     const assignment = JSON.parse(await readFile(runPath(root, plan, runId, iterationLayout.assignment('wi-003', 1)), 'utf8')) as { scope: { base: unknown } };
-    expect(assignment.scope.base).toEqual({ module: reviews, includedChildren: [notes, tags] });
+    expect(assignment.scope.base).toEqual({ module: reviews, included: [notes, tags].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) });
     const bindGate = attempts.find(attempt => attempt.subject.iteration === 'wi-003.i01')!;
     expect(summaryOf(bindGate)).toMatchObject({ selection: { kind: 'identity', scenarios: ['sc-001', 'sc-002', 'sc-003'] }, failures: [] });
     expect(summaryOf(bindGate)!.runs.map(one => one.module).sort()).toEqual([reviews, notes, tags].sort());
@@ -282,13 +282,13 @@ describe('the rules, over literal records', () => {
       moduleEntry(notes, notesDirectory, reviews),
       moduleEntry(`${reviews}/core`, `${reviewsDirectory}/subs/core`, reviews),
     ]);
-    const body = (base: { module: string; includedChildren: string[] }) => ({
+    const body = (base: { module: string; included: { directory: string; reason: string; instructions: string }[] }) => ({
       ...assign(base.module).assignment,
       scope: { base, extra: [], read: [], rationale: 'r' },
     });
     const evidence = { index, registry: new Map(), outline: null, integration: integrationScopeOf(records[3]!, records) };
-    expect(assignmentErrors(body({ module: reviews, includedChildren: [notes, `${reviews}/core`] }), evidence)).toEqual([]);
-    expect(assignmentErrors(body({ module: notes, includedChildren: [] }), evidence).map(error => error.path)).toEqual(['assignment.scope.base']);
+    expect(assignmentErrors(body({ module: reviews, included: [notes, `${reviews}/core`].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture child', instructions: 'Implement fixture' })) }), evidence)).toEqual([]);
+    expect(assignmentErrors(body({ module: notes, included: [] }), evidence).map(error => error.path)).toEqual(['assignment.scope.base']);
   });
 
   test('an integration work item declares its own scenario and nothing else; an entry\'s work item still cannot declare one', () => {

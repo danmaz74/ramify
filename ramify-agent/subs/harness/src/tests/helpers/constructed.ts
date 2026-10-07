@@ -4,6 +4,7 @@ import type { CommittedLine, CommittedRun } from '../../projections/inputs.js';
 import type { RunEvent } from '../../run/log.js';
 import type { RunRecord } from '../../run/records.js';
 import { workItemSchema, type WorkItem } from '../../work/records.js';
+import { defaultRunPolicy } from '../../run/policy.js';
 import { minimalProjectConfig } from './project-config.js';
 
 /*
@@ -32,7 +33,7 @@ export function constructedRecord(extra: Partial<RunRecord> = {}): RunRecord {
       architectView: { status: 'placeholder' },
     },
     prompts: {},
-    policy: {} as RunRecord['policy'],
+    policy: defaultRunPolicy({ projectRoot: '/nonexistent' }),
     projectConfig: { path: 'ramify-agent.json', hash, config: minimalProjectConfig },
     baseline: { unavailable: 'constructed' },
     planScenarios: { scenarios: [], limitations: [] },

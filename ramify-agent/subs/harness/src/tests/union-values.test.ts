@@ -489,7 +489,7 @@ describe('the records this iteration establishes', () => {
   test('every iteration kind, extra purpose and result outcome is written and read back', async () => {
     const store = await ledger();
     expect(iterationKindSchema.options).toEqual(['ordinary', 'breaking', 'contract', 'verification', 'repair', 'integration']);
-    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'fake-injection', 'outside-modules']);
+    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'fake-injection']);
 
     const outlineRef = { id: 'wi-001', revision: 1, hash: 'd'.repeat(64) };
     for (const [index, kind] of iterationKindSchema.options.entries()) {
@@ -505,14 +505,12 @@ describe('the records this iteration establishes', () => {
           // takes. The broad arm has no producer until that iteration.
           base: kind === 'breaking'
             ? { modules: ['shop', 'shop/orders'], rationale: 'the guarantee changes in both' }
-            : { module: 'shop/orders', includedChildren: ['shop/orders/pricing'] },
-          extra: extraPurposeSchema.options.map(purpose => (purpose === 'outside-modules'
-            ? { path: 'scripts/report', purpose, kind: 'directory' as const, reason: 'the plan requires the report' }
-            : { path: `subs/orders/src/${purpose}.ts`, purpose })),
+            : { module: 'shop/orders', included: ['shop/orders/pricing'].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) },
+          extra: extraPurposeSchema.options.map(purpose => ({ path: `subs/orders/src/${purpose}.ts`, purpose })),
           read: ['shop'],
-          bootstrap: kind === 'ordinary' ? [{ capability: outlineRef, directory: 'subs/orders/subs/pricing' }] : [],
+          bootstrap: kind === 'ordinary' ? [{ capability: outlineRef, owner: 'shop/orders/pricing', parent: 'shop/orders', directory: 'subs/orders/subs/pricing' }] : [],
           rationale: 'r',
-          resolved: { roots: ['/p/subs/orders/src'], files: ['/p/subs/orders/module.ramify'], view: { status: 'placeholder' } },
+          resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: ['/p/subs/orders/src'], files: ['/p/subs/orders/module.ramify'], view: { status: 'placeholder' } },
         },
         source: { elements: ['fr-001', 'nfr-001'], deviations: ['pd-001'], hash: 'f'.repeat(64) },
         externalCapabilities: [{ capability: 'send-email', owner: 'shop', role: 'use' }],
@@ -520,7 +518,7 @@ describe('the records this iteration establishes', () => {
         evidenceObligations: [{ suite: ['subs/orders/src/tests/conformance.test.ts'], against: 'fake' }],
         gate: kind === 'breaking'
           ? { checkpoint: 'breaking-iteration', tests: { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites: [] } }
-          : { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['shop/orders'], subtrees: [], extraSuites: [], outsideModules: ['scripts/report'] } },
+          : { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['shop/orders'], subtrees: [], extraSuites: [] } },
         guarded: [{ path: 'package.json', hash: 'e'.repeat(64) }],
         // An authorization names a guarded path, the reason, and the record
         // that authorized it. Both states are representable: none, and one.
@@ -812,7 +810,7 @@ describe('the records this iteration establishes', () => {
       stage: 0,
       goal: 'g',
       approach: 'a',
-      scope: { base: { module: 'shop/orders', includedChildren: [] }, extra: [], read: [], rationale: 'r' },
+      scope: { base: { module: 'shop/orders', included: [] }, extra: [], read: [], rationale: 'r' },
       citedElements: [],
       externalCapabilities: [],
       completionEvidence: 'e',
@@ -977,7 +975,7 @@ describe('the run protocol a client reads', () => {
           goal: 'g', approach: 'a',
           scope: {
             revision: 1, base: { modules: ['shop', 'shop/web'], rationale: 'the guarantee changes in both' }, extra: [], read: [], bootstrap: [], rationale: 'r',
-            resolved: { roots: ['/p/src'], files: [], view: { status: 'placeholder' } },
+            resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: ['/p/src'], files: [], view: { status: 'placeholder' } },
           },
           externalCapabilities: [], completionEvidence: 'e', evidenceObligations: [],
           gate: { checkpoint: 'breaking-iteration', tests: { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites: [] } },

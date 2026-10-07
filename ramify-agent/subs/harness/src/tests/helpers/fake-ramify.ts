@@ -1,3 +1,7 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { AffectedDocument } from 'ramify.ts/cli';
+import { treeInputs } from './iterations.js';
 import { RamifyCli, type MaterializeResult, type RamifyRun } from '../../../subs/evidence/src/ramify-cli.js';
 
 /*
@@ -52,6 +56,32 @@ export class FakeRamifyCli extends RamifyCli {
       : { code: 2, stdout: `${unavailable}\n`, stderr: '' };
     this.calls.push({ operation: 'run', argv: [...args], answer: `exit ${answer.code}` });
     return answer;
+  }
+
+  /** Explicitly scripted lifecycle placement; real installed F1 tests establish provider conformance. */
+  override async queryOwnership(projectRoot: string, paths: readonly string[] = ['.']): Promise<AffectedDocument> {
+    const index = await treeInputs().refresh(projectRoot);
+    if (index === null) throw new Error('Scripted lifecycle fixture has no topology');
+    const modules = [...index.modules.values()].map(module => ({ id: module.module, parent: module.parent, directory: module.dir || '.' }));
+    const exclusions: Array<{ kind: 'owned-unwired' | 'owned-nested-project' | 'external' | 'scratch'; directory: string; owner: string | null }> = [];
+    for (const module of modules) {
+      const text = await readFile(join(projectRoot, module.directory, 'module.ramify'), 'utf8');
+      for (const match of text.matchAll(/(owned-unwired|owned-nested-project|external)\s+"([^"]+)"/gu)) {
+        exclusions.push({ kind: match[1] as 'external', directory: join(module.directory === '.' ? '' : module.directory, match[2]!).replaceAll('\\', '/'), owner: match[1] === 'external' ? null : module.id });
+      }
+      exclusions.push({ kind: 'scratch', directory: join(module.directory === '.' ? '' : module.directory, 'src/tmp'), owner: module.id });
+    }
+    const seeds = paths.map(path => {
+      const exclusion = exclusions.filter(entry => path === entry.directory || path.startsWith(`${entry.directory}/`)).sort((a, b) => b.directory.length - a.directory.length)[0] ?? null;
+      const owner = modules.filter(module => module.directory === '.' || path === module.directory || path.startsWith(`${module.directory}/`)).sort((a, b) => b.directory.length - a.directory.length)[0];
+      if (path.startsWith('../')) return { path, status: 'outside-project', module: null, basis: 'none', exclusion: null, kind: null, selects: [] };
+      if (exclusion?.owner === null) return { path, status: 'excluded', module: null, basis: 'excluded', exclusion, kind: null, selects: [] };
+      return { path, status: 'owned', module: exclusion?.owner ?? owner!.id, basis: 'containment', exclusion, kind: exclusion === null ? 'inert' : 'ignored', selects: [] };
+    });
+    return { schemaVersion: 'ramify.affected-cli/4', root: projectRoot, mode: 'batch', ramifyVersion: 'scripted-lifecycle-only',
+      revision: { sequence: null, inputId: 'scripted-lifecycle' }, selection: { schemaVersion: 'ramify.affected/4', inputId: 'scripted-lifecycle', paths: seeds,
+        scope: { root: projectRoot, selection: 'given', configuration: 'tsconfig.json', invokedFrom: projectRoot, walkedAreas: [], ownership: { modules, exclusions } },
+        changedModules: [], affectedModules: [], testModules: [], selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' } } as AffectedDocument;
   }
 
   override async materialize(projectRoot: string, apiFrom?: string, _signal?: AbortSignal): Promise<MaterializeResult> {

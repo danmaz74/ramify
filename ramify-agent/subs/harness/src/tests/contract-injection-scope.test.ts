@@ -108,9 +108,10 @@ describe('where a fake may be injected', () => {
     ]), { seams: { ...seams, index: withBoth } });
     expect(refused.ok).toBe(false);
     if (refused.ok) return;
-    expect(refused.errors.map(error => error.path)).toEqual(['injectionSites.0', 'injectionSites.1', 'injectionSites.2', 'injectionSites.3']);
+    expect(refused.errors.map(error => error.path)).toEqual(['injectionSites.0', 'injectionSites.1', 'injectionSites.3']);
     expect(refused.errors[0]!.message).toContain('the own contents of "collection-review/workspace/reviews/core"');
-    expect(refused.errors[1]!.message).toContain('no module\'s own contents');
+    expect(refused.errors[1]!.message).toContain('collection-review');
+    expect(validateEngineer(contractNeeded([`${providerDirectory}/scripts/tool.ts`]), { seams: { ...seams, index: withBoth } }).ok).toBe(true);
     for (const error of refused.errors) expect(error.message).toContain("a fake injection site lies in the consumer's or the provider's own contents");
 
     // Without a view nothing can be placed, and the harness judges the sites

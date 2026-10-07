@@ -2,8 +2,9 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { runEventSchema } from '../run/log.js';
+import type { GateAttempt } from '../checks/records.js';
 import { observationSchema } from '../run/observations.js';
 import { runSchemas } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
@@ -115,6 +116,54 @@ afterAll(async () => {
 });
 
 describe('the composed runs', () => {
+  test('removed included child keeps scope authority, while legacy scoped discovery fails and the work-item gate commits later', async () => {
+    const run = finished.get('iteration')!;
+    const directory = runDirectory(run.root, run.runId);
+    const scoped = JSON.parse(await readFile(join(directory, 'gates/ga-0002/attempt.json'), 'utf8')) as GateAttempt;
+    expect(scoped.rules?.find(rule => rule.rule === 'write-scope')?.outcome).toBe('passed');
+    expect(scoped.verdict).toBe('not-verified');
+    expect(scoped.commands.some(command => command.notVerified === 'discovery-error')).toBe(true);
+    expect(scoped.commit).toBeNull();
+    const later = JSON.parse(await readFile(join(directory, 'gates/ga-0004/attempt.json'), 'utf8')) as GateAttempt;
+    expect(later.checkpoint).toBe('work-item');
+    expect(later.rules?.find(rule => rule.rule === 'write-scope')?.outcome).toBe('passed');
+    expect(later.commit).toBe('source-01');
+    expect(existsSync(join(run.root, 'subs/workspace/subs/reviews/subs/notes/subs/drafts/module.ramify'))).toBe(false);
+    expect(await readFile(join(run.root, 'subs/workspace/subs/reviews/subs/notes/shell-note.txt'), 'utf8')).toBe('left by the shell\n');
+  });
+
+  test('a rejected iteration cannot send its unauthorized dirty file through a later work-item or final committing checkpoint', async () => {
+    // Scripted lifecycle control of the actual committing checkpoint over
+    // assignments accepted by the real ledger. No Git or audit is executed.
+    const run = await runToEnd(scenarios.iteration);
+    try {
+      const active = run.service['runs'].get(`${plan}/${run.runId}`)!;
+      const ramify = run.service['options'].ramify;
+      const query = vi.spyOn(ramify, 'queryOwnership');
+      const git = run.service['git'];
+      const dirty = vi.spyOn(git, 'changedPaths').mockResolvedValue(['shell-note.txt']);
+      const commit = vi.spyOn(git, 'commitAccepted');
+      const before = commit.mock.calls.length;
+      await writeFile(join(run.root, 'shell-note.txt'), 'outside the originating notes assignments\n');
+      for (const checkpoint of ['iteration', 'work-item', 'final'] as const) {
+        query.mockClear();
+        const id = `ga-09${checkpoint === 'iteration' ? '00' : checkpoint === 'work-item' ? '01' : '02'}`;
+        const attempt = await run.service['committingCheckpoint'](active, {
+          id, runId: run.runId, checkpoint, projectRoot: run.root,
+          directory: active.path(`gates/${id}`), head: 'source-01', policy: active.record.policy,
+          ...(checkpoint === 'iteration' ? { tests: { failure: null, selection: { policy: 'owned-by-scope' as const, exactOwners: ['collection-review/workspace/reviews/notes'], subtrees: [], extraSuites: [], resolved: ['subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts'] } } } : {}),
+          subject: checkpoint === 'iteration' ? { workItem: 'wi-001', iteration: 'wi-001.i01' }
+            : checkpoint === 'work-item' ? { workItem: 'wi-001' } : {},
+        });
+        expect(attempt.rules?.find(rule => rule.rule === 'write-scope')).toMatchObject({ outcome: 'failed', violations: [{ path: 'shell-note.txt' }] });
+        expect(attempt.commit).toBeNull();
+        expect(query).toHaveBeenCalledTimes(1);
+        expect(commit.mock.calls).toHaveLength(before);
+      }
+      dirty.mockRestore(); query.mockRestore(); commit.mockRestore();
+    } finally { await run.dispose(); }
+  });
+
   test('each scenario runs to the end it is written for, and asks Git exactly what it states', () => {
     for (const [name, run] of finished) {
       const snapshot = run.service.getRun(plan, run.runId)!;
@@ -328,6 +377,11 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
  * becoming a second copy of the test that owns them.
  */
 const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly file: string; readonly test: string }> = [
+  { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.extra[].kind', values: ['file'], file: 'subs/harness/src/tests/write-guard.test.ts', test: 'PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions' },
+  { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.ownership.exclusions[].kind', values: ['owned-unwired', 'owned-nested-project', 'external', 'output'], file: 'subs/harness/src/tests/write-guard.test.ts', test: 'PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions' },
+  { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.included[].kind', values: ['owned-nested-project'], file: 'subs/harness/src/tests/write-guard.test.ts', test: 'PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions' },
+  { union: 'submission local-architect[assign].assignment.scope.extra[].kind', values: ['file'], file: 'subs/harness/src/tests/local-architect-submission.test.ts', test: 'removed outside-modules authority is refused, while narrow ordinary and bootstrap extras remain' },
+
   { union: 'record ramify-agent.iteration-assignment/1.coordination.kind', values: ['capability-task'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
   // Plan 16: the new-run capability path is driven in its own service tests.
   { union: 'run log.type', values: ['capability-requested', 'capability-qualified', 'capability-delegated'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
@@ -353,10 +407,6 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'submission engineer[capability-needed].request.knownInterface.kind', values: ['insufficient'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
   { union: 'submission engineer[capability-needed].request.examples[].designation', values: ['pseudocode'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'query events.events[].refs[].kind', values: ['capability-request', 'capability-task', 'capability-assignment'], file: 'subs/harness/src/tests/capability-tasks-projection.test.ts', test: 'CA23: capability event references identify requests, tasks and assignments' },
-  // A path outside every module, assigned as outside-modules and written through the guard.
-  { union: 'record ramify-agent.iteration-assignment/1.scope.extra[].purpose', values: ['outside-modules'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
-  { union: 'record ramify-agent.iteration-assignment/1.scope.extra[].kind', values: ['file'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
-  { union: 'submission local-architect[assign].assignment.scope.extra[].kind', values: ['file', 'directory'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
   // Plan 12: CheckFindings committed through a driven run's own transition, and iteration reviews.
   { union: 'run log.type', values: ['check-findings-recorded'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['producer'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
@@ -671,6 +721,11 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  * a producer, so the list can neither hide a new gap nor outlive a closed one.
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
+  { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.ownership.exclusions[].kind', values: ['repository', 'packages', 'generated'], reason: 'The current public rooted ownership topology does not emit these synthesized reserved path facts. Real installed F1 queries their excluded descendants; that is a path-answer witness, not a producer of captured topology table entries.' },
+  { union: 'submission local-architect[assign].assignment.scope.extra[].kind', values: ['directory'], reason: 'Current architect assignment validation rejects directory extras. Whole assigned child/project trees use included entries, and registry bootstrap creates its internal directory authority. Negative-input validation remains covered; no accepted submission produces this value.' },
+  { union: 'run log[iteration-closed].data.notices[].kind', values: ['module-removed'], reason: 'Interim Plan21 successor9 limitation: authorized child deletion keeps write scope PASS but the earlier scoped runner cannot discover its removed child owner. It commits later at the work-item checkpoint, which emits no iteration-closed removal notice. Deletion/source assertions remain; iteration9 must reconcile this witness.' },
+  { union: 'query runs.runs[].notices[].kind', values: ['module-removed'], reason: 'Interim Plan21 successor9 limitation: the authorized child deletion currently commits at a work-item checkpoint after scoped discovery-error, so no accepted iteration removal notice reaches this projection. The composed deletion assertion remains and successor9 must reconcile the notice witness.' },
+
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['audit-unselected'], reason: 'The current legacy registered executor falls back to a full audit when configured discovery is unavailable. An actual configured empty-selection consumer witness awaits iteration 9; iteration 0 only qualified the provider.' },
   { union: 'query work-item.iterations[].gates[].cause', values: ['in-scope'], reason: 'Historical iterations may project the former in-scope cause; new ordinary gates record the neutral check-failed cause without owner attribution.' },
   { union: 'record ramify-agent.gate-attempt/3.cause', values: ['in-scope', 'outside-assignment'], reason: 'Historical gates retain this inferred attribution, but current gates no longer assign failure ownership from locations or scope probes.' },
@@ -833,7 +888,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'Not assignable: the architect\'s assignment body has no integration kind, and no harness path creates one. It is in the record\'s vocabulary from the proposal and has never had a use.',
   },
   {
-    union: 'record ramify-agent.iteration-assignment/1.scope.extra[].purpose', values: ['consumer'],
+    union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.extra[].purpose', values: ['consumer'],
     reason: 'The consumer is a contract scope\'s base, not an extra location (iteration 9), so no writer names it.',
   },
   {

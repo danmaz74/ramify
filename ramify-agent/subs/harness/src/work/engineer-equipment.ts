@@ -348,7 +348,6 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
           hookTimeoutMs: inputs.commands.hookTimeoutMs,
           seen: seen!,
           ran: hookChecks,
-          outsideModules: inputs.tests.outsideModules,
           logFile: check => inputs.outputPath('hook', session.invocation, check),
         }).catch(error => ({
           checks: [{

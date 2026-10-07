@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { modulePathSchema, sha256Schema } from '../interfaces/protocol/evidence.js';
 import { invocationOutcomeSchema } from '../run/records.js';
 import { capabilityEngineerSubmissionKinds, engineerSubmissionKinds, engineerSubmissionSchema } from '../work/engineer.js';
-import { testSelectionPolicySchema } from '../work/iterations.js';
+import { writeScopeSchema, testSelectionPolicySchema } from '../work/iterations.js';
 
 /*
  * The records of one single engineer session, under
@@ -43,6 +43,8 @@ export const sessionLayout = {
 /** What a session was started with, written before the agent starts. */
 export const sessionRecordSchema = z.object({
   schema: z.literal('ramify-agent.session/2'),
+  policy: z.object({ version: z.literal('run-policy/7'), contract: z.literal('plan21-whole-owner-and-architect-reporting/1') }).strict(),
+  authority: writeScopeSchema,
   id: text,
   role: z.literal('engineer'),
   module: modulePathSchema,
@@ -63,7 +65,7 @@ export const sessionRecordSchema = z.object({
   tests: testSelectionPolicySchema,
   gate: z.boolean(),
   /** The guarded files as they stood at the start, which a gate compares the tree with. */
-  guarded: z.array(z.object({ path: text, hash: text }).strict()),
+  guarded: z.array(z.object({ path: text, hash: text.nullable() }).strict()),
   views: z.array(z.object({
     module: text,
     views: z.array(z.object({ area: text, path: text, revision: text.optional(), coverage: z.number().nullable() }).strict()),

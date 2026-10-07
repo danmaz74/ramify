@@ -79,21 +79,12 @@ const text = z.string().min(1);
  * receives and `envAdditions` the harness's own settings; `checks/records.ts`
  * says why.
  *
- * A command recorded before this harness recorded names holds `env` as a
- * name-to-value map. It is read as the names it maps, which is the whole of
- * what this harness now keeps of one: a version bump for it alone would have
- * made every recorded run unreadable to gain nothing, since no reader wanted
- * the values.
- * Its settings are not recoverable from such a map and are read as none.
  */
 export const checkCommandSchema = z.object({
   argv: z.array(z.string()),
   cwd: text,
-  env: z.union([
-    z.array(z.string()),
-    z.record(z.string(), z.string()).transform(recorded => Object.keys(recorded).sort()),
-  ]),
-  envAdditions: z.record(z.string(), z.string()).default({}),
+  env: z.array(z.string()),
+  envAdditions: z.record(z.string(), z.string()),
   timeoutMs: z.int().positive(),
 }).strict();
 
@@ -136,7 +127,8 @@ export type ReviewPolicy = z.infer<typeof reviewPolicySchema>;
  * configurable while it runs, so that an exhaustion is reproducible.
  */
 export const runPolicySchema = z.object({
-  version: text,
+  version: z.literal('run-policy/7'),
+  contract: z.literal('plan21-whole-owner-and-architect-reporting/1'),
   limits: z.object({
     repairRoundsPerIteration: z.int().positive(),
     repairRoundsPerWorkItemGate: z.int().positive(),
@@ -153,55 +145,51 @@ export const runPolicySchema = z.object({
     invocationIdleMs: z.int().positive(),
     invocationAbsoluteMs: z.int().positive(),
     maxIterationsPerWorkItem: z.int().positive(),
-    /** Captured for capability workflow runs; absent on historical policies. */
+    /** The bound used for capability tasks. */
     maxIterationsPerCapabilityTask: z.int().positive().optional(),
     maxWorkItems: z.int().positive(),
     maxPlacementRequests: z.int().positive(),
     maxInvocationsPerRun: z.int().positive(),
     runAbsoluteMs: z.int().positive(),
-    /** Assessment and correction rounds of one work item's reconciliation; absent before `run-policy/3`. */
+    /** Assessment and correction rounds of one work item's reconciliation. */
     reconciliationRoundsPerWorkItem: z.int().positive().optional(),
-    /** The least risk a correction after a work item's first reconciliation round may be planned for; absent before iteration 5. */
+    /** The least risk a correction after the first reconciliation round may be planned for. */
     laterRoundMinimumRisk: z.enum(['medium', 'high']).optional(),
-    /** The plan deviations a run records before the next one waits for the person; absent before plan deviations existed, which means five. */
+    /** The plan deviations recorded before the next one waits for the person. */
     maxPlanDeviations: z.int().nonnegative().optional(),
     /**
      * The longest one shell command of an engineer may run unless its
-     * assignment raises it; absent before assignments could raise bounds,
-     * which means the shell's own maximum.
+     * assignment raises it; the current policy builder supplies the default.
      */
     commandTimeoutMs: z.int().positive().optional(),
     /**
      * The ceilings an assignment may raise an engineer's bounds to: one
      * shell command, the idle bound and the absolute bound of each of its
-     * invocations. Absent before assignments could raise bounds, which means
-     * the defaults of `run/policy.ts`.
+     * invocations. The current policy builder supplies their defaults.
      */
     maxCommandTimeoutMs: z.int().positive().optional(),
     maxInvocationIdleMs: z.int().positive().optional(),
     maxInvocationAbsoluteMs: z.int().positive().optional(),
-    /** Absent on earlier runs, whose non-functional coverage is unavailable. */
+    /** The bounded non-functional phase configured by the current policy. */
     nonfunctionalRoundsPerPlan: z.int().positive().max(3).optional(),
   }).strict(),
   /**
-   * The context policy of each role. The reviewer's is absent from a run
-   * captured before `run-policy/3`, which reviews nothing; every other role
-   * must have one.
+   * The context policy of each role used by this current engine configuration.
    */
   context: z.object({
     'initial-architect': contextPolicySchema,
     'global-fork': contextPolicySchema,
     'local-architect': contextPolicySchema,
     engineer: contextPolicySchema,
-    /** Historical runs keep this role; new runs never invoke it. */
+    /** The current scripted lifecycle seam exercises this role; production uses capability assignments. */
     'contract-engineer': contextPolicySchema.optional(),
     'capability-architect': contextPolicySchema.optional(),
     reviewer: contextPolicySchema.optional(),
-    /** Absent from a run captured before failure analysis existed, which analyzes nothing. */
+    /** Context for failure analysis when that role is configured. */
     'failure-analyst': contextPolicySchema.optional(),
-    /** Absent before Plan 13. */
+    /** Context for evidence selection when that role is configured. */
     'context-selector': contextPolicySchema.optional(),
-    /** Absent before Plan 14. */
+    /** Context for catalog extraction when that role is configured. */
     'catalog-extractor': contextPolicySchema.optional(),
     'nonfunctional-coordinator': contextPolicySchema.optional(),
     'nonfunctional-repair-engineer': contextPolicySchema.optional(),
@@ -851,7 +839,7 @@ const verifiedPlannedCheckSchema = plannedCheckSchema
 
 /** A rule the harness verified itself over the tree, beside the commands it ran. */
 export const gateRuleSchema = z.object({
-  rule: z.enum(['fake-naming', 'fake-exposure-parity', 'scratch-safety']),
+  rule: z.enum(['fake-naming', 'fake-exposure-parity', 'scratch-safety', 'write-scope']),
   outcome: z.enum(['passed', 'failed']),
   violations: z.array(z.object({ rule: text, path: text, detail: text }).strict()),
   /** What the rule could not establish, or found and did not attribute to this attempt; absent when nothing. */
@@ -874,7 +862,7 @@ export const gateAttemptSchema = z.object({
   provider: z.object({ result: z.unknown(), checks: z.unknown() }).strict().optional(),
   guardedChanges: z.array(z.object({
     path: text,
-    before: z.string(),
+    before: z.string().nullable(),
     after: z.string().nullable(),
     authorizedBy: recordRefSchema.nullable(),
   }).strict()),
@@ -959,7 +947,7 @@ export const gateOperationSchema = z.object({
     scenarios: z.literal('none-selected').optional(),
   }).strict(),
   guardedChanges: z.array(z.object({
-    path: text, before: z.string(), after: z.string().nullable(), authorizedBy: recordRefSchema.nullable(),
+    path: text, before: z.string().nullable(), after: z.string().nullable(), authorizedBy: recordRefSchema.nullable(),
   }).strict()),
   rules: z.array(gateRuleSchema),
   unauthorized: z.boolean(),

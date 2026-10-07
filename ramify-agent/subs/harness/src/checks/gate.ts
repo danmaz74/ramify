@@ -49,7 +49,7 @@ export interface GateRequest {
   readonly repairRound?: number | undefined;
   readonly infrastructureAttempt?: number | undefined;
   /** The guarded files as the assignment captured them. */
-  readonly guarded?: readonly { readonly path: string; readonly hash: string }[] | undefined;
+  readonly guarded?: readonly { readonly path: string; readonly hash: string | null }[] | undefined;
   /** The assignment's project-relative write scope, retained for historical request compatibility. */
   readonly writeScope?: readonly string[] | undefined;
   /** A guarded path whose change a committed record authorized. */
@@ -111,7 +111,7 @@ export async function prepareGate(checkpoint: Checkpoint, request: GateRequest):
   const timeoutMs = request.checks.reduce((total, check) => total + check.command.timeoutMs, 0) + 30_000;
   // Scratch violations must stop before a committing checkpoint stages a tree.
   // Keep a normal failed attempt so the engineer receives repair diagnostics.
-  const unsafeScratch = rules.some(rule => rule.rule === 'scratch-safety' && rule.outcome === 'failed');
+  const unsafeScratch = rules.some(rule => (rule.rule === 'scratch-safety' || rule.rule === 'write-scope') && rule.outcome === 'failed');
   if (!verified || unsafeScratch) {
     return finishGate({ checkpoint, request, guardedChanges, rules, unauthorized, ruleFailed, decisive, timeoutMs }, {
       commands: await notVerifiedRecords(request, failures, unsafeScratch ? 'local-rule-failed' : 'interrupted'), audited: null, evidence: null,

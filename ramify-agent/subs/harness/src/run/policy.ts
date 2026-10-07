@@ -16,7 +16,7 @@ import { reviewPolicyVersion, roles, runPolicySchema, type CapturedProjectConfig
  */
 
 /** New runs use capability coordination. Earlier policy versions remain readable. */
-export const runPolicyVersion = 'run-policy/6';
+export const runPolicyVersion = 'run-policy/7';
 
 /** The bounds of the main plan's policy table. */
 export const defaultLimits: RunPolicy['limits'] = {
@@ -190,6 +190,7 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
     .map(role => [role, defaultContextPolicies[role]])) as RunPolicy['context'];
   return runPolicySchema.parse({
     version: runPolicyVersion,
+    contract: 'plan21-whole-owner-and-architect-reporting/1',
     limits: defaultLimits,
     context,
     transcript: defaultTranscriptPolicy,

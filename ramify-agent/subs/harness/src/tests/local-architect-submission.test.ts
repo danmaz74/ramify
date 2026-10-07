@@ -239,31 +239,18 @@ describe('the rules an assignment must satisfy', () => {
     expect(validateLocalArchitect(over('shop/billing'), { index, registry: proposing }).ok).toBe(true);
   });
 
-  test('an included child is a direct child, never a descendant', () => {
-    const deeper = architectIndex([
-      moduleEntry('shop', '', null),
-      moduleEntry('shop/orders', 'subs/orders', 'shop'),
-      moduleEntry('shop/orders/pricing', 'subs/orders/subs/pricing', 'shop/orders'),
-    ]);
-    const deepEvidence = { index: { ...index, modules: deeper.modules }, registry };
-
-    expect(validateLocalArchitect(over('shop/orders', {
-      scope: { base: { module: 'shop/orders', includedChildren: ['shop/orders/pricing'] }, extra: [], read: [], rationale: 'r' },
-    }), deepEvidence).ok).toBe(true);
-
-    // A grandchild is selected through its parent's subtree, never on its own.
-    const grandchild = validateLocalArchitect(over('shop', {
-      scope: { base: { module: 'shop', includedChildren: ['shop/orders/pricing'] }, extra: [], read: [], rationale: 'r' },
-    }), deepEvidence);
-    expect(grandchild.ok).toBe(false);
-    if (grandchild.ok) return;
-    expect(grandchild.errors[0]!.path).toBe('assignment.scope.base.includedChildren.0');
-    expect(grandchild.errors[0]!.message).toContain('never through a descendant');
+  test('included directories carry instructions; provider capture decides child and nested-project identity', () => {
+    expect(validateLocalArchitect(over('shop/orders', { scope: { base: { module: 'shop/orders', included: [
+      { directory: 'subs/orders/subs/physical', reason: 'Implement the whole child', instructions: 'Verify it at its root' },
+    ] }, extra: [], read: [], rationale: 'r' } }), evidence).ok).toBe(true);
+    expect(validateLocalArchitect(over('shop/orders', { scope: { base: { module: 'shop/orders', included: [
+      { directory: 'subs/orders/../bad', reason: 'r', instructions: 'i' },
+    ] }, extra: [], read: [], rationale: 'r' } }), evidence).ok).toBe(false);
   });
 
   test('an extra location lies under a module, and a capability is one the registry holds', () => {
     const outside = validateLocalArchitect(over('shop/orders', {
-      scope: { base: { module: 'shop/orders', includedChildren: [] }, extra: [{ path: '../elsewhere/contract.ts', purpose: 'contract' }], read: [], rationale: 'r' },
+      scope: { base: { module: 'shop/orders', included: [] }, extra: [{ path: '../elsewhere/contract.ts', purpose: 'contract' }], read: [], rationale: 'r' },
     }), evidence);
     expect(outside.ok).toBe(false);
     if (outside.ok) return;
@@ -317,82 +304,27 @@ describe('extra locations: module contents, paths outside modules and guarded fi
   /** An assignment over shop/orders with the extra locations given, and an outline revision where it authorizes anything. */
   const withExtra = (extra: unknown[], authorizations?: Array<{ path: string; rationale: string }>, kind: 'ordinary' | 'contract' = 'ordinary') => assign('shop/orders', {
     kind,
-    scope: { base: { module: 'shop/orders', includedChildren: [] }, extra: extra as never, read: [], rationale: 'r' },
+    scope: { base: { module: 'shop/orders', included: [] }, extra: extra as never, read: [], rationale: 'r' },
     ...(authorizations === undefined ? {} : { authorizations }),
   }, outline());
   const errorsOf = (result: ReturnType<typeof validateLocalArchitect>) => (result.ok ? [] : result.errors);
   const reason = 'The plan requires the report script to print the same block as the CLI.';
 
-  test('a file outside every module is accepted as outside-modules with a reason, including one beside a module\'s own contents', () => {
-    expect(errorsOf(validateLocalArchitect(withExtra([{ path: 'scripts/reference-harness/report.ts', purpose: 'outside-modules', reason }]), evidence))).toEqual([]);
-    expect(errorsOf(validateLocalArchitect(withExtra([{ path: 'subs/orders/scripts/foo.ts', purpose: 'outside-modules', reason }]), evidence))).toEqual([]);
-    expect(errorsOf(validateLocalArchitect(withExtra([{ path: 'scripts/generated', purpose: 'outside-modules', kind: 'directory', reason }]), evidence))).toEqual([]);
-  });
-
-  test('an outside-modules location needs a reason', () => {
-    for (const entry of [{ path: 'scripts/report.ts', purpose: 'outside-modules' }, { path: 'scripts/report.ts', purpose: 'outside-modules', reason: '  ' }]) {
-      expect(errorsOf(validateLocalArchitect(withExtra([entry]), evidence)).map(error => error.path)).toEqual(['assignment.scope.extra.0.reason']);
-    }
-  });
-
-  test('outside-modules never reaches a module\'s own contents, the root\'s included, nor a directory that holds them', () => {
-    for (const path of ['src/main.ts', 'module.ramify', 'README.md', 'subs/orders/src/order.ts', 'subs/orders/module.ramify']) {
-      const errors = errorsOf(validateLocalArchitect(withExtra([{ path, purpose: 'outside-modules', reason }]), evidence));
-      expect(`${path}: ${errors.map(error => error.path).join()}`).toBe(`${path}: assignment.scope.extra.0.path`);
-      expect(errors[0]!.message).toContain('own contents of');
-    }
-    const holding = errorsOf(validateLocalArchitect(withExtra([{ path: 'subs', purpose: 'outside-modules', kind: 'directory', reason }]), evidence));
-    expect(holding.map(error => error.path)).toEqual(['assignment.scope.extra.0.path']);
-    expect(holding[0]!.message).toContain('holds the own contents of "shop/orders"');
-    // The project root is not a path an extra location names.
-    for (const path of ['.', './']) {
-      expect(errorsOf(validateLocalArchitect(withExtra([{ path, purpose: 'outside-modules', kind: 'directory', reason }]), evidence))[0]!.message)
-        .toContain('is not a project-relative path');
-    }
-  });
-
-  test('every other purpose needs a module\'s own contents, and the refusal suggests outside-modules', () => {
-    expect(errorsOf(validateLocalArchitect(withExtra([
-      { path: 'src/interfaces/orders.ts', purpose: 'contract' },
-      { path: 'subs/orders/module.ramify', purpose: 'exposure-declaration' },
-    ]), evidence))).toEqual([]);
-    for (const path of ['scripts/reference-harness/report.ts', 'subs/orders/scripts/foo.ts', 'docs/notes.md']) {
-      const errors = errorsOf(validateLocalArchitect(withExtra([{ path, purpose: 'consumer' }]), evidence));
-      expect(errors.map(error => error.path)).toEqual(['assignment.scope.extra.0.path']);
-      expect(errors[0]!.expected).toContain('"outside-modules"');
-    }
-    // Only outside-modules names a directory.
-    expect(errorsOf(validateLocalArchitect(withExtra([{ path: 'subs/orders/src/fakes', purpose: 'fake', kind: 'directory' }]), evidence)).map(error => error.path))
-      .toEqual(['assignment.scope.extra.0.kind']);
-  });
-
-  test('a module an accepted proposal creates counts by its own contents', () => {
-    const proposing = new Map(registry);
-    proposing.set('note-store', {
-      ...registered, capability: 'note-store', owner: 'shop/billing',
-      proposed: { parent: 'shop', directory: 'subs/billing/', purpose: 'Holds the note.', tags: [] },
-    });
-    const creating = (extra: unknown[]) => assign('shop/billing', {
-      scope: { base: { module: 'shop/billing', includedChildren: [] }, extra: extra as never, read: [], rationale: 'r' },
-    }, outline());
-    expect(errorsOf(validateLocalArchitect(creating([{ path: 'subs/billing/src/notes.ts', purpose: 'consumer' }]), { index, registry: proposing }))).toEqual([]);
-    expect(errorsOf(validateLocalArchitect(creating([{ path: 'subs/billing/scripts/x.ts', purpose: 'consumer' }]), { index, registry: proposing })).map(error => error.path))
-      .toEqual(['assignment.scope.extra.0.path']);
-    expect(errorsOf(validateLocalArchitect(creating([{ path: 'subs/billing/src/notes.ts', purpose: 'outside-modules', reason }]), { index, registry: proposing })).map(error => error.path))
-      .toEqual(['assignment.scope.extra.0.path']);
-  });
-
-  test('the plans, the run\'s state and the repository\'s metadata are never an extra location', () => {
-    for (const path of ['plans/review-notes/plan.md', 'plans/review-notes/.harness', '.git/hooks/pre-commit']) {
-      const errors = errorsOf(validateLocalArchitect(withExtra([{ path, purpose: 'outside-modules', kind: 'directory', reason }]), evidence));
-      expect(`${path}: ${errors.map(error => error.path).join()}`).toBe(`${path}: assignment.scope.extra.0.path`);
-    }
+  test('removed outside-modules authority is refused, while narrow ordinary and bootstrap extras remain', () => {
+    expect(errorsOf(validateLocalArchitect(withExtra([{ path: 'scripts/report.ts', purpose: 'outside-modules', reason }]), evidence)).length).toBeGreaterThan(0);
+    expect(errorsOf(validateLocalArchitect(withExtra([{ path: 'src/interfaces/orders.ts', purpose: 'contract', kind: 'file' },
+      { path: 'subs/orders/module.ramify', purpose: 'exposure-declaration' }]), evidence))).toEqual([]);
+    expect(errorsOf(validateLocalArchitect(withExtra([{ path: 'subs/orders/src/fakes', purpose: 'fake', kind: 'directory' }]), evidence)).map(error => error.path)).toEqual(['assignment.scope.extra.0.kind']);
+    const proposing = new Map(registry); proposing.set('note-store', { ...registered, capability: 'note-store', owner: 'shop/billing',
+      proposed: { parent: 'shop', directory: 'subs/physical-billing/', purpose: 'Holds the note.', tags: [] } });
+    expect(errorsOf(validateLocalArchitect(assign('shop/billing', { scope: { base: { module: 'shop/billing', included: [] },
+      extra: [{ path: 'subs/physical-billing/scripts/x.ts', purpose: 'consumer' }], read: [], rationale: 'r' } }, outline()), { index, registry: proposing }))).toEqual([]);
   });
 
   test('the harness\'s own files are never an extra location', () => {
     const harnessOnly = new Set(['ramify-agent.json', 'subs/orders/src/tests/features/notes.feature']);
     for (const entry of [
-      { path: 'ramify-agent.json', purpose: 'outside-modules', reason },
+      { path: 'ramify-agent.json', purpose: 'consumer' },
       { path: 'subs/orders/src/tests/features/notes.feature', purpose: 'consumer' },
     ]) {
       const errors = errorsOf(validateLocalArchitect(withExtra([entry]), { ...evidence, harnessOnly }));
@@ -418,17 +350,11 @@ describe('extra locations: module contents, paths outside modules and guarded fi
     expect(errorsOf(validateLocalArchitect(withExtra(extras, authorizations), guarded))).toEqual([]);
 
     // Guarded configuration outside modules is no different.
-    expect(errorsOf(validateLocalArchitect(withExtra([{ path: 'package.json', purpose: 'outside-modules', reason }]), guarded)).map(error => error.path))
+    expect(errorsOf(validateLocalArchitect(withExtra([{ path: 'package.json', purpose: 'consumer' }]), guarded)).map(error => error.path))
       .toEqual(['assignment.scope.extra.0.path']);
     expect(errorsOf(validateLocalArchitect(
-      withExtra([{ path: 'package.json', purpose: 'outside-modules', reason }], [{ path: 'package.json', rationale: 'The script is registered.' }]), guarded,
+      withExtra([{ path: 'package.json', purpose: 'consumer' }], [{ path: 'package.json', rationale: 'The script is registered.' }]), guarded,
     ))).toEqual([]);
-
-    // A directory holding a guarded file needs its authorization too.
-    const holding = { ...evidence, guardedPaths: new Set(['scripts/tsconfig.json']) };
-    const directory = errorsOf(validateLocalArchitect(withExtra([{ path: 'scripts', purpose: 'outside-modules', kind: 'directory', reason }]), holding));
-    expect(directory.map(error => error.path)).toEqual(['assignment.scope.extra.0.path']);
-    expect(directory[0]!.message).toContain('"scripts/tsconfig.json"');
 
     // A contract iteration's authorizations are the harness's own.
     expect(errorsOf(validateLocalArchitect(withExtra(extras, undefined, 'contract'), { ...guarded, contracts: new Set(['ct-001']) })).map(error => error.path))

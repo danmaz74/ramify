@@ -10,6 +10,7 @@ import { writeFileAtomic } from '../../subs/ledger/src/atomic.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execution.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
+import { placementDecisions } from '../guard/write-guard.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import type { HookFinding } from '../hooks/post-write.js';
 import { inputsHash, loadPromptPackages, renderEngineerPrompt, sha256 } from '../prompts/packages.js';
@@ -38,7 +39,7 @@ import {
   type EngineerSubmission,
 } from '../work/engineer.js';
 import type { IterationAssignment } from '../work/iterations.js';
-import { auditPreparationPaths, captureGuardedFiles, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
+import { auditPreparationPaths, scopeConfigurationPaths, captureGuardedFiles, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
 import { iterationApiViews } from '../work/session.js';
 import {
   sessionLayout, sessionOutcomeSchema, sessionRecordSchema, sessionsDirectory,
@@ -193,6 +194,7 @@ export function sessionAcceptance(kind: EngineerSubmission['kind'], gate: boolea
 
 /** Runs one engineer session on one module, from the lock to the records. */
 export async function runSingleSession(options: SingleSessionOptions): Promise<SingleSessionResult> {
+  if (options.policy !== undefined && options.policy.version !== 'run-policy/7') return notStarted(`Run policy ${options.policy.version} is refused by run-policy/7; a fresh run is required`);
   if (options.prompt.trim() === '') return notStarted('The prompt is empty, so there is no goal to work on.');
   let projectRoot: string;
   try {
@@ -244,8 +246,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
 
   // The write scope: the module's own contents, as a run's ordinary
   // assignment has it, and each extra path the person named.
-  const base = { module: entry.module, includedChildren: [] as string[] };
-  const own = await resolveWriteScope({
+  const base = { module: entry.module, included: [] as { directory: string; reason: string; instructions: string }[] };
+  let own = await resolveWriteScope({ ramify,
     projectRoot,
     index: initial,
     view: { status: 'materialized', revision: initial.revision, input: initial.input, coverageLimits: [] },
@@ -256,7 +258,6 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     bootstrap: [],
     rationale: 'A single engineer session on this module.',
   });
-  const roots = [...own.resolved.roots];
   const files = [...own.resolved.files];
   const extra = [...new Set(options.write ?? [])];
   for (const path of extra) {
@@ -265,10 +266,18 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
       return notStarted(`The write path "${path}" is not a project-relative path inside the project.`);
     }
     const directory = path.endsWith('/') || await stat(target.resolved).then(found => found.isDirectory(), () => false);
-    const list = directory ? roots : files;
-    if (!list.includes(target.resolved)) list.push(target.resolved);
+    if (directory) {
+      const requested = path.replace(/\/$/u, '');
+      const topology = own.resolved.ownership;
+      const wholeTree = topology.modules.some(module => module.parent === entry.module && module.directory === requested)
+        || topology.exclusions.some(exclusion => exclusion.kind === 'owned-nested-project' && exclusion.directory === requested);
+      if (wholeTree) base.included.push({ directory: requested, reason: 'The user assigned this whole tree to the standalone session', instructions: options.prompt });
+      else if ((await placementDecisions(guardedScopeOf(own, [], ramify), projectRoot, [requested]))[0] !== true) return notStarted(`The directory ${path} is not one whole immediate child or declared owned nested project root`);
+    } else if (!files.includes(target.resolved)) files.push(target.resolved);
   }
-  const scope = { ...own, resolved: { ...own.resolved, roots, files } };
+  if (base.included.length > 0) own = await resolveWriteScope({ ramify, projectRoot, index: initial, view: own.resolved.view, revision: 1,
+    base, extra: [], read: [], bootstrap: [], rationale: 'A standalone session with explicitly included whole trees' });
+  const scope = { ...own, resolved: { ...own.resolved, files } };
   let harnessChanged: string[] = [];
   let alreadyChanged: string[];
   try {
@@ -293,11 +302,12 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const auditExists = await stat(join(projectRoot, 'ramify-audit.json')).then(found => found.isFile(), () => false);
   let auditPaths: string[] = [];
   if (auditExists) {
-    try { auditPaths = auditPreparationPaths(await readCommittedAuditConfiguration(projectRoot, head)); }
+    try { auditPaths = await auditPreparationPaths(await readCommittedAuditConfiguration(projectRoot, head), projectRoot); }
     catch (error) { return notStarted(`Committed audit configuration cannot be guarded: ${message(error)}`); }
   }
-  const guarded: GuardedScope = guardedScopeOf(scope, await deniedFiles(projectRoot, []));
-  const tests = testPolicyOf('ordinary', base, []);
+  const guardedFiles = await captureGuardedFiles(projectRoot, [], {}, [...auditPaths, ...scopeConfigurationPaths(scope)]);
+  const guarded: GuardedScope = guardedScopeOf(scope, await deniedFiles(projectRoot, guardedFiles.map(file => file.path)), ramify);
+  const tests = testPolicyOf('ordinary', base, [], [], scope.resolved.included);
 
   const policy = options.policy ?? defaultRunPolicy({ projectRoot });
   const { limits } = policy;
@@ -306,7 +316,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   if (loaded === undefined) return notStarted('No prompt package is loaded for the engineer.');
 
   const views = await iterationApiViews(ramify, projectRoot, initial, scope.base);
-  const guardedFiles = await captureGuardedFiles(projectRoot, [], {}, auditPaths);
+
 
   const id = sessionId();
   const records = join(projectRoot, sessionsDirectory, id);
@@ -336,7 +346,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const shown = scopePaths(projectRoot, scope);
 
   const record: SessionRecord = sessionRecordSchema.parse({
-    schema: 'ramify-agent.session/2',
+    schema: 'ramify-agent.session/2', policy: { version: 'run-policy/7', contract: 'plan21-whole-owner-and-architect-reporting/1' }, authority: scope,
     id,
     role: 'engineer',
     module: entry.module,
@@ -569,7 +579,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
         tests: selection,
         guarded: guardedFiles,
         authorizations: [],
-        rules: [safety],
+        rules: [safety, { rule: 'write-scope', outcome: snapshot.failure !== null || snapshot.outsideScope.length > 0 ? 'failed' : 'passed', violations: snapshot.outsideScope.map(path => ({ rule: 'write-scope', path, detail: 'Candidate change is outside current and captured write authority' })), ...(snapshot.failure === null ? {} : { limits: [snapshot.failure] }) }],
         ...(setup === undefined ? {} : { setup }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });

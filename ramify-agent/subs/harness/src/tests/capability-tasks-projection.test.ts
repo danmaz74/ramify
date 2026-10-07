@@ -108,8 +108,8 @@ test('CA23: nested dependency and settled partial blocker stay visible in the ta
   const assignment = { schema: 'ramify-agent.capability-assignment/1', id: 'cap-001.i01', task: task.id,
     sequence: 1, owner: 'b', plan: { id: task.id, revision: 1, hash: recordHash(plan) },
     purpose: 'Implement B source', approach: 'Extend B', requirementRefs: [], intendedEvidence: ['A real test'],
-    scope: { revision: 0, base: { module: 'b', includedChildren: [] }, extra: [], read: [], bootstrap: [],
-      rationale: 'B owns source', resolved: { roots: [], files: [], view: { status: 'placeholder' } } },
+    scope: { revision: 0, base: { module: 'b', included: [] }, extra: [], read: [], bootstrap: [],
+      rationale: 'B owns source', resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: [], files: [], view: { status: 'placeholder' } } },
     gate: { tests: { policy: 'owned-by-scope', exactOwners: ['b'], subtrees: [], extraSuites: [] } },
     startingTree: 'a'.repeat(64) };
   const childRequest = { ...request, id: 'need-002', parent: { kind: 'capability-task' as const, id: task.id },

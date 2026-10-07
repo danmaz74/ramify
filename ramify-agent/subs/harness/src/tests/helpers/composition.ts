@@ -262,7 +262,7 @@ const scopeTestRun = (...files: string[]): StatedCommand => ({
 const scopeScenarioRun: StatedCommand = { argv: () => ['npm', 'run', 'acceptance:quick', '--'], scenarios: true };
 
 /** The command the iteration's engineer runs through the unguarded shell. */
-const shellCommand = (root: string) => `rm -r '${join(root, draftsDirectory)}' && printf "left by the shell\\n" > '${join(root, 'shell-note.txt')}'`;
+const shellCommand = (root: string) => `rm -r '${join(root, draftsDirectory)}' && printf "left by the shell\\n" > '${join(root, notesDirectory, 'shell-note.txt')}'`;
 
 const notesModule = { directory: notesDirectory, name: 'notes', files: { 'src/notes.ts': consumerStub, 'src/tests/notes.test.ts': consumerTest('notes.ts') } };
 const limitsModule = { directory: limitsDirectory, name: 'limits', files: {} };
@@ -285,37 +285,36 @@ const iteration: Scenario = {
     scopeTestRun(`${notesDirectory}/src/tests/notes.test.ts`),
     scopeScenarioRun,
     {
-      // What the shell leaves: the child module gone, and a note outside
-      // every module. It is stated here and written directly; no shell runs.
+      // What the shell leaves: the assigned included child removed and an
+      // ordinary documentation file under the assigned owner. It is stated here and written directly; no shell runs.
       argv: root => ['bash', '-c', shellCommand(root)],
       cwd: root => join(root, notesDirectory, 'src'),
       async leaves(root) {
         await rm(join(root, draftsDirectory), { recursive: true });
-        await writeFile(join(root, 'shell-note.txt'), 'left by the shell\n');
+        await writeFile(join(root, notesDirectory, 'shell-note.txt'), 'left by the shell\n');
       },
     },
   ],
   git: {
     head: base,
     after: source(1),
-    recovered: [{ gate: 'ga-0002', answers: [null, source(1)] }],
+    recovered: [{ gate: 'ga-0004', answers: [null, source(1)] }],
     commits: [
       materialize(featureOf(notesDirectory, 'review-note')),
-      // The one committing iteration: the limit the engineer raised, the
-      // child module its shell removed, and the note that shell left outside
-      // every module.
+      // The work-item checkpoint commits the original assignments' authorized
+      // source, included-child removal and ordinary owner documentation.
+      // The earlier scoped discovery fails after the child declaration is removed.
       {
         commit: source(1),
         against: materialized,
         changes: [
           ...modified(`${notesDirectory}/src/notes.ts`),
           ...deleted(`${draftsDirectory}/README.md`, `${draftsDirectory}/module.ramify`),
-          ...untracked('shell-note.txt'),
+          ...untracked(`${notesDirectory}/shell-note.txt`),
         ],
       },
       // The repair iteration reports partial work and reaches no checkpoint;
-      // the work-item and final checkpoints find the committed tree unchanged.
-      unchanged(source(1)),
+      // the final checkpoint finds the work-item commit unchanged.
       unchanged(source(1)),
     ],
   },
@@ -335,7 +334,7 @@ const iteration: Scenario = {
         ].join('\n'),
       },
     },
-    // A child module nobody assigns, which the engineer's shell removes.
+    // An explicitly included child module, which the engineer's shell removes.
     { directory: draftsDirectory, name: 'drafts', files: {} },
   ]),
   script: root => byRole({
@@ -351,7 +350,7 @@ const iteration: Scenario = {
     'local-architect': [
       submit(assign(notes, {
         scope: {
-          base: { module: notes, includedChildren: [] },
+          base: { module: notes, included: [{ directory: draftsDirectory, reason: 'Remove the obsolete drafts child', instructions: 'Remove the assigned child and verify the notes owner' }] },
           extra: [{ path: 'subs/workspace/subs/reviews/module.ramify', purpose: 'exposure-declaration' }],
           read: [reviews],
           rationale: 'The limit is the notes module\'s own; its parent\'s declaration may need to say so.',

@@ -5,8 +5,7 @@ import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import type { SubmissionError } from '../run/submissions.js';
 import { slugSchema, type RegistryEntry } from '../analysis/records.js';
 import { assignedBoundsSchema, extraPurposeSchema, type AssignedBounds } from './iterations.js';
-import { plansDirectory } from '../plans/discover.js';
-import { inOwnContents, ownContentsWithin, within } from './scope.js';
+import { includedConfigurationPaths, within } from './scope.js';
 import { assignedScenarioErrors, type DeclarationContext } from './declarations.js';
 import type { IntegrationScope } from './integration.js';
 import type { OutlineBody } from './submission.js';
@@ -59,7 +58,7 @@ export const scopeBaseBodySchema = z.union([
   z.object({
     module: modulePathSchema,
     /** Direct children whose complete subtree is included. */
-    includedChildren: z.array(modulePathSchema),
+    included: z.array(z.object({ directory: text, reason: text, instructions: text }).strict()),
   }).strict(),
   z.object({
     /** Every module the break runs through, the one that breaks included. */
@@ -74,12 +73,9 @@ export const scopeBaseBodySchema = z.union([
 ]);
 
 /**
- * One location beyond the base. Every purpose but `outside-modules` names a
- * file in a module's own contents. `outside-modules` names a file, or with
- * `kind: "directory"` a directory whose new files it may create, outside
- * every module's own contents, and `reason` names the plan requirement that
- * only a change there meets. The schema accepts a blank reason so the rule
- * beside it can say what is missing.
+ * One narrow location beyond the base. An architect names a file; harness
+ * contract assignments may name a directory whose new files the agreement
+ * will define. Whole included trees have their own directory/reason/instructions.
  */
 export const extraLocationSchema = z.object({
   path: text,
@@ -235,22 +231,9 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
     ? findModule(index, narrow.module)!.dir
     : authority?.proposed?.directory ?? null;
 
-  narrow?.includedChildren.forEach((child, position) => {
-    const path = `assignment.scope.base.includedChildren.${position}`;
-    if (index === null) return;
-    const entry = findModule(index, child);
-    if (entry === undefined) {
-      errors.push({ path, message: `No module "${child}" is in the refreshed architect view`, expected: 'a module of the view' });
-      return;
-    }
-    if (entry.parent !== owner) {
-      errors.push({
-        path,
-        message: entry.parent === null
-          ? `"${child}" is the root module, not a direct child of "${owner}"`
-          : `"${child}" is a child of "${entry.parent}", not of "${owner}"; a subtree is selected through its direct child, never through a descendant`,
-        expected: `a direct child of "${owner}"`,
-      });
+  narrow?.included.forEach((entry, position) => {
+    if (entry.directory === '' || entry.directory.startsWith('/') || entry.directory.split('/').some(part => part === '..' || part === '.' || part === '')) {
+      errors.push({ path: `assignment.scope.base.included.${position}.directory`, message: 'An included tree names a normalized project-relative directory' });
     }
   });
 
@@ -297,7 +280,7 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
   // An authorization lets a guarded change pass the gate, so it names a
   // guarded path and arrives with the outline revision that records it.
   const authorizations = body.authorizations ?? [];
-  const guardedPaths = evidence.guardedPaths;
+  const guardedPaths = evidence.guardedPaths === undefined ? undefined : new Set([...evidence.guardedPaths, ...includedConfigurationPaths(base)]);
   authorizations.forEach((authorization, position) => {
     if (guardedPaths !== undefined && !guardedPaths.has(authorization.path)) {
       errors.push({
@@ -315,14 +298,10 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
     });
   }
 
-  // An extra location is classified as Ramify classifies it: a module owns
-  // its source area and its two declaration files, and nothing else beneath
-  // its directory. A path outside every module's own contents is reachable
-  // only as `outside-modules`, which in turn never reaches a module's own.
+  // Narrow extras still require explicit guarded authorization. Provider
+  // capture validates topology and hard exclusions before accepting authority.
   const authorized = new Set(authorizations.map(authorization => toPosix(authorization.path)));
   const harnessOnly = evidence.harnessOnly ?? new Set<string>();
-  const directories = index === null ? [] : [...index.modules.values()].map(module => ({ module: module.module, dir: toPosix(module.dir) }));
-  if (ownerDirectory !== null && !known && narrow !== null) directories.push({ module: narrow.module, dir: toPosix(ownerDirectory) });
   body.scope.extra.forEach((entry, position) => {
     const at = `assignment.scope.extra.${position}`;
     const path = `${at}.path`;
@@ -331,32 +310,8 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
       errors.push({ path, message: `"${entry.path}" is not a project-relative path`, expected: 'a path relative to the project root' });
       return;
     }
-    const outsideModules = entry.purpose === 'outside-modules';
     const directory = entry.kind === 'directory';
-    if (directory && !outsideModules) {
-      errors.push({
-        path: `${at}.kind`,
-        message: `An extra location for "${entry.purpose}" is one file; only an "outside-modules" location may name a directory`,
-        expected: '"file", or no kind',
-      });
-    }
-    if (outsideModules && (entry.reason ?? '').trim() === '') {
-      errors.push({
-        path: `${at}.reason`,
-        message: `A path outside every module is assigned for a plan requirement only a change there meets; "${entry.path}" names none`,
-        expected: 'the plan requirement the change serves',
-      });
-    }
-    // The plans and the run's state beneath them, and the repository's own
-    // metadata, are no project file an engineer changes.
-    if (within(target, plansDirectory) || target.split('/').includes('.git')) {
-      errors.push({
-        path,
-        message: `"${entry.path}" lies in ${target.split('/').includes('.git') ? 'the repository\'s metadata' : `${plansDirectory}/, which holds the plans and the harness's state`}; no assignment writes there`,
-        expected: 'a file of the project',
-      });
-      return;
-    }
+    if (directory) errors.push({ path: `${at}.kind`, message: 'An architect extra names one file; whole trees use included' });
     const covered = (file: string) => (directory ? within(file, target) : file === target);
     const reserved = [...harnessOnly].filter(covered).sort();
     if (reserved.length > 0) {
@@ -373,7 +328,7 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
     // authorizations are the harness's, so what it states here decides none.
     const unauthorized = body.kind === 'contract'
       ? []
-      : [...(evidence.guardedPaths ?? [])].filter(file => covered(file) && !authorized.has(file)).sort();
+      : [...(guardedPaths ?? [])].filter(file => covered(file) && !authorized.has(file)).sort();
     if (unauthorized.length > 0) {
       errors.push({
         path,
@@ -381,28 +336,7 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
         expected: `an entry in "assignment.authorizations" for ${unauthorized.map(file => `"${file}"`).join(', ')}, with an "outline" revision on the same submission that states why`,
       });
     }
-    if (index === null) return;
-    const owner = directories.find(candidate => inOwnContents(candidate.dir, target));
-    if (outsideModules) {
-      const reached = owner ?? (directory ? directories.find(candidate => ownContentsWithin(candidate.dir, target)) : undefined);
-      if (reached !== undefined) {
-        errors.push({
-          path,
-          message: owner !== undefined
-            ? `"${entry.path}" lies in the own contents of "${owner.module}", and "outside-modules" names only paths outside every module`
-            : `The directory "${entry.path}" holds the own contents of "${reached.module}", and "outside-modules" names only paths outside every module`,
-          expected: 'a path outside every module\'s src/, module.ramify and README.md, or another purpose',
-        });
-      }
-      return;
-    }
-    if (owner === undefined) {
-      errors.push({
-        path,
-        message: `"${entry.path}" lies in the own contents (src/, module.ramify, README.md) of no module of the refreshed view and of no module this assignment may create`,
-        expected: 'a path in an existing or authorized module\'s own contents; a file outside every module is assigned as "outside-modules" with a "reason"',
-      });
-    }
+
   });
 
   body.externalCapabilities.forEach((capability, position) => {
@@ -458,7 +392,7 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
   // expose-test lines go.
   const integration = evidence.integration;
   if (integration !== undefined) {
-    const wanted = `the base { module: "${integration.module}", includedChildren: [${integration.includedChildren.map(child => `"${child}"`).join(', ')}] }`;
+    const wanted = `the base { module: "${integration.module}", included: [${integration.includedChildren.map(child => `{ directory: "${findModule(index!, child)?.dir ?? child}", reason, instructions }`).join(', ')}] }`;
     if (narrow === null || narrow.module !== integration.module) {
       errors.push({
         path: 'assignment.scope.base',
@@ -466,10 +400,10 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
         expected: wanted,
       });
     } else {
-      const missing = integration.includedChildren.filter(child => !narrow.includedChildren.includes(child));
+      const missing = integration.includedChildren.filter(child => !narrow.included.some(entry => findModule(index!, child)?.dir === entry.directory));
       if (missing.length > 0) {
         errors.push({
-          path: 'assignment.scope.base.includedChildren',
+          path: 'assignment.scope.base.included',
           message: `The scope leaves out ${missing.map(child => `"${child}"`).join(', ')}, on the path to a sub-scenario's owner whose step files the scenario imports`,
           expected: wanted,
         });

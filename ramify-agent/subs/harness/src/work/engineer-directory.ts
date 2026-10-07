@@ -11,7 +11,7 @@ import type { WriteScope } from './iterations.js';
 export function assignedModuleDirectory(scope: WriteScope, index: ArchitectIndex | null): string {
   const module = 'module' in scope.base ? scope.base.module : scope.base.modules[0]!;
   const declared = directoryOf(index, module);
-  const candidates = scope.bootstrap.filter(entry => entry.directory.split('/').at(-1) === module.split('/').at(-1));
+  const candidates = scope.bootstrap.filter(entry => entry.owner === module && entry.parent === module.slice(0, module.lastIndexOf('/')));
   if (declared === null && candidates.length !== 1) throw new Error(`The assigned base module ${module} has no unambiguous bootstrap directory`);
   const bootstrap = candidates.length === 1 ? candidates[0] : undefined;
   const directory = declared ?? bootstrap?.directory;

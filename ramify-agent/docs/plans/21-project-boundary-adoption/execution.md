@@ -39,6 +39,21 @@ new normal request executed full under the provider's indeterminate-baseline
 rule; the iteration 2 receipt records that passing result. The failed 0.7.1
 result remains evidence, never a passing audit.
 
+**Iteration 3 provider prerequisite:** the real installed 0.4.0 ownership witness
+found that an owned ignored tree stopped classification before existing repository,
+package, generated and configured-output exclusions. The provider owner corrected
+that precedence without changing affected CLI/answer /4 or discovering inner project
+configuration. Qualified source `11170110b764c35892049281cec9fd8174e9abe4` passed
+a normal full audit (204 files, 2,894 tests, complete empty ledger), with report
+`a73f11bbee2aeac2a8f7e3af1ef82d7e4cac3131`. The coordinator published exact
+`ramify.ts@0.4.1`, verified fresh registry artifact/install controls and ordinary
+branch push/live identity at receipt `90a1f580d70e36a75f384f3f45dd34beb61289e5`.
+Its handoff is `/home/app/ramify-audit-pb-evidence/ramify-0.4.1-prod/handoff.json`;
+iteration 3 retains the failed 0.4.0 witness and records its exact consumer pin,
+installed-provider controls and delivery audit independently. Audit remains 0.7.2.
+This qualified correction was covered by the recorded publication authorization;
+the protected documents and earlier receipts remain unchanged.
+
 ## Iteration discipline
 
 Execute the [manifest](iterations/manifest.json) in order, one iteration at a

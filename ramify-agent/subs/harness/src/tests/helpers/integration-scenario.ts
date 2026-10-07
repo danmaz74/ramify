@@ -165,7 +165,7 @@ export const entryTurns = {
 export const bindAtAncestor = assign(reviews, {
   goal: 'Bind sc-003 at the common ancestor.',
   approach: 'Import both step files by name, and expose them to this module with expose-test.',
-  scope: { base: { module: reviews, includedChildren: [notes, tags] }, extra: [], read: [], rationale: 'The ancestor and both paths down to the owners.' },
+  scope: { base: { module: reviews, included: [notes, tags].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) }, extra: [], read: [], rationale: 'The ancestor and both paths down to the owners.' },
 }, outline());
 
 /** The engineer that binds it: the ancestor's step file, the two exposures, and the declaration. */

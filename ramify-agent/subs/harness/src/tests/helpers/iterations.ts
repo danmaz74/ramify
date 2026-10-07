@@ -41,7 +41,7 @@ export function assign(
   extra: Partial<AssignmentBody> = {},
   outline?: Extract<LocalArchitectSubmission, { kind: 'request-completion' }>['outline'],
 ): Extract<LocalArchitectSubmission, { kind: 'assign' }> {
-  const scope = extra.scope ?? { base: { module, includedChildren: [] }, extra: [], read: [], rationale: 'The work is in this module.' };
+  const scope = extra.scope ?? { base: { module, included: [] }, extra: [], read: [], rationale: 'The work is in this module.' };
   return {
     kind: 'assign',
     ...(outline === undefined ? {} : { outline }),

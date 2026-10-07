@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { hypothesisSchema, type Hypothesis } from '../analysis/records.js';
 import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
 import { jobSchemaVersion, jobsDirectory } from '../jobs/records.js';
+import { runPolicyVersion } from '../run/policy.js';
 import type { RunEvent } from '../run/log.js';
 import {
   entryAssignmentsSchema, gateAttemptSchema, gateAuditOutcomeSchema, runLayout, runRecordSchema,
@@ -250,6 +251,10 @@ export async function unservedRun(projectRoot: string, planId: string, runId: st
     document = JSON.parse(text) as unknown;
   } catch {
     return new ProjectionError('unreadable', `${shown} is not JSON`, [shown]);
+  }
+  const recordedPolicy = (document as { policy?: { version?: unknown } } | null)?.policy?.version;
+  if (recordedPolicy !== runPolicyVersion) {
+    return new ProjectionError('unsupported-version', `Run policy ${String(recordedPolicy ?? '(missing policy)')} is refused by ${runPolicyVersion}; a fresh run is required`, [shown]);
   }
   const declared = (document as { schema?: unknown } | null)?.schema;
   if (declared !== jobSchemaVersion) {

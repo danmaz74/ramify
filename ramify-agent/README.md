@@ -96,7 +96,11 @@ before any model call. The engineer gets what an implementation run gives
 its engineers: the engineer prompt, the module's API views, the write guard,
 the Ramify hook check after each edit, the shell, the scoped test tool and
 the validated submission. The prompt becomes the iteration's goal. The
-engineer may write the module's own contents and each `--write` path. The
+engineer may write the assigned owner's ordinary contents, with provider
+exclusions enforced at writes and candidate validation. A directory `--write`
+includes one whole immediate child or declared owned nested project, carrying
+the session task as its instructions. Guarded configuration needs recorded
+authorization, including when absent files are created. The
 session takes the project lock, so it never runs beside an implementation
 run or a server on the same project.
 

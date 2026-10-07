@@ -91,7 +91,7 @@ export interface CheckExecutionContext {
 /** The guarded-file comparison an executor may include in external evidence. */
 export interface CheckHarnessGuardedChange {
   readonly path: string;
-  readonly before: string;
+  readonly before: string | null;
   readonly after: string | null;
   readonly authorizedBy: { readonly id: string; readonly revision: number; readonly hash: string } | null;
 }

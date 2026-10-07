@@ -1,3 +1,4 @@
+import { defaultRunPolicy } from '../run/policy.js';
 import { describe, expect, it } from 'vitest';
 import { runEvent, type RunEventInput } from '../run/log.js';
 import {
@@ -43,9 +44,10 @@ describe('capability state and authority', () => {
   it('CA29 captures distinct task and global limits under the new policy version', () => {
     const previous = { version: 'run-policy/4', limits: {
       maxIterationsPerWorkItem: 12, maxWorkItems: 64, maxInvocationsPerRun: 400,
-    } } as RunPolicy;
-    expect(() => captureCapabilityLimits(previous)).toThrow('run-policy/6');
-    const policy = capabilityPolicyFrom(previous);
+    } } as unknown as RunPolicy;
+    expect(() => captureCapabilityLimits(previous)).toThrow('run-policy/7');
+    expect(() => capabilityPolicyFrom(previous)).toThrow('fresh run');
+    const policy = capabilityPolicyFrom(defaultRunPolicy({ projectRoot: '/fixture' }));
     const limits = captureCapabilityLimits(policy);
     expect(limits).toEqual({ maxAssignments: 12, maxWorkUnits: 64, maxInvocations: 400 });
     expect(canStartInvocation(399, limits)).toBe(true);

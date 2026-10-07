@@ -147,7 +147,7 @@ export function testPolicy(projectRoot: string, options: TestPolicyOptions = {})
   const { reviews: _reviews, ...unreviewed } = base;
   return {
     ...unreviewed,
-    version: 'run-policy/4',
+    version: 'run-policy/7',
     // Historical fixture runs use the captured contract role. New production
     // policy/5 deliberately omits it from its context and prompt manifest.
     context: { ...base.context, 'contract-engineer': defaultContextPolicies['contract-engineer'] },
@@ -296,7 +296,7 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
   const { service, recovery } = production === true
     ? await RunService.open(serviceOptions)
     : capabilityWorkflowFactory === undefined
-      ? await RunService.openForHistoricalTests(serviceOptions)
+      ? await RunService.openForScriptedLifecycleTests(serviceOptions)
       : await RunService.openForCapabilityTests(serviceOptions, capabilityWorkflowFactory);
   return { service, recovery, agent: scripted, lock, warnings };
 }

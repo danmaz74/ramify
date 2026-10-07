@@ -10,7 +10,7 @@ import { decideNonfunctionalRound } from '../../subs/nonfunctional/src/rounds.js
 import { assessedElements } from '../nonfunctional/submissions.js';
 import { projectMergeReadiness, type ReadinessDeviation } from '../run/merge-readiness.js';
 import {
-  legacyNonfunctionalCoverage, nonfunctionalDeviationSchema,
+  nonfunctionalDeviationSchema,
   type MergeReadiness,
 } from '../run/nonfunctional-records.js';
 import { invocationOutcomeSchema, runLayout } from '../run/records.js';
@@ -63,8 +63,7 @@ export function mergeReadinessOf(view: RunView, evidence: AcceptedEvidence): Mer
     nfrIds: null, assessment: null, deviations: [],
   });
   if (evidence.status === 'unavailable') {
-    return view.record.manifest.documentManifest === undefined
-      ? legacyNonfunctionalCoverage(view.record.manifest) : unavailable(evidence.reason);
+    return unavailable(evidence.reason);
   }
   const accepted = view.events.find(event => event.type === 'analysis-accepted');
   const marker = view.events.find(event => event.type === 'nonfunctional-phase-started');

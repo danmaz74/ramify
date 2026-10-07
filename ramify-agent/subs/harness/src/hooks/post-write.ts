@@ -196,12 +196,6 @@ export interface HookCheckOptions {
   /** The number of checks this invocation has already run. */
   readonly ran: number;
   /**
-   * The project-relative paths the assignment names as extra scope with
-   * purpose `outside-modules`. A file beneath one lies outside every module
-   * by assignment, so Ramify's warning that it does is not relayed.
-   */
-  readonly outsideModules?: readonly string[] | undefined;
-  /**
    * Whether the warnings and analysis limits on the written files are
    * relayed. A check whose text reaches no one, such as the one at
    * `completion-proposed`, passes false, so that they are not taken as told.
@@ -240,7 +234,7 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
 
   // What the mutation wrote, which the warnings and analysis limits relayed
   // must concern; where it is unknown, none is relayed.
-  const written = { files: options.relayNotices === false ? [] : paths ?? [], outsideModules: options.outsideModules ?? [] };
+  const written = { files: options.relayNotices === false ? [] : paths ?? [] };
 
   let completeNeeded = false;
   if (paths === null || paths.length === 0) {
@@ -296,7 +290,7 @@ function reported(
   result: RamifyCheckResult,
   covered: readonly string[] | 'all',
   seen: FindingsSeen,
-  written: { readonly files: readonly string[]; readonly outsideModules: readonly string[] },
+  written: { readonly files: readonly string[] },
 ): ReportedCheck {
   const found = findingsOf(result.report);
   const ran = check.outcome !== 'not-checked';
@@ -335,7 +329,7 @@ function reported(
   // A module whose description is invalid owns no source, so Ramify warns
   // that its files lie outside every module; that warning is the
   // description error's, which the engineer is told of as a finding.
-  const notices = ran ? seen.tell(noticesOf(result.report, written.files, evaluated ? written.outsideModules : null)) : [];
+  const notices = ran ? seen.tell(noticesOf(result.report, written.files, evaluated)) : [];
   return { ...check, newFindings: added.length, added, repeated, cleared, unevaluated, notices };
 }
 
@@ -429,12 +423,10 @@ export function findingIdentities(report: unknown): string[] {
 /**
  * The warnings and analysis limits a report states on the written files.
  * Ramify reports them apart from its findings, in `warnings` and
- * `coverage`, and fails no check on them. A warning that a file lies outside
- * every module's source is left out for a file beneath one of the
- * assignment's `outside-modules` paths, which lies there by assignment, and
- * left out entirely where `outsideModules` is null.
+ * `coverage`, and fails no check on them. Evaluation availability controls
+ * whether the hook can present source coverage notices.
  */
-export function noticesOf(report: unknown, written: readonly string[], outsideModules: readonly string[] | null): HookNotice[] {
+export function noticesOf(report: unknown, written: readonly string[], evaluated: boolean): HookNotice[] {
   if (typeof report !== 'object' || report === null || written.length === 0) return [];
   const document = report as Record<string, unknown>;
   const files = new Set(written);
@@ -447,7 +439,7 @@ export function noticesOf(report: unknown, written: readonly string[], outsideMo
     for (const file of named) {
       if (!files.has(file)) continue;
       if (code === 'outside-module-source') {
-        if (outsideModules === null || outsideModules.some(path => isBeneath(file, path))) continue;
+        if (!evaluated) continue;
         notices.push({
           identity: `warning:${code}:${file}`, kind: 'warning', code, file, line: null,
           message: 'the compiler selects this file, but it lies outside every module\'s source, so no module owns it and Ramify decides no import of it',
@@ -474,10 +466,7 @@ export function noticesOf(report: unknown, written: readonly string[], outsideMo
 }
 
 /** Whether a project-relative file is the path itself or lies beneath it. */
-function isBeneath(file: string, path: string): boolean {
-  const base = path.replace(/^\.\//, '').replace(/\/+$/, '');
-  return file === base || file.startsWith(`${base}/`);
-}
+
 
 /**
  * What the engineer is told, or null when no check produced news. A finding

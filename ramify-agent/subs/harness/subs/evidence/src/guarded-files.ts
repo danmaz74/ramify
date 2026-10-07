@@ -58,7 +58,7 @@ async function hashWithin(root: string, path: string): Promise<string | null> {
   try {
     return createHash('sha256').update(await readFile(absolute)).digest('hex');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT' || (error as NodeJS.ErrnoException).code === 'EISDIR') return null;
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT' || (error as NodeJS.ErrnoException).code === 'ENOTDIR') return null;
     throw error;
   }
 }

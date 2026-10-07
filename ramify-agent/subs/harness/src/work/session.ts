@@ -116,8 +116,7 @@ export async function iterationApiViews(
   base: WriteScope['base'],
 ): Promise<IterationApiViews[]> {
   const modules = 'module' in base
-    ? [base.module, ...base.includedChildren, ...[...index?.modules.keys() ?? []].filter(module =>
-      base.includedChildren.some(child => module.startsWith(`${child}/`)))]
+    ? [base.module, ...[...index?.modules.values() ?? []].filter(module => base.included.some(entry => module.dir === entry.directory || module.dir.startsWith(`${entry.directory}/`))).map(module => module.module)]
     : base.modules;
   const entries: IterationApiViews[] = [];
   for (const module of new Set(modules)) {

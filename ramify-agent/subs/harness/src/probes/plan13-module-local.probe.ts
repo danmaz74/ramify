@@ -22,7 +22,7 @@ import type { ArchitectIndex, ModuleEntry } from '../../subs/evidence/src/views.
 import { RamifyCli, type RamifyRun } from '../../subs/evidence/src/ramify-cli.js';
 import { checkCommand } from '../checks/records.js';
 import { ObservationLog } from '../run/observations.js';
-import { deniedFiles, guardedScopeOf } from '../work/scope.js';
+import { deniedFiles, guardedScopeOf, resolveWriteScope } from '../work/scope.js';
 import { engineerWorkingDirectory, repairWorkingDirectory } from '../work/engineer-directory.js';
 import { engineerEquipment } from '../work/engineer-equipment.js';
 import type { WriteScope } from '../work/iterations.js';
@@ -55,15 +55,10 @@ function indexOfProject(): ArchitectIndex {
   ]) };
 }
 
-function ordinaryScope(project: string): WriteScope {
-  const alpha = join(project, 'subs/alpha/src');
-  return {
-    revision: 1,
-    base: { module: 'app/alpha', includedChildren: [] },
-    extra: [], read: [], bootstrap: [], rationale: 'Tool-start witness',
-    resolved: { roots: [alpha], files: [],
-      view: { status: 'materialized', revision: 'probe', input: 'probe', coverageLimits: [] } },
-  } as WriteScope;
+async function capturedScope(project: string, kind: 'ordinary' | 'repair'): Promise<WriteScope> {
+  return resolveWriteScope({ projectRoot: project, ramify: new RamifyCli(), index: indexOfProject(), view: { status: 'placeholder' }, revision: 1,
+    base: kind === 'repair' ? { modules: ['app', 'app/alpha', 'app/beta'], rationale: 'One explicit project-wide probe repair' } : { module: 'app/alpha', included: [] },
+    extra: [], read: [], bootstrap: [], rationale: 'Manual tool-start witness; actual installed provider scope' });
 }
 
 function usage(events: readonly AgentEvent[]) {
@@ -107,7 +102,7 @@ async function oneSession(
   agent: ReturnType<typeof createPiAgent>, scratch: string, project: string,
   kind: 'ordinary' | 'repair', sessions: AgentSession[],
 ) {
-  const captured = ordinaryScope(project);
+  const captured = await capturedScope(project, kind);
   const view = indexOfProject();
   const cwd = kind === 'repair'
     ? await repairWorkingDirectory(project, 'app/alpha', view)
@@ -120,9 +115,7 @@ async function oneSession(
   const ramify = new ProbeUnavailableRamifyCli();
   const command = checkCommand({ argv: ['true'], cwd: project, timeoutMs: 5_000 });
   const denied = await deniedFiles(project, ['features/probe.feature', 'plans/probe/plan.md', 'docs/engineering.principles.md']);
-  const guarded = kind === 'repair'
-    ? { revision: 1, roots: [await realpath(project)], files: [], denied }
-    : guardedScopeOf(captured, denied);
+  const guarded = guardedScopeOf(captured, denied);
   const equipment = engineerEquipment({
     projectRoot: project, workingDirectory: cwd, ramify,
     commands: { typeCheck: command, allTests: command, scopedTests: command, ramifyCheck: command,
@@ -221,6 +214,8 @@ async function main(): Promise<number> {
     const project = join(scratch, 'project');
     await Promise.all(['subs/alpha/src', 'subs/beta/src', 'plans/probe', 'features', 'docs'].map(path => mkdir(join(project, path), { recursive: true })));
     const originals = new Map([
+      ['module.ramify', 'ramify 1\nroot module app\n'], ['subs/alpha/module.ramify', 'ramify 1\nmodule alpha\n'], ['subs/beta/module.ramify', 'ramify 1\nmodule beta\n'],
+      ['tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' }, include: ['**/*.ts'] })],
       ['subs/alpha/src/seed.txt', 'seed alpha\n'], ['subs/beta/src/seed.txt', 'seed beta\n'],
       ['plans/probe/plan.md', 'captured plan\n'], ['features/probe.feature', 'Feature: protected\n'],
       ['ramify-agent.json', '{}\n'], ['docs/engineering.principles.md', 'captured principle\n'],

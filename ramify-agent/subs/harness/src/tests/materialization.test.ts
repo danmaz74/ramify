@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
@@ -11,7 +11,7 @@ import {
 } from '../run/feature-files.js';
 import { runLayout } from '../run/records.js';
 import { iterationLayout, type IterationAssignment } from '../work/iterations.js';
-import { captureGuardedFiles } from '../work/scope.js';
+import { auditPreparationPaths, captureGuardedFiles } from '../work/scope.js';
 import { scenarioRecordSchema, scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import { initialScenarioStates } from '../../subs/scenarios/src/states.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
@@ -324,7 +324,7 @@ describe('the guarded list', () => {
     const guarded = await captureGuardedFiles(directory.path, [], {}, [
       'ramify-audit.json', `${deep}/package.json`, `${deep}/package-lock.json`,
     ]);
-    expect(guarded.map(file => file.path)).toEqual(['ramify-audit.json', `${deep}/package-lock.json`, `${deep}/package.json`]);
+    expect(guarded.filter(file => file.hash !== null).map(file => file.path)).toEqual(['ramify-audit.json', `${deep}/package-lock.json`, `${deep}/package.json`]);
     await writeFile(join(directory.path, deep, 'package.json'), '{"name":"changed"}\n');
     const attempt = await runGate(createPassingCheckExecution(), 'iteration', {
       id: 'ga-0002', projectRoot: directory.path, directory: join(directory.path, '.gates', 'ga-0002'),
@@ -333,6 +333,48 @@ describe('the guarded list', () => {
     });
     expect(attempt).toMatchObject({ verdict: 'failed', cause: 'guarded-change' });
     expect(attempt.guardedChanges.map(change => change.path)).toEqual([`${deep}/package.json`]);
+  });
+
+  test('PB3-P04: declared included package configuration creation and deletion require recorded authorization', async () => {
+    const directory = await temporaryDirectory(); cleanups.push(directory.remove);
+    const child = 'subs/group/physical';
+    await mkdir(join(directory.path, child), { recursive: true });
+    await writeFile(join(directory.path, child, 'package.json'), '{"name":"child"}');
+    await mkdir(join(directory.path, child, 'compiler/existing'), { recursive: true });
+    await writeFile(join(directory.path, child, 'compiler/existing/tsconfig.json'), '{}');
+    const configuration = { path: 'ramify-audit.json', projectRoot: '.', workspace: { packageDirectories: [child] },
+      checks: [{ executor: { commands: [{ cmd: 'vitest', args: ['--config', 'runner/custom.ts', '--project', 'node'], cwd: child }, { cmd: 'vitest', args: ['--project', 'tsc'], cwd: child }, { cmd: 'tsc', args: ['-p', 'compiler/custom.json'], cwd: child }, { cmd: 'tsc', args: ['--project', 'compiler/existing'], cwd: child }, { cmd: 'tsc', args: ['-p', 'compiler/absent'], cwd: child }] } }] };
+    const paths = await auditPreparationPaths(configuration, directory.path);
+    expect(paths).toContain(`${child}/vitest.config.ts`);
+    expect(paths).toContain(`${child}/runner/custom.ts`);
+    expect(paths).toContain(`${child}/tsconfig.json`);
+    expect(paths).toContain(`${child}/compiler/custom.json`);
+    expect(paths).not.toContain(`${child}/node`);
+    expect(paths).not.toContain(`${child}/tsc`);
+    expect(paths).not.toContain(`${child}/tsc/tsconfig.json`);
+    expect(paths).not.toContain(`${child}/compiler/existing`);
+    expect(paths).toContain(`${child}/compiler/existing/tsconfig.json`);
+    expect(paths).toContain(`${child}/compiler/absent/tsconfig.json`);
+    expect(paths).toContain(`${child}/vite.config.mts`);
+    const guarded = await captureGuardedFiles(directory.path, [], {}, paths);
+    expect(guarded).toContainEqual({ path: `${child}/vitest.config.ts`, hash: null });
+    expect(guarded).toContainEqual({ path: `${child}/runner/custom.ts`, hash: null });
+    expect(guarded).toContainEqual({ path: `${child}/compiler/absent/tsconfig.json`, hash: null });
+    await expect(captureGuardedFiles(directory.path, [], {}, [`${child}/compiler/existing`])).rejects.toMatchObject({ code: 'EISDIR' });
+    await writeFile(join(directory.path, child, 'vitest.config.ts'), 'export default {};');
+    await rm(join(directory.path, child, 'package.json'));
+    const request = { id: 'ga-0002', projectRoot: directory.path, directory: join(directory.path, '.gates/ga-0002'), head: 'a'.repeat(40),
+      checks: [{ kind: 'type-check' as const, command: checkCommand({ argv: ['true'], cwd: directory.path, timeoutMs: 30_000 }) }], guarded };
+    const refused = await runGate(createPassingCheckExecution(), 'iteration', request);
+    expect(refused).toMatchObject({ verdict: 'failed', cause: 'guarded-change' });
+    expect(refused.guardedChanges.map(change => [change.path, change.before === null, change.after === null])).toEqual([
+      [`${child}/package.json`, false, true], [`${child}/vitest.config.ts`, true, false],
+    ]);
+    const by = { path: 'iterations/it-0001/assignment.json', id: 'it-0001', revision: 1, hash: 'a'.repeat(64) };
+    const allowed = await runGate(createPassingCheckExecution(), 'iteration', { ...request, id: 'ga-0003', directory: join(directory.path, '.gates/ga-0003'),
+      authorizations: [`${child}/package.json`, `${child}/vitest.config.ts`].map(path => ({ path, by })) });
+    expect(allowed.verdict).toBe('passed');
+    expect(allowed.guardedChanges.every(change => change.authorizedBy?.id === 'it-0001')).toBe(true);
   });
 
   test('holds the configuration, the support files as they stand and each feature file at the hash of its expected rendering', async () => {
@@ -353,7 +395,7 @@ describe('the guarded list', () => {
       support: ['src/tests/support/world.ts'],
       expected: expectedFeatureHashes(expected),
     });
-    expect(guarded).toEqual([
+    expect(guarded.filter(file => file.hash !== null)).toEqual([
       { path: 'package.json', hash: sha256('{}\n') },
       { path: 'ramify-agent.json', hash: sha256('{"schema":"ramify-agent.project/1"}\n') },
       { path: expected[0]!.path, hash: contentHash(expected[0]!.content) },

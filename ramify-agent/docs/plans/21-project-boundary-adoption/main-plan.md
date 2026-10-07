@@ -59,7 +59,7 @@ is retained and regression-tested rather than reimplemented.
 - [Planning validation](planning-validation.md) records document validation,
   not runtime acceptance.
 
-The current adopted pair is the exact registry releases `ramify.ts` 0.4.0 and
+The current adopted pair is the exact registry releases `ramify.ts` 0.4.1 and
 `ramify-audit` 0.7.2. Ramify supplies affected CLI/answer /4; audit 0.7.2
 retains P3's public committed-configuration operation and evidence schema 4.
 Dan decided on 2026-10-07 that iteration 0 obtains audit 0.7.1 so the agent's
@@ -72,6 +72,9 @@ supersedes earlier ignore-list/affected-rule target versions. Provider receipts
 qualify their artifacts; the agent still needs its own installed-package witnesses.
 Iteration 0 records the original 0.4.0/0.7.1 pair and its qualification before
 adoption; the iteration 2 receipt records the 0.7.2 provider prerequisite.
+Iteration 3 adopts Ramify 0.4.1 after its provider-owned hard-exclusion precedence
+correction inside owned ignored trees. Its public affected CLI/answer /4 contract
+is unchanged; the earlier 0.4.0 receipts remain historical evidence.
 No consumer deep import or copied provider implementation is permitted.
 
 Declare `owned-unwired "docs"` and set `ignorePaths: ["docs/**"]`.

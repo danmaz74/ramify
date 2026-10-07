@@ -11,9 +11,9 @@ function assignment(): IterationAssignment {
     approach: 'Extend mcp.ts.',
     completionEvidence: 'A test calls the tool.',
     scope: {
-      base: { module: 'app/reviews', includedChildren: [] },
+      base: { module: 'app/reviews', included: [] },
       bootstrap: [],
-      resolved: { roots: ['/p/subs/reviews'], files: [] },
+      resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: ['/p/subs/reviews'], files: [] },
     },
     gate: { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['app/reviews'], subtrees: [], extraSuites: [] } },
     externalCapabilities: [],

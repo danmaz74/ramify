@@ -24,7 +24,7 @@ function index(modules: readonly [string, string][]): ArchitectIndex {
 }
 
 function scope(base: WriteScope['base'], roots: string[], bootstrap: WriteScope['bootstrap'] = []): WriteScope {
-  return { base, bootstrap, resolved: { roots }, revision: 1 } as WriteScope;
+  return { extra: [], read: [], rationale: 'fixture', base, bootstrap, resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots, files: [], view: { status: 'placeholder' } }, revision: 1 } as WriteScope;
 }
 
 test('root and multi-module assignments start in the first base module src', async () => {
@@ -33,7 +33,7 @@ test('root and multi-module assignments start in the first base module src', asy
   await mkdir(join(root, 'src'), { recursive: true });
   await mkdir(join(root, second, 'src'), { recursive: true });
   const view = index([['app', ''], ['app/second', second]]);
-  expect(await engineerWorkingDirectory(root, scope({ module: 'app', includedChildren: [] }, [join(root, 'src')]), view, git)).toBe(join(root, 'src'));
+  expect(await engineerWorkingDirectory(root, scope({ module: 'app', included: [] }, [join(root, 'src')]), view, git)).toBe(join(root, 'src'));
   expect(await engineerWorkingDirectory(root, scope({ modules: ['app/second', 'app'], rationale: 'joint work' }, [join(root, second), root]), view, git))
     .toBe(join(root, second, 'src'));
 });
@@ -42,11 +42,19 @@ test('an authorized bootstrap prepares missing src, while an unexpected missing 
   const root = await project();
   const dir = 'subs/new';
   await mkdir(join(root, dir), { recursive: true });
-  const captured = scope({ module: 'app/new', includedChildren: [] }, [join(root, dir, 'src')], [{ directory: dir, capability: { id: 'c', revision: 1, hash: 'h' } }]);
+  const captured = scope({ module: 'app/new', included: [] }, [join(root, dir, 'src')], [{ directory: dir, owner: 'app/new', parent: 'app', capability: { id: 'c', revision: 1, hash: 'h' } }]);
   expect(await engineerWorkingDirectory(root, captured, null, git)).toBe(join(root, dir, 'src'));
   expect((await stat(join(root, dir, 'src'))).isDirectory()).toBe(true);
   const absent = 'subs/absent';
   await mkdir(join(root, absent), { recursive: true });
-  await expect(engineerWorkingDirectory(root, scope({ module: 'app/absent', includedChildren: [] }, [join(root, absent, 'src')]), index([['app/absent', absent]]), git))
+  await expect(engineerWorkingDirectory(root, scope({ module: 'app/absent', included: [] }, [join(root, absent, 'src')]), index([['app/absent', absent]]), git))
     .rejects.toThrow('has no src directory');
+});
+
+test('bootstrap cwd binds declared owner identity even when the physical directory is renamed', async () => {
+  const root = await project(); const directory = 'subs/physical-name';
+  const captured = scope({ module: 'app/new', included: [] }, [join(root, directory)], [{ directory, owner: 'app/new', parent: 'app', capability: { id: 'c', revision: 1, hash: 'h' } }]);
+  expect(await engineerWorkingDirectory(root, captured, null, git)).toBe(join(root, directory, 'src'));
+  const collision = scope({ module: 'app/other/new', included: [] }, [join(root, directory)], captured.bootstrap);
+  await expect(engineerWorkingDirectory(root, collision, null, git)).rejects.toThrow('unambiguous bootstrap directory');
 });

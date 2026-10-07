@@ -435,8 +435,6 @@ async function runScopeTestSelection(options: ScopeTestsOptions, signal: AbortSi
       text: 'The selection is empty: this assignment owns no test file yet. Writing the first one is part of the work.',
     };
   }
-  // A suite beneath an `outside-modules` path runs on its own, as at the
-  // gate, so one the runner does not select fails rather than vanishing.
   const checks = scopedTestChecks(options.commands, resolved);
   if (options.commandExecution === undefined) {
     const results = [];
@@ -588,6 +586,12 @@ export function iterationMessage(briefing: IterationBriefing): string {
   const { assignment } = briefing;
   const startingModule = 'module' in assignment.scope.base ? assignment.scope.base.module : assignment.scope.base.modules[0]!;
   const paths = scopePaths(briefing.projectRoot, assignment.scope);
+  const includedInstructions = assignment.scope.resolved.included.flatMap(entry => [
+    `Included whole tree ${entry.directory} (${entry.kind}, owner ${entry.owner}): ${entry.reason}`,
+    entry.instructions,
+    ...(entry.kind === 'owned-nested-project' ? ['Ramify does not analyze this tree through the enclosing project. Use its own root for verification commands; substantial independent work is a separate run.'] : []),
+    ...entry.projectInstructions.map(document => `${document.path}:\n${document.text}`),
+  ]);
   const lines: string[] = [
     `# Iteration ${assignment.id} — ${describeBase(assignment)}`,
     '',
@@ -683,15 +687,16 @@ export function iterationMessage(briefing: IterationBriefing): string {
   }
 
   lines.push(`Work within the scope above and end your turn with \`${engineerToolName}\`.`);
+  if (includedInstructions.length > 0) lines.push('', '## Included tree instructions', '', ...includedInstructions);
   return lines.join('\n');
 }
 
 function describeBase(assignment: IterationAssignment): string {
   const base = assignment.scope.base;
   if ('module' in base) {
-    return base.includedChildren.length === 0
+    return base.included.length === 0
       ? base.module
-      : `${base.module}, with ${base.includedChildren.join(', ')}`;
+      : `${base.module}, with ${base.included.map(entry => `${entry.directory}: ${entry.reason}; ${entry.instructions}`).join(', ')}`;
   }
   return base.modules.join(', ');
 }

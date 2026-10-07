@@ -1,10 +1,12 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
 import { moduleTreeResponseSchema } from '../interfaces/protocol/evidence.js';
 import { planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
+import { unservedRun } from '../projections/inputs.js';
+import { constructedRecord, runId } from './helpers/constructed.js';
 import { ProjectRootError, startServer, type RunningServer } from '../http/server.js';
 import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
 
@@ -28,6 +30,30 @@ describe('the protocol over HTTP, with the web assets absent', () => {
   afterAll(async () => {
     await server.close();
     await fixture.remove();
+  });
+
+  test('PB3-R01: unserved old policies refuse direct projection and HTTP before record decoding', async () => {
+    const directory = join(fixture.root, 'plans/review-notes/.harness/jobs', runId);
+    await mkdir(directory, { recursive: true });
+    const path = join(directory, 'job.json');
+    for (const version of [undefined, ...Array.from({ length: 6 }, (_, index) => `run-policy/${index + 1}`)]) {
+      const text = JSON.stringify({ schema: 'ramify-agent.job/3', policy: version === undefined ? {} : { version }, body: 'deliberately not a current record' });
+      await writeFile(path, text);
+      const refusal = await unservedRun(fixture.root, 'review-notes', runId);
+      expect(refusal).toMatchObject({ code: 'unsupported-version' });
+      expect(refusal!.message).toContain(version ?? '(missing policy)');
+      expect(refusal!.message).toContain('run-policy/7');
+      expect(refusal!.message).toContain('fresh run');
+      const response = await query(server, protocolPaths.run('review-notes', runId));
+      expect(response.status).toBe(422);
+      const error = errorResponseSchema.parse(response.body).error;
+      expect(error.code).toBe('unsupported-version');
+      expect(error.message).toContain('fresh run');
+      expect(await readFile(path, 'utf8')).toBe(text);
+    }
+    await writeFile(path, '{broken JSON');
+    expect(await unservedRun(fixture.root, 'review-notes', runId)).toMatchObject({ code: 'unreadable' });
+    await writeFile(path, JSON.stringify(constructedRecord()));
   });
 
   test('the project query', async () => {

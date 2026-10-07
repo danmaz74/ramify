@@ -8,8 +8,8 @@ import { assign, outline } from './helpers/iterations.js';
 
 const assignment = {
   id: 'wi-001.i01', goal: 'Implement the endpoint', approach: 'Change the handler.', completionEvidence: 'Tests pass',
-  scope: { base: { module: 'app/reviews', includedChildren: [] }, bootstrap: [],
-    resolved: { roots: ['/p/subs/reviews'], files: [] }, extra: [] },
+  scope: { base: { module: 'app/reviews', included: [] }, bootstrap: [],
+    resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: ['/p/subs/reviews'], files: [] }, extra: [] },
   gate: { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['app/reviews'], subtrees: [], extraSuites: [] } },
   externalCapabilities: [],
 } as unknown as IterationAssignment;
@@ -39,6 +39,15 @@ describe('assignment element citations', () => {
     expect(errors[2]).toMatchObject({ message: '"fr-001" is cited more than once' });
     // A run without a catalog has no package to judge against.
     expect(assignmentErrors(body(['nfr-009']), { ...evidence, package: undefined })).toEqual([]);
+  });
+
+  test('PB3-S08: captured included project reason, instructions, owner and project instructions reach engineer briefs', () => {
+    const included = { directory: 'fixture', kind: 'owned-nested-project' as const, owner: 'app/reviews', reason: 'Repair independent fixture behavior',
+      instructions: 'Run its checks from fixture', projectInstructions: [{ path: 'fixture/AGENTS.md', text: 'Use the independent package root.' }] };
+    const current = { ...assignment, scope: { ...assignment.scope, base: { module: 'app/reviews', included: [{ directory: included.directory, reason: included.reason, instructions: included.instructions }] },
+      resolved: { ...assignment.scope.resolved, included: [included] } } } as IterationAssignment;
+    const text = iterationMessage({ assignment: current, projectRoot: '/p', base: 'abc' });
+    for (const expected of [included.directory, included.reason, included.instructions, included.owner, included.projectInstructions[0]!.text]) expect(text).toContain(expected);
   });
 
   test('engineer and contract briefs render the same package once, without rewriting the approach', () => {

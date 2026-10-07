@@ -210,7 +210,7 @@ describe('the revision a consumer architect assigns directly', () => {
       kind: 'contract',
       goal: 'Revise the agreement so that it states the behavior this module needs.',
       approach: 'The agreed suite fixes an ordering the provider cannot give; state the set instead.',
-      scope: { base: { module: reviews, includedChildren: [] }, extra: [], read: [], rationale: 'The consumer side of the agreement.' },
+      scope: { base: { module: reviews, included: [] }, extra: [], read: [], rationale: 'The consumer side of the agreement.' },
       citedElements: [],
       externalCapabilities: [],
       completionEvidence: 'The revised suite passes against the fake.',

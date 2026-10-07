@@ -479,13 +479,17 @@ For example, a brief could describe its scope as:
 
 ```yaml
 scope:
-  module: export
-  includedChildren: [formatting]
+  base:
+    module: export
+    included:
+      - directory: subs/formatting
+        reason: Implement the formatting behavior with its owner
+        instructions: Verify the whole assigned formatting subtree
 ```
 
 This includes `export`'s own contents and everything beneath
 `export/formatting`. Other children, such as `export/storage`, and all their
-descendants are excluded. An empty child list limits implementation to the
+descendants are excluded. An empty inclusion list limits implementation to the
 assigned module's own contents.
 
 The local architect records the scope choice and its rationale for each iteration.

@@ -464,7 +464,7 @@ function Decision({ decision }: { readonly decision: DecisionView }) {
       return (
         <li className="card decision">
           <p><span className="badge decided">scope</span> {decision.iteration} ({decision.iterationKind}): {decision.modules.map(module => <code key={module}>{module} </code>)}{decision.broad ? '(explicitly broad)' : ''}</p>
-          {decision.includedChildren.length > 0 && <p className="muted">Included children: {decision.includedChildren.join(', ')}</p>}
+          {decision.included.length > 0 && <p className="muted">Included trees: {decision.included.map(entry => `${entry.directory}: ${entry.reason}; ${entry.instructions}`).join('; ')}</p>}
           <p>{decision.rationale}</p>
           {decision.authorizations.length > 0 && <p className="muted">Authorized guarded changes: {decision.authorizations.map(a => `${a.path} (by ${a.by}: ${a.rationale})`).join('; ')}</p>}
         </li>
@@ -552,7 +552,7 @@ function WorkItemDetail({ client, planId, runId, version, workItem, onOpenGate }
                 {data.iterations.map(iteration => (
                   <li key={iteration.id} className="card">
                     <p><strong>{iteration.id}</strong> ({iteration.kind}, checkpoint {iteration.checkpoint}): {iteration.goal}</p>
-                    <p className="muted">Scope: {iteration.scope.modules.join(', ')}{iteration.scope.includedChildren.length ? ` with ${iteration.scope.includedChildren.join(', ')}` : ''}. {iteration.scope.rationale}</p>
+                    <p className="muted">Scope: {iteration.scope.modules.join(', ')}{iteration.scope.included.length ? ` with ${iteration.scope.included.map(entry => `${entry.directory}: ${entry.reason}; ${entry.instructions}`).join('; ')}` : ''}. {iteration.scope.rationale}</p>
                     <p>Result: {iteration.result ? `${iteration.result.outcome}${iteration.result.commit ? `, commit ${iteration.result.commit.slice(0, 12)}` : ''}` : 'open'}</p>
                     {iteration.result && iteration.result.findings.length > 0 && <ul>{iteration.result.findings.map(finding => <li key={finding}>{finding}</li>)}</ul>}
                     {iteration.result?.failure && <IterationFailure failure={iteration.result.failure} />}

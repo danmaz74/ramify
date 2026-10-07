@@ -57,9 +57,9 @@ function assignment(id: string, workItem: string, revision: number) {
   return iterationAssignmentSchema.parse({
     schema: 'ramify-agent.iteration-assignment/1', id, workItem,
     outline: { id: workItem, revision, hash }, stage: 0, kind: 'ordinary', goal: `Do ${id}`, approach: 'Implement it.',
-    scope: { revision, base: { module: reviews, includedChildren: [] },
+    scope: { revision, base: { module: reviews, included: [] },
       extra: [{ path: `subs/reviews/src/${id}.ts`, purpose: 'contract' }], read: [], bootstrap: [], rationale: 'Recorded scope.',
-      resolved: { roots: [], files: [], view: { status: 'placeholder' } } },
+      resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: [], files: [], view: { status: 'placeholder' } } },
     externalCapabilities: [], completionEvidence: 'Check it.', evidenceObligations: [],
     gate: { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: [], subtrees: [], extraSuites: [] } },
     guarded: [], authorizations: [],

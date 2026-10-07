@@ -29,7 +29,7 @@ describe('the captured commands', () => {
   });
   test('are the main plan\'s table, naming the environment the harness built', () => {
     const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
-    expect(policy.version).toBe('run-policy/6');
+    expect(policy.version).toBe('run-policy/7');
     expect(policy.limits.maxIterationsPerCapabilityTask).toBe(24);
     expect(policy.limits.nonfunctionalRoundsPerPlan).toBe(3);
     // The first trial's review policy and reconciliation bound (Plan 12).
@@ -93,7 +93,7 @@ describe('the captured commands', () => {
     expect(runPolicySchema.safeParse({ ...policy, context: partial }).success).toBe(false);
     // A run captured before the reviewer existed has no context for it, and reads back.
     const { reviewer: _reviewer, ...earlier } = policy.context;
-    expect(runPolicySchema.safeParse({ ...policy, version: 'run-policy/2', context: earlier, reviews: undefined }).success).toBe(true);
+    expect(runPolicySchema.safeParse({ ...policy, version: 'run-policy/2', context: earlier, reviews: undefined }).success).toBe(false);
   });
 });
 

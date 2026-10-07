@@ -46,22 +46,20 @@ write.
   described where they arise.
 - `assignment.scope.base.module` is the module the engineer works in. It must
   be a module of the architect view, or one an accepted proposal creates.
-- `assignment.scope.base.includedChildren` names direct children whose whole
-  subtree the engineer may write. A subtree is included or excluded whole: a
-  grandchild is never named, and a child you do not name is outside the
-  scope, whatever lies beneath it.
-- `assignment.scope.extra` names single locations beyond that base: a
-  contract, a conformance suite, a fake, an exposure declaration, a consumer.
-  Each must lie in a module's own contents — its `src/`, its `module.ramify`
-  or its `README.md` — of a module that exists or one this assignment
-  creates.
-- Where a plan requirement can be met only by changing a file outside every
-  module's own contents, such as a project script, name it in
-  `assignment.scope.extra` with purpose `outside-modules` and a `reason`
-  naming that requirement. `kind: "directory"` lets the engineer create files
-  beneath it. The gate runs the test files there, each on its own. Such a
-  location never reaches a module's own contents, and the files only the
-  harness writes are never one.
+- `assignment.scope.base.included` is the one list of whole included trees.
+  Each entry supplies `directory`, `reason` and `instructions`. Name either a
+  whole immediate child subtree or a declared owned nested project root. The
+  installed provider derives the entry's kind and owner. A nested project
+  inside an included child still needs its own entry. Preserve its project
+  instructions and verify from that project's root where applicable.
+- The assigned owner's ordinary documentation, auxiliary source, scratch and
+  owned unwired trees are part of its scope. Captured configuration inputs
+  still require recorded guarded-file authorization. External, repository,
+  package, generated and configured output exclusions always win, including
+  inside an included tree and against extra or bootstrap allowances.
+- `assignment.scope.extra` preserves narrow contract, conformance, fake and
+  exposure locations beyond the base. An extra cannot bypass provider
+  exclusions or files and durable state reserved to the harness.
 - `assignment.scope.read` is the reading you expect beyond the base. It is
   advice, not a boundary.
 - `assignment.externalCapabilities` names behavior other modules own that

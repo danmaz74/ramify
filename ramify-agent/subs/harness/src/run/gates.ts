@@ -46,7 +46,7 @@ export interface CheckpointRequest {
   /** For an `owned-by-scope` checkpoint: the selection resolved anew from the current tree. */
   readonly tests?: ResolvedTests | undefined;
   /** The guarded files as the assignment captured them. */
-  readonly guarded?: readonly { readonly path: string; readonly hash: string }[] | undefined;
+  readonly guarded?: readonly { readonly path: string; readonly hash: string | null }[] | undefined;
   /**
    * The project-relative write scope of the assignment this checkpoint
    * follows. A failed Ramify check's findings are attributed against it.

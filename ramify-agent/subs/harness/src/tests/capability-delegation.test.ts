@@ -357,19 +357,19 @@ for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port
   }, 45_000);
 }
 
-test('historical test composition cannot create a policy/6 run', async () => {
+test('scripted current-engine composition refuses an earlier captured policy before creating a run', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   await initRepository(fixture.root);
   await installMiniRunner(fixture.root);
   const opened = await openRuns(fixture.root, { git: gitService, script: script([]),
 
-    policy: root => capabilityPolicyFrom(testPolicy(root)) });
+    policy: root => ({ ...testPolicy(root), version: 'run-policy/6' } as never) });
   cleanups.push(() => opened.service.close());
-  await expect(opened.service.execute(startRun('need'))).rejects.toThrow('historical test workflow cannot create');
+  await expect(opened.service.execute(startRun('need'))).rejects.toThrow(/run-policy\/6.*run-policy\/7.*fresh run/u);
 });
 
-test('CA33: production composition captures policy/6 and delegates without contract dispatch', async () => {
+test('CA33: production composition captures policy/7 and delegates without contract dispatch', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   await initRepository(fixture.root);
@@ -388,7 +388,7 @@ test('CA33: production composition captures policy/6 and delegates without contr
   const job = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'job.json'), 'utf8')) as {
     policy: { version: string }; prompts: Record<string, unknown>;
   };
-  expect(job.policy.version).toBe('run-policy/6');
+  expect(job.policy.version).toBe('run-policy/7');
   expect(job.prompts['capability-architect']).toBeDefined();
   expect(job.prompts['contract-engineer']).toBeUndefined();
   await opened.service.close();

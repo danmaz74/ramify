@@ -193,7 +193,7 @@ export async function startServerWith(options: ServerSettings): Promise<RunningS
     };
     ({ service: runs, recovery } = options.runs?.policy === undefined
       ? await RunService.open(runOptions)
-      : await RunService.openForHistoricalTests(runOptions));
+      : await RunService.openForScriptedLifecycleTests(runOptions));
   } catch (error) {
     await owned?.dispose();
     await lock.release();

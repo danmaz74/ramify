@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createScriptedAgent, type ScriptStep } from '../../subs/agent/src/scripted.js';
@@ -135,7 +135,7 @@ async function session(
     onProgress: event => events.push(event),
     ...extra,
   });
-  expect(answerIndex).toBe(answers.length);
+  expect(answerIndex, JSON.stringify(result)).toBe(answers.length);
   checkExecution.assertComplete();
   expect(git.unexpected).toEqual([]);
   const starts = boundaries.starts ?? true;
@@ -386,6 +386,41 @@ describe('a single engineer session', () => {
 });
 
 describe('the gate option', () => {
+  test('PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint', async () => {
+    // This one witness explicitly starts a bounded shell. Provider ownership and
+    // automated check answers remain labeled scripted lifecycle controls.
+    const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    const argv: string[][] = [];
+    const commandExecution: CommandRunner = async request => {
+      argv.push([...request.argv]);
+      const output = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => actual.execFile(request.argv[0]!, request.argv.slice(1),
+        { cwd: request.cwd, timeout: Math.min(request.timeoutMs, 5000) }, (error, stdout, stderr) => error ? reject(error) : resolve({ stdout, stderr })));
+      return commandResult(request, output);
+    };
+    const allowedRoot = await project();
+    const allowed = await session(allowedRoot, [shell("printf '%s' 'export const noteLimit = 500;' > notes.ts"),
+      { kind: 'submit', input: completionProposed('Actual shell updated ordinary owned source') }], { gate: true },
+      { changed: [notesSource], commandExecution, ramify: [checked('complete'), checked('changed')], gate: passingGate });
+    expect(await readFile(join(allowedRoot, notesSource), 'utf8')).toContain('noteLimit = 500');
+    expect(finished(allowed.result).gate).toMatchObject({ verdict: 'passed' });
+    expect(allowed.git.commitAccepted).not.toHaveBeenCalled();
+    const deniedRoot = await project();
+    await mkdir(join(deniedRoot, 'src'), { recursive: true });
+    await writeFile(join(deniedRoot, 'src/root.ts'), 'export const root = true;');
+    const state = 'plans/plan/.harness/jobs/run/unsafe.json';
+    const denied = await session(deniedRoot, [shell(`mkdir -p '${deniedRoot}/plans/plan/.harness/jobs/run' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/ramify-audit.json' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/${state}'`),
+      { kind: 'submit', input: completionProposed('Actual shell created protected audit configuration and durable job state') }], { gate: true, module: 'collection-review' },
+      { changed: ['ramify-audit.json', state], commandExecution, ramify: [checked('complete')], gate: [] });
+    expect(await readFile(join(deniedRoot, 'ramify-audit.json'), 'utf8')).toContain('createdByShell');
+    expect(finished(denied.result).gate).toMatchObject({ verdict: 'failed' });
+    const attempt = gateAttemptSchema.parse(JSON.parse(await readFile(join(finished(denied.result).records, 'gate/attempt.json'), 'utf8')));
+    expect(attempt.rules?.find(rule => rule.rule === 'write-scope')).toMatchObject({ outcome: 'failed', violations: [{ rule: 'write-scope', path: state, detail: expect.any(String) }, { rule: 'write-scope', path: 'ramify-audit.json', detail: expect.any(String) }] });
+    expect(await readFile(join(deniedRoot, state), 'utf8')).toContain('createdByShell');
+    expect(attempt.commit).toBeNull();
+    expect(denied.git.commitAccepted).not.toHaveBeenCalled();
+    expect(argv).toHaveLength(2);
+  });
+
   test('passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed', async () => {
     const root = await project();
 
@@ -460,7 +495,7 @@ describe('the session\'s records', () => {
     expect(record).toMatchObject({ id: summary.session, module: notes, directory: notesDirectory, prompt: 'Raise the note limit to 500.', gate: true });
     // The session records its executor and the model it was asked for: none, for the fake.
     expect(record).toMatchObject({ schema: 'ramify-agent.session/2', agent: 'scripted', model: null });
-    expect(record.scope.roots).toEqual([`${notesDirectory}/src`]);
+    expect(record.scope.roots).toEqual([notesDirectory]);
 
     const observations = await observationsOf(records);
     expect(observations.map(line => line.type)).toEqual(expect.arrayContaining(['activity', 'guard', 'mutation', 'hook-check', 'coverage-gap']));

@@ -211,24 +211,25 @@ export const recoveryTable = {
     stated: 'Keeps what the writer left in the tree, closes the invocation, releases no second writer',
   },
   'gate-attempted': {
-    machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
+    machines: ['SM7', 'SM4'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
     effect: /the commit and audit of gate ga-\d+/, commits: { before: 1, after: 2 }, recovery: 'makes-the-commit',
-    at: { gate: 'ga-0002', revision: source(1) },
+    at: { gate: 'ga-0004', revision: source(1) },
     stated: 'The verified operation is durable and the commit is not made: recovery makes and audits one commit, then writes the complete attempt once',
   },
   'gate-committing': {
-    machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
+    machines: ['SM7', 'SM4'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
     effect: /the commit and audit of gate ga-\d+/, commits: { before: 2, after: 2 }, recovery: 'finds-the-commit',
-    at: { gate: 'ga-0002', revision: source(1) },
+    at: { gate: 'ga-0004', revision: source(1) },
     stated: 'The commit is made and the audit is not complete: recovery finds and re-audits that commit, then writes one complete attempt',
   },
   'gate-committed': {
+    when: events => { const event = events.at(-1); return event?.type === 'gate-attempted' && event.data.checkpoint === 'work-item'; },
     machines: ['SM7'], scenario: 'iteration', appended: interrupted, commits: { before: 2, after: 2 },
     stated: 'Leaves the complete attempt and its one commit alone and appends the interruption only',
   },
   'iteration-closed': {
     machines: ['SM5'], scenario: 'iteration', appended: interrupted,
-    stated: 'The accepted iteration stays accepted with its one commit; the work item is not closed by the interruption',
+    stated: 'The scoped iteration stays exhausted after child-removal discovery fails; the work item has not committed or closed at the interruption',
   },
   'session-finished': {
     machines: ['SM5'], scenario: 'iteration', appended: interrupted,

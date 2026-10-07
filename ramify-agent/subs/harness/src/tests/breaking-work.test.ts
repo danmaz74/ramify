@@ -481,7 +481,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
           kind: 'breaking',
           stage: 0,
           goal: 'Introduce the structured reviewer beside the plain field.',
-          scope: { base: { module: core, includedChildren: [] }, extra: [], read: [], rationale: 'The representation is defined here.' },
+          scope: { base: { module: core, included: [] }, extra: [], read: [], rationale: 'The representation is defined here.' },
         }, stagedOutline())),
         // Stage 1: the break, with the explicitly broad scope and its
         // rationale.
@@ -548,7 +548,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
 
     // The first stage is narrow; the two that break are the explicitly broad
     // form, each recorded with its own rationale.
-    expect(assignments[0]!.scope.base).toEqual({ module: core, includedChildren: [] });
+    expect(assignments[0]!.scope.base).toEqual({ module: core, included: [] });
     for (const assignment of assignments.slice(1)) {
       const base = assignment.scope.base;
       expect('modules' in base).toBe(true);
@@ -716,7 +716,7 @@ describe('the broad scope is a planned exception', () => {
 describe('K6: the gate is not satisfied by weakening what it checks', () => {
   test('an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes', async () => {
     const root = await target();
-    const narrow = { base: { module: core, includedChildren: [] }, extra: [], read: [], rationale: 'The representation is defined here.' };
+    const narrow = { base: { module: core, included: [] }, extra: [], read: [], rationale: 'The representation is defined here.' };
     const { service, runId, agent, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('reviewer-identity', attribution)]))],
       'local-architect': [
@@ -829,7 +829,7 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
       'local-architect': [
         submit(assign(core, {
           goal: 'State the reviewer\'s role in the outcome.',
-          scope: { base: { module: core, includedChildren: [] }, extra: [], read: [], rationale: 'The representation is defined here.' },
+          scope: { base: { module: core, included: [] }, extra: [], read: [], rationale: 'The representation is defined here.' },
         }, stagedOutline())),
         submit({ kind: 'unresolved', conflict: 'The iteration removed the runner\'s configuration rather than doing the work.', evidence: ['vitest.config.ts'] }),
       ],
@@ -873,7 +873,7 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
 describe('a break discovered during work', () => {
   test('break-discovered returns to the local architect, which restages, and the engineer widened nothing', async () => {
     const root = await target();
-    const narrow = { base: { module: core, includedChildren: [] }, extra: [], read: [], rationale: 'The representation is defined here.' };
+    const narrow = { base: { module: core, included: [] }, extra: [], read: [], rationale: 'The representation is defined here.' };
     const { service, runId, agent, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('reviewer-identity', attribution)]))],
       'local-architect': [
@@ -936,7 +936,7 @@ describe('a break discovered during work', () => {
     // module it was given, and nothing outside it changed in its turn.
     const first = await readAssignment(root, runId, 'wi-001', 1);
     expect(first.kind).toBe('ordinary');
-    expect(first.scope.base).toEqual({ module: core, includedChildren: [] });
+    expect(first.scope.base).toEqual({ module: core, included: [] });
     const reporting = agent!.sessions.filter(session => session.spec.role === 'engineer')[0]!;
     expect(reporting.results.filter(result => result.tool === 'write' || result.tool === 'edit')).toEqual([]);
     expect(reporting.results.map(result => result.tool)).toEqual(['read', 'read', 'submit_iteration_result']);

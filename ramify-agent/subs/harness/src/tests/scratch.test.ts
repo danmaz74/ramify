@@ -144,3 +144,16 @@ test('removal refuses a symlinked scratch directory without entering its target'
     await rm(outside, { recursive: true, force: true });
   }
 });
+
+// Whole-owner authority does not change the harness's declared-module scratch lifetime.
+test('PB3-S09: releasing selected child scratch preserves ordinary and independent project contents', async () => {
+  for (const path of ['subs/group/physical/src/tmp', 'subs/group/physical/docs', 'subs/group/physical/project/src/tmp']) await mkdir(join(root, path), { recursive: true });
+  await writeFile(join(root, 'subs/group/physical/src/tmp/free.txt'), 'scratch');
+  await writeFile(join(root, 'subs/group/physical/docs/module.ramify'), 'ignored ordinary bytes');
+  await writeFile(join(root, 'subs/group/physical/project/src/tmp/kept.txt'), 'independent project scratch');
+  const git = mockGit({ async trackedPaths() { return []; } });
+  expect(await removeScratchDirectories(root, ['subs/group/physical'], git)).toEqual({ preservedTracked: [] });
+  await expect(stat(join(root, 'subs/group/physical/src/tmp'))).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(await readFile(join(root, 'subs/group/physical/docs/module.ramify'), 'utf8')).toBe('ignored ordinary bytes');
+  expect(await readFile(join(root, 'subs/group/physical/project/src/tmp/kept.txt'), 'utf8')).toBe('independent project scratch');
+});

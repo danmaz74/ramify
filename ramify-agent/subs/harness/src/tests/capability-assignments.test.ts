@@ -102,7 +102,7 @@ function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-bloc
       const owners = [b, d, p, a];
       if (architect >= 2 && architect <= 5) return submit({ ...basis, kind: 'assign', assignment: assign(owners[architect - 2]!, {
         goal: `Update ${owners[architect - 2]}`, approach: 'Change owned source', completionEvidence: 'Owned source diff',
-        scope: { base: { module: owners[architect - 2]!, includedChildren: owners[architect - 2] === p ? [b] : [] },
+        scope: { base: { module: owners[architect - 2]!, included: owners[architect - 2] === p ? [{ directory: 'subs/b', reason: 'Fixture child', instructions: 'Implement fixture behavior' }] : [] },
           extra: [], read: [], rationale: 'Scoped compatibility change' },
       }).assignment });
       return architect === 6

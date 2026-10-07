@@ -215,7 +215,7 @@ describe('K3: exact-owner and included-subtree selections at gate time', () => {
         submit(assign(reviews, {
           goal: 'Carry the change into the core beneath it.',
           scope: {
-            base: { module: reviews, includedChildren: [`${reviews}/core`] },
+            base: { module: reviews, included: [`${reviews}/core`].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) },
             extra: [], read: [], rationale: 'The core changes with it.',
           },
         })),

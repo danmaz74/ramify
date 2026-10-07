@@ -464,23 +464,24 @@ describe('warnings and analysis limits on the files just written', () => {
     },
   ];
 
-  test('are relayed as not blocking, except a file outside modules that the assignment names as outside-modules scope', async () => {
+  test('are relayed as not blocking without an assignment-purpose warning suppression', async () => {
     const { ramify, root, answer } = await answering();
     const seen = new FindingsSeen();
     await answer(changedDocument({ warnings, coverage }), 0);
 
-    const result = await runHookCheck({ ...request(ramify, root, [mcp, stray, report], seen), outsideModules: ['scripts/report'] });
+    const result = await runHookCheck({ ...request(ramify, root, [mcp, stray, report], seen) });
 
     expect(result.checks[0]).toMatchObject({ outcome: 'passed', newFindings: 0 });
     expect(result.text).toBe([
       'Not blocking: Ramify reports these for the files you just wrote, and fails no check on them.',
       `- ${stray}: the compiler selects this file, but it lies outside every module's source, so no module owns it and Ramify decides no import of it [warning outside-module-source]`,
+      `- ${report}: the compiler selects this file, but it lies outside every module's source, so no module owns it and Ramify decides no import of it [warning outside-module-source]`,
       `- ${mcp}:163: Cannot establish the accessed source or resource target [analysis limit nonliteral-target]`,
       'An analysis limit is an import Ramify could not decide: it is neither allowed nor denied.',
     ].join('\n'));
 
     // Told once: the same warning and limit on a later write is not news.
-    const again = await runHookCheck({ ...request(ramify, root, [mcp, stray], seen), ran: 1, outsideModules: ['scripts/report'] });
+    const again = await runHookCheck({ ...request(ramify, root, [mcp, stray], seen), ran: 1 });
     expect(again.text).toBeNull();
   });
 
