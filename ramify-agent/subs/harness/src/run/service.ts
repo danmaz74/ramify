@@ -10633,17 +10633,57 @@ export class RunService {
     const assignments = request.subject?.iteration !== undefined
       ? [committed.assignments.get(request.subject.iteration)].filter((entry): entry is IterationAssignment => entry !== undefined)
       : [...committed.assignments.values()].filter(entry => request.subject?.workItem === undefined || entry.workItem === request.subject.workItem || (entry.coordination?.kind === 'capability-task' && entry.coordination.id === request.subject.workItem));
+    const capabilityAssigned = run.log.all('capability-assigned');
+    const assignmentOrder = new Map([
+      ...run.log.all('iteration-assigned').map(event => [event.data.iteration, event.sequence] as const),
+      ...capabilityAssigned.map(event => [event.data.assignment, event.sequence] as const),
+    ]);
     // Only authority co-committed with actual run assignments can cover a
     // later checkpoint. A rejected iteration's dirty files get no shortcut.
     const origins: Array<{ scope: WriteScope; guarded: readonly { path: string; hash: string | null }[];
-      authorizations: readonly { path: string }[]; inherited: readonly { path: string; hash: string | null }[]; parent?: IterationAssignment }> = assignments.map(assignment => {
-        const task = assignment.coordination?.kind === 'capability-task' ? committed.capabilityTasks.get(assignment.coordination.id) : undefined;
-        const parent = task === undefined ? undefined : committed.assignments.get(task.originatingAssignment);
-        const related = task !== undefined && parent !== undefined && (task.parent.kind === 'work-item' ? parent.workItem === task.parent.id : parent.coordination?.kind === 'capability-task' && parent.coordination.id === task.parent.id);
+      authorizations: readonly { path: string }[]; inherited: readonly { path: string; hash: string | null }[];
+      predecessors: readonly { assignment: IterationAssignment; paths?: readonly string[];
+        continuity: readonly (readonly { path: string; hash: string | null }[])[] }[] }> = assignments.map(assignment => {
+        const predecessors: Array<{ assignment: IterationAssignment; paths?: readonly string[];
+          continuity: readonly (readonly { path: string; hash: string | null }[])[] }> = [];
+        const continuity: Array<readonly { path: string; hash: string | null }[]> = [];
+        const visited = new Set<string>();
+        let ancestor = assignment;
+        while (ancestor.coordination?.kind === 'capability-task' && !visited.has(ancestor.id)) {
+          visited.add(ancestor.id);
+          const coordination = ancestor.coordination;
+          if (ancestor !== assignment) continuity.push(coordination.startingPaths);
+          const assigned = capabilityAssigned.find(event => event.data.assignment === ancestor.id
+            && event.data.task === coordination.id && event.data.sequence === coordination.sequence);
+          if (assigned === undefined) { predecessors.length = 0; break; }
+          // A settled partial writer of this exact task owns its unchanged
+          // inherited effects. Failed or unavailable settlement is no proof.
+          for (const event of run.log.all('capability-assignment-settled')) {
+            if (event.data.task !== coordination.id || event.sequence >= assigned.sequence || !['accepted', 'partial'].includes(event.data.outcome)
+              || event.data.mutated === undefined || event.data.outsideScope === undefined) continue;
+            const prior = committed.assignments.get(event.data.assignment);
+            if (prior?.coordination?.kind !== 'capability-task' || prior.coordination.id !== coordination.id
+              || prior.coordination.sequence >= coordination.sequence) continue;
+            const priorCoordination = prior.coordination;
+            const priorAssigned = capabilityAssigned.find(entry => entry.data.assignment === prior.id && entry.data.task === coordination.id
+              && entry.data.sequence === priorCoordination.sequence);
+            if (priorAssigned === undefined || priorAssigned.sequence >= event.sequence) continue;
+            predecessors.push({ assignment: prior, paths: event.data.mutated.filter(path => !event.data.outsideScope!.includes(path)), continuity: [...continuity] });
+          }
+          const task = committed.capabilityTasks.get(coordination.id);
+          const parent = task === undefined ? undefined : committed.assignments.get(task.originatingAssignment);
+          const related = task !== undefined && parent !== undefined && (task.parent.kind === 'work-item'
+            ? parent.workItem === task.parent.id && parent.coordination?.kind !== 'capability-task'
+            : parent.coordination?.kind === 'capability-task' && parent.coordination.id === task.parent.id);
+          if (!related || parent === undefined || (assignmentOrder.get(parent.id) ?? Infinity) >= assigned.sequence
+            || visited.has(parent.id)) { predecessors.length = 0; break; }
+          predecessors.push({ assignment: parent, continuity: [...continuity] });
+          ancestor = parent;
+        }
         return ({
         scope: assignment.scope, guarded: assignment.guarded, authorizations: assignment.authorizations,
         inherited: assignment.coordination?.kind === 'capability-task' ? assignment.coordination.startingPaths : [],
-        ...(related ? { parent } : {}),
+        predecessors,
       }); });
     if (request.checkpoint === 'final') {
       for (const entry of ledger) {
@@ -10653,7 +10693,7 @@ export class RunService {
           && record.id === event.data.assignment && record.revision === 1);
         if (records.length !== 1) throw new Error('Final checkpoint has an unavailable committed repair authority');
         const repair = nonfunctionalRepairAssignmentSchema.parse(records[0]!.body);
-        origins.push({ scope: repair.scope, guarded: repair.guarded, authorizations: [], inherited: [] });
+        origins.push({ scope: repair.scope, guarded: repair.guarded, authorizations: [], inherited: [], predecessors: [] });
       }
     }
     const scopeRules: GateRuleRecord[] = [];
@@ -10686,7 +10726,7 @@ export class RunService {
             if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
             throw error;
           });
-          // Exact unchanged captured harness effects and inherited parent bytes
+          // Exact unchanged captured harness effects and related inherited bytes
           // are not this writer's changes; null means actual absence only.
           const unchangedBytes = (prior !== undefined && hash === prior.hash) || (capturedFile !== undefined && hash === capturedFile.hash);
           const physical = unchangedBytes ? await resolveRealTarget(this.projectRoot, path) : undefined;
@@ -10703,10 +10743,14 @@ export class RunService {
             const input = { ...origin.scope, resolved: { ...origin.scope.resolved, files: [...origin.scope.resolved.files, resolve(this.projectRoot, path)] } };
             unchangedAuthority = (await outsideScope(this.projectRoot, guardedScopeOf(input, [], this.options.ramify, current), [path])).length === 0;
           }
-          if (unchangedIdentity && !unchangedAuthority && prior !== undefined && hash === prior.hash && origin.parent !== undefined) {
-            const parent = origin.parent;
-            const parentGuard = guardedScopeOf(parent.scope, await deniedFiles(this.projectRoot, [...harnessDenied, ...parent.guarded.filter(file => !parent.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify, current);
-            unchangedAuthority = (await outsideScope(this.projectRoot, parentGuard, [path])).length === 0;
+          if (unchangedIdentity && !unchangedAuthority && prior !== undefined && hash === prior.hash) {
+            for (const predecessor of origin.predecessors) {
+              if (predecessor.paths !== undefined && !predecessor.paths.includes(path)) continue;
+              if (!predecessor.continuity.every(snapshot => snapshot.some(entry => entry.path === path && entry.hash === hash))) continue;
+              const parent = predecessor.assignment;
+              const parentGuard = guardedScopeOf(parent.scope, await deniedFiles(this.projectRoot, [...harnessDenied, ...parent.guarded.filter(file => !parent.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify, current);
+              if ((await outsideScope(this.projectRoot, parentGuard, [path])).length === 0) { unchangedAuthority = true; break; }
+            }
           }
           if (unchangedAuthority) permitted.add(path);
           else candidate.push(path);

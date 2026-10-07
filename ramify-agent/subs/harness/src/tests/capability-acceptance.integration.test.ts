@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -35,6 +36,13 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     "Then('the outcome richer-a-fact promises is shown', function () { assert.match(this.result, /1 passed/); });",
     '',
   ].join('\n'));
+  // The real scenario runner is installed in this private project's bin
+  // directory. Declare its path before the run captures configuration;
+  // a bare command would require that directory on the captured PATH.
+  const configurationPath = join(fixture.root, 'ramify-agent.json');
+  const configuration = JSON.parse(await readFile(configurationPath, 'utf8'));
+  for (const mode of ['quick', 'full']) configuration.acceptance.modes[mode].command = ['node_modules/.bin/cucumber-js'];
+  await writeFile(configurationPath, `${JSON.stringify(configuration, null, 2)}\n`);
   await initRepository(fixture.root); await installMiniRunner(fixture.root);
   // Real Vitest compiles the fixture's TypeScript and resolves its .js source
   // specifiers; the small runner used by cooperation tests executes JS only.
@@ -85,6 +93,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       }
       const owner = spec.prompt.includes('# Iteration cap-') ? /Your starting module is `([^`]+)`/u.exec(spec.prompt)?.[1] : undefined;
       if (owner === b) return submit({ kind: 'partial', summary: 'B added the source field for combined verification', findings: [], unfinished: [] },
+        write('../docs/prior.txt', 'B-owned prior assignment documentation\n'),
         write('fact.ts', "export interface FactResult { text: string; source: string }\nexport const readFact = (): FactResult => ({ text: 'old', source: 'B' });\n"),
         write('tests/fact.test.ts', "import { expect, test } from 'vitest';\nimport { readFact } from '../fact.js';\ntest('B returns the independently specified fact', () => expect(readFact()).toEqual({ text: 'old', source: 'B' }));\n"));
       if (owner === d) return submit({ kind: 'partial', summary: 'D migrated its typed use for combined verification', findings: [], unfinished: [] },
@@ -199,6 +208,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     ? { outcome: { kind: 'completed', exitCode: 1 }, stdout: 'Combined capability repair fixture failure' }
     : {} });
   const gateContexts: string[] = [];
+  let inheritedAuthorityChecked = false;
   const options = { git: gitService, script: scripted, inputs: treeInputs(),
 
     checkExecution: mode === 'repair-exhaustion' ? { run: (checks: Parameters<typeof realChecks.run>[0],
@@ -212,6 +222,35 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     afterWrite: async (write: string, runId: string) => {
       const event = activeService?.events('need', runId)?.at(-1);
       const gate = activeService?.events('need', runId)?.filter(entry => entry.type === 'gate-attempted').at(-1);
+      if (mode === 'revision' && write === 'capability-assigned' && event?.type === 'capability-assigned' && event.data.sequence === 4) {
+        const assignment = JSON.parse(await readFile(runPath(fixture.root, 'need', runId, 'work-items/cap-001/iterations/04/assignment.json'), 'utf8'));
+        const active = activeService!['runs'].get(`need/${runId}`)!;
+        const request = { checkpoint: 'iteration' as const, subject: { workItem: 'wi-001', iteration: assignment.id } };
+        const paths = ['module.ramify', 'src/assembly.ts', 'subs/b/src/fact.ts', 'subs/b/src/tests/fact.test.ts', 'subs/d/src/consumer.ts', 'subs/b/docs/prior.txt'];
+        for (const path of paths) {
+          const hash = createHash('sha256').update(await readFile(join(fixture.root, path))).digest('hex');
+          expect(assignment.coordination.startingPaths).toContainEqual({ path, hash });
+        }
+        const positive = await activeService!['candidateAuthority'](active, request);
+        expect(positive.rules.find(rule => rule.rule === 'write-scope')?.outcome).toBe('passed');
+        expect(positive.ownership?.selection.paths.filter(seed => paths.includes(seed.path)).map(seed => [seed.path, seed.status, seed.module, seed.exclusion]).sort()).toEqual(
+          paths.map(path => [path, 'owned', path.startsWith('subs/b/') ? b : path.startsWith('subs/d/') ? d : p, null]).sort());
+        const file = join(fixture.root, 'subs/b/src/fact.ts');
+        const original = await readFile(file);
+        await writeFile(file, `${original.toString()}\n// unassigned later bytes\n`);
+        const changed = await activeService!['candidateAuthority'](active, request);
+        expect(changed.rules.find(rule => rule.rule === 'write-scope')?.violations).toContainEqual(expect.objectContaining({ path: 'subs/b/src/fact.ts' }));
+        await writeFile(file, original);
+        const declaration = join(fixture.root, 'subs/b/module.ramify');
+        const declared = await readFile(declaration);
+        for (const line of ['external "docs"', 'owned-nested-project "docs"']) {
+          await writeFile(declaration, `${declared.toString()}\n${line}\n`);
+          const narrowed = await activeService!['candidateAuthority'](active, request);
+          expect(narrowed.rules.find(rule => rule.rule === 'write-scope')?.violations).toContainEqual(expect.objectContaining({ path: 'subs/b/docs/prior.txt' }));
+        }
+        await writeFile(declaration, declared);
+        inheritedAuthorityChecked = true;
+      }
       if (mode === 'drift' && write === 'gate-committed' && gate?.type === 'gate-attempted' &&
         gate.data.checkpoint === 'work-item' && gate.data.verdict === 'passed') {
         writeFileSync(join(fixture.root, 'subs/b/src/fact.ts'), `${readFileSync(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')}\n// concurrent source edit after the passing gate\n`);
@@ -391,6 +430,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     gate: lastGateBody === null ? null : { cause: lastGateBody.cause,
       commands: lastGateBody.commands.map(command => [command.kind, command.outcome, command.output.tail.slice(-300)]) } })).toHaveLength(0);
   expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(1);
+  if (mode === 'revision') expect(inheritedAuthorityChecked).toBe(true);
   const taskSettlements = events.filter((event): event is Extract<typeof event, { type: 'capability-assignment-settled' }> =>
     event.type === 'capability-assignment-settled' && event.data.task === 'cap-001');
   expect(taskSettlements.filter(event => event.data.outcome === 'partial')).toHaveLength(3);
@@ -461,7 +501,10 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       });
     if (deferredBriefing.length === 0) {
       const current = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-      throw new Error(`B did not start: ${JSON.stringify(current.slice(-30))}`);
+      const gates = await Promise.all(current.filter(event => event.type === 'gate-attempted' && event.data.checkpoint === 'work-item')
+        .map(async event => event.type === 'gate-attempted'
+          ? JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, `gates/${event.data.gate}/attempt.json`), 'utf8')) : null));
+      throw new Error(`B did not start: ${JSON.stringify({ events: current.slice(-30), gates })}`);
     }
     expect(deferredBriefing).toContain('# Intervening capability work');
     expect(deferredBriefing).toContain('Task cap-001 returned tree');

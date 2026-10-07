@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +13,10 @@ import { reduceSessions } from '../run/sessions.js';
 import { analysisSchemas } from '../analysis/records.js';
 import { workSchemas } from '../work/records.js';
 import { iterationSchemas } from '../work/iterations.js';
+import type { IterationAssignment } from '../work/iterations.js';
+import { resolveWriteScope } from '../work/scope.js';
+import { committedRecords } from '../work/committed.js';
+import { fixtureTask } from './helpers/capability.js';
 import { contractSchemas } from '../contracts/records.js';
 import { architectureSchemas } from '../architecture/records.js';
 import { reviewSchemas } from '../reviews/records.js';
@@ -218,6 +223,61 @@ describe('the composed runs', () => {
       expect(await readFile(join(external, 'external.feature'), 'utf8')).toBe('external bytes must survive\n');
       dirty.mockRestore(); query.mockRestore(); commit.mockRestore();
     } finally { await run.dispose(); await rm(external, { recursive: true, force: true }); }
+  });
+
+  test('PB3: scripted nested predecessors require every intermediate inherited hash to match', async () => {
+    const run = await runToEnd(scenarios.iteration);
+    try {
+      const active = run.service['runs'].get(`${plan}/${run.runId}`)!;
+      const ledger = active.log.ledger.replay();
+      const grandparent = committedRecords(ledger).assignments.get('wi-001.i01')!;
+      const rootOwner = grandparent.scope.resolved.ownership.modules.find(module => module.parent === null)!.id;
+      const scope = await resolveWriteScope({ projectRoot: run.root, ramify: run.service['options'].ramify, index: null,
+        view: grandparent.scope.resolved.view, revision: 1, base: { module: rootOwner, included: [] },
+        extra: [], read: [], bootstrap: [], rationale: 'Scripted unrelated owner for nested provenance control' });
+      const path = 'subs/workspace/subs/reviews/subs/notes/docs/inherited.txt';
+      await mkdir(join(run.root, 'subs/workspace/subs/reviews/subs/notes/docs'), { recursive: true });
+      const hash = (bytes: string) => createHash('sha256').update(bytes).digest('hex');
+      await writeFile(join(run.root, path), 'later bytes\n');
+      const currentHash = hash('later bytes\n');
+      const parentTask = { ...fixtureTask(), id: 'cap-091', parent: { kind: 'work-item' as const, id: grandparent.workItem }, originatingAssignment: grandparent.id };
+      const childTask = { ...fixtureTask(), id: 'cap-092', parent: { kind: 'capability-task' as const, id: parentTask.id }, originatingAssignment: 'cap-091.i01' };
+      const parent: IterationAssignment = { ...grandparent, id: 'cap-091.i01', scope, guarded: [], authorizations: [],
+        coordination: { kind: 'capability-task', id: parentTask.id, sequence: 1, plan: grandparent.outline,
+          startingTree: 'a'.repeat(40), startingPaths: [{ path, hash: hash('earlier bytes\n') }] } };
+      const child: IterationAssignment = { ...parent, id: 'cap-092.i01',
+        coordination: { ...parent.coordination as Extract<NonNullable<IterationAssignment['coordination']>, { kind: 'capability-task' }>,
+          id: childTask.id, startingPaths: [{ path, hash: currentHash }] } };
+      // This is an explicit scripted ledger projection over a real finished
+      // run. It exercises the existing evaluator, not a coordinator producer.
+      const last = ledger.at(-1)!;
+      const entries = [parentTask, parent, childTask, child].map((body, index) => {
+        const sequence = last.sequence + index + 1;
+        const isAssignment = body.schema === 'ramify-agent.iteration-assignment/1';
+        return { sequence, at: last.at, transaction: {
+          event: { sequence, at: last.at, jobId: run.runId,
+            ...(isAssignment ? { type: 'capability-assigned' as const, data: { task: index === 1 ? parentTask.id : childTask.id,
+              assignment: body.id, sequence: 1, invocation: 'scripted-provenance' } }
+              : { type: 'capability-delegated' as const, data: { task: body.id, request: 'need-001', parent: 'wi-001', invocation: 'scripted-provenance', planRevision: 1 as const } }) },
+          records: [{ path: `scripted/${body.id}.json`, id: body.id, revision: 1, body }],
+        } };
+      });
+      const replay = vi.spyOn(active.log.ledger, 'replay').mockReturnValue([...ledger, ...entries]);
+      const dirty = vi.spyOn(run.service['git'], 'changedPaths').mockResolvedValue([path]);
+      const query = vi.spyOn(run.service['options'].ramify, 'queryOwnership');
+      const request = { checkpoint: 'iteration' as const, subject: { workItem: grandparent.workItem, iteration: child.id } };
+      query.mockClear();
+      const denied = await run.service['candidateAuthority'](active, request);
+      expect(denied.rules.find(rule => rule.rule === 'write-scope')?.violations).toContainEqual(expect.objectContaining({ path }));
+      expect(query).toHaveBeenCalledTimes(1);
+      if (parent.coordination?.kind !== 'capability-task') throw new Error('Missing scripted parent coordination');
+      parent.coordination.startingPaths[0]!.hash = currentHash;
+      query.mockClear();
+      const permitted = await run.service['candidateAuthority'](active, request);
+      expect(permitted.rules.find(rule => rule.rule === 'write-scope')?.outcome).toBe('passed');
+      expect(query).toHaveBeenCalledTimes(1);
+      replay.mockRestore(); dirty.mockRestore(); query.mockRestore();
+    } finally { await run.dispose(); }
   });
 
   test('each scenario runs to the end it is written for, and asks Git exactly what it states', () => {
