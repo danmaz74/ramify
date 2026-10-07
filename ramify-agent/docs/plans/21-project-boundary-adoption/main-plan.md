@@ -1,10 +1,18 @@
 # Plan 21: provider adoption and architect-owned completion
 
-**Date:** 2026-10-06. **Expanded:** 2026-10-07. **Status:** proposed;
-iteration 0 prerequisite review in progress; source implementation has not started.
+**Date:** 2026-10-06. **Expanded:** 2026-10-07. **Status:** implementation in
+progress; iteration 0 provider and responsibility prerequisites complete.
 Dan chose to consolidate provider adoption and responsibility corrections into
-this plan rather than introduce another plan. Planning is authorized; this
-revision does not authorize runtime implementation or protected-document edits.
+this plan rather than introduce another plan. At initial plan authoring, only
+planning was authorized; that historical limit did not authorize runtime
+implementation or protected-document edits. Dan subsequently requested
+implementation of this plan with a subagent per iteration on 2026-10-07 and
+approved the bounded provider public export, qualification and publication.
+The coordinator approved two exact `docs/harness.spec.md` corrections for their
+named later iterations, recorded in
+[protected wording](protected-wording-proposal.md); no other protected edit is
+implied. [Iteration 0's receipt](iterations/iteration0-results.md) records the
+completed prerequisite gate and its delivery-head evidence.
 
 ## Outcome
 
@@ -51,12 +59,12 @@ is retained and regression-tested rather than reimplemented.
 - [Planning validation](planning-validation.md) records document validation,
   not runtime acceptance.
 
-The adopted Ramify pin is the exact registry release `ramify.ts` 0.4.0:
-affected CLI/answer /4. The audit pin is the ramify-audit release after 0.7.0
-that exposes P3's committed-configuration operation publicly, keeping evidence
-schema 4; Dan decided on 2026-10-07 that iteration 0 obtains that release so
-the agent's pins and lockfile change once, in iteration 1. Published 0.7.0 is
-the qualified reference for every other contract, and the
+The adopted pair is the exact registry releases `ramify.ts` 0.4.0 and
+`ramify-audit` 0.7.1. Ramify supplies affected CLI/answer /4; audit 0.7.1
+publicly exports P3's committed-configuration operation and retains evidence
+schema 4. Dan decided on 2026-10-07 that iteration 0 obtains that release so
+the agent's pins and lockfile change once, in iteration 1. Published 0.7.0
+remains the historical reference for earlier contracts; the
 [three-kind handoff](/home/app/ramify-nested-kinds/docs/plans/nested-tree-kinds/handoff.md)
 supersedes earlier ignore-list/affected-rule target versions. Provider receipts
 qualify their artifacts; the agent still needs its own installed-package witnesses.
@@ -66,8 +74,9 @@ No consumer deep import or copied provider implementation is permitted.
 Declare `owned-unwired "docs"` and set `ignorePaths: ["docs/**"]`.
 Docs of every extension remain owned, unanalyzed and ordinarily writable;
 audit ignores independently govern full reuse. P1 stays withdrawn. P3's public
-committed-configuration question remains; revised P4 concerns committed test
-execution, never a semantic assignment conclusion or a dirty diagnostic path.
+committed-configuration operation is qualified in iteration 0; revised P4
+concerns committed test execution, never a semantic assignment conclusion or
+a dirty diagnostic path.
 
 ## Deliverables and limits
 

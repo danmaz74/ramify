@@ -103,5 +103,27 @@
       }
     ],
     "refsUnchanged": true
+  },
+  "invalidPolicyAndNoExecution": {
+    "installedVersion": "0.7.1",
+    "head": "6664c7adc65b22036f1a57275e9b5676cf7b543e",
+    "markerCommit": "d21594feb60bea7287d5087103f63d0923ced794",
+    "invalidPolicyCommit": "6664c7adc65b22036f1a57275e9b5676cf7b543e",
+    "returnedChecks": [
+      "b-check"
+    ],
+    "returnedCommand": {
+      "name": "node-a",
+      "cmd": "node",
+      "args": [
+        "-e",
+        "require('fs').writeFileSync('/tmp/plan21-iteration0-f3-check-executed.marker', 'executed')"
+      ],
+      "parser": "none",
+      "timeoutMs": 30000
+    },
+    "markerExistsAfterReaders": false,
+    "invalidPolicyError": "ramify-audit.json in the audited commit: ignorePaths [0] must not name the audit definition, ramify-audit.json; a changed audit policy requires a new baseline: \"ramify-audit.json\".",
+    "refsUnchanged": true
   }
 }

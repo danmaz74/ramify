@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "proposed",
+  "status": "implementation-in-progress",
   "execution": "serial",
   "iterations": [
     {
@@ -15,7 +15,7 @@
         "responsibility-contract-review",
         "protected-patch-authorization"
       ],
-      "status": "in-progress"
+      "status": "complete"
     },
     {
       "id": "1",

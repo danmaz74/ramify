@@ -2,8 +2,8 @@
 
 **Plan:** [Plan 21](../main-plan.md). **Prerequisites:** none for inspection.
 **Owners:** harness coordinator; provider repairs remain in their own projects.
-**Status:** provider and responsibility witnesses recorded. Final delivery-HEAD
-applicability and protected-file comparison are recorded at handoff. Earlier
+**Status:** complete. Delivery-HEAD applicability and protected-file comparison
+are recorded in the Git-common handoff companion after the receipt commit. Earlier
 [results](iteration0-results.md) retain their original witnesses.
 
 ## Goal

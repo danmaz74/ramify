@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { requestFromCommittedConfiguration, createNodeGitExecutor } from 'ramify-audit';
 
@@ -12,8 +12,12 @@ const commits = {
   nonregular: '735fab14b9369c3f281b56ad24d229d37867914b',
   malformed: '94edcf25944a03bfaf85b365b365714df632f2f2',
   invalidSchema: '18f34add842e596276b93f74103c974dcb9f5a1d',
+  marker: 'd21594feb60bea7287d5087103f63d0923ced794',
+  invalidPolicy: '6664c7adc65b22036f1a57275e9b5676cf7b543e',
 };
 const definition = `${repositoryPath}/ramify-audit.json`;
+const marker = '/tmp/plan21-iteration0-f3-check-executed.marker';
+rmSync(marker, { force: true });
 const original = readFileSync(definition);
 const refsBefore = git('show-ref');
 const request = (sourceCommit, projectRoot = '.', nested = false) =>
@@ -30,7 +34,11 @@ try {
     try { await request(commits[name]); negative[name] = { unexpectedSuccess: true }; }
     catch (error) { negative[name] = { error: String(error.message) }; }
   }
-  console.log(JSON.stringify({ positive, negative, refsUnchanged: refsBefore === git('show-ref') }, null, 2));
+  positive.marker = await request(commits.marker);
+  try { await request(commits.invalidPolicy); negative.invalidPolicy = { unexpectedSuccess: true }; }
+  catch (error) { negative.invalidPolicy = { error: String(error.message) }; }
+  console.log(JSON.stringify({ positive, negative, markerExistsAfterReaders: existsSync(marker),
+    refsUnchanged: refsBefore === git('show-ref') }, null, 2));
 } finally {
   writeFileSync(definition, original);
 }

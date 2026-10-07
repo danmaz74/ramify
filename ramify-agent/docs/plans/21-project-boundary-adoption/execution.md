@@ -7,8 +7,12 @@ Dan's request, so Plan 21's history stays separate from the merged Plan 20.
 Before starting, inspect its live branch, status and concurrent work. Preserve
 the main checkout and all existing edits. This is agent work: the toolkit's
 Studio workflow does not govern it. The expanded plan has twelve serial
-iterations, 0–11, and one combined new-run policy transition. Source edits and provider publication are
-not part of the planning task that created this document.
+iterations, 0–11, and one combined new-run policy transition. Source edits and
+provider publication were not part of the planning task that created this
+document. Dan later requested implementation with a subagent per iteration and
+approved the bounded provider public export, qualification and publication on
+2026-10-07; the published adoption pair is `ramify.ts` 0.4.0 and
+`ramify-audit` 0.7.1, as [iteration 0](iterations/iteration0-results.md) records.
 
 ## Iteration discipline
 
@@ -38,8 +42,9 @@ never silently claim the old audit executed at the new commit.
 
 During implementation, commit and push each accepted iteration and verify
 `HEAD == origin/feat/plan21-project-boundary-adoption` after the push.
-Do not describe local tracking refs as a remote check. No push or source commit
-is implied by this plan-authoring request.
+Do not describe local tracking refs as a remote check. The original
+plan-authoring request implied no push or source commit; the later implementation
+request invokes this serial delivery discipline.
 
 ## Checks
 

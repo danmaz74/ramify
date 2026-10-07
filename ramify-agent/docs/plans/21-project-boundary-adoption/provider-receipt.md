@@ -184,8 +184,11 @@ configuration while HEAD is B and working bytes are C. The separate
 [F3 public-reader result](evidence/iteration0-p3-f3.json) strengthens this
 with different committed A/B checks, ignore policy, workspace inputs and
 blobs under malformed working C, a nested committed request, and explicit
-missing, nonregular, malformed and invalid-definition rejections. All reader
-calls left refs unchanged and executed no checks.
+missing, nonregular, malformed, schema-invalid and invalid-policy rejections.
+The invalid policy names the audit definition in `ignorePaths`. A committed
+check command with an execution marker was returned by the public reader;
+the marker remained absent after the reads. All calls left refs unchanged and
+performed no preparation or check execution.
 
 The [P4 result](evidence/iteration0-p4-installed-f2.json) contains full and
 partial passing real Vitest runs, newly eligible and deleted tests, a genuine

@@ -4,7 +4,8 @@ These are disposable Git projects preserved as complete bundles. `f2.bundle`
 contains the five published audit reports and their exact run/tree refs as well
 as the full, partial, failure, deletion, empty-selection and cancellation
 source commits. `f3.bundle` contains the committed-configuration A/B, nested,
-missing, symlink, malformed and invalid-schema commits. The five `f2-*.json`
+missing, symlink, malformed, invalid-schema, invalid-policy and no-execution
+marker commits. The five `f2-*.json`
 files are the original CLI producer responses, without summary rewriting.
 The compact matrices are in `../iteration0-p3-f3.json` and
 `../iteration0-p4-installed-f2.json`.
@@ -41,7 +42,13 @@ completed producer result remains in `f2-failure.json`. The public
 copy the script into the isolated npm host (so its bare package import resolves),
 then pass the restored F3 directory as its first argument. The original A/B
 positive call was made while the working definition contained malformed JSON;
-that working change was restored afterward. `f2-cancellation.mjs` records the
+that working change was restored afterward. A further committed check command
+would write `/tmp/plan21-iteration0-f3-check-executed.marker` if run; the
+reader returns that command without creating the marker. Its invalid-policy
+successor rejects an `ignorePaths` entry matching `ramify-audit.json`, still
+without creating the marker or changing refs. The reader API receives only a
+Git executor, with no check-execution or workspace-preparation port.
+`f2-cancellation.mjs` records the
 public running cancellation: copy it into the same host and pass the restored
 F2 directory checked out at `55c8175`. Its command writes a marker after its
 child starts; the script aborts only after seeing that marker, then checks child

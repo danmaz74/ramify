@@ -193,9 +193,14 @@ directories and blob `3754992953a5a0e86bd6ae95a1e5596feb22c16f`.
 A's committed nested definition with `nested: true` returned only
 `nested-check`, the nested path and its own blob. Neither working C nor the
 other committed definition leaked into these requests. Separate committed
-missing, symlink/nonregular, malformed JSON and schema-invalid definitions
-each rejected with an explicit diagnostic; all public-reader calls left refs
-unchanged and executed no checks.
+missing, symlink/nonregular, malformed JSON, schema-invalid and invalid-policy
+definitions each rejected with an explicit diagnostic. The invalid policy was
+`ignorePaths` matching the committed audit definition. A separate accepted
+committed request returned a check command that would write a process marker;
+the marker stayed absent after both successful and rejected public-reader
+calls. Their API receives only a Git executor, no preparation or check-execution
+port. Refs remained unchanged. Thus configuration reading performed no setup
+or check execution.
 
 The [same-release P4 F2 witness](../evidence/iteration0-p4-installed-f2.json)
 ran public committed full and partial audits with installed Ramify 0.4.0 and
@@ -304,6 +309,17 @@ committed, staged, unstaged, untracked and renamed-file comparison is recorded
 at handoff.
 
 **Current gate:** the responsibility freeze, public P3 and revised P4 witnesses,
-and bounded actual-agent adoption inventory are complete. This receipt still
-requires its final committed-head baseline applicability and protected-file
-comparison below before the two-track iteration-0 exit gate passes.
+and bounded actual-agent adoption inventory are complete. Released baseline
+applicability and protected-file comparison at the delivery HEAD are recorded
+in the Git-common handoff evidence named below. With those checks passing,
+the two-track iteration-0 gate is complete; runtime Plan 21 integration cases
+remain assigned to their later iterations.
+
+The delivery-head applicability and protected-layer evidence is written after
+the final documentation commit to
+`/home/app/ramify-plan21-project-boundary-adoption/.git`'s common Git directory
+as `plan21-iteration0-handoff.json`. This avoids changing the HEAD that the
+released applicability query evaluates. It records that HEAD, original audit
+source/report identity, exact applicability response and all 16 protected
+hash comparisons across committed, staged, unstaged, untracked and rename
+layers. The coordinator must inspect this companion before starting iteration 1.
