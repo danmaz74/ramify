@@ -30,11 +30,14 @@ source `4003d70d158777b3f97965853ac921d2063b9685`, and published exact
 `ramify-audit@0.7.2`. Its provider receipt is
 `/home/app/ramify-audit-vpe/docs/2026-10-07-vitest-project-exclusions.md`;
 the consumer records its source, artifact and
-registry identities in the iteration 2 receipt. Provider GitHub push was
-still pending at adoption and must be verified separately before it is claimed.
-Iteration 2 adopts the exact registry pin, then needs a new normal clean-source
-audit result; the failed 0.7.1 result is retained as evidence, never treated
-as passing.
+registry identities in the iteration 2 receipt. The provider's GitHub push
+initially returned server errors; the coordinator later verified live remote,
+local HEAD and tracking at the exact receipt commit
+`43ca23e08a776df580655e945bbe4aff370e131a` without rewriting the
+qualified source history. Iteration 2 adopted the exact registry pin, and its
+new normal request executed full under the provider's indeterminate-baseline
+rule; the iteration 2 receipt records that passing result. The failed 0.7.1
+result remains evidence, never a passing audit.
 
 ## Iteration discipline
 
