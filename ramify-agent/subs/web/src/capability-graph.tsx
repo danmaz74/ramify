@@ -522,7 +522,7 @@ function CapabilityDetail({ capability, capabilities, omitted, onOpenWorkItem, s
         </div>
         <div><dt>Verification evidence</dt><dd>{capability.evidence.length > 0 ? capability.evidence.join(', ') : 'none recorded'}</dd></div>
         {capability.scenarios !== null && (
-          <div><dt>Acceptance scenarios</dt><dd>{capability.scenarios.implemented} of {capability.scenarios.total} implemented</dd></div>
+          <div><dt>Acceptance scenarios</dt><dd>{capability.scenarios.done} of {capability.scenarios.total} done</dd></div>
         )}
       </dl>
       {sessions && <ElementSessions diagram={sessions} sessions={of} element={capability.capability} />}

@@ -166,7 +166,7 @@ function Overview({ client, run, events, onApproved, onOpenGate }: {
           <div><dt>Open requirements</dt><dd>{run.counts.openRequirements}</dd></div>
           <div><dt>Invocations</dt><dd>{run.counts.invocations}</dd></div>
           <div><dt>Gate attempts</dt><dd>{run.counts.gateAttempts} (readiness attempts {run.counts.readinessAttempts})</dd></div>
-          <div><dt>Scenarios</dt><dd>{run.counts.scenarios.implemented} implemented, {run.counts.scenarios.declared} declared, {run.counts.scenarios.bound} bound, {run.counts.scenarios.pending} pending</dd></div>
+          <div><dt>Scenarios</dt><dd>{run.counts.scenarios.done} done, {run.counts.scenarios.bound} bound, {run.counts.scenarios.pending} pending</dd></div>
           <div><dt>Review</dt><dd>{reviewText(run.review)}</dd></div>
           <div><dt>Writer</dt><dd>{run.writer.held === null ? 'none held' : `held by ${run.writer.held}`}{run.writer.unsettled === null ? '' : `; ${run.writer.unsettled} was not confirmed settled`}</dd></div>
           <div><dt>Started</dt><dd>{run.startedAt}</dd></div>

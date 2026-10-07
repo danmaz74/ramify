@@ -185,7 +185,7 @@ function gateLine(gate: ScenarioGateResult): string {
 /** Every tracked scenario with its state, what it belongs to, where it lives and the gates that ran it. */
 export function ScenarioTable({ scenarios, total }: { readonly scenarios: readonly ScenarioView[]; readonly total: number }) {
   if (scenarios.length === 0) return <p className="muted">No scenario is tracked yet: the initial analysis has not been accepted.</p>;
-  const states = ['pending', 'bound', 'declared', 'implemented'] as const;
+  const states = ['pending', 'bound', 'done'] as const;
   return (
     <>
       <p className="muted" aria-label="Scenario states">
@@ -198,11 +198,11 @@ export function ScenarioTable({ scenarios, total }: { readonly scenarios: readon
           {scenarios.map(scenario => (
             <tr key={scenario.id} data-scenario={scenario.id}>
               <td><code>{scenario.id}</code><div>{scenario.name}</div></td>
-              <td><span className={`badge scenario-state-${scenario.state}`}>{scenario.state}</span>{scenario.implementedBy && <div className="muted">by {scenario.implementedBy}</div>}</td>
+              <td><span className={`badge scenario-state-${scenario.state}`}>{scenario.state}</span></td>
               <td>{originText(scenario.origin)}</td>
               <td>
                 {scenario.kind === 'integration'
-                  ? <>integration of {scenario.subScenarios.join(', ')}; {scenario.workItem ? <>work item {scenario.workItem}</> : 'no work item until its sub-scenarios are implemented'}</>
+                  ? <>integration of {scenario.subScenarios.join(', ')}; {scenario.workItem ? <>work item {scenario.workItem}</> : 'no work item until its sub-scenarios are reported done'}</>
                   : <>entry <code>{scenario.entry}</code>{scenario.workItem ? <>, work item {scenario.workItem}</> : ''}{scenario.partOf ? <>; sub-scenario of {scenario.partOf}</> : ''}</>}
               </td>
               <td><code>{scenario.owner}</code><div className="muted"><code>{scenario.file}</code></div></td>

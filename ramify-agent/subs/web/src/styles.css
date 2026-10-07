@@ -445,8 +445,8 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .scenario-plan { border-left: 3px solid var(--accent); }
 .badge.origin-plan { background: #dde8f6; color: var(--accent); }
 .badge.origin-architect { background: #eceff2; color: var(--muted); }
-.scenario-state-bound, .scenario-state-declared { background: #dde8f6; color: var(--accent); }
-.scenario-state-implemented { background: #dcefe3; color: var(--good); }
+.scenario-state-bound { background: #dde8f6; color: var(--accent); }
+.scenario-state-done { background: #dcefe3; color: var(--good); }
 .scenario-gates { list-style: none; padding: 0; margin: 0; }
 .scenario-gates li { margin-bottom: 0.2rem; }
 .scenario-status-passed { color: var(--good); }

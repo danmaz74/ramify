@@ -26,7 +26,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     startedAt: at, updatedAt: at, endedAt: null, failure: null,
     current: { workItem: 'wi-002', iteration: 'wi-002.i01', role: 'engineer', invocation: 'inv-0006' },
     waits: [],
-    counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3, scenarios: { pending: 2, bound: 0, declared: 0, implemented: 0 }, degradedStarts: 0 },
+    counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3, scenarios: { pending: 2, bound: 0, done: 0 }, degradedStarts: 0 },
     writer: { held: 'inv-0006', unsettled: null },
     review: 'not-reviewed',
     decisionRequests: { open: 0, waiting: false, workItems: [] },
@@ -55,7 +55,7 @@ function scenarioText(id: string, entry: string | null, owner: string, extra: Re
 function scenarioView(id: string, entry: string | null, state: string, extra: Record<string, unknown> = {}) {
   return {
     id, kind: 'entry', name: `Scenario ${id}`, state, origin: { kind: 'architect', refs: ['fr-002'] }, entry, partOf: null, subScenarios: [],
-    workItem: 'wi-001', owner: 'shop/notes', file: `subs/notes/src/tests/features/review-notes/${entry ?? 'integration'}.feature`, implementedBy: null, gates: [], ...extra,
+    workItem: 'wi-001', owner: 'shop/notes', file: `subs/notes/src/tests/features/review-notes/${entry ?? 'integration'}.feature`, gates: [], ...extra,
   };
 }
 
@@ -139,7 +139,7 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
     }),
     capabilities: capabilityListResponseSchema.parse({
       capabilities: [
-        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'Waiting for provider ob-ct-001 (rq-001)', dependsOn: [{ capability: 'send-email', tentative: false }], workItems: ['wi-001'], evidence: [], scenarios: { implemented: 0, total: 1 } },
+        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'Waiting for provider ob-ct-001 (rq-001)', dependsOn: [{ capability: 'send-email', tentative: false }], workItems: ['wi-001'], evidence: [], scenarios: { done: 0, total: 1 } },
         { capability: 'send-email', owner: 'collection-review/workspace/reviews', entry: false, tentative: false, state: 'completed', reason: 'Provider work completed with current evidence', dependsOn: [], workItems: ['wi-002'], evidence: ['ga-0007', 'ga-0006'], scenarios: null },
         { capability: 'note-rendering', owner: 'collection-review', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis note-rendering at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [{ capability: 'note-storage', tentative: true }], workItems: [], evidence: [], scenarios: null },
         { capability: 'note-storage', owner: 'collection-review/workspace/reviews', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis note-storage at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [], workItems: [], evidence: [], scenarios: null },
@@ -211,15 +211,15 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
     },
     scenarios: scenarioListResponseSchema.parse({
       scenarios: [
-        scenarioView('sc-001', 'review-note', 'implemented', {
-          origin: { kind: 'plan', planScenario: 'ps-01', lines: [10, 14] }, name: 'A reviewer writes a note', implementedBy: 'ga-0003',
+        scenarioView('sc-001', 'review-note', 'done', {
+          origin: { kind: 'plan', planScenario: 'ps-01', lines: [10, 14] }, name: 'A reviewer writes a note',
           gates: [
             { gate: 'ga-0002', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, verdict: 'failed', mode: 'quick', dryRun: false, status: 'failed', failure: noteFailure, undefined: [] },
             { gate: 'ga-0003', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, verdict: 'passed', mode: 'quick', dryRun: false, status: 'passed', failure: null, undefined: [] },
           ],
         }),
         scenarioView('sc-002', 'review-note', 'bound', { partOf: 'sc-004' }),
-        scenarioView('sc-003', 'note-tags', 'declared', { partOf: 'sc-004', owner: 'shop/tags', workItem: 'wi-002' }),
+        scenarioView('sc-003', 'note-tags', 'bound', { partOf: 'sc-004', owner: 'shop/tags', workItem: 'wi-002' }),
         scenarioView('sc-004', null, 'pending', { kind: 'integration', origin: { kind: 'plan', planScenario: 'ps-02', lines: [20, 25] }, subScenarios: ['sc-002', 'sc-003'], owner: 'shop', workItem: null }),
       ],
       total: 4,
@@ -527,7 +527,7 @@ test('CM19: a failed run says failed at run level only; a capability keeps its l
     ...failed,
     capabilities: capabilityListResponseSchema.parse({
       capabilities: [
-        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'wi-001 is under way, iteration wi-001.i02', dependsOn: [], workItems: ['wi-001'], evidence: [], scenarios: { implemented: 0, total: 1 } },
+        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'wi-001 is under way, iteration wi-001.i02', dependsOn: [], workItems: ['wi-001'], evidence: [], scenarios: { done: 0, total: 1 } },
         { capability: 'send-email', owner: 'collection-review/workspace/reviews', entry: false, tentative: false, state: 'todo', reason: 'wi-002 not started', dependsOn: [], workItems: ['wi-002'], evidence: [], scenarios: null },
       ],
       total: 2,
@@ -705,14 +705,14 @@ test('the Scenarios area lists every tracked scenario with its state, origin, wo
   const row = (id: string) => table.querySelector<HTMLElement>(`[data-scenario="${id}"]`)!;
   const cells = (id: string) => [...row(id).querySelectorAll('td')].map(cell => cell.textContent);
   expect([...table.querySelectorAll('tbody tr')].map(one => one.getAttribute('data-scenario'))).toEqual(['sc-001', 'sc-002', 'sc-003', 'sc-004']);
-  expect(within(row('sc-001')).getByText('implemented').className).toContain('scenario-state-implemented');
-  expect(cells('sc-001')[1]).toBe('implementedby ga-0003');
+  expect(within(row('sc-001')).getByText('done').className).toContain('scenario-state-done');
+  expect(cells('sc-001')[1]).toBe('done');
   expect(cells('sc-001')[2]).toBe('from the plan (ps-01, lines 10–14)');
   expect(cells('sc-002')[1]).toBe('bound');
   expect(cells('sc-002')[3]).toBe('entry review-note, work item wi-001; sub-scenario of sc-004');
-  expect(cells('sc-003')[1]).toBe('declared');
+  expect(cells('sc-003')[1]).toBe('bound');
   expect(cells('sc-004')[1]).toBe('pending');
-  expect(cells('sc-004')[3]).toBe('integration of sc-002, sc-003; no work item until its sub-scenarios are implemented');
+  expect(cells('sc-004')[3]).toBe('integration of sc-002, sc-003; no work item until its sub-scenarios are reported done');
   expect(cells('sc-004')[4]).toContain('subs/notes/src/tests/features/review-notes/integration.feature');
   expect(cells('sc-004')[5]).toBe('not run yet');
   const gates = within(row('sc-001')).getByLabelText('Gates of sc-001');
@@ -720,7 +720,7 @@ test('the Scenarios area lists every tracked scenario with its state, origin, wo
     'ga-0002 iteration wi-002.i01, quick: failedThen the note is listed: expected one note, got none',
     'ga-0003 iteration wi-002.i01, quick: passed',
   ]);
-  expect(screen.getByLabelText('Scenario states').textContent).toBe('1 pending · 1 bound · 1 declared · 1 implemented');
+  expect(screen.getByLabelText('Scenario states').textContent).toBe('1 pending · 2 bound · 1 done');
 });
 
 test('before the analysis is accepted the Scenarios area says nothing is tracked', async () => {

@@ -31,7 +31,7 @@ const statusColor = tokens.light.status;
 function nodeStatus(node: ExecutionNode): keyof typeof statusColor {
   switch (node.kind) {
     case 'capability': return node.state === 'completed' ? 'completed' : node.state === 'working' ? 'working' : 'todo';
-    case 'scenario': return node.state === 'implemented' && node.latestRealResult === 'passed' ? 'completed'
+    case 'scenario': return node.state === 'done' && node.latestRealResult === 'passed' ? 'completed'
       : node.latestRealResult === 'failed' ? 'failed' : node.latestRealResult === 'unavailable' ? 'attention' : 'todo';
     case 'requirement': return node.state === 'verified' ? 'completed' : node.state === 'working' || node.state === 'provider-conformed'
       ? 'working' : node.state === 'reopened' ? 'attention' : 'todo';
