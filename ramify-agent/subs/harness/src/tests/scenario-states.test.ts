@@ -12,7 +12,8 @@ import { validateEngineer } from '../work/engineer.js';
 import { iterationLayout } from '../work/iterations.js';
 import { scenarioRecordSchema, scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import { reduceScenarioStates, scenarioEventTypes, type ScenarioEvent } from '../../subs/scenarios/src/states.js';
-import { fixtureProjection, line, reported, submissionHash } from './helpers/obligations.js';
+import { fixtureProjection, line, reported, scenarioRecord, submissionHash } from './helpers/obligations.js';
+import { obligationsOf } from '../work/obligations.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import {
   consumerAgainstReal, consumerStub, consumerTest, contractNeeded, contractWrites, established, paths, providerWrites,
@@ -913,6 +914,10 @@ describe('PB3-D04: obligation reports beside the scenario states', () => {
     // An architect report moves its obligation alone.
     const withReport = fixtureProjection([...scenarioEvents.map(event => line(event.type, event.data)), gate, report]).obligations;
     expect([withReport.get('sc-001')?.status, withReport.get('sc-002')?.status, withReport.get('sc-002')?.revision]).toEqual(['pending', 'done', 1]);
+
+    // An entry scenario whose work item is not committed has no responsible architect: no obligation, and no failure.
+    const orphan = obligationsOf({ scenarios: [scenarioRecord('sc-009', 'unplanned-entry')], workItems: [], events: [] });
+    expect([...orphan.obligations.keys()]).toEqual([]);
 
     // A report is no scenario event: the tracked states do not see it.
     expect(scenarioEventTypes).not.toContain(report.type);

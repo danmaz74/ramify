@@ -175,15 +175,20 @@ export function caseObligationId(task: string, useCase: string): string {
   return `${task}.case.${useCase}`;
 }
 
-function scenarioResponsible(record: ScenarioRecord, workItems: readonly WorkItem[]): ObligationResponsible {
+/**
+ * The scenario's responsible architect, or null when its entry has no
+ * committed work item. The harness commits entry work items with their
+ * scenarios in one `analysis-accepted`, so that happens only in records the
+ * harness did not write; such a scenario has no responsible architect and is
+ * therefore no obligation, and the read projection does not fail on it.
+ */
+function scenarioResponsible(record: ScenarioRecord, workItems: readonly WorkItem[]): ObligationResponsible | null {
   if (record.kind === 'integration') {
     const item = workItems.find(candidate => integrationScenarioOf(candidate) === record.id);
     return item === undefined ? { kind: 'integration-scenario', id: record.id } : { kind: 'work-item', id: item.id };
   }
-  // Entry work items are committed by the same `analysis-accepted` as their scenarios.
   const item = workItems.find(candidate => 'entry' in candidate.origin && candidate.origin.entry === record.entry);
-  if (item === undefined) throw new Error(`Scenario ${record.id} names entry ${record.entry ?? '(none)'}, which no committed work item implements`);
-  return { kind: 'work-item', id: item.id };
+  return item === undefined ? null : { kind: 'work-item', id: item.id };
 }
 
 /**
@@ -197,7 +202,8 @@ export function obligationsOf(sources: ObligationSources): ObligationProjection 
   let tests = 0;
   const base = { status: 'pending' as const, revision: 0, case: null, description: null, registeredBy: null, report: null };
   for (const record of sources.scenarios) {
-    obligations.set(record.id, { ...base, id: record.id, kind: 'scenario', responsible: scenarioResponsible(record, sources.workItems) });
+    const responsible = scenarioResponsible(record, sources.workItems);
+    if (responsible !== null) obligations.set(record.id, { ...base, id: record.id, kind: 'scenario', responsible });
   }
   for (const line of sources.events) {
     if (line.type === 'capability-delegated') {

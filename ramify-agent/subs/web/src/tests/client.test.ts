@@ -75,7 +75,7 @@ test('reads the run\'s event page after a cursor', async () => {
 
 test('reads the scenario list at its path and validates it', async () => {
   const urls: string[] = [];
-  const list = { scenarios: [], total: 0 };
+  const list = { scenarios: [], total: 0, obligations: [] };
   const client = createProtocolClient('http://h', async input => {
     urls.push(String(input));
     return new Response(JSON.stringify(urls.length === 1 ? list : { scenarios: [{ id: 'sc-001' }], total: 1 }), { status: 200, headers: { 'content-type': 'application/json' } });
