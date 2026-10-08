@@ -50,12 +50,12 @@ import {
  *
  * The session is given what an implementation run gives its engineers: the
  * engineer prompt, the module's API views, the write guard, the Ramify hook
- * check after each mutation, the shell, the scoped test tool and the
- * validated submission. It holds the project lock for its whole life, so it
- * never runs beside an implementation run. Nothing follows its submission:
- * no capability task, no architect turn and no commit. With the gate
- * option the iteration checkpoint runs over the module afterwards, and its
- * verdict is recorded; the changes stay in the working tree either way.
+ * check after each mutation, the shell and the validated submission. It
+ * holds the project lock for its whole life, so it never runs beside an
+ * implementation run. Nothing follows its submission: no capability task,
+ * no architect turn and no commit. With the gate option the in-place
+ * diagnosis runs over the current bytes afterwards, and its verdict is
+ * recorded; the changes stay in the working tree either way.
  *
  * Its records are plain files under `plans/.harness/sessions/<id>/`, and
  * its transcript is `transcript.jsonl` beside them, written as a run's is.

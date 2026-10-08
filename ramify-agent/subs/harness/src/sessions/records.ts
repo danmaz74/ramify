@@ -61,7 +61,7 @@ export const sessionRecordSchema = z.object({
   base: z.string(),
   /** What the session may write, project-relative: the module's own contents and each extra path. */
   scope: z.object({ roots: z.array(z.string()), files: z.array(z.string()), extra: z.array(text) }).strict(),
-  /** The tests the scoped test tool and the gate resolve. */
+  /** The test selection the session's assignment records; its in-place diagnosis runs no test. */
   tests: testSelectionPolicySchema,
   gate: z.boolean(),
   /** The guarded files as they stood at the start, which a gate compares the tree with. */
