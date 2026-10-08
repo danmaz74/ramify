@@ -535,13 +535,18 @@ export function extraPlacementErrors(scope: WriteScope, answer: AffectedDocument
   return errors;
 }
 
+/** The captured scope, or the structural errors that refused it. */
+export type WriteScopeCheckResult =
+  | { readonly scope: WriteScope; readonly errors: readonly [] }
+  | { readonly scope: null; readonly errors: readonly SubmissionError[] };
+
 /**
  * A submitted scope judged by one ownership query: the `included` rules,
  * then the capture itself, then the placement of each `extra`. A capture
  * that throws is a rejection of the scope rather than a failure of the run.
  * The query's own failure is the provider's, and propagates.
  */
-export async function checkWriteScope(capture: ScopeCapture): Promise<{ readonly scope: WriteScope; readonly errors: readonly [] } | { readonly scope: null; readonly errors: readonly SubmissionError[] }> {
+export async function checkWriteScope(capture: ScopeCapture): Promise<WriteScopeCheckResult> {
   const ramify = capture.ramify ?? new RamifyCli();
   const answer = await ramify.queryOwnership(capture.projectRoot, ownershipQueryPaths(capture));
   const included = 'module' in capture.base ? includedTreeErrors(capture.base, answer) : [];
