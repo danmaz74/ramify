@@ -2,6 +2,9 @@
 
 Design documents for the separate agent harness:
 
+- [Plan 22: enforced test boundaries and prompt command cleanup](plans/22-test-boundaries/main-plan.md),
+  draft: scripted external systems in ordinary tests, explicit real-boundary
+  verification, preserved full-audit coverage and removal of needless cleanup waits
 - [Harness principles](harness.principles.md)
 - [Agent declarations and automated audit evidence](analysis/2026-10-07-agent-declarations-and-audit-responsibilities.md),
   desired responsibility boundary and issues in the current implementation and

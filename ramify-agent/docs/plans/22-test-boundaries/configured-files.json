@@ -1,0 +1,999 @@
+{
+  "capturedAt": "2026-10-08T04:02:14.812636+00:00",
+  "kind": "configured-file-discovery-only",
+  "command": "node_modules/.bin/vitest list --filesOnly --json",
+  "head": "286ca017d360b642610ca82f713cb2a222684fc1",
+  "workingTree": "dirty; active Plan 21 changes; HEAD alone does not identify these inputs",
+  "inputSha256": {
+    "package.json": "4c0412651655da5fe6b5793b40b49144159108ecfaf32861d3960bf5d0458a93",
+    "package-lock.json": "9d0b5e4332475cfc10b20c6f8c3d2aff035703a25af88710bc2beeb361ea96d6",
+    "vitest.config.ts": "c0f54f605e468027bffb775b4847c487bb88fb59f1b06528dbacb09738f07e7e",
+    "ramify-audit.json": "9bfaaa5d6b95d590cf044ecab60faec812b2e39fd5a7752be28e7190afa80baa",
+    "AGENTS.md": "936980754bb7a054de611627a3dca1e8ca77fd52a3976382f4c70461a5d47b41",
+    "subs/harness/src/run/service.ts": "6168f273f542b340dc45c4e4ca48c070cc316146bc59991987f7f6f9ff98a62e",
+    "subs/harness/src/tests/helpers/runs.ts": "b7e9eb9f5d441c1a31ab3d8424763a2473b1d3bb9131559c730f09a0aca92d72",
+    "subs/harness/src/tests/helpers/external-tools.ts": "6e5c696e740216ea3c4098c8c5faeab0dac16eb76889b304f8d36e9b20f198e7",
+    "subs/harness/src/tests/helpers/process-guard.ts": "fc471c09fc956f00f8646193ff9d259901512e879703f01093dd11f0308a54fa",
+    "subs/harness/src/tests/capability-acceptance.integration.test.ts": "6b74a66c0a8c9e37bc6f13a2c5812bc0e65ca82d1199c284ea9a09c6ba9eec18",
+    "subs/harness/subs/evidence/src/run-command-with-cleanup.sh": "2965f0e540d3e57cddbbe8141101127b19d49f59e01e3a7c1d07ff774c9d0244"
+  },
+  "count": 244,
+  "files": [
+    {
+      "file": "src/tests/cli.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "src/tests/session-command.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/acceptance-trial.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/accepted-boundary.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/accepted-commit.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/analysis-plan-evidence.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/analysis-scenarios.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/analysis-submission.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/assignment-source-evidence.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/audit-check-execution.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/audit-workspace-recovery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/breaking-work.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-assignments.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-consultation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-delegation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-historical-resume.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-records.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-recovery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-state.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-submission.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/capability-tasks-projection.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/catalog-extraction.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/check-findings-authority.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/check-findings-commands.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/check-findings-composition.integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/check-findings-composition.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/check-findings-ledger.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/check-findings-projection.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/check-findings-run.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/commit-recovery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/commit.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/compaction.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/composition-recovery-chains.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/composition-recovery-delegation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/composition-recovery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/composition.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/context-selection-delivery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/context-selection-runtime.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/context-selection-submissions.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/context-selection.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/contract-delegation-integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/contract-delegation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/contract-injection-scope.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/contract-revision-scripted.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/contract-revision.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/contract-scheduling.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/contract-submission.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/direct-check-execution.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/engineer-api-preparation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/engineer-briefing.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/engineer-directory.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/engineer-failures.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/engineer-submission.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/environment-problems.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/execution-map-causal.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/execution-map-contract.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/execution-map-durable.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/execution-map-http.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/execution-map-modules.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/execution-map-pages.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/execution-map-projection.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/external-boundaries.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/fake-exposure-parity.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/fixture-check.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/fixture-trials.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/fork-submission.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/gate-diagnostics.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/gate-not-verified.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/gate-progress.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/gate-repair-routing.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/helpers/preview-git.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/hook-checks.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/http.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/integration-scenarios-integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/integration-scenarios.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/iteration-gate-integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/iteration-gate.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/iteration-source-delivery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/iterations-integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/iterations.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/kpi-metrics.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/late-writes.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/line-events.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/lineage-metrics.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/local-architect-submission.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/local-authority.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/lock.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/materialization.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/measurement.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/merge-readiness.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/module-creation-integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/module-creation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/module-header.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/neutral-actions.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/no-rewind.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/nonfunctional-deviation-runtime.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/nonfunctional-deviation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/nonfunctional-phase.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/nonfunctional-recovery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/nonfunctional-repair.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/nonfunctional-run.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/nonfunctional-submissions.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/observation-log.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/placement.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/plan-deviations.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/plan-evidence-compatibility.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/plan-evidence-required-runtime.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/plan-evidence-review-unavailable.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/plan13-composed-functional.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/plans.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/progress-fixture.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/progress.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/project-config.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/projections-pure.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/protocol-contract.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/read-excursions.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/readiness-decision.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/readiness-direct-recovery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/readiness.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/reconciliation-submission.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/reconciliation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/record-reader.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/recorded-environment.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/requirement-architect-view.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/requirement-verification.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/review-attempts.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/review-lifecycle.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/review-questions.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/review-scheduling.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/review-signals.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/review-snapshot.integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/review-stop.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/review-tools.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run-bounds.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run-closing-order.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run-commands.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run-git.integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run-policy.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run-projections.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run-protocol-materialization.integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run-protocol.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run-recovery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/run.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/scenario-briefings.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/scenario-projections.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/scenario-states.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/scratch-setup.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/scratch.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/session-fixture.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/session-lifecycle.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/session-queries.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/session-reducer.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/setup-attribution.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tests.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/single-session-integration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/stop-before-start.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/test-lock-bounds.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/test-lock-gate.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/transcript-pages.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/transcript-run.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/transcript-writer.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/tree-identity.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/unguarded-write.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/union-values.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/work-item-api-views.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/work-items.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/write-guard.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/src/tests/port-additions.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/src/tests/port-observations.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/src/tests/scripted.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/src/tests/tool-actions.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/src/tests/transcript-content.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/compaction-policy.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/context-budget.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/fork-isolation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/guard-installed.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/guarded-writes.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/model-choice.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/pi-agent.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/session-modes.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/tool-actions.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/transcript-content.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/audit/src/tests/audit-conformance.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/audit/src/tests/completed-audit.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/audit/src/tests/test-lock.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/audit/src/tests/workspace-preparation.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/check-findings/src/tests/decide.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/check-findings/src/tests/deviations.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/check-findings/src/tests/identity.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/check-findings/src/tests/purity.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/check-findings/src/tests/queries.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/check-findings/src/tests/relations.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/check-findings/src/tests/stream.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/candidate-tree.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/git.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/guarded-files.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/project-boundary.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/project-configuration.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/run-command.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/scratch-git.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/views.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/corrupt-log.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/effects.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/fault-injection.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/killed-writer.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/ledger.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/materialize.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/record-read.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/store.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/torn-line.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/nonfunctional/src/tests/contracts.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/nonfunctional/src/tests/rounds.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/plan-evidence/src/tests/catalog.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/plan-evidence/src/tests/contracts.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/plan-evidence/src/tests/discovery.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/scenarios/src/tests/extraction.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/scenarios/src/tests/form.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/scenarios/src/tests/records.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/scenarios/src/tests/rendering.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/harness/subs/scenarios/src/tests/states.test.ts",
+      "project": "node"
+    },
+    {
+      "file": "subs/web/src/tests/app.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/capability-graph.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/capability-module-tree.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/capability-tasks.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/check-findings.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/client.test.ts",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/execution-map-client.test.ts",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/execution-map.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/execution-modules.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/plan-page.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/plans-page.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/run-page.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/session-marks.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/session-page.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/session-timeline.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/sessions-page.test.tsx",
+      "project": "web"
+    },
+    {
+      "file": "subs/web/src/tests/transcript-workspace.test.tsx",
+      "project": "web"
+    }
+  ]
+}
