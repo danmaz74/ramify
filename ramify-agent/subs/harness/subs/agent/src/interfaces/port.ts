@@ -23,11 +23,9 @@ export type BuiltinTool = 'read' | 'grep' | 'ls' | 'find';
 export type WriteTool = 'edit' | 'write';
 
 /**
- * An opaque handle to a point in a session's history, not to a session. The
- * implementation resolves it; the harness stores it and compares it for
- * equality only. A fork taken from a ref starts at the point that ref names,
- * so every ref the port hands back is pinned to the history as it stood when
- * the ref was produced.
+ * An internal adapter reference to a pinned provider-neutral point. The
+ * public operation boundary uses structured AgentSessionPoint values.
+ * The adapter validates run/point identity without opening provider files.
  */
 export type SessionRef = string;
 
@@ -40,9 +38,8 @@ export type SessionStart =
 export type SessionMode = SessionStart['mode'];
 
 /**
- * The mode that was actual. A requested mode the implementation could not
- * honor degrades to `fresh` and says why, so that a fork which silently
- * became a fresh session cannot corrupt the comparison of fork cost.
+ * The actual mode of the owning invocation. A named source-backed fresh
+ * recovery records its reason; implementations do not choose a fallback.
  */
 export interface ActualStart {
   readonly mode: SessionMode;
