@@ -8,11 +8,11 @@ import { hypothesisChangeSchema, slugSchema } from './records.js';
 import { extractDocumentScenarios, type PlanScenario, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
 import type { DocumentManifest } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import {
-  acceptElements, submittedElementSchema, type ElementCatalog, type ElementKind,
+  acceptElements, submittedElementSchema, type ElementCatalog, type ElementKind, type ElementReferenceList,
 } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import type { Incorporation } from './evidence-contracts.js';
 import {
-  integrationScenarioSubmissionSchema, scenarioSubmissionSchema, validateScenarioForm,
+  integrationScenarioSubmissionSchema, scenarioSubmissionSchema, validateScenarioForm, nonBehavioralAcceptanceSchema,
   type ScenarioFormResult, type ScenarioViewNames,
 } from '../../subs/scenarios/src/form.js';
 
@@ -48,6 +48,7 @@ const entrySchema = z.object({
   /** Keys of the context elements a reader needs to understand the entry. */
   contextRefs: z.array(text),
   citations: z.array(citationSchema),
+  nonBehavioralAcceptance: z.array(nonBehavioralAcceptanceSchema).optional(),
 }).strict();
 
 const hypothesisSubmissionSchema = z.object({
@@ -100,6 +101,7 @@ export interface AnalysisEvidence {
    * as a coverage limit rather than accepting a claim it did not check.
    */
   readonly index: ArchitectIndex | null;
+  readonly registeredTests?: ReadonlySet<string> | undefined;
   /** The catalog before this submission: the intake's and the principles extractions' elements. */
   readonly catalog: ElementCatalog;
   /** The intake's judgment of which captured plan documents supply binding scenarios. */
@@ -143,8 +145,9 @@ export function scenarioFormOf(submission: ResolvedAnalysis, evidence: AnalysisE
   return validateScenarioForm(
     { scenarios: submission.scenarios, integrationScenarios: submission.integrationScenarios },
     incorporatedScenarios(evidence),
-    submission.entries.map(entry => ({ capability: entry.capability, acceptanceRefs: entry.acceptanceRefs })),
+    submission.entries.map(entry => ({ capability: entry.capability, acceptanceRefs: entry.acceptanceRefs, nonBehavioralAcceptance: entry.nonBehavioralAcceptance })),
     viewNamesOf(evidence.index),
+    { registeredTests: evidence.registeredTests ?? new Set() },
   );
 }
 
@@ -188,7 +191,19 @@ export function analysisCitationErrors(
     for (const field of ['requirementRefs', 'acceptanceRefs', 'contextRefs'] as const) check(entry[field], citedKinds[field], `entries.${position}.${field}`);
   });
   analysis.scenarios.forEach((scenario, position) => check(scenario.refs ?? [], 'functional', `scenarios.${position}.refs`));
+  analysis.entries.forEach((entry, position) => check(entry.nonBehavioralAcceptance?.map(item => item.ref) ?? [], 'functional', `entries.${position}.nonBehavioralAcceptance`));
   return errors;
+}
+
+/** Typed local references are validated in submitted terms before ID allocation. */
+export function analysisElementReferences(analysis: Pick<ResolvedAnalysis, 'entries' | 'scenarios'>): ElementReferenceList[] {
+  return [
+    ...analysis.entries.flatMap((entry, position) => [
+      ...(['requirementRefs', 'acceptanceRefs', 'contextRefs'] as const).map(field => ({ path: `entries.${position}.${field}`, citations: entry[field], allowedKinds: [citedKinds[field]] })),
+      { path: `entries.${position}.nonBehavioralAcceptance`, citations: entry.nonBehavioralAcceptance?.map(item => item.ref) ?? [], allowedKinds: ['functional'] as const },
+    ]),
+    ...analysis.scenarios.map((scenario, position) => ({ path: `scenarios.${position}.refs`, citations: scenario.refs ?? [], allowedKinds: ['functional'] as const })),
+  ];
 }
 
 /** The architect's elements are functional or context, read from captured plan documents, and every citation names one of them. */
@@ -200,7 +215,7 @@ function elementErrors(submission: InitialAnalysisSubmission, evidence: Analysis
     if (!plans.has(element.document)) errors.push({ path: `elements.${index}.document`, message: `${element.document} is not a captured plan document`, expected: 'a captured plan document' });
   });
   if (errors.length === 0) {
-    const accepted = acceptElements(evidence.catalog, submission.elements);
+    const accepted = acceptElements(evidence.catalog, submission.elements, analysisElementReferences(submission));
     if (!accepted.ok) for (const error of accepted.errors) {
       const split = error.indexOf(': ');
       errors.push({ path: `elements.${error.slice(0, split)}`, message: error.slice(split + 2) });
@@ -217,7 +232,7 @@ function elementErrors(submission: InitialAnalysisSubmission, evidence: Analysis
  * accepted, so a failure here is the harness disagreeing with itself.
  */
 export function acceptArchitectElements(catalog: ElementCatalog, submission: InitialAnalysisSubmission): { readonly catalog: ElementCatalog; readonly analysis: ResolvedAnalysis } {
-  const accepted = acceptElements(catalog, submission.elements);
+  const accepted = acceptElements(catalog, submission.elements, analysisElementReferences(submission));
   if (!accepted.ok) throw new Error(`An accepted analysis has invalid elements: ${accepted.errors.join('; ')}`);
   const id = (key: string) => accepted.ids.get(key) ?? key;
   const { elements: _elements, ...rest } = submission;
@@ -227,7 +242,8 @@ export function acceptArchitectElements(catalog: ElementCatalog, submission: Ini
     analysis: {
       ...rest,
       entries: rest.entries.map(entry => ({ ...entry,
-        requirementRefs: entry.requirementRefs.map(id), acceptanceRefs: entry.acceptanceRefs.map(id), contextRefs: entry.contextRefs.map(id) })),
+        requirementRefs: entry.requirementRefs.map(id), acceptanceRefs: entry.acceptanceRefs.map(id), contextRefs: entry.contextRefs.map(id),
+        ...(entry.nonBehavioralAcceptance === undefined ? {} : { nonBehavioralAcceptance: entry.nonBehavioralAcceptance.map(item => ({ ...item, ref: id(item.ref) })) }) })),
       scenarios: rest.scenarios.map(scenario => (scenario.refs === undefined ? scenario : { ...scenario, refs: scenario.refs.map(id) })),
     },
   };

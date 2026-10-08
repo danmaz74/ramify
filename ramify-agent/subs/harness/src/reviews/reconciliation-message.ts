@@ -57,7 +57,7 @@ export function reconciliationMessage(packet: ReconciliationPacket): string {
     '',
     '## Source',
     '',
-    `The audited source is \`${basis.source.commit}\` (tree \`${basis.source.tree}\`). The project as it stands is that source; read it where a concern points.`,
+    `The audited source is \`${basis.source.commit}\` (tree \`${basis.source.tree}\`). Start with the reviewed patch and its canonical changed-path list, then read the source each concern requires. Retain harness-produced changes in the audited diff; producer attribution never hides a patch.`,
     '',
     '## This round',
     '',

@@ -1,3 +1,4 @@
+import { taskSupportSections } from '../work/task-support.js';
 import { randomBytes } from 'node:crypto';
 import { mkdir, realpath, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
@@ -391,6 +392,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
     index: () => index,
     guarded,
     scopeRevision: scope.revision,
+    submissions: { legalOutcomes: ['completion-proposed', 'partial', 'unsuitable', 'capability-needed'], completionOutcome: 'completion-proposed' },
     outputPath: (kind, _invocation, number) => at(kind === 'shell' ? sessionLayout.shellOutput(number) : sessionLayout.hookOutput(number)),
   });
 
@@ -403,7 +405,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
     // is judged: the hook checks saw only the mutations they covered.
     validate: async input => capabilityEngineerSubmissionSchema.safeParse(input).success
       ? validateEngineer(input, {
-        capabilityWorkflow: true, kind: 'ordinary', obligation: null, openFindings: await tools.findingsAtCompletion(input),
+        capabilityWorkflow: true, kind: 'ordinary', obligation: null, openFindings: tools.openFindings(),
       })
       : { ok: false, errors: [{ path: 'kind', message: 'This session accepts only the current capability engineer submissions' }] },
     accept: async value => {
@@ -460,7 +462,9 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
       name: engineerToolName,
       description: engineerSubmissionDescription,
       inputSchema: capabilityEngineerJsonSchema,
-      accept: async input => {
+      accept: async (input, signal) => {
+        await tools.findingsAtCompletion(input, signal);
+        signal.throwIfAborted();
         const verdict = await judge.judge(input);
         transcript.note(verdictNote(recorder.callId(engineerToolName), engineerToolName, verdict));
         progress({
@@ -498,11 +502,11 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
     sessions = await HarnessSessionOperations.open(join(projectRoot, sessionsDirectory, 'session-operations'), agent);
     const brief: HarnessTaskBrief = { kind: 'standalone-command', objective: 'Carry out this standalone module command and submit its observed result.',
       goal: assignment.goal, requirements: [assignment.completionEvidence],
-      sections: [{ key: 'assignment', text: prompt.split(assignment.goal).join('') }],
+      sections: taskSupportSections(prompt, [`## Goal\n\n${assignment.goal}`, `## Completion evidence\n\n${assignment.completionEvidence}`]),
       environment: { projectRoot, workingDirectory, candidate: null, snapshot: null, limits,
         availableTools: [...spec.builtinTools, ...spec.tools.map(tool => tool.name), engineerToolName],
         views: views.flatMap(view => view.views.map(item => ({ path: item.path, revision: item.revision, modules: [view.module], coverage: item.coverage === null ? [] : [`${item.coverage} coverage limits`] }))),
-        supportPaths: loaded.files.map(file => file.path), cucumberConfiguration: null } };
+        supportPaths: loaded.files.map(file => file.path), cucumberConfiguration: JSON.stringify({ kind: 'not-applicable', reason: 'Standalone assignment selects no registered feature files' }) } };
     agentSession = await sessions.start({ runId: `standalone:${id}`, operationId: id, session: id, loaded, brief, spec,
       authority: { scope, guarded: guardedFiles }, validator: { name: engineerToolName, schema: capabilityEngineerJsonSchema, submissionSchema: 'ramify-agent.engineer-submission/1', bound: limits.rejectedSubmissionsPerTurn },
       destination: { session: id, submission: sessionLayout.submission }, currentAuthority: async () => options.signal?.aborted !== true,
@@ -545,6 +549,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
   await settleSessionEquipment(equipment.settle, limits.stopSettleMs).catch(() => false);
   const settled = await writer.release(id, agentSession);
   settlementConfirmed = settled.confirmed;
+  if (settlementConfirmed) await equipment.drained?.();
   if (!settlementConfirmed) retainProjectLock();
   const snapshot = await recordSettledSnapshot({ projectRoot, changed: () => git.changedPaths(projectRoot), scope: guarded }, observations);
   const removed = settlementConfirmed ? await removeScratchDirectories(projectRoot, [entry.dir], git) : { preservedTracked: [] };

@@ -452,7 +452,7 @@ describe('a mutation is observed even when the tool failed', () => {
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes'))).toBe('completed');
 
     const result = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;
     const invocation = result.invocations[0]!;
@@ -462,17 +462,17 @@ describe('a mutation is observed even when the tool failed', () => {
     const byTool = observations.filter(line => line.type === 'mutation' && line.data.observedBy === 'tool');
     expect(byTool).toHaveLength(2);
     expect(byTool.map(line => (line.type === 'mutation' ? line.data.toolFailed : null))).toEqual([true, false]);
-    expect(byTool.every(line => line.type === 'mutation' && line.data.attributable)).toBe(true);
-    expect(byTool.every(line => line.type === 'mutation' && line.data.paths.length === 1)).toBe(true);
+    expect(byTool.map(line => line.type === 'mutation' ? [line.data.attributable, line.data.paths.length] : null)).toEqual([[false, 0], [true, 1]]);
 
     // One hook check per settled mutation, and the run's stubbed `ramify`
     // checks nothing, which is recorded as such and never as a pass.
     const hooks = observations.filter(line => line.type === 'hook-check');
     // Two checks after the two settled mutations, and the fresh check the
     // claimed completion was judged against, which names itself.
-    expect(hooks.map(line => (line.type === 'hook-check' ? line.data.atCompletion ?? false : null))).toEqual([false, false, true]);
+    expect(hooks.map(line => (line.type === 'hook-check' ? line.data.atCompletion ?? false : null))).toEqual([false, false, false, true]);
+    expect(hooks.map(line => line.type === 'hook-check' ? line.data.mode : null)).toEqual(['changed', 'complete', 'changed', 'complete']);
     expect(hooks.every(line => line.type === 'hook-check' && line.data.outcome === 'not-checked')).toBe(true);
-    expect(hooks.every(line => line.type === 'hook-check' && line.data.mode === 'changed')).toBe(true);
+
     // An invocation failure printed no check document: no provider, and no path disposition the harness could invent.
     expect(hooks.every(line => line.type === 'hook-check' && line.data.provider === null && line.data.dispositions.length === 0)).toBe(true);
 

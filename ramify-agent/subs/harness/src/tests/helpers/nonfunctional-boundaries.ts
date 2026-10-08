@@ -193,6 +193,8 @@ export function nfrBoundaries(root: string, script: NfrScript = {}) {
   });
   const candidates = retain(scriptedCandidates(root, {
     [initial]: { tree: trees.initial, files: {}, base: initial, changes: [] },
+    [trees.initial]: { tree: trees.initial, files: {}, base: initial, changes: [] },
+    [trees.repaired]: { tree: trees.repaired, files: repairedFiles, base: initial, changes: edits },
     [committed]: { tree: trees.repaired, files: repairedFiles, base: initial, changes: edits },
   }));
   // NFR lifecycle capture uses real guarded-file snapshots, not suspended-capability source capture.

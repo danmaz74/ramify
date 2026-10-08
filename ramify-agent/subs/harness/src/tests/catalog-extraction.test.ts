@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { openElementCatalog, type ElementCatalog, type SubmittedElement } from '../../subs/plan-evidence/src/interfaces/catalog.js';
-import { acceptIntake, acceptPrinciples, applyCheck, type CheckState, type CheckSubmission, type IntakeSubmission } from '../analysis/extraction.js';
-import { acceptArchitectElements, type AnalysisEvidence } from '../analysis/submission.js';
+import { acceptIntake, acceptPrinciples, applyCheck, correctionSchema, type CheckState, type CheckSubmission, type IntakeSubmission } from '../analysis/extraction.js';
+import { acceptArchitectElements, validateInitialAnalysis, type AnalysisEvidence } from '../analysis/submission.js';
 import { analysis, entry } from './helpers/analysis.js';
 
 /*
@@ -162,7 +162,7 @@ describe('a checker', () => {
       entries: [{ capability: 'send-email', requirementRefs: ['fr-001'], acceptanceRefs: ['fr-003', 'fr-002'], contextRefs: [] }],
     }), evidence(later.catalog));
     expect(retired.ok).toBe(false);
-    if (!retired.ok) expect(retired.errors).toEqual([{ path: 'entries.0.acceptanceRefs.1', message: 'unknown element fr-002' }]);
+    if (!retired.ok) expect(retired.errors).toEqual([{ path: 'entries.0.acceptanceRefs.1', message: 'unknown element reference "fr-002"' }]);
     // A retired ID cannot be retired or rewritten again either.
     const again = applyCheck(later, 'doc-001', 'inv-0006', check({ corrections: [
       { action: 'rewrite', reason: 'Stronger than the plan.', element: { id: 'fr-002', text: 'Weaker.', conditions: [], uncertainty: '' } },
@@ -206,5 +206,40 @@ describe('a checker', () => {
     ]);
     expect(applied.findings.every(finding => finding.document === 'doc-001' && finding.invocation === 'inv-0004')).toBe(true);
     expect(applied.analysis.entries[0]).toMatchObject({ requirementRefs: ['fr-003'], acceptanceRefs: ['fr-002'], contextRefs: ['ctx-001'] });
+  });
+});
+
+
+describe('Plan23 consumer catalog/form corrections', () => {
+  test('retire-only correction is valid; add still requires an element and rejected local refs consume no IDs', () => {
+    expect(correctionSchema.safeParse({ action: 'replace', reason: 'Duplicate recommendation.', retire: ['rec-001'], elements: [] }).success).toBe(true);
+    expect(correctionSchema.safeParse({ action: 'add', reason: 'Missing.', elements: [] }).success).toBe(false);
+    const state = extracted();
+    const retired = applyCheck(state, 'doc-001', 'inv-retire', check({ corrections: [{ action: 'replace', reason: 'The recommendation duplicated another source.', retire: ['rec-001'], elements: [] }] }), evidence(state.catalog));
+    if (!retired.ok) throw new Error(JSON.stringify(retired.errors));
+    expect(retired.catalog.retired).toEqual(['rec-001']); expect(retired.findings[0]).toMatchObject({ elements: [], retired: ['rec-001'] });
+    const corrections = [{ action: 'add' as const, reason: 'Missing functional wording.', elements: [element('new-local', 'functional', 'doc-001')] }];
+    const invalid = applyCheck(state, 'doc-001', 'inv-reject', check({ corrections, entries: [{ capability: 'send-email', requirementRefs: ['new-local'], acceptanceRefs: ['MISSING-LOCAL'], contextRefs: [] }] }), evidence(state.catalog));
+    expect(invalid.ok).toBe(false); if (!invalid.ok) expect(JSON.stringify(invalid.errors)).toContain('MISSING-LOCAL');
+    expect(ids(state.catalog)).toEqual(['nfr-001', 'rec-001', 'fix-001', 'fr-001', 'fr-002']);
+    const valid = applyCheck(state, 'doc-001', 'inv-retry', check({ corrections, entries: [{ capability: 'send-email', requirementRefs: ['new-local'], acceptanceRefs: ['fr-002'], contextRefs: [] }] }), evidence(state.catalog));
+    if (!valid.ok) throw new Error(JSON.stringify(valid.errors)); expect(valid.catalog.elements.at(-1)!.id).toBe('fr-003');
+  });
+
+  test('registered non-behavioral declaration validates and resolves its local ref; a path, scenario or unregistered test cannot substitute', () => {
+    const submitted = analysis([entry('send-email', 'mail')]);
+    submitted.scenarios[0]!.refs = [];
+    submitted.entries[0]!.nonBehavioralAcceptance = [{ kind: 'non-behavioral', ref: 'send-email-acceptance', test: 'test-001' }];
+    const available = { ...evidence(open), registeredTests: new Set(['test-001']) };
+    expect(validateInitialAnalysis(submitted, available).ok).toBe(true);
+    const accepted = acceptArchitectElements(open, submitted);
+    expect(accepted.analysis.entries[0]!.nonBehavioralAcceptance).toEqual([{ kind: 'non-behavioral', ref: 'fr-002', test: 'test-001' }]);
+    for (const testIdentity of ['src/test.ts', 'sc-001', 'test-999']) {
+      const rejected = validateInitialAnalysis({ ...submitted, entries: [{ ...submitted.entries[0], nonBehavioralAcceptance: [{ kind: 'non-behavioral', ref: 'send-email-acceptance', test: testIdentity }] }] }, available);
+      expect(rejected.ok).toBe(false); if (!rejected.ok) expect(rejected.errors[0]!.path).toBe('entries.0.nonBehavioralAcceptance.0.test');
+    }
+    const invalidKind = validateInitialAnalysis({ ...submitted, elements: submitted.elements.map(element => element.key === 'send-email-acceptance' ? { ...element, kind: 'context' } : element) }, available);
+    expect(invalidKind.ok).toBe(false);
+    expect(validateInitialAnalysis({ ...submitted, entries: [...submitted.entries, submitted.entries[0]] }, available).ok).toBe(false);
   });
 });

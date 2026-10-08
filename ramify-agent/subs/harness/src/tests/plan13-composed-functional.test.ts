@@ -97,6 +97,7 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   });
   const candidates = scriptedCandidates(fixture.root, {
     [scenario.commit!]: { tree, files: {}, base: 'unchanged-fixture-revision', changes: [] },
+    [tree]: { tree, files: {}, base: scenario.commit!, changes: [] },
   });
   const opened = await openRunsWithoutProcesses(fixture.root, git, { agent, inputs: treeInputs(), candidates });
   cleanups.push(() => opened.service.close());
@@ -125,6 +126,9 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   const coordinator = agent.sessions.filter(session => session.spec.role === 'nonfunctional-coordinator');
   expect(coordinator).toHaveLength(1);
   expect(coordinator[0]!.spec.prompt).toContain(selectedQuote);
+  expect(coordinator[0]!.spec.prompt).toContain(`\"base\":\"${scenario.commit!}\"`);
+  expect(coordinator[0]!.spec.prompt).toContain(`\"tree\":\"${tree}\"`);
+  expect(coordinator[0]!.spec.prompt).toContain('\"changedPaths\":[]');
   expect(coordinator[0]!.spec.prompt).toContain(uncitedQuote);
   expect(coordinator[0]!.spec.prompt).toContain('### nfr-002');
   expect(coordinator[0]!.spec.prompt).not.toContain(advice);

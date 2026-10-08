@@ -24,6 +24,19 @@ vi.mock('node:child_process', async original =>
 import { cleanups, notes, notesDirectory, notesSource, project, session, checked, passingGate, finished, outcomeOf, observationsOf, exists } from './single-session-fixture.js';
 
 describe('a single engineer session', () => {
+  test('the prepared standalone packet preserves a multiline literal goal and fenced consecutive headings byte for byte', async () => {
+    const root = await project();
+    const prompt = 'Keep every byte.\n\nEmbedded prose: Keep every byte.\n\n````text\n# comment\n# second\n## nested\n\nKeep every byte.\n```\n# still literal\n````\n\n~~~text\n# tilde\n# another\nKeep every byte.\n~~~';
+    const { result, events, agent } = await session(root, [{ kind: 'submit', input: unsuitableScope('Only capture the current packet.') }], { prompt });
+    expect(finished(result).ended).toBe('submitted');
+    const packet = events.find(event => event.type === 'started')!;
+    if (packet.type !== 'started') throw new Error('missing packet');
+    expect(packet.message).toContain(`# Goal\n${prompt}`);
+    expect(packet.message.split(prompt)).toHaveLength(2);
+    expect(agent.sessions[0]!.spec.prompt).toBe(packet.message);
+    expect(packet.message).toContain('## Approach the architect asked for\n\nNot stated.');
+  });
+
   test('an unconfirmed operation barrier retains project ownership and scratch and refuses the gate', async () => {
     const root = await project();
     const scratch = join(root, notesDirectory, 'src/tmp/unfinished.txt');
@@ -71,7 +84,7 @@ describe('a single engineer session', () => {
       { kind: 'submit', input: unsuitableScope('The sibling is outside this assignment.') },
     ], {}, {
       changed: [notesSource, `${notesDirectory}/src/new.ts`],
-      ramify: [checked('changed'), checked('changed'), checked('complete')],
+      ramify: [checked('changed'), checked('changed')],
       commandExecution, command: 'pwd',
     });
     const summary = finished(result);
@@ -100,7 +113,7 @@ describe('a single engineer session', () => {
     const { result, agent, events, git } = await session(root, [
       edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
       { kind: 'submit', input: completionProposed('The limit is 500.') },
-    ], {}, { changed: [notesSource], ramify: [checked('changed'), checked('changed')] });
+    ], {}, { changed: [notesSource], ramify: [checked('changed'), checked('complete')] });
 
     const summary = finished(result);
     expect(result.exitStatus).toBe(0);
@@ -127,7 +140,8 @@ describe('a single engineer session', () => {
     expect(started.message).toContain('# Goal\nRaise the note limit to 500.');
     expect(started.message.split('Raise the note limit to 500.')).toHaveLength(2);
     expect(started.message).toContain('## Approach the architect asked for\n\nNot stated.');
-    expect(started.message).toContain('## Completion evidence\n\nNot stated.');
+    expect(started.message).toContain('# Requirements\n- Not stated.');
+    expect(started.message).not.toContain('## Completion evidence');
     expect(agent.sessions[0]!.spec.prompt).toBe(started.message);
   }, 120_000);
 
@@ -166,9 +180,9 @@ describe('a single engineer session', () => {
       { kind: 'submit', input: completionProposed('The limit is 500, with the violation removed.') },
     ], {}, { changed: [notesSource], ramify: [
       { form: 'changed', outcome: 'findings' },
-      { form: 'changed', outcome: 'findings' },
+      { form: 'complete', outcome: 'findings' },
       checked('changed'),
-      checked('changed'),
+      checked('complete'),
     ] });
 
     const summary = finished(result);
@@ -273,7 +287,7 @@ describe('the gate option', () => {
       { kind: 'submit', input: completionProposed('The limit is 500.') },
     ], { gate: true }, {
       changed: [notesSource],
-      ramify: [checked('changed'), checked('changed')],
+      ramify: [checked('changed'), checked('complete')],
       gate: passingGate,
     });
 
@@ -298,7 +312,7 @@ describe('the gate option', () => {
     const { result, git } = await session(root, [
       { kind: 'submit', input: completionProposed('The limit is already right.') },
     ], { gate: true }, {
-      ramify: [checked('changed')],
+      ramify: [checked('complete')],
       gate: [{ outcome: { kind: 'completed', exitCode: 1 } }, {}],
     });
 
@@ -328,7 +342,7 @@ describe('the session\'s records', () => {
       { kind: 'submit', input: completionProposed('The limit is 500.') },
     ], { gate: true }, {
       changed: [notesSource],
-      ramify: [checked('complete'), checked('changed'), checked('changed')],
+      ramify: [checked('changed'), checked('complete')],
       gate: passingGate,
       commandExecution, command: 'echo checking',
     });
@@ -352,10 +366,9 @@ describe('the session\'s records', () => {
     gateAttemptSchema.parse(JSON.parse(await readFile(join(records, 'gate', 'attempt.json'), 'utf8')));
 
     expect(await readdir(join(records, 'shell'))).toEqual(['001.log']);
-    // One check after each of the two mutations, and the fresh check over
-    // the write scope that the claimed completion was judged against.
+    // The no-op shell reserves identity 1 without launching a check; the edit and independent completion use 2 and 3.
     const hooks = await readdir(join(records, 'hooks'));
-    expect(hooks).toEqual(['001.json', '002.json', '003.json']);
+    expect(hooks).toEqual(['002.json', '003.json']);
     for (const hook of hooks) JSON.parse(await readFile(join(records, 'hooks', hook), 'utf8'));
     // Durable operations use the shared owned ledger; no per-invocation executor directory.
     expect(await exists(join(records, 'session'))).toBe(false);
@@ -397,7 +410,7 @@ describe('the session\'s records', () => {
     };
     const { result } = await session(root, [], { agent }, {
       changed: [notesSource],
-      ramify: [checked('complete'), checked('changed'), checked('changed')],
+      ramify: [checked('changed'), checked('complete')],
       commandExecution, command: 'echo checking',
     });
 
@@ -430,13 +443,13 @@ describe('the session\'s records', () => {
     expect(decisions.map(decision => decision.kind)).toEqual([
       'post-write-check', 'guard-denied', 'post-write-check', 'post-write-check', 'submission-verdict',
     ]);
-    // The shell's changed set is unknown, so its check is a complete one, whose log the entry names.
+    // The complete content inventory proves this shell changed nothing; it launches no mutation check.
     expect(decisions[0]).toMatchObject({
       callId: `${id}:call-1`, atCompletion: false,
-      checks: [{ mode: 'changed', outcome: 'not-checked', log: null }, { mode: 'complete', log: { stored: 'file', path: 'hooks/001.json' } }],
+      checks: [],
     });
     expect(decisions[1]).toMatchObject({ callId: `${id}:call-2`, tool: 'write', verdict: 'blocked-scope', requested: join(root, outside) });
-    expect(decisions[3]).toMatchObject({ atCompletion: true, callId: null, checks: [{ mode: 'changed' }] });
+    expect(decisions[3]).toMatchObject({ atCompletion: true, callId: null, checks: [{ mode: 'complete' }] });
     expect(decisions[4]).toMatchObject({
       callId: `${id}:call-4`, verdict: 'accepted', text: { stored: 'inline', text: sessionAcceptance('completion-proposed', false) },
     });

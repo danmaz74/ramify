@@ -129,7 +129,7 @@ export function engineerScenarioSection(scenarios: EngineerScenarios | undefined
   lines.push(
     '## Binding a scenario',
     '',
-    `- Write step definitions in \`src/tests/steps/\` of a module within your write scope (a testing module's \`src/steps/\`). A run of these scenarios loads their owner's step files, ${directories.map(directory => `\`${directory}/\``).join(', ')}, and what those import.`,
+    `- Write step definitions in \`src/tests/steps/\` of a module within your write scope (a testing module's \`src/steps/\`). Candidate step locations are ${directories.map(directory => `\`${directory}/\``).join(', ')}. Effective project configuration determines which support files are actually loaded; these directories alone establish no import provenance.`,
     '- Never edit a feature file. The harness writes them, and a write to one is refused.',
     '- Bind each assigned scenario in `bindings` of your completion proposal once its step definitions bind its steps, naming the fakes they rely on. Binding removes its pending tag, so the next gate\'s audit runs it through the project\'s configured scenario check; a pending scenario is not run.',
     ...namedImportLines(),
@@ -159,7 +159,7 @@ function integrationEngineerSection(integration: IntegrationBriefing, state: Sce
     ...scenario.source,
     '```',
     '',
-    '### The step files it imports',
+    '### Candidate step files and import evidence',
     '',
   ];
   for (const sub of integration.subScenarios) lines.push(`- \`${sub.id}\` (${sub.name}) is owned by \`${sub.owner}\`.`);
@@ -168,6 +168,7 @@ function integrationEngineerSection(integration: IntegrationBriefing, state: Sce
   }
   lines.push(
     '',
+    'The files above were observed in their owners, not established as imports. Inspect the actual binding file and effective support configuration before claiming their provenance.',
     '## Binding it',
     '',
     `- Write one step file in \`${scenario.steps}/\` that imports the step files above and defines no step of its own:`,

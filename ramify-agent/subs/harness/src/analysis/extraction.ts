@@ -10,7 +10,7 @@ import { extractPlanScenarios } from '../../subs/scenarios/src/extraction.js';
 import type { SubmissionError, SubmissionValidation } from '../run/submissions.js';
 import { incorporationSchema, type Incorporation } from './evidence-contracts.js';
 import type { CatalogFinding } from './records.js';
-import { analysisCitationErrors, scenarioFormOf, type AnalysisEvidence, type ResolvedAnalysis } from './submission.js';
+import { analysisCitationErrors, analysisElementReferences, scenarioFormOf, type AnalysisEvidence, type ResolvedAnalysis } from './submission.js';
 
 /*
  * The bounded turns that extract the element catalog beside the initial
@@ -49,7 +49,7 @@ export const correctionSchema = z.discriminatedUnion('action', [
   /** An element made stronger or weaker than its source; it keeps its ID. */
   z.object({ action: z.literal('rewrite'), reason: text, element: elementRewriteSchema }).strict(),
   /** A split, a merge or a reclassification: the old IDs retire and the new elements get new ones. */
-  z.object({ action: z.literal('replace'), reason: text, retire: z.array(text).min(1), elements: z.array(submittedElementSchema).min(1) }).strict(),
+  z.object({ action: z.literal('replace'), reason: text, retire: z.array(text).min(1), elements: z.array(submittedElementSchema) }).strict(),
 ]);
 export type Correction = z.infer<typeof correctionSchema>;
 
@@ -126,8 +126,8 @@ export function applyCheck(state: CheckState, document: string, invocation: stri
     });
   });
   if (errors.length > 0) return { ok: false, errors };
-  const revised = reviseCatalog(state.catalog, { rewrite, retire, add: added });
-  if (!revised.ok) return { ok: false, errors: revised.errors.map(error => toError('corrections', error)) };
+  const revised = reviseCatalog(state.catalog, { rewrite, retire, add: added, references: analysisElementReferences({ entries: value.entries.map(entry => ({ ...entry, description: '', owner: '', citations: [] })), scenarios: value.scenarios.map(scenario => ({ ...scenario, entry: '', origin: { kind: 'architect' as const }, gherkin: '' })) }) });
+  if (!revised.ok) return { ok: false, errors: revised.errors.map(error => toError(error.startsWith('entries.') || error.startsWith('scenarios.') ? '' : 'corrections', error)) };
 
   const active = new Set(revised.catalog.elements.map(element => element.id));
   const resolve = (citations: readonly string[], path: string): string[] => {
@@ -138,6 +138,7 @@ export function applyCheck(state: CheckState, document: string, invocation: stri
   };
   const capabilities = new Set(state.analysis.entries.map(entry => entry.capability));
   const entries = new Map(value.entries.map((entry, index) => {
+    if (value.entries.slice(0, index).some(prior => prior.capability === entry.capability)) errors.push({ path: `entries.${index}.capability`, message: 'Duplicate entry correction' });
     if (!capabilities.has(entry.capability)) errors.push({ path: `entries.${index}.capability`, message: `No entry "${entry.capability}"`, expected: 'an entry of the analysis' });
     return [entry.capability, {
       requirementRefs: resolve(entry.requirementRefs, `entries.${index}.requirementRefs`),
@@ -147,6 +148,7 @@ export function applyCheck(state: CheckState, document: string, invocation: stri
   }));
   const keys = new Set(state.analysis.scenarios.map(scenario => scenario.key));
   const scenarios = new Map(value.scenarios.map((scenario, index) => {
+    if (value.scenarios.slice(0, index).some(prior => prior.key === scenario.key)) errors.push({ path: `scenarios.${index}.key`, message: 'Duplicate scenario correction' });
     if (!keys.has(scenario.key)) errors.push({ path: `scenarios.${index}.key`, message: `No scenario "${scenario.key}"`, expected: 'a scenario key of the analysis' });
     return [scenario.key, resolve(scenario.refs, `scenarios.${index}.refs`)] as const;
   }));

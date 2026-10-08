@@ -1,3 +1,4 @@
+import type { Observation } from '../run/observations.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -127,7 +128,16 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   expect(repair?.spec.prompt).toMatch(/^Elements: nfr-001$/mu);
   expect(repair?.spec.prompt).toContain(`> ${obligation}`);
   for (const text of [otherObligation, fixed, advice]) expect(repair?.spec.prompt).not.toContain(text);
-  expect(repair?.denied.length).toBe(1);
+  const repairStart = events.find(event => event.type === 'invocation-started' && event.data.role === 'nonfunctional-repair-engineer');
+  if (repairStart?.type !== 'invocation-started') throw new Error('Missing actual repair invocation');
+  const deniedCall = `${repairStart.data.invocation}:call-3`;
+  const observations = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations(repairStart.data.invocation)), 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line) as Observation);
+  expect(observations.flatMap(item => item.type === 'guard' && item.data.callId === deniedCall ? [item.data] : [])).toEqual([{
+    callId: deniedCall, tool: 'write', requested: plan, resolved: plan, owner: null, scopeRevision: 1, verdict: 'blocked-scope',
+    reason: `${plan} is written by the harness alone; no agent edits it`,
+  }]);
+  expect(observations.some(item => item.type === 'mutation' && item.data.callId === deniedCall)).toBe(false);
+  expect(repair?.results.find(result => result.callId === 'call-3')).toMatchObject({ tool: 'write', isError: true, text: expect.stringContaining('Nothing was written.') });
   expect(await readFile(plan, 'utf8')).toBe(`${original}\n${obligation}\n${otherObligation}\n${advice}\n`);
   expect(await readFile(join(firstSrc, 'nonfunctional-repair.ts'), 'utf8')).toContain('auditRecord');
   expect(await readFile(otherFile, 'utf8')).toContain('catalogAuditRecord');

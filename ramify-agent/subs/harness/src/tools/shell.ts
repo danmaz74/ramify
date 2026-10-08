@@ -3,8 +3,9 @@ import { z } from 'zod';
 import type { JsonSchema, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
 import { childEnvironment, runCommand, type CommandOutcome } from '../../subs/evidence/src/run-command.js';
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
-import { classifyShellTestRun, shellTestDirectories } from './shell-tests.js';
+import { classifyShellTestRun, shellTestDirectories, type FocusedCucumberSelection } from './shell-tests.js';
 import { changesBetween, sharedMutationOrder, type MutationChange, type MutationLease, type MutationOrder, type MutationSnapshot } from '../hooks/mutation-order.js';
 
 /*
@@ -71,6 +72,7 @@ export const shellJsonSchema = z.toJSONSchema(shellInputSchema) as JsonSchema;
 export interface ShellCall {
   /** The call's own number in this invocation, from 1. */
   readonly call: number;
+  readonly callId?: string | undefined;
   readonly command: string;
   readonly timeoutMs: number;
   /** The file the complete output is written to. */
@@ -107,7 +109,8 @@ export interface ShellOptions {
    * implementation may have judged it first; the harness judges again
    * whatever reaches it, so it never relies on that having happened.
    */
-  readonly judge: (input: unknown) => Promise<{ readonly ok: true } | { readonly ok: false; readonly text: string }>;
+  readonly callId?: ((input: unknown) => string) | undefined;
+  readonly judge: (input: unknown, callId?: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly text: string }>;
   /** The complete output file of the nth call. */
   readonly outputFile: (call: number) => string;
   /** Records the call before the command runs, so a command that never returns still has its record. */
@@ -119,6 +122,9 @@ export interface ShellOptions {
   /** The longest one command may run; the shell's own maximum when absent. */
   readonly maxTimeoutMs?: number | undefined;
   readonly mutation?: ShellMutationOptions | undefined;
+  /** Exact prepared commands alone receive the declared runner environment. */
+  readonly focusedCommands?: readonly { readonly shellCommand: string; readonly selection: FocusedCucumberSelection;
+    readonly environment: Readonly<Record<string, string>>; readonly sourceFiles: Readonly<Record<string, string>> }[] | undefined;
 }
 
 /**
@@ -171,7 +177,8 @@ export function createShellTool(options: ShellOptions): ShellTool {
     },
     async execute(input: unknown, signal: AbortSignal): Promise<ToolResult> {
       if (stopped || signal?.aborted) return { isError: true, text: 'Cancelled, nothing ran: the shell is stopped.' };
-      const judged = await options.judge(input);
+      const callId = options.callId?.(input);
+      const judged = await options.judge(input, callId);
       if (!judged.ok) return { isError: true, text: judged.text };
       const request = inputSchema.parse(input);
       const testScripts: Record<string, string | null> = {};
@@ -189,7 +196,15 @@ export function createShellTool(options: ShellOptions): ShellTool {
           candidate = parent;
         }
       }
-      const testRun = classifyShellTestRun(request.command, { workingDirectory: options.workingDirectory, testScripts });
+      const focused = options.focusedCommands?.find(command => command.shellCommand === request.command);
+      const verified = focused !== undefined && await focusedFilesMatch(focused.selection, focused.sourceFiles);
+      const testRun = classifyShellTestRun(request.command, { workingDirectory: options.workingDirectory, testScripts,
+        focusedCucumber: verified ? [focused!.selection] : [] });
+      if (testRun.kind === 'unverified') {
+        const text = `Refused, nothing ran: Cucumber selection is unverified (${testRun.reason}). Use the current prepared focused command; paths plus a default profile are not selection evidence.`;
+        await options.refused?.(text);
+        return { isError: true, text };
+      }
       if (testRun.kind === 'whole-suite') {
         const explanation = `Refused, nothing ran: \`${testRun.segment}\` runs the project's whole test suite (${testRun.reason}). The whole suite is not run from \`shell\`: it runs through ramify-audit at the gates, a full run takes minutes and waits behind every other suite run on this machine, and it verifies far more than this iteration is judged on. To run particular tests, name their files: \`npx vitest run <path/to/file.test.ts> …\` or \`npm test -- <path/to/file.test.ts>\`. Watch mode is refused for the same reason: it never ends on its own.`;
         await options.refused?.(explanation);
@@ -200,6 +215,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
       calls += 1;
       const call: ShellCall = {
         call: calls,
+        callId,
         command: request.command,
         timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
         outputFile: options.outputFile(calls),
@@ -211,13 +227,18 @@ export function createShellTool(options: ShellOptions): ShellTool {
         executionSignal.throwIfAborted();
         await options.starting(call);
         const before = options.mutation === undefined ? null : await snapshot(options.mutation);
+        // Revalidate after queueing and snapshot capture, at the actual process dispatch seam.
+        if (focused !== undefined && !await focusedFilesMatch(focused.selection, focused.sourceFiles)) {
+          return { isError: true, text: 'Refused, nothing ran: prepared Cucumber configuration or source changed before dispatch.' };
+        }
+        executionSignal.throwIfAborted();
         const began = Date.now();
         let completed;
         try {
           completed = await (options.commandExecution ?? runCommand)({
             argv: ['bash', '-c', request.command],
             cwd: options.workingDirectory,
-            env: childEnvironment(),
+            env: verified ? focused!.environment : childEnvironment(),
             timeoutMs: call.timeoutMs,
             outputFile: call.outputFile,
             signal: executionSignal,
@@ -312,4 +333,14 @@ function describeOutcome(outcome: CommandOutcome, timeoutMs: number): string {
     case 'runner-error':
       return `The command could not be run (${outcome.error.kind}): ${outcome.error.message}`;
   }
+}
+
+/** Current bytes authenticate both generated selection and its authored source inputs. */
+async function focusedFilesMatch(selection: FocusedCucumberSelection, sourceFiles: Readonly<Record<string, string>>): Promise<boolean> {
+  try {
+    for (const [path, identity] of Object.entries({ ...sourceFiles, [selection.config]: selection.configurationIdentity })) {
+      if (createHash('sha256').update(await readFile(path)).digest('hex') !== identity) return false;
+    }
+    return true;
+  } catch { return false; }
 }

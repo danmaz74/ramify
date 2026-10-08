@@ -1,4 +1,10 @@
-import { readFile, stat } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { resolve, basename, relative, sep } from 'node:path';
+import { childEnvironment, type CommandRunner } from '../../subs/evidence/src/run-command.js';
+import { loadCucumberConfiguration } from '../../subs/evidence/src/cucumber-configuration.js';
+import { buildFocusedScenarioCommand, type FocusedScenarioCommand } from './focused-scenarios.js';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { architectViewDirectory, findModule, readApiView, readArchitectMeta, type ApiViewSnapshot, type ArchitectIndex, type SourceArea } from '../../subs/evidence/src/views.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
@@ -636,4 +642,109 @@ function ids(values: readonly string[]): string {
 
 function list(values: readonly string[]): string {
   return values.length === 0 ? 'none' : values.map(value => `\`${value}\``).join(', ');
+}
+
+/** Prepare only an explicit literal Cucumber declaration. Unsupported wrappers/dynamic
+ * source choices stay unavailable; configured full-audit authority is unchanged. */
+export async function prepareAssignedCucumber(input: { readonly projectRoot: string; readonly scratchDirectory: string;
+  readonly featurePaths: readonly string[]; readonly checks: readonly unknown[]; readonly runner: CommandRunner }): Promise<{
+    readonly command: FocusedScenarioCommand; readonly sourceFiles: Readonly<Record<string, string>>;
+  }> {
+  const unavailable = (reason: string) => ({ command: { kind: 'unavailable' as const, reason }, sourceFiles: {} });
+  if (input.featurePaths.length === 0) return unavailable('No exact assigned feature files were selected');
+  type Declaration = { cmd?: string; args?: readonly string[]; cwd?: string; env?: Record<string, string>; parser?: string };
+  const declarations = input.checks.flatMap(check => {
+    const executor = (check as { executor?: { kind?: string; commands?: readonly Declaration[] } }).executor;
+    return executor?.kind === 'command' ? executor.commands ?? [] : [];
+  }).filter(command => command.parser === 'cucumber');
+  if (declarations.length !== 1) return unavailable('Exactly one declared Cucumber executor is required');
+  let command = declarations[0]!;
+  const root = await realpath(input.projectRoot).catch(() => null);
+  const cwd = await realpath(resolve(input.projectRoot, command.cwd ?? '.')).catch(() => null);
+  if (root === null || cwd === null) return unavailable('Declared Cucumber cwd cannot be observed');
+  const inside = relative(root, cwd);
+  if (inside === '..' || inside.startsWith(`..${sep}`)) return unavailable('Declared Cucumber cwd is outside the project');
+  const extraSources: Record<string, string> = {};
+  if (basename(command.cmd ?? '') === 'npm' && command.args?.[0] === 'run' && command.args.length === 2) {
+    const packagePath = await realpath(resolve(cwd, 'package.json')).catch(() => null);
+    if (packagePath === null || relative(root, packagePath).startsWith(`..${sep}`)) return unavailable('Declared package source is outside the project or unavailable');
+    let bytes: Buffer; let script: unknown;
+    try { bytes = await readFile(packagePath); script = (JSON.parse(bytes.toString('utf8')) as { scripts?: Record<string, unknown> }).scripts?.[command.args[1]!]; }
+    catch { return unavailable('Declared package script cannot be read'); }
+    if (typeof script !== 'string') return unavailable('Declared Cucumber script does not exist');
+    const tokens = literalCommandTokens(script);
+    if (tokens === null) return unavailable('Declared Cucumber script contains dynamic shell syntax');
+    const env = { ...command.env };
+    while (/^[A-Za-z_][A-Za-z0-9_]*=/u.test(tokens[0] ?? '')) {
+      const assignment = tokens.shift()!; const equal = assignment.indexOf('='); env[assignment.slice(0, equal)] = assignment.slice(equal + 1);
+    }
+    const executable = tokens.shift();
+    if (!executable || basename(executable) !== 'cucumber-js') return unavailable('Declared script is not a literal Cucumber command');
+    extraSources[packagePath] = createHash('sha256').update(bytes).digest('hex');
+    command = { ...command, cmd: executable, args: tokens, env };
+  }
+  if (basename(command.cmd ?? '') !== 'cucumber-js') return unavailable('Unsupported Cucumber executable wrapper');
+  const args = command.args ?? []; const profiles: string[] = []; const provided: Record<string, unknown> = {};
+  let file: string | undefined;
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]!;
+    if (arg === '--config' || arg === '-c') file = args[++index];
+    else if (arg === '--profile' || arg === '-p') { const profile = args[++index]; if (!profile) return unavailable('Missing declared profile'); profiles.push(profile); }
+    else if (arg === '--tags') provided.tags = args[++index];
+    else if (arg === '--name') provided.name = [...provided.name as string[] ?? [], args[++index]];
+    else if (arg === '--dry-run') provided.dryRun = true;
+    else return unavailable(`Unsupported declared Cucumber option ${arg}`);
+  }
+  if (!file) {
+    // Installed 13.2.1 locateFile order. Retain the actual selected source bytes.
+    for (const name of ['cucumber.js', 'cucumber.cjs', 'cucumber.mjs', 'cucumber.json', 'cucumber.yaml', 'cucumber.yml']) {
+      try { await stat(resolve(cwd, name)); file = name; break; }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return unavailable('Cucumber default configuration cannot be observed'); }
+    }
+  }
+  if (!file) return unavailable('The declared command selects no authored Cucumber configuration');
+  const sourcePath = await realpath(resolve(cwd, file)).catch(() => null);
+  if (sourcePath === null) return unavailable('Authored Cucumber configuration cannot be observed');
+  const sourceRelative = relative(root, sourcePath);
+  if (sourceRelative === '..' || sourceRelative.startsWith(`..${sep}`)) return unavailable('Authored Cucumber configuration is outside the project');
+  const source = await readFile(sourcePath).catch(() => null);
+  if (source === null) return unavailable('Authored Cucumber configuration cannot be read');
+  const sourceIdentity = createHash('sha256').update(source).digest('hex');
+  const effective = await loadCucumberConfiguration({ cwd, file, profiles, provided,
+    environment: childEnvironment(command.env ?? {}), configurationIdentity: sourceIdentity, nodeExecutable: process.execPath }, input.runner);
+  const prepared = buildFocusedScenarioCommand({ effective, featurePaths: input.featurePaths.map(path => resolve(input.projectRoot, path)),
+    scratchDirectory: input.scratchDirectory, cucumberExecutable: command.cmd!.includes('/') ? resolve(cwd, command.cmd!) : resolve(cwd, 'node_modules/.bin/cucumber-js') });
+  if (prepared.kind === 'available') {
+    await mkdir(input.scratchDirectory, { recursive: true });
+    await writeFile(prepared.configPath, prepared.configText, { flag: 'wx' }).catch(async error => {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || await readFile(prepared.configPath, 'utf8') !== prepared.configText) throw error;
+    });
+  }
+  return { command: prepared, sourceFiles: { ...extraSources, [sourcePath]: sourceIdentity } };
+}
+
+/** A bounded literal shell parser: quote grouping is accepted; expansions/operators are refused. */
+function literalCommandTokens(text: string): string[] | null {
+  const words: string[] = []; let word = ''; let quote: string | undefined;
+  for (const character of text) {
+    if (quote) { if (character === quote) quote = undefined; else if (quote === '"' && /[$`\\]/u.test(character)) return null; else word += character; }
+    else if (character === "'" || character === '"') quote = character;
+    else if (/\s/u.test(character)) { if (word) { words.push(word); word = ''; } }
+    else if (/[;&|<>($`\\]/u.test(character)) return null;
+    else word += character;
+  }
+  if (quote) return null;
+  if (word) words.push(word);
+  return words;
+}
+
+/** Credential-free current selection descriptor carried in the task packet/manifest. */
+export function focusedScenarioFacts(prepared: Awaited<ReturnType<typeof prepareAssignedCucumber>>): string {
+  const command = prepared.command;
+  return JSON.stringify(command.kind === 'unavailable' ? { kind: 'unavailable', reason: command.reason } : {
+    kind: 'available', cwd: command.cwd, configPath: command.configPath, sourceIdentity: command.sourceIdentity,
+    sourceFiles: prepared.sourceFiles, configurationIdentity: command.configurationIdentity,
+    argv: command.argv, selection: command.selection, support: command.support,
+    environmentNames: Object.keys(command.environment).sort(),
+  });
 }

@@ -1,3 +1,7 @@
+import { posix } from 'node:path';
+import type { ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
+import type { CandidateSource } from '../../subs/evidence/src/git.js';
+import { snapshotTools } from '../reviews/snapshot.js';
 import { z } from 'zod';
 import { assessmentCoverage, assessmentResultSchema, assessmentSchema, type Assessment, type Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 import type { RoundDecision } from '../../subs/nonfunctional/src/rounds.js';
@@ -90,6 +94,7 @@ export function validateCoordinatorAction(input: unknown, context: ActionContext
   const undetermined = new Set(context.results.filter(item => item.result === 'undetermined').map(item => item.nfr));
   const covered = new Set(context.investigatedNfrs);
   if (value.kind === 'investigate') {
+    errors.push(...nonfunctionalScopeErrors(value.scope));
     if (context.decision.action !== 'investigate' && context.decision.action !== 'repair-or-close') {
       errors.push({ path: 'kind', message: `Investigation is not permitted while the next step is ${context.decision.action}` });
     }
@@ -166,3 +171,48 @@ export const nonfunctionalRepairSubmissionSchema = z.discriminatedUnion('kind', 
 export type NonfunctionalRepairSubmission = z.infer<typeof nonfunctionalRepairSubmissionSchema>;
 export const nonfunctionalRepairJsonSchema = z.toJSONSchema(nonfunctionalRepairSubmissionSchema);
 export const nonfunctionalRepairToolName = 'submit_nonfunctional_repair';
+
+/** Source-only candidate tools; VCS, run records, generated views and symlinks
+ * cannot become assessment evidence merely by naming them in a scope. */
+export function boundedNonfunctionalTools(input: {
+  readonly source: CandidateSource; readonly projectRoot: string; readonly candidate: string;
+  readonly base: string; readonly scope?: readonly string[] | undefined;
+}): readonly ToolDefinition[] {
+  const scopes = input.scope ?? ['.'];
+  const allowed = (path: string) => nonfunctionalSourceAllows(path, scopes);
+  let loaded: Promise<ReturnType<typeof snapshotTools>> | undefined;
+  const tools = () => loaded ??= (async () => {
+    const entries = new Map((await input.source.treeEntries(input.projectRoot, input.candidate)).filter(entry => allowed(entry.path)).map(entry => [entry.path, entry]));
+    const directories = new Set(['']);
+    for (const path of entries.keys()) for (let directory = posix.dirname(path); directory !== '.' && !directories.has(directory); directory = posix.dirname(directory)) directories.add(directory);
+    const changes = (await input.source.diffNameStatus(input.projectRoot, input.base, input.candidate)).filter(change => allowed(change.path));
+    const scopedSource: CandidateSource = { ...input.source,
+      grepTree: async (root, commit, pattern, paths = [], signal) => {
+        const files = [...entries.values()].filter(entry => entry.kind === 'file' && (paths.length === 0 || paths.some(path => entry.path === path || entry.path.startsWith(`${path}/`)))).map(entry => entry.path);
+        // An empty Git path list means the whole tree, so never pass it for an empty scope.
+        return files.length === 0 ? [] : input.source.grepTree(root, commit, pattern, files, signal);
+      },
+    };
+    return snapshotTools({ commit: input.candidate, base: input.base, tree: input.candidate, entries, directories, changes }, scopedSource, input.projectRoot);
+  })();
+  const declarations = snapshotTools({ commit: input.candidate, base: input.base, tree: input.candidate, entries: new Map(), directories: new Set(['']), changes: [] }, input.source, input.projectRoot);
+  return declarations.definitions.map(definition => ({ ...definition,
+    description: `${definition.description} Only the fixed NFR source scope is available; Git metadata and harness run records are excluded.`,
+    execute: async (value, signal) => (await tools()).definitions.find(tool => tool.name === definition.name)!.execute(value, signal),
+  }));
+}
+
+/** Literal project-relative read scope, without dynamic globs or traversal. */
+export function nonfunctionalScopeErrors(scope: readonly string[]): SubmissionError[] {
+  return scope.flatMap((path, index) => path === '.' || path !== '' && !posix.isAbsolute(path) && !path.split('/').some(part => part === '..' || ['.git', 'node_modules', '.ramify', '.ramify-architect'].includes(part))
+    && !/^plans\/(?:[^/]+\/)?\.harness(?:\/|$)/u.test(path) && !/[*?\[\]{}\\]/u.test(path)
+    ? [] : [{ path: `scope.${index}`, message: 'Scope must be a literal project source path excluding VCS and run records' }]);
+}
+
+
+/** One literal source policy for both delivered changed paths and actual reads/searches. */
+export function nonfunctionalSourceAllows(path: string, scopes: readonly string[]): boolean {
+  return !path.split('/').some(part => ['.git', 'node_modules', '.ramify', '.ramify-architect'].includes(part))
+    && !/^plans\/(?:[^/]+\/)?\.harness(?:\/|$)/u.test(path)
+    && scopes.some(scope => scope === '.' || path === scope || path.startsWith(`${scope.replace(/\/$/u, '')}/`));
+}

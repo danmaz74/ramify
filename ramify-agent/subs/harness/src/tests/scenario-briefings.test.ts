@@ -192,7 +192,7 @@ describe('the engineer\'s briefing', () => {
     expect(text).toContain('1 more scenario of the entry is reported done already; the gates run it too.');
     // The three rules, and named imports.
     expect(text).toContain('## Binding a scenario');
-    expect(text).toContain('- Write step definitions in `src/tests/steps/` of a module within your write scope (a testing module\'s `src/steps/`). A run of these scenarios loads their owner\'s step files, `subs/shelf/src/tests/steps/`, and what those import.');
+    expect(text).toContain('- Write step definitions in `src/tests/steps/` of a module within your write scope (a testing module\'s `src/steps/`). Candidate step locations are `subs/shelf/src/tests/steps/`. Effective project configuration determines which support files are actually loaded; these directories alone establish no import provenance.');
     expect(text).toContain('- Never edit a feature file.');
     expect(text).toContain('- Bind each assigned scenario in `bindings` of your completion proposal once its step definitions bind its steps, naming the fakes they rely on.');
     expect(text).toContain('never with a symbol-free\n  `import \'…\'`');

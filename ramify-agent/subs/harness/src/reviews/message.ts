@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { capabilityEngineerSubmissionSchema } from '../work/engineer.js';
 import { deviationNotice } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import type { CapturedInput } from './inputs.js';
@@ -28,6 +30,8 @@ export interface ReviewBriefing {
   readonly package?: string | undefined;
   /** Scope: the run's plan document as the candidate holds it, which a concern can name as its ground; null when it holds none. */
   readonly planDocument?: string | null | undefined;
+  /** Exact committed producer/binding evidence, authenticated against the reviewed feature bytes. */
+  readonly pendingBindings?: readonly { readonly path: string; readonly sha256: string; readonly scenario: string; readonly invocation: string; readonly submission: string }[] | undefined;
 }
 
 const questions = { code: 'Code review', scope: 'Scope review', design: 'Design review' } as const;
@@ -77,9 +81,11 @@ export function reviewMessage(briefing: ReviewBriefing): string {
     '',
     ...(snapshot.changes.length === 0
       ? ['The candidate changed nothing. Submit with nothing inspected and nothing missing.']
-      : snapshot.changes.map(change => `- ${change.status} ${change.path}`)),
+      : [...new Map(snapshot.changes.map(change => [`${change.status}\0${change.path}`, change])).values()].map(change => `- ${change.status} ${change.path}`)),
     '',
   );
+  lines.push('Read snapshot_diff first, then inspect the changed implementation and the source required to judge it. The audited diff includes harness-produced changes; no feature or pending-tag patch is hidden.', '');
+  for (const binding of briefing.pendingBindings ?? []) lines.push(`Harness pending-tag binding: ${binding.scenario} in ${binding.path}, exact candidate sha256 ${binding.sha256}, accepted producer ${binding.invocation}, submission ${binding.submission}. This attribution supplies provenance; review the actual audited patch.`, '');
   if (briefing.checkFindings.length > 0) {
     lines.push('## CheckFindings this work item already holds', '');
     for (const entry of briefing.checkFindings) lines.push(`- ${entry.id} (${entry.standing}): ${entry.title}`);
@@ -101,4 +107,21 @@ export function orientationMessage(guidance: readonly CapturedInput[]): string {
   ];
   for (const entry of guidance) lines.push(`## ${entry.ref} (sha256 ${entry.hash.slice(0, 12)})`, '', entry.text.trimEnd(), '');
   return lines.join('\n');
+}
+
+
+/** Committed acceptance supplies identity; exact candidate/rendering bytes supply attribution. */
+export function pendingBindingEvidence(input: { readonly path: string; readonly scenario: string; readonly invocation: string;
+  readonly submission: string; readonly submissionBytes: Uint8Array; readonly candidateBytes: string; readonly expectedBytes: string | undefined }) {
+  if (input.expectedBytes === undefined || input.candidateBytes !== input.expectedBytes
+    || createHash('sha256').update(input.submissionBytes).digest('hex') !== input.submission) return null;
+  let raw: unknown;
+  try { raw = JSON.parse(new TextDecoder().decode(input.submissionBytes)); } catch { return null; }
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const { schema, ...body } = raw as Record<string, unknown>;
+  if (schema !== 'ramify-agent.engineer-submission/1') return null;
+  const proposal = capabilityEngineerSubmissionSchema.safeParse(body);
+  if (!proposal.success || proposal.data.kind !== 'completion-proposed' || !proposal.data.bindings.some(binding => binding.id === input.scenario)) return null;
+  return { path: input.path, scenario: input.scenario, invocation: input.invocation, submission: input.submission,
+    sha256: createHash('sha256').update(input.candidateBytes).digest('hex') };
 }

@@ -210,7 +210,7 @@ export function hookRunBoundaries(root: string) {
       expect(input.projectRoot).toBe(root);
       // Validate the committed gate checkpoint itself rather than interpreting its numeric identity.
       if (input.attemptId === 'ga-0001') { expect(input.mode).toBe('full'); expect(input.nested).toBe(true); expect(input.sourceCommit).toBe(initial); expect(runId ?? input.runId).toBe(input.runId); runId = input.runId; once('readiness-audit'); }
-      else { expect(['ga-0002', 'ga-0003', 'ga-0004']).toContain(input.attemptId); expect(input.runId).toBe(runId); expect(input.sourceCommit).toBe(finalHead); expect(input.mode).toBe(input.attemptId === 'ga-0004' ? 'full' : 'project-default'); expect(input.nested ?? false).toBe(input.attemptId === 'ga-0004'); once(({ 'ga-0002': 'iteration-audit', 'ga-0003': 'work-item-audit', 'ga-0004': 'final-audit' })[input.attemptId as 'ga-0002' | 'ga-0003' | 'ga-0004']); }
+      else { expect(['ga-0002', 'ga-0003', 'ga-0004']).toContain(input.attemptId); expect(input.runId).toBe(runId); expect(input.sourceCommit).toBe(finalHead); expect(input.mode, `audit ${input.attemptId}`).toBe(input.attemptId === 'ga-0004' ? 'full' : 'project-default'); expect(input.nested ?? false).toBe(input.attemptId === 'ga-0004'); once(({ 'ga-0002': 'iteration-audit', 'ga-0003': 'work-item-audit', 'ga-0004': 'final-audit' })[input.attemptId as 'ga-0002' | 'ga-0003' | 'ga-0004']); }
       const result = await auditAnswers.run(input);
       return result;
     },
@@ -221,10 +221,15 @@ export function hookRunBoundaries(root: string) {
       if (argv[0] === '--version') expect(argv).toEqual(['--version']);
       if (argv[0] === 'measure') expect(argv).toEqual(['measure', '--root', root, '--format', 'json']);
       if (argv[0] === 'check') {
+        if (argv[1] === '--batch') {
+          expect(argv).toEqual(['check', '--batch', '--root', root, '--format', 'json', '--no-snapshot']);
+
+        } else {
         expect(argv.slice(0, 2)).toEqual(['check', '--changed']); const format = argv.indexOf('--format'); expect(format).toBeGreaterThan(2);
         for (const path of argv.slice(2, format)) expect(Object.hasOwn(owners, path), `unstated hook path ${path}`).toBe(true);
         expect(argv.slice(format, -1)).toEqual(['--format', 'json', '--deadline']);
         expect([String(testPolicy(root).commands.hookTimeoutMs), String(completionCheckDeadlineMs)]).toContain(argv.at(-1));
+        }
       }
       return super.run(argv, cwd, signal);
     }
