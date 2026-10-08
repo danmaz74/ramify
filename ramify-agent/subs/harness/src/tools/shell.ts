@@ -5,6 +5,7 @@ import { childEnvironment, runCommand, type CommandOutcome } from '../../subs/ev
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { classifyShellTestRun, shellTestDirectories } from './shell-tests.js';
+import { changesBetween, sharedMutationOrder, type MutationChange, type MutationLease, type MutationOrder, type MutationSnapshot } from '../hooks/mutation-order.js';
 
 /*
  * The engineer's shell.
@@ -81,6 +82,19 @@ export interface ShellResult {
   readonly outcome: CommandOutcome;
   readonly exitCode: number | null;
   readonly elapsedMs: number;
+  readonly change?: MutationChange | undefined;
+}
+
+/** Integrated callers settle mutation observations and checks before releasing the worktree. */
+export interface ShellMutationOptions {
+  /** The canonical project root, shared with guarded tools and completion checks. */
+  readonly worktree: string;
+  readonly order?: MutationOrder | undefined;
+  /** Reserve check/log identities synchronously before queueing or executing. */
+  readonly reserve?: ((call: ShellCall) => void) | undefined;
+  /** Actual complete content identities; omissions or errors remain unknown. */
+  readonly snapshot?: (() => Promise<MutationSnapshot>) | undefined;
+  readonly settled: (call: ShellCall, result: ShellResult, change: MutationChange, lease: MutationLease, signal: AbortSignal) => Promise<{ readonly text: string } | null>;
 }
 
 export interface ShellOptions {
@@ -104,6 +118,7 @@ export interface ShellOptions {
   readonly refused?: ((explanation: string) => Promise<void>) | undefined;
   /** The longest one command may run; the shell's own maximum when absent. */
   readonly maxTimeoutMs?: number | undefined;
+  readonly mutation?: ShellMutationOptions | undefined;
 }
 
 /**
@@ -130,6 +145,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
   }
   const running = new Set<Running>();
   let calls = 0;
+  let stopped = false;
   const maxTimeoutMs = options.maxTimeoutMs ?? shellMaxTimeoutMs;
   const inputSchema = shellInputSchemaFor(maxTimeoutMs);
   // A command asked for no timeout of its own gets the default, and never
@@ -154,6 +170,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
       return { kind: 'command', command: typeof command === 'string' ? command : null };
     },
     async execute(input: unknown, signal: AbortSignal): Promise<ToolResult> {
+      if (stopped || signal?.aborted) return { isError: true, text: 'Cancelled, nothing ran: the shell is stopped.' };
       const judged = await options.judge(input);
       if (!judged.ok) return { isError: true, text: judged.text };
       const request = inputSchema.parse(input);
@@ -178,6 +195,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
         await options.refused?.(explanation);
         return { isError: true, text: explanation };
       }
+      if (stopped || signal?.aborted) return { isError: true, text: 'Cancelled, nothing ran: the shell is stopped.' };
 
       calls += 1;
       const call: ShellCall = {
@@ -186,39 +204,76 @@ export function createShellTool(options: ShellOptions): ShellTool {
         timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
         outputFile: options.outputFile(calls),
       };
-      await options.starting(call);
-
+      options.mutation?.reserve?.(call);
       const controller = new AbortController();
-      const done = (options.commandExecution ?? runCommand)({
-        argv: ['bash', '-c', request.command],
-        cwd: options.workingDirectory,
-        env: childEnvironment(),
-        timeoutMs: call.timeoutMs,
-        outputFile: call.outputFile,
-        signal: signal === undefined ? controller.signal : AbortSignal.any([signal, controller.signal]),
-      });
+      const executionSignal = signal === undefined ? controller.signal : AbortSignal.any([signal, controller.signal]);
+      const execute = async (lease?: MutationLease): Promise<ToolResult> => {
+        executionSignal.throwIfAborted();
+        await options.starting(call);
+        const before = options.mutation === undefined ? null : await snapshot(options.mutation);
+        const began = Date.now();
+        let completed;
+        try {
+          completed = await (options.commandExecution ?? runCommand)({
+            argv: ['bash', '-c', request.command],
+            cwd: options.workingDirectory,
+            env: childEnvironment(),
+            timeoutMs: call.timeoutMs,
+            outputFile: call.outputFile,
+            signal: executionSignal,
+          });
+        } catch (error) {
+          // The production runner returns structured outcomes, but an injected
+          // executor can throw after changing files. Observe/settle that case
+          // before propagating the original error, without inventing output.
+          if (options.mutation !== undefined) {
+            await snapshot(options.mutation);
+            const change: MutationChange = { kind: 'unknown', reason: 'command executor rejected without established effect settlement' };
+            const result: ShellResult = {
+              outcome: { kind: 'runner-error', error: { kind: 'executor-rejected', message: error instanceof Error ? error.message : String(error) } },
+              exitCode: null, elapsedMs: Date.now() - began, change,
+            };
+            const settlementErrors: unknown[] = [];
+            try { await options.ended(call, result); } catch (failure) { settlementErrors.push(failure); }
+            try { await options.mutation.settled(call, result, change, lease!, executionSignal); } catch (failure) { settlementErrors.push(failure); }
+            if (settlementErrors.length > 0) throw new AggregateError([error, ...settlementErrors], 'command and mutation settlement failed', { cause: error });
+          }
+          throw error;
+        }
+        let change = before === null ? undefined : changesBetween(before, await snapshot(options.mutation!));
+        if (change?.kind === 'known' && change.paths.length === 0 && completed.outcome.kind !== 'completed') {
+          change = { kind: 'unknown', reason: `${completed.outcome.kind} command has no established complete mutation result` };
+        }
+        const exitCode = completed.outcome.kind === 'completed' ? completed.outcome.exitCode : null;
+        const result: ShellResult = { outcome: completed.outcome, exitCode, elapsedMs: completed.elapsedMs, ...(change === undefined ? {} : { change }) };
+        // Failed/cancelled commands may still have changed files. Their check
+        // belongs inside this lease, as does its observation settlement.
+        let hook: { readonly text: string } | null = null;
+        try { await options.ended(call, result); }
+        finally {
+          if (options.mutation !== undefined) hook = await options.mutation.settled(call, result, change!, lease!, executionSignal);
+        }
+        return {
+          isError: exitCode !== 0,
+          text: [
+            `$ ${request.command}`,
+            describeOutcome(completed.outcome, call.timeoutMs),
+            `Elapsed ${(completed.elapsedMs / 1000).toFixed(1)} s. Complete output: ${call.outputFile} (${completed.output.bytes} bytes${completed.output.truncated ? ', truncated at the cap' : ''}).`,
+            '',
+            completed.output.tail,
+            ...(hook === null || hook.text === '' ? [] : ['', hook.text]),
+          ].join('\n'),
+        };
+      };
+      const done = options.mutation === undefined ? execute()
+        : (options.mutation.order ?? sharedMutationOrder).run(options.mutation.worktree, execute, executionSignal);
       const entry: Running = { controller, done };
       running.add(entry);
-      let completed;
       try {
-        completed = await done;
+        return await done;
       } finally {
         running.delete(entry);
       }
-
-      const exitCode = completed.outcome.kind === 'completed' ? completed.outcome.exitCode : null;
-      await options.ended(call, { outcome: completed.outcome, exitCode, elapsedMs: completed.elapsedMs });
-
-      return {
-        isError: exitCode !== 0,
-        text: [
-          `$ ${request.command}`,
-          describeOutcome(completed.outcome, call.timeoutMs),
-          `Elapsed ${(completed.elapsedMs / 1000).toFixed(1)} s. Complete output: ${call.outputFile} (${completed.output.bytes} bytes${completed.output.truncated ? ', truncated at the cap' : ''}).`,
-          '',
-          completed.output.tail,
-        ].join('\n'),
-      };
     },
   };
 
@@ -228,11 +283,21 @@ export function createShellTool(options: ShellOptions): ShellTool {
       return calls;
     },
     async settle(): Promise<void> {
+      stopped = true;
       const pending = [...running];
       for (const entry of pending) entry.controller.abort();
       await Promise.allSettled(pending.map(entry => entry.done));
     },
   };
+}
+
+async function snapshot(options: ShellMutationOptions): Promise<MutationSnapshot> {
+  if (options.snapshot === undefined) return { kind: 'unknown', reason: 'no complete mutation snapshot was supplied' };
+  try {
+    return await options.snapshot();
+  } catch (error) {
+    return { kind: 'unknown', reason: `mutation snapshot unavailable: ${error instanceof Error ? error.message : String(error)}` };
+  }
 }
 
 /** How the command ended, in the agent's own terms. */

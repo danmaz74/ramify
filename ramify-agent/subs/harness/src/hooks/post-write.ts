@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { RamifyCheckResult, RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
+import { sharedMutationOrder, type MutationChange, type MutationLease } from './mutation-order.js';
 
 /*
  * The post-write hook check.
@@ -44,7 +45,7 @@ export interface HookPathDisposition {
 export interface HookCheck {
   readonly paths: readonly string[];
   readonly mode: HookMode;
-  /** The project verdict: exit 0, 1 or anything else. It says nothing about a path the provider did not analyze. */
+  /** The established project verdict. Incomplete/cancelled execution is not checked; per-path analysis stays separate. */
   readonly outcome: 'passed' | 'findings' | 'not-checked';
   readonly reason: string | null;
   /** Findings this check reported that no earlier check of this invocation had. */
@@ -157,6 +158,22 @@ export class FindingsSeen {
   private readonly standing = new Map<string, readonly HookFinding[]>();
   private readonly told = new Set<string>();
   private readonly written = new Set<string>();
+  private checksReserved = 0;
+  private readonly reservations = new WeakSet<HookCheckReservation>();
+
+  /** Reserve before awaiting a mutation/check; concurrent callers cannot reuse a log identity. */
+  reserveCheck(after = 0): HookCheckReservation {
+    this.checksReserved = Math.max(this.checksReserved, after) + 1;
+    const reservation = Object.freeze({ number: this.checksReserved });
+    this.reservations.add(reservation);
+    return reservation;
+  }
+
+  /** A reservation belongs to this invocation and is consumed at most once. */
+  claimCheck(reservation: HookCheckReservation): number {
+    if (!this.reservations.delete(reservation)) throw new Error('hook check reservation is foreign or already consumed');
+    return reservation.number;
+  }
 
   /** The findings not seen before, adding them all to what has been seen. */
   admit(findings: readonly HookFinding[]): HookFinding[] {
@@ -230,20 +247,39 @@ export class FindingsSeen {
   }
 }
 
+export interface HookCheckReservation {
+  readonly number: number;
+}
+
+/** Legal current-role submissions are supplied by the same contract as the validator. */
+export interface HookSubmissionPolicy {
+  readonly legalOutcomes: readonly string[];
+  readonly completionOutcome: string | null;
+}
+
 export interface HookCheckOptions {
   readonly ramify: RamifyCli;
   readonly projectRoot: string;
   /**
    * The paths the mutation changed, or `null` when the changed set could not
-   * be established — which is every call of the unguarded shell.
+   * be established. An empty list is proven no change, not uncertainty.
    */
-  readonly paths: readonly string[] | null;
+  readonly paths?: readonly string[] | null | undefined;
+  /** Explicit observation takes precedence over the older paths input. */
+  readonly change?: MutationChange | undefined;
+  /** Completion always checks, independently of mutation-triggered skips. */
+  readonly purpose?: 'mutation' | 'completion' | undefined;
   readonly hookTimeoutMs: number;
   readonly seen: FindingsSeen;
   /** Where the nth check of this invocation writes what the CLI printed. */
   readonly logFile: (check: number) => string;
   /** The number of checks this invocation has already run. */
   readonly ran: number;
+  /** An optional identity reserved before enqueueing the complete mutation lifecycle. */
+  readonly reservation?: HookCheckReservation | undefined;
+  /** Already held across mutation execution; avoids reacquiring its worktree lock. */
+  readonly lease?: MutationLease | undefined;
+  readonly submissions?: HookSubmissionPolicy | undefined;
   /**
    * Whether the warnings and analysis limits on the written files are
    * relayed. A check whose text reaches no one, such as the one at
@@ -274,11 +310,32 @@ export const completionCheckFileLimit = 400;
  * and what the engineer must be told.
  */
 export async function runHookCheck(options: HookCheckOptions): Promise<HookOutcome> {
+  const mutation = options.purpose !== 'completion';
+  if (mutation && options.change?.kind === 'refused') return { checks: [], gaps: [], text: null };
+  const requested = options.change?.kind === 'known' ? options.change.paths
+    : options.change === undefined ? options.paths ?? null : null;
+  if (mutation && requested !== null && requested.length === 0) return { checks: [], gaps: [], text: null };
+  // Reserve before any provider, scheduling or file-system await. Old callers
+  // can keep supplying ran; the invocation-owned counter is authoritative.
+  const checkNumber = options.seen.claimCheck(options.reservation ?? options.seen.reserveCheck(options.ran));
+  if (options.lease !== undefined) {
+    options.lease.assertHeld(options.projectRoot);
+    return performHookCheck(options, requested, checkNumber);
+  }
+  return sharedMutationOrder.run(options.projectRoot,
+    () => performHookCheck(options, requested, checkNumber), options.signal);
+}
+
+async function performHookCheck(options: HookCheckOptions, requested: readonly string[] | null, checkNumber: number): Promise<HookOutcome> {
+  if (options.signal?.aborted) return {
+    checks: [{ paths: requested ?? [], mode: requested === null || requested.length === 0 ? 'complete' : 'changed',
+      outcome: 'not-checked', reason: 'stopped', newFindings: 0, log: null, provider: null, dispositions: [] }],
+    gaps: [], text: 'Ramify hook check: not-checked (stopped). Nothing was verified by this check. It is not a pass.',
+  };
   const checks: ReportedCheck[] = [];
   const gaps: HookGap[] = [];
-  let ran = options.ran;
 
-  const paths = options.paths === null ? null : relativePaths(options.projectRoot, options.paths);
+  const paths = requested === null ? null : relativePaths(options.projectRoot, requested);
   // The warnings and analysis limits relayed concern what this invocation
   // wrote. A check whose text reaches no one records no write and relays nothing.
   const relay = options.relayNotices !== false;
@@ -287,28 +344,26 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
   let completeNeeded = false;
   if (paths === null || paths.length === 0) {
     completeNeeded = true;
-    gaps.push({
+    if (options.purpose !== 'completion') gaps.push({
       kind: 'changed-paths-unknown',
       detail: 'the mutation named no path the harness could establish, so a changed check covers nothing and a complete check was run',
     });
-    checks.push({
+    if (options.purpose !== 'completion') checks.push({
       paths: [], mode: 'changed', outcome: 'not-checked',
       reason: 'the changed set could not be established', newFindings: 0, log: null, provider: null, dispositions: [], ...nothingReported,
     });
   } else {
-    ran += 1;
-    const log = options.logFile(ran);
+    const log = options.logFile(checkNumber);
     const result = await options.ramify.checkChanged(paths, options.projectRoot, options.hookTimeoutMs, options.signal);
     await record(log, result);
-    checks.push(reported({ paths, mode: 'changed', log }, result, options.seen, relay));
+    checks.push(reported({ paths, mode: 'changed', log }, result, options.seen, relay, options.signal?.aborted === true));
   }
 
   if (completeNeeded) {
-    ran += 1;
-    const log = options.logFile(ran);
+    const log = options.logFile(checkNumber);
     const result = await options.ramify.checkComplete(options.projectRoot, options.signal);
     await record(log, result);
-    checks.push(reported({ paths: paths ?? [], mode: 'complete', log }, result, options.seen, relay));
+    checks.push(reported({ paths: paths ?? [], mode: 'complete', log }, result, options.seen, relay, options.signal?.aborted === true));
   }
 
   for (const check of checks) {
@@ -319,7 +374,7 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
   return {
     checks: checks.map(({ added: _added, repeated: _repeated, cleared: _cleared, unevaluated: _unevaluated, notices: _notices, retained: _retained, unsupported: _unsupported, ...check }) => check),
     gaps,
-    text: describe(checks),
+    text: describe(checks, options.submissions),
   };
 }
 
@@ -342,10 +397,12 @@ function reported(
   result: RamifyCheckResult,
   seen: FindingsSeen,
   relay: boolean,
+  cancelled = false,
 ): ReportedCheck {
   const decoded = result.provider !== null;
   const found = decoded ? findingsOf(result.report) : [];
-  const established = decoded && result.outcome !== 'not-checked';
+  const outcome = cancelled ? 'not-checked' : outcomeOf(result);
+  const established = decoded && outcome !== 'not-checked';
   const evaluated = result.execution === 'completed';
   const covered: readonly string[] | 'all' = !established ? []
     : result.form === 'complete' ? 'all'
@@ -382,8 +439,8 @@ function reported(
   const notices = decoded && relay ? seen.tell(noticesOf(result.report, seen.writtenPaths())) : [];
   return {
     ...check,
-    outcome: outcomeOf(result),
-    reason: result.reason,
+    outcome,
+    reason: cancelled ? 'stopped' : result.reason ?? (outcome === 'not-checked' ? result.execution : null),
     newFindings: added.length,
     provider: result.provider === null ? null : { schema: result.provider.schema, revision: result.provider.revision },
     dispositions: result.paths.map(path => ({
@@ -403,8 +460,9 @@ function sameViolation(a: HookFinding, b: HookFinding): boolean {
     && a.original?.owner === b.original?.owner && a.original?.file === b.original?.file && a.original?.binding === b.original?.binding;
 }
 
-/** Exit 0 is checked with nothing to report, 1 is findings, and anything else is not checked. */
+/** Incomplete execution establishes no verdict, even beside genuine diagnostics at exit 1. */
 function outcomeOf(result: RamifyCheckResult): HookCheck['outcome'] {
+  if (result.execution === 'incomplete' || result.execution === 'unavailable' || result.reason === 'changed-input') return 'not-checked';
   return result.outcome === 'checked' ? 'passed' : result.outcome === 'findings' ? 'findings' : 'not-checked';
 }
 
@@ -532,7 +590,7 @@ export function noticesOf(report: unknown, written: readonly string[]): HookNoti
  * A path the provider did not analyze is said to be not analyzed, whatever
  * the project verdict: a passing check verified nothing about it.
  */
-function describe(checks: readonly ReportedCheck[]): string | null {
+function describe(checks: readonly ReportedCheck[], submissions?: HookSubmissionPolicy): string | null {
   const added = unique(checks.flatMap(check => check.added));
   const standing = unique(checks.flatMap(check => check.repeated)).filter(finding => !added.some(other => other.identity === finding.identity));
   const cleared = unique(checks.flatMap(check => check.cleared))
@@ -543,12 +601,14 @@ function describe(checks: readonly ReportedCheck[]): string | null {
   if (added.length > 0) {
     lines.push(`${label(added.length)}. The iteration gate fails while ${added.length === 1 ? 'it stands' : 'they stand'}.`);
     for (const finding of added) lines.push(`- ${sentenceOf(finding)}`);
-    lines.push(remedyOf(added));
+    lines.push(remedyOf(added, submissions));
   }
   if (standing.length > 0) {
     lines.push(added.length > 0 ? `Also still standing (${standing.length}):` : `${label(standing.length)} still standing (${standing.length}):`);
     for (const finding of standing) lines.push(`- ${sentenceOf(finding)}`);
-    if (added.length === 0) lines.push(`Fix ${standing.length === 1 ? 'it' : 'them'}, or submit \`contract-needed\` or \`unsuitable\`. \`completion-proposed\` is refused while ${standing.length === 1 ? 'it stands' : 'they stand'}.`);
+    if (added.length === 0) lines.push(submissions === undefined
+      ? `Fix ${standing.length === 1 ? 'it' : 'them'}, or submit \`contract-needed\` or \`unsuitable\`. \`completion-proposed\` is refused while ${standing.length === 1 ? 'it stands' : 'they stand'}.`
+      : legalRemedy(standing, submissions));
   }
   if (cleared.length > 0) lines.push(clearedLine(cleared));
   const unevaluated = checks.flatMap(check => check.unevaluated === null ? [] : [check.unevaluated]);
@@ -692,7 +752,8 @@ export function sentenceOf(finding: HookFinding): string {
  * carries the same procedure at length; this is the reminder beside the
  * finding, not a second copy of it.
  */
-function remedyOf(findings: readonly HookFinding[]): string {
+function remedyOf(findings: readonly HookFinding[], submissions?: HookSubmissionPolicy): string {
+  if (submissions !== undefined) return legalRemedy(findings, submissions);
   const imported = findings.flatMap(finding => finding.original === null ? [] : [finding.original]);
   const owners = [...new Set(imported.map(original => original.owner))];
   const symbols = [...new Set(imported.map(original => `\`${original.binding}\``))];
@@ -706,10 +767,22 @@ function remedyOf(findings: readonly HookFinding[]): string {
  * Why a completion is refused while findings stand, for the submission's
  * validation error: the same sentences the edits carried.
  */
-export function openFindingsMessage(findings: readonly HookFinding[]): string {
+export function openFindingsMessage(findings: readonly HookFinding[], submissions?: HookSubmissionPolicy): string {
   const owners = [...new Set(findings.flatMap(finding => finding.original === null ? [] : [finding.original.owner]))];
   const outside = owners.length === 0 ? '' : ` Editing ${owners.map(owner => `\`${owner}\``).join(' or ')}'s module.ramify is outside your write scope.`;
-  return `${label(findings.length)} still standing; the iteration gate fails on ${findings.length === 1 ? 'it' : 'them'}. ${findings.map(sentenceOf).join(' ')} Fix ${findings.length === 1 ? 'it' : 'them'} and submit again, or submit \`contract-needed\` or \`unsuitable\` (reason \`scope\`).${outside}`;
+  return submissions === undefined
+    ? `${label(findings.length)} still standing; the iteration gate fails on ${findings.length === 1 ? 'it' : 'them'}. ${findings.map(sentenceOf).join(' ')} Fix ${findings.length === 1 ? 'it' : 'them'} and submit again, or submit \`contract-needed\` or \`unsuitable\` (reason \`scope\`).${outside}`
+    : `${label(findings.length)} still standing; the iteration gate fails on ${findings.length === 1 ? 'it' : 'them'}. ${findings.map(sentenceOf).join(' ')} ${legalRemedy(findings, submissions)}${outside}`;
+}
+
+function legalRemedy(findings: readonly HookFinding[], submissions: HookSubmissionPolicy): string {
+  const legal = [...new Set(submissions.legalOutcomes)].filter(kind => kind !== submissions.completionOutcome);
+  const alternate = legal.length === 0 ? '' : `, or submit ${legal.map(kind => `\`${kind}\``).join(' or ')}`;
+  const completion = submissions.completionOutcome !== null && submissions.legalOutcomes.includes(submissions.completionOutcome)
+    ? ` \`${submissions.completionOutcome}\` is refused while ${findings.length === 1 ? 'this stands' : 'these stand'}.` : '';
+  const owners = [...new Set(findings.flatMap(finding => finding.original === null ? [] : [finding.original.owner]))];
+  const foreign = owners.length === 0 ? '' : ` Use the available API view; never copy or derive foreign internals. ${owners.map(owner => `\`${owner}\``).join(' or ')}'s module.ramify remains outside your write scope.`;
+  return `Fix ${findings.length === 1 ? 'it' : 'them'} inside your write scope${alternate}.${completion}${foreign}`;
 }
 
 async function record(path: string, result: RamifyCheckResult): Promise<void> {
