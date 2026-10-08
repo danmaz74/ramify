@@ -79,25 +79,28 @@ This is that fixture and not this package's test framework, which is Vitest.
 
 ### The scenario harness
 
-`ramify-agent.json` beside `package.json` declares the package's scenario
-harness to ramify-agent: the support code Cucumber imports before any step
-file, `integration-tests`' World and hooks, and the command of each execution
-mode. It also declares that the type check prints `tsc`'s output, so a gate
-attributes a failed type check by where its errors lie. The mode is fixed for one run of the runner by `TEST_MODE` and never
-written into a scenario. `acceptance:quick` drives the configured system in
-process, through `createTestSystem`, as every other test does.
-`acceptance:full` reaches the same system through the real listener on a
-loopback port: the `BeforeAll` hook starts it with `startServedTestSystem`,
+The package's scenarios run in two modes, fixed for one run of the runner by
+`TEST_MODE` and never written into a scenario. `acceptance:quick` drives the
+configured system in process, through `createTestSystem`, as every other test
+does. `acceptance:full` reaches the same system through the real listener on
+a loopback port: the `BeforeAll` hook starts it with `startServedTestSystem`,
 which the root also exposes to its descendants, the typed client and the MCP
-sessions speak HTTP to it, and the `AfterAll` hook stops it. Full mode needs no
-browser and no `setup` or `teardown` command, and a dry run starts nothing. An
-MCP session's id is the one the listener's transport generated there, which
-the scenario compares against the id the server saw. `test:cucumber` runs
-quick mode under this package's own `cucumber.js` profile; a run of the
-harness passes its own profile instead.
+sessions speak HTTP to it, and the `AfterAll` hook stops it. Full mode needs
+no browser and no setup command, and a dry run starts nothing. An MCP
+session's id is the one the listener's transport generated there, which the
+scenario compares against the id the server saw. `test:cucumber` runs quick
+mode under this package's own `cucumber.js` profile.
+
+ramify-agent runs none of these scripts itself. A gate asks for the
+project's committed audit, whose configured Cucumber check runs the
+scenarios under the profile it commits; the fixture commits no audit
+definition, so the tests that drive a run over it answer each gate with a
+scripted configured audit. `ramify-agent.json` beside `package.json` declares
+only that the type check prints `tsc`'s output, so a standalone diagnosis
+attributes a failed type check by where its errors lie.
 
 Step definitions and feature files sit in the conventional directories the
-harness collects: a module's `src/tests/steps/` and `src/tests/features/`, or,
+harness writes feature files beneath and briefs engineers to use: a module's `src/tests/steps/` and `src/tests/features/`, or,
 for a testing module such as `integration-tests`, its `src/steps/` and
 `src/features/`.
 

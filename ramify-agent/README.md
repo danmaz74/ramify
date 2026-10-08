@@ -94,8 +94,8 @@ The module is named by its declared-name path, as the architect view names
 it, or by its project-relative directory; an unknown module is refused
 before any model call. The engineer gets what an implementation run gives
 its engineers: the engineer prompt, the module's API views, the write guard,
-the Ramify hook check after each edit, the shell, the scoped test tool and
-the validated submission. The prompt becomes the iteration's goal. The
+the Ramify hook check after each edit, the shell, which runs named test
+files and refuses a whole-suite run, and the validated submission. The prompt becomes the iteration's goal. The
 engineer may write the assigned owner's ordinary contents, with provider
 exclusions enforced at writes and candidate validation. A directory `--write`
 includes one whole immediate child or declared owned nested project, carrying

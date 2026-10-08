@@ -48,7 +48,8 @@ run.
   with the review of the scenarios; hypotheses as forecasts with standing
   and revision beside the decisions; work items, each with its reviews and
   CheckFindings (`src/check-findings.tsx`); the scenarios; checks with
-  bounded output tails and each scenario check's summary; capability
+  bounded output tails and the tracked scenario results read from each
+  gate's audit; capability
   progress; the run's sessions, each opening its transcript and each
   invocation its chapter; and the metrics with the evaluation evidence. The
   connection to the harness is shown apart from the run's state.

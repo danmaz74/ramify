@@ -28,10 +28,11 @@ remains a historical design boundary.
 in four places. The initial analysis also assigns the plan's Gherkin
 scenarios to entry capabilities and writes one for each entry that has none.
 A run started with the review stop waits for a person's approval after the
-analysis is accepted, the one human-review wait. Every committing gate runs
-a scenario check, and a work item completes only when its local architect
-has reported its scenarios done. The final gate runs every tracked scenario
-in full mode.
+analysis is accepted, the one human-review wait. Every committing gate asks
+for the project's committed audit, whose configured Cucumber check runs the
+scenarios without a pending tag, and a work item completes only when its
+local architect has reported its scenarios done. The final gate asks for a
+full audit, which runs every tracked scenario.
 
 The [metrics glossary](../metrics/glossary.md) distinguishes search space from
 its measurements. Here, an invocation's search space is its available source
@@ -936,8 +937,8 @@ Use a few explicit failure categories to select recovery:
 | Required change outside the assignment or to an established obligation | Return to the local architect for a scoped assignment or recorded obligation revision. |
 
 An invocation's idle bound measures the session's silence, not the harness's
-work. A command the harness runs for the session, such as a shell call or a
-scoped test run, holds the idle bound for the command's own timeout plus a
+work. A command the harness runs for the session, such as a shell call,
+holds the idle bound for the command's own timeout plus a
 margin, because that timeout already bounds it; the invocation's absolute
 bound is unchanged, so every command stays bounded.
 

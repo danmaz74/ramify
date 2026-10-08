@@ -11,6 +11,18 @@ declaration states with the architect-owned obligation states of its
 Sections 6 to 11 and the events table below describe that model; the
 decisions at the end record the v1 choices as they were made.
 
+**Scenario execution since Plan 21.** Iteration 9 of the same plan removed
+the harness's own scenario check. A project's scenarios run as a configured
+Cucumber check of its committed audit definition, `ramify-audit.json`, whose
+committed profile excludes `@ramify-pending`. Every committing gate asks for
+the project's committed audit of its candidate commit, and the provider
+selects that check and narrows it by ownership as it narrows Vitest. The
+tracked scenario results are read from the raw runner output for display
+only. `ramify-agent.json` has no `acceptance` section, readiness has no
+acceptance steps, and an engineer has no scoped test tool. Sections 0, 4 and
+6 to 11 and [the scenario check](#the-scenario-check) describe that model;
+decisions 4, 6 and 7 at the end record the v1 choices it replaced.
+
 **Where the implementation differs from this text.** The results record
 every deviation; these change what the document says:
 
@@ -73,26 +85,25 @@ and `unresolved` run states do not exist there yet.
   from `pending` where existing step definitions bind it, and only that
   architect's revision moves it back to `bound`. No gate result, repair exit,
   yield or source change moves a state.
-- **One Cucumber run per owner module, in the target project's own scenario
-  harness.** A project configuration file, `ramify-agent.json`, declares the
-  command of each execution mode and the support code that loads the world,
-  hooks and driver. A run imports that support code and one module's step
-  files and runs that module's feature files, so a scenario binds only to
-  definitions its owner wrote or imported. Sharing a definition with another
-  owner is an ordinary testing import, exposed with `expose-test`, which
-  Ramify verifies. Iteration gates run the scope's owners with scenarios
-  selected by identity tag; work-item gates run every module with untagged
-  scenarios in quick mode; the final gate runs them all in full mode.
+- **Scenarios run as a configured check of the project's committed audit.**
+  The project's `ramify-audit.json` declares a Cucumber check whose
+  committed profile excludes `@ramify-pending`. Every committing gate asks
+  for the project's committed audit of its candidate commit: the project's
+  default mode at iteration, contract and work-item gates, a full audit at
+  the final gate. The provider selects the check and narrows it by
+  ownership. Sharing a step definition with another owner is an ordinary
+  testing import, exposed with `expose-test`, which Ramify verifies.
 - **An integration scenario gets a work item at the common ancestor** once
   its sub-scenarios are reported done. Its engineer imports the
   sub-scenarios' step definitions there, through `expose-test`, and a failure
   of the scenario is that work item's to resolve.
-- **The harness reads Cucumber's message stream itself**, as a registered
-  check inside ramify-audit, and derives each scenario's result and the step
-  definitions that bound it.
+- **The harness reads the raw runner output the audit published** and
+  derives each tracked scenario's result and the step definitions that
+  bound it, for display only. The audit's composed verdict decides the
+  gate.
 - **A plan is finished** when every tracked scenario, integration scenarios
   included, is reported `done` and carries no pending tag, and the final
-  gate, which runs every scenario in full mode beside the project's tests,
+  gate, a full audit of the project's configured checks, scenarios included,
   its type check and a complete Ramify check, passes. Its scenario results
   are raw evidence, never matched to the states.
   Completion can await user review of non-functional plan deviations before
@@ -113,11 +124,10 @@ They are defined in the [glossary](../glossary.md).
 | Sub-scenario | An entry scenario the architect derived from an integration scenario, ideally by picking its steps verbatim. |
 | Bridging Given | A `Given` in a sub-scenario that replaces another entry's action with the state it leaves. |
 | Step definition | The TypeScript that Cucumber matches a step's text to. Agents write step definitions; they never write scenarios. |
-| Binding | The set of step definitions a run matched to a scenario's steps, read from Cucumber's message stream. A run loads only the owner's step files, so every binding definition is one of them or reachable from their imports. |
-| Scenario harness | The target project's world, driver, hooks and the two scripts that run scenarios in quick and full mode. |
-| Execution mode | `quick` or `full`, fixed for one run of the runner and never written into a scenario. |
+| Binding | The set of step definitions a run matched to a scenario's steps, read from the Cucumber run a gate's audit published. |
+| Scenario harness | The target project's world, driver, hooks and the configured Cucumber check of its committed audit definition that runs its scenarios. |
 | Identity tag | `@ramify-sc-NNN`, the tag that names one tracked scenario in the source. |
-| Pending tag | `@ramify-pending`, the tag that keeps a scenario out of every run that does not select it by identity. The harness manages it. |
+| Pending tag | `@ramify-pending`, the tag the harness keeps on a `pending` scenario, which the project's committed Cucumber profile excludes. |
 
 ## What v1 leaves out
 
@@ -135,10 +145,7 @@ They are defined in the [glossary](../glossary.md).
 - Composition duties for the integration work item beyond binding its one
   scenario and repairing what that binding reveals.
 - Scenario names in the architect view's `tests.jsonl`.
-- Parallel Cucumber workers, module-scoped selection in ramify-audit, and
-  reuse of a gate's scenario results by a later gate.
-- A project without a scenario harness. Readiness fails it, as it fails a
-  project without Vitest today.
+- Parallel Cucumber workers.
 
 ## The run, stage by stage
 
@@ -149,89 +156,86 @@ start -> capture the plan, its scenarios included
       -> initial analysis: entries, hypotheses, scenarios per entry
       -> analysis accepted: scenario text frozen
       -> awaiting review, when asked for; approve or stop
-      -> readiness: baseline, plus the scenario harness and its baseline
+      -> readiness: a configured full audit of HEAD, scenarios included
       -> run branch; feature files materialized and committed
       -> work items: iterations bind and declare; gates verify
-      -> final gate: every scenario, full mode, none pending
+      -> final gate: a full audit, every scenario reported done
       -> completed
 ```
 
 ### 0. What the target project provides
 
-The scenario harness is the target project's, as decided. The project
-declares it in a configuration file, `ramify-agent.json`, beside
-`package.json` and `module.ramify`. The harness reads nothing else about the
-project's scenarios, and the file holds only what the harness cannot derive.
+The scenario harness is the target project's, as decided. Its scenarios run
+as a configured Cucumber check of the project's committed audit definition,
+`ramify-audit.json`, under a Cucumber profile the project commits. The
+profile excludes `@ramify-pending`, so a scenario nothing has bound or
+reported done never runs. ramify-agent's own project declares the profile in
+`cucumber.json`:
 
 ```json
 {
-  "schema": "ramify-agent.project/1",
-  "acceptance": {
-    "support": [
-      "src/tests/support/world.ts",
-      "src/tests/support/hooks.ts"
-    ],
-    "modes": {
-      "quick": { "command": ["npm", "run", "acceptance:quick", "--"] },
-      "full": {
-        "command": ["npm", "run", "acceptance:full", "--"],
-        "setup": ["npm", "run", "acceptance:server:start"],
-        "teardown": ["npm", "run", "acceptance:server:stop"],
-        "readiness": "dry-run"
-      }
-    }
+  "default": {
+    "paths": ["src/tests/features/**/*.feature", "subs/*/src/tests/features/**/*.feature"],
+    "import": ["src/tests/steps/**/*.ts", "subs/*/src/tests/steps/**/*.ts"],
+    "tags": "not @ramify-pending"
   }
 }
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `acceptance.support` | The files Cucumber imports before any step file, in order: the world constructor, the hooks, the driver. Globs are allowed. They are ordinary testing source of the module whose test area holds them. |
-| `acceptance.modes.<mode>.command` | The argv that starts `cucumber-js` in that mode, with the mode's environment and loader, such as `TEST_MODE` and `--import tsx`, and passes the arguments the harness appends through to it. Both `quick` and `full` are required. |
-| `acceptance.modes.<mode>.setup`, `teardown` | Optional. Run once per gate attempt before the mode's first run and after its last, so a server or a database started for full mode serves every module's run. Without them, each run starts what its hooks start. |
-| `acceptance.modes.full.readiness` | `dry-run`, the default, or `run`: whether readiness executes full mode or only loads it. See [readiness](#4-readiness). |
-| `setup` | Optional. The project's setup commands, such as its build, in order: each `{ name?, command, cwd?, timeoutMs?, env? }`, where `command` is a non-empty argv, `cwd` a directory inside the project relative to its root (the root by default), `timeoutMs` a positive bound (ten minutes by default) and `env` names and values added to the command's environment. Every gate runs them before its other commands; see [setup commands](#setup-commands). |
-| `typeCheck.output` | Optional historical command-format metadata (`tsc`). New runs retain the producer diagnostics and route a failed iteration check to its engineer for bounded repair; diagnostic locations do not assign repair ownership. |
-| `timeouts` | Optional. The gate's command timeouts for this project, in milliseconds, each a positive integer of at most 7,200,000 (two hours): `typeCheck`, `tests` (the project's tests and each nested package's), `scopedTests` (the scoped test run, which `run_scope_tests` uses too) and `ramifyCheck`. Each replaces the harness's own timeout of that command in the policy `start-run` captures into `job.json`; a command it does not name keeps the harness's. A project whose suite runs longer than the harness's 900 s declares `"timeouts": { "tests": 1800000 }`. |
+and the check in `ramify-audit.json`:
+
+```json
+{
+  "id": "agent-scenarios",
+  "executor": { "kind": "command", "commands": [
+    { "name": "scenarios", "cmd": "npm", "args": ["run", "test:scenarios"], "parser": "cucumber", "timeoutMs": 600000 }
+  ] },
+  "dependsOn": ["agent-typecheck"]
+}
+```
+
+The harness writes no profile, passes no tag and selects nothing. Every
+committing gate asks the installed provider for the project's committed
+audit of its candidate commit, and the provider selects the configured
+checks and narrows Vitest and Cucumber by ownership. The profile and the
+definition are guarded configuration, so no agent changes what a gate runs.
 
 What the harness derives without configuration:
 
 | Convention | Rule |
 | --- | --- |
-| Step definitions | Under a module's `src/tests/steps/`, or a testing module's `src/steps/`. The harness imports these directories for every module of the architect view. |
-| Feature files | Under a module's `src/tests/features/`, or a testing module's `src/features/`. The harness collects these for every module and writes the plan's files beneath them. |
-| Shared step definitions | A step definition lives in the module whose scenarios it binds. A module that needs another owner's definitions imports them by name from a step file that owner exposes with `expose-test`, re-exposed along the path as any testing symbol is. ESM evaluates a file once per process, so the definitions register once. A step text defined twice within one run is `ambiguous` and fails the gate. |
+| Step definitions | Under a module's `src/tests/steps/`, or a testing module's `src/steps/`. The engineer's briefing names the owner's directory. |
+| Feature files | Under a module's `src/tests/features/`, or a testing module's `src/features/`. The harness writes the plan's files beneath them; the project's committed profile must collect them. |
+| Shared step definitions | A step definition lives in the module whose scenarios it binds. A module that needs another owner's definitions imports them by name from a step file that owner exposes with `expose-test`, re-exposed along the path as any testing symbol is. A step text defined twice within one run is `ambiguous` and fails the check. |
 | World and driver | Exposed to descendants through `expose-test`, so step definitions in any module build on them under ordinary Ramify rules. |
 
-The project's own Cucumber profile, `cucumber.js` or a variant, is not read.
-The harness passes a profile of its own with `--config`, so a gate's run does
-not depend on what the project's profile adds, such as an HTML report written
-into the worktree, a `--parallel` setting or a `@wip` filter. A project that
-runs its scenarios by hand keeps its profile for that.
-
 A project whose outside is a CLI or an API provides a driver for that; the
-harness never sees the driver. Quick and full mode are the project's
-definitions, as in cucumber-viz's template applications: JSDOM against an
-in-process router with an in-memory database, and a real browser against a
-running server.
+harness never sees the driver. How a project runs its scenarios, in process
+or against a running server, is the committed check's business.
 
-The configuration file is read at `start-run`, validated against its schema,
-captured into `job.json` beside the run policy, and guarded like
-`package.json`: an agent's change to it is a guarded change. The file is
-designed to hold later settings, such as the test and type-check commands the
-policy hardcodes today; v1 moves nothing into it that this design does not
-need. A project whose type check is `tsc` may declare so:
+The project's configuration file, `ramify-agent.json`, beside `package.json`
+and `module.ramify`, holds only what the harness cannot derive, all of it
+optional, and names no test and no scenario:
 
 ```json
 {
   "schema": "ramify-agent.project/1",
-  "typeCheck": { "output": "tsc" },
-  "acceptance": { "...": "as above" }
+  "typeCheck": { "output": "tsc" }
 }
 ```
 
-The gate then reads `tsc`'s error lines, in its plain form
-`path(line,col): error TSnnnn: message` or its pretty form
+| Field | Meaning |
+| --- | --- |
+| `setup` | Optional. The project's setup commands, such as its build, in order: each `{ name?, command, cwd?, timeoutMs?, env? }`, where `command` is a non-empty argv, `cwd` a directory inside the project relative to its root (the root by default), `timeoutMs` a positive bound (ten minutes by default) and `env` names and values added to the command's environment. Readiness requires them to equal the committed definition's workspace setup commands; see [setup commands](#setup-commands). |
+| `typeCheck.output` | Optional. The format the type check prints, `tsc`, from which a standalone diagnosis attributes a failed type check by the locations of its errors. |
+| `timeouts` | Optional. A standalone diagnosis's command timeouts, in milliseconds, each a positive integer of at most 7,200,000 (two hours): `typeCheck` and `ramifyCheck`. Each replaces the harness's own timeout of that command. |
+
+An `acceptance` section, `timeouts.tests` or `timeouts.scopedTests` makes the
+file invalid. The file is read at `start-run`, validated against its schema,
+captured into `job.json` beside the run policy, and guarded like
+`package.json`: an agent's change to it is a guarded change. With
+`typeCheck.output: "tsc"` a standalone diagnosis reads `tsc`'s error lines,
+in its plain form `path(line,col): error TSnnnn: message` or its pretty form
 `path:line:col - error TSnnnn: message`, and passes over blank and indented
 lines, the pretty form's code excerpt and summary, npm's `> ` banner and its
 `npm error`, `npm ERR!` and `npm warn` lines. Each path is read relative to
@@ -240,42 +244,26 @@ the command's working directory.
 #### Setup commands
 
 A project whose tests need a build output the repository ignores, such as
-`dist/`, declares the commands that make it:
+`dist/`, declares the commands that make it as the workspace setup commands
+of its committed audit definition. ramify-audit's `nodejs` preparation links
+the installed dependencies of the project and of each declared package into
+the worktree of every audited commit, then runs the commands there, their
+output captured and published with the audit's evidence. Readiness runs the
+same commands in place in the run working tree as its `declared-preparation`
+step, and fails where `ramify-agent.json`'s `setup` names other commands. A
+standalone session's in-place diagnosis runs `ramify-agent.json`'s `setup`
+before its type check and Ramify check, as commands of kind `setup`; a setup
+command named `build` is shown as the build.
 
-```json
-{
-  "schema": "ramify-agent.project/1",
-  "setup": [
-    { "name": "build", "command": ["npm", "run", "build"], "timeoutMs": 900000 },
-    { "command": ["npm", "run", "build"], "cwd": "packages/ui", "env": { "NODE_ENV": "production" } }
-  ],
-  "acceptance": { "...": "as above" }
-}
-```
-
-Every gate runs them first, in order, as commands of kind `setup`, recorded,
-announced with `gate-command-started` and shown like any other command; a
-setup command named `build` is shown as the build. Readiness and a
-standalone session's gate run them in place at the project root, and
-readiness records them as its `baseline-setup` step. A committing gate
-forwards them to ramify-audit: its `nodejs` preparation links the installed
-dependencies of the project and of each nested package into the worktree of
-the committed revision, then runs the commands there, their output captured
-beside the attempt and published with the audit's evidence.
-
-Once a setup command has not passed, no later command of the gate runs, and
-each is recorded as not verified for that reason, never as a selection that
-found nothing. A setup command that ran and exited non-zero fails the
-attempt: after readiness passed, the change since the last passing state is
-the assignment's own, so the failure is `in-scope` and the engineer repairs
-it, briefed with the command, its exit code and the end of what it printed.
-A work-item or final gate follows its own next step. One that timed out,
-could not start or was stopped is infrastructure, and takes the bounded
-retry. At readiness, a setup command that exits non-zero fails readiness
-with the end of its output and no recovery; one that timed out is rerun.
-ramify-audit stops the whole process tree of a setup command that timed out
-or was cancelled, and the command's record and briefing say how, and that
-its output may be incomplete where its output streams stayed open.
+Once a setup command has not passed, no check of the audit runs after it. A
+setup command that ran and exited non-zero fails a committing gate as
+`check-failed`: after readiness passed, the change since the last passing
+state is the assignment's own, so the engineer repairs it, briefed with the
+gate's digest. One that timed out is `not-verified` with cause `timeout`;
+one that could not start or was stopped is infrastructure. At readiness, a
+setup command that exits non-zero fails readiness with the end of its
+output and no recovery; one that timed out is rerun. ramify-audit stops the
+whole process tree of a setup command that timed out or was cancelled.
 
 A setup command must not install dependencies: the audited worktree already
 links the project's installed ones, and a package manager would follow the
@@ -283,14 +271,13 @@ link and change or empty the project's own installation. ramify-audit
 refuses an installing command (`npm ci`, `pnpm install`, a bare `yarn` and
 the like) where its working directory, or one up to four levels below it,
 has a linked `node_modules`, so readiness refuses one first, at
-`baseline-setup`, before any command runs and with no recovery, saying what
+`declared-preparation`, before any command runs and with no recovery, saying what
 to remove from `setup`. Should a committing gate meet the refusal all the
 same, it is infrastructure, with ramify-audit's message.
 
-The `collection-review` fixture needs the configuration file, a full mode and
-the two scripts; its quick mode is the in-process `createTestSystem` its one
-existing scenario already uses. Its `test:cucumber` script stops being
-reported as an unsupported runner once the file names the acceptance modes.
+The `collection-review` fixture commits no audit definition: the tests that
+drive a run over it answer each gate with a scripted configured audit, and
+its `ramify-agent.json` declares only its type check's output.
 
 ### 1. Plan capture
 
@@ -416,20 +403,21 @@ gains that section; the records are enough for it.
 
 ### 4. Readiness
 
-Readiness gains four steps, in this order after `test-runner`:
+Readiness has no acceptance step of its own. It verifies the project root,
+removes stale scratch, and requires a clean repository, the compiler
+configuration, a valid `ramify-agent.json` and an answering Ramify command
+line. Then:
 
 | Step | Verifies | On failure |
 | --- | --- | --- |
-| `project-config` | `ramify-agent.json` exists and validates against `ramify-agent.project/1`; every `support` entry matches at least one file inside a module's test area. | `readiness-failed`, reason `project-config-invalid`, with the schema's message. Not a code-repair assignment. |
-| `acceptance-runner` | `node_modules/.bin/cucumber-js` exists; each mode's `command` resolves, which for `npm run <script>` means the script exists. | `readiness-failed`, reason `acceptance-harness-missing`, after the usual recoveries. |
-| `baseline-acceptance` | One quick run per module with feature files, with `not @ramify-pending`, over the project's existing scenarios, passes strictly. | As `baseline-tests`. The plan's feature files are not written yet, so this is the project's own regression acceptance. |
-| `acceptance-full` | With `readiness: dry-run`, the full-mode command with `--dry-run`, once per module, loads every step file and reports no `undefined` or `ambiguous` step. With `readiness: run`, the same runs execute and pass strictly. | As `baseline-tests`. A dry run runs no hook and no `setup`, so a full mode that starts servers costs nothing under the default. |
+| `audit-config` | The committed `ramify-audit.json` at HEAD has the policy `start-run` captured. | `readiness-failed`; reconcile the configuration and start a new run. |
+| `declared-packages` | Every package directory the definition declares is installed. | One bounded reinstall, then `readiness-failed`. |
+| `declared-preparation` | The definition's workspace setup commands pass in the run working tree, and `ramify-agent.json`'s `setup`, where present, names the same commands. | `readiness-failed` with the end of the command's output. |
+| `configured-full-audit` | The provider's full audit of HEAD completes with the composed verdict `pass`. Its configured scenario check runs the project's own scenarios and any tracked one already bound. | `readiness-failed`; an audit that does not complete takes the bounded recovery. |
 
-The default is the dry run because executing full mode costs a browser and a
-database for a baseline the final gate will establish anyway, and the dry run
-catches the likeliest defect, a step file that does not load under full mode.
-A project whose full mode is cheap, or whose runs are long enough that a
-broken full mode must be found first, sets `run`.
+The plan's feature files are not written yet, so the full audit is the
+project's own regression acceptance, and its gate attempt is the baseline. A
+project whose committed audit has no Cucumber check runs no scenario.
 
 ### 5. Materialization
 
@@ -489,9 +477,10 @@ gate is a guarded change, so the tracked feature files join the guarded list
 of every assignment with the hash of their expected rendering, and the write
 guard refuses agent edit and write calls to them outright.
 
-`ramify-agent.json` joins the guarded list, in both places it is kept, and
-so do the files named by `acceptance.support`. The project's own Cucumber
-profiles stay guarded as `cucumber.js` is today, although no gate reads them.
+`ramify-agent.json` and `ramify-audit.json` join the guarded list, in both
+places it is kept, and so does the project's Cucumber configuration
+(`cucumber.js`, `.cjs`, `.mjs`, `.json`, `.yaml` or `.yml`), whose profile
+decides what the configured scenario check runs.
 
 ### 6. A work item
 
@@ -514,9 +503,10 @@ The engineer's briefing carries, for each scenario of its work item's entry
 that is not `done`, the text, the feature file's path, the state, and three
 rules: write step definitions in `src/tests/steps/` of a module within the
 write scope; never edit a feature file; bind each assigned scenario in the
-proposal, naming the fakes it relies on, which `run_scope_tests` can show
-running in quick mode. Provider work items have no scenarios, and their
-briefings say nothing about them.
+proposal, naming the fakes it relies on. It has no scoped test tool: the
+briefing names its owners' test areas, and it runs named test files through
+`shell`, which refuses a whole-suite run. Provider work items have no
+scenarios, and their briefings say nothing about them.
 
 ### 7. Binding, and the iteration gate
 
@@ -532,19 +522,19 @@ submission }`) before the iteration gate. A `pending` obligation becomes
 `bound`; a `done` one stays `done` and records the new list. The architect
 sees each binding's fakes with its provenance.
 
-Then the gate runs as today: the harness compares guarded files, re-renders
-the feature files, so a bound scenario loses its pending tag in the gate's
-own commit, commits, and the audit runs the checkpoint's checks over that
-commit. The scenario check is one of them, described
-[below](#the-scenario-check). For the `iteration` and `contract` checkpoints
-it selects, by identity tag, the scope's owners' scenarios without a pending
-tag and the pending ones the assignment names, and runs them strictly in
-quick mode.
+Then the gate runs: the harness compares guarded files, re-renders the
+feature files, so a bound scenario loses its pending tag in the gate's own
+commit, commits, and asks for the project's committed audit of that commit
+in the project's default mode. The provider selects the configured checks,
+the scenario check among them, and narrows them by ownership; a scenario
+that still carries its pending tag is excluded by the committed profile.
+See [the scenario check](#the-scenario-check).
 
 A pass leaves every state as it is: a bound scenario stays `bound` until its
-architect reports it. On a failure the ordinary repair rounds apply, and the
-repair briefing carries the raw failures, every result and the runner's
-complete diagnostics, with no cause inferred. Exhaustion, a placement request
+architect reports it. On a failure the same engineer session continues with the gate's
+digest: the audit's checks, the end of what each failing one printed and
+every tracked scenario result read from the raw runner output, with no cause
+inferred. Exhaustion, a placement request
 or a yield leaves every state as it is; nothing is withdrawn.
 
 ### 8. Providers, fakes and bound scenarios
@@ -568,14 +558,14 @@ answers in the same turn with the reports, an assignment or a blocker, and
 an exhausted bound fails the run as `invalid-submission` naming the IDs
 still owed. Its own reports are applied first, so a completion request that
 reports the last scenario done is not rejected for it. The
-`work-item` gate then runs every module that has feature files, one quick run
-each with `not @ramify-pending`, strictly, and `work-item-completed` requires
-that gate's pass.
+`work-item` gate then asks for the project's committed audit of its
+candidate commit in the project's default mode, and `work-item-completed`
+requires that gate's pass.
 
-Those runs include the project's own scenarios and every earlier work item's
-bound and done ones, so each work-item gate is also the regression acceptance
-of the whole project in quick mode. A failure fails the gate and leaves every
-state as it is.
+The provider's selection includes the project's own scenarios and every
+earlier work item's bound and done ones wherever the change reaches them,
+so each work-item gate is also regression acceptance. A failure fails the
+gate and leaves every state as it is.
 
 ### 10. Integration scenarios
 
@@ -602,7 +592,7 @@ shared through the testing tag. That decision is why v1 has this work item:
 one per integration scenario, created when it becomes due.
 
 When the scenario fails, the failure reaches the work item's repair rounds
-raw, with every result and the runner's complete diagnostics; the harness
+raw, with every result read from the runner's output; the harness
 generates no composition diagnosis and names no suspect step. The agents
 investigate it, through the ordinary repair rounds, then the local
 architect's placement and delegation paths, or `unresolved`. The run cannot
@@ -610,12 +600,13 @@ complete around it: the work item must complete like every other.
 
 ### 11. The final gate
 
-The `final` checkpoint runs every module's feature files in full mode, one
-run per module, with no tag filter and strictly. Its harness rule requires
-that every tracked scenario is reported `done` before the run; its failure,
-`acceptance-incomplete`, fails the run with evidence rather than returning
-anywhere. `job-completed` then requires, beside its present conditions, a
-passing final attempt. Its scenario check results are recorded as raw
+The `final` checkpoint asks for a full audit of its candidate commit: every
+configured check, the scenario check over every feature file the committed
+profile collects. Its harness rule requires that every tracked scenario is
+reported `done` before the run, so none carries the pending tag; its
+failure, `acceptance-incomplete`, fails the run with evidence rather than
+returning anywhere. `job-completed` then requires, beside its present
+conditions, a passing final attempt. Its scenario results are display
 evidence and never matched to the states.
 
 ### 12. Stop, crash and recovery
@@ -629,113 +620,73 @@ evidence and never matched to the states.
   commit is retried. `scenarios-materialized` is recorded as an effect with
   an intent line first, as gate commits are, so a crash between the commit
   and the record finds the commit by its trailer.
-- **A crash during the scenario check** is the audit's interrupted attempt,
-  as today, and the retry audits the same commit.
+- **A crash during a gate's audit** is the audit's interrupted attempt, and
+  the retry asks again about the same commit.
 
 ## The scenario check
 
-One new check kind, `scenarios`, planned by `checkpointPolicies` beside
-`tests`, `type-check` and `ramify-check`, and executed by the same registered
-executor under an ID such as `check-03-scenarios`. Readiness plans it through
-the in-place runner.
+The harness has no scenario check of its own. The project's committed audit
+definition declares a Cucumber check, and the project's committed profile
+decides what it collects and loads; the profile excludes `@ramify-pending`.
 
-| Checkpoint | Mode | Modules run | Selection within each run | Strict |
-| --- | --- | --- | --- | --- |
-| `readiness` | quick | every module with feature files | `not @ramify-pending` | yes |
-| `iteration`, `contract` | quick | the scope's owners that have non-pending scenarios | identity tags of those scenarios | yes |
-| `breaking-iteration`, `work-item` | quick | every module with feature files | `not @ramify-pending` | yes |
-| `final` | full | every module with feature files | everything | yes |
+| Checkpoint | Audit asked for | What runs |
+| --- | --- | --- |
+| `readiness` | full, of HEAD, not committing | every configured check |
+| `iteration`, `contract`, `breaking-iteration`, `work-item` | the project's default, of the candidate commit | the checks and owners the provider selects |
+| `final` | full, of the candidate commit | every configured check |
 
-An iteration or contract gate whose scope holds no non-pending scenario plans
-no scenario check and records `scenarios: none-selected`; an empty selection
-is not a failure there, unlike an empty test selection.
+The provider's default for a Ramify project is `ramify-partial` from its
+baseline, falling back to a full audit where it has none, and full for any
+other project. It narrows Vitest and Cucumber by ownership, so a gate runs
+the scenarios of the owners its change reaches. Applicable reuse of an
+earlier record keeps the requested commit, the audited commit, the report
+refs and the ignored changed paths. A run whose captured audit policy no
+longer matches the committed definition is refused: the policy is
+everything the run captured except the commit.
 
-**One run per module.** A run imports the configured support files and one
-module's step files, and runs that module's feature files. Nothing else is
-loaded, so a scenario can bind only to definitions its owner wrote or
-reached through an import, and those imports are what Ramify verifies. The
-runs of one attempt execute one after another; `setup` and `teardown` of the
-mode, when configured, run once around them.
+**The verdict.** The audit's composed verdict is the gate's answer: `fail`
+fails the gate as `check-failed`, and an audit that did not complete or was
+indeterminate is `not-verified`, caused by a timeout or by infrastructure.
+`undefined`, `pending` and `ambiguous` steps fail the scenario check as the
+provider's Cucumber parser reports them. A harness rule or an unauthorized
+guarded change fails a passing audit.
 
-**The profile and the command.** For each run the harness writes a Cucumber
-profile into the attempt's directory, outside the worktree, and runs the
-mode's configured command with it. Both are built from the captured
-configuration and the refreshed architect view, and the audit's existing path
-mapping rebases them into its worktree:
-
-```js
-// <attempt-dir>/scenarios/subs-customers.profile.mjs, written by the harness
-export default {
-  import: [
-    'src/tests/support/world.ts',               // acceptance.support, in order
-    'src/tests/support/hooks.ts',
-    'subs/customers/src/tests/steps/**/*.{ts,js}',   // this module's step files
-  ],
-  paths: ['subs/customers/src/tests/features'],  // this module's feature files
-  tags: '<expression>',
-  strict: true,
-  format: ['message:<attempt-dir>/scenarios/subs-customers.ndjson'],
-};
-```
-
-```text
-<acceptance.modes.<mode>.command> --config <attempt-dir>/scenarios/<module>.profile.mjs [--dry-run]
-```
-
-A testing module's step and feature directories are its `src/steps/` and
-`src/features/`. `cucumber-js` loads the project's own default profile only
-when no `--config` is given, so nothing of it reaches a gate; the configured
-`support` entries are the whole of what the project contributes to a run
-beyond the mode's command. Each profile is recorded with the attempt, so
-what a gate ran is readable afterwards. Timeouts: 600 s per quick run,
-1,800 s per full run, and the attempt's bound is their sum over the modules
-run, plus `setup` and `teardown`.
-
-**The result.** The executor reads the message stream, not the exit code
-alone, and answers the audit and the attempt with a `ScenarioCheckSummary`:
+**The results.** `checks/scenario-results.ts` reads the raw runner output
+of every Cucumber command the provider published, identifies each tracked
+scenario by its identity tag and counts the project's own scenarios by
+outcome:
 
 ```yaml
-mode: quick
-selection: { kind: identity, scenarios: [sc-001, sc-003] }   # or all-untagged, all
-excluded: 4                 # tracked scenarios the pending tag kept out
-runs:
-  - { module: subs/customers, exit: 0, profile: scenarios/subs-customers.profile.mjs, messages: scenarios/subs-customers.ndjson }
-scenarios:
-  - id: sc-001
-    run: subs/customers
-    status: passed          # passed | failed | undefined | pending | ambiguous | skipped
-    file: subs/customers/src/tests/features/send-customer-email/send-customer-email.feature
-    line: 9
-    binding:
-      - { step: "Given a customer with the address ada@example.com", definition: "subs/customers/src/tests/steps/customers.steps.ts:12" }
-    failure: { step: "Then ...", message: "..." }             # when failed
-untracked: { passed: 11, failed: 0 }   # the project's own scenarios, by count
+- id: sc-001
+  check: scenarios                # the configured check, and the command that ran it
+  status: passed                  # passed | failed | undefined | pending | ambiguous | skipped
+  file: subs/customers/src/tests/features/send-customer-email/send-customer-email.feature
+  line: 9
+  binding:
+    - { step: "Given a customer with the address ada@example.com", definition: "subs/customers/src/tests/steps/customers.steps.ts:12" }
+  failure: { step: "Then ...", message: "..." }   # when failed
+  undefined: []                   # step texts no definition matched
 ```
 
-A scenario's status is the worst of its pickles. The check passes when every
-run exited zero, every selected tracked scenario `passed` and every untracked
-scenario passed. `undefined`, `pending` and `ambiguous` are failures;
-`--strict` already makes the runner say so, and the reducer says which
-scenario.
+A scenario's status is the worst of its steps. These results are display
+only: they never move a scenario's state, and never create or withdraw a
+report or a CheckFinding.
 
 **Binding is recorded, not policed.** Each scenario's `binding` names the
 file of every definition that bound a step. A definition outside the owner's
-own step files reached the run through an import, which Ramify verified; the
-local architect sees it in the gate section, which is enough for v1. One gap
-belongs to Ramify rather than the harness: a symbol-free import of another
-owner's step file loads it without exposure under the source interpretation
-rules, so the engineer's briefing asks for a named import, and a rule on
-symbol-free loads of testing source is the toolkit's to add if it matters.
+own step files reached the run through an import, which Ramify verified, or
+through the project's profile; the local architect sees it in the gate
+section, which is enough for v1. A symbol-free import of another owner's
+step file loads it without exposure under the source interpretation rules,
+so the engineer's briefing asks for a named import.
 
-**Diagnostics.** The engineer's repair briefing and the local architect's
-gate section carry, per failing scenario, its name, file and line, the failing
-step, its message and, for `undefined`, the step text with no definition. The
-attempt keeps the full stream at `output.path`.
-
-**ramify-audit's own Cucumber summary** (`CUCUMBER_SUMMARY_FILE`, which treats
-`undefined` as a passing warning) is not used. The harness is a registered
-executor and reports its own summary, so the strict rule holds whatever the
-library would infer. That settles the sixth open question without a spike.
+**Diagnostics.** The gate's digest names the audit request, its modes, the
+composed verdict and any reuse, then each published check: one line where
+it passed, the provider's record and the end of what it printed where it
+did not. Where a tracked scenario did not pass, it lists every tracked
+result with its file and line, failing step, message and undefined steps,
+and counts the project's own failures. A passing gate's digest carries the
+binding of each scenario it passed.
 
 ## Records, events and projections
 
@@ -769,9 +720,10 @@ derives from them:
 | `obligation-reported` | `id`, `judgment: done \| bound`, `basedOnRevision`, `revision`, `where?`, `by`, `submission` | `pending \| bound -> done`, `done -> bound`; the last sub-scenario's done report commits the integration work item |
 | `work-item-started` | gains origin `integration` with `scenario` | |
 
-`GateAttempt` becomes `ramify-agent.gate-attempt/3` with the `scenarios`
-command kind, the summary above under its command record, and the path of
-the profile it ran. `RunRecord` carries `reviewStop` and the captured
+`GateAttempt` is `ramify-agent.gate-attempt/3`. A committing gate's attempt
+carries its audit request and answer under `audit`, the provider's result
+and published checks under `provider`, the evidence refs, and no command
+records; the scenario results are read from `provider`. `RunRecord` carries `reviewStop` and the captured
 `ramify-agent.project/1` configuration, so a run is reproducible from
 `job.json` as it is for the policy today. `RunSnapshot` gains `review` and
 `counts.scenarios: { pending, bound, done }`.
@@ -812,14 +764,14 @@ on `start-run`.
 
 | Change | Where |
 | --- | --- |
-| Gherkin parsing, plan scenario extraction, form rules, feature rendering, the message-stream reducer, the per-module profiles | A new module `subs/harness/subs/scenarios`, pure functions with no I/O, the one importer of `@cucumber/gherkin` and `@cucumber/messages`. The harness receives its exports, as it receives the audit adapter's. |
+| Gherkin parsing, plan scenario extraction, form rules, feature rendering | A new module `subs/harness/subs/scenarios`, pure functions with no I/O, the one importer of `@cucumber/gherkin` and `@cucumber/messages`. The harness receives its exports, as it receives the audit adapter's. |
 | Integration work items | `work/records.ts` gains the origin; `run/service.ts` creates the item with the done report of its last sub-scenario and briefs its local architect with the scenario, its sub-scenarios and their owners' step files. |
 | The project configuration: schema, reading, validation, capture into `job.json` | A new `run/project-config.ts` in the harness, with the schema in `run/records.ts` beside the run policy; `subs/evidence` reads the file. |
 | Plan capture | `run/service.ts` where `input/plan.md` is written; the plan scenarios join the analysis briefing in `analysisMessage`. |
 | Submission `/2`, validation, acceptance | `analysis/submission.ts`, `analysis/accept.ts`; the records under a new `scenarios/` layout entry in `run/records.ts`. |
 | `reviewStop`, `approve-analysis`, phase, budget subtraction | `interfaces/protocol/runs.ts`, `run/log.ts`, `run/snapshot.ts`, `run/service.ts`. |
 | Readiness steps | `run/readiness.ts`, `run/records.ts` step names. |
-| The Cucumber profile written per attempt | The `scenarios` module builds it; `checks/execution.ts` and the audit executor write it into the attempt's directory. |
+| Scenario results read from the audit's raw runner output | `checks/scenario-results.ts`, for display in `checks/diagnostics.ts` and the projections. |
 | Materialization and the two non-gate commits | `run/service.ts` after `createBranch`; `subs/evidence` for the git calls. |
 | Guarded and denied files | `work/scope.ts`, `subs/evidence/src/guarded-files.ts`, `guard/write-guard.ts`. |
 | Bindings and reports | `work/engineer.ts`, `work/obligations.ts`, `work/submission.ts`, and the acceptance paths in `run/service.ts`. |
@@ -827,7 +779,7 @@ on `start-run`.
 | State transitions at gates and events | `run/service.ts`, `run/log.ts`. |
 | Briefings and procedures | `src/prompts/*` at version 2 for the initial architect, local architect and engineer; `work/session.ts`, `work/engineer.ts`. |
 | Projections, protocol, web | `projections/progress.ts`, `projections/queries.ts`, `interfaces/protocol/runs.ts`, `http/app.ts`, `subs/web`. |
-| Fixture | `fixtures/collection-review`: `ramify-agent.json`, the two scripts, a full mode, and the step and feature directories. |
+| Fixture | `fixtures/collection-review`: `ramify-agent.json`, the step and feature directories, and a scripted configured audit in the tests that drive it. |
 
 ## Order of implementation
 

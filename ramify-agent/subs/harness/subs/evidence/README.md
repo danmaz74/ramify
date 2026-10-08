@@ -108,8 +108,9 @@ unavailable with that reason, never a zero.
 `guarded-files.ts` holds `guardedFilesHash`: the SHA-256 of each file whose
 change could weaken a check, which is the test runner's and the compiler's
 configuration, the package manifests, `ramify-agent.json`, and whatever the
-caller names, such as the contract artifacts an assignment requires and the
-scenario harness's support files. It is one hash per file rather than one over the set, so a change
+caller names, such as the contract artifacts an assignment requires, the
+project's Cucumber configuration and its committed audit definition. It is
+one hash per file rather than one over the set, so a change
 names the file that changed, and a file that is not there is `null`. It
 compares nothing, and no identity of the working tree is taken anywhere.
 
@@ -117,7 +118,7 @@ compares nothing, and no identity of the working tree is taken anywhere.
 
 `project-configuration.ts` reads `ramify-agent.json` at the project root, the
 file in which a target project declares what the harness cannot derive, such
-as the commands of its acceptance modes. It answers the file's text and
+as its setup commands and its type check's output format. It answers the file's text and
 SHA-256, or that it is missing or unreadable, and never throws for either.
 What the file must say is the harness's: this module does not parse it.
 

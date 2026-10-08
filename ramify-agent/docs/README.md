@@ -91,8 +91,9 @@ Design documents for the separate agent harness:
   the design of the first step, implemented by Plan 10, with Dan's decisions of 2026-09-23: plan
   scenarios extracted at capture, frozen at analysis, a review stop,
   harness-materialized feature files, four scenario states, declarations
-  verified by every gate, one Cucumber run per owner module read from its
-  message stream, and an integration work item at the common ancestor
+  verified by every gate, and an integration work item at the common
+  ancestor; since Plan 21, scenarios run as a configured Cucumber check of
+  the project's committed audit
 - [Work-brief decomposition spike](spikes/work-brief-examples/README.md), isolated example requests and Sol planning runs
 - [Autonomous-loop initial capability and module hypothesis](spikes/autonomous-loop-initial-analysis/README.md),
   spike output and reusable input for the later implementation plan
