@@ -6,7 +6,8 @@
     "subs/harness/module.ramify",
     "docs/plans/23-session-reuse-and-run-efficiency/iterations/manifest.json",
     "vitest.config.ts",
-    "src/tests/test-boundaries.json"
+    "src/tests/test-boundaries.json",
+    "module.ramify"
   ],
   "iterations": {
     "0": [
