@@ -319,5 +319,16 @@
     "structure": "passed; partial analysis coverage; 314 analysis limits",
     "logs": "/tmp/ramify-plan23-integrated-scope-repair-*.log",
     "finalFullAudit": "pending iteration 14"
+  },
+  "providerAmendments": {
+    "sessionQuiescence": {
+      "providerHead": "f5ef60e5ff909c559e2af277b8b279c01f29a7e5",
+      "integratedHead": "425cb8d787210ca7f9e408bcb46df359dbb7ad5a",
+      "ordinaryFiles": 5,
+      "ordinaryTests": 78,
+      "typeCheck": "passed",
+      "structure": "passed; partial analysis coverage; 317 analysis limits",
+      "logs": "/tmp/ramify-plan23-integrated-quiescence-*.log"
+    }
   }
 }

@@ -223,3 +223,12 @@ persistence failure/recovery must remain visible. Unsupported preflight likewise
 dispatches nothing and creates no operation intent. Full production/process/live
 claims remain unqualified here; the inherited iteration 0 materializer failure is
 not relabeled as passing.
+
+## Integrated actual settlement refinement
+
+The accepted generic quiescence amendment `f5ef60e5` is recorded in receipt 1.
+Its Pi final-hook control preserves the original zero-dispatch/late-event checks
+while observing a prompt fenced receipt and delayed actual Stop/settled barrier.
+Joined engine/Pi/store/scripted checks passed 5 files/78 tests, all type scopes
+and structural checking (317 explicit limits). Q02 live/process evidence remains
+iteration 14; this refinement supplies no live claim.

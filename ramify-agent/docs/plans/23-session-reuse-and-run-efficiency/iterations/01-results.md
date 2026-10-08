@@ -168,3 +168,34 @@ answers under the ordinary process guard. No direct complete suite, full audit,
 new boundary registration, live provider call, performance comparison, push or
 merge was performed. These controls establish ordinary session/storage behavior;
 they do not replace iteration 14's native kernel/transport and full qualification.
+
+## Accepted quiescence amendment, 2026-10-08
+
+Provider `f5ef60e5ff909c559e2af277b8b279c01f29a7e5`, joined at
+`425cb8d787210ca7f9e408bcb46df359dbb7ad5a`, corrects receipt/idle conflation found
+during iteration 8 integration. Stop aborts and fences a durable receipt promptly
+with no reusable point for dispatched/unknown effects; `stop()` and `settled()`
+separately await actual driver, admitted tool/guard/mutation hook/payload work,
+queued persistence and publication. Normal completion drains admitted work before
+a reusable receipt. Current public signatures are unchanged.
+
+A process-wide owner-token barrier survives terminal fencing and is shared by
+reconstructed factories. A separate owner-checked CAS attests internal
+`quiescent: true` only after drainage; exact terminal receipt, effects and session
+points remain unchanged. A live foreign owner without that marker cannot prove
+idle and reports typed unavailable quiescence. The harness retains its captured
+settlement deadline and independently confirms process/tree settlement.
+
+New independent controls cover delayed ignored-signal tool and mutation hook,
+detached tool/payload at normal driver return, blocked guard, publication,
+reconstructed Stop/terminal Retry, and a completed marker with live foreign PID.
+Pi final-hook and production-store liveness controls now observe the receipt
+fence before releasing blocked work and awaiting actual drainage. The worker
+retains its initial old-control timeout in `/tmp/plan23-quiescence-receipt.md`;
+that run is not passing evidence. Final worker selection: 3 files/60 tests.
+
+Integrator executed the engine, Pi prefix preservation/session modes, production
+store and scripted selections: **5 files/78 tests passed**; all four type scopes
+passed; structural check passed with 0 errors, 0 warnings and 317 analysis limits.
+Logs: `/tmp/ramify-plan23-integrated-quiescence-*.log`. No native/live/full audit
+claim is made by this amendment. Exact five paths are recorded in write-sets.

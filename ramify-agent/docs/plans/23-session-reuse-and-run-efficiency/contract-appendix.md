@@ -374,3 +374,15 @@ plain immutable declarations; executable SDK builtin handlers stay inside pi and
 are rebound to each task's current working directory and authority. Consumers
 must use accepted task packets and their compact declaration schema so each full
 submission schema is delivered once; actual validators retain the owning schema.
+
+## Actual operation settlement refinement
+
+A durable terminal receipt and execution quiescence are separate. Stop fences and
+records immediately; `stop()` and `settled()` await actual driver and admitted
+work drainage. Normal completion drains admitted runtime calls and payload writes
+before publishing a reusable receipt. After all publication/persistence drains,
+an owner-checked internal operation CAS may attest `quiescent: true` without
+changing receipt, effects or session points. A reconstructed factory shares the
+original owner-token barrier; a live foreign owner without attested drainage
+reports unavailable quiescence. Harness callers retain their captured bounds and
+process/tree confirmation, and never translate a receipt alone into idle.
