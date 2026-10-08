@@ -62,13 +62,16 @@ vi.mock('node:child_process', async original =>
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
+  const errors: unknown[] = [];
   try {
-    for (const cleanup of cleanups.splice(0)) await cleanup();
+    // Settle services before removing the fixtures they are still writing.
+    for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
     const unanswered = [...gits.values()].flatMap(git => [...git.unexpected]);
     gits.clear();
-    expect(unanswered, 'Git operations a scenario states no answer for').toEqual([]);
-    expectNoProcesses();
+    try { expect(unanswered, 'Git operations a scenario states no answer for').toEqual([]); } catch (error) { errors.push(error); }
+    try { expectNoProcesses(); } catch (error) { errors.push(error); }
   } finally { forgetExternalTools(); }
+  if (errors.length) throw new AggregateError(errors, 'Recovery fixture teardown failed');
 });
 
 /** The revision every project of this file is on before its run commits anything. */
