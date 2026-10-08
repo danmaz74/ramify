@@ -1,0 +1,477 @@
+{
+  "schema": "ramify-agent.test-boundaries/1",
+  "boundaries": [
+    {
+      "file": "subs/harness/subs/evidence/src/tests/git.test.ts",
+      "boundary": "Git object, branch, commit, trailer and failure behavior",
+      "whyFakeCannotProve": "The assertions require native tool or kernel behavior and actual output, objects or process settlement.",
+      "owningCases": [
+        "the real Git adapter > inspects committed, staged, unstaged, deleted and untracked source without changing files, index or refs",
+        "the real Git adapter > creates and resumes a run branch, commits with its own policy, and recovers exact commit identities",
+        "the real Git adapter > refuses a run branch git cannot create, with git's own message",
+        "the real Git adapter > reports staged, untracked and renamed paths through the adapter",
+        "the real Git adapter > reads path and line changes relative to the accepted revision even after a failed attempt commits",
+        "the real Git adapter > serves a committed candidate from Git objects, whatever the working tree holds afterwards",
+        "the real Git adapter > reports an unavailable head and a typed status error outside a repository"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/candidate-tree.test.ts",
+      "boundary": "Native Git candidate object bytes and index isolation",
+      "whyFakeCannotProve": "The assertions require native tool or kernel behavior and actual output, objects or process settlement.",
+      "owningCases": [
+        "preview matches a whole-worktree commit and preserves staged user index bytes",
+        "a late source mutation changes the preview tree",
+        "nested cwd previews the entire eventual repository tree",
+        "a repository nested inside another uses its own root and index",
+        "a failed add cleans its isolated index and leaves the user index unchanged",
+        "an aborted preview leaves no temporary index"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/scratch-git.test.ts",
+      "boundary": "Native Git index and effective ignore rules",
+      "whyFakeCannotProve": "The assertions require native tool or kernel behavior and actual output, objects or process settlement.",
+      "owningCases": [
+        "index paths and effective ignore rules come from Git, including unchanged and staged scratch"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/provisional-git.boundary.test.ts",
+      "boundary": "Native staged paths and object reads",
+      "whyFakeCannotProve": "The assertions require native tool or kernel behavior and actual output, objects or process settlement.",
+      "owningCases": [
+        "actual provisional Git reads binary committed/index bytes, exact staged paths and absent blobs",
+        "actual provisional Git propagates process/cwd errors rather than reporting absent blobs"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/project-boundary.test.ts",
+      "boundary": "Installed CLI project-root and package boundary behavior",
+      "whyFakeCannotProve": "The assertions require native tool or kernel behavior and actual output, objects or process settlement.",
+      "owningCases": [
+        "installed Ramify project boundary > marked root, four inert owned docs extensions and analyzed scripts use current ownership identity",
+        "installed Ramify project boundary > an invocation from a nested module selects the marked project and both API source areas",
+        "installed Ramify project boundary > an unmarked explicit target is refused before analysis",
+        "installed Ramify project boundary > auxiliary source is analyzed and a hidden child import is denied",
+        "installed Ramify hook dispositions > excluded-only exits 0 and 1, mixed, cold and deadline exit 2, source deletion, an auxiliary boundary violation, a scratch warning and configuration"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/evidence/src/tests/run-command.boundary.test.ts",
+      "boundary": "Actual command streams, exit, timeout, process-group cleanup and wrapper signals",
+      "whyFakeCannotProve": "The assertions require native tool or kernel behavior and actual output, objects or process settlement.",
+      "owningCases": [
+        "command cleanup wrapper > group: does not sleep or escalate when TERM finds no target",
+        "command cleanup wrapper > group: waits and escalates after delivered TERM",
+        "command cleanup wrapper > single: does not sleep or escalate when TERM finds no target",
+        "command cleanup wrapper > single: waits and escalates after delivered TERM",
+        "runCommand > completes with the exit code the command chose and writes its complete output",
+        "runCommand > passes exact stdin bytes through the process-group start barrier",
+        "runCommand > holds the command behind durable group registration and reports its kernel identity",
+        "runCommand > tells a non-zero exit from a timeout",
+        "runCommand > surfaces a spawn failure as a runner error with its string code",
+        "runCommand > reports a cancelled command as cancelled, not as a failure",
+        "runCommand > reports output beyond the cap as truncated and never as a pass",
+        "runCommand > bounds the tail it answers while the file keeps the complete output",
+        "runCommand > writes no output file when the caller asked for none",
+        "runCommand > settles a descendant that outlives the command, by its process group",
+        "runCommand > escalates to KILL for a TERM-resistant descendant after its parent exits",
+        "childEnvironment > leaves NODE_OPTIONS out of the child environment",
+        "childEnvironment > passes on the allowlist and withholds everything else, in a real child"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/audit/src/tests/audit-conformance.test.ts",
+      "boundary": "Published audit SDK producer, reports, Git refs, cancellation and recovery conformance",
+      "whyFakeCannotProve": "Synthetic reports or in-process locks cannot establish the installed producer/object/OS contract.",
+      "owningCases": [
+        "ramify-audit 0.7.2 conformance > fact 1: command summaries preserve status and runner errors but never an exit code",
+        "ramify-audit 0.7.2 conformance > fact 2: command checks inherit the process environment except NODE_OPTIONS",
+        "ramify-audit 0.7.2 conformance > fact 3: registered executors receive the repository worktree and make failures explicit",
+        "ramify-audit 0.7.2 conformance > fact 4: publication needs a Git identity and accepts an injected identity",
+        "ramify-audit 0.7.2 conformance > fact 5: nodejs preparation links only repository-root node_modules",
+        "ramify-audit 0.7.2 conformance > fact 6: every selected check runs after a check fails",
+        "ramify-audit 0.7.2 conformance > fact 7: an audit waiting on another process lease cancels on its signal",
+        "ramify-audit 0.7.2 conformance > fact 8: a killed audit leaves its worktree and registration until explicit recovery",
+        "ramify-audit 0.7.2 conformance > fact 9: a full audit remains applicable to its branch",
+        "ramify-audit 0.7.2 conformance > fact 10: two audits in one second overwrite the run ref, tree ref and note",
+        "ramify-audit 0.7.2 conformance > fact 11: cancelled and failed audits publish nothing",
+        "ramify-audit 0.7.2 conformance > fact 12: protocol v2 accepts the default mode and rejects a selector",
+        "ramify-audit 0.7.2 conformance > fact 13: an audit of already audited code is reused unless forced, and names the audited commit",
+        "ramify-audit 0.7.2 conformance > fact 14: evidence recorded under another ignore list is never reused, and the changed list starts a new record",
+        "ramify-audit 0.7.2 conformance > refuses duplicate check IDs, including two checks of kind tests",
+        "ramify-audit 0.7.2 conformance > audits a commitAccepted commit without changing branch, HEAD, index or worktree"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/audit/src/tests/workspace-preparation.boundary.test.ts",
+      "boundary": "Committed provider definitions, private object bundle and native environment projection",
+      "whyFakeCannotProve": "Synthetic reports or in-process locks cannot establish the installed producer/object/OS contract.",
+      "owningCases": [
+        "reads the installed provider F3 committed A/B definitions despite malformed working C, without execution",
+        "keeps a declared credential-style variable in command A and scrubs its ambient value from command B",
+        "binds identical root and nested argv to their exact working directories before projecting declared environment",
+        "binds the F2 configured discovery reports and rejects partial or mismatched recovery evidence"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/audit/src/tests/test-lock.boundary.test.ts",
+      "boundary": "Actual private kernel-lock contention, expiry and cancellation",
+      "whyFakeCannotProve": "Synthetic reports or in-process locks cannot establish the installed producer/object/OS contract.",
+      "owningCases": [
+        "audit module test lock wrapper > two suite commands serialize on a private lock; cancellation closes a wait",
+        "audit module test lock wrapper > wait expiry reports a runner error without starting the command",
+        "audit module test lock wrapper > cancellation measures from the first wait callback, excluding lock discovery",
+        "audit module test lock wrapper > a runner exception after acquisition keeps only the completed wait duration"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/capability-acceptance.boundary.test.ts",
+      "boundary": "Composed actual Git, test failure, repair, review and handback",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "CA08 CA11\u2013CA15 CA17 CA25 CA30: actual Git and local-command multi-owner migration, repair, handback and linked revision"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/capability-dependencies.boundary.test.ts",
+      "boundary": "Actual accepted dependency commits and produced tests",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "CA19 CA21 CA32: actual nested C child gate, review and handback to B"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/capability-delegation.boundary.test.ts",
+      "boundary": "Actual composed delegated module creation and commits",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "CA30: provisional snapshot keeps staged, worktree, untracked and deleted bytes separately"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/write-guard.boundary.test.ts",
+      "boundary": "Actual shell writes and native Git candidate protection",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "PB3-S01\u2013S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions",
+        "PB3-S06: actual changed declarations narrow an invocation and restart; removed captured exclusions never widen",
+        "PB3-S07: unavailable placement and mismatched bootstrap identities cannot grant writes",
+        "PB3-S04 P04: intercepted and direct candidate-classifier controls cannot bypass captured inputs or harness state",
+        "PB3-P04: explicitly included independent project configs are guarded without workspace membership",
+        "PB3-S06: removing child declarations cannot widen capture; included child removal remains within both permissions"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/measurement.boundary.test.ts",
+      "boundary": "Installed measurement and command adapters over actual project files",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "the frozen baseline > a run freezes B from its first snapshot, and job.json names it",
+        "the recipe > the architect view is measured at its publication size when one is published"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/capability-recovery.boundary.test.ts",
+      "boundary": "Actual Git commit idempotency and crash/recovery object history",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "CA20: a registered real process group survives a service crash and is settled before any successor work",
+        "CA19 CA30: a snapshot written before its request commit is adopted with the exact dirty index and tree",
+        "CA19: retry refuses a changed staged or untracked candidate and preserves its bytes"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/nonfunctional-run.boundary.test.ts",
+      "boundary": "Actual audit and accepted Git tree for composed nonfunctional work",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "an empty fixed catalog records a candidate-bound empty assessment and audits its exact tree"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/readiness.boundary.test.ts",
+      "boundary": "Actual output reuse, owned workspace cancellation and Git scratch lifecycle",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "declared preparation and configured full readiness > the installed provider runs full after local setup, then reuses full while local setup recreates deleted output",
+        "declared preparation and configured full readiness > cancelling a native configured command settles its process and owned audit workspace before readiness returns",
+        "declared preparation and configured full readiness > a scratch-only successor keeps captured audit policy while a committed policy change refuses native readiness"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/hook-checks.boundary.test.ts",
+      "boundary": "Actual executable timeout and observed child disappearance",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "a hook check after a settled mutation > an executable that never answers within the harness's own bound is not checked either"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.boundary.test.ts",
+      "boundary": "Actual process group liveness and late writer settlement",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "actual writer process settlement > a session that says it is idle while its process group runs is not settled",
+        "actual writer process settlement > a write that still arrives while the group is being killed is recorded, not lost",
+        "actual writer process settlement > a group nobody registers is a group nothing waits for"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.boundary.test.ts",
+      "boundary": "Actual shell output, bounds, timeout and descendant settlement",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "the actual shell tool executor > runs the command it is given and answers its exit code, its tail and its output file",
+        "the actual shell tool executor > bounds the tail it answers while the file keeps everything",
+        "the actual shell tool executor > a command that outlives its timeout is a timeout, not a failure",
+        "the actual shell tool executor > a command that leaves a descendant is settled by its process group",
+        "the actual shell tool executor > settlement ends a command that is still running, with its group"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.boundary.test.ts",
+      "boundary": "PB3-S04 actual permitted shell mutation versus protected candidate",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "the actual session shell write boundary > PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/audit-check-execution.boundary.test.ts",
+      "boundary": "Actual configured provider runner truth, reuse and publication",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "configured committed execution over F2 (runner truth) > narrows real Vitest and Cucumber checks by ownership, keeps runner discovery and empty selection as producer facts, and carries failures through a zero-selection link",
+        "applicable reuse over F4's root project > reuses applicable full evidence across an ignored-only change, keeping both source identities and executing nothing",
+        "applicable reuse over F4's root project > a changed ignore list refuses the active run and needs a new baseline, never reusing evidence recorded under the old list",
+        "configured gate outcomes > a failing configured command fails the gate with its output and no invented command record",
+        "configured gate outcomes > a failing harness rule fails a passing audit, still without a command record",
+        "configured gate outcomes > a setup command that exits non-zero is the candidate's failure, and no check runs after it",
+        "configured gate outcomes > a setup command that does not finish in time is infrastructure, not a failure of the source",
+        "configured gate outcomes > cancellation answers nothing for the commit and publishes no evidence",
+        "configured gate outcomes > the gate's own bound ending a running audit is a timeout, not an infrastructure failure",
+        "configured gate outcomes > reopens the exact completed request without executing its checks again",
+        "a standalone session's in-place diagnosis > runs its type-check and Ramify check in the working tree and publishes nothing"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/audit-workspace-recovery.test.ts",
+      "boundary": "Actual owned Git workspace lifecycle, crash and recovery",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "durable audit workspace ownership > removes only an inactive owned worktree and is idempotent after cleanup",
+        "durable audit workspace ownership > covers missing paths, partial creation and a repeated interrupted cleanup",
+        "durable audit workspace ownership > preserves active audits and repository or registration mismatches",
+        "durable audit workspace ownership > refuses and preserves the repository when a matching record names it as the temporary directory",
+        "durable audit workspace ownership > a killed audit after creation is cleaned before the same commit is re-audited",
+        "durable audit workspace ownership > a killed audit during execution is cleaned before the same commit is re-audited",
+        "durable audit workspace ownership > a restarted nested audit retrieves its recorded root and nested records, and an unrecorded one is answered from published evidence; nothing runs again"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/test-lock-gate.test.ts",
+      "boundary": "Actual private kernel holder and harness gate wait/cancellation",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "the machine test lock at a gate > an in-place type check runs while a suite holds the lock, without waiting for it",
+        "the machine test lock at a gate > a focused shell run finishes while a suite holds the private lock",
+        "the machine test lock at a gate > a configured check waiting for the lock is reported with the provider line, and the gate passes once it ran",
+        "the machine test lock at a gate > cancelling a gate whose configured check waits for the lock is not verified, never a pass"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/late-writes.test.ts",
+      "boundary": "Actual process writer lifetime and gate settlement",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "a tool that writes after cancellation > is settled with its process group, and its result completes nothing"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/unguarded-write.test.ts",
+      "boundary": "Actual shell mutation and guarded candidate check",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "X6: an unguarded shell mutation and an outside read make the MVP's limits visible > the shell write reaches disk and is recorded, while candidate gates refuse to commit it"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/plan21-workflows.integration.test.ts",
+      "boundary": "Actual installed nested partial/full gates and scoped architect workflow",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "F5/F6 ordinary workflow: failure, repair and full nested acceptance > a failed nested final audit keeps its declarations and report; a repaired run reports unfinished work, reassesses and passes",
+        "F5/F6 capability workflow: delegation, handback and suspended consumer resumption > a delegated handback reports its own outcome only; the suspended consumer resumes across a restart, and its architect reports the consumer scenario",
+        "F5 standalone work: the same scope, hooks and diagnosis, with no commit > a standalone session through the command entry diagnoses its tree in place and commits nothing"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/run-git.integration.test.ts",
+      "boundary": "Actual commit recovery, unchanged commits and producer composition",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "run-to-Git integration > PB3: real producer proof refuses unrelated, missing, stale, aliased and merge candidates",
+        "run-to-Git integration > a final candidate without any captured writer origin is refused before a real Git commit",
+        "run-to-Git integration > a passing final gate over a changed tree makes exactly one commit, with the gate as its trailer",
+        "run-to-Git integration > recovery finds the real commit by both trailers and does not create a duplicate"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/project-boundary-audit.integration.test.ts",
+      "boundary": "Actual nested producer discovery, recovery and cancellation",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "a full nested final audit over F4 (PB3-E05) > audits every eligible project, skips the external tree with its reason, and fails on a nested failure under a passing root",
+        "a full nested final audit over F4 (PB3-E05) > indeterminate nested discovery leaves the final gate unverified, whatever the root answered",
+        "the readiness baseline over F4: the final gate's own nested full request > refuses readiness on a nested project's failure before the run branch exists, then passes, and the final gate's identical request reuses its records",
+        "recovering and cancelling a nested final audit over F4 (PB3-E06) > retrieves a completed invocation's exact root and nested records by their identities, running nothing again",
+        "recovering and cancelling a nested final audit over F4 (PB3-E06) > cancellation during a nested project settles its process and workspace before a replacement attempt"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/fixture-check.test.ts",
+      "boundary": "Installed checker validates fresh target fixture",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "the collection-review fixture satisfies Ramify's rules > a fresh copy checks with no error and no warning beyond its configuration files"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/requirement-architect-view.test.ts",
+      "boundary": "Installed materializer generates architect fake/real symbol evidence",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "P2: architectural evidence does not present a fake as production behavior > the architect view of the accepted state shows the fake under its fake name"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/integration-scenarios-integration.test.ts",
+      "boundary": "Installed checker accepts ancestor imports only through declared exposure",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "AS08: an integration scenario bound through expose-test > the scripted run completes with the integration scenario done, and the real checker accepts the ancestor's imports only through the exposures"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/module-creation-integration.test.ts",
+      "boundary": "Installed materializer refreshes created module architectural evidence",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "G9: an accepted proposed entry owner reaches implementation > a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/iterations-integration.test.ts",
+      "boundary": "Actual installed CLI, public provider and Git accepted gate objects",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "G8: one small work item completes in one iteration > a local architect assigns it, an engineer works it, the gate accepts it and the harness commits"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/single-session-integration.test.ts",
+      "boundary": "Actual shell and completion command session",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "a standalone session process boundary > a violation written through the shell, which no hook check saw, is caught when completion is proposed"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/run-protocol-materialization.integration.test.ts",
+      "boundary": "Installed materialized placement views and unchanged native Git status",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "the module-capability comparison of a completed scripted run, over HTTP > initial and current placements, the compared identities and coverage, and no file or event changed"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/iteration-gate-integration.test.ts",
+      "boundary": "Actual failing test, repair and accepted Git checkpoint",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "K1: a module gate fails, is repaired and reruns the complete gate > a real failing assertion in scope returns in-scope diagnostics and one repair round"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/review-snapshot.integration.test.ts",
+      "boundary": "Actual audited Git objects versus subsequently changing live files",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "a review snapshot over a real repository > the reader reads the audited candidate while a later writer changes and commits the live tree"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/check-findings-composition.integration.test.ts",
+      "boundary": "Actual audited trees and revision-grounded checks",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "the composed CheckFinding path over a real repository > concerns over real audited trees are related, corrected on a later commit, claimed on its tree and fixed, with the ground hashed from Git's objects"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/fixture-trials.test.ts",
+      "boundary": "Existing opt-in live fixture trial workflow (two optional skipped cases)",
+      "whyFakeCannotProve": "The owning cases assert actual installed tool, published report/Git object or kernel process behavior; a scripted answer cannot establish that boundary.",
+      "owningCases": [
+        "one work item, one iteration: the outline records single-iteration and one accepted iteration completes it",
+        "the break is staged, and every accepted boundary passes the whole project's real suite, type check and Ramify check"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/ledger/src/tests/killed-writer.test.ts",
+      "boundary": "Actual killed ledger writer and crash-safe durable recovery",
+      "whyFakeCannotProve": "A simulated writer cannot establish persisted bytes at process death.",
+      "owningCases": [
+        "a real writer process killed with SIGKILL in the middle of appending > every resulting log reopens, replays to a complete transaction and accepts the next append"
+      ]
+    },
+    {
+      "file": "src/tests/session-command.test.ts",
+      "boundary": "Actual production CLI session input/output and termination",
+      "whyFakeCannotProve": "A direct handler cannot establish executable argument, stream and shutdown behavior.",
+      "owningCases": [
+        "a session on the scripted fake prints its stream, says nothing verified the work, and exits 0 on a submission",
+        "a session that cannot start exits 2 and says why"
+      ]
+    },
+    {
+      "file": "src/tests/test-boundaries.integration.test.ts",
+      "boundary": "Actual configured Vitest worker guard, bypass and discovery controls",
+      "whyFakeCannotProve": "In-process wrappers cannot establish runner import/setup/teardown installation and reused worker behavior.",
+      "owningCases": [
+        "automatic ordinary runtime process boundary > builtin state cannot grant caller supplied native permission",
+        "automatic ordinary runtime process boundary > root reinstall cannot erase a caught refusal",
+        "automatic ordinary runtime process boundary > all seven native/default/CommonJS APIs are refused",
+        "automatic ordinary runtime process boundary > caught named Git refusal",
+        "automatic ordinary runtime process boundary > default export",
+        "automatic ordinary runtime process boundary > promisified export",
+        "automatic ordinary runtime process boundary > CommonJS node spelling",
+        "automatic ordinary runtime process boundary > CommonJS bare spelling",
+        "automatic ordinary runtime process boundary > ESM bare spelling",
+        "automatic ordinary runtime process boundary > importActual",
+        "automatic ordinary runtime process boundary > module setup",
+        "automatic ordinary runtime process boundary > beforeAll setup",
+        "automatic ordinary runtime process boundary > afterAll failure retains refusal",
+        "automatic ordinary runtime process boundary > afterAll teardown",
+        "automatic ordinary runtime process boundary > compatibility reset cannot erase",
+        "automatic ordinary runtime process boundary > default Git adapter",
+        "automatic ordinary runtime process boundary > missing candidate injection",
+        "automatic ordinary runtime process boundary > real Ramify adapter",
+        "automatic ordinary runtime process boundary > the complete configured invocation enforces a caught attempt too",
+        "automatic ordinary runtime process boundary > a newly discovered ordinary scripted case passes without attempted launches",
+        "configured partition validation > public configured discovery is a disjoint complete union and preserves fixture/scratch exclusions",
+        "configured partition validation > fails configuration for missing manifest",
+        "configured partition validation > fails configuration for missing file",
+        "configured partition validation > fails configuration for duplicate path",
+        "configured partition validation > fails configuration for bad path",
+        "configured partition validation > fails configuration for excluded fixture",
+        "configured partition validation > fails configuration for excluded scratch",
+        "configured partition validation > fails configuration for web boundary",
+        "builtin functions captured across a reused worker > ordinary then native then ordinary",
+        "builtin functions captured across a reused worker > native then ordinary then native"
+      ]
+    }
+  ]
+}

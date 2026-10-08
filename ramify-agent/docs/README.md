@@ -3,8 +3,9 @@
 Design documents for the separate agent harness:
 
 - [Plan 22: enforced test boundaries and prompt command cleanup](plans/22-test-boundaries/main-plan.md),
-  draft: scripted external systems in ordinary tests, explicit real-boundary
-  verification, preserved full-audit coverage and removal of needless cleanup waits
+  implementation in progress: scripted ordinary scenarios, automatic process
+  guarding, explicit real-boundary selection and prompt command cleanup; final
+  audit and preservation qualification remain pending
 - [Harness principles](harness.principles.md)
 - [Agent declarations and automated audit evidence](analysis/2026-10-07-agent-declarations-and-audit-responsibilities.md),
   desired responsibility boundary and issues in the current implementation and
@@ -192,6 +193,8 @@ Design documents for the separate agent harness:
 - [Ramify measurements and agent KPIs](measurements-and-kpis.md)
 - [Potential future capabilities](future/README.md), candidate and planned
   user-facing features with their maturity
+- [Testing ramify-agent](testing.spec.md), automatic ordinary process guard,
+  exact native witnesses, focused selectors and complete audit qualification
 - [Plan 2C consumer review](reviews/2026-09-19-plan2c-consumer-review.md)
 
 What Ramify provides to agents is described in the toolkit's

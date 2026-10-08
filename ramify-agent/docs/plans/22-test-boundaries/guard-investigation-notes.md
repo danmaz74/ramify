@@ -1,6 +1,6 @@
 # Automatic guard investigation handoff
 
-**Status:** implementation considerations for iteration 6, pending experiments.
+**Status:** historical considerations below; automatic enforcement implemented in optimization 13, pending full audit and integration.
 These notes add no runner exemption or settled implementation choice.
 
 The migrated acceptance files currently install
@@ -35,3 +35,28 @@ Outer audit Git, test discovery and Vitest worker creation are infrastructure
 outside ordinary test execution. They do not justify an opt-out available to
 ordinary tests. The committed complete audit still discovers and executes the
 union of ordinary and explicitly registered actual-boundary files.
+
+## Delivered investigation
+
+The installed Vitest 4.1.11 experiments demonstrated that native builtin
+instrumentation followed by `syncBuiltinESMExports` reaches named/default,
+promisified, both CommonJS spellings and `vi.importActual` routes. The builtin
+wrappers retain private state across module resets and reused workers. Root
+setup derives permission from actual testPath and the exact registry. Reinstall
+of the current file preserves attempts; switching files cannot drop unfinalized
+refusals. Root `aroundAll` wraps user setup, cleanup and teardown, and preserves
+both an original thrown error and an enforcement error.
+
+Actual child runners proved both ordinary/native orders with isolate:false in
+one PID, sharing cached CommonJS and promisified exports. Native controls return
+actual Node stdout; ordinary attempts fail the file despite catches and never
+write the process-side marker. The retained harness compatibility recorder may
+reset its local observations only; root enforcement remains independent. The
+decoder's cloned hoisted recorder has been replaced by root forwarding.
+
+Config validation asks the public installed `createVitest` /
+`globTestSpecifications` for original include/exclude discovery, then closes all
+owned projects/servers before returning configuration. It starts no workers or
+test setup. Exact registration errors fail configuration; the aggregate audit
+check remains unchanged. Per-file command observations are generated under the
+installed package cache without changing guard permission.
