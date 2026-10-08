@@ -27,6 +27,7 @@ function auditView(requested: string, audited: string, verdict: 'pass' | 'fail',
     requestId: `run:${requested.slice(0, 7)}`, mode: 'project-default', status: 'completed',
     definition: { path: 'ramify-audit.json', blob: 'f'.repeat(40) }, requestedSourceCommit: requested, auditedSourceCommit: audited,
     requestedMode: 'ramify-partial', executedMode: 'ramify-partial', fallbackReason: null, reuse, verdict, detail: `composed ${verdict}`,
+    nested: false, projects: null, discovery: null,
   };
 }
 
@@ -1143,4 +1144,44 @@ test('a run held on an environment problem shows its diagnosis and suggestion in
   fireEvent.click(within(form).getByRole('button', { name: 'Answer' }));
   await waitFor(() => expect(client.commands.map(command => command.type)).toEqual(['respond-to-check-finding']));
   expect(client.commands[0]).toMatchObject({ payload: { checkFinding: 'cf-0001', request: 'cfd-0001', option: 'resume', responder: 'dan' } });
+});
+
+test('PB3-E07: a nested final audit shows each project\'s verdict, execution, failures, counts, duration and record, and what discovery skipped', async () => {
+  const run = stubRun();
+  const failed = run.gates!['ga-0002']!;
+  const bucket = (total: number, failedCount: number) => ({ total, passed: total - failedCount, failed: failedCount, skipped: 0 });
+  const project = (projectRoot: string, verdict: 'pass' | 'fail', execution: 'ran' | 'reused', report: string, failures: string[] = []) => ({
+    projectRoot, verdict, execution, status: 'completed', failures, requestId: `request-${projectRoot}`, auditedSourceCommit: failedCommit,
+    requestedMode: 'full', executedMode: 'full', fallbackReason: null,
+    reuse: execution === 'reused' ? { auditedCommit: baseCommit, ignoredChangedPaths: ['engine/docs/notes.md'], requestedMode: 'full', resolution: 'requested' } : null,
+    evidence: { reportCommit: report.repeat(40), runRef: `refs/audited/projects/${projectRoot}/runs/r`, treeRef: 'refs/audited/by-tree/t' },
+    retrievalCommands: [`git show refs/audited/projects/${projectRoot}/runs/r:reports/audit/summary.json`], durationSeconds: 1.5,
+    counts: { checks: bucket(1, failures.length === 0 ? 0 : 1), tests: bucket(12, failures.length), scenarios: null }, detail: 'composed',
+  });
+  run.gates!['ga-0002'] = gateViewSchema.parse({
+    ...failed,
+    audit: {
+      ...auditView(failedCommit, failedCommit, 'fail'), mode: 'full', requestedMode: 'full', executedMode: 'full', nested: true,
+      detail: 'invocation fail over 2 projects; failed: engine; skipped: vendor/lib (external)',
+      projects: [project('.', 'pass', 'ran', '1'), project('engine', 'fail', 'reused', '2', ['engine-check: FAIL'])],
+      discovery: { status: 'complete', skipped: [{ projectRoot: 'vendor/lib', enclosingProject: '.', reason: 'external', directory: 'vendor' }], unavailable: [] },
+    },
+  });
+  render(<RunPage client={clientWith(run)} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Checks' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'ga-0002' }));
+  const audit = within(await screen.findByLabelText('Gate ga-0002')).getByLabelText('Configured audit');
+  expect(within(audit).getByText('Invocation verdict').nextElementSibling?.textContent).toBe('fail: invocation fail over 2 projects; failed: engine; skipped: vendor/lib (external)');
+  const projects = within(audit).getByLabelText('Audited projects');
+  const rows = [...projects.children].map(item => item.querySelector('p')!.textContent);
+  expect(rows).toEqual(['.: pass, ran, executed full', 'engine: fail, reused, executed full']);
+  const engine = projects.children[1] as HTMLElement;
+  expect(engine.className).toContain('audit-project-fail');
+  expect(engine.textContent).toContain('checks 0/1 passed, 1 failed; tests 11/12 passed, 1 failed; 1.5 s');
+  expect(engine.textContent).toContain(`Reused the record of ${baseCommit}; ignored changes: engine/docs/notes.md`);
+  expect(within(engine).getByLabelText('Failures of engine').textContent).toBe('engine-check: FAIL');
+  expect(engine.textContent).toContain(`Report commit ${'2'.repeat(40)}; run ref refs/audited/projects/engine/runs/r`);
+  expect(engine.textContent).toContain('git show refs/audited/projects/engine/runs/r:reports/audit/summary.json');
+  expect(within(audit).getByLabelText('Skipped projects').textContent).toBe('Not audited: vendor/lib, beneath external vendor of .');
+  expect(within(audit).getByText('Nested discovery').nextElementSibling?.textContent).toMatch(/^complete/u);
 });

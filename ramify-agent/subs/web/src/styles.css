@@ -264,6 +264,11 @@ main.route-run { max-width: none; }
 .facts div { display: flex; flex-wrap: wrap; gap: 0 0.5rem; margin: 0.15rem 0; }
 .facts dt { color: var(--muted); min-width: 10rem; }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
+.audit-projects { list-style: none; padding: 0; margin: 0.2rem 0; display: grid; gap: 0.4rem; }
+.audit-project { border-left: 3px solid var(--line); padding: 0.2rem 0 0.2rem 0.6rem; }
+.audit-project p { margin: 0.1rem 0; }
+.audit-project-fail { border-left-color: var(--bad); }
+.audit-project-indeterminate { border-left-color: var(--warn); }
 .run-failure { color: var(--bad); }
 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 1rem; }
 .columns.three { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
@@ -447,6 +452,11 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .badge.origin-architect { background: #eceff2; color: var(--muted); }
 .scenario-state-bound { background: #dde8f6; color: var(--accent); }
 .scenario-state-done { background: #dcefe3; color: var(--good); }
+/* A scenario row keeps its headings, ids, state and gate words whole; only paths break anywhere. */
+.table.scenarios th, .table.scenarios td { overflow-wrap: break-word; }
+.table.scenarios td:nth-child(5) { overflow-wrap: anywhere; }
+.table.scenarios td:first-child code, .table.scenarios td:nth-child(2) { white-space: nowrap; }
+@media (max-width: 700px) { .table.scenarios th, .table.scenarios td:not(:nth-child(2)) { overflow-wrap: anywhere; } .table.scenarios td:first-child code { white-space: normal; } }
 .scenario-gates { list-style: none; padding: 0; margin: 0; }
 .scenario-gates li { margin-bottom: 0.2rem; }
 .scenario-status-passed { color: var(--good); }
@@ -603,6 +613,9 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .check-passed { background: #dcefe3; color: var(--good); }
 .check-findings { background: #f6dcd9; color: var(--bad); }
 .check-not-checked { background: #f7ecd4; color: var(--warn); }
+.dispositions { list-style: none; padding-left: 0.8rem; margin: 0.2rem 0; font-size: 0.85rem; }
+.disposition-checked { background: #e8eef6; color: var(--ink); }
+.disposition-not-analyzed, .disposition-not-checked { background: #f7ecd4; color: var(--warn); }
 .file-view { margin: 0.3rem 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .file-view figcaption { padding: 0.25rem 0.6rem; background: #f1f3f5; border-bottom: 1px solid var(--line); font-size: 0.82rem; overflow-wrap: anywhere; }
 .file-lines {

@@ -599,7 +599,7 @@ function WorkItemDetail({ client, planId, runId, version, workItem, onOpenGate }
 function Scenarios({ client, planId, runId, version }: AreaProps) {
   const state = useRunQuery(`scenarios:${runId}`, version, () => client.getScenarios(planId, runId));
   return (
-    <div className="area" aria-label="Scenarios">
+    <div className="area area-broad" aria-label="Scenarios">
       <Loading state={state} what="the scenarios">
         {data => <ScenarioTable scenarios={data.scenarios} total={data.total} />}
       </Loading>
@@ -690,8 +690,65 @@ function AuditRequestFacts({ audit }: { readonly audit: NonNullable<GateView['au
       <div><dt>Audited source</dt><dd>{audit.auditedSourceCommit === null ? 'none' : <code>{audit.auditedSourceCommit}</code>}</dd></div>
       <div><dt>Mode</dt><dd>requested {audit.requestedMode ?? 'unknown'}, executed {audit.executedMode ?? 'unknown'}{audit.fallbackReason === null ? '' : ` (${audit.fallbackReason})`}</dd></div>
       {audit.reuse !== null && <div><dt>Reused record</dt><dd>of <code>{audit.reuse.auditedCommit}</code>; ignored changes: {audit.reuse.ignoredChangedPaths.length === 0 ? 'none' : audit.reuse.ignoredChangedPaths.join(', ')}</dd></div>}
-      <div><dt>Composed verdict</dt><dd>{audit.verdict ?? 'none'}{audit.verdict === 'pass' ? '' : `: ${audit.detail}`}</dd></div>
+      <div><dt>{audit.nested ? 'Invocation verdict' : 'Composed verdict'}</dt><dd>{audit.verdict ?? 'none'}{audit.verdict === 'pass' ? '' : `: ${audit.detail}`}</dd></div>
+      {audit.nested && <NestedAuditFacts audit={audit} />}
     </dl>
+  );
+}
+
+type AuditCountBucket = { readonly total: number; readonly passed: number; readonly failed: number; readonly skipped: number };
+
+function bucketText(label: string, bucket: AuditCountBucket): string {
+  return `${label} ${bucket.passed}/${bucket.total} passed${bucket.failed === 0 ? '' : `, ${bucket.failed} failed`}${bucket.skipped === 0 ? '' : `, ${bucket.skipped} skipped`}`;
+}
+
+/**
+ * A nested request's projects as the harness recorded them: each project's
+ * own verdict, whether this request ran, reused or did not run it, its
+ * failures, counts, duration and record, then what discovery skipped and
+ * could not decide. Nothing here is recomputed.
+ */
+function NestedAuditFacts({ audit }: { readonly audit: NonNullable<GateView['audit']> }) {
+  return (
+    <>
+      <div>
+        <dt>Projects</dt>
+        <dd>{audit.projects === null ? 'none recorded' : (
+          <ul className="audit-projects" aria-label="Audited projects">
+            {audit.projects.map(project => (
+              <li key={project.projectRoot} className={`audit-project audit-project-${project.verdict}`}>
+                <p><code>{project.projectRoot}</code>: <strong>{project.verdict}</strong>, {project.execution}
+                  {project.executedMode === null ? '' : `, executed ${project.executedMode}`}
+                  {project.status === 'completed' ? '' : ` (${project.status}: ${project.detail})`}</p>
+                {project.counts !== null && <p className="muted">{[
+                  bucketText('checks', project.counts.checks),
+                  ...(project.counts.tests === null ? [] : [bucketText('tests', project.counts.tests)]),
+                  ...(project.counts.scenarios === null ? [] : [bucketText('scenarios', project.counts.scenarios)]),
+                ].join('; ')}{project.durationSeconds === null ? '' : `; ${project.durationSeconds} s`}</p>}
+                {project.reuse !== null && <p className="muted">Reused the record of <code>{project.reuse.auditedCommit}</code>; ignored changes: {project.reuse.ignoredChangedPaths.length === 0 ? 'none' : project.reuse.ignoredChangedPaths.join(', ')}</p>}
+                {project.failures.length > 0 && <ul aria-label={`Failures of ${project.projectRoot}`}>{project.failures.map((failure, index) => <li key={index}>{failure}</li>)}</ul>}
+                <p className="muted">{project.evidence === null ? 'No published record'
+                  : <>Report commit <code>{project.evidence.reportCommit}</code>; run ref <code>{project.evidence.runRef}</code></>}</p>
+                {project.retrievalCommands.length > 0 && <details><summary>Retrieve its record</summary>
+                  <ul>{project.retrievalCommands.map(command => <li key={command}><code>{command}</code></li>)}</ul></details>}
+              </li>
+            ))}
+          </ul>
+        )}</dd>
+      </div>
+      <div>
+        <dt>Nested discovery</dt>
+        <dd>{audit.discovery === null ? 'none recorded' : <>
+          {audit.discovery.status}
+          {audit.discovery.skipped.length > 0 && <ul aria-label="Skipped projects">{audit.discovery.skipped.map(skip => (
+            <li key={skip.projectRoot}>Not audited: <code>{skip.projectRoot}</code>, beneath {skip.reason} <code>{skip.directory}</code> of <code>{skip.enclosingProject}</code></li>
+          ))}</ul>}
+          {audit.discovery.unavailable.length > 0 && <ul aria-label="Undecided nested definitions">{audit.discovery.unavailable.map(gap => (
+            <li key={gap.enclosingProject}>Beneath <code>{gap.enclosingProject}</code>: {gap.reason}{gap.definitions.length === 0 ? '' : ` (${gap.definitions.join(', ')})`}</li>
+          ))}</ul>}
+        </>}</dd>
+      </div>
+    </>
   );
 }
 
