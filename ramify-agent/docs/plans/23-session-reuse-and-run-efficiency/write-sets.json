@@ -212,7 +212,8 @@
       "subs/harness/subs/agent/subs/pi/src/tests/context-budget.test.ts",
       "subs/harness/subs/agent/subs/pi/src/tests/compaction-policy.test.ts",
       "subs/harness/subs/agent/subs/pi/src/tests/transcript-content.test.ts",
-      "subs/harness/subs/agent/subs/pi/src/tests/tool-actions.test.ts"
+      "subs/harness/subs/agent/subs/pi/src/tests/tool-actions.test.ts",
+      "subs/harness/src/sessions/records.ts"
     ],
     "10": [
       "subs/harness/src/run/service.ts",
