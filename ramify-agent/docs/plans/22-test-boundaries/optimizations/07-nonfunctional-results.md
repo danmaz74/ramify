@@ -86,3 +86,19 @@ explicitly runs the correct `composition.test.ts`.
 The coordinator must review preservation and run the installed released
 `--full --nested` audit on the clean committed candidate before integrating.
 This engineer report does not declare semantic completion or Plan22 completion.
+
+## Committed whitespace correction
+
+The coordinator's committed-patch check found one redundant newline at EOF in
+`nonfunctional-run.boundary.test.ts`. The implementation agent's earlier
+`git diff --check` had inspected the working diff; an empty working diff after
+commit did not validate the committed patch. Removed exactly that extra newline
+and refreshed the evidence source hash. The complete executable test callback
+is unchanged, so prior focused/type/module results still apply. The corrected
+candidate's optimization patch is verified with `git diff 5c62119f HEAD --check`.
+
+The coordinator's multiline shell accidentally continued from the failed
+precheck into its full audit. The coordinator cancelled only its verified own
+audit process; exit130 is incomplete evidence, retained at
+`/tmp/plan22-opt07-audit.json` and `.stderr.log`. A fresh released full nested
+audit is required before merging. No passing audit is claimed here.

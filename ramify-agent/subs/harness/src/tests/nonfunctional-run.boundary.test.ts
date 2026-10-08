@@ -50,4 +50,3 @@ test('an empty fixed catalog records a candidate-bound empty assessment and audi
   const finalAttempted = events.find(event => event.type === 'gate-attempted' && event.data.gate === bound.data.gate);
   expect(finalAttempted).toBeDefined();
 }, 30_000);
-

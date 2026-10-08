@@ -186,7 +186,7 @@
     "subs/harness/src/tests/nonfunctional-repair.test.ts": "397901d3b318ee27592a88b731ef0b866e40e87979686fb7149349f2fcd67a17",
     "subs/harness/src/tests/nonfunctional-deviation-runtime.test.ts": "40c3a8c06a4d1569f5887039e936cd47f80e443d5fc02ff351cd0c62809855e1",
     "subs/harness/src/tests/nonfunctional-boundaries.test.ts": "e15b3e3ad371b52e5874344e3f965b7e4de812e4593ccb65ef4b66b9db00b30c",
-    "subs/harness/src/tests/nonfunctional-run.boundary.test.ts": "c511208ed191c51ab73630dce7d6459c69482fd0edb75ec2246818e1416229f5",
+    "subs/harness/src/tests/nonfunctional-run.boundary.test.ts": "e6e1ee15be2a733a5a364f04e48118cfe85ef4194a3e93a87345dd2e9158a37d",
     "subs/harness/src/tests/helpers/nonfunctional-boundaries.ts": "1f96957c00a40cf15f03c1975ad01b5138135aed423afe8cc4f285c8f547e2a8"
   },
   "configurationHashes": {
@@ -289,5 +289,17 @@
     "commandResult": "own Vitest PID2318543 terminated after strict ownership schema rejected accidental tags; no passing qualification claimed",
     "durableFailure": "/tmp/plan22-nonfunctional-topology-schema-failure.jsonl",
     "sha256": "73617eaef4a383a36b72e26786941a20d457c35577fa5a45ba7209e7eede7f89"
+  },
+  "committedWhitespaceCorrection": {
+    "originalCandidate": "1f0c20cf3b8ac1705f8df6a2e48911a5825ea219",
+    "file": "subs/harness/src/tests/nonfunctional-run.boundary.test.ts",
+    "previousSha256": "c511208ed191c51ab73630dce7d6459c69482fd0edb75ec2246818e1416229f5",
+    "currentSha256": "e6e1ee15be2a733a5a364f04e48118cfe85ef4194a3e93a87345dd2e9158a37d",
+    "change": "Removed exactly one redundant newline at EOF; executable callback unchanged.",
+    "precheck": "Coordinator git diff HEAD^ HEAD --check found a new blank line at EOF; implementation-agent earlier empty working-tree diff check had not checked the committed patch.",
+    "coordinatorAudit": "Cancelled after accidental continuation past failed precheck; exit130; not passing evidence.",
+    "auditOutput": "/tmp/plan22-opt07-audit.json",
+    "auditStderr": "/tmp/plan22-opt07-audit.stderr.log",
+    "verification": "Prior focused/type/module checks apply unchanged executable content. Coordinator must run fresh released full nested audit on corrected candidate."
   }
 }
