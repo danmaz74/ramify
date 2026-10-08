@@ -28,11 +28,12 @@
  */
 import { execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { collectTrialScratchSetup, recordedTrialScratch, trialReportDestination } from './trial-attribution.js';
 
 const run = promisify(execFile);
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -243,10 +244,20 @@ async function verify(): Promise<number> {
     return 2;
   }
   const runDirectory = join(jobs, runId);
-  const events = (await readFile(join(runDirectory, 'events.jsonl'), 'utf8')).split('\n').filter(Boolean)
-    .map(line => (JSON.parse(line) as { event: { type: string } }).event.type);
+  const recordedEvents = (await readFile(join(runDirectory, 'events.jsonl'), 'utf8')).split('\n').filter(Boolean)
+    .map(line => (JSON.parse(line) as { event: { type: string } }).event);
+  const events = recordedEvents.map(event => event.type);
+  const final = (await git(project, 'rev-parse', '--verify', 'HEAD^{commit}')).trim();
+  const ignoreFile = join(project, '.gitignore');
+  const ignoreInfo = await lstat(ignoreFile).catch((error: unknown) => { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; });
+  let setup;
+  try {
+    if (ignoreInfo !== null && !ignoreInfo.isFile()) throw new Error('Current .gitignore is not a regular file');
+    setup = await collectTrialScratchSetup({ project, runId, base: baseline.commit, final, record: recordedTrialScratch(recordedEvents, runId), currentIgnoreBytes: ignoreInfo === null ? null : await readFile(ignoreFile), currentIgnoreMode: ignoreInfo === null ? null : (ignoreInfo.mode & 0o111) !== 0 ? '100755' : '100644' });
+  } catch (error) { setup = { state: 'unavailable' as const, reason: error instanceof Error ? error.message : String(error), identities: null, setupOnly: false, added: null, deleted: null, nonSetup: null }; }
 
   // Everything git sees as changed since the baseline, committed or not.
+  // Only the independently verified exact setup delta can leave ordinary scope accounting.
   // The harness's directories and Ramify's views are ignored by the fixture's
   // own .gitignore and by the .gitignore the harness writes into its state.
   const diff = (await git(project, 'diff', '--name-status', '--no-renames', baseline.commit)).trim().split('\n').filter(Boolean)
@@ -258,10 +269,12 @@ async function verify(): Promise<number> {
   const { scopes, outside } = await recordedScopes(runDirectory);
   const served = await servedOutsideScope(project, baseline.plan, runId);
 
+  const setupChanges: string[] = [];
   const inScope: string[] = [];
   const recordedOutside: string[] = [];
   const defects: string[] = [];
   for (const change of changes) {
+    if (change.path === '.gitignore' && setup.setupOnly) { setupChanges.push(`${change.status} ${change.path}  (exact recorded scratch setup at ${final})`); continue; }
     const absolute = join(project, change.path);
     const scope = scopes.find(candidate => candidate.files.includes(absolute) || candidate.roots.some(root => within(absolute, root)));
     if (scope !== undefined) {
@@ -286,7 +299,7 @@ async function verify(): Promise<number> {
     project, plan: baseline.plan, run: runId, baseline: baseline.commit, branch: head,
     terminal: events.at(-1) ?? null,
     scopes: scopes.length,
-    counts, inScope, recordedOutside, defects,
+    counts, setup, setupChanges, inScope, recordedOutside, defects,
     evaluation: typeof served === 'string' ? { unavailable: served } : { outsideScope: [...served].sort() },
     status: status === '' ? [] : status.split('\n'),
   };
@@ -295,6 +308,9 @@ async function verify(): Promise<number> {
   console.log(`Run: ${runId} of "${baseline.plan}", last event ${report.terminal}; ${scopes.length} recorded write scopes.`);
   console.log(`Branch ${head}; baseline ${baseline.commit}.`);
   console.log(`Changed since the baseline: ${counts.changed} modified, ${counts.added} added, ${counts.deleted} deleted.`);
+  console.log(`Exact recorded setup changes: ${setupChanges.length}`);
+  for (const line of setupChanges) console.log(`  ${line}`);
+  if (setup.state === 'unavailable') console.log(`Setup attribution unavailable: ${setup.reason}`);
   console.log(`Inside a recorded write scope: ${inScope.length}`);
   for (const line of inScope) console.log(`  ${line}`);
   console.log(`Outside every scope, and in outsideScope and in the evaluation: ${recordedOutside.length}`);
@@ -304,10 +320,10 @@ async function verify(): Promise<number> {
   for (const line of defects) console.log(`  ${line}`);
   console.log(`git status: ${status === '' ? 'clean' : `\n${status}`}`);
   const json = option('--json');
-  if (json !== undefined) await writeFile(resolve(json), `${JSON.stringify(report, null, 2)}\n`);
+  if (json !== undefined) await writeFile(await trialReportDestination(project, json), `${JSON.stringify(report, null, 2)}\n`);
   if (typeof served === 'string') return 2;
   console.log(defects.length === 0
-    ? 'Every change is inside a recorded write scope, or recorded outside one and in the evaluation.'
+    ? 'Every change is exact recorded setup, inside a recorded write scope, or recorded outside one and in the evaluation.'
     : 'The run changed the project outside what its records account for.');
   return defects.length === 0 ? 0 : 1;
 }

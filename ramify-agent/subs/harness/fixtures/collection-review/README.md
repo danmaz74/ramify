@@ -91,9 +91,9 @@ session's id is the one the listener's transport generated there, which the
 scenario compares against the id the server saw. `test:cucumber` runs quick
 mode under this package's own `cucumber.js` profile.
 
-ramify-agent runs none of these scripts itself. A gate asks for the
-project's committed audit, whose configured Cucumber check runs the
-scenarios under the profile it commits. The fixture commits no audit
+Engineering tools can execute the project's declared commands. Each gate
+independently asks for the committed configured audit, whose Cucumber check
+runs the scenarios under its committed profile. The fixture commits no audit
 definition, so the tests that drive a run over it answer each gate with a
 scripted configured audit; a trial copy made by `npm run trial -- prepare`
 commits one in the copy. `cucumber.js` also collects the feature files a run
@@ -108,16 +108,10 @@ harness writes feature files beneath and briefs engineers to use: a module's `sr
 for a testing module such as `integration-tests`, its `src/steps/` and
 `src/features/`.
 
-The World and the hooks stay in `integration-tests`, and a module that is
-not `dispatch`-tagged cannot import them: they are built on
-`createTestSystem`, whose `[testing, dispatch]` tags they carry. A step file
-that does not drive the system needs neither. The plan `status-badge-tone`
-states its first two acceptance bullets as scenarios, owned by `shared-ui`,
-whose test area is `[testing, ui]`; their step file renders the badge with
-`react-dom/server`, as the badge's unit tests do, and keeps what it rendered
-in its own scope. Cucumber still constructs the World for each scenario,
-since the support files load in every run, and its constructor starts
-nothing.
+Scenario support, World and hooks are configured by `cucumber.js`. Their
+module declarations and generated API views identify which source areas can
+import them. New scenarios retain the requirements stated by their plan;
+implementation choices belong to the assigned engineer and responsible architect.
 
 ## The ownership tree
 
@@ -161,33 +155,19 @@ Each `module.ramify` states one module's name, its tags, and what it exposes and
 in which direction. Read them together with each owner's README, which says what
 the module is for; the comments in the descriptions say why each exposure exists.
 
-Nothing checks them yet: version 1 has no parser, loader or evaluator support.
-Until it does, every description is reviewed by hand against the
-[description review checklist](../../docs/plans/reference-project/implementation.md#description-review-checklist)
-at the end of each iteration. Use that checklist when you change a description,
-and record the change in the contract map below.
+The installed Ramify CLI parses these descriptions and checks source access.
+Run the configured structural check when changing a description and use the
+generated source or testing API view for the area that will import a symbol.
+An analysis limitation records incomplete evidence; it does not supply access
+or establish a scenario's semantic completion.
 
-## Cases, contracts and the report
+## Trial records
 
-- The [case catalogue](../../docs/plans/reference-project/cases.md) names every
-  expectation this project is a witness for, and what each one still needs.
-- The [contract map](../../docs/plans/reference-project/contract-map.md) records
-  every exposed symbol: its owner, defining file, kind, tags, the statements
-  that carry it, and the modules that import it.
-- The [reference harness](../../scripts/reference-harness) holds one record per
-  case family and prints what has actually been established. From the repository
-  root above this package:
-
-  ```bash
-  npm run reference:report            # runs this package's tiers, then reports
-  npm run reference:report -- --dry-run
-  npm run reference:cases             # the harness's own tests
-  ```
-
-  The report is deliberately unflattering: the application, protocol and tools
-  tiers pass — the last of them the one Cucumber scenario — and every case whose
-  capability does not exist yet is listed as **not executed** rather than
-  skipped or dropped.
+`plans/` is explicitly owned-unwired in the root description. It holds plan
+requirements and the harness's durable `plans/<plan>/.harness/` run records;
+source modules and their configured tests remain analyzed. Trial verification
+reports and retained evidence are written outside the prepared project. The
+project's existing configured audit obligations still apply to every gate.
 
 ## Independence
 
@@ -202,9 +182,12 @@ procedure, to be repeated whenever its dependencies change:
    overrides.
 4. Remove the copy.
 
-Last run on 2026-09-07 with Node v22.23.2 and npm 10.9.8, after the scenario
+Historical standalone evidence from 2026-09-07 with Node v22.23.2 and npm 10.9.8, after the scenario
 moved into `integration-tests`: `npm ci` installed from the lockfile with no
 vulnerabilities, `type-check` reported nothing, `build` transformed 49 modules
 into `dist/`, `npm test` passed 77 tests in 20 files, and
 `npm run test:cucumber` passed its one scenario of 12 steps and exited on its
 own. Nothing outside the copy was needed.
+
+That historical result predates the current fixture-input changes and is not
+qualification of a new prepared copy.

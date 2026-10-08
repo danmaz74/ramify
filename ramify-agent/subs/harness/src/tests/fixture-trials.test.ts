@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, test } from 'vitest';
@@ -75,8 +75,8 @@ async function stages(plan: string): Promise<Array<Record<string, string>>> {
 }
 
 /** A stage's source, written file by file through the guarded `write` tool. */
-function writes(files: Record<string, string>) {
-  return Object.entries(files).map(([path, content]) => write(path, content));
+function writes(files: Record<string, string>, moduleSourceDirectory: string) {
+  return Object.entries(files).map(([path, content]) => write(relative(moduleSourceDirectory, path), content));
 }
 
 interface TrialResult {
@@ -146,6 +146,7 @@ async function trial(plan: string, script: Parameters<typeof byRole>[0], check: 
     const snapshot = onlyRun(reopened.service, plan);
     await reopened.service.close();
 
+    if (out !== undefined && (resolve(out) === resolve(project!) || resolve(out).startsWith(`${resolve(project!)}/`))) throw new Error('Trial evidence output must be outside the analyzed prepared copy');
     if (out !== undefined) await retain(join(out, plan), project!, plan, runId, verified.stdout, report);
 
     const read = async <T>(path: string): Promise<T> => JSON.parse(await readFile(runPath(project!, plan, runId, path), 'utf8')) as T;
@@ -225,7 +226,7 @@ describe.runIf(selected.includes('status-badge-tone'))('the status-badge-tone tr
       ],
       engineer: [submit(
         completionProposed('The badge carries its tone, neutral by default, with its own tests; both scenarios bind to its step file.', { bindings: [{ id: 'sc-001' }, { id: 'sc-002' }] }),
-        ...writes(stage), write(badgeSteps, badgeStepFile),
+        ...writes(stage, 'subs/workspace/subs/shared-ui/src'), write(relative('subs/workspace/subs/shared-ui/src', badgeSteps), badgeStepFile),
       )],
     }, async result => {
       expect(result.snapshot.state).toBe('completed');
@@ -303,9 +304,9 @@ describe.runIf(selected.includes('reviewer-identity'))('T3: reviewer-identity on
         submit(requestCompletion({ changes: 'Every stage is accepted; the reviewer is carried and shown.', revisionReason: 'The last stage is accepted.' })),
       ],
       engineer: [
-        submit(completionProposed('The shared vocabulary has the structured reviewer.'), ...writes(prepare!)),
-        submit(completionProposed('The outcome requires the reviewer, and the runtime, both surfaces and every caller carry it.'), ...writes(surfaces!)),
-        submit(completionProposed('The review panel shows the reviewer\'s name and role above the verdict.'), ...writes(views!)),
+        submit(completionProposed('The shared vocabulary has the structured reviewer.'), ...writes(prepare!, 'subs/workspace/subs/contracts/src')),
+        submit(completionProposed('The outcome requires the reviewer, and the runtime, both surfaces and every caller carry it.'), ...writes(surfaces!, 'subs/workspace/subs/reviews/subs/core/src')),
+        submit(completionProposed('The review panel shows the reviewer\'s name and role above the verdict.'), ...writes(views!, 'subs/workspace/subs/reviews/subs/ui/src')),
       ],
     }, async result => {
       expect(result.snapshot.failure).toBeNull();

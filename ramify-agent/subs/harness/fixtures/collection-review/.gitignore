@@ -4,7 +4,7 @@ dist/
 
 # Materialized API-view catalogs, the materialized architect view and the
 # publisher's reserved transient staging/rollback siblings of each, with their
-# sibling marker files. See /ramify/.gitignore for the matching rule.
+# sibling marker files produced by the installed Ramify publisher.
 .ramify/
 .ramify.tmp-*/
 .ramify.old-*/
