@@ -304,7 +304,10 @@
       "subs/harness/subs/agent/README.md",
       "subs/harness/subs/agent/subs/pi/README.md",
       "docs/plans/23-session-reuse-and-run-efficiency/iterations/14-results.md",
-      "subs/harness/src/work/scope.ts"
+      "subs/harness/src/work/scope.ts",
+      "subs/harness/src/qualification/live-session.ts",
+      "subs/harness/src/tests/plan23-live-session.test.ts",
+      "subs/harness/subs/agent/subs/pi/src/pi-agent.ts"
     ]
   },
   "rules": [
