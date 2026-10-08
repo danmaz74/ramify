@@ -236,7 +236,8 @@
       "subs/harness/src/tools/shell.ts",
       "subs/harness/src/nonfunctional/prompts.ts",
       "subs/harness/src/sessions/single.ts",
-      "subs/harness/src/tests/single-session.test.ts"
+      "subs/harness/src/tests/single-session.test.ts",
+      "subs/harness/src/tests/single-session-fixture.ts"
     ],
     "11": [
       "subs/harness/src/run/service.ts",
