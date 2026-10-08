@@ -3,6 +3,9 @@
 **Parent:** [main plan](main-plan.md). Names below are proposed contracts, not
 claims that the current port already implements them. Iteration 0 freezes exact
 types and consumer fixtures; changing them later requires updating dependents.
+The [execution v1 appendix](contract-appendix.md) freezes the execution-base
+wire values, provider seams and recovery identities; [fixture contracts](fixture-contracts.md)
+fix independent expectations.
 
 ## C1. Session identity, history and storage
 

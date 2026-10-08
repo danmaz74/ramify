@@ -13,7 +13,12 @@ directories, fixture copies and provider state. Never run two mutating trials on
 one fixture or worktree. Use one worker per ready iteration, within available
 agent/host capacity; starting with three workers is sufficient to exploit the graph.
 
-Each iteration owns only the paths named in its brief and its own results file.
+The [exact write-set manifest](write-sets.json) reserves optional files by iteration
+on execution v1. Additional paths require an integrator reservation before editing.
+The harness `module.ramify` remains integrator-owned; child declarations follow
+the provider ownership in that manifest.
+
+Each iteration owns only its reserved paths and its own results file.
 Before starting, expand the write set to exact files and compare it with active
 iterations. Distinct feature names do not prove safe independence. If a shared
 file is needed, move that edit to the designated integration iteration or serialize
