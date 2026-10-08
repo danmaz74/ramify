@@ -126,7 +126,11 @@
       "subs/harness/subs/agent/subs/pi/src/tests/plan23-prefix-preservation.test.ts",
       "subs/harness/subs/agent/subs/pi/src/tests/helpers/scripted-provider.ts",
       "subs/harness/subs/agent/subs/pi/src/tests/helpers/session.ts",
-      "docs/plans/23-session-reuse-and-run-efficiency/iterations/07-results.md"
+      "docs/plans/23-session-reuse-and-run-efficiency/iterations/07-results.md",
+      "subs/harness/subs/agent/src/interfaces/session-operations.ts",
+      "subs/harness/subs/agent/src/session-operations.ts",
+      "subs/harness/subs/agent/src/tests/plan23-session-operations.test.ts",
+      "subs/harness/subs/agent/module.ramify"
     ],
     "8": [
       "subs/harness/src/run/service.ts",
