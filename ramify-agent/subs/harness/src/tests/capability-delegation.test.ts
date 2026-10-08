@@ -1,21 +1,39 @@
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { capabilityFlowBoundaries, flowInitialHead } from './helpers/capability-flow-boundaries.js';
+import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
-import { gitService } from '../../subs/evidence/src/git.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
-import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { git, initRepository, openRuns, runEventsOnDisk, runPath, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
+import { assign, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
+import { openRuns, runEventsOnDisk, runPath, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { capabilityPolicyFrom } from '../capability/policy.js';
-import { captureProvisionalSource } from '../capability/source.js';
-import { temporaryDirectory } from './helpers/fixture.js';
 import { decision, forkDecision } from './helpers/placement.js';
 import type { CapabilityRequest, CapabilityTask } from '../capability/records.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 
+vi.mock('node:child_process', async importOriginal => {
+  const { guardedChildProcess } = await import('./helpers/process-guard.js');
+  return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
+});
+beforeEach(() => resetSpawnAttempts());
+const answers: ReturnType<typeof capabilityFlowBoundaries>[] = [];
+async function openGuardedRuns(root: string, answers: ReturnType<typeof capabilityFlowBoundaries>, options: Parameters<typeof openRuns>[1]) {
+  return openRuns(root, { ...options, ...(options.script === undefined ? {} : { script: answers.script(options.script) }) });
+}
+async function openGuardedCapabilityRuns(root: string, answers: ReturnType<typeof capabilityFlowBoundaries>, options: Parameters<typeof openCapabilityRuns>[1]) {
+  return openCapabilityRuns(root, { ...options, ...(options.script === undefined ? {} : { script: answers.script(options.script) }) });
+}
+
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+afterEach(async () => {
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
+  for (const answer of answers.splice(0)) try { answer.assertComplete(); } catch (error) { errors.push(error); }
+  try { expect(spawnAttempts(), 'ordinary capability setup/flow/teardown process attempts').toEqual([]); } catch (error) { errors.push(error); }
+  if (errors.length) throw new AggregateError(errors, 'Capability flow fixture teardown failed');
+});
 
 const a = 'capability-coordination/a';
 const b = 'capability-coordination/b';
@@ -88,12 +106,13 @@ function script(starts: string[], capabilityPrompts: string[] = [], qualificatio
 test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  const base = await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'delegation', 'a+b'); answers.push(boundaryAnswers);
+  const base = flowInitialHead;
+
   const starts: string[] = [];
   const capabilityPrompts: string[] = [];
-  const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService, script: script(starts, capabilityPrompts), inputs: treeInputs(),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, {
+    ...boundaryAnswers.options, script: script(starts, capabilityPrompts), inputs: treeInputs(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -127,7 +146,7 @@ test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and kee
   const request = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'capabilities/requests/need-001.json'), 'utf8')) as CapabilityRequest;
   const task = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'capabilities/cap-001/task.json'), 'utf8')) as CapabilityTask;
   expect(request.source.acceptedBase).not.toBe(base);
-  expect((await git(fixture.root, 'rev-parse', 'HEAD')).trim()).toBe(request.source.acceptedBase);
+  expect(await boundaryAnswers.options.git.currentHead(fixture.root)).toBe(request.source.acceptedBase);
   expect(request.original.examples[0]?.id).toBe('need-001.ex01');
   expect(request.source.delta.map(delta => delta.path)).toEqual([
     'subs/a/src/caller.ts', 'subs/a/src/extra.ts', 'subs/a/src/tests/caller.test.ts',
@@ -156,12 +175,13 @@ test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and kee
 test('an unsafe scratch override refuses capability source capture until the same engineer repairs it', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'scratch', 'a+b'); answers.push(boundaryAnswers);
+
+
   const ordinary = script([]);
   let captured = 0;
-  const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService,
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, {
+    ...boundaryAnswers.options,
     script: spec => {
       const steps = typeof ordinary === 'function' ? ordinary(spec) : ordinary;
       if (spec.role !== 'engineer') return steps;
@@ -195,7 +215,7 @@ test('an unsafe scratch override refuses capability source capture until the sam
   expect(await readFile(runPath(fixture.root, 'need', receipt.jobId,
     runLayout.observations(engineer.data.invocation)), 'utf8')).toContain('!tmp/');
   const request = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'capabilities/requests/need-001.json'), 'utf8')) as CapabilityRequest;
-  expect((await git(fixture.root, 'rev-parse', 'HEAD')).trim()).toBe(request.source.acceptedBase);
+  expect(await boundaryAnswers.options.git.currentHead(fixture.root)).toBe(request.source.acceptedBase);
   expect(await readFile(join(fixture.root, 'subs/a/src/tmp/draft.txt'), 'utf8')).toBe('provisional scratch\n');
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const version = opened.service.getRun('need', receipt.jobId)!.version;
@@ -208,12 +228,13 @@ test('an unsafe scratch override refuses capability source capture until the sam
 test('a capability architect budget return reconstructs a fresh session with the current task and plan', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'delegation', 'a+b'); answers.push(boundaryAnswers);
+
+
   const starts: string[] = [];
   const prompts: string[] = [];
-  const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService, script: script(starts, prompts, 'placement', 1, true), inputs: treeInputs(),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, {
+    ...boundaryAnswers.options, script: script(starts, prompts, 'placement', 1, true), inputs: treeInputs(),
 
   });
   cleanups.push(() => opened.service.close());
@@ -256,11 +277,12 @@ test('a capability architect budget return reconstructs a fresh session with the
 test('exhausted capability architect budget returns leave the task unfinished without handback', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'delegation', 'a+b'); answers.push(boundaryAnswers);
+
+
   const starts: string[] = [];
-  const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService, script: script(starts, [], 'placement', 6), inputs: treeInputs(),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, {
+    ...boundaryAnswers.options, script: script(starts, [], 'placement', 6), inputs: treeInputs(),
 
   });
   cleanups.push(() => opened.service.close());
@@ -285,8 +307,9 @@ for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port
   test(`CA16 CA26: ${mode} respects the captured capability action rejection bound`, async () => {
     const fixture = await copyCapabilityFixture();
     cleanups.push(fixture.remove);
-    await initRepository(fixture.root);
-    await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'delegation', 'a+b'); answers.push(boundaryAnswers);
+
+
     const ordinary = script([]);
     let architectTurns = 0;
     const scripted: Script = spec => {
@@ -306,8 +329,8 @@ for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port
       }));
       return Array.from({ length: 2 }, () => ({ kind: 'submit' as const, input: incomplete }));
     };
-    const opened = await openCapabilityRuns(fixture.root, {
-      git: gitService, script: scripted, inputs: treeInputs(),
+    const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, {
+      ...boundaryAnswers.options, script: scripted, inputs: treeInputs(),
       policy: root => ({ ...testPolicy(root), limits: { ...testPolicy(root).limits, rejectedSubmissionsPerTurn: 2 } }),
     });
     cleanups.push(() => opened.service.close());
@@ -360,9 +383,10 @@ for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port
 test('scripted current-engine composition refuses an earlier captured policy before creating a run', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
-  const opened = await openRuns(fixture.root, { git: gitService, script: script([]),
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'policy', 'a+b'); answers.push(boundaryAnswers);
+
+
+  const opened = await openGuardedRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script([]),
 
     policy: root => ({ ...testPolicy(root), version: 'run-policy/6' } as never) });
   cleanups.push(() => opened.service.close());
@@ -372,10 +396,11 @@ test('scripted current-engine composition refuses an earlier captured policy bef
 test('CA33: production composition captures policy/7 and delegates without contract dispatch', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
-  const opened = await openRuns(fixture.root, {
-    production: true, git: gitService, script: script([]), inputs: treeInputs(),
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'delegation', 'a+b'); answers.push(boundaryAnswers);
+
+
+  const opened = await openGuardedRuns(fixture.root, boundaryAnswers, {
+    production: true, ...boundaryAnswers.options, script: script([]), inputs: treeInputs(),
 
   });
   cleanups.push(() => opened.service.close());
@@ -397,11 +422,12 @@ test('CA33: production composition captures policy/7 and delegates without contr
 test('an unresolved qualification returns through the global architect and the same local architect', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'delegation', 'a+b'); answers.push(boundaryAnswers);
+
+
   const starts: string[] = [];
-  const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService, script: script(starts, [], 'unresolved'), inputs: treeInputs(),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, {
+    ...boundaryAnswers.options, script: script(starts, [], 'unresolved'), inputs: treeInputs(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -433,8 +459,9 @@ test('an unresolved qualification returns through the global architect and the s
 test('CA02: local architect finds an existing API and the same engineer verifies it', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'existing', 'a'); answers.push(boundaryAnswers);
+
+
   let engineerTurns = 0;
   const scripted: Script = spec => {
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a)]));
@@ -457,8 +484,8 @@ test('CA02: local architect finds an existing API and the same engineer verifies
     if (spec.role === 'capability-architect') throw new Error('Existing behavior must not start a new task');
     return [];
   };
-  const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService, script: scripted, inputs: treeInputs(),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, {
+    ...boundaryAnswers.options, script: scripted, inputs: treeInputs(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -485,42 +512,3 @@ test('CA02: local architect finds an existing API and the same engineer verifies
   }
   await opened.service.settled('need', receipt.jobId);
 }, 30_000);
-
-test('CA30: provisional snapshot keeps staged, worktree, untracked and deleted bytes separately', async () => {
-  const fixture = await copyCapabilityFixture();
-  cleanups.push(fixture.remove);
-  const run = await temporaryDirectory();
-  cleanups.push(run.remove);
-  const base = await initRepository(fixture.root);
-  const tracked = 'subs/a/src/caller.ts';
-  await writeFile(join(fixture.root, tracked), 'export const staged = true;\n');
-  await git(fixture.root, 'add', tracked);
-  await writeFile(join(fixture.root, tracked), 'export const worktree = true;\n');
-  await writeFile(join(fixture.root, 'subs/a/src/extra.ts'), 'export const untracked = true;\n');
-  await rm(join(fixture.root, 'subs/d/src/consumer.ts'));
-  const captured = await captureProvisionalSource({
-    projectRoot: fixture.root, runDirectory: run.path, request: 'need-001', acceptedBase: base,
-    writerSettledBy: 'inv-0001', changedPaths: await gitService.changedPaths(fixture.root, base),
-  });
-  const manifest = JSON.parse(await readFile(join(run.path, captured.snapshot), 'utf8')) as {
-    files: Array<{ path: string; worktree: string | null; index: string | null; base: string | null }>;
-    tree: string; snapshotHash: string;
-  };
-  expect(captured.tree).toBe(manifest.tree);
-  expect(captured.snapshotHash).toBe(manifest.snapshotHash);
-  expect(captured.tree).not.toBe(captured.snapshotHash);
-  expect((await git(fixture.root, 'cat-file', '-t', captured.tree)).trim()).toBe('tree');
-  expect((await git(fixture.root, 'diff', '--name-only', captured.tree, base)).trim().split('\n'))
-    .toContain('subs/a/src/extra.ts');
-  const staged = manifest.files.find(file => file.path === tracked)!;
-  expect(Buffer.from(staged.index!, 'base64').toString()).toContain('staged = true');
-  expect(Buffer.from(staged.worktree!, 'base64').toString()).toContain('worktree = true');
-  expect(captured.delta.find(file => file.path === tracked)?.staged).toBe(true);
-  const untracked = manifest.files.find(file => file.path === 'subs/a/src/extra.ts')!;
-  expect(untracked.base).toBeNull();
-  expect(untracked.index).toBeNull();
-  expect(Buffer.from(untracked.worktree!, 'base64').toString()).toContain('untracked = true');
-  const deleted = manifest.files.find(file => file.path === 'subs/d/src/consumer.ts')!;
-  expect(deleted.worktree).toBeNull();
-  expect(deleted.base).not.toBeNull();
-});

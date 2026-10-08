@@ -1,18 +1,35 @@
+import { capabilityFlowBoundaries } from './helpers/capability-flow-boundaries.js';
+import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
 import { rootDescription } from './helpers/root-description.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
-import { gitService } from '../../subs/evidence/src/git.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
-import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { initRepository, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
+import { assign, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
+import { runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import { decision, forkDecision } from './helpers/placement.js';
 
+vi.mock('node:child_process', async importOriginal => {
+  const { guardedChildProcess } = await import('./helpers/process-guard.js');
+  return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
+});
+beforeEach(() => resetSpawnAttempts());
+const answers: ReturnType<typeof capabilityFlowBoundaries>[] = [];
+async function openGuardedCapabilityRuns(root: string, answers: ReturnType<typeof capabilityFlowBoundaries>, options: Parameters<typeof openCapabilityRuns>[1]) {
+  return openCapabilityRuns(root, { ...options, ...(options.script === undefined ? {} : { script: answers.script(options.script) }) });
+}
+
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+afterEach(async () => {
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
+  for (const answer of answers.splice(0)) try { answer.assertComplete(); } catch (error) { errors.push(error); }
+  try { expect(spawnAttempts(), 'ordinary capability setup/flow/teardown process attempts').toEqual([]); } catch (error) { errors.push(error); }
+  if (errors.length) throw new AggregateError(errors, 'Capability flow fixture teardown failed');
+});
 const a = 'capability-coordination/a';
 const b = 'capability-coordination/b';
 const d = 'capability-coordination/d';
@@ -114,11 +131,12 @@ function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-bloc
 
 test('an explicit partial capability result returns its cross-owner blocker to the architect', async () => {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'partial', 'a+b'); answers.push(boundaryAnswers);
   await mkdir(join(fixture.root, 'src/tests'), { recursive: true });
   await writeFile(join(fixture.root, 'src/tests/stale.test.ts'), "expect('old');\n");
-  await initRepository(fixture.root); await installMiniRunner(fixture.root);
+
   const seen: string[] = [], prompts: string[] = [];
-  const opened = await openCapabilityRuns(fixture.root, { git: gitService,
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options,
     script: script(seen, 'partial-blocker', prompts), inputs: treeInputs(),
     });
   cleanups.push(() => opened.service.close());
@@ -149,9 +167,10 @@ test('an explicit partial capability result returns its cross-owner blocker to t
 
 test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes', async () => {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
-  await initRepository(fixture.root); await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'assignment', 'a+b'); answers.push(boundaryAnswers);
+
   const seen: string[] = [];
-  const opened = await openCapabilityRuns(fixture.root, { git: gitService, script: script(seen), inputs: treeInputs(),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(seen), inputs: treeInputs(),
     });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -224,9 +243,10 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
 
 test('CA10: a wider boundary decision returns to the same capability architect', async () => {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
-  await initRepository(fixture.root); await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'boundary', 'a+b'); answers.push(boundaryAnswers);
+
   const seen: string[] = [];
-  const opened = await openCapabilityRuns(fixture.root, { git: gitService, script: script(seen, 'boundary'),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(seen, 'boundary'),
     inputs: treeInputs(), });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -268,13 +288,14 @@ async function stopAfterArchitectYield(service: Awaited<ReturnType<typeof openCa
 
 test('PB3: unreadable inherited directory bytes cannot be captured as absent authority', async () => {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
-  await initRepository(fixture.root); await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'unreadable', 'a+b'); answers.push(boundaryAnswers);
+
   const baseScript = script([]);
   let unreadableCandidate = false;
-  const git = Object.assign(Object.create(gitService), {
-    changedPaths: async (root: string, base?: string) => unreadableCandidate ? ['subs/a/src'] : gitService.changedPaths(root, base),
+  const git = Object.assign(Object.create(boundaryAnswers.options.git), {
+    changedPaths: async (root: string, base?: string) => unreadableCandidate ? ['subs/a/src'] : boundaryAnswers.options.git.changedPaths(root, base),
   });
-  const opened = await openCapabilityRuns(fixture.root, { git, inputs: treeInputs(), script: spec => {
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, git, inputs: treeInputs(), script: spec => {
     const steps = typeof baseScript === 'function' ? baseScript(spec) : baseScript;
     if (spec.role === 'capability-architect' && steps.some(step => step.kind === 'submit' && (step.input as { kind?: string }).kind === 'assign')) unreadableCandidate = true;
     return steps;

@@ -1,21 +1,38 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { capabilityFlowBoundaries } from './helpers/capability-flow-boundaries.js';
+import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildCapabilityPlanRevision, unreportedByHandback, validateCapabilityAction, validateCapabilityPlanUpdate, type CapabilityActionBasis,
 } from '../capability/submission.js';
 import { copyCapabilityFixture, fixturePlan, openCapabilityRuns } from './helpers/capability.js';
 import { capabilityPlanSchema } from '../capability/records.js';
 import type { Script } from '../../subs/agent/src/scripted.js';
-import { gitService } from '../../subs/evidence/src/git.js';
 import { analysis, entry } from './helpers/analysis.js';
-import { assign, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
-import { initRepository, runEventsOnDisk, startRun, until } from './helpers/runs.js';
+import { assign, edit, outline, submit, treeInputs } from './helpers/iterations.js';
+import { runEventsOnDisk, startRun, until } from './helpers/runs.js';
 import { capabilityContext, line, registered, reported, submissionHash } from './helpers/obligations.js';
 import { validateEngineer } from '../work/engineer.js';
 import { obligationEventsToRecord, outstandingReports } from '../work/obligations.js';
 import type { RunEvent } from '../run/log.js';
 
+vi.mock('node:child_process', async importOriginal => {
+  const { guardedChildProcess } = await import('./helpers/process-guard.js');
+  return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
+});
+beforeEach(() => resetSpawnAttempts());
+const answers: ReturnType<typeof capabilityFlowBoundaries>[] = [];
+async function openGuardedCapabilityRuns(root: string, answers: ReturnType<typeof capabilityFlowBoundaries>, options: Parameters<typeof openCapabilityRuns>[1]) {
+  return openCapabilityRuns(root, { ...options, ...(options.script === undefined ? {} : { script: answers.script(options.script) }) });
+}
+
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+afterEach(async () => {
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
+  for (const answer of answers.splice(0)) try { answer.assertComplete(); } catch (error) { errors.push(error); }
+  try { expect(spawnAttempts(), 'ordinary capability setup/flow/teardown process attempts').toEqual([]); } catch (error) { errors.push(error); }
+  if (errors.length) throw new AggregateError(errors, 'Capability flow fixture teardown failed');
+});
 
 const basis: CapabilityActionBasis = {
   task: 'cap-001', planRevision: 2, coordinatorInvocation: 'inv-0003', state: 'coordinating',
@@ -262,10 +279,11 @@ function reportingScript(prompts: string[]): Script {
 it('PB3-D01 PB3-D02 PB3-D04: a capability architect registers a case and a test and reports during coordination; the run records exactly that', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'report', 'a+b'); answers.push(boundaryAnswers);
+
+
   const prompts: string[] = [];
-  const opened = await openCapabilityRuns(fixture.root, { git: gitService, script: reportingScript(prompts), inputs: treeInputs() });
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: reportingScript(prompts), inputs: treeInputs() });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
   const events = () => opened.service.events('need', receipt.jobId) ?? [];

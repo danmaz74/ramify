@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { access, chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,7 @@ import { createScriptedAgent, type Script, type ScriptedAgent, type ScriptedAgen
 import { declaringScenarios } from './declarations.js';
 import { childEnvironment } from '../../../subs/evidence/src/run-command.js';
 import { gitService } from '../../../subs/evidence/src/git.js';
+import { readJsonLines } from '../../../subs/ledger/src/jsonl.js';
 import { checkCommand } from '../../checks/records.js';
 import { privateRamify, RamifyCli, ramifyExecutable } from '../../../subs/evidence/src/ramify-cli.js';
 import type { CapturedInputManifest } from '../../interfaces/protocol/evidence.js';
@@ -309,10 +310,13 @@ export function emptyAnalysis() {
   return { elements: [], entries: [], hypotheses: [], coverageLimits: [], scenarios: [], integrationScenarios: [] };
 }
 
-/** The run's events as written in its `events.jsonl`, one to a ledger line. */
+/* Read complete ledger lines while a run may append its next line. A missing run log
+ * remains an error; only an unfinished final append is deferred. */
 export async function runEventsOnDisk(root: string, planId: string, runId: string): Promise<RunEvent[]> {
-  const text = await readFile(join(root, 'plans', planId, '.harness', 'jobs', runId, 'events.jsonl'), 'utf8');
-  return text.split('\n').filter(Boolean).map(line => (JSON.parse(line) as { event: RunEvent }).event);
+  const path = join(root, 'plans', planId, '.harness', 'jobs', runId, 'events.jsonl');
+  await access(path); // readJsonLines answers an absent file as empty; this helper refuses it.
+  const loaded = await readJsonLines(path);
+  return loaded.records.map(record => (record as { event: RunEvent }).event);
 }
 
 /** The directory of one run beneath the project. */
