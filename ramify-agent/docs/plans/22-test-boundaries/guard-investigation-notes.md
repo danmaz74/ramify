@@ -67,3 +67,18 @@ ENOENT keeps its outcome and contributes no refused local observation. Local
 recorder resets do not erase root enforcement. The committed MAIN fixture-trial
 advance b23db328 was adopted before final qualification, preserving its ten
 changed files verbatim.
+
+## First complete enforcement audit and repair
+
+The first automatic enforcement audit of `953ab293` failed in twelve previously
+unclassified files; the [complete failure receipt](optimizations/13-failed-enforcement-audit.md)
+retains the ledger. Ten genuine native cases moved without changing their case
+bodies, and the single contract-delegation fixture test was explicitly
+registered. Policy/decoder, HTTP and SDK adapter cases remain guarded with
+finite literal command, candidate, materialization and search replies. The real
+in-place executor accepts the existing external CommandRunner port while
+preserving its production default and provider dispatch. Cleanup aggregates
+errors, and two transport controls show caught/unused/exhausted replies cannot
+silently pass. Repaired core `06d833cf` qualifies 255 focused passes and the
+282-file configured partition; another released full nested audit is still
+required. See the [current receipt](optimizations/13-automatic-boundaries-results.md).
