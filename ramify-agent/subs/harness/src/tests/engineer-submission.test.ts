@@ -378,8 +378,16 @@ describe('a Ramify module violation in a run', () => {
     // Each answer is a `ramify.check/3` result that checked every named path.
     const answer = (findings: Record<string, unknown>[]) => async (paths: readonly string[]) => changedResult(root, paths, findings);
     const checked = vi.spyOn(ramify, 'checkChanged')
-      .mockImplementationOnce(answer([finding])).mockImplementationOnce(answer([finding]))
+      .mockImplementationOnce(answer([finding]))
       .mockImplementation(answer([]));
+    const completed = vi.spyOn(ramify, 'checkComplete').mockImplementation(async () => {
+      const findings = (await readFile(join(root, file), 'utf8')).includes(marker) ? [finding] : [];
+      const report = { schemaVersion: 'ramify.analysis/3', request: { project: { root } }, inputId: 'scripted-completion',
+        outcome: { execution: 'completed', check: findings.length === 0 ? 'passed' : 'failed', coverage: 'complete' },
+        diagnostics: findings, warnings: [], coverage: [] };
+      return { form: 'complete', exitCode: findings.length === 0 ? 0 : 1, outcome: findings.length === 0 ? 'checked' : 'findings', reason: null,
+        report, stdout: JSON.stringify(report), stderr: '', provider: { schema: 'ramify.analysis/3', revision: 'scripted-completion' }, execution: 'completed', paths: [], removed: [], unsupported: null };
+    });
     const { service, agent } = await openRunsWithGit(root, {
       inputs: treeInputs(), git, candidates: finalCandidate(root, 'fixed-source').candidates, ramify,
       // The engineer's writes are what Git reports once the feature files are committed.
@@ -388,9 +396,9 @@ describe('a Ramify module violation in a run', () => {
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
         engineer: [[
-          edit(file, 'noteLimit = 400;', `noteLimit = 500; ${marker}`),
+          edit(join(root, file), 'noteLimit = 400;', `noteLimit = 500; ${marker}`),
           { kind: 'submit', input: completionProposed() },
-          edit(file, ` ${marker}`, ''),
+          edit(join(root, file), ` ${marker}`, ''),
           { kind: 'submit', input: completionProposed() },
         ]],
       }),
@@ -413,7 +421,8 @@ describe('a Ramify module violation in a run', () => {
     expect(engineer.verdicts[1]).toMatchObject({ accepted: true });
     // The edit that fixed it checked clean, so it told the engineer nothing about Ramify.
     expect(fixed!.text).not.toContain('RAMIFY');
-    expect(checked).toHaveBeenCalledTimes(4);
+    expect(checked).toHaveBeenCalledTimes(2);
+    expect(completed).toHaveBeenCalledTimes(2);
     git.assertComplete();
   }, 300_000);
 });

@@ -25,7 +25,7 @@ describe('the actual session shell write boundary', () => {
     const allowedRoot = await project();
     const allowed = await session(allowedRoot, [shell("printf '%s' 'export const noteLimit = 500;' > notes.ts"),
       { kind: 'submit', input: completionProposed('Actual shell updated ordinary owned source') }], { gate: true },
-      { changed: [notesSource], commandExecution, command: "printf '%s' 'export const noteLimit = 500;' > notes.ts", ramify: [checked('complete'), checked('changed')], gate: passingGate });
+      { changed: [notesSource], commandExecution, command: "printf '%s' 'export const noteLimit = 500;' > notes.ts", ramify: [checked('changed'), checked('complete')], gate: passingGate });
     expect(await readFile(join(allowedRoot, notesSource), 'utf8')).toContain('noteLimit = 500');
     expect(finished(allowed.result).gate).toMatchObject({ verdict: 'passed' });
     expect(allowed.git.commitAccepted).not.toHaveBeenCalled();
@@ -35,7 +35,7 @@ describe('the actual session shell write boundary', () => {
     const state = 'plans/plan/.harness/jobs/run/unsafe.json';
     const denied = await session(deniedRoot, [shell(`mkdir -p '${deniedRoot}/plans/plan/.harness/jobs/run' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/ramify-audit.json' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/${state}'`),
       { kind: 'submit', input: completionProposed('Actual shell created protected audit configuration and durable job state') }], { gate: true, module: 'collection-review' },
-      { changed: ['ramify-audit.json', state], commandExecution, command: `mkdir -p '${deniedRoot}/plans/plan/.harness/jobs/run' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/ramify-audit.json' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/${state}'`, ramify: [checked('complete'), { form: 'changed', outcome: 'not-checked' }], gate: [] });
+      { changed: ['ramify-audit.json', state], commandExecution, command: `mkdir -p '${deniedRoot}/plans/plan/.harness/jobs/run' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/ramify-audit.json' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/${state}'`, ramify: [checked('changed'), { form: 'complete', outcome: 'not-checked' }], gate: [] });
     expect(await readFile(join(deniedRoot, 'ramify-audit.json'), 'utf8')).toContain('createdByShell');
     expect(finished(denied.result).gate).toMatchObject({ verdict: 'failed' });
     const attempt = gateAttemptSchema.parse(JSON.parse(await readFile(join(finished(denied.result).records, 'gate/attempt.json'), 'utf8')));

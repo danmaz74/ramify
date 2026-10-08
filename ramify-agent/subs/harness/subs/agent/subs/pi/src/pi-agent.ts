@@ -1,4 +1,4 @@
-import { createPiSessionOperations } from './session-operations.js';
+import { createPiSessionOperations, piBuiltinDeclarations } from './session-operations.js';
 import type { SessionStore } from '../../../src/interfaces/session-operations.js';
 import { type DefaultResourceLoader, getAgentDir, ModelRuntime, resolveCliModel } from '@earendil-works/pi-coding-agent';
 import { join } from 'node:path';
@@ -88,6 +88,7 @@ export async function piReadiness(options: PiAgentOptions = {}): Promise<{ reado
 export function createPiAgentOn(source: PiRuntimeSource): AgentPort {
   return {
     name: 'pi',
+    builtinDeclarations: piBuiltinDeclarations,
     sessionOperations: source.sessionStore ? createPiSessionOperations(source, source.sessionStore) : null,
     bindSessionStore: sessionStore => createPiSessionOperations(source, sessionStore),
     support: piSupport,

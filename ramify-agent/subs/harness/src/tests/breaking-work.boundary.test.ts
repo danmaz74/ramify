@@ -295,7 +295,9 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
     // The guarded write of the same path was refused outright: it lies
     // outside the scope, and only the shell's unguarded write reached it.
     const firstEngineer = agent!.sessions.filter(session => session.spec.role === 'engineer')[0]!;
-    expect(firstEngineer.denied).toHaveLength(1);
+    const refusedWrites = firstEngineer.results.filter(result => result.tool === 'write' && result.isError);
+    expect(refusedWrites).toHaveLength(1);
+    expect(refusedWrites[0]!.text).toContain('vitest.config.ts');
     expect((await readResult(root, runId, 'wi-001', 1)).outcome).toBe('unsuitable');
 
     // The architect was told which path, so it could record the revision.

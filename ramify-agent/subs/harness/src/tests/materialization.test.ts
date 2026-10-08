@@ -529,7 +529,10 @@ describe('an engineer and the feature files', () => {
     // The two guarded writes were refused outright, the feature file although
     // it lies inside the scope; the observation says why.
     const engineer = opened.agent!.sessions.filter(session => session.spec.role === 'engineer')[0]!;
-    expect(engineer.denied).toHaveLength(2);
+    const refusedWrites = engineer.results.filter(result => result.tool === 'write' && result.isError);
+    expect(refusedWrites).toHaveLength(2);
+    expect(refusedWrites[0]!.text).toContain(notesFeature);
+    expect(refusedWrites[1]!.text).toContain('ramify-agent.json');
     const events = await runEventsOnDisk(project, plan, runId);
     const engineerStart = events.find(event => event.type === 'invocation-started' && event.data.role === 'engineer');
     if (engineerStart?.type !== 'invocation-started') throw new Error('Missing engineer invocation');

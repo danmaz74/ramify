@@ -122,10 +122,12 @@ describe('a run whose invocation is not confirmed settled', () => {
     // The analysis was accepted; readiness never ran, so the run has no gate.
     const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
     // Its three sessions are the intake, the initial architect and the check.
-    const session = ['session-opened', 'invocation-started', 'invocation-ended'];
+    const session = ['session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended'];
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'document-manifest-committed', ...session, ...session, ...session, 'analysis-accepted', 'session-finished', 'job-failed',
     ]);
+    expect(events.filter(event => event.type === 'invocation-prepared').map(event => event.data.invocation))
+      .toEqual(['inv-0001', 'inv-0001', 'inv-0002', 'inv-0002', 'inv-0003', 'inv-0003']);
     for (const invocation of ['inv-0001', 'inv-0002', 'inv-0003']) {
       const outcome = JSON.parse(await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.outcome(invocation)), 'utf8')) as InvocationOutcome;
       expect(outcome.settled.confirmed, invocation).toBe(false);

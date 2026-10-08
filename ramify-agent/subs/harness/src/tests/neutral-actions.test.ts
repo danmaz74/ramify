@@ -223,7 +223,7 @@ describe('ST05: an executor whose tools are named otherwise is recorded and guar
     ]);
     expect(recorded.filter(line => 'search' in line).map(line => line['search'])).toEqual([`noteLimit in ${notesDirectory}/src`]);
     expect(recorded.filter(line => 'excursion' in line).map(line => line['excursion'])).toEqual([
-      { callId: 'call-1', module: 'collection-review/workspace/reviews', firstEntry: true },
+      { callId: 'inv-0007:call-1', module: 'collection-review/workspace/reviews', firstEntry: true },
     ]);
     expect(guarded.filter(line => 'guard' in line).map(line => (line['guard'] as { verdict: string; requested: string })))
       .toEqual([

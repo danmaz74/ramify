@@ -59,17 +59,16 @@ async function stubRamify(): Promise<RamifyCli> {
     'const args = process.argv.slice(2);',
     "if (args[0] === '--version') { console.log('ramify 0.0.0 (the session integration stub)'); process.exit(0); }",
     "if (args[0] === 'materialize') process.exit(0);",
-    "if (args[0] === 'check' && args[1] === '--changed') {",
-    "  const paths = args.slice(2, args.indexOf('--format'));",
+    "if (args[0] === 'check' && args[1] === '--batch') {",
+    `  const paths = [${JSON.stringify(notesSource)}];`,
     "  const forbidden = paths.filter(path => existsSync(join(process.cwd(), path)) && readFileSync(join(process.cwd(), path), 'utf8').includes('FORBIDDEN'));",
     "  const findings = forbidden.map(file => ({ id: 'source-diagnostic/1:' + file, category: 'import', code: 'not-visible', new: true,",
     "    message: 'collection-review:interfaces/protocol.ts#ToolResult: not-visible', location: { file, start: 0, end: 1, line: 1, column: 1 },",
     "    related: [], importer: { owner: 'collection-review/workspace/reviews/notes' }, accessId: null,",
     "    original: { kind: 'code', owner: 'collection-review', file: 'interfaces/protocol.ts', binding: 'ToolResult' } }));",
     "  const code = findings.length > 0 ? 1 : 0;",
-    "  console.log(JSON.stringify({ schemaVersion: 'ramify.check/3', root: process.cwd(), revision: { id: 'rev/1:stub:1', sequence: 1, path: 'source' }, since: null,",
-    "    paths: paths.map(path => ({ path, disposition: 'checked', module: 'stub', exclusion: null, reason: 'content', sha256: '0'.repeat(64) })),",
-    "    outcome: 'checked', reason: null, execution: 'completed', findings, removed: [], warnings: [], coverage: [], checked: null, timings: {}, exitCode: code }));",
+    "  console.log(JSON.stringify({ schemaVersion: 'ramify.analysis/3', request: { project: { root: process.cwd() } }, inputId: 'stub-completion',",
+    "    outcome: { execution: 'completed', check: code === 0 ? 'passed' : 'failed', coverage: 'complete' }, diagnostics: findings, warnings: [], coverage: [], exitCode: code }));",
     '  process.exit(code);',
     '}',
     "console.log(JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable', reason: 'stub', exitCode: 2 }));",
@@ -87,8 +86,8 @@ describe('a standalone session process boundary', () => {
   test('a violation written through the shell, which no hook check saw, is caught when completion is proposed', async () => {
     const root = await project();
     const agent = createScriptedAgent([
-      // The shell names no changed set, so the hook runs a complete check,
-      // which this stub does not answer: nothing saw the violation.
+      // The settled shell has a known changed set. This provider deliberately
+      // cannot answer that hook; independent completion still reads the real source.
       shell(`printf '// FORBIDDEN\\n' >> notes.ts`),
       { kind: 'submit', input: completionProposed('The limit is 500.') },
       shell(`sed -i '/FORBIDDEN/d' notes.ts`),
@@ -109,11 +108,10 @@ describe('a standalone session process boundary', () => {
 
     const summary = result.summary;
     const record = agent.sessions[0]!;
-    // The hook after the shell call saw nothing: the complete check it ran
-    // could not run, which is stated and is not a pass.
-    const appended = events.filter(event => event.type === 'harness-text' && event.kind === 'appended');
-    expect((appended[0] as Extract<SessionProgress, { type: 'harness-text' }>).text).toContain('Nothing was verified by this check');
-    expect((appended[0] as Extract<SessionProgress, { type: 'harness-text' }>).text).not.toContain('RAMIFY MODULE VIOLATION');
+    // The check is delivered in the shell result under its mutation lease.
+    const shellResult = record.results.find(result => result.tool === 'shell');
+    expect(shellResult!.text).toContain('Nothing was verified by this check');
+    expect(shellResult!.text).not.toContain('RAMIFY MODULE VIOLATION');
 
     // The fresh check at `completion-proposed` found it all the same.
     expect(record.verdicts[0]).toMatchObject({ accepted: false });

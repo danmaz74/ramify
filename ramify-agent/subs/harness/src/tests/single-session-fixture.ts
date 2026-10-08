@@ -151,7 +151,7 @@ export async function session(
     onProgress: event => events.push(event),
     ...extra,
   });
-  expect(answerIndex, JSON.stringify(result)).toBe(answers.length);
+  expect(answerIndex, JSON.stringify({ result, toolResults: agent.sessions.map(record => record.results) })).toBe(answers.length);
   checkExecution.assertComplete();
   expect(git.unexpected).toEqual([]);
   const starts = boundaries.starts ?? true;

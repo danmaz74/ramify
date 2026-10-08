@@ -73,11 +73,11 @@ export function readSessionPointReference(ref: string): { readonly runId: string
 export class HarnessSessionOperations {
   private readonly pending = new Set<Promise<unknown>>();
   private readonly unconfirmed = new Set<string>();
-  private constructor(private readonly directory: string, private readonly store: LedgerSessionStore, readonly operations: SessionOperations) {}
+  private constructor(private readonly directory: string, private readonly store: LedgerSessionStore, readonly operations: SessionOperations, private readonly agent: AgentPort) {}
   static async open(directory: string, agent: AgentPort): Promise<HarnessSessionOperations> {
     if (!agent.bindSessionStore) throw new Error(genericSessionDriverUnavailableError);
     const store = await openSessionStore({ directory: join(directory, 'store') });
-    try { return new HarnessSessionOperations(directory, store, agent.bindSessionStore(store)); }
+    try { return new HarnessSessionOperations(directory, store, agent.bindSessionStore(store), agent); }
     catch (error) { await store.close(); throw error; }
   }
   /** Refuses to release the store while any dispatched operation still owns its barrier. */
@@ -141,7 +141,10 @@ export class HarnessSessionOperations {
     const current = taskBriefingRevision({ revision, goal: input.brief.goal, requirements: input.brief.requirements, sections });
     const history = [...(prior?.history ?? [])];
     if (!history.some(entry => entry.revision === revision)) history.push(current);
+    const builtins = input.spec.builtinTools;
+    const builtinDeclarations = this.agent.builtinDeclarations?.(builtins, spec.scope.workingDirectory) ?? piBuiltinDeclarations(builtins, spec.scope.workingDirectory);
     const packet = input.restore && previous ? previous.packet : buildTaskPacket({ loaded: input.loaded, ...input.brief,
+      environment: { ...input.brief.environment, availableTools: [...builtinDeclarations.map(tool => tool.name), ...spec.tools.map(tool => tool.name), spec.submission.name] },
       briefing: buildBriefingDelivery({ mode: spec.session.mode, current, inheritedRevision: prior?.revision ?? null, history }),
       inheritedPoint: sourceRef ? sessionPointReference(runId, sourceRef.point) : null, inherited: prior?.inherited ?? [],
       supplyRoleInstructions: !prior?.inherited.some(item => item.key === `role:${input.loaded.role}` && item.kind === 'role-instructions'),
@@ -151,7 +154,7 @@ export class HarnessSessionOperations {
     const task: SessionTaskInput = input.restore && previous ? previous.task : { role: spec.role, message: packet.message, submissionTool: packet.submissionTool,
       environment: { workingDirectory: spec.scope.workingDirectory, candidate: input.brief.environment.candidate, snapshot: input.brief.environment.snapshot, limits: input.brief.environment.limits },
       policyIdentity: exactInputHash(JSON.stringify(policy)), validatorIdentity: exactInputHash(JSON.stringify(input.validator)), destinationIdentity: exactInputHash(JSON.stringify(input.destination)) };
-    const declarations = [...piBuiltinDeclarations(spec.builtinTools, spec.scope.workingDirectory), ...spec.tools.map(({ name, description, inputSchema, mutating }) => ({ name, description, inputSchema, mutating: mutating ?? false })), packet.declaration];
+    const declarations = [...builtinDeclarations, ...spec.tools.map(({ name, description, inputSchema, mutating }) => ({ name, description, inputSchema, mutating: mutating ?? false })), packet.declaration];
     if (input.restore && previous && (JSON.stringify(policy) !== JSON.stringify(previous.policy) || JSON.stringify(declarations) !== JSON.stringify(previous.declarations) || spec.role !== previous.task.role)) throw new Error('Restored authority, validator, destination or declarations differ from original operation');
     const intent: Intent = input.restore && previous ? previous : { schema: 'ramify-agent.harness-operation/1', runId, operationId, session: input.session, source: sourceRef?.point ?? null,
       mode: spec.session.mode, packet, context: { inherited: [...(prior?.inherited ?? []), ...packet.additions], history, revision }, policy, task, declarations };

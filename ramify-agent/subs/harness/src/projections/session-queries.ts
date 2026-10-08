@@ -233,7 +233,7 @@ export class SessionQueries {
     let names: string[];
     try {
       names = (await readdir(join(this.source.projectRoot, sessionsDirectory), { withFileTypes: true }))
-        .filter(entry => entry.isDirectory() && standaloneSessionIdSchema.safeParse(entry.name).success)
+        .filter(entry => entry.isDirectory() && entry.name !== 'session-operations' && standaloneSessionIdSchema.safeParse(entry.name).success)
         .map(entry => entry.name)
         .sort();
     } catch (error) {

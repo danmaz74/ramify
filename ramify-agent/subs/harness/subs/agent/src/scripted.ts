@@ -188,6 +188,15 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
   const lost = new Set<string>();
   return {
     name: 'scripted',
+    ...(options.toolNames === undefined ? {} : {
+      builtinDeclarations: (names: readonly (BuiltinTool | WriteTool)[]): readonly SessionToolDeclaration[] => names.map(builtin => {
+        const name = options.toolNames?.[builtin] ?? builtin;
+        const path = name === builtin ? 'path' : builtin === 'grep' ? 'in' : 'file_path';
+        return { name, description: `Scripted ${builtin} built-in`, mutating: builtin === 'edit' || builtin === 'write',
+          inputSchema: { type: 'object', properties: { [path]: { type: 'string' }, content: { type: 'string' }, edits: { type: 'array' },
+            pattern: { type: 'string' }, regex: { type: 'string' } } } };
+      }),
+    }),
     support: { ...scriptedSupport, ...options.support },
     sessions,
     loseSession(point) { if (!point || typeof point.sessionId !== 'string') throw new Error('A structured session point is required'); const fresh = !lost.has(point.sessionId); lost.add(point.sessionId); return fresh; },
@@ -405,7 +414,7 @@ function builtinAction(builtin: BuiltinTool | WriteTool | undefined, input: unkn
   const record = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
   const text = (key: string): string | null => (typeof record[key] === 'string' ? record[key] as string : null);
   const count = (key: string): number | null => (typeof record[key] === 'number' ? record[key] as number : null);
-  const path = text('path');
+  const path = text('path') ?? text('file_path') ?? text('in');
   switch (builtin) {
     case 'read': {
       if (path === null) return { kind: 'other' };
@@ -414,7 +423,7 @@ function builtinAction(builtin: BuiltinTool | WriteTool | undefined, input: unkn
     }
     case 'grep':
     case 'find':
-      return { kind: 'search', pattern: text('pattern'), path, glob: text('glob') };
+      return { kind: 'search', pattern: text('pattern') ?? text('regex'), path, glob: text('glob') };
     case 'ls':
       return { kind: 'search', pattern: null, path, glob: null };
     case 'edit':
