@@ -1,0 +1,477 @@
+{
+  "baseCommit": "19c9c3cf3a93f6927088302a539b71a565ab5d9c",
+  "originalWriteGuardSha256": "a365094175aa00e7c54de32ea1ca2bfe3fe3f4c42093994ea539f57209039a29",
+  "sourceSha256": {
+    "subs/harness/src/tests/write-guard.test.ts": "4fe2516272d843b587992cd01cc2114bed4e6e9d1b9c315187bf7721e86955a9",
+    "subs/harness/src/tests/write-guard.boundary.test.ts": "c48adf363f739ef713fe9290cc8577f8a2bcb3bd00519a58b374293f5dbee7a3",
+    "subs/harness/src/tests/write-guard-ownership.test.ts": "a775ad0142517ebd2382409790aab3406bf68767c7f05bfd4a26f29a2cfbeacd",
+    "subs/harness/src/tests/helpers/write-guard-fixture.ts": "14ea33c69a6357fdc8f52840b5b19864aa968e76d2a4ebe760dd472bb8958a2a",
+    "subs/harness/src/tests/helpers/write-guard-ownership.ts": "8578ca25d06ce0c0314a441d9025e92ed41381ac99633e496016d78fefafcce5",
+    "vitest.config.ts": "c0f54f605e468027bffb775b4847c487bb88fb59f1b06528dbacb09738f07e7e",
+    "package.json": "4c0412651655da5fe6b5793b40b49144159108ecfaf32861d3960bf5d0458a93",
+    "package-lock.json": "9d0b5e4332475cfc10b20c6f8c3d2aff035703a25af88710bc2beeb361ea96d6"
+  },
+  "preservation": [
+    {
+      "title": "the table: existing files, a new file, a traversal, a symlink and the assigned contract location",
+      "expectCalls": 6,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": false,
+      "originalCallbackSha256": "0af15fff951b23c5c37770ac625b35ea89494dc86dcc8bb3e63a9d49205c9df7"
+    },
+    {
+      "title": "a child subtree the assignment did not include is outside the scope, whatever lies beneath it",
+      "expectCalls": 4,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": false,
+      "originalCallbackSha256": "b8b11e7d9680a7f255dcbd58fc6aaf252eee415b426f4db019be2b65673ccebc"
+    },
+    {
+      "title": "a bootstrap scope reaches a directory that does not exist yet, and nothing beside it",
+      "expectCalls": 4,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": false,
+      "originalCallbackSha256": "feb37942aa23c939d271a647d0ae30f8d5c4a6079117ac04a77f61978942af72"
+    },
+    {
+      "title": "a feature file and the configuration are refused outright, although the scope contains them, and nothing is written",
+      "expectCalls": 8,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": false,
+      "originalCallbackSha256": "ff926247a46182b45ad06bc30eab352eed3d593ed18593fae3e1536fb7f2faf3"
+    },
+    {
+      "title": "blocked-unresolved and blocked-scope are distinct verdicts with distinct reasons",
+      "expectCalls": 6,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": false,
+      "originalCallbackSha256": "40d00e6a7b489588f120fda525cdc0a56191a2ece8c2687da14c1f21662a1bab"
+    },
+    {
+      "title": "a call that is not one write of one path is unresolved, whatever its tool is called",
+      "expectCalls": 5,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": false,
+      "originalCallbackSha256": "641690a2fc8c12b408730d3b82a5a437aa6e66e3c6554b088bb944f8e5aa04d5"
+    },
+    {
+      "title": "a symlink loop cannot be resolved, and is not reported as a scope violation",
+      "expectCalls": 3,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": false,
+      "originalCallbackSha256": "0d3ec1c65b248921be204d05daef3cb19244d5770f1ea792a0d60e698043647d"
+    },
+    {
+      "title": "it names the target and the scope, and directs the engineer to report rather than retry",
+      "expectCalls": 7,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": false,
+      "originalCallbackSha256": "15973557a5f01a3fb2a9874026a822c19cc9cad74edfbd7d6b76b55125f7990e"
+    },
+    {
+      "title": "it stays lexical: an absolute candidate and one that escapes are both refused",
+      "expectCalls": 4,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": true,
+      "originalCallbackSha256": "b3c3a134fede283c95bea4802e8a7e40498b9f20ec2daf00df5127b777b4921a"
+    },
+    {
+      "title": "the real target of a new path is its nearest existing ancestor with the rest appended",
+      "expectCalls": 3,
+      "destination": "write-guard.test.ts",
+      "actualProvider": false,
+      "unchangedCallback": false,
+      "originalCallbackSha256": "ce412efd9a6ee22e2007ee679501be265e20c34a8f9f45bc67c5db847669c609"
+    },
+    {
+      "title": "PB3-S01\u2013S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions",
+      "expectCalls": 15,
+      "destination": "write-guard.boundary.test.ts",
+      "actualProvider": true,
+      "unchangedCallback": true,
+      "originalCallbackSha256": "e000b6e39f4562da0d90b9c123a307050a2f5dba4ad407e4b2bd04ebce21687a"
+    },
+    {
+      "title": "PB3-S06: actual changed declarations narrow an invocation and restart; removed captured exclusions never widen",
+      "expectCalls": 4,
+      "destination": "write-guard.boundary.test.ts",
+      "actualProvider": true,
+      "unchangedCallback": true,
+      "originalCallbackSha256": "803a2e15ce3d811259162b36834e64b1539251f842ccc7a85a956754b59ad4f6"
+    },
+    {
+      "title": "PB3-S07: unavailable placement and mismatched bootstrap identities cannot grant writes",
+      "expectCalls": 2,
+      "destination": "write-guard.boundary.test.ts",
+      "actualProvider": true,
+      "unchangedCallback": true,
+      "originalCallbackSha256": "b9437f67566e9805f532c95c22dafb00cba406e4202a1c3bef857f745e5d3d8e"
+    },
+    {
+      "title": "PB3-S04 P04: intercepted and direct candidate-classifier controls cannot bypass captured inputs or harness state",
+      "expectCalls": 2,
+      "destination": "write-guard.boundary.test.ts",
+      "actualProvider": true,
+      "unchangedCallback": true,
+      "originalCallbackSha256": "73f57725809c5a9ac9a6524b66a44f0d4b9102930c366694ccf7b331dda7fb6b"
+    },
+    {
+      "title": "PB3-P04: explicitly included independent project configs are guarded without workspace membership",
+      "expectCalls": 7,
+      "destination": "write-guard.boundary.test.ts",
+      "actualProvider": true,
+      "unchangedCallback": true,
+      "originalCallbackSha256": "3a18a3559df2bd0363e3d6891b396fa6e183b4c2905683b84b4e1584320019ff"
+    },
+    {
+      "title": "PB3-S06: removing child declarations cannot widen capture; included child removal remains within both permissions",
+      "expectCalls": 6,
+      "destination": "write-guard.boundary.test.ts",
+      "actualProvider": true,
+      "unchangedCallback": true,
+      "originalCallbackSha256": "74f84f75cc25376144ba314f8ad9a904e67fbd872083398c3281c3b93a54587d"
+    }
+  ],
+  "runs": {
+    "baseline": {
+      "command": "node_modules/.bin/vitest run subs/harness/src/tests/write-guard.test.ts --reporter=json --outputFile=/tmp/plan22-write-guard-baseline.json",
+      "cwd": "ramify-agent/",
+      "counts": {
+        "numTotalTests": 16,
+        "numPassedTests": 16,
+        "numFailedTests": 0,
+        "numPendingTests": 0
+      },
+      "files": [
+        {
+          "path": "subs/harness/src/tests/write-guard.test.ts",
+          "durationMs": 42004.25244140625,
+          "cases": [
+            {
+              "title": "X3: allowed and denied targets the table: existing files, a new file, a traversal, a symlink and the assigned contract location",
+              "status": "passed",
+              "durationMs": 8056.399845
+            },
+            {
+              "title": "X3: allowed and denied targets a child subtree the assignment did not include is outside the scope, whatever lies beneath it",
+              "status": "passed",
+              "durationMs": 3737.332333999999
+            },
+            {
+              "title": "X3: allowed and denied targets a bootstrap scope reaches a directory that does not exist yet, and nothing beside it",
+              "status": "passed",
+              "durationMs": 3546.360666999999
+            },
+            {
+              "title": "the files only the harness writes a feature file and the configuration are refused outright, although the scope contains them, and nothing is written",
+              "status": "passed",
+              "durationMs": 2305.127738000001
+            },
+            {
+              "title": "X5: a resolution failure is not a scope violation blocked-unresolved and blocked-scope are distinct verdicts with distinct reasons",
+              "status": "passed",
+              "durationMs": 1160.3970809999992
+            },
+            {
+              "title": "X5: a resolution failure is not a scope violation a call that is not one write of one path is unresolved, whatever its tool is called",
+              "status": "passed",
+              "durationMs": 634.0514750000002
+            },
+            {
+              "title": "X5: a resolution failure is not a scope violation a symlink loop cannot be resolved, and is not reported as a scope violation",
+              "status": "passed",
+              "durationMs": 563.4598220000007
+            },
+            {
+              "title": "what a block tells the agent it names the target and the scope, and directs the engineer to report rather than retry",
+              "status": "passed",
+              "durationMs": 1182.8375860000015
+            },
+            {
+              "title": "the lifted containment check it stays lexical: an absolute candidate and one that escapes are both refused",
+              "status": "passed",
+              "durationMs": 0.6933539999990899
+            },
+            {
+              "title": "the lifted containment check the real target of a new path is its nearest existing ancestor with the rest appended",
+              "status": "passed",
+              "durationMs": 5.186424999999872
+            },
+            {
+              "title": "PB3-S01\u2013S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions",
+              "status": "passed",
+              "durationMs": 10335.514895
+            },
+            {
+              "title": "PB3-S06: actual changed declarations narrow an invocation and restart; removed captured exclusions never widen",
+              "status": "passed",
+              "durationMs": 2797.307703999999
+            },
+            {
+              "title": "PB3-S07: unavailable placement and mismatched bootstrap identities cannot grant writes",
+              "status": "passed",
+              "durationMs": 540.2152589999969
+            },
+            {
+              "title": "PB3-S04 P04: intercepted and direct candidate-classifier controls cannot bypass captured inputs or harness state",
+              "status": "passed",
+              "durationMs": 2185.0839739999938
+            },
+            {
+              "title": "PB3-P04: explicitly included independent project configs are guarded without workspace membership",
+              "status": "passed",
+              "durationMs": 561.3230980000008
+            },
+            {
+              "title": "PB3-S06: removing child declarations cannot widen capture; included child removal remains within both permissions",
+              "status": "passed",
+              "durationMs": 4392.252428
+            }
+          ]
+        }
+      ]
+    },
+    "ordinary-first": {
+      "command": "node_modules/.bin/vitest run subs/harness/src/tests/write-guard.test.ts --reporter=json --outputFile=/tmp/plan22-write-guard-ordinary-first.json",
+      "cwd": "ramify-agent/",
+      "counts": {
+        "numTotalTests": 10,
+        "numPassedTests": 10,
+        "numFailedTests": 0,
+        "numPendingTests": 0
+      },
+      "files": [
+        {
+          "path": "subs/harness/src/tests/write-guard.test.ts",
+          "durationMs": 110.236328125,
+          "cases": [
+            {
+              "title": "X3: allowed and denied targets the table: existing files, a new file, a traversal, a symlink and the assigned contract location",
+              "status": "passed",
+              "durationMs": 31.641010999999935
+            },
+            {
+              "title": "X3: allowed and denied targets a child subtree the assignment did not include is outside the scope, whatever lies beneath it",
+              "status": "passed",
+              "durationMs": 9.983731000000034
+            },
+            {
+              "title": "X3: allowed and denied targets a bootstrap scope reaches a directory that does not exist yet, and nothing beside it",
+              "status": "passed",
+              "durationMs": 12.665136999999959
+            },
+            {
+              "title": "the files only the harness writes a feature file and the configuration are refused outright, although the scope contains them, and nothing is written",
+              "status": "passed",
+              "durationMs": 12.703182999999967
+            },
+            {
+              "title": "X5: a resolution failure is not a scope violation blocked-unresolved and blocked-scope are distinct verdicts with distinct reasons",
+              "status": "passed",
+              "durationMs": 8.514247999999952
+            },
+            {
+              "title": "X5: a resolution failure is not a scope violation a call that is not one write of one path is unresolved, whatever its tool is called",
+              "status": "passed",
+              "durationMs": 7.165538999999967
+            },
+            {
+              "title": "X5: a resolution failure is not a scope violation a symlink loop cannot be resolved, and is not reported as a scope violation",
+              "status": "passed",
+              "durationMs": 9.036202000000003
+            },
+            {
+              "title": "what a block tells the agent it names the target and the scope, and directs the engineer to report rather than retry",
+              "status": "passed",
+              "durationMs": 8.464492000000064
+            },
+            {
+              "title": "the lifted containment check it stays lexical: an absolute candidate and one that escapes are both refused",
+              "status": "passed",
+              "durationMs": 0.8357169999999314
+            },
+            {
+              "title": "the lifted containment check the real target of a new path is its nearest existing ancestor with the rest appended",
+              "status": "passed",
+              "durationMs": 8.236353000000008
+            }
+          ]
+        }
+      ]
+    },
+    "final": {
+      "command": "node_modules/.bin/vitest run subs/harness/src/tests/write-guard.test.ts subs/harness/src/tests/write-guard.boundary.test.ts subs/harness/src/tests/write-guard-ownership.test.ts --reporter=json --outputFile=/tmp/plan22-write-guard-final.json",
+      "cwd": "ramify-agent/",
+      "counts": {
+        "numTotalTests": 20,
+        "numPassedTests": 20,
+        "numFailedTests": 0,
+        "numPendingTests": 0
+      },
+      "files": [
+        {
+          "path": "subs/harness/src/tests/write-guard-ownership.test.ts",
+          "durationMs": 13.806640625,
+          "cases": [
+            {
+              "title": "caught ownership calls with the wrong project root still fail completion",
+              "status": "passed",
+              "durationMs": 9.355200000000025
+            },
+            {
+              "title": "caught exhausted or unstated ownership queries still fail completion",
+              "status": "passed",
+              "durationMs": 1.4443489999999883
+            },
+            {
+              "title": "a required query cannot invent a seed outside the literal ownership facts",
+              "status": "passed",
+              "durationMs": 1.7437449999999899
+            },
+            {
+              "title": "unused required ownership answers fail completion",
+              "status": "passed",
+              "durationMs": 0.8066759999999817
+            }
+          ]
+        },
+        {
+          "path": "subs/harness/src/tests/write-guard.boundary.test.ts",
+          "durationMs": 33234.891357421875,
+          "cases": [
+            {
+              "title": "PB3-S01\u2013S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions",
+              "status": "passed",
+              "durationMs": 16387.634595000003
+            },
+            {
+              "title": "PB3-S06: actual changed declarations narrow an invocation and restart; removed captured exclusions never widen",
+              "status": "passed",
+              "durationMs": 4374.962011
+            },
+            {
+              "title": "PB3-S07: unavailable placement and mismatched bootstrap identities cannot grant writes",
+              "status": "passed",
+              "durationMs": 884.8534819999986
+            },
+            {
+              "title": "PB3-S04 P04: intercepted and direct candidate-classifier controls cannot bypass captured inputs or harness state",
+              "status": "passed",
+              "durationMs": 3532.047998000002
+            },
+            {
+              "title": "PB3-P04: explicitly included independent project configs are guarded without workspace membership",
+              "status": "passed",
+              "durationMs": 893.2948209999995
+            },
+            {
+              "title": "PB3-S06: removing child declarations cannot widen capture; included child removal remains within both permissions",
+              "status": "passed",
+              "durationMs": 7160.891287999999
+            }
+          ]
+        },
+        {
+          "path": "subs/harness/src/tests/write-guard.test.ts",
+          "durationMs": 173.8798828125,
+          "cases": [
+            {
+              "title": "X3: allowed and denied targets the table: existing files, a new file, a traversal, a symlink and the assigned contract location",
+              "status": "passed",
+              "durationMs": 63.13676399999997
+            },
+            {
+              "title": "X3: allowed and denied targets a child subtree the assignment did not include is outside the scope, whatever lies beneath it",
+              "status": "passed",
+              "durationMs": 14.255700000000047
+            },
+            {
+              "title": "X3: allowed and denied targets a bootstrap scope reaches a directory that does not exist yet, and nothing beside it",
+              "status": "passed",
+              "durationMs": 19.923639999999978
+            },
+            {
+              "title": "the files only the harness writes a feature file and the configuration are refused outright, although the scope contains them, and nothing is written",
+              "status": "passed",
+              "durationMs": 17.847121000000016
+            },
+            {
+              "title": "X5: a resolution failure is not a scope violation blocked-unresolved and blocked-scope are distinct verdicts with distinct reasons",
+              "status": "passed",
+              "durationMs": 14.5642959999999
+            },
+            {
+              "title": "X5: a resolution failure is not a scope violation a call that is not one write of one path is unresolved, whatever its tool is called",
+              "status": "passed",
+              "durationMs": 10.371486000000004
+            },
+            {
+              "title": "X5: a resolution failure is not a scope violation a symlink loop cannot be resolved, and is not reported as a scope violation",
+              "status": "passed",
+              "durationMs": 11.440922999999998
+            },
+            {
+              "title": "what a block tells the agent it names the target and the scope, and directs the engineer to report rather than retry",
+              "status": "passed",
+              "durationMs": 10.915296000000012
+            },
+            {
+              "title": "the lifted containment check it stays lexical: an absolute candidate and one that escapes are both refused",
+              "status": "passed",
+              "durationMs": 1.1768799999999828
+            },
+            {
+              "title": "the lifted containment check the real target of a new path is its nearest existing ancestor with the rest appended",
+              "status": "passed",
+              "durationMs": 8.879932000000053
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "checks": {
+    "type-check": {
+      "exitCode": 0,
+      "scopes": 4
+    },
+    "check:self": {
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 0,
+      "analysisLimits": 310,
+      "coverage": "partial"
+    },
+    "diff-check": {
+      "exitCode": 0
+    }
+  },
+  "ordinaryEnforcement": "Preimport child_process refusal; zero attempts after each test and cleanup. Exact required query scripts fail unused answers; caught script errors persist. No fixture Git/CLI commands.",
+  "failureRecords": [
+    {
+      "kind": "document-validation",
+      "command": "git diff --check",
+      "status": "failed",
+      "reason": "Extra blank EOF lines in original split file and new fixture helper; removed; staged validation subsequently passed"
+    },
+    {
+      "kind": "analysis-tooling",
+      "status": "failed",
+      "reason": "TypeScript 7 native package lacks old AST API; switched to independent callback scanner; all16 titles and86 expects preserved, six boundary callbacks byte-identical"
+    }
+  ],
+  "limits": [
+    "Timing host not isolated; final combined focused run overlapped compiler and check:self; boundary33.234s compared baseline20.812s does not indicate provider optimization.",
+    "PB3-S07 remains actual provider control as assigned, though its bootstrap rejection may be separately classifiable.",
+    "Global runner guard and exact boundary registry are later work; no full audit in this optimization."
+  ]
+}
