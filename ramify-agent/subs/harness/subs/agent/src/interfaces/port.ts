@@ -1,3 +1,4 @@
+import type { SessionOperations, SessionStore } from './session-operations.js';
 /*
  * The agent port: how the harness core drives an agent session without
  * knowing which agent runs it. A session starts with a role, a scope, a
@@ -502,6 +503,10 @@ export interface AgentSession {
 
 /** An agent implementation: pi, or the scripted fake. */
 export interface AgentPort {
+  /** Additive lifecycle while old internal callers migrate through iteration 9. */
+  readonly sessionOperations?: SessionOperations | null | undefined;
+  /** Bind one harness-owned store lifetime without exposing provider transcript handling. */
+  bindSessionStore?(sessionStore: SessionStore): SessionOperations;
   /** A short name recorded with each job, such as `pi` or `scripted`. */
   readonly name: string;
   /** What this implementation supports, and the reason for anything it does not. */

@@ -1,3 +1,5 @@
+import { createSessionOperations } from './session-operations.js';
+import type { SessionDriverInvocation, SessionExecutionBindings, SessionOperationDriver, SessionOperations, SessionStore, SessionToolDeclaration } from './interfaces/session-operations.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { assistantText, contextBudgetReached, noMessageDetail } from './interfaces/port.js';
@@ -120,6 +122,8 @@ export interface ScriptedSessionRecord {
 }
 
 export interface ScriptedAgent extends AgentPort {
+  readonly sessionOperations: SessionOperations | null;
+  bindSessionStore(sessionStore: SessionStore): SessionOperations;
   readonly sessions: readonly ScriptedSessionRecord[];
   /**
    * Forgets a session, as an implementation that can no longer read one does.
@@ -130,6 +134,8 @@ export interface ScriptedAgent extends AgentPort {
 }
 
 export interface ScriptedAgentOptions {
+  readonly sessionStore?: SessionStore | undefined;
+  readonly operationScript?: SessionScript | undefined;
   /** How long `settled()` waits before answering `timed-out`. */
   readonly settleMs?: number | undefined;
   /**
@@ -192,6 +198,8 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
 
   return {
     name: 'scripted',
+    bindSessionStore: sessionStore => createScriptedOperations(sessionStore, script, options),
+    sessionOperations: options.sessionStore ? createScriptedOperations(options.sessionStore, script, options) : null,
     support,
     sessions,
 
@@ -573,4 +581,134 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
       resolve();
     }
   });
+}
+
+/** Explicit scripts for the durable lifecycle; no implicit external answers or legacy session lookup. */
+export type SessionScriptStep =
+  | { readonly kind: 'tool'; readonly tool: string; readonly input: unknown; readonly callId?: string }
+  | { readonly kind: 'submit'; readonly input: unknown; readonly callId?: string }
+  | { readonly kind: 'message'; readonly payload: Readonly<Record<string, unknown>> }
+  | { readonly kind: 'await'; readonly until: () => Promise<unknown> }
+  | { readonly kind: 'fail'; readonly error: string }
+  | { readonly kind: 'end'; readonly message?: string };
+export type SessionScript = readonly SessionScriptStep[] | ((input: SessionDriverInvocation) => readonly SessionScriptStep[]);
+export function createScriptedSessionDriver(script: SessionScript): SessionOperationDriver {
+  return {
+    async dispatch(input, runtime) {
+      const steps = typeof script === 'function' ? script(input) : script;
+      runtime.onEvent({ type: 'message', role: 'user', blocks: [{ type: 'text', text: input.task.message }] });
+      for (let index = 0; index < steps.length; index += 1) {
+        if (runtime.signal.aborted) return { kind: 'stopped' };
+        const step = steps[index]!;
+        const key = `${input.key.operationId}:step:${index}`;
+        if (step.kind === 'await') { await settledOrAborted(step.until(), runtime.signal); continue; }
+        if (step.kind === 'fail') return { kind: 'failed', error: step.error };
+        if (step.kind === 'end') return step.message === undefined ? { kind: 'ended' } : { kind: 'ended', message: step.message };
+        await runtime.persistPayload(key, new TextEncoder().encode(JSON.stringify(step)));
+        if (step.kind === 'message') {
+          const text = typeof step.payload['text'] === 'string' ? step.payload['text'] : '';
+          runtime.onEvent({ type: 'message', role: 'assistant', blocks: text === '' ? [] : [{ type: 'text', text }], text, usage: null, detail: noMessageDetail });
+          continue;
+        }
+        const callId = step.callId ?? key;
+        const tool = step.kind === 'tool' ? step.tool : input.task.submissionTool;
+        const description = runtime.describeTool(tool, step.input);
+        const call: ToolCallBlock = { type: 'tool-call', callId, tool, input: step.input, action: description.action };
+        runtime.onEvent({ type: 'message', role: 'assistant', blocks: [call], text: assistantText([call]), usage: null, detail: noMessageDetail });
+        runtime.onEvent({ type: 'tool-started', callId, tool, input: step.input, ...description });
+        const finish = (text: string, isError: boolean) => {
+          runtime.onEvent({ type: 'tool-finished', callId, tool, isError, reachedTool: input.session.activeTools.includes(tool), errorText: isError ? text : undefined });
+          runtime.onEvent({ type: 'message', role: 'tool-result', callId, tool, isError, blocks: text === '' ? [] : [{ type: 'text', text }] });
+        };
+        if (step.kind === 'tool') {
+          const answer = await runtime.callTool(callId, step.tool, step.input);
+          await runtime.persistPayload(`${key}:result`, new TextEncoder().encode(JSON.stringify(answer)));
+          finish(answer.text, answer.isError ?? false);
+        } else {
+          const verdict = await runtime.submit(callId, step.input);
+          await runtime.persistPayload(`${key}:result`, new TextEncoder().encode(JSON.stringify(verdict)));
+          finish(verdict.accepted ? verdict.text ?? 'The submission was accepted.' : verdict.errors.join('\n'), !verdict.accepted);
+          if (verdict.accepted) return { kind: 'submitted', input: step.input };
+          if ('final' in verdict) return { kind: 'ended' };
+        }
+      }
+      return { kind: 'ended' };
+    },
+  };
+}
+
+/** Reuses existing Script declarations; durable session history remains solely in the new store. */
+function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOptions): SessionOperationDriver {
+  return {
+    async dispatch(input, runtime) {
+      await runtime.assertLive();
+      // This private actor executes one script, without reading or writing any old session.
+      const actor = createScriptedAgent(script, { ...options, sessionStore: undefined });
+      let eventIndex = 0;
+      let events: Promise<unknown> = Promise.resolve();
+      let eventError: unknown;
+      const flush = async () => { await events; if (eventError !== undefined) throw eventError; };
+      const scopedCall = (callId: string) => `${input.key.operationId}:${callId}`;
+      const declarations = input.session.declarations;
+      const submission = declarations.find(item => item.name === input.task.submissionTool)!;
+      let toolCalls = 0;
+      let submissions = 0;
+      const spec: SessionSpec = {
+        role: input.task.role, scope: { workingDirectory: input.task.environment.workingDirectory },
+        systemPrompt: input.session.initialInstructions, prompt: input.task.message,
+        session: { mode: 'fresh' }, context: input.session.policy.context,
+        builtinTools: [], sessionDirectory: '',
+        tools: declarations.filter(item => item.name !== submission.name).map(declaration => ({
+          ...declaration,
+          action: value => runtime.describeTool(declaration.name, value).action,
+          async execute(value) { await flush(); toolCalls++; return runtime.callTool(scopedCall(`tool-${toolCalls}`), declaration.name, value); },
+        })),
+        submission: { ...submission, async accept(value) { await flush(); submissions++; return runtime.submit(scopedCall(`submission-${submissions}`), value); } },
+        onEvent(event) {
+          const index = eventIndex++;
+          events = events.then(async () => {
+            await runtime.persistPayload(`${input.key.operationId}:event:${index}`, new TextEncoder().encode(JSON.stringify(event)));
+            runtime.onEvent(event);
+          }).catch(error => { eventError ??= error; });
+        },
+      };
+      const session = actor.startSession(spec);
+      const stop = () => { void session.stop(); };
+      runtime.signal.addEventListener('abort', stop, { once: true });
+      try { const result = await session.outcome; await flush(); return result; }
+      finally { runtime.signal.removeEventListener('abort', stop); }
+    },
+  };
+}
+
+/** Provider built-ins are bound here, never by a harness-side transcript decoder. */
+function createScriptedOperations(sessionStore: SessionStore, script: Script, options: ScriptedAgentOptions): SessionOperations {
+  const operations = createSessionOperations({ sessionStore, driver: options.operationScript ? createScriptedSessionDriver(options.operationScript) : createScriptDeclarationDriver(script, options) });
+  function enrich(bindings: SessionExecutionBindings, declarations: readonly SessionToolDeclaration[]): SessionExecutionBindings {
+    const tools = [...bindings.tools];
+    for (const declaration of declarations) {
+      if (tools.some(item => item.name === declaration.name)) continue;
+      const builtin = portTools.find(name => (options.toolNames?.[name] ?? name) === declaration.name);
+      if (!builtin) continue;
+      tools.push({ ...declaration, action: input => builtinAction(builtin, input), async execute(input) {
+        const action = builtinAction(builtin, input);
+        if (builtin === 'write' || builtin === 'edit') return performWrite(bindings.task.environment.workingDirectory, builtin, declaration.name, action, input);
+        // As in the existing Script fake, reads/searches are explicitly scripted observations.
+        return { text: '', isError: false };
+      } });
+    }
+    return { ...bindings, tools };
+  }
+  return {
+    ...operations,
+    async continue(input) {
+      const snapshot = await operations.inspect(input.runId, input.sessionId);
+      return operations.continue({ ...input, bindings: enrich(input.bindings, [...(snapshot?.declarations ?? []), ...input.toolChange.add]) });
+    },
+    async retry(input) {
+      const operation = await sessionStore.read(input.runId, `operation:${input.operationId}`);
+      const snapshot = operation?.body['snapshot'] as { declarations?: readonly SessionToolDeclaration[] } | undefined;
+      return operations.retry({ ...input, bindings: enrich(input.bindings, snapshot?.declarations ?? []) });
+    },
+  };
 }
