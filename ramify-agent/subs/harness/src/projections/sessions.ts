@@ -3,6 +3,7 @@ import type {
   RunSessionView, SessionAppend, SessionInvocation, SessionReach, SessionListEntry, SessionSuspension, ShownSessionState,
 } from '../interfaces/protocol/sessions.js';
 import { terminalRunEvents } from '../run/log.js';
+import { operationIdentitySchema } from '../interfaces/protocol/runs.js';
 import type { SessionId } from '../run/records.js';
 import { InvalidSessionTransitionError, reduceSessions, type RunSession } from '../run/sessions.js';
 import { standaloneSessionState, type SessionOutcomeRecord, type SessionRecord } from '../sessions/records.js';
@@ -86,6 +87,12 @@ export function runSessionViews(view: RunView): RunSessionView[] {
         resume(event.data.session, moment);
         invocations.set(event.data.invocation, {
           invocation: event.data.invocation,
+          operation: (() => {
+            const operation = view.records.invocations.get(event.data.invocation)?.sessionOperation;
+            const point = view.records.outcomes.get(event.data.invocation)?.sessionOperation?.point;
+            const parsed = operationIdentitySchema.safeParse({ ...operation, ...(point === undefined ? {} : { point }) });
+            return parsed.success ? parsed.data : null;
+          })(),
           start: event.data.start,
           started: moment,
           ended: null,

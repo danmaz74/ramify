@@ -1,4 +1,8 @@
+import { isAbsolute, relative, resolve } from 'node:path';
 import type { AgentEvent, AgentPort, AgentSession, ContextPolicy, SessionOutcome } from '../../subs/agent/src/interfaces/port.js';
+import type { SessionExecutionIdentity } from '../../subs/agent/src/interfaces/session-operations.js';
+import { estimateRecordedCharge } from '../kpi/efficiency.js';
+import type { ExplorationObservation } from '../kpi/exploration.js';
 import { activityOf } from '../jobs/activity.js';
 import type { InvocationTranscript } from '../transcripts/recorder.js';
 import type { ExcursionWatcher } from './excursions.js';
@@ -24,6 +28,7 @@ export interface UsageTotals {
 
 export interface PortEventRecorderOptions {
   readonly projectRoot: string;
+  readonly invocation?: { readonly id: string; readonly role: string; readonly startedAt: string; readonly submissionTool: string; readonly declaredPaths: readonly string[] };
   /** Where the port resolves relative tool paths. Defaults to project root for readers. */
   readonly workingDirectory?: string | undefined;
   readonly observations: ObservationLog;
@@ -59,7 +64,20 @@ export class PortEventRecorder {
   /** Port callbacks are synchronous, so their durable writes run on this ordered tail. */
   private pending: Promise<void> = Promise.resolve();
 
-  constructor(private readonly options: PortEventRecorderOptions) {}
+  private identity: SessionExecutionIdentity | null = null;
+  private readonly finishes = new Map<string, { event: Extract<AgentEvent, { type: 'tool-finished' }>; at: string | null }>();
+  private readonly actions = new Map<string, Extract<AgentEvent, { type: 'tool-started' }>>();
+  private milestone = false;
+  constructor(private readonly options: PortEventRecorderOptions) {
+    for (const row of options.observations.observations) {
+      if (row.type === 'usage') { this.usageObserved = true; for (const part of ['input', 'output', 'cacheRead', 'cacheWrite', 'total'] as const) this.usage[part] += row.data.usage[part]; }
+      if (row.type === 'milestone') this.milestone = true;
+    }
+  }
+  identify(identity: SessionExecutionIdentity): void {
+    if (this.identity !== null && JSON.stringify(this.identity) !== JSON.stringify(identity)) throw new Error('Observation execution identity changed');
+    this.identity = identity;
+  }
 
   /** The identifier of the call in flight for one tool, as the port last reported it. */
   callId(tool: string): string {
@@ -82,13 +100,11 @@ export class PortEventRecorder {
 
   /** Records one event. What is counted is counted before its ordered durable write. */
   record(event: AgentEvent): Promise<void> {
+    const admittedAt = new Date().toISOString();
     // The transcript queues its own entry in order; a failed write there is
     // its own coverage gap and never this observation's failure.
-    this.options.transcript?.event(event);
-    if (event.type === 'message' && event.role === 'assistant' && event.usage) {
-      this.usageObserved = true;
-      for (const part of ['input', 'output', 'cacheRead', 'cacheWrite', 'total'] as const) this.usage[part] += event.usage[part];
-    }
+    const { execution: _execution, observation: _observation, replayed: _replayed, ...display } = event;
+    this.options.transcript?.event(display);
     if (event.type === 'tool-started') {
       this.calls.set(event.tool, event.callId);
       this.open.set(event.callId, { tool: event.tool, startedAt: Date.now() });
@@ -103,7 +119,7 @@ export class PortEventRecorder {
       ? this.options.judge.countImplementationRejection(event.callId, event.tool, event.errorText ?? 'the input was rejected before the tool ran')
       : undefined;
 
-    const recording = this.pending.then(() => this.persist(event, recordRejection));
+    const recording = this.pending.then(() => this.persist(event, admittedAt, recordRejection));
     // One failed observation is reported by the caller but does not prevent
     // later observations, or the drain, from reaching the end of the queue.
     this.pending = recording.catch(() => undefined);
@@ -115,8 +131,9 @@ export class PortEventRecorder {
     await this.pending;
   }
 
-  private async persist(event: AgentEvent, recordRejection?: (() => Promise<void>) | undefined): Promise<void> {
+  private async persist(event: AgentEvent, admittedAt: string, recordRejection?: (() => Promise<void>) | undefined): Promise<void> {
     const { observations } = this.options;
+    await this.efficiency(event, admittedAt);
     if (event.type === 'context-observed') {
       await observations.record({
         type: 'context',
@@ -138,7 +155,7 @@ export class PortEventRecorder {
       await recordRejection?.();
     }
     const activity = activityOf(event, this.options.workingDirectory ?? this.options.projectRoot, this.options.projectRoot);
-    if (activity) await observations.record({ type: 'activity', data: { activity } });
+    if (activity) await observations.record({ type: 'activity', data: { activity }, ...(event.observation?.sourceId ? { sourceId: event.observation.sourceId } : {}) });
     if (activity?.kind === 'read') {
       const excursion = this.options.excursions.observe(activity.path);
       if (excursion !== null) {
@@ -150,9 +167,85 @@ export class PortEventRecorder {
     }
   }
 
+  private path(path: string): string {
+    const absolute = isAbsolute(path) ? path : resolve(this.options.workingDirectory ?? this.options.projectRoot, path);
+    return relative(this.options.projectRoot, absolute).split('\\').join('/') || '.';
+  }
+  private async efficiency(event: AgentEvent, admittedAt: string): Promise<void> {
+    const { observations, invocation } = this.options;
+    if (event.execution) this.identify(event.execution);
+    const sourceId = event.observation?.sourceId;
+    if (event.type === 'message' && event.role === 'assistant' && event.observation?.elapsedMs !== undefined) {
+      await observations.record({ type: 'model-duration', ...(sourceId ? { sourceId } : {}), data: { elapsedMs: event.observation.elapsedMs } });
+    }
+    if (event.type === 'message' && event.role === 'assistant' && event.usage) {
+      const supplied = event.observation?.charge;
+      const estimated = supplied ? estimateRecordedCharge({ model: supplied.model, newInputTokens: event.usage.input, cachedInputTokens: event.usage.cacheRead,
+        cacheWriteTokens: event.usage.cacheWrite, outputTokens: event.usage.output, ratesPerMillion: supplied.ratesPerMillion }) : null;
+      const charge = estimated && supplied ? { ...estimated, ratesPerMillion: { ...estimated.ratesPerMillion }, coverage: [...estimated.coverage], sourceRevision: supplied.sourceRevision } : null;
+      const written = await observations.record({ type: 'usage', data: { usage: event.usage, charge, modelElapsedMs: event.observation?.elapsedMs ?? null }, ...(sourceId ? { sourceId } : {}) });
+      if (written) { this.usageObserved = true; for (const part of ['input', 'output', 'cacheRead', 'cacheWrite', 'total'] as const) this.usage[part] += event.usage[part]; }
+      if (!sourceId) await observations.record({ type: 'coverage-gap', data: { kind: 'usage-unavailable', detail: 'Usage is an unkeyed observed subtotal; replay identity unavailable' } });
+    } else if (event.type === 'message' && event.role === 'assistant' && event.observation?.coverage?.some(reason => reason.includes('usage'))) {
+      await observations.record({ type: 'coverage-gap', ...(sourceId ? { sourceId } : {}), data: { kind: 'usage-unavailable', detail: event.observation.coverage.join('; ') } });
+    }
+    if (!invocation || !this.identity) return;
+    if (event.type === 'tool-started') {
+      this.actions.set(event.callId, event);
+      const prior = observations.observations.find(row => row.type === 'tool-start' && row.data.callId === event.callId);
+      const startedAt = prior?.type === 'tool-start' ? prior.data.startedAt : event.replayed ? null : event.observation?.at ?? admittedAt;
+      const action = event.action;
+      const requested = action.kind === 'read' ? [this.path(action.path)] : action.kind === 'search' ? [this.path(action.path ?? '.'), ...(action.glob ? [action.glob] : [])] : [];
+      await observations.record({ type: 'tool-start', sourceId: `${event.callId}:start`, data: { callId: event.callId, tool: event.tool,
+        kind: action.kind === 'read' || action.kind === 'search' ? action.kind : 'other', requestedScope: requested, startedAt } });
+      if (!this.milestone && (event.tool === invocation.submissionTool || (invocation.role.includes('engineer') && action.kind !== 'harness'))) {
+        const written = await observations.record({ type: 'milestone', sourceId: 'first-milestone', data: { kind: event.tool === invocation.submissionTool ? 'first-designated-submission' : 'first-engineering-action', at: startedAt } });
+        if (written) this.milestone = true;
+      }
+    } else if (event.type === 'tool-finished') {
+      const at = event.replayed ? null : event.observation?.at ?? admittedAt;
+      const start = observations.observations.find(row => row.type === 'tool-start' && row.data.callId === event.callId);
+      const startedAt = start?.type === 'tool-start' ? start.data.startedAt : null;
+      await observations.record({ type: 'tool-duration', sourceId: `${event.callId}:duration`, data: { callId: event.callId, startedAt, endedAt: at,
+        elapsedMs: event.replayed ? null : event.observation?.elapsedMs ?? (at !== null && startedAt !== null ? Math.max(0, Date.parse(at) - Date.parse(startedAt)) : null),
+        coverage: event.replayed ? ['Known effect replay: original finish duration unavailable unless already recorded'] : [] } });
+      this.finishes.set(event.callId, { event, at });
+      if (event.observation?.returnedBytes !== undefined) await this.exploration(event.callId);
+    } else if (event.type === 'message' && event.role === 'tool-result') {
+      const text = event.blocks.filter(block => block.type === 'text').map(block => block.text).join('\n');
+      await this.exploration(event.callId, { bytes: Buffer.byteLength(text), textOnly: event.blocks.every(block => block.type === 'text') });
+    }
+  }
+  private async exploration(callId: string, result?: { bytes: number; textOnly: boolean }): Promise<void> {
+    const { invocation, observations } = this.options;
+    const finish = this.finishes.get(callId); const start = this.actions.get(callId);
+    if (!finish || !start || !invocation || !this.identity || (start.action.kind !== 'read' && start.action.kind !== 'search')) return;
+    const beginning = observations.observations.find(row => row.type === 'tool-start' && row.data.callId === callId);
+    const startedAt = beginning?.type === 'tool-start' ? beginning.data.startedAt : null;
+    const facts = finish.event.observation;
+    const resolved = facts?.resolvedScope?.map(path => this.path(path)) ?? null;
+    const files = facts?.files?.map(path => this.path(path)) ?? null;
+    const roots = invocation.declaredPaths.map(path => this.path(path));
+    const outside = resolved === null || roots.length === 0 ? null : resolved.some(path => !roots.some(root => root === '.' || path === root || path.startsWith(`${root}/`)));
+    const coverage = [...(facts?.coverage ?? []), ...(finish.event.replayed ? ['Known effect replay; original finish/duration unavailable where not recorded'] : []),
+      ...(sourceMissing(start) ? ['Producer source event key unavailable; call identity only'] : []), ...(result?.textOnly === false ? ['Non-text returned bytes unavailable'] : [])];
+    const observation: ExplorationObservation = { id: `${invocation.id}:${callId}:${start.action.kind}`, invocationId: invocation.id, operationId: this.identity.operationId, role: invocation.role,
+      sessionId: this.identity.sessionId, turn: this.identity.turn, callId, kind: start.action.kind,
+      requestedScope: beginning?.type === 'tool-start' ? beginning.data.requestedScope : [], resolvedScope: resolved, files,
+      returnedBytes: facts?.returnedBytes ?? result?.bytes ?? null, startedAt, endedAt: finish.at,
+      elapsedMs: finish.event.replayed ? null : facts?.elapsedMs ?? (startedAt && finish.at ? Math.max(0, Date.parse(finish.at) - Date.parse(startedAt)) : null),
+      outcome: facts?.outcome ?? (!finish.event.reachedTool ? 'refused' : finish.event.isError ? 'failed' : 'completed'),
+      broad: start.action.kind === 'search' ? (beginning?.type === 'tool-start' ? beginning.data.requestedScope[0] === '.' || (start.action.glob?.includes('**') ?? false) : null) : false,
+      outsideScope: outside, coverage };
+    await observations.record({ type: 'exploration', sourceId: `${callId}:exploration`, data: { ...observation, requestedScope: [...observation.requestedScope], resolvedScope: observation.resolvedScope === null ? null : [...observation.resolvedScope], files: observation.files === null ? null : [...observation.files], coverage: [...observation.coverage] } });
+    this.finishes.delete(callId);
+  }
+
   /** Records what the session never reported: no context size, no usage. Silence is a gap, not room. */
   async recordGaps(agent: AgentPort): Promise<void> {
     const { observations } = this.options;
+    for (const callId of [...this.finishes.keys()]) await this.exploration(callId);
+    if (this.open.size > 0) await observations.record({ type: 'coverage-gap', data: { kind: 'observation-truncated', detail: `${this.open.size} tool calls have no observed finish; known subtotals only` } });
     if (!this.contextObserved) {
       await observations.record({
         type: 'coverage-gap',
@@ -332,3 +425,5 @@ export function endedOf(kind: string, boundReached: boolean): InvocationOutcome[
   if (kind === 'stopped') return 'stopped';
   return boundReached ? 'invalid-submission' : 'ended';
 }
+
+function sourceMissing(event: AgentEvent): boolean { return !event.observation?.sourceId; }

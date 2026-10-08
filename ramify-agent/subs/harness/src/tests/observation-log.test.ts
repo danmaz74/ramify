@@ -74,7 +74,8 @@ describe('the observation log', () => {
     await observations.record({ type: 'coverage-gap', data: { kind: 'usage-unavailable', detail: 'none reported' } });
     await writeFile(path, `${await readFile(path, 'utf8')}{"n":2,"at":"x","type":"nonsense","data":{}}\n`);
     const reopened = await open();
-    expect(reopened.count('coverage-gap')).toBe(1);
+    expect(reopened.count('coverage-gap')).toBe(2);
+    expect(reopened.observations.at(-1)).toMatchObject({ type: 'coverage-gap', data: { kind: 'observation-truncated', detail: expect.stringContaining('1 unreadable rows') } });
     expect(await reopened.record({ type: 'coverage-gap', data: { kind: 'context-unavailable', detail: 'none' } })).toBe(true);
   });
 

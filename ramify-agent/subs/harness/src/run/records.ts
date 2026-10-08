@@ -672,7 +672,7 @@ export type DegradeRelation = z.infer<typeof degradeRelationSchema>;
 
 /** Provider-neutral operation linkage. No executor file names or provider entry IDs. */
 export const sessionOperationLinkSchema = z.object({ runId: text, operationId: text,
-  sessionId: text.optional(), point: z.object({ sessionId: text, kind: z.enum(['turn', 'checkpoint']), turn: z.int().nonnegative(), checkpoint: text }).strict().nullable().optional(),
+  sessionId: text.optional(), turn: z.int().nonnegative().optional(), sourcePoint: z.object({ sessionId: text, kind: z.enum(['turn', 'checkpoint']), turn: z.int().nonnegative(), checkpoint: text }).strict().optional(), point: z.object({ sessionId: text, kind: z.enum(['turn', 'checkpoint']), turn: z.int().nonnegative(), checkpoint: text }).strict().nullable().optional(),
 }).strict();
 
 export const invocationSchema = z.object({
@@ -697,6 +697,7 @@ export const invocationSchema = z.object({
     write: z.int().nonnegative().nullable(),
     measurement: recordRefSchema.nullable(),
     size: scopeSizeSchema.nullable(),
+    readSize: scopeSizeSchema.nullable().optional(),
   }).strict(),
   writer: z.boolean(),
   /** Exact candidate tree before a writer started; absent where the writer was started without one. */

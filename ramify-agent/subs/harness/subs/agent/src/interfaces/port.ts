@@ -1,4 +1,4 @@
-import type { SessionOperations, SessionStore } from './session-operations.js';
+import type { SessionOperations, SessionStore, SessionExecutionIdentity } from './session-operations.js';
 /*
  * The agent port: how the harness core drives an agent session without
  * knowing which agent runs it. A session starts with a role, a scope, a
@@ -392,7 +392,23 @@ export function assistantText(blocks: readonly AssistantBlock[]): string {
  * the text, the tool calls and their results, paired by call ID. Detail an
  * executor may not report is `null` when absent; see {@link MessageDetail}.
  */
-export type AgentEvent =
+/** Producer-owned immutable observation key and facts; absent detail is unknown. No file contents/environment values. */
+export interface AgentEventObservation {
+  readonly sourceId: string;
+  readonly at?: string;
+  readonly elapsedMs?: number | null;
+  readonly resolvedScope?: readonly string[] | null;
+  readonly files?: readonly string[] | null;
+  readonly returnedBytes?: number | null;
+  readonly outcome?: 'completed' | 'failed' | 'refused' | 'interrupted';
+  readonly coverage?: readonly string[];
+  readonly charge?: {
+    readonly model: string;
+    readonly sourceRevision: string;
+    readonly ratesPerMillion: { readonly newInput: number | null; readonly cachedInput: number | null; readonly cacheWrite: number | null; readonly output: number | null };
+  };
+}
+export type AgentEvent = (
   /** `mutating` and `action` are declared by the implementation or by the tool's author, never inferred from the name. */
   | {
       readonly type: 'tool-started'; readonly callId: string; readonly tool: string; readonly input: unknown;
@@ -447,7 +463,12 @@ export type AgentEvent =
       readonly type: 'retry'; readonly phase: 'started'; readonly attempt: number;
       readonly maxAttempts: number | null; readonly delayMs: number | null; readonly errorText: string | null;
     }
-  | { readonly type: 'retry'; readonly phase: 'ended'; readonly attempt: number; readonly succeeded: boolean; readonly errorText: string | null };
+  | { readonly type: 'retry'; readonly phase: 'ended'; readonly attempt: number; readonly succeeded: boolean; readonly errorText: string | null }) & {
+  readonly execution?: SessionExecutionIdentity;
+  /** A journaled effect is being reported again; new callback duration is not original execution time. */
+  readonly replayed?: boolean;
+  readonly observation?: AgentEventObservation;
+};
 
 /** Why a compaction ran. */
 export type CompactionReason = 'manual' | 'threshold' | 'overflow';

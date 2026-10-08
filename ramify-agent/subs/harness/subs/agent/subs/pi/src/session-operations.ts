@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import {
   createAgentSession, createEditTool, createFindTool, createGrepTool, createLsTool, createReadTool, createWriteTool,
   DefaultResourceLoader, SessionManager, SettingsManager,
@@ -6,7 +7,7 @@ import {
 import { createSessionOperations } from '../../../src/session-operations.js';
 import { SessionDriverUnavailableError } from '../../../src/interfaces/session-operations.js';
 import { assistantText, contextBudgetReached, noMessageDetail } from '../../../src/interfaces/port.js';
-import type { BuiltinTool, SessionOutcome, ToolDefinition, ToolResult, WriteTool } from '../../../src/interfaces/port.js';
+import type { AgentEventObservation, BuiltinTool, SessionOutcome, ToolDefinition, ToolResult, WriteTool } from '../../../src/interfaces/port.js';
 import type { ContinueSessionInput, SessionDriverInvocation, SessionDriverRuntime, SessionExecutionBindings, SessionOperations, SessionOperationHandle, SessionOperationReceipt, SessionStore, SessionToolDeclaration } from '../../../src/interfaces/session-operations.js';
 import { builtinAction, chooseModel, permissiveSchema, type PiRuntimeSource } from './pi-agent.js';
 import { copy, decodePreservedTranscript, installedPiPublicExport, installedPiSerialization, same, sameNative, serializeNativePrefix, supportedPreservingModel, validateNativeRequest, type PiTranscriptMessage, type PiTranscriptTool, type PreservedPiTranscript } from './preservation.js';
@@ -143,18 +144,24 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
     }
     applied.add(entry.key);
   }
-  const persist = async () => {
-    const native = await serializeNativePrefix(chosen.model, messages);
+  let persistence: Promise<void> = Promise.resolve();
+  const persist = (captured?: PiTranscriptMessage[]): Promise<void> => {
+    const persistedMessages = copy(captured ?? messages);
+    const nextPersistence = persistence.then(async () => {
+    const native = await serializeNativePrefix(chosen.model, persistedMessages);
     if (inherited && (native.instructions !== inherited.instructions || !sameNative(native.tools, inherited.tools) || !sameNative(native.input.slice(0, inherited.input.length), inherited.input))) throw new Error('Restored opaque pi prefix changed before provider dispatch');
     // The installed serializer inserts synthetic outputs for unfinished calls.
     // Persist actual opaque messages immediately, but freeze native input only
     // at complete boundaries; a synthetic missing result was never dispatched.
-    const unfinished = messages.some(message => message.role === 'assistant' && message.content.some(block => block.type === 'toolCall' && !messages.some(result => result.role === 'toolResult' && result.toolCallId === block.id)));
+    const unfinished = persistedMessages.some(message => message.role === 'assistant' && message.content.some(block => block.type === 'toolCall' && !persistedMessages.some(result => result.role === 'toolResult' && result.toolCallId === block.id)));
     if (!unfinished) completeNative = native;
     if (!completeNative) throw new Error('Opaque transcript has no complete native prefix');
-    const next: PreservedPiTranscript = { schema: 'ramify.pi-transcript/1', packageVersion: '0.87.1', transport: 'sse', model: modelIdentity, messages: copy(messages), appliedAgentKeys: [...applied], declarations: copy(declarations), additionKeys: [...additions], activeTools: [...activeTools], native: completeNative, sequence: ++sequence, preparedOperationId: input.key.operationId };
+    const next: PreservedPiTranscript = { schema: 'ramify.pi-transcript/1', packageVersion: '0.87.1', transport: 'sse', model: modelIdentity, messages: persistedMessages, appliedAgentKeys: [...applied], declarations: copy(declarations), additionKeys: [...additions], activeTools: [...activeTools], native: completeNative, sequence: ++sequence, preparedOperationId: input.key.operationId };
     await runtime.persistPayload(`${input.key.operationId}:pi-state:${sequence}`, new TextEncoder().encode(JSON.stringify(next)));
     state = next;
+    });
+    persistence = nextPersistence.catch(() => undefined);
+    return nextPersistence;
   };
   await persist();
   // A recorded accepted verdict completes the missing exact tool-result artifact, never a model request.
@@ -210,6 +217,7 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
       return nativeToolResult(result);
     },
   })) as PiSession['agent']['state']['tools'];
+  let dispatchStarted: number | null = null;
   const stream = session.agent.streamFunction;
   let requestCount = 0;
   session.agent.streamFunction = async (model, context, options) => {
@@ -226,16 +234,48 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
         if ((body as Record<string, unknown>)['model'] !== chosen.model.id) throw new Error('Final native request changed model identity');
         const actual = validateNativeRequest(body, expected, inherited);
         await runtime.persistPayload(`${input.key.operationId}:pi-request:${sequence}:${++requestCount}`, new TextEncoder().encode(JSON.stringify({ schema: 'ramify.pi-native-request/1', packageVersion: '0.87.1', transport: 'sse', model: modelIdentity, ...actual, request: copy(body) })));
-        await runtime.assertLive(); if (runtime.signal.aborted) throw new Error('Operation stopped');
+        await runtime.assertLive();
+        dispatchStarted = Date.now(); if (runtime.signal.aborted) throw new Error('Operation stopped');
         return body;
       } catch (error) { fatal = String(error); throw error; }
     } });
   };
+  const toolTimes = new Map<string, number>();
+  const observedAt = () => new Date().toISOString();
   const unsubscribe = session.agent.subscribe(async event => {
-    if (event.type === 'message_end') { messages = copy(session.agent.state.messages); await persist(); }
-    if (event.type === 'tool_execution_start') runtime.onEvent({ type: 'tool-started', callId: event.toolCallId, tool: event.toolName, input: event.args, ...runtime.describeTool(event.toolName, event.args) });
-    if (event.type === 'tool_execution_end') runtime.onEvent({ type: 'tool-finished', callId: event.toolCallId, tool: event.toolName, isError: event.isError, reachedTool: input.session.activeTools.includes(event.toolName) });
-    if (event.type === 'message_end') reportMessage(event as AgentSessionEvent, runtime);
+    // Capture actual event identity/time before any awaited storage can admit later callbacks.
+    const admissionAt = Date.now();
+    const captured = event.type === 'message_end' ? copy(event) : null;
+    const eventMessages = event.type === 'message_end' ? copy(session.agent.state.messages) : null;
+    const sourceIndex = event.type === 'message_end' ? session.agent.state.messages.indexOf(event.message) : -1;
+    const messageSourceId = sourceIndex >= 0 ? `pi-message:${sourceIndex}` : null;
+    const modelElapsedMs = dispatchStarted === null ? null : Math.max(0, admissionAt - dispatchStarted);
+    if (eventMessages) { messages = eventMessages; await persist(eventMessages); }
+    if (event.type === 'tool_execution_start') {
+      const reused = input.recovering && input.effects.some(effect => effect.callId === event.toolCallId && effect.phase === 'completed');
+      if (!reused) toolTimes.set(event.toolCallId, Date.now());
+      runtime.onEvent({ type: 'tool-started', callId: event.toolCallId, tool: event.toolName, input: event.args,
+        observation: { sourceId: `pi-call:${event.toolCallId}:start`, ...(reused ? {} : { at: observedAt() }) }, ...runtime.describeTool(event.toolName, event.args) });
+    }
+    if (event.type === 'tool_execution_end') {
+      const start = toolTimes.get(event.toolCallId); toolTimes.delete(event.toolCallId);
+      const call = messages.flatMap(message => message.role === 'assistant' ? message.content.filter(block => block.type === 'toolCall') : []).find(call => call.id === event.toolCallId);
+      const action = call ? runtime.describeTool(event.toolName, call.arguments).action : null;
+      const result = event.result as NativeToolResult;
+      const text = result.content.filter(block => block.type === 'text').map(block => block.text).join('\n');
+      const details = result.details as { files?: unknown; truncation?: { truncated?: boolean } } | undefined;
+      const target = action && (action.kind === 'read' || action.kind === 'search') ? resolve(input.task.environment.workingDirectory, action.path ?? '.') : null;
+      const files = Array.isArray(details?.files) && details.files.every(file => typeof file === 'string') ? details.files as string[]
+        : action?.kind === 'read' && !event.isError && target ? [target] : null;
+      const coverage = [...(details?.truncation?.truncated ? ['Returned content truncated by the tool'] : []),
+        ...(result.content.some(block => block.type !== 'text') ? ['Non-text result bytes unavailable'] : []),
+        ...(action?.kind === 'search' ? ['Scanned bytes not reported; returned bytes are output only', ...(files === null ? ['Matched file identities not reported'] : [])] : [])];
+      runtime.onEvent({ type: 'tool-finished', callId: event.toolCallId, tool: event.toolName, isError: event.isError,
+        observation: { sourceId: `pi-call:${event.toolCallId}:finish`, at: observedAt(), elapsedMs: start === undefined ? null : Math.max(0, Date.now() - start),
+          returnedBytes: Buffer.byteLength(text), files, resolvedScope: target === null ? null : [target], coverage },
+        reachedTool: input.session.activeTools.includes(event.toolName) });
+    }
+    if (captured) reportMessage(captured as AgentSessionEvent, runtime, messageSourceId, chosen, modelElapsedMs, new Date(admissionAt).toISOString());
     if (event.type === 'turn_end') {
       const usage = session.getContextUsage();
       if (usage) { runtime.onEvent({ type: 'context-observed', tokens: usage.tokens, window: usage.contextWindow }); if (contextBudgetReached(input.session.policy.context, usage.tokens, usage.contextWindow)) budget = usage.tokens; }
@@ -244,7 +284,7 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
   const stop = () => session.agent.abort(); runtime.signal.addEventListener('abort', stop, { once: true });
   try {
     await runtime.assertLive();
-    if (!input.recovering) runtime.onEvent({ type: 'message', role: 'user', blocks: [{ type: 'text', text: input.task.message }] });
+    if (!input.recovering) runtime.onEvent({ type: 'message', role: 'user', observation: { sourceId: `pi-message:${messages.length - 1}` }, blocks: [{ type: 'text', text: input.task.message }] });
     const last = messages.at(-1);
     if (input.recovering && last?.role === 'assistant') {
       // Complete known tool effects without asking the model to repeat a tool call.
@@ -280,13 +320,25 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
     return { kind: 'ended' };
   } finally { runtime.signal.removeEventListener('abort', stop); unsubscribe(); session.dispose(); }
 }
-function reportMessage(event: AgentSessionEvent, runtime: SessionDriverRuntime): void {
+function reportMessage(event: AgentSessionEvent, runtime: SessionDriverRuntime, sourceId: string | null,
+  chosen: Awaited<ReturnType<typeof chooseModel>>, elapsedMs: number | null, at: string): void {
   if (event.type !== 'message_end') return;
   const message = event.message;
-  if (message.role === 'user') runtime.onEvent({ type: 'message', role: 'user', blocks: typeof message.content === 'string' ? [{ type: 'text', text: message.content }] : message.content.map(block => block.type === 'text' ? block : { type: 'other', kind: block.type, description: 'Provider content' }) });
-  else if (message.role === 'toolResult') runtime.onEvent({ type: 'message', role: 'tool-result', callId: message.toolCallId, tool: message.toolName, isError: message.isError, blocks: message.content.map(block => block.type === 'text' ? block : { type: 'other', kind: block.type, description: 'Provider content' }) });
+  if (message.role === 'user') runtime.onEvent({ type: 'message', role: 'user', ...(sourceId === null ? {} : { observation: { sourceId } }), blocks: typeof message.content === 'string' ? [{ type: 'text', text: message.content }] : message.content.map(block => block.type === 'text' ? block : { type: 'other', kind: block.type, description: 'Provider content' }) });
+  else if (message.role === 'toolResult') runtime.onEvent({ type: 'message', role: 'tool-result', ...(sourceId === null ? {} : { observation: { sourceId } }), callId: message.toolCallId, tool: message.toolName, isError: message.isError, blocks: message.content.map(block => block.type === 'text' ? block : { type: 'other', kind: block.type, description: 'Provider content' }) });
   else if (message.role === 'assistant') {
     const blocks = message.content.map(block => block.type === 'thinking' ? { type: 'thinking' as const, visibility: 'unmarked' as const, text: block.thinking } : block.type === 'toolCall' ? { type: 'tool-call' as const, callId: block.id, tool: block.name, input: block.arguments, action: runtime.describeTool(block.name, block.arguments).action } : block);
-    runtime.onEvent({ type: 'message', role: 'assistant', blocks, text: assistantText(blocks), usage: message.usage ? { input: message.usage.input, output: message.usage.output, cacheRead: message.usage.cacheRead, cacheWrite: message.usage.cacheWrite, total: message.usage.totalTokens } : null, detail: noMessageDetail });
+    const usage = message.usage;
+    let rates = chosen.model.cost;
+    let threshold = -1;
+    const inputTokens = usage.input + usage.cacheRead + usage.cacheWrite;
+    for (const tier of chosen.model.cost.tiers ?? []) if (inputTokens > tier.inputTokensAbove && tier.inputTokensAbove > threshold) { rates = tier; threshold = tier.inputTokensAbove; }
+    const longWrite = usage.cacheWrite1h ?? 0;
+    const effectiveWrite = usage.cacheWrite > 0 ? (rates.cacheWrite * (usage.cacheWrite - longWrite) + rates.input * 2 * longWrite) / usage.cacheWrite : rates.cacheWrite;
+    const reported = usage.input + usage.output + usage.cacheRead + usage.cacheWrite > 0;
+    const charge: AgentEventObservation['charge'] = { model: `${chosen.model.provider}/${chosen.model.id}`, sourceRevision: `pi-ai@0.87.1:model-runtime:tier=${threshold}:cacheWrite1h=${longWrite}`,
+      ratesPerMillion: { newInput: rates.input, cachedInput: rates.cacheRead, cacheWrite: effectiveWrite, output: rates.output } };
+    runtime.onEvent({ type: 'message', role: 'assistant', ...(sourceId === null ? {} : { observation: { sourceId, at, elapsedMs, ...(reported ? { charge } : { coverage: ['SDK normalized all-zero usage; original provider report presence unavailable'] }) } }), blocks, text: assistantText(blocks), usage: reported ? { input: message.usage.input, output: message.usage.output, cacheRead: message.usage.cacheRead, cacheWrite: message.usage.cacheWrite, total: message.usage.totalTokens } : null, detail: { ...noMessageDetail, model: charge.model, thinkingLevel: chosen.thinkingLevel ?? null, stopReason: message.stopReason === 'stop' ? 'end' : ['toolUse', 'tool-use'].includes(message.stopReason) ? 'tool-use' : ['length', 'error', 'aborted'].includes(message.stopReason) ? message.stopReason as 'length' | 'error' | 'aborted' : 'other',
+        error: message.errorMessage ?? null, reasoningTokens: usage.reasoning ?? null, cost: { ...usage.cost }, cacheWrites: { short: usage.cacheWrite - longWrite, long: longWrite } } });
   }
 }

@@ -1,7 +1,7 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { AgentPort, AgentSession, AppendOutcome, SessionSpec } from '../../subs/agent/src/interfaces/port.js';
-import type { AgentSessionPoint, SessionExecutionBindings, SessionExecutionPolicy, SessionOperations, SessionTaskInput, SessionToolDeclaration } from '../../subs/agent/src/interfaces/session-operations.js';
+import type { AgentSessionPoint, SessionExecutionIdentity, SessionExecutionBindings, SessionExecutionPolicy, SessionOperations, SessionTaskInput, SessionToolDeclaration } from '../../subs/agent/src/interfaces/session-operations.js';
 import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-operations.js';
 import { writeFileExclusive } from '../../subs/ledger/src/atomic.js';
 import { openSessionStore, type LedgerSessionStore } from './session-store.js';
@@ -31,6 +31,7 @@ export interface HarnessOperationInput {
   readonly destination: Readonly<Record<string, unknown>>;
   readonly currentAuthority: () => Promise<boolean>;
   readonly prepared?: (packet: TaskPacket) => Promise<void>;
+  readonly identified?: (identity: SessionExecutionIdentity) => Promise<void>;
   readonly restore?: boolean;
   readonly accepted?: () => { readonly value: unknown; readonly schema: string; readonly submissionHash: string };
 }
@@ -156,8 +157,14 @@ export class HarnessSessionOperations {
       mode: spec.session.mode, packet, context: { inherited: [...(prior?.inherited ?? []), ...packet.additions], history, revision }, policy, task, declarations };
     await this.retain(path, intent);
     await input.prepared?.(packet);
+    let identified: string | null = null;
+    const identify = async (identity: SessionExecutionIdentity) => {
+      const key = JSON.stringify(identity);
+      if (identified === key) return;
+      await input.identified?.(identity); identified = key;
+    };
     // These executable closures belong to this invocation. Serialized inputs are fixed independently.
-    const bindings: SessionExecutionBindings = { task: intent.task, policy: intent.policy, tools: spec.tools,
+    const bindings: SessionExecutionBindings = { prepared: identify, task: intent.task, policy: intent.policy, tools: spec.tools,
       submission: { name: spec.submission.name, accept: async (value, signal) => {
         if (signal.aborted) return { accepted: false, errors: ['The operation was stopped'] };
         const verdict = await spec.submission.accept(value, signal);
@@ -167,8 +174,9 @@ export class HarnessSessionOperations {
       currentAuthority: async () => input.currentAuthority(), guard: spec.guard, afterMutation: spec.afterMutation, onEvent: spec.onEvent, publish: async () => undefined };
     let handle;
     let initialPoint: AgentSessionPoint | null = sourceRef?.point ?? null;
-    const engineIntent = previous ? await this.store.read(runId, `operation:${operationId}`) : null;
+    const engineIntent = previous ? await this.operations.operationIdentity(runId, operationId) : null;
     if (engineIntent) {
+      await identify(engineIntent);
       handle = await this.operations.retry({ runId, operationId, bindings });
     } else {
       if (spec.session.mode !== 'continue') {

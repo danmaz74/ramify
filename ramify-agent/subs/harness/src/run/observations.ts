@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { appendJsonLine, readJsonLines } from '../../subs/ledger/src/jsonl.js';
+import { readFile } from 'node:fs/promises';
+import { appendJsonLine, discardPartialLine } from '../../subs/ledger/src/jsonl.js';
+import { explorationObservationSchema, recordedChargeSchema } from '../interfaces/protocol/runs.js';
 import { usageSchema } from './records.js';
 
 /*
@@ -44,10 +46,16 @@ const hookDispositionSchema = z.object({
 }).strict();
 
 const observation = <T extends string, D extends z.ZodType>(type: T, data: D) =>
-  z.object({ n: z.int().positive(), at: z.iso.datetime(), type: z.literal(type), data }).strict();
+  z.object({ n: z.int().positive(), at: z.iso.datetime(), type: z.literal(type), data, sourceId: text.optional() }).strict();
 
 /** One line of an observation log. */
 export const observationSchema = z.discriminatedUnion('type', [
+  observation('exploration', explorationObservationSchema),
+  observation('usage', z.object({ usage: usageSchema, charge: recordedChargeSchema.nullable(), modelElapsedMs: z.number().nonnegative().nullable() }).strict()),
+  observation('model-duration', z.object({ elapsedMs: z.number().nonnegative().nullable() }).strict()),
+  observation('tool-start', z.object({ callId: text, tool: text, kind: z.enum(['read', 'search', 'other']), requestedScope: z.array(z.string()), startedAt: z.string().nullable() }).strict()),
+  observation('tool-duration', z.object({ callId: text, startedAt: z.string().nullable(), endedAt: z.string().nullable(), elapsedMs: z.number().nonnegative().nullable(), coverage: z.array(z.string()) }).strict()),
+  observation('milestone', z.object({ kind: z.enum(['first-designated-submission', 'first-engineering-action']), at: z.string().nullable() }).strict()),
   observation('activity', z.object({ activity: activitySchema }).strict()),
   /** The input itself is never stored: it may hold file contents. */
   observation('rejection', z.object({
@@ -134,10 +142,11 @@ export type CoverageGapKind = ObservationOf<'coverage-gap'>['data']['kind'];
 export const rawOutputGapKinds: ReadonlySet<CoverageGapKind> = new Set<CoverageGapKind>(['transcript-incomplete']);
 
 /** An observation to record: its type, its data, and the call it belongs to where it has one. */
-export type ObservationInput = { [T in ObservationType]: { readonly type: T; readonly data: ObservationOf<T>['data'] } }[ObservationType];
+export type ObservationInput = { [T in ObservationType]: { readonly type: T; readonly data: ObservationOf<T>['data']; readonly sourceId?: string } }[ObservationType];
 
 /** The identity a replay is recognized by: one call, one type, once. */
 function keyOf(input: ObservationInput): string | undefined {
+  if (input.sourceId) return `${input.sourceId}\u0000${input.type}`;
   const data = input.data as { callId?: unknown };
   return typeof data.callId === 'string' && data.callId !== '' ? `${data.callId}\u0000${input.type}` : undefined;
 }
@@ -148,6 +157,7 @@ function keyOf(input: ObservationInput): string | undefined {
  * counting it twice.
  */
 export class ObservationLog {
+  private lastNumber = 0;
   private constructor(
     readonly path: string,
     private readonly seen: Set<string>,
@@ -156,7 +166,19 @@ export class ObservationLog {
   ) {}
 
   static async open(path: string): Promise<ObservationLog> {
-    const loaded = await readJsonLines(path);
+    const bytes = await readFile(path).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return Buffer.alloc(0);
+      throw error;
+    });
+    const end = bytes.lastIndexOf(10) + 1;
+    const records: unknown[] = [];
+    let start = 0;
+    for (let index = 0; index < end; index++) if (bytes[index] === 10) {
+      try { records.push(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(start, index)))); }
+      catch { records.push(null); }
+      start = index + 1;
+    }
+    const loaded = { records, completeBytes: end, discardedPartial: end < bytes.length ? bytes.subarray(end).toString('utf8') : null };
     const list: Observation[] = [];
     const seen = new Set<string>();
     for (const line of loaded.records) {
@@ -166,7 +188,12 @@ export class ObservationLog {
       const key = keyOf(parsed.data as ObservationInput);
       if (key !== undefined) seen.add(key);
     }
-    return new ObservationLog(path, seen, list, 0);
+    await discardPartialLine(path, loaded);
+    const log = new ObservationLog(path, seen, list, 0);
+    log.lastNumber = loaded.records.reduce<number>((maximum, value) => value !== null && typeof value === 'object' && 'n' in value && Number.isSafeInteger(value.n) && (value.n as number) > maximum ? value.n as number : maximum, 0);
+    const invalid = loaded.records.length - list.length;
+    if (invalid > 0 || (loaded.discardedPartial !== null)) await log.record({ type: 'coverage-gap', data: { kind: 'observation-truncated', detail: `${invalid} unreadable rows; trailing partial=${(loaded.discardedPartial !== null)}; known observations retained` } });
+    return log;
   }
 
   get observations(): readonly Observation[] {
@@ -186,15 +213,21 @@ export class ObservationLog {
    * Appends one observation, unless its `(callId, type)` is already in the
    * log. Answers whether it was written.
    */
-  async record(input: ObservationInput, at: Date = new Date()): Promise<boolean> {
+  private pending: Promise<unknown> = Promise.resolve();
+  record(input: ObservationInput, at: Date = new Date()): Promise<boolean> {
+    const result = this.pending.then(() => this.append(input, at));
+    this.pending = result.catch(() => undefined); return result;
+  }
+  private async append(input: ObservationInput, at: Date): Promise<boolean> {
     const key = keyOf(input);
     if (key !== undefined && this.seen.has(key)) {
       this.dropped += 1;
       return false;
     }
-    const line = observationSchema.parse({ n: this.list.length + 1, at: at.toISOString(), type: input.type, data: input.data });
+    const line = observationSchema.parse({ n: this.lastNumber + 1, at: at.toISOString(), type: input.type, data: input.data, ...(input.sourceId ? { sourceId: input.sourceId } : {}) });
     await appendJsonLine(this.path, line);
     this.list.push(line);
+    this.lastNumber = line.n;
     if (key !== undefined) this.seen.add(key);
     return true;
   }

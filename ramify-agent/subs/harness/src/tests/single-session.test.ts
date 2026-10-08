@@ -34,6 +34,11 @@ describe('a single engineer session', () => {
     expect(packet.message).toContain(`# Goal\n${prompt}`);
     expect(packet.message.split(prompt)).toHaveLength(2);
     expect(agent.sessions[0]!.spec.prompt).toBe(packet.message);
+    const recorded = sessionRecordSchema.parse(JSON.parse(await readFile(join(finished(result).records, 'session.json'), 'utf8')));
+    expect(recorded.prompts.manifest).toMatchObject({ schema: 'ramify-agent.delivered-inputs/1', currentMessage: { bytes: Buffer.byteLength(packet.message) } });
+    expect(recorded.scopeSize).toMatchObject({ bytes: null, coverage: 'partial', components: expect.arrayContaining([expect.objectContaining({ component: 'support-documents', state: 'measured' })]) });
+    expect(recorded.scopeSize!.subtotal).toBeGreaterThan(0);
+    expect(recorded.sessionOperation).toMatchObject({ runId: `standalone:${recorded.id}`, operationId: recorded.id, turn: 1, sourcePoint: { turn: 0, kind: 'checkpoint' } });
     expect(packet.message).toContain('## Approach the architect asked for\n\nNot stated.');
   });
 

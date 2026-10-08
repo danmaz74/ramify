@@ -48,6 +48,7 @@ describe('a projection never writes, and no query appends an event', () => {
     const receipt = await opened.service.execute(startRun(plan));
     const runId = receipt.jobId;
     await opened.service.settled(plan, runId);
+    expect(opened.service.getRun(plan, runId)).toMatchObject({ state: 'completed', failure: null });
 
     // In-process first, against the service that ran it.
     const before = await fileHashes(runPath(root, plan, runId));

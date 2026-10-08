@@ -9,6 +9,8 @@ export class SessionDriverUnavailableError extends Error {
 }
 export interface AgentSessionPoint { readonly sessionId: AgentSessionId; readonly kind: 'turn' | 'checkpoint'; readonly turn: number; readonly checkpoint: string }
 export interface SessionOperationKey { readonly runId: string; readonly operationId: SessionOperationId }
+/** Original admitted execution identity. sourcePoint is real; no terminal checkpoint is guessed. */
+export interface SessionExecutionIdentity extends SessionOperationKey { readonly sessionId: AgentSessionId; readonly turn: number; readonly sourcePoint: AgentSessionPoint }
 export interface SessionLineage { readonly sessionId: AgentSessionId; readonly parent: AgentSessionPoint | null; readonly currentPoint: AgentSessionPoint }
 export interface SessionOperationReceipt extends SessionOperationKey {
   readonly sessionId: AgentSessionId; readonly turn: number | null; readonly point: AgentSessionPoint | null;
@@ -35,6 +37,8 @@ export interface SessionStore {
 export interface SessionExecutionPolicy { readonly context: ContextPolicy; readonly authority: Readonly<Record<string, unknown>>; readonly validator: Readonly<Record<string, unknown>>; readonly destination: Readonly<Record<string, unknown>> }
 export interface SessionExecutionBindings {
   readonly task: SessionTaskInput; readonly policy: SessionExecutionPolicy;
+  /** Original identity, after admission/current authority and before events/effects. Rebound on unfinished Retry. */
+  readonly prepared?: ((identity: SessionExecutionIdentity) => Promise<void>) | undefined;
   readonly tools: readonly ToolDefinition[];
   readonly submission: { readonly name: string; accept(input: unknown, signal: AbortSignal): Promise<SubmissionVerdict> };
   readonly currentAuthority: (task: SessionTaskInput, policy: SessionExecutionPolicy) => Promise<boolean>;
@@ -67,7 +71,7 @@ export interface SessionDriverRuntime {
   onEvent(event: AgentEvent): void;
 }
 export interface SessionDriverInvocation {
-  readonly key: SessionOperationKey; readonly session: AgentSessionSnapshot; readonly task: SessionTaskInput;
+  readonly key: SessionOperationKey; readonly identity: SessionExecutionIdentity; readonly session: AgentSessionSnapshot; readonly task: SessionTaskInput;
   readonly recovering: boolean; readonly effects: readonly SessionEffectRecord[];
 }
 /** Implementations own opaque provider encoding; display events never become provider history.
@@ -98,6 +102,8 @@ export interface SessionOperations {
   changeTools(input: ChangeSessionToolsInput): Promise<SessionOperationReceipt>;
   retry(input: RetrySessionInput): Promise<SessionOperationHandle>;
   stop(input: StopSessionInput): Promise<SessionOperationReceipt>;
+  /** Pure original intent lookup. Missing is null; corrupt/unavailable state rejects. No dispatch or acceptance. */
+  operationIdentity(runId: string, operationId: SessionOperationId): Promise<SessionExecutionIdentity | null>;
   inspect(runId: string, sessionId: AgentSessionId, point?: AgentSessionPoint): Promise<AgentSessionSnapshot | null>;
 }
 export interface SessionExecutionOwner { readonly token: string; readonly pid: number }

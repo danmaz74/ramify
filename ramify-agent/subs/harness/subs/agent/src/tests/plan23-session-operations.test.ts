@@ -48,6 +48,19 @@ describe('Plan 23 F1 high-level session operations', () => {
     expect(await rebuilt.inspect('run-A', P.sessionId)).toBeNull(); expect(dispatches).toBe(1);
     expect((await rebuilt.fork({ runId: 'run-A', operationId: 'safe-old', sourcePoint: P.point! })).status).toBe('completed');
   });
+  it('original-operation lookup refuses corrupt points and envelopes without dispatch or acceptance', async () => {
+    let dispatches = 0; const store = memoryStore();
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    await operations.create(create);
+    const original = (await store.read('run-A', 'operation:create'))!;
+    for (const patch of [{ runId: 'other' }, { id: 'operation:other' }, { body: { ...original.body, snapshot: { ...(original.body['snapshot'] as object), currentPoint: { sessionId: original.body['sessionId'], turn: 0, kind: 'invented', checkpoint: '' } } } }]) {
+      const corrupt = { ...original, ...patch };
+      const reader: SessionStore = { ...store, read: async () => corrupt };
+      const reopened = createSessionOperations({ sessionStore: reader, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+      await expect(reopened.operationIdentity('run-A', 'create')).rejects.toThrow('Corrupt');
+    }
+    expect(dispatches).toBe(0);
+  });
   it('S01/S02 retains exact role, turn/checkpoint lineage and isolated siblings', async () => {
     const store = memoryStore(); let dispatches = 0;
     const driver: SessionOperationDriver = { dispatch: async (input, runtime) => { dispatches++; expect(input.session.initialInstructions).toBe('Role A\nGeneral task protocol.'); return createScriptedSessionDriver([{ kind: 'submit', input: { orientation: 'A' } }]).dispatch(input, runtime); } };
@@ -251,5 +264,43 @@ describe('Plan 23 F1 high-level session operations', () => {
     expect((await newlyBound.create(create)).status).toBe('completed');
     const P = await agent.sessionOperations!.create(create);
     expect((await (await agent.sessionOperations!.continue(continuation(P.sessionId, P.point!, 't'))).receipt).outcome).toEqual({ kind: 'submitted', input: { orientation: 'A' } });
+  });
+});
+
+describe('Plan 23 original execution observation identities', () => {
+  it('prepares the durable original executing turn before every event and terminal lookup has zero effects', async () => {
+    const prepared: unknown[] = []; const events: unknown[] = []; let dispatches = 0; let accepts = 0;
+    const gate = deferred();
+    const operations = createSessionOperations({ sessionStore: memoryStore(), driver: { async dispatch(input, runtime) {
+      dispatches++; expect(prepared).toEqual([input.identity]);
+      runtime.onEvent({ type: 'context-observed', tokens: null, window: 100 });
+      const verdict = await runtime.submit('submit-original', { orientation: 'A' });
+      return verdict.accepted ? { kind: 'submitted', input: { orientation: 'A' } } : { kind: 'ended' };
+    } } });
+    expect(await operations.operationIdentity('run-A', 'missing')).toBeNull();
+    const P = await operations.create(create);
+    const bound = bindings({ prepared: async value => { prepared.push(value); await gate.promise; },
+      onEvent: event => events.push(event.execution), submission: { name: 'submit_orientation', accept: async () => { accepts++; return { accepted: true }; } } });
+    const running = await operations.continue(continuation(P.sessionId, P.point!, 'original', bound));
+    await flush(); expect(dispatches).toBe(0); expect(events).toEqual([]);
+    const expected = { runId: 'run-A', operationId: 'original', sessionId: P.sessionId, turn: 1, sourcePoint: P.point };
+    expect(await operations.operationIdentity('run-A', 'original')).toEqual(expected);
+    gate.resolve(); const receipt = await running.receipt;
+    expect(receipt.outcome?.kind).toBe('submitted'); expect(events).toEqual([expected]);
+    const throwing = bindings({ prepared: async () => { throw new Error('terminal must not prepare'); }, onEvent: () => { throw new Error('terminal must not observe'); }, submission: { name: 'submit_orientation', accept: async () => { throw new Error('terminal must not accept twice'); } } });
+    expect(await (await operations.retry({ runId: 'run-A', operationId: 'original', bindings: throwing })).receipt).toEqual(receipt);
+    expect(await operations.operationIdentity('run-A', 'original')).toEqual(expected); expect(dispatches).toBe(1); expect(accepts).toBe(1);
+  });
+  it('keeps checkpoint and sibling origins distinct even where their next executing turn number is equal', async () => {
+    const operations = createSessionOperations({ sessionStore: memoryStore(), driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const P = await operations.create(create); const first = await (await operations.continue(continuation(P.sessionId, P.point!, 'first'))).receipt;
+    const C = await operations.appendContext({ runId: 'run-A', operationId: 'C', sessionId: P.sessionId, expectedPoint: first.point!, additions: [{ key: 'brief', kind: 'brief', revision: 'r1', text: 'B' }] });
+    const L = await operations.fork({ runId: 'run-A', operationId: 'L', sourcePoint: first.point! });
+    const R = await operations.fork({ runId: 'run-A', operationId: 'R', sourcePoint: C.point! });
+    await (await operations.continue(continuation(L.sessionId, L.point!, 'left'))).receipt;
+    await (await operations.continue(continuation(R.sessionId, R.point!, 'right'))).receipt;
+    const left = await operations.operationIdentity('run-A', 'left'); const right = await operations.operationIdentity('run-A', 'right');
+    expect(left?.turn).toBe(2); expect(right?.turn).toBe(2); expect(left?.sessionId).not.toBe(right?.sessionId); expect(left?.sourcePoint).toEqual(L.point); expect(right?.sourcePoint).toEqual(R.point);
+    expect((await operations.inspect('run-A', L.sessionId))?.parent).toEqual(first.point); expect((await operations.inspect('run-A', R.sessionId))?.parent).toEqual(C.point);
   });
 });

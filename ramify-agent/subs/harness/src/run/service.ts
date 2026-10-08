@@ -120,7 +120,7 @@ import {
   type ExtractionTurn, type LoadedPackage,
 } from '../prompts/packages.js';
 import {
-  baselineScope, captureSnapshot, invocationScope, revisionMismatch, rootModuleOfSnapshot, scopeSize, supportDocument, writeScopeMeasurement,
+  baselineScope, captureSnapshot, deliveredScopeInputs, invocationScope, revisionMismatch, rootModuleOfSnapshot, scopeSize, supportDocument, readScopeMeasurement, writeScopeMeasurement,
   type DeclaredScope,
 } from '../kpi/capture.js';
 import { cachedChangeHistory } from '../kpi/delivered.js';
@@ -428,7 +428,7 @@ interface InvocationRequest<T> {
    * invocation starts, with its own prompt package, the plan and the brief
    * it is delivered as its support documents. Without it `scope.size` stands.
    */
-  readonly measured?: { readonly snapshot: MeasurementSnapshot; readonly scope: DeclaredScope } | undefined;
+  readonly measured?: { readonly snapshot: MeasurementSnapshot; readonly scope: DeclaredScope; readonly readScope?: DeclaredScope } | undefined;
   /** Whether this invocation holds the run's one writer. */
   readonly writer?: boolean | undefined;
   /** Exact tree at writer start when task-local mutation attribution is required. */
@@ -744,6 +744,7 @@ export class RunService {
   private readonly candidates: CandidateSource;
   /** What the run queries read each run's delivered change from. */
   readonly changeHistory: ChangeHistory;
+  get candidateSource(): CandidateSource { return this.candidates; }
 
   private constructor(private readonly options: RunServiceOptions, private readonly workflow: CapabilityWorkflow | null) {
     this.git = options.git ?? gitService;
@@ -3812,7 +3813,7 @@ export class RunService {
       validate: input => validateAgainst(nonfunctionalRepairSubmissionSchema, input),
       keep: () => finished('work-closed'),
       scope: { write: 1, measurement: baseline === null ? null : this.baselineReference(run), size: null },
-      ...(baseline === null ? {} : { measured: { snapshot: baseline, scope: writeScopeMeasurement(assignment.scope) } }),
+      ...(baseline === null ? {} : { measured: { snapshot: baseline, scope: writeScopeMeasurement(assignment.scope), readScope: readScopeMeasurement(assignment.scope) } }),
       writer: true, guarded, workingDirectory, equip: tools.equip,
     });
     await this.recordLineEvents(run, result.id, before, await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git));
@@ -4066,6 +4067,64 @@ export class RunService {
    * the run-wide bounds, the identifiers, the events that license it, its
    * transcript's start and, for the writer, the writer's acquisition.
    */
+  /** Latest immutable invocation revision, unlike owning assignment/license lookups. */
+  private invocationRecord(run: Run, id: string) {
+    const record = run.log.ledger.replay().flatMap(entry => entry.transaction.records).filter(record => record.path === runLayout.invocation(id)).at(-1);
+    if (!record) throw new Error('Invocation record missing');
+    return { revision: record.revision, body: invocationSchema.parse(record.body) };
+  }
+
+  private async prepareInvocation<T>(run: Run, id: string,
+    supplied?: { packet: import('../prompts/tasks.js').TaskPacket; request: InvocationRequest<T> },
+    identity?: import('../../subs/agent/src/interfaces/session-operations.js').SessionExecutionIdentity): Promise<void> {
+    const prior = this.invocationRecord(run, id);
+    let body = prior.body;
+    if (supplied) {
+      const { packet, request } = supplied;
+      const hash = inputsHash([packet.roleInstructions, packet.message]);
+      if (body.prompt.inputsHash !== undefined) {
+        if (body.prompt.inputsHash !== hash || canonicalJson(body.prompt.manifest) !== canonicalJson(packet.manifest)) throw new Error('Original delivered invocation inputs changed');
+      } else {
+        let size: Invocation['scope']['size'];
+        let readSize: Invocation['scope']['size'] = null;
+        try {
+          const baseline = 'measurement' in run.record.baseline ? run.record.baseline.measurement : null;
+          const snapshot = request.measured?.snapshot ?? (baseline === null ? null : measurementSnapshotSchema.parse(JSON.parse(await readFile(run.path(runLayout.measurement(baseline.id)), 'utf8'))));
+          const declared: DeclaredScope = request.measured?.scope ?? { exactOwners: [], subtrees: [], apiViews: false, architectView: false, supportDocuments: [] };
+          const actual = deliveredScopeInputs(declared, packet.manifest);
+          if (snapshot === null) {
+            const known = actual.supplementary.reduce((sum, entry) => sum + entry.bytes, 0) + (actual.scope.brief ?? 0);
+            size = { policy: 'scope-size/2', snapshot: 'unavailable', bytes: null, subtotal: known, coverage: 'partial', components: [
+              { component: 'owned-source', detail: request.role, state: 'unavailable', bytes: null, reason: 'No frozen measurement snapshot is available' },
+              { component: 'support-documents', detail: 'Actual delivered/inherited inputs', state: 'measured', bytes: known },
+            ] };
+          } else {
+            if (request.measured?.readScope) readSize = scopeSize(snapshot, request.measured.readScope);
+            else if (request.writer !== true && request.measured) readSize = scopeSize(snapshot, { ...request.measured.scope, supportDocuments: [], brief: 0 });
+            const paths = new Set(actual.supplementary.map(entry => entry.path));
+            const frozen = { ...snapshot, supplementary: [...snapshot.supplementary.filter(entry => !paths.has(entry.path)), ...actual.supplementary] };
+            size = scopeSize(frozen, await invocationScope(this.projectRoot, run.record.planId, declared, request.loaded, packet.message, packet.manifest));
+            if (!request.measured) size = { ...size, bytes: null, coverage: 'partial', components: [...size.components,
+              { component: 'owned-source', detail: request.role, state: 'unknown', bytes: null, reason: 'This role has no recorded owned-source size declaration; delivered support subtotal retained' }] };
+          }
+        } catch (error) {
+          const known = request.measured ? scopeSize(request.measured.snapshot, { ...request.measured.scope, supportDocuments: [], brief: 0 }) : null;
+          size = { policy: 'scope-size/2', snapshot: request.measured?.snapshot.id ?? 'unavailable', bytes: null, subtotal: known?.subtotal ?? 0, coverage: 'partial', components: [
+            ...(known?.components.filter(component => component.component !== 'support-documents') ?? []),
+            { component: 'support-documents', detail: request.role, bytes: null, state: 'unavailable', reason: message(error) },
+          ] };
+        }
+        body = { ...body, prompt: { ...body.prompt, inputsHash: hash, manifest: { ...packet.manifest } }, scope: { ...body.scope, size, readSize } };
+      }
+    }
+    if (identity) {
+      if (body.sessionOperation?.sourcePoint && canonicalJson(body.sessionOperation.sourcePoint) !== canonicalJson(identity.sourcePoint)) throw new Error('Original invocation operation point changed');
+      body = { ...body, sessionOperation: { ...identity, point: body.sessionOperation?.point } };
+    }
+    if (canonicalJson(body) === canonicalJson(prior.body)) return;
+    await this.write(run, { type: 'invocation-prepared', data: { invocation: id } }, [{ path: runLayout.invocation(id), id, revision: prior.revision + 1, body }]);
+  }
+
   private async startInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<
     | { readonly refused: string }
     | { readonly id: string; readonly session: SessionId; readonly observations: ObservationLog; readonly transcript: InvocationTranscript; readonly closed: () => void }
@@ -4105,11 +4164,8 @@ export class RunService {
       attempt: request.attempt,
       session: requestedSession(request),
       prompt: { package: request.loaded.package, hash: request.loaded.hash, requestedInputsHash: inputsHash([request.systemPrompt, request.prompt]) },
-      scope: request.measured === undefined ? request.scope : {
-        ...request.scope,
-        size: scopeSize(request.measured.snapshot,
-          await invocationScope(this.projectRoot, run.record.planId, request.measured.scope, request.loaded, request.prompt)),
-      },
+      // Actual delivered size is committed by invocation-prepared, before events.
+      scope: { ...request.scope, size: null },
       writer: request.writer === true,
       ...(request.candidateBefore === undefined ? {} : { candidateBefore: request.candidateBefore }),
       base: this.accepted(run),
@@ -4213,6 +4269,7 @@ export class RunService {
     const context = contextPolicyOf(run.record.policy, request.role);
     const recorder = new PortEventRecorder({
       projectRoot: this.projectRoot, workingDirectory: request.workingDirectory ?? this.projectRoot, observations, judge, excursions, context, transcript,
+      invocation: { id, role: request.role, startedAt: invocationSchema.parse(this.committedBody(run, runLayout.invocation(id))).startedAt, submissionTool: request.toolName, declaredPaths: request.guarded?.roots ?? [] },
     });
     // Every port event is activity; `touch` is what the idle bound resets.
     // A command the equipment runs for the session holds it instead. An
@@ -4279,7 +4336,12 @@ export class RunService {
         validator: { name: request.toolName, schema: request.inputSchema, submissionSchema: request.submissionSchema, bound: limits.rejectedSubmissionsPerTurn },
         destination: { run: run.record.jobId, invocation: id, submission: runLayout.submission(id) },
         accepted: () => { if (value === undefined || submissionHash === null) throw new Error('Accepted destination was not retained'); return { value, schema: request.submissionSchema, submissionHash }; }, currentAuthority: async () => !this.ignoring(run) && request.fenced?.() !== true,
+        identified: async identity => {
+          recorder.identify(identity);
+          await this.prepareInvocation(run, id, undefined, identity);
+        },
         prepared: async packet => {
+          await this.prepareInvocation(run, id, { packet, request });
           const recorded = await readTranscript(run.path(runLayout.transcript(session))).catch(error => {
             if (request.restore === true) throw error;
             // A new invocation keeps display transcript failures as coverage gaps.
@@ -8727,7 +8789,7 @@ export class RunService {
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
           size: null,
         },
-        measured: { snapshot: baseline, scope: measurementScope },
+        measured: { snapshot: baseline, scope: measurementScope, readScope: readScopeMeasurement(assignment.scope) },
         writer: true,
         ...(beforeTree === undefined ? {} : { candidateBefore: beforeTree }),
         guarded,
@@ -9328,7 +9390,7 @@ export class RunService {
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
           size: null,
         },
-        measured: { snapshot: baseline, scope: measurementScope },
+        measured: { snapshot: baseline, scope: measurementScope, readScope: readScopeMeasurement(assignment.scope) },
         writer: true,
         guarded,
         equip: tools.equip,
@@ -10596,13 +10658,14 @@ export class RunService {
       ...(degraded === undefined ? {} : { degraded }),
     };
     const packet = this.sessionOperations === undefined ? null : await this.sessionOperations.then(operations => operations.packet(run.record.jobId, id), () => null);
-    const invocation = packet === null ? null : invocationSchema.parse(this.committedBody(run, runLayout.invocation(id)));
+    const latest = packet === null ? null : this.invocationRecord(run, id);
+    const invocation = latest?.body ?? null;
     const written = await this.write(run, {
       type: 'invocation-ended',
       data: keeping.kept ? { ...ended, kept: true } : { ...ended, kept: false, finished: keeping.finished },
     }, [
       { path: runLayout.outcome(id), id, revision: 1, body: outcome },
-      ...(invocation === null || packet === null ? [] : [{ path: runLayout.invocation(id), id, revision: 2, body: { ...invocation, prompt: { ...invocation.prompt, inputsHash: inputsHash([packet.roleInstructions, packet.message]), manifest: packet.manifest } } }]),
+      ...(invocation === null || packet === null ? [] : [{ path: runLayout.invocation(id), id, revision: latest!.revision + 1, body: { ...invocation, prompt: { ...invocation.prompt, inputsHash: inputsHash([packet.roleInstructions, packet.message]), manifest: packet.manifest } } }]),
     ]);
     // The transcript's end follows the log's, so the point it names is one
     // the log has; recovery ends an interrupted invocation's transcript too.

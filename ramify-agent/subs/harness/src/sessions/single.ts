@@ -1,4 +1,5 @@
 import { taskSupportSections } from '../work/task-support.js';
+import { deliveredScopeInputs, writeScopeMeasurement } from '../kpi/capture.js';
 import { randomBytes } from 'node:crypto';
 import { mkdir, realpath, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
@@ -349,7 +350,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
   const prompt = iterationMessage({ assignment, projectRoot, workingDirectory, base: head, views });
   const shown = scopePaths(projectRoot, scope);
 
-  const record: SessionRecord = sessionRecordSchema.parse({
+  let record: SessionRecord = sessionRecordSchema.parse({
     schema: 'ramify-agent.session/2', policy: { version: 'run-policy/7', contract: 'plan21-whole-owner-and-architect-reporting/1' }, authority: scope,
     id,
     role: 'engineer',
@@ -423,7 +424,8 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
 
   const excursions = new ExcursionWatcher({ projectRoot, index: initial, scope: guarded });
   const context = contextPolicyOf(policy, 'engineer');
-  const recorder = new PortEventRecorder({ projectRoot, workingDirectory, observations, judge, excursions, context, transcript });
+  const recorder = new PortEventRecorder({ projectRoot, workingDirectory, observations, judge, excursions, context, transcript,
+    invocation: { id, role: 'engineer', startedAt: record.startedAt, submissionTool: engineerToolName, declaredPaths: shown.roots } });
   const bounds = new InvocationBounds(limits);
   const equipment = tools.equip({
     invocation: id,
@@ -510,8 +512,20 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
     agentSession = await sessions.start({ runId: `standalone:${id}`, operationId: id, session: id, loaded, brief, spec,
       authority: { scope, guarded: guardedFiles }, validator: { name: engineerToolName, schema: capabilityEngineerJsonSchema, submissionSchema: 'ramify-agent.engineer-submission/1', bound: limits.rejectedSubmissionsPerTurn },
       destination: { session: id, submission: sessionLayout.submission }, currentAuthority: async () => options.signal?.aborted !== true,
+      identified: async identity => {
+        recorder.identify(identity);
+        record = { ...record, sessionOperation: { ...identity } };
+        await writeFileAtomic(at(sessionLayout.session), `${JSON.stringify(record, null, 2)}\n`);
+      },
       prepared: async packet => {
-        await writeFileAtomic(at(sessionLayout.session), `${JSON.stringify({ ...record, prompts: { package: loaded.package, hash: loaded.hash, inputsHash: inputsHash([packet.roleInstructions, packet.message]) } }, null, 2)}\n`);
+        const actual = deliveredScopeInputs(writeScopeMeasurement(scope), packet.manifest);
+        const known = actual.supplementary.reduce((sum, entry) => sum + entry.bytes, 0) + (actual.scope.brief ?? 0);
+        record = { ...record, prompts: { package: loaded.package, hash: loaded.hash, inputsHash: inputsHash([packet.roleInstructions, packet.message]), manifest: { ...packet.manifest } },
+          scopeSize: { policy: 'scope-size/2', snapshot: 'standalone-unavailable', bytes: null, subtotal: known, coverage: 'partial', components: [
+            { component: 'owned-source', detail: entry.module, bytes: null, state: 'unavailable', reason: 'Standalone session has no frozen measurement snapshot' },
+            { component: 'support-documents', detail: 'Actual delivered inputs', bytes: known, state: 'measured' },
+          ] } };
+        await writeFileAtomic(at(sessionLayout.session), `${JSON.stringify(record, null, 2)}\n`);
         progress({ type: 'started', session: id, module: entry.module, directory: entry.dir, records, scope: shown, message: packet.message });
         await transcript.started({ role: 'engineer', work: {}, start: 'opened', requested: 'fresh', executor: agent.name, model: options.model ?? null,
           systemPrompt: packet.roleInstructions, prompt: packet.message });
@@ -625,7 +639,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
   const standing = tools.openFindings();
   await writeOutcome(at(sessionLayout.outcome), {
     session: id,
-    sessionOperation: { runId: `standalone:${id}`, operationId: id, ...(readSessionPointReference(agentSession.ref) === null ? { point: null } : { sessionId: readSessionPointReference(agentSession.ref)!.point.sessionId, point: readSessionPointReference(agentSession.ref)!.point }) },
+    sessionOperation: { ...record.sessionOperation, runId: `standalone:${id}`, operationId: id, ...(readSessionPointReference(agentSession.ref) === null ? { point: null } : { sessionId: readSessionPointReference(agentSession.ref)!.point.sessionId, point: readSessionPointReference(agentSession.ref)!.point }) },
     ended,
     ...(interruption === undefined ? {} : { interruption }),
     ...(error === undefined ? {} : { error }),

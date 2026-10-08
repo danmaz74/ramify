@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { z } from 'zod';
 import { modulePathSchema, sha256Schema } from '../interfaces/protocol/evidence.js';
-import { invocationOutcomeSchema } from '../run/records.js';
+import { invocationOutcomeSchema, invocationSchema, scopeSizeSchema } from '../run/records.js';
 import { capabilityEngineerSubmissionKinds, engineerSubmissionKinds, engineerSubmissionSchema } from '../work/engineer.js';
 import { writeScopeSchema, testSelectionPolicySchema } from '../work/iterations.js';
 
@@ -69,7 +69,9 @@ export const sessionRecordSchema = z.object({
     views: z.array(z.object({ area: text, path: text, revision: text.optional(), coverage: z.number().nullable() }).strict()),
     unavailable: z.string().nullable(),
   }).strict()),
-  prompts: z.object({ package: text, hash: sha256Schema, inputsHash: sha256Schema }).strict(),
+  prompts: z.object({ package: text, hash: sha256Schema, inputsHash: sha256Schema, manifest: z.record(z.string(), z.unknown()).optional() }).strict(),
+  sessionOperation: invocationSchema.shape.sessionOperation,
+  scopeSize: scopeSizeSchema.nullable().optional(),
 }).strict();
 export type SessionRecord = z.infer<typeof sessionRecordSchema>;
 

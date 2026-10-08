@@ -1,12 +1,17 @@
-import type { ChangeHistory } from '../../subs/evidence/src/git.js';
-import { readJsonLines } from '../../subs/ledger/src/jsonl.js';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { verifySetupLineIdentities, type RecordedSetupDelta, type SetupAddedLineFact, type SetupCandidatePartition, type SetupDeletedLineFact, type SetupLineMappingFacts } from '../../../../src/trial-attribution.js';
+import { scratchIgnoreRule } from '../work/scratch.js';
+import type { CandidateSource, ChangeHistory, LineCommit } from '../../subs/evidence/src/git.js';
 import { acceptedCommit } from '../checks/accepted.js';
-import type { InvocationEvaluation, MetricsResponse } from '../interfaces/protocol/runs.js';
+import { deliveredManifestViewSchema, operationIdentitySchema, scopeSizeViewSchema, recordedChargeSchema, type InvocationEvaluation, type InvocationEfficiency, type MetricsResponse } from '../interfaces/protocol/runs.js';
 import { baselineScope, rootModuleOfSnapshot, scopeSize } from '../kpi/capture.js';
 import { deliveredChange, type DeliveredChange } from '../kpi/delivered.js';
 import { guardingReport } from '../kpi/guarding.js';
 import { lineageMetrics, lineagePolicyVersion } from '../kpi/lineage.js';
-import { kpiMetrics, kpiPolicyVersion, measurementPolicyVersion, type InvocationFacts } from '../kpi/metrics.js';
+import { comparableScopeMetrics, kpiMetrics, kpiPolicyVersion, measurementPolicyVersion, type InvocationFacts } from '../kpi/metrics.js';
+import { explorationDetails } from '../kpi/exploration.js';
+import { invocationTiming } from '../kpi/efficiency.js';
 import { observationSchema, type Observation } from '../run/observations.js';
 import { invocationSessions } from '../run/sessions.js';
 import {
@@ -57,15 +62,23 @@ async function baselineOf(view: RunView): Promise<MetricsResponse['baseline']> {
  */
 export async function readObservationLog(path: string, shown: string): Promise<readonly Observation[] | { unavailable: string }> {
   try {
-    const loaded = await readJsonLines(path);
+    const bytes = await readFile(path);
     const lines: Observation[] = [];
     let invalid = 0;
-    for (const record of loaded.records) {
-      const parsed = observationSchema.safeParse(record);
-      if (parsed.success) lines.push(parsed.data);
-      else invalid += 1;
+    const completeBytes = bytes.lastIndexOf(10) + 1;
+    const complete = completeBytes === bytes.length;
+    let start = 0;
+    for (let index = 0; index < completeBytes; index++) if (bytes[index] === 10) {
+      try {
+        const parsed = observationSchema.safeParse(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(start, index))));
+        if (parsed.success) lines.push(parsed.data);
+        else invalid += 1;
+      } catch { invalid += 1; }
+      start = index + 1;
     }
-    if (invalid > 0) return { unavailable: `${shown} has ${invalid} line(s) this harness does not read` };
+    if (invalid > 0 || (!complete && bytes.length > 0)) lines.push({ n: lines.reduce((maximum, row) => Math.max(maximum, row.n), 0) + 1,
+      at: lines.at(-1)?.at ?? '1970-01-01T00:00:00.000Z', type: 'coverage-gap', data: { kind: 'observation-truncated',
+        detail: `${shown}: ${invalid} unreadable rows; trailing partial=${!complete}; known observations retained` } });
     return lines;
   } catch (error) {
     return { unavailable: `${shown} cannot be read: ${error instanceof Error ? error.message : String(error)}` };
@@ -145,6 +158,132 @@ function scoped(invocation: string, observations: readonly Observation[]): Obser
 export interface RunHistory {
   readonly projectRoot: string;
   readonly changes: ChangeHistory;
+  readonly candidates?: CandidateSource | undefined;
+}
+
+/** Exact byte proof against Git's independently recorded blob object identity. */
+function authenticatedText(text: string, objectId: string | undefined): { hash: string; lines: string[] } | null {
+  if (objectId === undefined || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(objectId)) return null;
+  const bytes = Buffer.from(text, 'utf8');
+  const actual = createHash(objectId.length === 40 ? 'sha1' : 'sha256').update(Buffer.from(`blob ${bytes.length}\0`)).update(bytes).digest('hex');
+  if (actual !== objectId) return null; // Decoded replacement characters cannot impersonate invalid original UTF-8.
+  const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  return { hash: createHash('sha256').update(bytes).digest('hex'), lines };
+}
+const exactLineHash = (text: string) => createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex');
+function projectPath(row: LineCommit): string | null {
+  const prefix = row.projectPrefix;
+  if (prefix === undefined || row.sourcePath === undefined || (prefix !== '' && (!prefix.endsWith('/') || prefix.startsWith('/')))) return null;
+  if (!row.sourcePath.startsWith(prefix)) return null;
+  const path = row.sourcePath.slice(prefix.length);
+  return path !== '' && !/[\\\0]/.test(path) && !path.startsWith('/') && !/^[A-Za-z]:/.test(path) && path.split('/').every(part => part !== '' && part !== '.' && part !== '..') ? path : null;
+}
+
+/** Collects complete FINAL/BASE origin partitions before asking the shared pure verifier.
+ * Old scripted Git rows, unavailable blob identities and unrecorded setup edits remain unknown.
+ */
+export async function setupLineIdentitiesOf(view: RunView, history: RunHistory, base: string, final: string): Promise<import('../kpi/delivered.js').HarnessLineIdentities> {
+  const chain = [base, ...await history.changes.commitsBetween(history.projectRoot, base, final)];
+  if (chain.at(-1) !== final || new Set(chain).size !== chain.length) throw new Error('Complete first-parent revision chain unavailable');
+  const candidates: SetupCandidatePartition[] = [];
+  const files = await history.changes.changedFiles(history.projectRoot, base, final);
+  const partitions: { before: string | null; after: string | null; origins: LineCommit[]; seen: LineCommit[] }[] = [];
+  const expand = (ranges: readonly (readonly [number, number])[]) => ranges.flatMap(([start, count]) => Array.from({ length: count }, (_, offset) => start + offset));
+  const complete = (expected: readonly number[], rows: readonly LineCommit[]) => rows.length === expected.length && new Set(rows.map(row => row.line)).size === rows.length && rows.every(row => expected.includes(row.line) && chain.includes(row.commit));
+  for (const file of files) {
+    if (file.binary) throw new Error('Binary direct-diff partition has no exact line identities');
+    const origins = file.after === null || file.added.length === 0 ? [] : await history.changes.lineOrigins(history.projectRoot, base, final, file.after, file.added);
+    const seen = file.before === null || file.deleted.length === 0 ? [] : await history.changes.lineLastSeen(history.projectRoot, base, final, file.before, file.deleted);
+    if (!complete(expand(file.added), origins) || !complete(expand(file.deleted), seen)) throw new Error('Complete direct-diff line origin identity unavailable');
+    for (const row of origins) candidates.push({ commit: row.commit, path: file.after!, kind: 'added' });
+    for (const row of seen) {
+      const removing = chain[chain.indexOf(row.commit) + 1];
+      if (removing === undefined) throw new Error('Deleted BASE line removing commit unavailable');
+      candidates.push({ commit: removing, path: file.before!, kind: 'deleted' });
+    }
+    partitions.push({ before: file.before, after: file.after, origins, seen });
+  }
+  const blob = async (revision: string, path: string, prefix: string | undefined) => {
+    if (history.candidates === undefined || prefix === undefined || (prefix !== '' && (!prefix.endsWith('/') || prefix.startsWith('/') || prefix.split('/').slice(0, -1).some(part => part === '' || part === '.' || part === '..')))) return null;
+    const repositoryPath = `${prefix}${path}`;
+    const entries = await history.candidates.treeEntries(history.projectRoot, revision);
+    const entry = entries.find(value => value.path === repositoryPath);
+    if (entry === undefined) return { hash: null, lines: [] as string[], text: null };
+    if (entry.kind !== 'file' || entry.objectId === undefined) return null;
+    const text = await history.candidates.readBlob(history.projectRoot, revision, repositoryPath);
+    const authenticated = authenticatedText(text, entry.objectId);
+    return authenticated === null ? null : { ...authenticated, text };
+  };
+  const records: RecordedSetupDelta[] = [];
+  const facts: SetupLineMappingFacts[] = [];
+  const setup: { id: string; commit: string; path: string; original?: string | null }[] = [];
+  for (const event of view.events) {
+    if (event.type === 'scratch-setup-complete' && event.data.commit !== null && event.data.appended) {
+      const previousCompletion = view.events.filter(value => value.type === 'scratch-setup-complete' && value.sequence < event.sequence).at(-1)?.sequence ?? 0;
+      const intents = view.events.filter(value => value.type === 'scratch-setting-up' && value.sequence > previousCompletion && value.sequence < event.sequence);
+      const original = intents.length === 1 ? intents[0] : undefined;
+      setup.push({ id: `scratch:${event.sequence}`, commit: event.data.commit, path: '.gitignore', ...(original?.type === 'scratch-setting-up' ? { original: original.data.originalIgnoreBase64 } : {}) });
+    } else if ((event.type === 'scenarios-materialized' || event.type === 'scenarios-reworded') && event.data.commit !== null) {
+      // Feature setup has no recorded byte delta. Its own partitions stay unknown rather than waive all future edits to a path.
+      const paths = event.type === 'scenarios-materialized' ? event.data.files : view.events.filter(value => value.type === 'scenarios-rewording').flatMap(value => value.data.files);
+      for (const path of paths) setup.push({ id: `scenario:${event.sequence}:${path}`, commit: event.data.commit, path });
+    }
+  }
+  for (const item of setup) {
+    const beforeRevision = chain[chain.indexOf(item.commit) - 1] ?? '';
+    const partition = partitions.find(value => value.before === item.path || value.after === item.path);
+    const prefix = [...(partition?.origins ?? []), ...(partition?.seen ?? [])].find(row => projectPath(row) !== null)?.projectPrefix;
+    const before = beforeRevision === '' ? null : await blob(beforeRevision, item.path, prefix);
+    const after = await blob(item.commit, item.path, prefix);
+    let sourceAdded: { line: number; hash: string }[] | null = null;
+    let sourceDeleted: { line: number; hash: string }[] | null = null;
+    if (item.original !== undefined && before !== null && after !== null) {
+      const originalBytes = item.original === null ? Buffer.alloc(0) : Buffer.from(item.original, 'base64');
+      const originalText = originalBytes.toString('utf8');
+      const canonicalOriginal = item.original === null || originalBytes.toString('base64') === item.original;
+      const suffix = originalBytes.length === 0 || originalBytes.at(-1) === 10 ? '' : '\n';
+      const expected = Buffer.concat([originalBytes, Buffer.from(`${suffix}${scratchIgnoreRule}\n`)]);
+      if (canonicalOriginal && Buffer.from(originalText, 'utf8').equals(originalBytes) && (before.text === null ? item.original === null : before.text === originalText) && after.text !== null && Buffer.from(after.text, 'utf8').equals(expected)) {
+        // A missing EOF LF changes that exact old line as well as appending the rule.
+        const alteredLast = suffix === '' ? 0 : 1;
+        sourceDeleted = alteredLast === 0 ? [] : [{ line: before.lines.length, hash: exactLineHash(before.lines.at(-1)!) }];
+        sourceAdded = after.lines.slice(before.lines.length - alteredLast).map((line, index) => ({ line: before.lines.length - alteredLast + index + 1, hash: exactLineHash(line) }));
+      }
+    }
+    let finalAdded: SetupAddedLineFact[] | null = null;
+    let baseDeleted: SetupDeletedLineFact[] | null = null;
+    if (partition !== undefined) {
+      const finalBlob = partition.after === null ? null : await blob(final, partition.after, prefix);
+      const baseBlob = partition.before === null ? null : await blob(base, partition.before, prefix);
+      if (partition.origins.length === 0) finalAdded = [];
+      else if (finalBlob !== null) {
+        const rows: SetupAddedLineFact[] = [];
+        for (const row of partition.origins) {
+          const originPath = projectPath(row); const line = finalBlob.lines[row.line - 1];
+          if (line === undefined || (row.commit === item.commit && (originPath !== item.path || row.sourceLine === undefined || after === null || after.lines[row.sourceLine - 1] === undefined || exactLineHash(after.lines[row.sourceLine - 1]!) !== exactLineHash(line)))) { rows.length = 0; break; }
+          rows.push({ line: row.line, hash: exactLineHash(line), originCommit: row.commit, originPath: originPath ?? '', originLine: row.sourceLine ?? 0, boundary: row.boundary });
+        }
+        if (rows.length === partition.origins.length) finalAdded = rows;
+      }
+      if (partition.seen.length === 0) baseDeleted = [];
+      else if (baseBlob !== null) {
+        const mapped = beforeRevision === base ? partition.seen.map(row => ({ ...row, commit: base, sourceLine: row.line, sourcePath: `${prefix}${partition.before}`, projectPrefix: prefix })) : await history.changes.lineLastSeen(history.projectRoot, base, beforeRevision, partition.before!, files.find(file => file.before === partition.before)!.deleted);
+        const byLine = new Map(mapped.map(row => [row.line, row]));
+        const rows: SetupDeletedLineFact[] = [];
+        for (const row of partition.seen) {
+          const removingCommit = chain[chain.indexOf(row.commit) + 1];
+          const mappedRow = byLine.get(row.line); const line = baseBlob.lines[row.line - 1];
+          if (line === undefined || removingCommit === undefined || (removingCommit === item.commit && (mappedRow?.commit !== beforeRevision || projectPath(mappedRow) === null || mappedRow.sourceLine === undefined || before === null || before.lines[mappedRow.sourceLine - 1] === undefined || exactLineHash(before.lines[mappedRow.sourceLine - 1]!) !== exactLineHash(line)))) { rows.length = 0; break; }
+          rows.push({ line: row.line, hash: exactLineHash(line), lastSeenCommit: row.commit, removingCommit, sourceBeforePath: mappedRow === undefined ? '' : projectPath(mappedRow) ?? '', sourceBeforeLine: mappedRow?.commit === beforeRevision ? mappedRow.sourceLine ?? null : null });
+        }
+        if (rows.length === partition.seen.length) baseDeleted = rows;
+      }
+    } else { finalAdded = []; baseDeleted = []; }
+    records.push({ ...item, runId: view.record.jobId, beforeRevision, beforeBlobHash: before?.hash ?? null, afterBlobHash: after?.hash ?? null, added: sourceAdded, deleted: sourceDeleted });
+    facts.push({ recordId: item.id, base, final, beforeRevision, commit: item.commit, beforeBlobHash: before?.hash ?? null, afterBlobHash: after?.hash ?? null,
+      sourceAdded, sourceDeleted, beforePath: partition?.before ?? null, afterPath: partition?.after ?? null, finalAdded, baseDeleted });
+  }
+  return verifySetupLineIdentities({ runId: view.record.jobId, base, final, firstParentCommits: chain, records, facts, candidates });
 }
 
 /**
@@ -172,12 +311,12 @@ async function deliveredOf(view: RunView, history: RunHistory | undefined, lines
     if (event.type === 'invocation-started') {
       if (view.records.invocations.get(event.data.invocation)?.writer === true) pending.push(event.data.invocation);
     } else if (event.type === 'scratch-setup-complete' || event.type === 'scenarios-reworded') {
-      if (event.data.commit !== null) harness.add(event.data.commit);
+      // Setup commits may contain other edits; only verified line identities can exclude their setup delta.
     } else if (event.type === 'scenarios-materialized') {
-      if (event.data.commit !== null) harness.add(event.data.commit);
-      for (const file of event.data.files) harnessPaths.add(file);
+      // Setup commits may contain other edits; only verified line identities can exclude their setup delta.
+      // Later edits to the same scenario path retain their ordinary attribution.
     } else if (event.type === 'scenarios-rewording') {
-      for (const file of event.data.files) harnessPaths.add(file);
+      // Later edits to the same scenario path retain their ordinary attribution.
     } else if (event.type === 'gate-attempted' && !seen.has(event.data.gate)) {
       seen.add(event.data.gate);
       // A gate commits what the writers since the previous commit left.
@@ -189,7 +328,10 @@ async function deliveredOf(view: RunView, history: RunHistory | undefined, lines
   }
   if (history === undefined) return { state: 'unavailable', reason: 'No Git history is available to read the delivered change from' };
   const recorded = new Map([...lines].map(([id, summary]) => [id, summary === null || 'unavailable' in summary ? null : summary]));
-  return deliveredChange(history.changes, { projectRoot: history.projectRoot, base, final, writers, harness, harnessPaths, recorded });
+  let harnessDeltas: import('../kpi/delivered.js').HarnessLineIdentities;
+  try { harnessDeltas = await setupLineIdentitiesOf(view, history, base, final); }
+  catch (error) { return { state: 'unavailable', reason: `Exact setup line attribution unavailable: ${error instanceof Error ? error.message : String(error)}` }; }
+  return deliveredChange(history.changes, { projectRoot: history.projectRoot, base, final, writers, harness, harnessPaths, recorded, harnessDeltas });
 }
 
 /**
@@ -260,19 +402,29 @@ export async function metricsOf(view: RunView, history?: RunHistory): Promise<Me
   const gateAttempts = [...view.gates.values()]
     .filter(gate => gate.body.subject.iteration !== undefined && accepted.has(gate.body.subject.iteration))
     .map(gate => gate.body.id);
+  const delivered = await deliveredOf(view, history, recorded);
   const metrics = kpiMetrics({
     baseline: baseline.state === 'measured' ? { bytes: baseline.bytes, snapshot: baseline.snapshot } : { unavailable: baseline.reason },
     invocations: facts,
-    delivered: await deliveredOf(view, history, recorded),
+    delivered,
     gateAttempts,
     acceptedIterations,
   }, guarding);
+  let baselineSize: ReturnType<typeof scopeSize> | { unavailable: string } = { unavailable: baseline.state === 'unavailable' ? baseline.reason : 'Frozen snapshot unavailable' };
+  if (!('unavailable' in view.record.baseline)) {
+    const text = await readRunFile(view, runLayout.measurement(view.record.baseline.measurement.id));
+    let parsed: ReturnType<typeof measurementSnapshotSchema.safeParse> | null = null;
+    try { parsed = text === null ? null : measurementSnapshotSchema.safeParse(JSON.parse(text)); } catch { /* baselineOf already reports the unreadable snapshot */ }
+    if (parsed?.success) baselineSize = scopeSize(parsed.data, baselineScope(rootModuleOfSnapshot(parsed.data) ?? 'root', parsed.data.supplementary.map(entry => entry.path)));
+  }
+  const scopeComparisons = comparableScopeMetrics({ baseline: baselineSize, writers: new Map([...view.records.invocations.values()].filter(invocation => invocation.writer).map(invocation => [invocation.id, invocation.scope.size])), delivered });
 
   return {
     policyVersion: kpiPolicyVersion,
     measurementPolicy: measurementPolicyVersion,
     baseline,
     metrics,
+    scopeComparisons: JSON.parse(JSON.stringify(scopeComparisons)) as MetricsResponse['scopeComparisons'],
     lineage: { policyVersion: lineagePolicyVersion, metrics: lineageMetrics(lineage) },
     evaluation: {
       guarding,
@@ -286,11 +438,65 @@ export async function metricsOf(view: RunView, history?: RunHistory): Promise<Me
 
 /** What one invocation's evaluation is computed from. */
 export interface EvaluationInputs {
-  readonly invocation: Pick<Invocation, 'id' | 'role' | 'work' | 'writer'>;
-  readonly outcome: Pick<InvocationOutcome, 'ended' | 'outsideScope' | 'usage'> | null;
+  readonly invocation: Pick<Invocation, 'id' | 'role' | 'work' | 'writer'> & Partial<Pick<Invocation, 'startedAt' | 'prompt' | 'scope' | 'sessionOperation'>>;
+  readonly outcome: Pick<InvocationOutcome, 'ended' | 'outsideScope' | 'usage'> & Partial<Pick<InvocationOutcome, 'elapsedMs' | 'settled' | 'sessionOperation'>> | null;
   readonly observations: readonly Observation[] | { unavailable: string };
   /** Its line events; null for an invocation that held no writer. */
   readonly lines: InvocationFacts['lines'];
+}
+
+/** Immutable measurements use original invocation boundaries and recorded source facts only. */
+function efficiencyOf({ invocation, outcome, observations }: EvaluationInputs): InvocationEfficiency {
+  const log = Array.isArray(observations) ? observations as readonly Observation[] : [];
+  const coverage = new Set<string>();
+  if (!Array.isArray(observations)) coverage.add((observations as { unavailable: string }).unavailable);
+  for (const row of log) if (row.type === 'coverage-gap') coverage.add(`${row.data.kind}: ${row.data.detail}`);
+  const unique = new Map<string, Observation>();
+  const conflicts = new Set<string>();
+  for (const row of log) {
+    const key = row.sourceId === undefined ? `row:${row.n}` : `${row.type}:${row.sourceId}`;
+    if (conflicts.has(key)) continue;
+    const prior = unique.get(key);
+    if (prior === undefined) unique.set(key, row);
+    else if (JSON.stringify(prior.data) !== JSON.stringify(row.data)) {
+      coverage.add(`${key}: conflicting source observation; excluded`);
+      unique.delete(key); conflicts.add(key);
+    }
+  }
+  const rows = [...unique.values()];
+  const exploration = explorationDetails(rows.filter(row => row.type === 'exploration').map(row => row.data), [...coverage]);
+  const usage = rows.filter(row => row.type === 'usage');
+  const modelDurations = rows.filter(row => row.type === 'model-duration');
+  const modelValues = modelDurations.length > 0 ? modelDurations.map(row => row.data.elapsedMs) : usage.map(row => row.data.modelElapsedMs);
+  const charges = usage.flatMap(row => row.data.charge === null ? [] : [row.data.charge]);
+  if (usage.length === 0) coverage.add('Usage and recorded model rates unavailable');
+  if (usage.some(row => row.data.charge === null)) coverage.add('Some usage has no recorded rates');
+  const milestone = rows.find(row => row.type === 'milestone');
+  const durations = rows.filter(row => row.type === 'tool-duration');
+  const starts = rows.filter(row => row.type === 'tool-start');
+  const collectionIncomplete = [...coverage].some(reason => /observation-truncated|conflicting/.test(reason));
+  const completeTools = !collectionIncomplete && starts.length > 0 && starts.every(start => durations.some(row => row.data.callId === start.data.callId && row.data.elapsedMs !== null));
+  const toolSubtotalMs = durations.reduce((sum, row) => sum + (row.data.elapsedMs ?? 0), 0);
+  const timing = invocationTiming({ startedAt: invocation.startedAt ?? '', endedAt: outcome?.settled?.at ?? null,
+    milestone: milestone?.data.kind ?? null, milestoneAt: milestone?.data.at ?? null,
+    modelElapsedMs: !collectionIncomplete && modelValues.length > 0 && modelValues.every(value => value !== null) ? modelValues.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null,
+    checkElapsedMs: null, exploration: exploration.observations, coverage: [...coverage, 'Check durations are not recorded', ...(completeTools ? [] : [`Tool duration: known subtotal ${toolSubtotalMs} ms; total unavailable`])] });
+  const manifest = deliveredManifestViewSchema.safeParse(invocation.prompt?.manifest);
+  const declared = scopeSizeViewSchema.safeParse(invocation.scope?.size);
+  const readScope = scopeSizeViewSchema.safeParse(invocation.scope?.readSize);
+  const operation = operationIdentitySchema.safeParse({ ...invocation.sessionOperation, ...(outcome?.sessionOperation?.point === undefined ? {} : { point: outcome.sessionOperation.point }) });
+  if (!manifest.success) coverage.add('Actual delivered input manifest unavailable');
+  if (!declared.success) coverage.add('Declared scope size unavailable');
+  if (!operation.success) coverage.add('Original operation identity unavailable');
+  if (!readScope.success) coverage.add('Declared read scope byte size unavailable; returned output bytes are not scanned or source bytes');
+  const chargeSubtotal = charges.reduce((sum, charge) => sum + [charge.newInput, charge.cachedInput, charge.cacheWrite, charge.output].reduce<number>((amount, value) => amount + (value ?? 0), 0), 0);
+  const completeCharges = usage.length > 0 && charges.length === usage.length && charges.every(charge => charge.total !== null) && ![...coverage].some(reason => /usage|truncated|conflicting/i.test(reason));
+  return { operation: operation.success ? operation.data : null, manifest: manifest.success ? manifest.data : null,
+    declared: declared.success ? declared.data : null, readScope: readScope.success ? readScope.data : null,
+    exploration: { metrics: { ...exploration.metrics, coverage: [...exploration.metrics.coverage] }, zeroMatchSearches: exploration.zeroMatchSearches,
+      observations: exploration.observations.map(row => ({ ...row, requestedScope: [...row.requestedScope], resolvedScope: row.resolvedScope === null ? null : [...row.resolvedScope], files: row.files === null ? null : [...row.files], coverage: [...row.coverage] })) },
+    timing: { ...timing, toolElapsedMs: completeTools ? toolSubtotalMs : null, toolSubtotalMs, modelSubtotalMs: modelValues.reduce<number>((sum, value) => sum + (value ?? 0), 0), checkSubtotalMs: 0, coverage: [...timing.coverage] }, charges: charges.map(charge => recordedChargeSchema.parse(charge)), chargeTotal: completeCharges ? chargeSubtotal : null, chargeSubtotal, coverage: [...coverage],
+    units: { scope: 'bytes', returned: 'UTF-8 output bytes', duration: 'ms', charge: 'USD' } };
 }
 
 /**
@@ -309,6 +515,7 @@ export function evaluationOf({ invocation, outcome, observations, lines }: Evalu
     request: invocation.work.request ?? null,
     ended: outcome?.ended ?? null,
     writer: invocation.writer,
+    efficiency: efficiencyOf({ invocation, outcome, observations, lines }),
     guarding: Array.isArray(observations)
       ? { guarded: [...report.guarded], unguarded: [...report.unguarded], verdicts: { ...report.verdicts }, complete: report.complete, statement: report.statement }
       : {

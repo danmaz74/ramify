@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { sha256Schema } from './evidence.js';
 import { jobIdSchema, planIdSchema } from './ids.js';
 import { jobVersionSchema } from './jobs.js';
-import { invocationEvaluationSchema, roleSchema, runIdSchema } from './runs.js';
+import { invocationEvaluationSchema, operationIdentitySchema, roleSchema, runIdSchema } from './runs.js';
 import {
   transcriptContinuesSchema, transcriptEndedSchema, transcriptEntrySchema, transcriptForkSchema, transcriptInterruptionSchema,
   transcriptPointSchema, transcriptReplacesSchema, transcriptRequestedBySchema, transcriptStartModeSchema, transcriptWorkSchema,
@@ -155,6 +155,7 @@ export type SessionDegrade = z.infer<typeof sessionDegradeSchema>;
 /** One invocation of a session: one segment of its conversation. */
 export const sessionInvocationSchema = z.object({
   invocation: text,
+  operation: operationIdentitySchema.nullable().optional(),
   /** `opened` for the session's first invocation, `continued` for one that joins it. */
   start: z.enum(['opened', 'continued']),
   /** Its `invocation-started`. */

@@ -1366,6 +1366,52 @@ export const guardingViewSchema = z.object({
 }).strict();
 export type GuardingView = z.infer<typeof guardingViewSchema>;
 
+/** Actual provider-neutral operation identity; sourcePoint is not a fabricated completion checkpoint. */
+export const operationIdentitySchema = z.object({ runId: text, operationId: text, sessionId: text, turn: count,
+  sourcePoint: z.object({ sessionId: text, kind: z.enum(['turn', 'checkpoint']), turn: count, checkpoint: text }).strict(),
+  point: z.object({ sessionId: text, kind: z.enum(['turn', 'checkpoint']), turn: count, checkpoint: text }).strict().nullable().optional(),
+}).strict();
+export type OperationIdentity = z.infer<typeof operationIdentitySchema>;
+const manifestSource = z.object({ path: text, hash: text, bytes: count, kind: z.string().optional() }).strict();
+export const deliveredManifestViewSchema = z.object({ schema: z.literal('ramify-agent.delivered-inputs/1'), inheritedPoint: z.string().nullable(), hash: text,
+  entries: z.array(z.object({ key: text, kind: z.enum(['role-instructions', 'procedure', 'brief', 'environment', 'task', 'tool-declaration', 'skill']), source: z.string().nullable(), revision: z.string().nullable(), hash: text, bytes: count, delivery: z.enum(['inherited', 'appended']), sources: z.array(manifestSource) }).strict()),
+  currentMessage: z.object({ hash: text, bytes: count }).strict().nullable(),
+}).strict();
+export type DeliveredManifestView = z.infer<typeof deliveredManifestViewSchema>;
+export const scopeSizeViewSchema = z.object({ policy: z.enum(['scope-size/1', 'scope-size/2']), snapshot: text,
+  components: z.array(z.object({ component: z.enum(['owned-source', 'api-views', 'architect-view', 'support-documents']), detail: z.string(), bytes: count.nullable(), state: z.enum(['measured', 'unavailable', 'unknown']), reason: z.string().optional(), buckets: z.record(z.string(), count).optional() }).strict()),
+  bytes: count.nullable(), subtotal: count, coverage: z.enum(['complete', 'partial']),
+}).strict();
+export type ScopeSizeView = z.infer<typeof scopeSizeViewSchema>;
+export const explorationObservationSchema = z.object({ id: text, invocationId: text, operationId: text, role: text, sessionId: text, turn: count, callId: text,
+  kind: z.enum(['read', 'search']), requestedScope: z.array(z.string()), resolvedScope: z.array(z.string()).nullable(), files: z.array(z.string()).nullable(),
+  returnedBytes: count.nullable(), startedAt: z.string().nullable(), endedAt: z.string().nullable(), elapsedMs: z.number().nonnegative().nullable(),
+  outcome: z.enum(['completed', 'failed', 'refused', 'interrupted']), broad: z.boolean().nullable(), outsideScope: z.boolean().nullable(), coverage: z.array(z.string()),
+}).strict();
+export type ExplorationObservationView = z.infer<typeof explorationObservationSchema>;
+export const explorationMetricsSchema = z.object({ reads: count, uniqueFilesRead: count, repeatedReads: count, returnedBytes: count, searches: count, broadSearches: count, outsideScopeSearches: count, toolElapsedMs: z.number().nonnegative(), coverage: z.array(z.string()) }).strict();
+export type ExplorationMetricsView = z.infer<typeof explorationMetricsSchema>;
+export const invocationTimingSchema = z.object({ startedAt: z.string(), endedAt: z.string().nullable(), milestone: z.enum(['first-designated-submission', 'first-engineering-action']).nullable(), milestoneAt: z.string().nullable(),
+  elapsedMs: z.number().nonnegative().nullable(), toMilestoneMs: z.number().nonnegative().nullable(), modelElapsedMs: z.number().nonnegative().nullable(), toolElapsedMs: z.number().nonnegative().nullable(), checkElapsedMs: z.number().nonnegative().nullable(),
+  modelSubtotalMs: z.number().nonnegative().optional(), toolSubtotalMs: z.number().nonnegative().optional(), checkSubtotalMs: z.number().nonnegative().optional(), coverage: z.array(z.string()) }).strict();
+export type InvocationTimingView = z.infer<typeof invocationTimingSchema>;
+const amount = z.number().nonnegative().nullable();
+export const recordedChargeSchema = z.object({ model: text, currency: z.literal('USD'), source: z.enum(['provider-recorded', 'estimated-from-recorded-rates']),
+  sourceRevision: text.optional(), newInputTokens: count.nullable(), cachedInputTokens: count.nullable(), cacheWriteTokens: count.nullable(), outputTokens: count.nullable(),
+  ratesPerMillion: z.object({ newInput: amount, cachedInput: amount, cacheWrite: amount, output: amount }).strict(),
+  newInput: amount, cachedInput: amount, cacheWrite: amount, output: amount, total: amount, coverage: z.array(z.string()),
+}).strict();
+export type RecordedChargeView = z.infer<typeof recordedChargeSchema>;
+export const invocationEfficiencySchema = z.object({ operation: operationIdentitySchema.nullable(), manifest: deliveredManifestViewSchema.nullable(),
+  declared: scopeSizeViewSchema.nullable(), readScope: scopeSizeViewSchema.nullable(),
+  exploration: z.object({ metrics: explorationMetricsSchema, zeroMatchSearches: count, observations: z.array(explorationObservationSchema) }).strict(),
+  timing: invocationTimingSchema, charges: z.array(recordedChargeSchema), chargeTotal: amount, chargeSubtotal: z.number().nonnegative(), coverage: z.array(z.string()),
+  units: z.object({ scope: z.literal('bytes'), returned: z.literal('UTF-8 output bytes'), duration: z.literal('ms'), charge: z.literal('USD') }).strict(),
+}).strict();
+export type InvocationEfficiency = z.infer<typeof invocationEfficiencySchema>;
+export const scopeComparisonSchema = z.object({ mean: metricSchema, ratio: metricSchema, attributedWeight: z.number().nonnegative(), completeSizeWeight: z.number().nonnegative(), unknownSizeWeight: z.number().nonnegative(), unattributedWeight: z.number().nonnegative() }).strict();
+export type ScopeComparisonView = z.infer<typeof scopeComparisonSchema>;
+
 /** One invocation's evaluation evidence: guarding, what changed outside its scope, hook checks and reads outside it. */
 export const invocationEvaluationSchema = z.object({
   invocation: text,
@@ -1375,6 +1421,7 @@ export const invocationEvaluationSchema = z.object({
   request: text.nullable(),
   ended: text.nullable(),
   writer: z.boolean(),
+  efficiency: invocationEfficiencySchema.optional(),
   guarding: guardingViewSchema,
   /** Writers only: uncommitted changed paths outside the write scope when it settled. */
   outsideScope: z.array(text),
@@ -1413,6 +1460,7 @@ export const metricsResponseSchema = z.object({
     z.object({ state: z.literal('unavailable'), reason: text, subtotal: count.nullable() }).strict(),
   ]),
   metrics: z.array(metricSchema),
+  scopeComparisons: z.object({ projectOnly: scopeComparisonSchema, total: scopeComparisonSchema }).strict().optional(),
   /**
    * The lineage measurements: forks, continuations, repairs, degraded starts
    * and replacements, each segment classified by the start it made.

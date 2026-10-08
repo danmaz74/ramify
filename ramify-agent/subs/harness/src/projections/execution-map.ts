@@ -208,6 +208,7 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
     add({ ...base(key('session', session.session), `${label(session.role)} ${session.session}`, source), kind: 'session',
       role: session.role, state: session.state, executor: session.executor, workItem: workItem === null ? null : key('work-item', workItem),
       reach: session.reaches, invocations: session.invocations.map(invocation => invocation.invocation),
+      operations: session.invocations.flatMap(invocation => invocation.operation == null ? [] : [invocation.operation]),
       modules: module === null ? [] : [{ module, role: session.role === 'local-architect' ? 'local-architect' as const :
         session.role === 'engineer' ? 'engineer' as const : session.role === 'contract-engineer' ? 'contract-engineer' as const : 'owner' as const, source }],
     });

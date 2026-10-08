@@ -161,7 +161,8 @@ export class SessionQueries {
       // The session is its own one invocation, and a writer. It records no
       // line events, which its lines say rather than showing none.
       evaluation: evaluationOf({
-        invocation: { id: record.id, role: record.role, work: {}, writer: true },
+        invocation: { id: record.id, role: record.role, work: {}, writer: true, startedAt: record.startedAt,
+          sessionOperation: record.sessionOperation, prompt: { ...record.prompts }, scope: { write: record.authority.revision, measurement: null, size: record.scopeSize ?? null } },
         outcome,
         observations: await readObservationLog(join(found.directory, sessionLayout.observations), sessionLayout.observations),
         lines: { unavailable: 'a standalone session records no line events' },

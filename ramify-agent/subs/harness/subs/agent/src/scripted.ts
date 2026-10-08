@@ -525,7 +525,7 @@ export function createScriptedSessionDriver(script: SessionScript): SessionOpera
   return {
     async dispatch(input, runtime) {
       const steps = typeof script === 'function' ? script(input) : script;
-      runtime.onEvent({ type: 'message', role: 'user', blocks: [{ type: 'text', text: input.task.message }] });
+      runtime.onEvent({ type: 'message', role: 'user', observation: { sourceId: `${input.key.operationId}:user` }, blocks: [{ type: 'text', text: input.task.message }] });
       for (let index = 0; index < steps.length; index += 1) {
         if (runtime.signal.aborted) return { kind: 'stopped' };
         const step = steps[index]!;
@@ -536,18 +536,18 @@ export function createScriptedSessionDriver(script: SessionScript): SessionOpera
         await runtime.persistPayload(key, new TextEncoder().encode(JSON.stringify(step)));
         if (step.kind === 'message') {
           const text = typeof step.payload['text'] === 'string' ? step.payload['text'] : '';
-          runtime.onEvent({ type: 'message', role: 'assistant', blocks: text === '' ? [] : [{ type: 'text', text }], text, usage: null, detail: noMessageDetail });
+          runtime.onEvent({ type: 'message', role: 'assistant', observation: { sourceId: `${key}:assistant` }, blocks: text === '' ? [] : [{ type: 'text', text }], text, usage: null, detail: noMessageDetail });
           continue;
         }
         const callId = step.callId ?? key;
         const tool = step.kind === 'tool' ? step.tool : input.task.submissionTool;
         const description = runtime.describeTool(tool, step.input);
         const call: ToolCallBlock = { type: 'tool-call', callId, tool, input: step.input, action: description.action };
-        runtime.onEvent({ type: 'message', role: 'assistant', blocks: [call], text: assistantText([call]), usage: null, detail: noMessageDetail });
-        runtime.onEvent({ type: 'tool-started', callId, tool, input: step.input, ...description });
+        runtime.onEvent({ type: 'message', role: 'assistant', observation: { sourceId: `${key}:assistant` }, blocks: [call], text: assistantText([call]), usage: null, detail: noMessageDetail });
+        runtime.onEvent({ type: 'tool-started', callId, tool, input: step.input, observation: { sourceId: `${key}:start` }, ...description });
         const finish = (text: string, isError: boolean) => {
-          runtime.onEvent({ type: 'tool-finished', callId, tool, isError, reachedTool: input.session.activeTools.includes(tool), errorText: isError ? text : undefined });
-          runtime.onEvent({ type: 'message', role: 'tool-result', callId, tool, isError, blocks: text === '' ? [] : [{ type: 'text', text }] });
+          runtime.onEvent({ type: 'tool-finished', callId, tool, isError, observation: { sourceId: `${key}:finish`, returnedBytes: Buffer.byteLength(text), coverage: ['Scripted returned text only; resolved files and searched bytes not reported'] }, reachedTool: input.session.activeTools.includes(tool), errorText: isError ? text : undefined });
+          runtime.onEvent({ type: 'message', role: 'tool-result', callId, tool, isError, observation: { sourceId: `${key}:result` }, blocks: text === '' ? [] : [{ type: 'text', text }] });
         };
         if (step.kind === 'tool') {
           const answer = await runtime.callTool(callId, step.tool, step.input);
@@ -623,7 +623,7 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
           const index = eventIndex++;
           events = events.then(async () => {
             await runtime.persistPayload(`${input.key.operationId}:event:${index}`, new TextEncoder().encode(JSON.stringify(observed)));
-            runtime.onEvent(observed);
+            runtime.onEvent({ ...observed, observation: { ...observed.observation, sourceId: `${input.key.operationId}:event:${index}` } });
           }).catch(error => { eventError ??= error; });
         },
       };

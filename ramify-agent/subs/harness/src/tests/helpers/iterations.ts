@@ -131,15 +131,21 @@ export function byRole(plan: Readonly<Record<string, readonly Turn[]>>): Script 
  * then in order: the nth invocation of a role for one work item runs that
  * key's nth turn, and the last repeats once they are spent.
  *
- * A key is `role:wi-004`, taken from the identifier the first line of the
- * message carries, or the role alone for a turn that names no work item. It
+ * A key is `role:wi-004`, taken from the newest renderer-owned current task
+ * objective's exact work binding; legacy display fixtures use their first line, or the role alone for a turn that names no work item. It
  * is how a test of several work items says what each one does without
  * predicting the order the scheduler takes them in.
  */
 export function byWork(plan: Readonly<Record<string, readonly Turn[]>>): Script {
   const counts = new Map<string, number>();
   return (spec: SessionSpec): readonly ScriptStep[] => {
-    const named = /\bwi-\d+/.exec(spec.prompt.split('\n')[0] ?? '')?.[0];
+    // The callback sees inherited packets too. Only the newest renderer-owned current objective binds this turn.
+    const objectives = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gm)];
+    let named: string | undefined;
+    if (objectives.length > 0) {
+      const work = JSON.parse(objectives.at(-1)![1]!) as { workItem?: unknown };
+      if (typeof work.workItem === 'string' && /^wi-\d+$/.test(work.workItem)) named = work.workItem;
+    } else if (!spec.prompt.includes('# CURRENT TASK')) named = /\bwi-\d+/.exec(spec.prompt.split('\n')[0] ?? '')?.[0];
     const key = named === undefined ? spec.role : `${spec.role}:${named}`;
     const turns = plan[key] ?? plan[spec.role] ?? (spec.role === 'failure-analyst' ? [failureAnalystFake()] : []);
     if (turns.length === 0) return [{ kind: 'end', message: `no turn scripted for ${key}` }];

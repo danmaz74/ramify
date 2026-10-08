@@ -62,15 +62,16 @@ const invocationEndedFields = {
   /** The session the invocation belongs to. */
   session: sessionIdSchema,
   /**
-   * A start the executor could not honor. It is recorded here, at the end,
-   * because the actual start is known only once the session has started,
-   * after `invocation-started` is committed.
+   * An explicitly named owning-workflow recovery relation. It is recorded at
+   * the end beside the actual start; the executor never silently changes modes.
    */
   degraded: degradeRelationSchema.optional(),
 };
 
 /** One line of a run's event log. */
 export const runEventSchema = z.discriminatedUnion('type', [
+  /** Actual packet/scope/execution identity committed before observational events; does not start another invocation. */
+  event('invocation-prepared', z.object({ invocation: text }).strict()),
   /** The run's first event, holding the start command. It licenses the initial architect. */
   event('job-started', z.object({ command: acceptedCommandSchema }).strict()),
   /**

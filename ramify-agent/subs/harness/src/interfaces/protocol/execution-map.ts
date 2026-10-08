@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { modulePathSchema, moduleTreeResponseSchema } from './evidence.js';
 import { jobVersionSchema } from './jobs.js';
 import {
-  capabilityStateSchema, gateCauseSchema, gateCheckpointSchema, gateVerdictSchema, roleSchema,
+  capabilityStateSchema, gateCauseSchema, gateCheckpointSchema, gateVerdictSchema, operationIdentitySchema, roleSchema,
   scenarioGateResultSchema, scenarioKindSchema, scenarioStatusSchema, trackedScenarioStateSchema, workItemStateSchema,
 } from './runs.js';
 import { sessionReachSchema, sessionStateSchema } from './sessions.js';
@@ -163,7 +163,7 @@ export const executionNodeSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('session'), role: roleSchema, state: sessionStateSchema,
     executor: text, workItem: executionElementKeySchema.nullable(),
-    reach: sessionReachSchema, invocations: z.array(text),
+    reach: sessionReachSchema, invocations: z.array(text), operations: z.array(operationIdentitySchema).optional(),
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('gate'), checkpoint: gateCheckpointSchema,
     /** Null while the attempt is active; no verdict has been established yet. */

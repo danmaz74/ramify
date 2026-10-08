@@ -4,7 +4,7 @@ import type { GuardedCall, SessionOutcome, SubmissionVerdict, ToolResult } from 
 import type {
   AgentSessionPoint, AgentSessionSnapshot, ContinueSessionInput, SessionEffectRecord, SessionExecutionBindings,
   SessionOperationHandle, SessionOperationKey, SessionOperationReceipt, SessionOperations, SessionOperationsOptions,
-  SessionStoreRecord, SessionTaskInput, SessionToolChange, SessionTranscriptEntry,
+  SessionStoreRecord, SessionExecutionIdentity, SessionTaskInput, SessionToolChange, SessionTranscriptEntry,
 } from './interfaces/session-operations.js';
 
 type Snapshot = AgentSessionSnapshot;
@@ -50,6 +50,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
   async function readOperation(key: SessionOperationKey): Promise<{ record: SessionStoreRecord; body: OperationBody } | null> {
     const found = await store.read(key.runId, operationRecordId(key.operationId));
     if (found === null) return null;
+    if (found.runId !== key.runId || found.id !== operationRecordId(key.operationId)) throw new Error('Corrupt session operation identity');
     if (found.schema !== 'ramify-agent.session-operation/1') throw new Error('Unsupported session operation schema');
     const body = clone(found.body) as unknown as OperationBody;
     if (!['intent', 'dispatched', 'terminal'].includes(body.phase) || typeof body.sessionId !== 'string' || !Array.isArray(body.effects) || !Array.isArray(body.provider)) throw new Error('Corrupt session operation');
@@ -108,7 +109,16 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     if (committed.kind === 'conflict') return await terminalDuplicate(key, input) ?? receipt(key, snapshot.sessionId, 'conflict', committed.reason);
     return clone(result);
   }
+  function executionIdentity(key: SessionOperationKey, body: OperationBody): SessionExecutionIdentity {
+    const source = body.snapshot?.currentPoint;
+    if (body.snapshot?.runId !== key.runId || body.snapshot.sessionId !== body.sessionId || !body.sessionId || !source || source.sessionId !== body.sessionId || !Number.isSafeInteger(source.turn) || source.turn < 0 || !['turn', 'checkpoint'].includes(source.kind) || typeof source.checkpoint !== 'string' || !source.checkpoint) throw new Error('Corrupt original operation point');
+    return { ...clone(key), sessionId: body.sessionId, turn: source.turn + (body.kind === 'continue' ? 1 : 0), sourcePoint: clone(source) };
+  }
   const api: SessionOperations = {
+    async operationIdentity(runId, operationId) {
+      const found = await readOperation({ runId, operationId });
+      return found ? executionIdentity({ runId, operationId }, found.body) : null;
+    },
     async create(input) {
       const frozen = clone(input) as unknown as Record<string, unknown>;
       const duplicate = await terminalDuplicate(input, frozen); if (duplicate) return duplicate;
@@ -240,7 +250,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     const uncertain = op.body.effects.some(effect => effect.phase === 'intent');
     const interruptedProvider = outcome.kind === 'stopped' && op.body.phase === 'dispatched';
     const available = !unavailable && !uncertain && !interruptedProvider;
-    const currentPoint = point(op.body.sessionId, op.body.snapshot.currentPoint.turn + 1, 'turn');
+    const currentPoint = point(op.body.sessionId, executionIdentity(key, op.body).turn, 'turn');
     const snapshot: Snapshot = { ...op.body.snapshot, currentPoint, transcript: [...op.body.snapshot.transcript, ...op.body.provider], activeOperation: null, available };
     const status = unavailable ? 'unavailable' : outcome.kind === 'stopped' ? 'stopped' : uncertain ? 'unavailable' : outcome.kind === 'failed' ? 'failed' : 'completed';
     const result = receipt(key, op.body.sessionId, status, uncertain ? 'External effect completion unknown; point unavailable' : interruptedProvider ? 'Provider completion interrupted; point unavailable' : reason, available ? currentPoint : null, outcome, currentPoint.turn);
@@ -376,6 +386,8 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
       try {
         await assertLive();
         let current = await readOperation(key); if (!current) throw new Error('Missing operation');
+        await bindings.prepared?.(executionIdentity(key, current.body));
+        await assertLive();
         await verifyPayloads({ ...current.body.snapshot, transcript: [...current.body.snapshot.transcript, ...current.body.provider] });
         // Recovery is opt-in and independently grounded. Arbitrary effects never replay blindly.
         for (const effect of current.body.effects.filter(item => item.phase === 'intent')) {
@@ -392,7 +404,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         {
           const dispatched = await serial(() => updateOperation(key, body => ({ ...body, phase: 'dispatched' }), owner.token));
           await assertLive();
-          try { outcome = await options.driver.dispatch({ key: clone(key), task: clone((dispatched.input as unknown as Omit<ContinueSessionInput, 'bindings'>).task), session: clone({ ...dispatched.snapshot, transcript: [...dispatched.snapshot.transcript, ...dispatched.provider] }), recovering, effects: clone(dispatched.effects) }, {
+          try { outcome = await options.driver.dispatch({ key: clone(key), identity: executionIdentity(key, dispatched), task: clone((dispatched.input as unknown as Omit<ContinueSessionInput, 'bindings'>).task), session: clone({ ...dispatched.snapshot, transcript: [...dispatched.snapshot.transcript, ...dispatched.provider] }), recovering, effects: clone(dispatched.effects) }, {
             signal: abort.signal, assertLive: () => admit(assertLive),
             describeTool(name, input) {
               const declaration = dispatched.snapshot.declarations.find(item => item.name === name);
@@ -412,7 +424,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
               return id;
             }),
             readPayload: id => admit(async () => { const bytes = await store.getPayload(id); if (bytes === null) throw new SessionDriverUnavailableError(`Missing provider payload ${id}`); return bytes; }),
-            onEvent(event) { if (!admissionClosed && !abort.signal.aborted && liveOwnerTokens.has(owner.token)) bindings.onEvent(event); },
+            onEvent(event) { if (!admissionClosed && !abort.signal.aborted && liveOwnerTokens.has(owner.token)) bindings.onEvent({ ...event, execution: executionIdentity(key, dispatched), replayed: recovering && 'callId' in event && dispatched.effects.some(effect => effect.callId === event.callId && effect.phase === 'completed') }); },
           }); } finally { admissionClosed = true; await drain(); }
           // A provider cannot claim acceptance it never durably obtained from the current validator.
           if (outcome.kind === 'submitted') {
