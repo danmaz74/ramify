@@ -244,8 +244,22 @@
         "W06",
         "W07"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness run/service.ts and context-selection/review/consultation/recovery orchestration and tests; serial after 8."
+      "status": "accepted ordinary fork runtime; native/live/full qualification remains iteration 14",
+      "writeBoundary": "Harness run/service.ts and context-selection/review/consultation/recovery orchestration and tests; serial after 8.",
+      "receipt": "09-results.md",
+      "providerHead": "a7b73fc9c3d78f922626697591b39c88cd287453",
+      "standaloneFixHead": "2bb28379d08765eb7f69a8f2ec8540d172043b34",
+      "integratedHead": "3eb9dfd2",
+      "integrationVerification": {
+        "ordinaryFiles": 12,
+        "ordinaryTests": 137,
+        "standaloneFiles": 1,
+        "standaloneTests": 13,
+        "typeCheck": "passed all four configured scopes after final standalone fix",
+        "structure": "passed; partial analysis coverage; 317 analysis limits",
+        "logs": "/tmp/ramify-plan23-integrated-forks-*.log",
+        "limit": "Joined137 and final standalone13 are separate passing commands; historical worker failures retained in receipt. No native/live/full qualification claim."
+      }
     },
     {
       "id": "10",
@@ -262,7 +276,7 @@
         "W10",
         "W11"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness run/service.ts, work/engineer-equipment.ts, work/scenario-briefing.ts, work/session.ts and briefing/submission wiring/tests; serial shared-runtime owner."
     },
     {

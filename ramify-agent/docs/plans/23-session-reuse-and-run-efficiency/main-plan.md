@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-08. **Status:** implementation in progress in
 `/home/app/ramify-plan23-session-reuse`, branch `feat/plan23-session-reuse`.
-Iterations 0–8 are accepted for their recorded scopes; fork integration is active.
+Iterations 0–9 are accepted for their recorded scopes; run corrections are active.
 The failed baseline audit is retained; a focused native
 materializer repair now passes, while final full qualification remains pending. See
 [its receipt](iterations/00-results.md) and [execution manifest](iterations/manifest.json). This plan implements the selected changes in both the
