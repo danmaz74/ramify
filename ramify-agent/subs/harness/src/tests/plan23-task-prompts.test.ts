@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { z } from 'zod';
 import type { Role } from '../interfaces/protocol/runs.js';
 import { defaultSkillDirectory, loadPromptPackages, renderNonfunctionalCoordinatorPrompt, renderNonfunctionalRepairPrompt, type LoadedPackage } from '../prompts/packages.js';
 import { buildTaskPacket, renderRequiredSlots, stableRoleInstructions, type TaskKind, type TaskEnvironment } from '../prompts/tasks.js';
@@ -9,6 +10,7 @@ import { briefingAdditionKey, buildBriefingDelivery, taskBriefingRevision, type 
 import { buildDeliveredManifest, exactInputHash } from '../prompts/delivered-manifest.js';
 import { workOrientationMessage } from '../context-selection/prompts.js';
 import { repairPrompt } from '../nonfunctional/prompts.js';
+import { qualificationActionSchema } from '../capability/submission.js';
 
 // Independently named expectations. No renderer/schema selection generates this table.
 const expected: readonly [Role, TaskKind, string, boolean][] = [
@@ -72,6 +74,69 @@ function input(loaded: LoadedPackage, kind: TaskKind) {
   return { loaded, kind, objective: 'Implement the current assigned task', goal: 'Deliver the status label', requirements: ['Expose the current status'], environment: environment(),
     briefing: buildBriefingDelivery({ mode: 'fresh', current: taskR1, inheritedRevision: null, history: [] }), inheritedPoint: null, inherited: [], supplyRoleInstructions: true } as const;
 }
+
+describe('specialized continuing capability task bindings', () => {
+  const pairs = [
+    ['local-architect', 'capability-qualification', 'submit_capability_qualification'],
+    ['capability-architect', 'capability-qualification', 'submit_capability_qualification'],
+    ['engineer', 'consultation', 'answer_capability_consultation'],
+  ] as const;
+  // This schema is owned by the consultation caller, just as its runtime validator is.
+  const consultationSchema = z.object({ answer: z.string().min(1), objections: z.array(z.string()) }).strict();
+  const actualConsultationSchema = JSON.stringify(z.toJSONSchema(consultationSchema));
+  function specialized(role: typeof pairs[number][0], kind: typeof pairs[number][1]) {
+    return { ...input(current.get(role)!, kind),
+      environment: { ...environment(), availableTools: ['read', 'grep', 'ls', 'submit_capability_qualification', 'answer_capability_consultation'] },
+      ...(kind === 'consultation' ? { consultationSubmissionSchema: actualConsultationSchema } : {}) };
+  }
+  test.each(pairs)('%s/%s binds actual %s schema once and preserves role/deltas', (role, kind, tool) => {
+    const base = specialized(role, kind); const first = buildTaskPacket(base);
+    const next = buildTaskPacket({ ...base, supplyRoleInstructions: false, inheritedPoint: 'P:T1', inherited: first.additions,
+      requirements: ['Expose the changed status'], briefing: buildBriefingDelivery({ mode: 'continue', current: taskR2, inheritedRevision: 'r1', history: [taskR1] }) });
+    expect(first.submissionTool).toBe(tool); expect(next.submissionTool).toBe(tool);
+    expect(first.roleInstructions).toBe(stableRoleInstructions(base.loaded)); expect(next.roleInstructions).toBe(first.roleInstructions);
+    expect(next.additions.filter(item => item.kind === 'role-instructions' || item.kind === 'tool-declaration')).toEqual([]);
+    expect(next.message).toContain('Expose the changed status'); expect(next.message).not.toContain('Expose the current status'); expect(next.message).not.toContain('Deliver the status label');
+    const schema = first.declaration.description.slice(first.declaration.description.indexOf('{'));
+    expect(JSON.parse(schema)).toEqual(z.toJSONSchema(kind === 'consultation' ? consultationSchema : qualificationActionSchema));
+    const delivered = [...first.additions, ...next.additions].map(item => item.kind === 'tool-declaration' ? JSON.parse(item.text).description : item.text).join('\n'); expect(delivered.split(schema)).toHaveLength(2);
+    expect(first.declaration.inputSchema).toEqual({ type: 'object' }); expect(first.message).not.toContain(schema); expect(first.roleInstructions).not.toContain(schema);
+    const procedure = first.additions.find(item => item.kind === 'procedure')!.text;
+    expect(procedure).toContain('read-only'); expect(procedure).toContain('supplied'); expect(procedure).toContain(tool);
+    expect(procedure).not.toMatch(/shell|report\.md|submit_iteration_result|submit_work_item_result/);
+    if (kind === 'consultation') {
+      expect(JSON.parse(schema)).toMatchObject({ type: 'object', additionalProperties: false, required: ['answer', 'objections'], properties: { answer: { type: 'string', minLength: 1 }, objections: { type: 'array', items: { type: 'string' } } } });
+    } else {
+      expect(JSON.parse(schema).oneOf.map((variant: { properties: { kind: { const: string } } }) => variant.properties.kind.const)).toEqual(['satisfy-with-existing', 'delegate-capability', 'request-placement', 'unresolved']);
+    }
+    const conflicting = first.additions.map(item => item.kind === 'tool-declaration' ? { ...item, text: JSON.stringify({ ...first.declaration, description: 'changed declaration' }) } : item);
+    expect(() => buildTaskPacket({ ...base, inheritedPoint: 'P:T1', inherited: conflicting, supplyRoleInstructions: false,
+      briefing: buildBriefingDelivery({ mode: 'continue', current: taskR1, inheritedRevision: 'r1', history: [] }) })).toThrow(`Immutable tool declaration changed for ${tool}`);
+  });
+  test.each(pairs)('%s/%s requires its actual available tool %s', (role, kind, tool) => {
+    const base = specialized(role, kind);
+    expect(() => buildTaskPacket({ ...base, environment: { ...base.environment, availableTools: environment().availableTools } })).toThrow(`Current submission tool ${tool} is unavailable`);
+  });
+  test('consultation has no fallback schema and an inherited declaration cannot change', () => {
+    const base = specialized('engineer', 'consultation');
+    expect(() => buildTaskPacket({ ...base, consultationSubmissionSchema: undefined })).toThrow('actual caller-owned submission schema');
+    expect(() => buildTaskPacket({ ...base, consultationSubmissionSchema: '[]' })).toThrow('actual object submission schema');
+    const first = buildTaskPacket(base);
+    const inherited = { briefing: buildBriefingDelivery({ mode: 'continue', current: taskR1, inheritedRevision: 'r1', history: [] }), inheritedPoint: 'P:T1', inherited: first.additions, supplyRoleInstructions: false };
+    const changed = JSON.stringify(z.toJSONSchema(consultationSchema.extend({ changed: z.boolean() })));
+    expect(() => buildTaskPacket({ ...base, ...inherited, consultationSubmissionSchema: changed })).toThrow('Immutable tool declaration changed for answer_capability_consultation');
+    expect(() => buildTaskPacket({ ...base, loaded: current.get('capability-architect')! })).toThrow('Unsupported role/task');
+    expect(() => buildTaskPacket({ ...input(current.get('engineer')!, 'capability-qualification'), environment: base.environment })).toThrow('Unsupported role/task');
+  });
+  test('continuing engineering appends the consultation declaration once without replacing its stable head', () => {
+    const base = specialized('engineer', 'consultation'); const first = buildTaskPacket(input(base.loaded, 'engineering'));
+    const consultation = buildTaskPacket({ ...base, briefing: buildBriefingDelivery({ mode: 'continue', current: taskR1, inheritedRevision: 'r1', history: [] }),
+      inheritedPoint: 'P:T1', inherited: first.additions, supplyRoleInstructions: false });
+    expect(consultation.roleInstructions).toBe(first.roleInstructions);
+    expect(consultation.additions.filter(item => item.kind === 'tool-declaration').map(item => item.key)).toEqual(['tool:answer_capability_consultation']);
+    expect(consultation.additions.filter(item => item.kind === 'role-instructions' || item.kind === 'brief')).toEqual([]);
+  });
+});
 
 describe('P01/P02/P05: stable role and complete current tasks', () => {
   test.each(expected)('%s/%s submits through %s (capability=%s)', (role, kind, tool, capability) => {

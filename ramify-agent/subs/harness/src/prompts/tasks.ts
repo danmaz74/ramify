@@ -1,5 +1,7 @@
 import type { LoadedPackage, ExtractionTurn } from './packages.js';
 import type { ReviewKind } from '../run/records.js';
+import { z } from 'zod';
+import { qualificationActionSchema } from '../capability/submission.js';
 import { initialAnalysisToolName } from '../analysis/submission.js';
 import { intakeToolName, principleToolName, checkToolName } from '../analysis/extraction.js';
 import { localArchitectToolName } from '../work/submission.js';
@@ -17,7 +19,7 @@ import { taskBriefingRevision, type BriefingDelivery } from './briefings.js';
 
 export type TaskKind = 'initial-analysis' | ExtractionTurn | 'placement' | 'orientation' | 'assignment' | 'completion' | 'repair' | 'qualification'
   | 'selection' | 'reselection' | 'capability' | 'engineering' | 'contract' | 'reconciliation' | ReviewKind | 'design-orientation'
-  | 'failure-analysis' | 'assessment' | 'action' | 'investigation' | 'standalone-command';
+  | 'failure-analysis' | 'assessment' | 'action' | 'investigation' | 'standalone-command' | 'capability-qualification' | 'consultation';
 
 export interface TaskEnvironment {
   readonly projectRoot: string;
@@ -72,6 +74,8 @@ export function buildTaskPacket(input: {
   /** Supplied once for a fresh session or a role change, false for ordinary continuation. */
   readonly supplyRoleInstructions: boolean;
   readonly changedPaths?: readonly { readonly path: string; readonly annotation?: string }[];
+  /** Consultation's actual caller-owned schema, serialized from its runtime validator. */
+  readonly consultationSubmissionSchema?: string;
 }): TaskPacket {
   const { loaded, environment } = input;
   if (!input.objective.trim() || !input.goal.trim() || input.requirements.length === 0 || input.requirements.some(requirement => !requirement.trim())) throw new Error('Task requires objective, goal and complete requirement text');
@@ -87,7 +91,7 @@ export function buildTaskPacket(input: {
   for (const section of canonical.sections) {
     if (!input.briefing.currentSections.some(current => current.key === section.key && current.text === section.text)) throw new Error(`Current task briefing requires canonical ${section.key} section matching its explicit inputs`);
   }
-  const task = taskDefinition(loaded, input.kind);
+  const task = taskDefinition(loaded, input.kind, input.consultationSubmissionSchema);
   if (!environment.availableTools.includes(task.tool)) throw new Error(`Current submission tool ${task.tool} is unavailable`);
   if (['code', 'scope', 'design'].includes(input.kind) && (!environment.candidate || !environment.snapshot)) throw new Error('Review requires current candidate and snapshot identities');
   const procedure = renderRequiredSlots(task.procedure, { submissionTool: task.tool }, ['submissionTool']);
@@ -121,7 +125,7 @@ export function buildTaskPacket(input: {
     manifest: buildDeliveredManifest({ inheritedPoint: input.inheritedPoint, inherited: input.inherited, appended: additions, currentMessage: message }) };
 }
 
-function taskDefinition(loaded: LoadedPackage, kind: TaskKind): { tool: string; schema: string; procedure: string; source: string | null } {
+function taskDefinition(loaded: LoadedPackage, kind: TaskKind, consultationSubmissionSchema?: string): { tool: string; schema: string; procedure: string; source: string | null } {
   let tool: string | undefined;
   let schema = loaded.submissionSchema;
   let procedure = loaded.procedure;
@@ -145,6 +149,19 @@ function taskDefinition(loaded: LoadedPackage, kind: TaskKind): { tool: string; 
   }
   if (role === 'context-selector' && ['selection', 'reselection'].includes(kind)) tool = contextSelectorToolName;
   if (role === 'engineer' && ['engineering', 'repair', 'qualification', 'standalone-command'].includes(kind)) tool = engineerToolName;
+  if (role === 'engineer' && kind === 'consultation') {
+    if (!consultationSubmissionSchema?.trim()) throw new Error('Consultation requires the actual caller-owned submission schema');
+    const supplied: unknown = JSON.parse(consultationSubmissionSchema);
+    if (supplied === null || typeof supplied !== 'object' || Array.isArray(supplied) || (supplied as { type?: unknown }).type !== 'object') throw new Error('Consultation requires the actual object submission schema');
+    tool = 'answer_capability_consultation'; schema = consultationSubmissionSchema;
+    procedure = 'Answer only the named read-only consumer consultation using the supplied question, current plan, source and references. Use the supplied views and available read-only tools to state evidence, objections and uncertainty. Submit the answer through {{submissionTool}}; an answer authorizes no source changes.';
+    source = null;
+  }
+  if (['local-architect', 'capability-architect'].includes(role) && kind === 'capability-qualification') {
+    tool = 'submit_capability_qualification'; schema = JSON.stringify(z.toJSONSchema(qualificationActionSchema));
+    procedure = 'Qualify only the named capability request using its current request and invocation identities, captured source, current plan and supplied API views. Inspect the actual exposed API and use sites; a matching name does not establish sufficient behavior and a missing name does not establish absence. Use available read-only tools. Submit satisfy-with-existing with concrete API evidence, delegate-capability with placement reasoning, request-placement, or unresolved through {{submissionTool}}.';
+    source = null;
+  }
   if (role === 'capability-architect' && kind === 'capability') tool = 'submit_capability_action';
   if (role === 'contract-engineer' && kind === 'contract') tool = contractToolName;
   if (['local-architect', 'capability-architect'].includes(role) && kind === 'reconciliation') {
