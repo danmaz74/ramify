@@ -764,3 +764,12 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .settlement.waiver { border-left-color: var(--warn); }
 .check-finding-history { font-size: 0.9rem; border-top: 1px dashed var(--line); margin-top: 0.4rem; }
 .check-finding-history h4 { margin: 0.5rem 0 0.2rem; color: var(--muted); }
+
+/* Recorded efficiency facts share the existing read-only table and details patterns. */
+.session-efficiency { margin-block: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: .4rem; }
+.session-efficiency section { margin-block: 1rem; }
+.session-efficiency details { margin-block: .65rem; }
+.session-efficiency code, .operation-facts dd { overflow-wrap: anywhere; }
+.session-efficiency .table { display: block; max-width: 100%; overflow-x: auto; }
+.session-efficiency h3, .session-efficiency h4 { margin-block: .6rem; }
+.operation-facts { font-size: .9rem; }

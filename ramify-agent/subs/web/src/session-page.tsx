@@ -6,6 +6,7 @@ import type {
 import type { TranscriptEntry, TranscriptEntryOf } from '../../harness/src/interfaces/protocol/transcripts.js';
 import { ClientError, type ProtocolClient } from './client.js';
 import { EvaluationFacts } from './evaluation.js';
+import { SessionMetrics } from './session-metrics.js';
 import { chapterHref, routeHref, sessionHref, type SessionAnchor } from './routes.js';
 import { reachText, SessionState } from './run-labels.js';
 import { isFinal, useSessionTranscript, type SessionDetail, type SessionTranscript } from './session-progress.js';
@@ -140,7 +141,7 @@ function DegradedStartsNotice({ at: ref, session }: { readonly at: SessionRef; r
     <section className="notice degraded-notice" aria-label="Degraded starts">
       <p>
         <strong>{degraded.length === 1 ? 'A degraded start' : `${degraded.length} degraded starts`}.</strong>
-        {' '}The executor was asked to continue or fork this session's conversation and started a fresh one instead, without its history.
+        {' '}A recorded start differed from the requested continuation or fork. Fresh reconstruction requires a named recovery requested by the caller.
       </p>
       <ul>
         {degraded.map(({ invocation, number, requested, actual, reason }) => (
@@ -217,10 +218,11 @@ function ChapterView({ chapter, context, detail, anchor }: {
                 Started at {invocation.started.at} (event {invocation.started.sequence})
                 {invocation.ended ? `; ended at ${invocation.ended.at} (event ${invocation.ended.sequence})` : ''}
                 {invocation.kept === true ? '; it kept the session' : invocation.kept === false ? '; it finished the session' : ''}
-                {invocation.point && <>; its end is <PointLink from={ref} point={invocation.point} /></>}
+                {invocation.point && invocation.operation?.point !== null && <>; its end is <PointLink from={ref} point={invocation.point} /></>}
               </p>
             )}
             {evaluation !== undefined && <EvaluationFacts evaluation={evaluation} />}
+            <SessionMetrics evaluation={evaluation} operation={invocation?.operation} invocation={chapter.invocation} />
           </>
         )}
       </header>

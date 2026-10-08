@@ -290,6 +290,8 @@ test('a degraded start is noticed above the session\'s facts, with a link to its
   render(<SessionPage client={client} session={ses3} anchor={null} interval={60_000} />);
   const notice = await screen.findByRole('region', { name: 'Degraded starts' });
   expect(notice.textContent).toContain('A degraded start.');
+  expect(notice.textContent).toContain('named recovery requested by the caller');
+  expect(notice.textContent).not.toContain('executor was asked');
   expect(notice.textContent).toContain('fork was requested and fresh was made (the source session file is gone)');
   expect(within(notice).getByRole('link', { name: 'Chapter 1: inv-0003' }).getAttribute('href'))
     .toBe(`#/plans/${planId}/runs/${runId}/sessions/ses-0003/chapters/inv-0003`);
@@ -387,4 +389,32 @@ test('PB3-E07: a post-write check shows each path\'s disposition, and a not-anal
   expect(screen.getByText('project passed').className).toContain('check-passed');
   expect(screen.queryByText('passed')).toBeNull();
   expect(document.body.textContent).toContain('ramify.check/1');
+});
+
+
+test('recorded stopped operation exposes original checkpoint identity and no reusable end, preserving chapter navigation', async () => {
+  const old = liveEngineer().invocations[0]!;
+  const operation = { runId, operationId: old.invocation, sessionId: 'original-generic', turn: 2,
+    sourcePoint: { sessionId: 'original-generic', kind: 'checkpoint' as const, turn: 1, checkpoint: 'append-original' }, point: null };
+  const session = sessionView('ses-0002', { state: 'finished', invocations: [{ ...old, operation, outcome: 'stopped', evaluation: null }] });
+  render(<SessionPage client={clientWith(session, page([]))} session={ses2} anchor={{ kind: 'chapter', invocation: old.invocation }} interval={60_000} />);
+  const facts = await screen.findByLabelText(`Operation of ${old.invocation}`);
+  expect(facts.textContent).toContain('Turn 2 in original-generic');
+  expect(facts.textContent).toContain('Checkpoint append-original, turn 1 in original-generic');
+  expect(facts.textContent).toContain('No reusable completion point');
+  const chapter = screen.getByRole('heading', { name: /Chapter 1: inv-0002/ }).closest('section')!;
+  expect(chapter.textContent).toContain('stopped');
+  expect(chapter.querySelector('.chapter-moments')!.textContent).not.toContain('its end is');
+  expect(within(facts).queryByRole('link')).toBeNull();
+});
+
+
+test('named caller reconstruction displays its exact recorded reason without asserting an executor fallback', async () => {
+  const reason = 'scope-review reconstruction from the recorded assignment packet';
+  const session = sessionView('ses-0002', { invocations: [{ ...liveEngineer().invocations[0]!, degraded: { requested: 'fork', actual: 'fresh', reason } }] });
+  render(<SessionPage client={clientWith(session, page([]))} session={ses2} anchor={null} interval={60_000} />);
+  const notice = await screen.findByRole('region', { name: 'Degraded starts' });
+  expect(notice.textContent).toContain(reason);
+  expect(notice.textContent).toContain('named recovery requested by the caller');
+  expect(notice.textContent).not.toContain('executor started a fresh');
 });

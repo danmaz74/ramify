@@ -1207,3 +1207,29 @@ test('PB3-E07: a nested final audit shows each project\'s verdict, execution, fa
   expect(within(audit).getByLabelText('Skipped projects').textContent).toBe('Not audited: vendor/lib, beneath external vendor of .');
   expect(within(audit).getByText('Nested discovery').nextElementSibling?.textContent).toMatch(/^complete/u);
 });
+
+
+test('V01: actual Run Measurements renders server-comparable scopes and weights without deriving ratios', async () => {
+  const run = stubRun();
+  const metric = (id: string, unit: string, supplied: number, numerator: number, denominator: number) => ({ id, unit, policyVersion: 'kpi/1' as const, measurementPolicy: 'scope-size/2' as const, state: 'measured' as const, value: supplied, numerator, denominator, subtotal: null, coverage: { covered: 4, total: 4 }, evidence: ['original server projection'], note: null });
+  const weights = { attributedWeight: 4, completeSizeWeight: 3, unknownSizeWeight: 1, unattributedWeight: 2 };
+  run.metrics = metricsResponseSchema.parse({ ...run.metrics, scopeComparisons: {
+    projectOnly: { ...weights, mean: metric('project-size', 'bytes', 50, 200, 4), ratio: metric('project-ratio', 'dimensionless', 0.4166666666666667, 50, 120) },
+    total: { ...weights, mean: metric('total-size', 'bytes', 90, 360, 4), ratio: metric('total-ratio', 'dimensionless', 0.45, 90, 200) },
+  } });
+  const client = clientWith(run);
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Measurements' }));
+  const project = await screen.findByRole('table', { name: 'Project-only scope metrics' });
+  expect(project.textContent).toContain('dimensionlessmeasured0.4167');
+  expect(screen.getByRole('table', { name: 'Total delivered scope metrics' }).textContent).toContain('dimensionlessmeasured0.4500');
+  expect(screen.getByRole('region', { name: 'Project-only scope' }).textContent).toContain('4 attributed; 3 complete size; 1 unknown size; 2 unattributed');
+  expect(screen.getByRole('heading', { name: 'Invocation efficiency' })).toBeTruthy();
+  // Supplied ratio deliberately differs from its operands: presentation must not calculate a new ratio.
+  cleanup();
+  run.metrics.scopeComparisons!.projectOnly.ratio.value = 0.123456;
+  render(<RunPage client={clientWith(run)} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Measurements' }));
+  const sentinel = await screen.findByRole('table', { name: 'Project-only scope metrics' });
+  expect(sentinel.textContent).toContain('dimensionlessmeasured0.1235');
+});

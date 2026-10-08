@@ -6,6 +6,7 @@ import type { TranscriptPoint } from '../../harness/src/interfaces/protocol/tran
 import { chapterHref, pointHref, sessionHref } from './routes.js';
 import { reachText, SessionState } from './run-labels.js';
 import { pointText } from './transcript.js';
+import { OperationFacts, operationText } from './session-metrics.js';
 
 /*
  * Run → Sessions: the run's session history as a timeline. Each session is
@@ -255,6 +256,8 @@ export function segmentName(session: RunSessionView, segment: TimelineSegment): 
     endText(session, invocation),
     degradedText(invocation),
     eventsText(invocation),
+    invocation.operation ? operationText(invocation.operation) : null,
+    invocation.operation?.point === null ? 'no reusable completion point' : null,
   ].filter(Boolean).join(', ');
 }
 
@@ -439,6 +442,7 @@ function SessionItem({ session, refOf }: { readonly session: RunSessionView; rea
             <li key={invocation.invocation}>
               <a href={chapterHref(ref, invocation.invocation)}>Chapter {index + 1}: {invocation.invocation}</a>: {startText(session, invocation)}; {endText(session, invocation)}; {eventsText(invocation)}
               {degraded && <span className="warn">; {degraded}</span>}
+              <OperationFacts invocation={invocation.invocation} operation={invocation.operation === undefined ? invocation.evaluation?.efficiency?.operation : invocation.operation} />
             </li>
           );
         })}

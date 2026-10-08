@@ -206,3 +206,21 @@ test('a live session\'s timeline grows as the run\'s version moves', async () =>
   await screen.findByRole('link', { name: /^Chapter 1 of ses-0005: inv-0006, opened in place of ses-0003 \(reconstructed\), submitted/ });
   expect(screen.getByRole('group', { name: /^ses-0005 / }).getAttribute('aria-label')).toBe('ses-0005 engineer, finished');
 });
+
+
+test('same-number sibling generic turns keep original session identities and chapter URLs, with stopped point null', () => {
+  const sessions = lineageSessions().slice(0, 2).map((session, index) => ({ ...session, invocations: session.invocations.slice(0, 1).map(invocation => ({ ...invocation,
+    operation: { runId, operationId: invocation.invocation, sessionId: index === 0 ? 'generic-left' : 'generic-right', turn: 2,
+      sourcePoint: { sessionId: index === 0 ? 'generic-left' : 'generic-right', kind: 'checkpoint' as const, turn: 1, checkpoint: index === 0 ? 'left-append' : 'right-append' }, point: null },
+    outcome: 'stopped' as const,
+  })) }));
+  renderTimeline(sessions);
+  for (const [index, session] of sessions.entries()) {
+    const invocation = session.invocations[0]!;
+    const generic = index === 0 ? 'generic-left' : 'generic-right';
+    const link = within(lane(session.session)).getByRole('link', { name: new RegExp(`Turn 2 in ${generic}`) });
+    expect(link.getAttribute('href')).toBe(`${base}/${session.session}/chapters/${invocation.invocation}`);
+    expect(link.getAttribute('aria-label')).toContain('no reusable completion point');
+    expect(screen.getByLabelText(`Operation of ${invocation.invocation}`).textContent).toContain(index === 0 ? 'left-append' : 'right-append');
+  }
+});

@@ -71,11 +71,11 @@ export function metricValue(metric: Metric | LineageMetric): string {
 
 /**
  * A session's degraded starts, as a badge whose accessible name and title
- * say what happened: the executor was asked to continue or fork the
- * conversation and started a fresh one.
+ * say that the recorded start differed from the requested continuation
+ * or fork; a fresh reconstruction must be a named caller recovery.
  */
 export function DegradedStarts({ count }: { readonly count: number }) {
   const label = count === 1 ? 'degraded start' : `${count} degraded starts`;
-  const explanation = `${count === 1 ? 'An invocation' : `${count} invocations`} of this session asked the executor to continue or fork its conversation, and the executor started a fresh one instead.`;
+  const explanation = `${count === 1 ? 'An invocation' : `${count} invocations`} of this session recorded a different start from the requested continuation or fork. Fresh reconstruction requires a named caller recovery.`;
   return <span className="badge degraded-badge" role="img" aria-label={`${label}: ${explanation}`} title={explanation}>{label}</span>;
 }

@@ -62,7 +62,7 @@ test('a session with degraded starts is flagged with their count and why; the ot
   const [once, twice, none] = within((await screen.findByRole('heading', { name: 'Finished and interrupted' })).closest('section')!).getAllByRole('listitem');
   const flag = within(once!).getByRole('img', { name: /^degraded start: / });
   expect(flag.textContent).toBe('degraded start');
-  expect(flag.getAttribute('title')).toBe('An invocation of this session asked the executor to continue or fork its conversation, and the executor started a fresh one instead.');
+  expect(flag.getAttribute('title')).toBe('An invocation of this session recorded a different start from the requested continuation or fork. Fresh reconstruction requires a named caller recovery.');
   expect(within(twice!).getByRole('img', { name: /^2 degraded starts: 2 invocations of this session/ }).textContent).toBe('2 degraded starts');
   expect(within(none!).queryByRole('img')).toBeNull();
   expect(none!.textContent).not.toContain('degraded');

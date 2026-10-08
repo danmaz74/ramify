@@ -18,6 +18,7 @@ import { useRunProgress, useRunQuery } from './run-progress.js';
 import { ApproveForm, canApprove, reviewText, ReviewPanel, GateScenarioResults, ObligationList, ScenarioReview, ScenarioTable } from './run-scenarios.js';
 import type { DiagramSessions } from './session-marks.js';
 import { SessionTimeline } from './session-timeline.js';
+import { SessionMetrics } from './session-metrics.js';
 
 /*
  * The Run page: one run, as the harness projects it. Its overview shows
@@ -287,7 +288,7 @@ function DegradedStartsNotice({ client, run }: { readonly client: ProtocolClient
   return (
     <li className="notice notice-degraded-start">
       <strong>{count === 1 ? 'A degraded start' : `${count} degraded starts`}</strong>
-      <p>The executor was asked to continue or fork a session's conversation and started a fresh one instead, without its history.</p>
+      <p>A recorded start differed from the requested continuation or fork. Fresh reconstruction requires a named recovery requested by the caller.</p>
       {state.status === 'failed' && <p className="muted">The sessions could not be read to name them: {state.error.message}</p>}
       {starts.length > 0 && (
         <ul>
@@ -873,15 +874,36 @@ function Measurements({ client, planId, runId, version }: AreaProps) {
             </section>
             <section className="panel">
               <h2>Metrics</h2>
-              <p className="muted">KPI projection {data.policyVersion}; sizes under {data.measurementPolicy}. Baseline B: {data.baseline.state === 'measured' ? `${data.baseline.bytes} bytes (${data.baseline.snapshot})` : `unavailable: ${data.baseline.reason}`}.</p>
+              <p className="muted">KPI projection {data.policyVersion}; sizes under {data.measurementPolicy}. Baseline B: {data.baseline.state === 'measured' ? `${data.baseline.bytes} bytes (${data.baseline.snapshot})` : `unavailable: ${data.baseline.reason}${data.baseline.subtotal === null ? '' : `; known subtotal ${data.baseline.subtotal} bytes`}`}.</p>
               <table className="table metrics" aria-label="Metrics">
                 <thead><tr><th>Metric</th><th>State</th><th>Value</th><th>Numerator</th><th>Denominator</th><th>Coverage</th><th>Note</th></tr></thead>
                 <tbody>{data.metrics.map(metric => <MetricRow key={metric.id} metric={metric} />)}</tbody>
               </table>
             </section>
+            {data.scopeComparisons && <section className="panel" aria-label="Comparable scopes">
+              <h2>Comparable scopes</h2>
+              {(['projectOnly', 'total'] as const).map(kind => {
+                const comparison = data.scopeComparisons![kind];
+                const label = kind === 'projectOnly' ? 'Project-only scope' : 'Total delivered scope';
+                return <section key={kind} aria-label={label}><h3>{label}</h3>
+                  <p>Recorded weights: {comparison.attributedWeight} attributed; {comparison.completeSizeWeight} complete size; {comparison.unknownSizeWeight} unknown size; {comparison.unattributedWeight} unattributed.</p>
+                  <table className="table metrics" aria-label={`${label} metrics`}>
+                    <thead><tr><th>Metric</th><th>State</th><th>Value</th><th>Numerator</th><th>Denominator</th><th>Coverage</th><th>Note</th></tr></thead>
+                    <tbody><MetricRow metric={comparison.mean} /><MetricRow metric={comparison.ratio} /></tbody>
+                  </table>
+                </section>;
+              })}
+            </section>}
+            <section className="panel" aria-label="Invocation efficiency">
+              <h2>Invocation efficiency</h2>
+              {data.evaluation.invocations.length === 0 ? <p>No invocation efficiency records.</p> : data.evaluation.invocations.map(evaluation => <details key={evaluation.invocation}>
+                <summary>{evaluation.invocation} ({evaluation.role}) · {evaluation.ended ?? 'not ended'}</summary>
+                <SessionMetrics evaluation={evaluation} />
+              </details>)}
+            </section>
             <section className="panel">
               <h2>Lineage</h2>
-              <p className="muted">Lineage measurements {data.lineage.policyVersion}. Each segment counts as the start its executor made: a fork or continuation it made fresh is measured as a fresh start and counted as degraded. Forks are grouped by the context generation they forked.</p>
+              <p className="muted">Lineage measurements {data.lineage.policyVersion}. Starts and recovery reasons are recorded by the harness; a fresh reconstruction is a named caller recovery. Forks are grouped by the recorded context generation.</p>
               <table className="table metrics" aria-label="Lineage measurements">
                 <thead><tr><th>Measurement</th><th>State</th><th>Value</th><th>Numerator</th><th>Denominator</th><th>Coverage</th><th>Note</th></tr></thead>
                 <tbody>{data.lineage.metrics.map(metric => <MetricRow key={metric.id} metric={metric} />)}</tbody>
