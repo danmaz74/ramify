@@ -199,3 +199,37 @@ store and scripted selections: **5 files/78 tests passed**; all four type scopes
 passed; structural check passed with 0 errors, 0 warnings and 317 analysis limits.
 Logs: `/tmp/ramify-plan23-integrated-quiescence-*.log`. No native/live/full audit
 claim is made by this amendment. Exact five paths are recorded in write-sets.
+
+## Accepted owned-store replay cache amendment
+
+Provider `39486a63fe74b18820b9e38e729355aec0d6c854`, joined at
+`752e0ecfda493e614692b34ef3186dfce3ffee2b`, corrects repeated full journal replay
+and historic payload rehashing observed when iteration 8's existing lifecycle
+check reached its unchanged 180-second bound. That timeout remains failed evidence;
+provider acceptance does not qualify the lifecycle rerun.
+
+One shared owned writer domain retains the authoritative opened Ledger, validated
+committed records and unique payload fingerprints. Clean reads/CAS do not reopen
+or replay historical transactions; cache state follows only successful durable
+append and uses the actual JSON representation. It checks ledger and unique
+payload inode/device/size/nanosecond mtime/ctime, validates changed payload bytes,
+and refuses unexpected ledger changes or lost ownership. Direct payload requests
+always read/hash actual bytes. Failed append invalidates cache so later replay
+reflects actual durable data, including partial or complete writes. Fresh writer
+acquisition revalidates all referenced identities. Materialized copies remain
+non-authoritative; CAS, corruption and missing-data behavior remain enforced.
+
+Independent six-revision/repeated-payload controls count one ledger open/replay
+and one committed identity read/hash in a shared clean lifetime, while direct
+gets each read/hash and reopening revalidates. Other controls exercise shared CAS,
+failed append, caller mutation, durable JSON parity, ledger/payload changes,
+materialized-copy deletion, and ownership loss. These are fixed correctness/call
+count controls; no timing threshold or performance comparison is claimed.
+
+Worker final selection passed 2 files/30 tests, all type scopes and structural
+checking. Intermediate type/structure failures and final commands are retained
+in `/tmp/plan23-store-cache-receipt.md`. Integrator joined engine/Pi/store/cache/
+scripted selections passed **6 files/92 tests**, all four type scopes, structural
+checking with 0 errors, 0 warnings and 317 explicit limits. Logs:
+`/tmp/ramify-plan23-integrated-store-cache-*.log`. Exactly two paths changed.
+Native/live/full audit qualification and iteration 8 lifecycle remain separate.

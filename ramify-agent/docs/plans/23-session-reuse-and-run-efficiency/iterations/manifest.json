@@ -329,6 +329,15 @@
       "typeCheck": "passed",
       "structure": "passed; partial analysis coverage; 317 analysis limits",
       "logs": "/tmp/ramify-plan23-integrated-quiescence-*.log"
+    },
+    "sessionStoreCache": {
+      "providerHead": "39486a63fe74b18820b9e38e729355aec0d6c854",
+      "integratedHead": "752e0ecfda493e614692b34ef3186dfce3ffee2b",
+      "ordinaryFiles": 6,
+      "ordinaryTests": 92,
+      "typeCheck": "passed",
+      "structure": "passed; partial analysis coverage; 317 analysis limits",
+      "logs": "/tmp/ramify-plan23-integrated-store-cache-*.log"
     }
   }
 }
