@@ -103,8 +103,18 @@
         "H05",
         "H06"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness focused-config builder (new src/work/focused-scenarios.ts), tools/shell-tests.ts, evidence child adapter for effective project configuration if required, and their own tests. Excludes scenario form, run service and scenario-briefing wiring."
+      "status": "accepted provider; integrated runtime consumers remain iteration 10",
+      "writeBoundary": "Harness focused-config builder (new src/work/focused-scenarios.ts), tools/shell-tests.ts, evidence child adapter for effective project configuration if required, and their own tests. Excludes scenario form, run service and scenario-briefing wiring.",
+      "receipt": "04-results.md",
+      "providerHead": "f666678da51c87a82ed8e8fd707e0ee99b3f98fb",
+      "integratedHead": "9c641f11caca476f23d1ab5f8d94a9a49bb1fb95",
+      "integrationVerification": {
+        "ordinaryFiles": 9,
+        "ordinaryTests": 124,
+        "typeCheck": "passed",
+        "structure": "passed; partial analysis coverage; 314 analysis limits",
+        "logs": "/tmp/ramify-plan23-integrated-catalog-focus-*.log"
+      }
     },
     {
       "id": "5",
@@ -117,8 +127,18 @@
         "C02",
         "C03"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness/plan-evidence catalog interface and tests; harness/scenarios form.ts and tests. Excludes prompt templates, focused command builder and run/service.ts."
+      "status": "accepted provider; integrated runtime consumers remain iteration 10",
+      "writeBoundary": "Harness/plan-evidence catalog interface and tests; harness/scenarios form.ts and tests. Excludes prompt templates, focused command builder and run/service.ts.",
+      "receipt": "05-results.md",
+      "providerHead": "eb97988755b5c53ff38de39a72d69e2d6e11c4a1",
+      "integratedHead": "9c641f11caca476f23d1ab5f8d94a9a49bb1fb95",
+      "integrationVerification": {
+        "ordinaryFiles": 9,
+        "ordinaryTests": 124,
+        "typeCheck": "passed",
+        "structure": "passed; partial analysis coverage; 314 analysis limits",
+        "logs": "/tmp/ramify-plan23-integrated-catalog-focus-*.log"
+      }
     },
     {
       "id": "6",
@@ -133,7 +153,7 @@
         "M04",
         "M05"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness src/kpi/ calculations and local tests. Excludes run/service.ts, run/observations.ts, run/records.ts, protocol and web. Consume frozen proposed input types through owner-local types until integration."
     },
     {
