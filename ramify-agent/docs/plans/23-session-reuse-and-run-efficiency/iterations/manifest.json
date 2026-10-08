@@ -28,8 +28,18 @@
         "S05",
         "S06"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness/agent port and scripted implementation; new harness session-store adapter and its own tests. Own run/sessions.ts if required; do not edit run/service.ts, pi or shared run records."
+      "status": "accepted provider; pi/runtime integration remains iterations 7\u20139",
+      "writeBoundary": "Harness/agent port and scripted implementation; new harness session-store adapter and its own tests. Own run/sessions.ts if required; do not edit run/service.ts, pi or shared run records.",
+      "receipt": "01-results.md",
+      "providerHead": "10fd6f21a1de31d178a22471b450c8ebc2c382a1",
+      "integratedHead": "d0d06c1080258e4ebf625eb820a6e8f5b123ad70",
+      "integrationVerification": {
+        "ordinaryFiles": 5,
+        "ordinaryTests": 45,
+        "typeCheck": "passed",
+        "structure": "passed; partial analysis coverage",
+        "logs": "/tmp/ramify-plan23-integrated-sessions-*.log"
+      }
     },
     {
       "id": "2",
@@ -139,7 +149,7 @@
         "S10",
         "S11"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness/agent/pi implementation and tests only; consume accepted agent/storage contract from 1."
     },
     {

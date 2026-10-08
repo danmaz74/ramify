@@ -174,7 +174,8 @@
       "subs/harness/src/tests/scenario-briefings.test.ts",
       "subs/harness/src/tests/hook-run-boundaries.test.ts",
       "subs/harness/src/tests/plan23-real-run-corrections.test.ts",
-      "docs/plans/23-session-reuse-and-run-efficiency/iterations/10-results.md"
+      "docs/plans/23-session-reuse-and-run-efficiency/iterations/10-results.md",
+      "subs/harness/src/analysis/submission.ts"
     ],
     "11": [
       "subs/harness/src/run/service.ts",
