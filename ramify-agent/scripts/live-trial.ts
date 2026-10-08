@@ -8,9 +8,12 @@
  *   npm run trial -- verify <project> [--run <run-id>] [--json <file>]
  *
  * `prepare` copies the fixture, runs `npm ci` in the copy from its committed
- * lockfile, makes the copy a git repository with one commit, and records that
- * commit as the baseline beside the copy. The fixture itself is never
- * written. It prints the commands that start the harness on the copy.
+ * lockfile, links this package's `ramify` into the copy's installation,
+ * writes the copy's audit definition, makes the copy a git
+ * repository with one commit, and records that commit as the baseline beside
+ * the copy. The fixture itself is never written: committing an audit
+ * definition there would make it a nested project of ramify-agent's own
+ * audit. It prints the commands that start the harness on the copy.
  *
  * `verify` compares every file outside the harness's own directories and
  * Ramify's generated views, which git ignores, with the baseline commit, and
@@ -25,7 +28,7 @@
  */
 import { execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { cp, mkdtemp, readdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +38,40 @@ const run = promisify(execFile);
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const fixture = join(packageRoot, 'subs', 'harness', 'fixtures', 'collection-review');
 const baselineName = 'loop-trial-baseline.json';
+const ramify = join(packageRoot, 'node_modules', '.bin', 'ramify');
+
+/**
+ * The copy's committed `ramify-audit.json`, which readiness, every gate and
+ * the final gate ask: the fixture's type check, its Vitest suite, its
+ * Cucumber scenarios under the committed `not @ramify-pending` profile, and a
+ * complete batch Ramify check by the `ramify` this package installs, which
+ * `prepare` also links into the copy's `node_modules/.bin`.
+ */
+function trialAuditDefinition(): string {
+  const command = (name: string, cmd: string, args: readonly string[], parser: 'vitest' | 'cucumber' | 'none') =>
+    ({ name, cmd, args, parser, timeoutMs: 600_000 });
+  const check = (id: string, name: string, description: string, commands: readonly unknown[], dependsOn?: readonly string[]) => ({
+    id, name, description, scope: 'both', category: 'deterministic',
+    executor: { kind: 'command', commands, continueOnFailure: true },
+    onFailure: 'record',
+    ...(dependsOn === undefined ? {} : { dependsOn }),
+  });
+  const afterTypeCheck = ['fixture-type-check'];
+  const definition = {
+    checks: [
+      check('fixture-type-check', 'Fixture type check', 'Type-check the fixture\'s source, tests and configuration',
+        [command('npm-type-check', 'npm', ['run', 'type-check'], 'none')]),
+      check('fixture-tests', 'Fixture tests', 'Run every owner\'s Vitest tests',
+        [command('npm-test', 'npm', ['test'], 'vitest')], afterTypeCheck),
+      check('fixture-scenarios', 'Fixture scenarios', 'Run the bound Cucumber scenarios under the committed not @ramify-pending profile',
+        [command('npm-cucumber', 'npm', ['run', 'test:cucumber'], 'cucumber')], afterTypeCheck),
+      check('fixture-structure', 'Fixture structural check', 'Run a complete batch Ramify check',
+        [command('ramify-check', ramify, ['check', '--batch', '--format', 'json', '--no-snapshot'], 'none')], afterTypeCheck),
+    ],
+    workspace: { preparation: 'nodejs', options: { packageDirectories: [''], setupCommands: [] } },
+  };
+  return `${JSON.stringify(definition, null, 2)}\n`;
+}
 
 interface Baseline {
   readonly schema: 'ramify-agent.loop-trial-baseline/1';
@@ -97,6 +134,12 @@ async function prepare(): Promise<number> {
     }
   }
 
+  // The audit's expected-file verification asks the project's own `ramify`
+  // for ownership; the fixture does not depend on ramify.ts, so the copy's
+  // installation, which git ignores, links the one this package installs.
+  await mkdir(join(project, 'node_modules', '.bin'), { recursive: true });
+  await symlink(ramify, join(project, 'node_modules', '.bin', 'ramify'));
+  await writeFile(join(project, 'ramify-audit.json'), trialAuditDefinition());
   await git(project, 'init', '--quiet', '--initial-branch=main');
   await git(project, 'add', '--all');
   await git(project, 'commit', '--quiet', '--message', 'fixture');

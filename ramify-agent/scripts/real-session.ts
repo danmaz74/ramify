@@ -8,7 +8,7 @@
  *
  * Without `--project` it prepares a copy first, as `npm run trial --
  * prepare` does: the fixture copied, its toolchain installed with `npm ci`,
- * and one commit, so that readiness can pass. The copy is kept, with the
+ * its audit definition written, and one commit, so that readiness can pass. The copy is kept, with the
  * run's records, for `npm run trial -- verify <copy>` and for review.
  *
  * It posts `start-run` to `/api/v1/commands`, then reads the run's event page

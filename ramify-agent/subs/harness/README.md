@@ -1036,8 +1036,12 @@ pi actually made and what the snapshot tools answered.
   directories installed and its declared preparation, then one configured
   full nested audit of HEAD through the installed provider, the final
   gate's own request and answered by an applicable earlier record where the
-  provider finds one, and last the run branch (`run/readiness.ts`). `audit-config` fails where the definition
-  `ramify-audit.json` at HEAD no longer has the policy `start-run` captured.
+  provider finds one, and last the run branch (`run/readiness.ts`). `start-run`
+  reads the definition, `ramify-audit.json` at HEAD, before it writes
+  anything of the run or starts any agent, and refuses a project whose
+  definition is missing or invalid as `unreadable`, with the provider's
+  reason. `audit-config` fails where the definition at HEAD no longer has
+  the policy `start-run` captured.
   `declared-preparation` runs the committed workspace setup commands in the
   run working tree, and fails where `ramify-agent.json`'s `setup` differs
   from them. `configured-full-audit` passes on a completed audit whose
@@ -1057,9 +1061,9 @@ pi actually made and what the snapshot tools answered.
   `timeouts` (for a standalone diagnosis's type check and Ramify check) and
   `setup`, and an `acceptance` section or a test timeout makes it invalid.
   Neither consumes a recovery, and neither is a code-repair assignment. A
-  missing or invalid file never refuses `start-run`. The project's tests
-  and scenarios are checks of its committed audit definition, and nothing in
-  `ramify-agent.json` names them.
+  missing or invalid `ramify-agent.json` never refuses `start-run`. The
+  project's tests and scenarios are checks of its committed audit
+  definition, and nothing in `ramify-agent.json` names them.
 - **The feature files.** Once readiness has passed and the run branch
   exists, and before the first local architect starts, the harness renders
   every tracked feature file from the scenario records and their states
