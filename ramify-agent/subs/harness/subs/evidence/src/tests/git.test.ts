@@ -1,4 +1,5 @@
 import { chmod, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GitError, gitCandidateSource as candidate, gitChangeHistory, gitService as git, inspectGit } from '../git.js';
@@ -160,6 +161,8 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       const base = await git.currentHead(root);
       await repository.write('src/one.ts', 'export const one = 1;\n// hello\n');
       await symlink('../../outside.txt', join(root, 'src', 'link'));
+      await repository.write('src/replacement.ts', 'literal \uFFFD\n');
+      await writeFile(join(root, 'src', 'raw.bin'), Buffer.from([0xff, 0x0a]));
       await repository.git('add', '--all');
       await repository.git('-c', 'user.name=f', '-c', 'user.email=f@l', 'commit', '--message', 'candidate');
       const commit = (await repository.git('rev-parse', 'HEAD')).trim();
@@ -169,15 +172,31 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       await repository.write('src/two.ts', 'export const two = 2;\n');
 
       expect(await candidate.commitTree(root, commit)).toBe((await repository.git('rev-parse', `${commit}^{tree}`)).trim());
-      expect(await candidate.treeEntries(root, commit)).toEqual([
-        { path: 'README.md', kind: 'file', bytes: 8 },
-        { path: 'src/link', kind: 'symlink', bytes: 17 },
-        { path: 'src/one.ts', kind: 'file', bytes: 31 },
-      ]);
+      // Fixed original bytes authenticate Git's object IDs independently of decoded text.
+      const originals = [
+        { path: 'README.md', kind: 'file', content: Buffer.from('fixture\n') },
+        { path: 'src/link', kind: 'symlink', content: Buffer.from('../../outside.txt') },
+        { path: 'src/one.ts', kind: 'file', content: Buffer.from('export const one = 1;\n// hello\n') },
+        { path: 'src/raw.bin', kind: 'file', content: Buffer.from([0xff, 0x0a]) },
+        { path: 'src/replacement.ts', kind: 'file', content: Buffer.from('literal \uFFFD\n') },
+      ];
+      const objectIdOf = (content: Buffer): string => createHash('sha1')
+        .update(Buffer.from(`blob ${content.byteLength}\0`)).update(content).digest('hex');
+      const expectedEntries = originals.map(({ path, kind, content }) => ({ path, kind, bytes: content.byteLength, objectId: objectIdOf(content) }));
+      expect(await candidate.treeEntries(root, commit)).toEqual(expectedEntries);
+      for (const expected of expectedEntries) {
+        expect((await repository.git('rev-parse', `${commit}:${expected.path}`)).trim()).toBe(expected.objectId);
+      }
+      const replacement = await candidate.readBlob(root, commit, 'src/replacement.ts');
+      expect(replacement).toBe('literal \uFFFD\n');
+      expect(objectIdOf(Buffer.from(replacement))).toBe(expectedEntries.find(entry => entry.path === 'src/replacement.ts')!.objectId);
+      const lossy = await candidate.readBlob(root, commit, 'src/raw.bin');
+      expect(lossy).toBe('\uFFFD\n');
+      expect(objectIdOf(Buffer.from(lossy))).not.toBe(expectedEntries.find(entry => entry.path === 'src/raw.bin')!.objectId);
       expect(await candidate.readBlob(root, commit, 'src/one.ts')).toBe('export const one = 1;\n// hello\n');
       expect(await candidate.grepTree(root, commit, 'hel+o', ['src'])).toEqual([{ path: 'src/one.ts', line: 2, text: '// hello' }]);
       expect(await candidate.grepTree(root, commit, 'absent')).toEqual([]);
-      expect(await candidate.diffNameStatus(root, base, commit)).toEqual([{ status: 'A', path: 'src/link' }, { status: 'A', path: 'src/one.ts' }]);
+      expect(await candidate.diffNameStatus(root, base, commit)).toEqual(['src/link', 'src/one.ts', 'src/raw.bin', 'src/replacement.ts'].map(path => ({ status: 'A', path })));
       expect(await candidate.diffPatch(root, base, commit, 'src/one.ts')).toContain('+export const one = 1;');
       await expect(candidate.readBlob(root, commit, 'src/two.ts')).rejects.toBeInstanceOf(GitError);
     });

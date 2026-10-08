@@ -536,6 +536,8 @@ export interface TreeEntry {
   readonly kind: 'file' | 'executable' | 'symlink' | 'submodule';
   /** The blob's size in bytes; null for a submodule. */
   readonly bytes: number | null;
+  /** The exact full Git blob object ID, when valid metadata supplies it; absent for submodules or unknown proof. */
+  readonly objectId?: string;
 }
 
 /** One line a search matched in a commit. */
@@ -554,16 +556,28 @@ export async function commitTree(root: string, commit: string, signal?: AbortSig
 /** Every entry of a commit's tree, recursively, in Git's order. */
 export async function treeEntries(root: string, commit: string, signal?: AbortSignal): Promise<TreeEntry[]> {
   const run = await gitOk(root, ['ls-tree', '-r', '-z', '-l', '--full-tree', commit], signal);
+  return parseTreeEntries(run.stdout);
+}
+
+/** Decode the existing NUL-delimited ls-tree response without additional Git requests. */
+export function parseTreeEntries(output: string): TreeEntry[] {
   const entries: TreeEntry[] = [];
-  for (const field of run.stdout.split('\0')) {
+  const fields = output.split('\0');
+  for (const [index, field] of fields.entries()) {
     if (field === '') continue;
     const tab = field.indexOf('\t');
     if (tab < 0) continue;
-    const [mode, , , size] = field.slice(0, tab).split(/\s+/);
+    const metadata = field.slice(0, tab).split(/\s+/);
+    const [mode, type, objectId, size] = metadata;
     const path = field.slice(tab + 1);
     const kind = mode === '120000' ? 'symlink' : mode === '160000' ? 'submodule' : mode === '100755' ? 'executable' : 'file';
     const bytes = Number.parseInt(size ?? '', 10);
-    entries.push({ path, kind, bytes: Number.isNaN(bytes) ? null : bytes });
+    const validBlob = metadata.length === 4 && type === 'blob'
+      && (mode === '100644' || mode === '100755' || mode === '120000')
+      && objectId !== undefined && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(objectId) && /[1-9a-f]/u.test(objectId)
+      && size !== undefined && /^(?:0|[1-9][0-9]*)$/u.test(size) && Number.isSafeInteger(bytes)
+      && index < fields.length - 1 && path !== '';
+    entries.push({ path, kind, bytes: Number.isNaN(bytes) ? null : bytes, ...(validBlob ? { objectId } : {}) });
   }
   return entries;
 }
