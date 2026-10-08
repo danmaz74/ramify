@@ -276,8 +276,20 @@
         "W10",
         "W11"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness run/service.ts, work/engineer-equipment.ts, work/scenario-briefing.ts, work/session.ts and briefing/submission wiring/tests; serial shared-runtime owner."
+      "status": "accepted ordinary runtime corrections; native/live/full qualification remains iteration14",
+      "writeBoundary": "Harness run/service.ts, work/engineer-equipment.ts, work/scenario-briefing.ts, work/session.ts and briefing/submission wiring/tests; serial shared-runtime owner.",
+      "receipt": "10-results.md",
+      "providerHead": "d4460fda9db110dc2b6411e80ea7fe234bab447b",
+      "receiptHead": "ba90933cccc54fdb5e209d6daecc5349790a0d5c",
+      "integratedHead": "909ae04a",
+      "integrationVerification": {
+        "ordinaryFiles": 14,
+        "ordinaryTests": 195,
+        "typeCheck": "passed all four configured scopes",
+        "structure": "passed; partial analysis coverage; 317 retained analysis limits",
+        "logs": "/tmp/ramify-plan23-integrated-run-corrections-*.log",
+        "limit": "No native, live provider or full configured audit claim."
+      }
     },
     {
       "id": "11",
@@ -291,7 +303,7 @@
         "M07",
         "M08"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree after accepted iteration10",
       "writeBoundary": "Harness run/service.ts, run/observations.ts, run/records.ts, interfaces/protocol and projections; agent event enrichment if required by frozen contract. Serial runtime owner; no web/trial edits."
     },
     {
@@ -317,7 +329,7 @@
         "T01",
         "T02"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree after accepted iteration10",
       "writeBoundary": "Root scripts/live-trial.ts, trial fixtures/README, fixture-trials.test.ts and dedicated trial-verifier tests. Excludes runtime service, metrics, protocol and web."
     },
     {
