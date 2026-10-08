@@ -212,8 +212,24 @@
         "W01",
         "W02"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness run/service.ts, run/records.ts, sessions/single.ts, invocation integration and related helpers/tests. No parallel shared runtime writer."
+      "status": "accepted ordinary runtime; fork policy remains 9 and live/native/full qualification remains 14",
+      "writeBoundary": "Harness run/service.ts, run/records.ts, sessions/single.ts, invocation integration and related helpers/tests. No parallel shared runtime writer.",
+      "receipt": "08-results.md",
+      "providerHead": "9d4a89e12c3e3d23a9911dea9b660f7673ec1380",
+      "integratedHead": "aee6f911",
+      "testAmendmentHead": "7569274a0b2b4416ecdaaf5b4fcb5a416b6e612e",
+      "verifiedHead": "78121c20",
+      "integrationVerification": {
+        "ordinaryFiles": 7,
+        "ordinaryTests": 110,
+        "requiredFiles": 3,
+        "requiredTests": 43,
+        "typeCheck": "passed all four configured scopes after test amendment",
+        "structure": "passed; partial analysis coverage; 317 analysis limits",
+        "logs": "/tmp/ramify-plan23-integrated-continuations-*.log",
+        "repair": "Initial joined109passed1failed retained. Six other files95tests passed; corrected generic file15tests passed with stronger history/current-delivery/retry assertions. Type and structure repeated on repaired source.",
+        "pendingHandoff": "Iteration10 fence-aware Markdown heading grouping preserves consecutive literal # comments."
+      }
     },
     {
       "id": "9",
@@ -228,7 +244,7 @@
         "W06",
         "W07"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness run/service.ts and context-selection/review/consultation/recovery orchestration and tests; serial after 8."
     },
     {

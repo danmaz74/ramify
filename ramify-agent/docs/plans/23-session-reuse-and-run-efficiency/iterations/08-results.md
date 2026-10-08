@@ -248,3 +248,31 @@ as preserving. Full line inventory:
 inventory `/tmp/plan23-ordinary-recovery-inventory.md` and original fork inventory
 `/tmp/migration-inventory.md` remain read-only references. Coordinator owns
 central ordinary/test exposures, registry and statuses.
+
+## Coordinator acceptance of ordinary runtime integration
+
+Source delivery `9d4a89e12c3e3d23a9911dea9b660f7673ec1380` was integrated at
+`aee6f911`. The stronger generic callback contract control from
+`7569274a0b2b4416ecdaaf5b4fcb5a416b6e612e` and its receipt amendment are
+included in verified integration source `78121c20`. The initial joined run is
+retained: seven files, 109 passing tests and the single stale callback-text
+assertion. Its six other files passed all 95 tests, including the unchanged
+required selectors' 43 tests. The corrected generic file then passed all 15
+cases, checking inherited callback perception, exact current-only recorded and
+emitted user bytes, original policy/environment/tool, accepted outcomes and
+terminal Retry with no extra model/tool/acceptance. **All seven selected files
+and 110 cases are now passing across these named checks.** This is not a claim
+that the initial combined run passed.
+
+All four configured type scopes passed again on the repaired integration.
+Structural validation completed and passed with zero errors, zero warnings and
+317 explicit analysis limits, retaining partial analysis coverage. Logs:
+`/tmp/ramify-plan23-integrated-continuations-{focused,generic-repair,repaired-types,repaired-structure}.log`.
+The runtime source did not change for the corrected generic test. No native,
+live, whole-suite or full-audit evidence is inferred from these ordinary checks.
+W01–W02 ordinary integration is accepted; iteration 9 can use this source.
+
+The narrow heading-grouping preservation correction described above remains
+an explicit iteration 10 briefing handoff. Its fixed literal control must retain
+consecutive `#` lines within fenced code. Fork policy/API retirement and final
+qualification remain their owning iterations.
