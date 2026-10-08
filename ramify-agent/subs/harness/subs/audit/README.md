@@ -15,13 +15,13 @@ one of two modes. `project-default` leaves the mode to the provider, which
 audits a Ramify project `ramify-partial` from its baseline and any other
 project in full; `full` asks for a full audit. Readiness asks `full` of
 HEAD; each committing gate asks of its candidate commit, `full` at the final
-gate. The request is the one the provider builds from the committed
+gate. Readiness's baseline and the final gate make the same nested request. The request is the one the provider builds from the committed
 definition, so its checks, ignore list, preparation and check universe are
 the project's own. The harness plans no command, walks no test file and adds
 no check: the provider owns discovery, selection by ownership, completeness,
 reuse and the verdict.
 
-The final gate's request is nested: the provider also audits every tracked
+The readiness and final gate request is nested: the provider also audits every tracked
 nested definition beneath the project that an enclosing Ramify project does
 not exclude, each under its own definition, change set, reuse and evidence
 refs, in the same worktree. The result keeps every project's verdict,

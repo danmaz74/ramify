@@ -228,10 +228,13 @@ export async function executeConfiguredGate(
   return finishConfiguredGate(prepared, result, commit, boundExpired);
 }
 
-/** The committing gate's attempt: its audit's answer beside the harness's own findings. */
-function finishConfiguredGate(prepared: PreparedGate, result: ConfiguredAuditResult, commit: string | null, boundExpired = false): GateAttempt {
-  const { request, checkpoint, guardedChanges, rules, unauthorized, ruleFailed } = prepared;
-  const record: GateAuditRecord = {
+/**
+ * The gate's record of a configured audit's answer: the request, both
+ * source identities, modes, reuse, verdict and, for a nested request, each
+ * project and the discovery outcome. Readiness's baseline records the same.
+ */
+export function configuredAuditRecord(result: ConfiguredAuditResult): GateAuditRecord {
+  return {
     requestId: result.requestId,
     mode: result.mode,
     nested: result.nested,
@@ -252,6 +255,12 @@ function finishConfiguredGate(prepared: PreparedGate, result: ConfiguredAuditRes
       unavailable: result.discovery.unavailable.map(gap => ({ ...gap, definitions: [...gap.definitions] })),
     },
   };
+}
+
+/** The committing gate's attempt: its audit's answer beside the harness's own findings. */
+function finishConfiguredGate(prepared: PreparedGate, result: ConfiguredAuditResult, commit: string | null, boundExpired = false): GateAttempt {
+  const { request, checkpoint, guardedChanges, rules, unauthorized, ruleFailed } = prepared;
+  const record = configuredAuditRecord(result);
   const answered = result.status === 'completed';
   // The candidate's own declared setup, such as its build, exiting non-zero
   // is the candidate's failure, as a failing check is: the engineer repairs

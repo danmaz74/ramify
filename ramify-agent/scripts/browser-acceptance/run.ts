@@ -245,21 +245,14 @@ try {
   await durablePage.goto(`http://127.0.0.1:${address.port}`, { waitUntil: 'networkidle' });
   const durableCanvas = durablePage.getByLabel('Zoomable execution canvas');
   await durableCanvas.waitFor();
-  // Gates delivered through the configured audit retain their outcomes, so
-  // the scripted run no longer carries Plan 11's many historical audit gaps.
-  // Its one remaining gap is the readiness gate's publication without a
-  // retained outcome (recorded as an open item in Plan 21 iteration 10); the
-  // many-gap collapse is witnessed by execution-map.test.tsx's fourteen gaps.
-  const durableGaps = durablePage.locator('.execution-coverage-gaps');
-  await durableGaps.waitFor();
-  const shownGaps = await durableGaps.locator('li').allTextContents();
-  check('the run\'s remaining audit gap is counted and collapsed without losing detail',
-    shownGaps.length === 1 && /^Audit result for gate ga-0001 is unavailable/u.test(shownGaps[0] ?? '') &&
-    !(await durableGaps.evaluate(el => (el as HTMLDetailsElement).open)) &&
-    /Coverage gaps: 1\./u.test(await durablePage.locator('.execution-area > p.muted').first().textContent() ?? ''));
-  await durableGaps.locator('summary').click();
-  check('the gap list expands', await durableGaps.evaluate(el => (el as HTMLDetailsElement).open));
-  await durableGaps.locator('summary').click();
+  // Every gate of the scripted run, the readiness baseline included, now
+  // keeps its configured audit outcome, so the run has none of Plan 11's
+  // historical audit gaps. The many-gap collapse and expansion are witnessed
+  // by execution-map.test.tsx's fourteen-gap fixture.
+  const exportedGaps = durablePages.reduce((total, value) => total + value.coverage.gaps.length, 0);
+  check('a run whose gates all retain their audit outcomes shows no coverage gap',
+    exportedGaps === 0 && await durablePage.locator('.execution-coverage-gaps').count() === 0 &&
+    !/Coverage gaps/u.test(await durablePage.locator('.execution-area > p.muted').first().textContent() ?? ''));
   check('the same disk-backed run renders in Chromium through its bounded pages',
     await durableCanvas.locator('.execution-capability').count() >= 3 &&
     await durablePage.getByLabel('All sessions').getByRole('listitem').count() > 0 &&

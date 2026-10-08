@@ -76,8 +76,10 @@ Delivery cuts qualified so far:
 | 4: guarded ten-case write matrix and six retained actual provider controls | `cf813618` | [Integrated focused verification](optimizations/04-integrated-results.md) |
 
 These cuts have integrated focused passes. The initial full baseline failed one
-crash fixture, subsequently corrected with focused evidence. Final full-audit
-qualification and project-wide automatic enforcement remain outstanding.
+crash fixture, subsequently corrected with focused evidence. A later released
+full nested audit of all four integrated cuts passed: [audit receipt](optimizations/04-released-audit.md). This was post-merge qualification. Subsequent cuts require
+passing released audits before merge. Final full-audit qualification and
+project-wide automatic enforcement remain outstanding.
 
 Focused Vitest runs are permitted for the optimization's cases. Full-suite
 verification runs through the installed committed audit CLI, serialized after
