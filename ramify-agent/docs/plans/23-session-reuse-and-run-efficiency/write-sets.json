@@ -321,7 +321,18 @@
       "subs/harness/src/work/scope.ts",
       "subs/harness/src/qualification/live-session.ts",
       "subs/harness/src/tests/plan23-live-session.test.ts",
-      "subs/harness/subs/agent/subs/pi/src/pi-agent.ts"
+      "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
+      "subs/harness/src/run/service.ts",
+      "subs/harness/src/tests/check-findings-composition.test.ts",
+      "subs/harness/src/tests/review-questions.test.ts",
+      "subs/harness/src/analysis/submission.ts",
+      "subs/harness/src/tests/analysis-submission.test.ts",
+      "subs/harness/src/tests/analysis-scenarios.test.ts",
+      "subs/harness/subs/agent/src/tests/port-additions.test.ts",
+      "subs/harness/subs/agent/src/tests/port-observations.test.ts",
+      "subs/harness/subs/agent/src/tests/transcript-content.test.ts",
+      "subs/harness/src/tests/lineage-metrics.test.ts",
+      "subs/harness/src/tests/union-values.test.ts"
     ]
   },
   "rules": [
@@ -362,5 +373,27 @@
       "subs/harness/subs/evidence/src/tests/git.test.ts",
       "subs/harness/subs/evidence/src/tests/plan23-blob-object-facts.test.ts"
     ]
+  },
+  "qualificationRepairs": {
+    "full-audit-637d8ff7": {
+      "evidence": "41209da07bbf06539523dc31c40afb52faef3aab",
+      "root": [
+        "subs/harness/src/analysis/submission.ts",
+        "subs/harness/src/tests/analysis-submission.test.ts",
+        "subs/harness/src/tests/analysis-scenarios.test.ts"
+      ],
+      "runtimeWorker": [
+        "subs/harness/src/run/service.ts",
+        "subs/harness/src/tests/check-findings-composition.test.ts",
+        "subs/harness/src/tests/review-questions.test.ts"
+      ],
+      "agentTestWorker": [
+        "subs/harness/subs/agent/src/tests/port-additions.test.ts",
+        "subs/harness/subs/agent/src/tests/port-observations.test.ts",
+        "subs/harness/subs/agent/src/tests/transcript-content.test.ts",
+        "subs/harness/src/tests/lineage-metrics.test.ts",
+        "subs/harness/src/tests/union-values.test.ts"
+      ]
+    }
   }
 }
