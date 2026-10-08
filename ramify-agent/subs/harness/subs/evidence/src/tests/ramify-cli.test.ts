@@ -1,7 +1,17 @@
-import { chmod, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { RamifyCli } from '../ramify-cli.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ScriptedCli } from './helpers/scripted-cli.js';
+import { spawnAttempts } from '../../../../src/tests/helpers/process-guard.js';
+vi.mock('node:child_process', async importOriginal => {
+  const { guardedChildProcess } = await import('../../../../src/tests/helpers/process-guard.js');
+  return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
+});
+const answers: ScriptedCli[] = [];
+afterEach(() => {
+  const errors: unknown[] = [];
+  for (const answer of answers.splice(0)) try { answer.assertComplete(); } catch (error) { errors.push(error); }
+  try { expect(spawnAttempts(), 'ordinary CLI setup/flow/teardown process attempts').toEqual([]); } catch (error) { errors.push(error); }
+  if (errors.length) throw new AggregateError(errors, 'CLI teardown failed');
+});
 import { decodeOwnershipAnswer } from '../ownership.js';
 import { temporaryDirectory } from './helpers/temporary.js';
 
@@ -12,7 +22,7 @@ import { temporaryDirectory } from './helpers/temporary.js';
  * strictly, `ramify.check/3` for the changed form and `ramify.analysis/3`
  * for the complete one; any other answer is unsupported and never a pass.
  *
- * The CLI is answered here by a stand-in, so that no test starts a daemon.
+ * Strict finite replies answer the real CLI builders/decoders without processes.
  * The installed CLI's own payloads are decoded in `project-boundary.test.ts`.
  */
 describe('the Ramify check forms', () => {
@@ -25,14 +35,16 @@ describe('the Ramify check forms', () => {
     await directory.remove();
   });
 
-  const cli = async (body: string, exitCode: number): Promise<RamifyCli> => {
-    const executable = join(directory.path, 'ramify-stub.sh');
-    await writeFile(executable, `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > ${join(directory.path, 'argv.txt')}\ncat <<'DOCUMENT'\n${body}\nDOCUMENT\nexit ${exitCode}\n`);
-    await chmod(executable, 0o755);
-    return new RamifyCli({ executable });
+  const cli = async (body: string, exitCode: number, paths: readonly string[] | null = null, deadline = 2_000): Promise<ScriptedCli> => {
+    const answer = new ScriptedCli();
+    answer.declare({ cwd: directory.path, argv: paths === null
+      ? ['check', '--batch', '--root', directory.path, '--format', 'json', '--no-snapshot']
+      : ['check', '--changed', ...paths, '--format', 'json', '--deadline', String(deadline)],
+      result: { code: exitCode, stdout: `${body}\n`, stderr: '' } });
+    answers.push(answer); return answer;
   };
 
-  const argv = async (): Promise<string[]> => (await readFile(join(directory.path, 'argv.txt'), 'utf8')).trim().split('\n');
+  const argv = async (): Promise<string[]> => [...answers.at(-1)!.calls.at(-1)!.argv];
 
   const complete = (execution: string, check: string, root = directory.path) => JSON.stringify({
     schemaVersion: 'ramify.analysis/3', runId: 'r', inputId: 'input/1:abc', request: { project: { root } },
@@ -81,7 +93,7 @@ describe('the Ramify check forms', () => {
   });
 
   it('runs the hook check for the named paths, with its deadline, and keeps each path\'s disposition', async () => {
-    const ramify = await cli(JSON.stringify(changed()), 0);
+    const ramify = await cli(JSON.stringify(changed()), 0, ['src/one.ts', 'docs/two.md']);
 
     const result = await ramify.checkChanged(['src/one.ts', 'docs/two.md'], directory.path, 2_000);
 
@@ -96,8 +108,8 @@ describe('the Ramify check forms', () => {
       revision: null, since: null, outcome: 'not-checked', reason, execution: null, removed: [], exitCode: 2,
       paths: [{ path, disposition: 'not-checked', module: null, exclusion: null, reason }],
     }));
-    const cold = await (await cli(notChecked('cold', 'src/one.ts'), 2)).checkChanged(['src/one.ts'], directory.path, 2_000);
-    const configuration = await (await cli(notChecked('configuration-changed', 'tsconfig.json'), 2)).checkChanged(['tsconfig.json'], directory.path, 2_000);
+    const cold = await (await cli(notChecked('cold', 'src/one.ts'), 2, ['src/one.ts'])).checkChanged(['src/one.ts'], directory.path, 2_000);
+    const configuration = await (await cli(notChecked('configuration-changed', 'tsconfig.json'), 2, ['tsconfig.json'])).checkChanged(['tsconfig.json'], directory.path, 2_000);
 
     expect(cold).toMatchObject({ outcome: 'not-checked', reason: 'cold', unsupported: null });
     expect(cold.paths[0]).toMatchObject({ disposition: 'not-checked', reason: 'cold' });
@@ -117,7 +129,7 @@ describe('the Ramify check forms', () => {
     ];
     for (const [document, exitCode, message] of cases) {
       const named = message === 'are not the named paths' ? ['src/one.ts'] : (document as { paths: Array<{ path: string }> }).paths.map(path => path.path);
-      const result = await (await cli(JSON.stringify(document), exitCode)).checkChanged(named, directory.path, 2_000);
+      const result = await (await cli(JSON.stringify(document), exitCode, named)).checkChanged(named, directory.path, 2_000);
       expect(result, message).toMatchObject({ outcome: 'not-checked', provider: null, paths: [] });
       expect(result.unsupported).toContain(message);
       expect(result.reason).toBe(`unsupported result: ${result.unsupported}`);
@@ -125,7 +137,7 @@ describe('the Ramify check forms', () => {
   });
 
   it('reads an earlier document version, or a verdict without a document, as unsupported', async () => {
-    const earlier = await (await cli(JSON.stringify({ schemaVersion: 'ramify.check/1', outcome: 'checked', findings: [] }), 0)).checkChanged(['src/one.ts'], directory.path, 2_000);
+    const earlier = await (await cli(JSON.stringify({ schemaVersion: 'ramify.check/1', outcome: 'checked', findings: [] }), 0, ['src/one.ts'])).checkChanged(['src/one.ts'], directory.path, 2_000);
     const bare = await (await cli('', 0)).checkComplete(directory.path);
     const analysis = await (await cli(JSON.stringify({ schemaVersion: 'ramify.analysis/2', outcome: { execution: 'completed', check: 'passed' } }), 0)).checkComplete(directory.path);
 
@@ -135,7 +147,7 @@ describe('the Ramify check forms', () => {
   });
 
   it('names the invocation and its exit code where the CLI gave no reason', async () => {
-    const ramify = await cli('ramify: the daemon could not be reached', 2);
+    const ramify = await cli('ramify: the daemon could not be reached', 2, ['src/one.ts'], 500);
 
     const result = await ramify.checkChanged(['src/one.ts'], directory.path, 500);
 
@@ -147,7 +159,7 @@ describe('the Ramify check forms', () => {
   });
 
   it('reads an invocation failure as not checked with its own reason', async () => {
-    const ramify = await cli(JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable', reason: 'stub', exitCode: 2 }), 2);
+    const ramify = await cli(JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable', reason: 'stub', exitCode: 2 }), 2, ['src/one.ts'], 500);
 
     const result = await ramify.checkChanged(['src/one.ts'], directory.path, 500);
 

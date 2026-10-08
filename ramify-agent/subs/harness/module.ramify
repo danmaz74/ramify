@@ -63,3 +63,6 @@ expose-src PausableDeadline from "run/pausable-deadline.ts" to descendants
 
 expose-sub commitAccepted, createRunBranch, isCleanRepository from evidence to descendants
 expose-sub runCommand, childEnvironment, outputTailBytes, CommandRequest, CommandRun, CommandOutcome, CommandOutput, CommandRunner from evidence to descendants
+
+// Temporary local guards forward to root enforcement in Plan 22 iteration 6.
+expose-test guardedChildProcess, SpawnAttempt, ProcessSpawnGuardError, spawnAttempts from "helpers/process-guard.ts" to descendants
