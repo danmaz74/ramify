@@ -69,8 +69,19 @@
         "H03",
         "H04"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness src/hooks/post-write.ts, src/tools/shell.ts and owner-local scheduling helpers/tests. Excludes shell-tests.ts, engineer-equipment.ts and run/service.ts."
+      "status": "accepted provider; lifecycle wiring remains iteration 10",
+      "writeBoundary": "Harness src/hooks/post-write.ts, src/tools/shell.ts and owner-local scheduling helpers/tests. Excludes shell-tests.ts, engineer-equipment.ts and run/service.ts.",
+      "receipt": "03-results.md",
+      "providerHead": "ce029705a219ec1ec402a3b084e8edc025f8514b",
+      "integratedHead": "2960af3c6b80800de31bbb79d2f2fbb8f193082c",
+      "integrationVerification": {
+        "ordinaryFiles": 5,
+        "ordinaryTests": 71,
+        "typeCheck": "passed",
+        "structure": "passed; partial analysis coverage",
+        "logs": "/tmp/ramify-plan23-integrated-hooks-*.log",
+        "repair": "Old engineer timeout prose assertion now verifies delivered current environment; corrected file 15/15 passed after 4 other files passed. Initial failure log retained."
+      }
     },
     {
       "id": "4",
@@ -96,7 +107,7 @@
         "C02",
         "C03"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness/plan-evidence catalog interface and tests; harness/scenarios form.ts and tests. Excludes prompt templates, focused command builder and run/service.ts."
     },
     {

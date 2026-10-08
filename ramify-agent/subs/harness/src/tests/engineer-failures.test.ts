@@ -200,8 +200,9 @@ describe('an engineer ended by a bound in the middle of a command', () => {
     const [, next] = role('engineer');
     const tool = next!.tools.find(candidate => candidate.name === shellToolName)!;
     expect((tool.inputSchema as { properties: { timeoutMs: { maximum: number } } }).properties.timeoutMs.maximum).toBe(1_200_000);
-    expect(next!.systemPrompt).toContain('at most 1200000 ms');
-    expect(role('engineer')[0]!.systemPrompt).toContain('at most 600000 ms');
+    expect(`${next!.systemPrompt}\n${next!.prompt}`).toMatch(/"commandTimeoutMs"\s*:\s*"?1200000"?/);
+    const initial = role('engineer')[0]!;
+    expect(`${initial.systemPrompt}\n${initial.prompt}`).toMatch(/"commandTimeoutMs"\s*:\s*"?600000"?/);
     // The larger timeout was accepted, and the command ran with it.
     expect(asked).toEqual([
       { command: 'npm run test:slow', timeoutMs: 600_000 },
