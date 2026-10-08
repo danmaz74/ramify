@@ -240,7 +240,9 @@
       "subs/harness/src/tests/single-session-fixture.ts",
       "subs/harness/src/tests/hook-checks.test.ts",
       "subs/harness/src/tests/helpers/hook-run-boundaries.ts",
-      "subs/harness/src/tests/nonfunctional-submissions.test.ts"
+      "subs/harness/src/tests/nonfunctional-submissions.test.ts",
+      "subs/harness/src/tests/helpers/nonfunctional-boundaries.ts",
+      "subs/harness/src/tests/plan13-composed-functional.test.ts"
     ],
     "11": [
       "subs/harness/src/run/service.ts",
