@@ -292,7 +292,8 @@
       "docs/plans/23-session-reuse-and-run-efficiency/iterations/12-results.md",
       "subs/web/src/tests/session-page.test.tsx",
       "subs/web/src/tests/session-timeline.test.tsx",
-      "subs/web/src/tests/sessions-page.test.tsx"
+      "subs/web/src/tests/sessions-page.test.tsx",
+      "subs/web/src/run-labels.tsx"
     ],
     "13": [
       "scripts/live-trial.ts",
