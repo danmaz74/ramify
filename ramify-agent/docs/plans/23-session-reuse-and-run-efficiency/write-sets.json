@@ -400,7 +400,9 @@
         "subs/harness/src/tests/check-findings-composition.test.ts",
         "subs/harness/src/tests/review-questions.test.ts",
         "subs/harness/src/tests/helpers/acceptance-flow.ts",
-        "subs/harness/src/tests/helpers/dependency-flow.ts"
+        "subs/harness/src/tests/helpers/dependency-flow.ts",
+        "subs/harness/src/tests/helpers/acceptance-boundaries.ts",
+        "subs/harness/src/tests/helpers/dependency-boundaries.ts"
       ],
       "agentTestWorker": [
         "subs/harness/subs/agent/src/tests/port-additions.test.ts",
