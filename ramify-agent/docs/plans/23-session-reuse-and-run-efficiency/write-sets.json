@@ -143,7 +143,8 @@
       "subs/harness/src/tests/session-lifecycle.test.ts",
       "subs/harness/src/tests/plan23-continuing-work.test.ts",
       "subs/harness/src/tests/single-session.test.ts",
-      "docs/plans/23-session-reuse-and-run-efficiency/iterations/08-results.md"
+      "docs/plans/23-session-reuse-and-run-efficiency/iterations/08-results.md",
+      "subs/harness/subs/agent/src/scripted.ts"
     ],
     "9": [
       "subs/harness/src/run/service.ts",
@@ -180,7 +181,9 @@
       "subs/harness/src/tests/hook-run-boundaries.test.ts",
       "subs/harness/src/tests/plan23-real-run-corrections.test.ts",
       "docs/plans/23-session-reuse-and-run-efficiency/iterations/10-results.md",
-      "subs/harness/src/analysis/submission.ts"
+      "subs/harness/src/analysis/submission.ts",
+      "subs/harness/src/tools/shell.ts",
+      "subs/harness/src/nonfunctional/prompts.ts"
     ],
     "11": [
       "subs/harness/src/run/service.ts",
