@@ -48,5 +48,6 @@ Baseline source is commit `19c9c3cf3a93f6927088302a539b71a565ab5d9c`.
 No full audit was run here; the coordinator owns final qualification and semantic
 preservation remains responsible-architect review. The new boundary path is a
 candidate for the later exact registry and is currently included by existing
-runner discovery. Current Plan21 adoption and inventory-consumer reconciliation
-will be recorded separately before delivery.
+runner discovery. The qualified branch then adopted concurrent Plan21 commit `292154763c95d5338405fad41c27dd06caefb914` through merge `aec0c0569a619ee13d2b1f3e4049cc7183c4c906`. Exactly three `composition.test.ts` inventory paths now point to the moved F1 test; their titles and union values and the concurrent CA08 corrections remain unchanged. A search found no other executable consumers of its old location. Historical Plan21 evidence keeps its original provenance.
+
+The reconciled focused four-file run passed all 31 cases with no skip, including all original guard cases, four strict controls and the complete composition file. Type-check passed all four scopes and check:self passed with 0 errors, 0 warnings and 313 analysis limits after Plan21 adoption (partial coverage). All 35 declared ordinary ownership queries were consumed, and the ordinary process-attempt assertions stayed zero. Exact reconciled commands, cases, durations and hashes are in [the reconciliation evidence](04-write-guard-reconciliation.json).
