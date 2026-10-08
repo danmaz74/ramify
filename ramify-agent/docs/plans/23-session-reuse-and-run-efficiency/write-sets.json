@@ -144,7 +144,8 @@
       "subs/harness/src/tests/plan23-continuing-work.test.ts",
       "subs/harness/src/tests/single-session.test.ts",
       "docs/plans/23-session-reuse-and-run-efficiency/iterations/08-results.md",
-      "subs/harness/subs/agent/src/scripted.ts"
+      "subs/harness/subs/agent/src/scripted.ts",
+      "subs/harness/src/tests/helpers/session-scenario.ts"
     ],
     "9": [
       "subs/harness/src/run/service.ts",
@@ -293,6 +294,11 @@
     "cucumber-config-path": [
       "subs/harness/src/work/focused-scenarios.ts",
       "subs/harness/src/tests/plan23-focused-scenarios.test.ts"
+    ],
+    "pi-native-request-artifact": [
+      "subs/harness/subs/agent/subs/pi/src/preservation.ts",
+      "subs/harness/subs/agent/subs/pi/module.ramify",
+      "subs/harness/subs/agent/subs/pi/src/tests/plan23-native-request-artifact.test.ts"
     ]
   }
 }
