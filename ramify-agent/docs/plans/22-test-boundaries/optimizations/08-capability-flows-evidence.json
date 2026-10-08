@@ -1,8 +1,8 @@
 {
   "base": "323bdc13460f8c003f7cf61e8fd7062a805bc55a",
   "implementationCommit": "1ecaf0d7",
-  "adoptedTarget": "cc27f03c80f8afe80010dd42cc9eae40d0dd5035",
-  "qualifiedRuntimeHead": "7a8acd3a182df62e860c28516e6f98a2164bb92f",
+  "adoptedTarget": "f2968d17fa2f0657112ef8edab474537473f964a",
+  "qualifiedRuntimeHead": "6d0dfd7f8f56cd834c5ee76d55b1d2193b254d93",
   "mapping": [
     {
       "oldFile": "subs/harness/src/tests/capability-assignments.test.ts",
@@ -412,8 +412,11 @@
     "subs/harness/src/tests/capability-flow-boundaries.test.ts": "e4cde01e4c1b680b7a8bfe1bdff8898f95317a65c559afaec3eebd807c3fcf21",
     "subs/harness/src/tests/helpers/capability-flow-boundaries.ts": "7424aaef964ea20424956a1c3a0094a33b30da8f57215877b04a83f71cc9a2b8",
     "subs/harness/src/run/service.ts": "e2f2d9cc075bea20f3f2d9f3f83d140fdb38333cde51b18e3b7a2d090802ba3f",
-    "subs/harness/src/tests/helpers/runs.ts": "302cd8f9e122d3889b24cc4ced9680051ee1b3221e4b8764956420e565a92754",
-    "subs/harness/src/tests/composition.test.ts": "fcbecda959bddbb597910ba5893d2914e31c6288205573fabb2f25bc042950cf"
+    "subs/harness/src/tests/helpers/runs.ts": "c51f36345334e0c5c301a86ea2957a2e98a32ef3657c2f0f358bc6f969f229f9",
+    "subs/harness/src/tests/composition.test.ts": "fcbecda959bddbb597910ba5893d2914e31c6288205573fabb2f25bc042950cf",
+    "subs/harness/src/tests/run-recovery.test.ts": "661d0989fea97d3f30f3578f2484face5b278112b5a5c6172747841310aadb60",
+    "subs/harness/src/tests/run-event-reader.test.ts": "7562c172c3d300b2c77dfda3e75a2fcb336ed170feb8d686d3593d3104073eab",
+    "subs/harness/src/tests/protocol-contract.test.ts": "fed573d71264c24ed614b664ce917506bab0df92c35060ee3ab1540148c702da"
   },
   "configurationHashes": {
     "package.json": "df8473368f6e34409bc6f7917ba183bda93db16cf2b75f8a561c42ab12c29551",
@@ -549,9 +552,9 @@
     "kind": "read-only installed Vitest discovery, not test acceptance"
   },
   "qualification": {
-    "focused": "47 passed, 0 failed, 0 skipped",
-    "typeCheck": "All four package scopes passed at reconciled source; /tmp/plan22-capability-flows-reconciled-types.log",
-    "moduleCheck": "0 errors, 0 warnings, 313 analysis limits; /tmp/plan22-capability-flows-reconciled-self.log",
+    "focused": "86 passed, 0 failed, 0 skipped, including qualification prerequisite controls and original recovery table",
+    "typeCheck": "Four scopes passed; /tmp/plan22-capability-flows-prerequisite-types.log",
+    "moduleCheck": "0 errors, 0 warnings, 313 analysis limits; /tmp/plan22-capability-flows-prerequisite-self.log",
     "preMergeFullNestedAudit": "Unrun by subagent; coordinator must execute before merge",
     "noProductionConfigurationOrPinChangeByOptimization": true
   },
@@ -562,5 +565,84 @@
     "sharedDaemonPid": 2225313,
     "testFixtureProcesses": "Ordinary processes refused; retained actual CA30 Git commands returned normally. No owned long-lived fixture process introduced."
   },
-  "performanceLimit": "Same host, evolving Plan21 source and concurrent type/module/workflow load. Focused file times vary: first passing ordinary sum 8.288 s; reconciled ordinary sum 17.345 s; baseline 20.011 s including 0.188 s actual CA30 case. No controlled full-audit speedup or timing gate claimed."
+  "performanceLimit": "Same host, evolving Plan21 source and concurrent type/module/workflow load. Focused file times vary: first passing ordinary sum 8.288 s; reconciled ordinary sum 17.345 s; baseline 20.011 s including 0.188 s actual CA30 case. No controlled full-audit speedup or timing gate claimed.",
+  "initialQualifiedRuntimeHead": "7a8acd3a182df62e860c28516e6f98a2164bb92f",
+  "qualificationPrerequisite": {
+    "commit": "6d0dfd7f8f56cd834c5ee76d55b1d2193b254d93",
+    "adoptedTarget": "f2968d17fa2f0657112ef8edab474537473f964a",
+    "failedBaseline": {
+      "artifact": "/tmp/plan22-opt08-adopted-baseline-failure.json",
+      "sha256": "4465f6a9b7b6068aa47f033cd0bf421669317aa78d48ef06a03a2570e47f14ae",
+      "sourceCommit": "cc27f03c80f8afe80010dd42cc9eae40d0dd5035",
+      "refs": {
+        "reportCommit": "e51b822e3688930f52245c1d9e4927a6c61839fa",
+        "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T07-15-03Z-cc27f03c8",
+        "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/ca0e4c808700ea36ba9031362178fdb7a4f6adcc"
+      },
+      "primaryFailures": [
+        "protocol-contract: absent required documentManifest",
+        "run-recovery: live polling parsed an incomplete trailing JSON line"
+      ],
+      "secondaryFailure": "Recovery fixture cleanup removed the directory before closing its active resumed service, racing writes and producing ENOTEMPTY.",
+      "protocolRepair": "Adopted only committed Plan21 repair0108a28d via targetf2968d17; did not copy unfinished edits."
+    },
+    "correction": {
+      "helper": "runEventsOnDisk reuses exposed readJsonLines after access preserves ENOENT; completed corrupt lines still fail and no file bytes are truncated.",
+      "cleanup": "run-recovery releases services before fixture removal and collects all cleanup/guard errors.",
+      "originalRecoveryCallbacksByteIdentical": true,
+      "tests": "Four new guarded controls: complete records, unfinished final append, corrupt completed record followed by valid records, missing-file refusal.",
+      "controlsFile": "subs/harness/src/tests/run-event-reader.test.ts",
+      "controlTitles": [
+        "the run event reader returns every complete written record without launching a process",
+        "the run event reader defers only the unfinished final append and leaves its bytes intact",
+        "the run event reader rejects a corrupt completed record even when valid records follow it",
+        "the run event reader preserves missing-file refusal instead of answering an empty run"
+      ],
+      "qualificationProseAmendment": "After the passing run, the control title and helper comment changed from durable/committed to written/complete; executable behavior is unchanged, per coordinator instruction."
+    },
+    "focused": {
+      "artifact": "/tmp/plan22-capability-flows-prerequisite.json",
+      "sha256": "36a63df560f6ec3ef347fa75c8026f57e6d83623cd01303530dd8aeab8dc6aaf",
+      "passed": 86,
+      "failed": 0,
+      "pending": 0,
+      "counts": {
+        "cut8AndComposition": 47,
+        "originalRecovery": 35,
+        "newReaderControls": 4
+      },
+      "fileSeconds": {
+        "subs/harness/src/tests/capability-assignments.test.ts": 3.617,
+        "subs/harness/src/tests/capability-consultation.test.ts": 0.837,
+        "subs/harness/src/tests/capability-delegation.boundary.test.ts": 0.283,
+        "subs/harness/src/tests/capability-delegation.test.ts": 5.436,
+        "subs/harness/src/tests/capability-flow-boundaries.test.ts": 0.025,
+        "subs/harness/src/tests/capability-submission.test.ts": 0.922,
+        "subs/harness/src/tests/composition.test.ts": 8.47,
+        "subs/harness/src/tests/run-event-reader.test.ts": 0.027,
+        "subs/harness/src/tests/run-recovery.test.ts": 15.858
+      }
+    },
+    "types": {
+      "passed": true,
+      "artifact": "/tmp/plan22-capability-flows-prerequisite-types.log",
+      "sha256": "cc20c8cd61ad65bc7bb1f956b6c3edae16121fe0425f7fd5894d9eb76fe49c3c"
+    },
+    "module": {
+      "passed": true,
+      "errors": 0,
+      "warnings": 0,
+      "analysisLimits": 313,
+      "artifact": "/tmp/plan22-capability-flows-prerequisite-self.log",
+      "sha256": "249aeff6f2a9e2b43caf23d7400fa017e2f9c69b9818590067c3e5b54471befe"
+    },
+    "configuredDiscovery": {
+      "artifact": "/tmp/plan22-capability-flows-prerequisite-discovery.json",
+      "sha256": "32dc4cd19c68be2fcc22e2fd2d5c2c5632ddb2d21dc45095ef2dec7348227e7f",
+      "files": 262,
+      "readerControlsSelected": true,
+      "kind": "read-only discovery"
+    },
+    "fullNestedPreMergeAudit": "Unrun by subagent; coordinator must audit this combined committed source before merging."
+  }
 }

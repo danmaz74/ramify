@@ -1,5 +1,8 @@
 # Optimization 8: capability flow external boundaries
 
+**Latest qualification:** committed prerequisite `6d0dfd7f` adopts target `f2968d17`
+and passes 86 focused cases. See the appended prerequisite evidence below.
+
 Implementation `1ecaf0d7`; base `323bdc13460f8c003f7cf61e8fd7062a805bc55a`. Adopted only committed Plan21
 `cc27f03c80f8afe80010dd42cc9eae40d0dd5035` in qualified runtime candidate `7a8acd3a182df62e860c28516e6f98a2164bb92f`. The coordinator must run
 the released full nested audit on the clean candidate before integration.
@@ -103,3 +106,47 @@ normally. Future discovery should use an owned endpoint.
 Global automatic process enforcement, runner partition and remaining consumer
 migrations remain future cuts. Full audit execution and responsible architect
 semantic review remain coordinator responsibilities.
+
+## Qualification prerequisite: complete log reads and settled fixture cleanup
+
+The coordinator preserved a released nested baseline failure at
+`/tmp/plan22-opt08-adopted-baseline-failure.json` (SHA-256
+`4465f6a9b7b6068aa47f033cd0bf421669317aa78d48ef06a03a2570e47f14ae`), source `cc27f03c`, report
+`e51b822e3688930f52245c1d9e4927a6c61839fa`. Its original recovery case
+“a crash after immutable analysis evidence is staged leaves no accepted analysis
+and a fresh run can use changed evidence” polled a live append-only log through
+`runEventsOnDisk`, which parsed an unfinished final JSON string. Cleanup then
+removed its fixture before closing the resumed service; ongoing blob writes
+produced a secondary `ENOTEMPTY` failure. These failures belong to the adopted
+baseline; the artifact remains a failed audit, not passing delivery evidence.
+
+The other baseline failure was the protocol fixture's missing documentManifest.
+Plan21 committed its repair in `0108a28d`; only committed target `f2968d17fa2f0657112ef8edab474537473f964a`
+was adopted. No unfinished target work was copied or edited.
+
+Coordinator-authorized test-only prerequisite `6d0dfd7f8f56cd834c5ee76d55b1d2193b254d93` changes the event-reader
+helper to reuse the ledger owner's already exposed `readJsonLines`. An existence
+check preserves the helper's `ENOENT` refusal. The reader defers an unterminated
+final append, rejects malformed newline-completed records, and leaves file bytes
+untouched. Recovery cleanup reverses ownership order, settling services before
+removing their fixtures, while collecting all cleanup and boundary-check errors.
+The entire original recovery test body section is byte-identical; its 35 cases,
+titles, assertions and timeouts remain unchanged.
+
+Four guarded controls in `subs/harness/src/tests/run-event-reader.test.ts` verify complete written records, both
+malformed and valid JSON tails without a newline, corruption of a completed line
+even when valid records follow, and missing-file refusal. Configured runner
+listing includes that file and selects 262 files. These controls make
+no Git or process calls. Reader completion does not establish crash durability.
+
+Focused qualification ran the previous seven cut8/composition files plus the
+complete recovery file and reader controls. Artifact
+`/tmp/plan22-capability-flows-prerequisite.json` passed **86 cases, zero failed or
+skipped**: 47 previous cut8/composition, 35 recovery and four new controls. All
+four type scopes passed; module check again reported zero errors/warnings and
+313 analysis limits. After that pass, the helper comment and one control title
+were corrected to say complete/written, without changing executable behavior.
+
+The full released pre-merge nested audit remains unrun by this subagent. The
+coordinator must execute it on the combined clean candidate after serializing
+with Plan21's active audit. No merge, target edit or push was performed.
