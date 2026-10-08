@@ -9,6 +9,7 @@
     "type-check": "tsc --noEmit && tsc --noEmit -p subs/web/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p scripts/browser-acceptance/tsconfig.json",
     "test": "vitest run",
     "check:self": "ramify check --batch --root .",
+    "test:scenarios": "NODE_OPTIONS='--import tsx' cucumber-js",
     "build:web": "NODE_ENV=production vite build --config subs/web/vite.config.ts",
     "dev:web": "vite --config subs/web/vite.config.ts",
     "serve": "tsx src/main.ts serve",

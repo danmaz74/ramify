@@ -1,5 +1,7 @@
 {
-  "ignorePaths": ["docs/**"],
+  "ignorePaths": [
+    "docs/**"
+  ],
   "checks": [
     {
       "id": "patch-integrity",
@@ -73,6 +75,33 @@
             ],
             "parser": "vitest",
             "timeoutMs": 1200000
+          }
+        ],
+        "continueOnFailure": true
+      },
+      "onFailure": "record",
+      "dependsOn": [
+        "agent-typecheck"
+      ]
+    },
+    {
+      "id": "agent-scenarios",
+      "name": "Ramify agent scenarios",
+      "description": "Run the agent's bound Cucumber scenarios under its committed not @ramify-pending profile",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "agent-cucumber",
+            "cmd": "npm",
+            "args": [
+              "run",
+              "test:scenarios"
+            ],
+            "parser": "cucumber",
+            "timeoutMs": 600000
           }
         ],
         "continueOnFailure": true
