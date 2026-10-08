@@ -6,7 +6,9 @@ inventory. **Owner:** harness/evidence.
 ## Goal
 
 Completed commands with no remaining target avoid the grace sleep; owned
-descendants still settle before the runner answers.
+descendants still receive wrapper cleanup and escalation. Actual-process checks
+observe settlement, including the existing cancellation path whose result may
+precede wrapper cleanup.
 
 ## Read first
 

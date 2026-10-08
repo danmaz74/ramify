@@ -13,7 +13,10 @@ continues to execute both suites, with no loss of configured coverage.
 
 Production commands that have already exited and left no descendants incur no
 cleanup grace sleep. Commands that leave descendants, time out, are cancelled
-or exceed output limits still settle their owned processes before returning.
+or exceed output limits retain wrapper cleanup and escalation. Actual-process
+checks observe settlement of owned processes. Qualification confirmed that the
+existing cancellation result can precede wrapper cleanup; this optimization
+preserves that behavior and does not claim synchronous settlement on cancellation.
 
 ## Basis and current state
 
