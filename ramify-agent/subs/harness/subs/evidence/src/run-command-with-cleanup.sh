@@ -18,13 +18,17 @@ cleanup_child() {
   local pid="${1:-}"
   if [ -z "$pid" ]; then return; fi
   if [ "$KILL_MODE" = "group" ]; then
-    kill -TERM -- "-$pid" 2>/dev/null || true
-    sleep 0.2
-    kill -KILL -- "-$pid" 2>/dev/null || true
+    # The leader may have exited while its descendants still own the group.
+    # Signal the group itself; a missing target needs no grace period.
+    if kill -TERM -- "-$pid" 2>/dev/null; then
+      sleep 0.2
+      kill -KILL -- "-$pid" 2>/dev/null || true
+    fi
   else
-    kill -TERM "$pid" 2>/dev/null || true
-    sleep 0.2
-    kill -KILL "$pid" 2>/dev/null || true
+    if kill -TERM "$pid" 2>/dev/null; then
+      sleep 0.2
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
   fi
 }
 
