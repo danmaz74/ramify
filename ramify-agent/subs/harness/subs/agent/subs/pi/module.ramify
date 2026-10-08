@@ -4,3 +4,5 @@ module pi
 // The port's implementation on pi. The pi package, its session format and its
 // login stay behind this boundary; nothing else in the project imports pi.
 expose-src createPiAgent, piReadiness, PiAgentOptions from "pi-agent.ts" to parent
+
+expose-src piBuiltinDeclarations from "session-operations.ts" to parent

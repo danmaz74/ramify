@@ -3,6 +3,10 @@ import type { AgentEvent, ContextPolicy, GuardedCall, GuardDecision, JsonSchema,
 export type AgentSessionId = string;
 export type SessionOperationId = string;
 export type TranscriptPayloadId = string;
+/** Provider history cannot safely be resumed. Historic settled points remain valid. */
+export class SessionDriverUnavailableError extends Error {
+  constructor(reason: string) { super(reason); this.name = 'SessionDriverUnavailableError'; }
+}
 export interface AgentSessionPoint { readonly sessionId: AgentSessionId; readonly kind: 'turn' | 'checkpoint'; readonly turn: number; readonly checkpoint: string }
 export interface SessionOperationKey { readonly runId: string; readonly operationId: SessionOperationId }
 export interface SessionLineage { readonly sessionId: AgentSessionId; readonly parent: AgentSessionPoint | null; readonly currentPoint: AgentSessionPoint }

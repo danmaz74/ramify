@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSessionOperations } from '../session-operations.js';
+import { SessionDriverUnavailableError } from '../interfaces/session-operations.js';
 import { createScriptedAgent, createScriptedSessionDriver } from '../scripted.js';
 import type { AgentSessionPoint, ContinueSessionInput, SessionExecutionBindings, SessionExecutionPolicy, SessionOperationDriver, SessionStore, SessionStoreRecord, SessionTaskInput, SessionToolDeclaration } from '../interfaces/session-operations.js';
 
@@ -34,6 +35,17 @@ function continuation(sessionId: string, expectedPoint: AgentSessionPoint, opera
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
 
 describe('Plan 23 F1 high-level session operations', () => {
+  it('durably fences typed unavailable provider history while leaving historic settled points forkable', async () => {
+    let dispatches = 0; const store = memoryStore();
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; throw new SessionDriverUnavailableError('Opaque request prefix is corrupt'); } } });
+    const P = await operations.create(create);
+    const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'unsafe'))).receipt;
+    expect(end).toMatchObject({ status: 'unavailable', point: null, reason: 'Opaque request prefix is corrupt' });
+    const rebuilt = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    expect(await (await rebuilt.retry({ runId: 'run-A', operationId: 'unsafe', bindings: bindings() })).receipt).toEqual(end);
+    expect(await rebuilt.inspect('run-A', P.sessionId)).toBeNull(); expect(dispatches).toBe(1);
+    expect((await rebuilt.fork({ runId: 'run-A', operationId: 'safe-old', sourcePoint: P.point! })).status).toBe('completed');
+  });
   it('S01/S02 retains exact role, turn/checkpoint lineage and isolated siblings', async () => {
     const store = memoryStore(); let dispatches = 0;
     const driver: SessionOperationDriver = { dispatch: async (input, runtime) => { dispatches++; expect(input.session.initialInstructions).toBe('Role A\nGeneral task protocol.'); return createScriptedSessionDriver([{ kind: 'submit', input: { orientation: 'A' } }]).dispatch(input, runtime); } };

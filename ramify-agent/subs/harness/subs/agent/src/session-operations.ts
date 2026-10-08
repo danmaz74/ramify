@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { SessionDriverUnavailableError } from './interfaces/session-operations.js';
 import type { GuardedCall, SessionOutcome, SubmissionVerdict, ToolResult } from './interfaces/port.js';
 import type {
   AgentSessionPoint, AgentSessionSnapshot, ContinueSessionInput, SessionEffectRecord, SessionExecutionBindings,
@@ -59,7 +60,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     return { record: found, body };
   }
   async function verifyPayloads(snapshot: Snapshot): Promise<void> {
-    for (const entry of snapshot.transcript) if (await store.getPayload(entry.payloadId) === null) throw new Error(`Unavailable transcript payload ${entry.payloadId}`);
+    for (const entry of snapshot.transcript) if (await store.getPayload(entry.payloadId) === null) throw new SessionDriverUnavailableError(`Unavailable transcript payload ${entry.payloadId}`);
   }
   function receipt(key: SessionOperationKey, sessionId: string, status: SessionOperationReceipt['status'], reason: string | null, point: AgentSessionPoint | null = null, outcome: SessionOutcome | null = null, turn: number | null = null): SessionOperationReceipt {
     return { runId: key.runId, operationId: key.operationId, sessionId, status, reason, point, outcome, turn };
@@ -140,7 +141,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         snapshot = prepare(loaded.body.snapshot, input.additions, input.toolChange);
         if (!snapshot.activeTools.includes(input.task.submissionTool)) throw new Error('Designated submission tool is inactive');
         snapshot = { ...snapshot, policy: clone(input.policy), activeOperation: input.operationId, transcript: [...snapshot.transcript, await payload(`prepare:${input.operationId}`, frozen)] };
-      } catch (error) { return completedHandle(receipt(input, input.sessionId, 'conflict', errorText(error))); }
+      } catch (error) { return completedHandle(receipt(input, input.sessionId, error instanceof SessionDriverUnavailableError ? 'unavailable' : 'conflict', errorText(error))); }
       const op: OperationBody = { kind: 'continue', input: frozen, sessionId: input.sessionId, snapshot, effects: [], provider: [], owner: null, phase: 'intent', receipt: null };
       const committed = await store.commit({ runId: input.runId, expected: [{ id: operationRecordId(input.operationId), revision: null }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(input, operationRecordId(input.operationId), 1, op, false), record(input, loaded.record.id, loaded.record.revision + 1, { ...loaded.body, snapshot }, true)], payloads: snapshot.transcript.map(entry => entry.payloadId) });
       if (committed.kind === 'conflict') return completedHandle(await terminalDuplicate(input, frozen) ?? receipt(input, input.sessionId, 'conflict', committed.reason));
@@ -171,7 +172,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
       if (!loaded) return null;
       const snapshot = expectedPoint ? loaded.body.points.find(item => equal(item.currentPoint, expectedPoint)) : loaded.body.snapshot;
       if (!snapshot || !snapshot.available) return null;
-      await verifyPayloads(snapshot);
+      try { await verifyPayloads(snapshot); } catch (error) { if (error instanceof SessionDriverUnavailableError) return null; throw error; }
       return clone(snapshot);
     },
   };
@@ -183,7 +184,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     if (loaded.body.snapshot.activeOperation !== null || !equal(input.expectedPoint, loaded.body.snapshot.currentPoint)) return receipt(input, input.sessionId, 'conflict', 'Expected point is stale or session active');
     let snapshot: Snapshot;
     try { await verifyPayloads(loaded.body.snapshot); snapshot = prepare(loaded.body.snapshot, additions, toolChange); }
-    catch (error) { return receipt(input, input.sessionId, 'conflict', errorText(error)); }
+    catch (error) { return receipt(input, input.sessionId, error instanceof SessionDriverUnavailableError ? 'unavailable' : 'conflict', errorText(error)); }
     snapshot = { ...snapshot, currentPoint: point(input.sessionId, snapshot.currentPoint.turn, 'checkpoint'), transcript: [...snapshot.transcript, await payload(`${kind}:${input.operationId}`, frozen)] };
     return commitSimple(input, frozen, kind, snapshot, loaded, null);
   }
@@ -204,16 +205,16 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     if (committed.kind === 'conflict') throw new Error(committed.reason);
     return body;
   }
-  async function settle(key: SessionOperationKey, outcome: SessionOutcome, reason: string | null = null): Promise<SessionOperationReceipt> {
+  async function settle(key: SessionOperationKey, outcome: SessionOutcome, reason: string | null = null, unavailable = false): Promise<SessionOperationReceipt> {
     const op = await readOperation(key); if (!op) throw new Error('Missing operation intent');
     if (op.body.receipt) return clone(op.body.receipt);
     const loaded = await readSession(key.runId, op.body.sessionId); if (!loaded) throw new Error('Missing active session');
     const uncertain = op.body.effects.some(effect => effect.phase === 'intent');
     const interruptedProvider = outcome.kind === 'stopped' && op.body.phase === 'dispatched';
-    const available = !uncertain && !interruptedProvider;
+    const available = !unavailable && !uncertain && !interruptedProvider;
     const currentPoint = point(op.body.sessionId, op.body.snapshot.currentPoint.turn + 1, 'turn');
     const snapshot: Snapshot = { ...op.body.snapshot, currentPoint, transcript: [...op.body.snapshot.transcript, ...op.body.provider], activeOperation: null, available };
-    const status = outcome.kind === 'stopped' ? 'stopped' : uncertain ? 'unavailable' : outcome.kind === 'failed' ? 'failed' : 'completed';
+    const status = unavailable ? 'unavailable' : outcome.kind === 'stopped' ? 'stopped' : uncertain ? 'unavailable' : outcome.kind === 'failed' ? 'failed' : 'completed';
     const result = receipt(key, op.body.sessionId, status, uncertain ? 'External effect completion unknown; point unavailable' : interruptedProvider ? 'Provider completion interrupted; point unavailable' : reason, available ? currentPoint : null, outcome, currentPoint.turn);
     const terminal: OperationBody = { ...op.body, phase: 'terminal', receipt: result };
     const committed = await store.commit({ runId: key.runId, expected: [{ id: op.record.id, revision: op.record.revision }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(key, op.record.id, op.record.revision + 1, terminal, false), record(key, loaded.record.id, loaded.record.revision + 1, { snapshot, points: available ? [...loaded.body.points, snapshot] : loaded.body.points }, true)], payloads: snapshot.transcript.map(item => item.payloadId) });
@@ -371,7 +372,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
               }, owner.token));
               return id;
             },
-            async readPayload(id) { const bytes = await store.getPayload(id); if (bytes === null) throw new Error(`Missing provider payload ${id}`); return bytes; },
+            async readPayload(id) { const bytes = await store.getPayload(id); if (bytes === null) throw new SessionDriverUnavailableError(`Missing provider payload ${id}`); return bytes; },
             onEvent(event) { if (!stopped && liveOwnerTokens.has(owner.token)) bindings.onEvent(event); },
           });
           // A provider cannot claim acceptance it never durably obtained from the current validator.
@@ -388,7 +389,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         resolveReceipt(value);
       } catch (error) {
         if (stopped) return;
-        try { const value = await serial(() => settle(key, { kind: 'failed', error: errorText(error) }, errorText(error))); resolveReceipt(value); }
+        try { const value = await serial(() => settle(key, { kind: 'failed', error: errorText(error) }, errorText(error), error instanceof SessionDriverUnavailableError)); resolveReceipt(value); }
         catch (storageError) { rejectReceipt(storageError); }
       } finally { liveOwnerTokens.delete(owner.token); ownerControllers.delete(owner.token); active.delete(activeKey(key)); }
     })();

@@ -1,3 +1,5 @@
+import { createPiSessionOperations } from './session-operations.js';
+import type { SessionStore } from '../../../src/interfaces/session-operations.js';
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -97,6 +99,7 @@ type PiThinkingLevel = NonNullable<ReturnType<typeof resolveCliModel>['thinkingL
 interface ChosenModel { readonly model: PiModel; readonly thinkingLevel: PiThinkingLevel | undefined }
 
 export interface PiAgentOptions {
+  readonly sessionStore?: SessionStore | undefined;
   /**
    * The model as pi's `--model` accepts it, such as `anthropic/claude-opus-4-5`,
    * optionally with a thinking level, such as `openai-codex/gpt-5.6-sol:high`.
@@ -118,6 +121,8 @@ export interface PiAgentOptions {
 
 /** How this adapter reaches pi's models; tests supply a runtime with a scripted provider. */
 export interface PiRuntimeSource {
+  readonly sessionStore?: SessionStore | undefined;
+  readonly preservingExtensions?: NonNullable<ConstructorParameters<typeof DefaultResourceLoader>[0]>['extensionFactories'];
   readonly agentDirectory: string;
   readonly model?: string | undefined;
   readonly settleMs?: number | undefined;
@@ -133,6 +138,7 @@ export function createPiAgent(options: PiAgentOptions = {}): AgentPort {
   let runtime: Promise<ModelRuntime> | undefined;
   return createPiAgentOn({
     agentDirectory,
+    sessionStore: options.sessionStore,
     model: options.model,
     settleMs: options.settleMs,
     compaction: options.compaction,
@@ -167,6 +173,8 @@ export function createPiAgentOn(source: PiRuntimeSource): AgentPort {
   const live = new Map<string, PiSession>();
   return {
     name: 'pi',
+    sessionOperations: source.sessionStore ? createPiSessionOperations(source, source.sessionStore) : null,
+    bindSessionStore: sessionStore => createPiSessionOperations(source, sessionStore),
     support: piSupport,
     startSession: spec => startPiSession(spec, source, live),
     appendContext: (ref, key, text) => appendPiContext(live, ref, key, text),
@@ -264,7 +272,7 @@ function openSessionManager(spec: SessionSpec): { readonly manager: SessionManag
  * returned beside the model so the session can be started with it. Dropping
  * it would run the model at pi's default level while the request named another.
  */
-async function chooseModel(runtime: ModelRuntime, requested: string | undefined): Promise<ChosenModel> {
+export async function chooseModel(runtime: ModelRuntime, requested: string | undefined): Promise<ChosenModel> {
   if (requested !== undefined) {
     const resolved = resolveCliModel({ cliModel: requested, modelRuntime: runtime });
     if (resolved.error !== undefined || resolved.model === undefined) throw new Error(resolved.error ?? `pi does not know the model "${requested}"`);
