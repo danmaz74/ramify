@@ -2,8 +2,8 @@
   "optimization": 13,
   "title": "Automatic ordinary process guard and configured native partition",
   "base": "9be12ee55385490e9db45f923b7b9f517d3a27d7",
-  "coreSource": "06d833cfaf5c8a2cb325ce448a36c38b2e03d9bf",
-  "coreTree": "21b61c1fc2de8e2d891d42ccd0af8a4fe80605d1",
+  "coreSource": "49ebd333c1edaf2df1aa17c96c227f3784d0a766",
+  "coreTree": "a5e2d6ebfa709d99b9f8c413d411a57e925a87f4",
   "installedVersions": {
     "ramify.ts": "0.4.1",
     "ramify-audit": "0.7.2",
@@ -235,7 +235,8 @@
           "status": "passed",
           "durationSeconds": 0.066
         }
-      ]
+      ],
+      "qualifiedSource": "06d833cfaf5c8a2cb325ce448a36c38b2e03d9bf"
     },
     "fourCompilerScopes": "passed",
     "selfCheck": {
@@ -243,8 +244,59 @@
       "warnings": 0,
       "analysisLimits": 313
     },
-    "fullNestedPremergeAudit": "Previous953ab FAILED with twelve ordinary process violations; re-audit of repaired core UNRUN, required coordinator gate",
-    "integration": "UNRUN: required after premerge audit"
+    "fullNestedPremergeAudit": "Both prior candidate audits FAILED and retained; next audit of repaired49eb core UNRUN, required coordinator gate",
+    "integration": "UNRUN: required after premerge audit",
+    "postMaterializerQualification": {
+      "source": "49ebd333c1edaf2df1aa17c96c227f3784d0a766",
+      "passed": 33,
+      "failed": 0,
+      "method": "Sequential scope qualification: composition11 after exact historical mapping; native5 and SDK17 from retained mixed batch. Not a claimed single33pass run.",
+      "composition": {
+        "passed": 11,
+        "failed": 0,
+        "artifact": "/tmp/plan22-opt13-post-materializer-composition.json"
+      },
+      "nativeProjectBoundary": {
+        "passed": 5,
+        "failed": 0,
+        "artifact": "/tmp/plan22-opt13-post-materializer-focused.json",
+        "cases": [
+          {
+            "title": "marked root, four inert owned docs extensions and analyzed scripts use current ownership identity",
+            "milliseconds": 37169.230745
+          },
+          {
+            "title": "an invocation from a nested module selects the marked project and both API source areas",
+            "milliseconds": 84757.077238
+          },
+          {
+            "title": "an unmarked explicit target is refused before analysis",
+            "milliseconds": 155.0338699999993
+          },
+          {
+            "title": "auxiliary source is analyzed and a hidden child import is denied",
+            "milliseconds": 1021.5468600000022
+          },
+          {
+            "title": "excluded-only exits 0 and 1, mixed, cold and deadline exit 2, source deletion, an auxiliary boundary violation, a scratch warning and configuration",
+            "milliseconds": 3435.685467999996
+          }
+        ]
+      },
+      "sdkAdapter": {
+        "passed": 17,
+        "failed": 0,
+        "artifact": "/tmp/plan22-opt13-post-materializer-focused.json"
+      },
+      "fourCompilerScopes": "passed",
+      "selfCheck": {
+        "errors": 0,
+        "warnings": 0,
+        "analysisLimits": 313
+      },
+      "publicCollectedCaseCount": 2088,
+      "publicCaseIdentitiesUnchanged": true
+    }
   },
   "discovery": {
     "totalFiles": 282,
@@ -14329,7 +14381,16 @@
       "startTime": 1791456141580,
       "finishTime": 1791456175095.5166,
       "ordinaryControlChildrenHaveZeroAllowedCalls": true,
-      "countLimits": "API observations include failed launches and Node exec delegation; descendant processes are not recursively traced. Owned native materializer endpoint lifecycle uses privateRamify.dispose; all observed worker PIDs gone."
+      "countLimits": "API observations include failed launches and Node exec delegation; descendant processes are not recursively traced. Owned native materializer endpoint lifecycle uses privateRamify.dispose; all observed worker PIDs gone.",
+      "qualifiedSource": "06d833cfaf5c8a2cb325ce448a36c38b2e03d9bf"
+    },
+    "secondFullAuditOrdinaryEvidence": {
+      "source": "5eeef65b",
+      "report": "980175ce27bd9f273ec8a9d71305a0a657b9ed9e",
+      "files": 234,
+      "allowed": 0,
+      "refused": 0,
+      "receipt": "13-second-failed-audit.json"
     }
   },
   "boundaryRegistry": {
@@ -14861,7 +14922,8 @@
     "ramify-agent/AGENTS.md": "6cc191b493590ace9d1f1deb979c5271bd00c55029b8a90448b99a3a4f27a6fa",
     "ramify-agent/docs/README.md": "299fdff3891b193ad974643f777d4b2fc68269c99d25d61e701f0724b70d9088",
     "ramify-agent/docs/architecture/acceptance-scenarios.md": "8dde8836729417e744a8a8bbadec2c9ba48afa254ba6793b8e6cb5f7b7abe4aa",
-    "ramify-agent/docs/plans/22-test-boundaries/guard-investigation-notes.md": "649b5621ef97cc52e0ac964d361f53132e8d5e77a85833fe2d6e13bb856aacac",
+    "ramify-agent/docs/plans/03-autonomous-implementation-loop/acceptance-evidence.json": "118ea8cab34d72863ae3a80373c90bf09accee1bdc1a0710e235239f958c176a",
+    "ramify-agent/docs/plans/22-test-boundaries/guard-investigation-notes.md": "8f135f21f875fb0dfa121b6e2ad7f05c0156462686c81aa0f39b439d8c916a06",
     "ramify-agent/docs/testing.spec.md": "dd462665e9bb14fce8280495ca091b5ab7f3b27261c28a8581f476aeb2b2032e",
     "ramify-agent/module.ramify": "a994aaefba9e5d76d893c3fd8886c6f95482137db0633e31c3d937f5f2b92e1b",
     "ramify-agent/package.json": "4dbe09066b1a065dfffc87f1b24bec95d8741220e548fce987800593381bd7cb",
@@ -14882,6 +14944,7 @@
     "ramify-agent/subs/harness/src/tests/breaking-work-fixture.ts": "67d4c9509cb43d5c28d2fddd576ae777e62149df29a07f204ae1b13c1661eee2",
     "ramify-agent/subs/harness/src/tests/breaking-work.boundary.test.ts": "5cb6d6cd3fb9ce0b662302c118d2eb03bb11ec86c0a42936839c48ad7149c425",
     "ramify-agent/subs/harness/src/tests/breaking-work.test.ts": "078ea2ffce0a3fd73e02a77e792b0b60bee711b58df4ab660238fd75bf2193fa",
+    "ramify-agent/subs/harness/src/tests/composition.test.ts": "200884a5eb41fdb35e5b406390c25bd6215900edf197096f74e94d10893ab6d1",
     "ramify-agent/subs/harness/src/tests/engineer-api-preparation.boundary.test.ts": "e0fed68baea740c5e4fded7dba1fdf24d26582a6045d5ed478379bdafb7c0603",
     "ramify-agent/subs/harness/src/tests/engineer-api-preparation.test.ts": "13d89060902c9d88855f20d06c996580c3e7d2ea2f4feb8f51f956627aa54790",
     "ramify-agent/subs/harness/src/tests/external-boundaries.test.ts": "46df65aaadece45836d25a9d8ba90f0d98e70fe629edf4829ea31e0b2164108d",
@@ -14900,7 +14963,7 @@
     "ramify-agent/subs/harness/src/tests/scratch-setup.test.ts": "61ad91384100f6edd4c8d2d7d69cbee2c79187e274ff322e60edaed18967415c",
     "ramify-agent/subs/harness/src/tests/scripted-transports.test.ts": "e15d2298ad17173cf3f1cf633bd3ccb49da580a93908d7331f7cf036ef32e91d",
     "ramify-agent/subs/harness/src/tests/tree-identity.test.ts": "eb4cc0b38236b8339b417d3128cdf832f1d2874f37ddd04562101534236590bd",
-    "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/helpers/scripted-grep.ts": "9f0409146211892a8241296c14656c1693f4966685f9182b039af618df7dea22",
+    "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/helpers/scripted-grep.ts": "0b1e43362809f8cc2fc35ff3987f23d984de6d3a88e2a9835d42b6be8baea72d",
     "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/pi-agent.test.ts": "980b1a866c6be1d23486931b6687bff1fec1fad506fd27df4d2f7e4d14c297f5",
     "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/transcript-content.test.ts": "c3c18cf9d0c4f2147d7c852fccd93c18ad7e59ba11c9652c388d9053eea3583b",
     "ramify-agent/subs/harness/subs/evidence/src/tests/measure.test.ts": "5434ecf04d2ce0733c86fc4fd88800b3807e348c9b441637c40193d8a072db1c",
@@ -14950,6 +15013,18 @@
     {
       "artifact": "/tmp/plan22-opt13-repaired-qualified-focused.log before correction",
       "outcome": "Authoring validation rejected empty optional owningCases when public collection omitted wholly skipped trials. Original optional source titles retained; final qualification passed."
+    },
+    {
+      "artifact": "13-second-failed-audit.json",
+      "outcome": "Three failures: two current composition metadata references and actual materializer signature-printer panic; all234ordinary files have zero process calls."
+    },
+    {
+      "artifact": "/tmp/plan22-opt13-materializer-repro.json",
+      "outcome": "Exact observed native materializer panic reproduced before named signature correction."
+    },
+    {
+      "artifact": "/tmp/plan22-opt13-post-materializer-focused.json",
+      "outcome": "30passed3failed: two original5s threshold composition failures under observed concurrent compute, and one residual historical filename assertion. Native5/SDK17 passed; failures retained with full messages in secondAuditRepair."
     }
   ],
   "remaining": [
@@ -15014,7 +15089,14 @@
     "self": "/tmp/plan22-opt13-repaired-final-self.json",
     "discoveryPrefix": "/tmp/plan22-opt13-repaired-",
     "migration": "/tmp/plan22-opt13-repaired-migration.json",
-    "processes": "/tmp/plan22-opt13-repaired-processes.json"
+    "processes": "/tmp/plan22-opt13-repaired-processes.json",
+    "postMaterializerQualification": {
+      "mixedBatch": "/tmp/plan22-opt13-post-materializer-focused.json",
+      "composition": "/tmp/plan22-opt13-post-materializer-composition.json",
+      "types": "/tmp/plan22-opt13-post-materializer-final-types.log",
+      "self": "/tmp/plan22-opt13-post-materializer-final-self.json",
+      "cases": "/tmp/plan22-opt13-post-materializer-cases.json"
+    }
   },
   "previousQualification": {
     "source": "cb5b4b2d8a85d27511e8af010718b8f123c32d06",
@@ -15166,5 +15248,74 @@
     ],
     "controls": "Two isolated finite transport controls prove caught unknown/exhausted/unused command and candidate replies remain failures; no automatic guard optout."
   },
-  "sourceHashesQualification": "Hashes at core source before documentation-only receipt commit; core tree binds all tracked content."
+  "sourceHashesQualification": "Hashes at core source before documentation-only receipt commit; core tree binds all tracked content.",
+  "secondAuditRepair": {
+    "auditSource": "5eeef65bb86b76319a36232513e15f7a6093702c",
+    "report": "980175ce27bd9f273ec8a9d71305a0a657b9ed9e",
+    "receipt": "13-second-failed-audit.json",
+    "all234OrdinaryFilesAllowedCalls": 0,
+    "all234OrdinaryFilesRefusedCalls": 0,
+    "ordinaryBehavior": "No runtime or guard behavior changed by this correction. SDK namespace parameter replaced with small named three-method interface and explicit result/void types; current K6/K7 metadata updated.",
+    "beforeAfterCompilerProof": {
+      "beforeArtifact": "/tmp/plan22-opt13-materializer-repro.json",
+      "beforeFailed": 1,
+      "samePanic": "TSGo GetEmitModuleFormatOfFile received nil SourceFile through signature printer",
+      "afterArtifact": "/tmp/plan22-opt13-materializer-named-types.json",
+      "afterPassed": 1,
+      "nonselectedCases": 4,
+      "fullNativeFilePassed": true,
+      "noPinTimeoutSkipOrToolkitChanges": true
+    },
+    "historicalOwnershipTranslation": {
+      "file": "subs/harness/src/tests/composition.test.ts",
+      "tableLine": 1173,
+      "applyLine": 1197,
+      "title": "every case has exactly one owning iteration, and its owning tests are present by name and belong to that iteration",
+      "exactMappings": {
+        "K6": {
+          "breaking-work.test.ts": "breaking-work.boundary.test.ts"
+        },
+        "K7": {
+          "breaking-work.test.ts": "breaking-work.boundary.test.ts"
+        }
+      },
+      "guardedChangeReferenceLine": 743,
+      "everyOtherOwnershipCheckPreserved": true,
+      "ordinaryBreakDiscoveredRetained": true,
+      "historicalReceiptsUnchanged": true
+    },
+    "retainedMixedBatch": {
+      "artifact": "/tmp/plan22-opt13-post-materializer-focused.json",
+      "passed": 30,
+      "failed": 3,
+      "skipped": 0,
+      "failures": [
+        {
+          "title": "a rejected iteration cannot send its unauthorized dirty file through a later work-item or final committing checkpoint",
+          "fullName": "the composed runs a rejected iteration cannot send its unauthorized dirty file through a later work-item or final committing checkpoint",
+          "milliseconds": 5053.372874000004,
+          "failureMessages": [
+            "Error: STACK_TRACE_ERROR\n    at task (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1784:27)\n    at Object.<anonymous> (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1817:16)\n    at Object.<anonymous> (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1563:28)\n    at chain (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:599:14)\n    at /home/app/ramify-plan22-automatic-test-boundaries/ramify-agent/subs/harness/src/tests/composition.test.ts:144:3\n    at file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1889:40\n    at runWithSuite (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:2258:8)\n    at Object.collect (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1889:10)\n    at Object.collect (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1893:54)\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        },
+        {
+          "title": "PB3: equal captured bytes, feature tampering and later render aliases cannot bypass the actual committing gate",
+          "fullName": "the composed runs PB3: equal captured bytes, feature tampering and later render aliases cannot bypass the actual committing gate",
+          "milliseconds": 5000.509909,
+          "failureMessages": [
+            "Error: STACK_TRACE_ERROR\n    at task (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1784:27)\n    at Object.<anonymous> (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1817:16)\n    at Object.<anonymous> (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1563:28)\n    at chain (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:599:14)\n    at /home/app/ramify-plan22-automatic-test-boundaries/ramify-agent/subs/harness/src/tests/composition.test.ts:175:3\n    at file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1889:40\n    at runWithSuite (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:2258:8)\n    at Object.collect (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1889:10)\n    at Object.collect (file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1893:54)\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        },
+        {
+          "title": "every case has exactly one owning iteration, and its owning tests are present by name and belong to that iteration",
+          "fullName": "the acceptance matrix, composed every case has exactly one owning iteration, and its owning tests are present by name and belong to that iteration",
+          "milliseconds": 44.29392199999711,
+          "failureMessages": [
+            "AssertionError: expected [ \u2026(2) ] to deeply equal []\n    at /home/app/ramify-plan22-automatic-test-boundaries/ramify-agent/subs/harness/src/tests/composition.test.ts:1231:22\n    at file:///ramify/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ]
+        }
+      ],
+      "timingContext": "Two unchanged composition runtime cases failed at the original5s threshold (5053.373ms/5000.510ms) while our native materializer and an independently observed MAIN multi-file Vitest run were active. Timing is consistent with contention; causation was not isolated experimentally. Composition11 passed alone afterward with unchanged bounds. The third failure was the remaining historical results-note filename reference, corrected with the exact K6/K7 map."
+    }
+  }
 }

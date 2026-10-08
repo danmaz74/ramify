@@ -1,9 +1,9 @@
 # Optimization 13: automatic ordinary test boundaries
 
 **Status:** repaired focused qualification passed; the coordinator's next full
-nested premerge audit and safe integration remain required. Core source
-`06d833cfaf5c8a2cb325ce448a36c38b2e03d9bf`, tree
-`21b61c1fc2de8e2d891d42ccd0af8a4fe80605d1`. Fresh base
+nested premerge audit and safe integration remain required. Current core source
+`49ebd333c1edaf2df1aa17c96c227f3784d0a766`, tree
+`a5e2d6ebfa709d99b9f8c413d411a57e925a87f4`. Fresh base
 `9be12ee55385490e9db45f923b7b9f517d3a27d7`; adopted committed MAIN advance
 `b23db328ae94136d0bab51dccf6a9f2f1946345f` remains preserved in all ten files.
 
@@ -42,7 +42,7 @@ unchanged source cases that public collection omits; aggregate execution should
 therefore report 2,090 cases including those skips. No new skip, retry, timeout,
 pin or audit selection change was introduced.
 
-Final combined qualification: **255 passed, zero failed, two existing optional
+Earlier combined qualification of core `06d833cf`: **255 passed, zero failed, two existing optional
 skips**, across 36 focused files, in 33.516 s. It includes all twelve repaired
 files, their dedicated native files, 34 guard/runner controls, the two transport
 controls, migrated acceptance/dependency/recovery/hook/readiness/settlement,
@@ -67,3 +67,48 @@ The gain is guarded ordinary selection separate from actual tool/kernel
 witnesses. No controlled aggregate speedup is claimed. The next released full
 nested audit remains **UNRUN**; the coordinator must pass it before merging and
 complete final inventory, timing and architect preservation qualification.
+
+
+## Second full audit and final correction
+
+The second full audit of `5eeef65b` failed after 371.133 s; its
+[complete receipt](13-second-failed-audit.md) retains all three failures.
+All **234 ordinary files recorded zero allowed and zero refused launches**.
+Two composition metadata checks still named moved K6/K7 groups. Current
+acceptance metadata and the guarded-change reference now name the boundary
+file. An exact K6/K7-only translation reads the historical results notes at
+`composition.test.ts:1173` and applies at `:1197`; every other ownership check
+and the ordinary break-discovered reference remain intact. Historical receipts
+are unchanged.
+
+The native full-project materializer failure reproduced before editing with
+the same TSGo nil-SourceFile signature-printer panic. The helper's whole SDK
+namespace parameter became a small named three-method interface, with explicit
+session-result and void returns. The exact native case passed afterward, then
+all five real project-boundary/materializer cases passed with original limits;
+the nested invocation took 84.757 s in the concurrent batch. No toolkit,
+production behavior, pin, timeout or skip changes were made.
+
+That mixed batch retained **30 passed and three failed**. Two unchanged
+composition runtime cases failed at their original five-second threshold:
+“a rejected iteration cannot send its unauthorized dirty file through a later
+work-item or final committing checkpoint” (5,053.373 ms) and “PB3: equal captured
+bytes, feature tampering and later render aliases cannot bypass the actual
+committing gate” (5,000.510 ms). Our native materializer and a separate MAIN
+multi-file run were observed computing concurrently; the timings are consistent
+with contention, whose causation was not isolated experimentally. The third
+failure was the remaining historical filename ownership lookup, subsequently
+corrected. Full failure messages are retained in the evidence JSON.
+
+Final affected-scope qualification is **composition 11/11, native
+project-boundary 5/5 and SDK adapter 17/17**, across sequential runs. This is
+additional qualification alongside the preserved earlier 255-case scope. All
+four compiler scopes pass; self-check remains zero errors/warnings and 313
+limits. The exact 2,088 public case identities and 282-file partition are
+unchanged. Raw artifacts are `/tmp/plan22-opt13-post-materializer-`:
+`focused.json`, `composition.json`, `final-types.log`, `final-self.json` and
+`cases.json`; before/after materializer artifacts are
+`/tmp/plan22-opt13-materializer-{repro,named-types}.json`.
+
+The coordinator's next serialized full nested audit is still **UNRUN** and
+required before merge.

@@ -82,3 +82,18 @@ errors, and two transport controls show caught/unused/exhausted replies cannot
 silently pass. Repaired core `06d833cf` qualifies 255 focused passes and the
 282-file configured partition; another released full nested audit is still
 required. See the [current receipt](optimizations/13-automatic-boundaries-results.md).
+
+## Second audit: current composition metadata and SDK signature printing
+
+The second full audit recorded zero process calls in all 234 ordinary files,
+while two composition metadata checks and the real project materializer failed.
+The exact native panic reproduced before editing. A named three-method SDK
+facade and explicit return types qualified the same materializer invocation,
+and all five native project-boundary cases then passed. Exact K6/K7 historical
+filename translations preserve their ownership checks without rewriting old
+receipts; composition's eleven cases pass. The retained mixed batch includes
+two original five-second threshold failures during observed concurrent native
+and MAIN computation, and the residual historical-reference failure. See the
+[second failure receipt](optimizations/13-second-failed-audit.md) and
+[current correction qualification](optimizations/13-automatic-boundaries-results.md).
+Core `49ebd333` is ready for the coordinator's serialized full nested audit.
