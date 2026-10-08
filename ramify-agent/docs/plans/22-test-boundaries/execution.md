@@ -66,8 +66,9 @@ Delivery cuts qualified so far:
 | --- | --- | --- |
 | 1: command cleanup and accurate crashed-executor fixture | `e1ebdb75`, follow-up `3d69f923` | [Focused correction and failed full baseline](optimizations/01-integrated-baseline.md) |
 | 2: guarded twelve-case acceptance matrix and retained actual witness | `b8b3e055` | [Integrated focused verification](optimizations/02-integrated-results.md) |
+| 3: guarded thirteen-case dependency matrix and retained nested actual witness | `bf1261cb` | [Integrated focused verification](optimizations/03-integrated-results.md) |
 
-Both cuts have integrated focused passes. The initial full baseline failed one
+These cuts have integrated focused passes. The initial full baseline failed one
 crash fixture, subsequently corrected with focused evidence. Final full-audit
 qualification and project-wide automatic enforcement remain outstanding.
 
