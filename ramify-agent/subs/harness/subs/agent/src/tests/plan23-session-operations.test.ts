@@ -219,15 +219,31 @@ describe('Plan 23 F1 high-level session operations', () => {
     expect(record?.body['effects']).toMatchObject([{ tool: 'write', phase: 'intent' }, { tool: 'afterMutation:write', phase: 'completed', result: { text: 'failure check retained' } }]);
   });
   it('binds existing Script functions to durable tasks, handlers and designated submission', async () => {
-    let scripts = 0; let calls = 0; const messages: string[] = [];
+    let scripts = 0; let calls = 0; let accepted = 0;
+    const messages: string[] = []; const emitted: unknown[] = [];
     const agent = createScriptedAgent(spec => { scripts++; messages.push(spec.prompt); expect(spec.systemPrompt).toBe('Role A\nGeneral task protocol.'); return [{ kind: 'tool', tool: 'read', input: {} }, { kind: 'submit', input: { orientation: 'A' } }]; });
-    const operations = agent.bindSessionStore(memoryStore()); const P = await operations.create(create);
-    const b = bindings({ tools: [{ ...tools[0]!, execute: async () => { calls++; return { text: 'scripted read' }; } }] });
+    const store = memoryStore(); const operations = agent.bindSessionStore(store); const P = await operations.create(create);
+    const b = bindings({
+      tools: [{ ...tools[0]!, execute: async () => { calls++; return { text: 'scripted read' }; } }],
+      submission: { name: 'submit_orientation', accept: async (value, signal) => { accepted++; expect(signal.aborted).toBe(false); expect(value).toEqual({ orientation: 'A' }); return { accepted: true }; } },
+      onEvent: event => { if (event.type === 'message' && event.role === 'user') emitted.push(event.blocks); },
+    });
     const T1 = await (await operations.continue(continuation(P.sessionId, P.point!, 'one', b))).receipt;
     expect(T1.outcome).toEqual({ kind: 'submitted', input: { orientation: 'A' } });
     const next = { ...task, message: 'Assignment A' }; const nextBindings = { ...b, task: next };
     const T2 = await (await operations.continue(continuation(P.sessionId, T1.point!, 'two', nextBindings))).receipt;
-    expect(T2.turn).toBe(2); expect(messages).toEqual(['Orient A', 'Assignment A']); expect(scripts).toBe(2); expect(calls).toBe(2);
+    expect(T2.turn).toBe(2); expect(T2.outcome).toEqual({ kind: 'submitted', input: { orientation: 'A' } });
+    // Script perception includes inherited model-visible text. Neither the
+    // captured current spec nor the emitted user message redelivers that text.
+    expect(messages).toEqual(['Orient A', 'Orient A\n\nAssignment A']);
+    expect(agent.sessions.map(record => record.spec.prompt)).toEqual(['Orient A', 'Assignment A']);
+    expect(emitted).toEqual([[{ type: 'text', text: 'Orient A' }], [{ type: 'text', text: 'Assignment A' }]]);
+    expect(agent.sessions.map(record => ({ role: record.spec.role, cwd: record.spec.scope.workingDirectory, submission: record.spec.submission.name })))
+      .toEqual(Array(2).fill({ role: 'architect', cwd: '/A', submission: 'submit_orientation' }));
+    expect((await store.read('run-A', 'operation:one'))?.body['input']).toMatchObject({ task, policy });
+    expect((await store.read('run-A', 'operation:two'))?.body['input']).toMatchObject({ task: next, policy });
+    expect(await (await operations.retry({ runId: 'run-A', operationId: 'two', bindings: nextBindings })).receipt).toEqual(T2);
+    expect(scripts).toBe(2); expect(calls).toBe(2); expect(accepted).toBe(2);
   });
   it('exposes the same lifecycle on the scripted factory', async () => {
     const agent = createScriptedAgent([], { sessionStore: memoryStore(), operationScript: [{ kind: 'submit', input: { orientation: 'A' } }] });
