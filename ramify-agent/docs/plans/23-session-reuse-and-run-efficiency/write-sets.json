@@ -145,7 +145,8 @@
       "subs/harness/src/tests/single-session.test.ts",
       "docs/plans/23-session-reuse-and-run-efficiency/iterations/08-results.md",
       "subs/harness/subs/agent/src/scripted.ts",
-      "subs/harness/src/tests/helpers/session-scenario.ts"
+      "subs/harness/src/tests/helpers/session-scenario.ts",
+      "subs/harness/subs/agent/src/tests/plan23-session-operations.test.ts"
     ],
     "9": [
       "subs/harness/src/run/service.ts",
