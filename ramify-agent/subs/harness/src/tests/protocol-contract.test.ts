@@ -149,6 +149,7 @@ describe('the evidence a run works from', () => {
   test('an input manifest carries the plan hash, the checkout and the view', () => {
     const manifest = {
       planHash: 'a'.repeat(64),
+      documentManifest: { path: 'input/documents.json', hash: 'b'.repeat(64) },
       source: { commit: 'abc', dirty: false },
       versions: { architectPrompt: '1', procedure: '1', skill: '1', ramify: '1' },
       architectView: { status: 'placeholder' },
@@ -156,6 +157,8 @@ describe('the evidence a run works from', () => {
     expect(inputManifestSchema.parse(manifest)).toEqual(manifest);
     expect(inputManifestSchema.safeParse({ ...manifest, planHash: 'short' }).success).toBe(false);
     expect(inputManifestSchema.safeParse({ ...manifest, source: null }).success).toBe(true);
+    const { documentManifest: _omitted, ...withoutDocuments } = manifest;
+    expect(inputManifestSchema.safeParse(withoutDocuments).success).toBe(false);
   });
 
   test('the module tree is available with the view\'s identity, or unavailable with a reason', () => {
