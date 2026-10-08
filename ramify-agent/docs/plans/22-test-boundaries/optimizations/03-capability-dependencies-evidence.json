@@ -1,0 +1,317 @@
+{
+  "schema": "ramify-agent.test-optimization-evidence/1",
+  "optimization": 3,
+  "baseCommit": "afcd2e2c8c8dc07b5567d32187113d08b30db620",
+  "candidateCommit": "the commit containing this evidence; supplied in the coordinator handoff",
+  "pinnedDependencies": {
+    "ramify.ts": "0.4.1",
+    "ramify-audit": "0.7.2",
+    "vitest": "4.1.11"
+  },
+  "candidateSourceSha256": {
+    "subs/harness/src/tests/capability-dependencies.test.ts": "546963c78a8c673b654faac924224e4f4620fd8b2b96de9ba2f692c67e161ee0",
+    "subs/harness/src/tests/capability-dependencies.boundary.test.ts": "16e229ec484a15196f6a72ef4c41e25754ae1a292293d29d554e1cd5629c0f67",
+    "subs/harness/src/tests/dependency-boundaries.test.ts": "178c9762747d6fd6fb64cbb42cf37c3d6b6a57dd660f157ebec31480279c9cd5",
+    "subs/harness/src/tests/helpers/dependency-flow.ts": "ae63a104cb9f99c7a99cef1bc35251cde80cd8b4277c506349b28a1b3cd5d48b",
+    "subs/harness/src/tests/helpers/dependency-boundaries.ts": "d13b17506f4dd97a99bb68ac8962df103ebe5961fe60b289e9cd0ad2965ea408",
+    "subs/harness/src/tests/helpers/dependency-files.ts": "98034e9a0bff4d6548dd49ae2f8b9c18ea6f79b3afae0c1c991aaba46b2ca309"
+  },
+  "timings": {
+    "metric": "sum of Vitest per-case duration milliseconds, equivalent original 13 rows",
+    "beforeMs": 26021.25646,
+    "ordinaryAfterMs": 4228.371627999999,
+    "retainedActualWitnessMs": 6638.780339,
+    "negativeControlsMs": 9.926819999999907,
+    "conditions": "isolated package cwd; shared host and concurrent checks; single final focused measurement, no quiet-host benchmark guarantee"
+  },
+  "caseMapping": [
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21 CA29 CA32: a nested request keeps its parent assignment and depth-first authority in the real ledger",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21 CA29 CA32: a nested request keeps its parent assignment and depth-first authority in the real ledger",
+      "treatment": "unchanged real ledger control",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 66.10185700000011,
+      "afterMs": 40.65686700000015,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21: exact ancestor task reference is rejected while another need in the same provider is allowed",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21: exact ancestor task reference is rejected while another need in the same provider is allowed",
+      "treatment": "unchanged real ledger control",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 20.23380700000007,
+      "afterMs": 11.707762000000002,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA19 CA26: a committed plan revision rematerializes once and rejects stale replay",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA19 CA26: a committed plan revision rematerializes once and rejects stale replay",
+      "treatment": "unchanged real ledger control",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 21.13566200000014,
+      "afterMs": 11.176674999999932,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while parent B assignment waits",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while parent B assignment waits",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 2601.1586140000004,
+      "afterMs": 726.0207190000001,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 1335.38933,
+      "afterMs": 317.81194000000005,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation after placement-intent restart",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation after placement-intent restart",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 1252.9394629999997,
+      "afterMs": 363.2934329999998,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation after fork-accepted restart",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation after fork-accepted restart",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 1266.1529849999988,
+      "afterMs": 357.7247779999998,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation after fork-partial restart",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation after fork-partial restart",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 1237.399711,
+      "afterMs": 344.2209849999999,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation after qualification-accepted restart",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21 CA32: nested request-placement returns a global decision before child delegation after qualification-accepted restart",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 1082.6258849999995,
+      "afterMs": 313.1706369999997,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21 CA32: nested unresolved returns a global decision before child delegation",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21 CA32: nested unresolved returns a global decision before child delegation",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 1026.382359000001,
+      "afterMs": 282.2944690000004,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA21 CA32: nested unresolved returns a global decision before child delegation after fork-accepted restart",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA21 CA32: nested unresolved returns a global decision before child delegation after fork-accepted restart",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 1065.8146429999997,
+      "afterMs": 306.4049379999997,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA19 CA21 CA32: a real C child gate and review hand back to B",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA19 CA21 CA32: a scripted C child gate and review hand back to B",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 7875.5957880000005,
+      "afterMs": 563.5592230000002,
+      "ordinaryChildProcessAttempts": 0
+    },
+    {
+      "originalFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "originalTitle": "CA19 CA21 CA32: a real C child gate and review hand back to B after service restart",
+      "destinationFile": "subs/harness/src/tests/capability-dependencies.test.ts",
+      "destinationTitle": "CA19 CA21 CA32: a scripted C child gate and review hand back to B after service restart",
+      "treatment": "same real harness/ledger assertions; scripted external ports",
+      "beforeStatus": "passed",
+      "afterStatus": "passed",
+      "beforeMs": 7170.326356000001,
+      "afterMs": 590.3292019999999,
+      "ordinaryChildProcessAttempts": 0
+    }
+  ],
+  "additionalCases": [
+    {
+      "title": "nested boundary script retains a caught wrong-root Git assertion",
+      "status": "passed",
+      "durationMs": 6.197987000000012,
+      "childProcessAttempts": 0
+    },
+    {
+      "title": "nested boundary script retains an unknown candidate even when its reader catches it",
+      "status": "passed",
+      "durationMs": 1.0425049999998919,
+      "childProcessAttempts": 0
+    },
+    {
+      "title": "nested boundary script retains a caught invalid source read",
+      "status": "passed",
+      "durationMs": 1.371550999999954,
+      "childProcessAttempts": 0
+    },
+    {
+      "title": "nested boundary script refuses an undeclared diff and requires its stated answers to be consumed",
+      "status": "passed",
+      "durationMs": 1.3147770000000492,
+      "childProcessAttempts": 0
+    }
+  ],
+  "actualWitness": {
+    "file": "subs/harness/src/tests/capability-dependencies.boundary.test.ts",
+    "title": "CA19 CA21 CA32: actual nested C child gate, review and handback to B",
+    "status": "passed",
+    "boundary": "actual Git, actual B/C Vitest commands and actual tsc; scripted agents/local audit provider and fake Ramify ownership; no published-audit/provider-conformance claim"
+  },
+  "assertions": {
+    "originalExpectCalls": 69,
+    "preservedInOrdinaryAndSharedDriver": 69,
+    "additionalOrdinaryProcessGuardExpectCalls": 1,
+    "originalRowCount": 13,
+    "destinationRowCount": 13,
+    "renamedGateTitles": 2
+  },
+  "checks": [
+    {
+      "command": "node_modules/.bin/vitest run subs/harness/src/tests/capability-dependencies.test.ts subs/harness/src/tests/dependency-boundaries.test.ts --reporter=json --outputFile=/tmp/plan22-dependencies-qualified.json",
+      "status": "passed",
+      "cases": 17
+    },
+    {
+      "command": "node_modules/.bin/vitest run subs/harness/src/tests/capability-dependencies.boundary.test.ts --reporter=json --outputFile=/tmp/plan22-dependencies-boundary.json",
+      "status": "passed",
+      "cases": 1
+    },
+    {
+      "command": "npm run type-check",
+      "status": "passed",
+      "compilerScopes": 4
+    },
+    {
+      "command": "node_modules/.bin/tsc --noEmit",
+      "status": "passed",
+      "purpose": "Main-scope qualification after helper argument hardening"
+    },
+    {
+      "command": "npm run check:self",
+      "status": "passed",
+      "errors": 0,
+      "warnings": 0,
+      "analysisLimits": 310
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "authoringFailures": [
+    {
+      "stage": "initial conversion",
+      "source": "uncommitted authoring candidate; exact source hash not captured",
+      "passed": 10,
+      "failed": 3,
+      "diagnosis": "Missing unchanged index answer during restart reconciliation; missing empty pending-delta answer after child commit",
+      "failedTitles": [
+        "CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while parent B assignment waits",
+        "CA19 CA21 CA32: a real C child gate and review hand back to B",
+        "CA19 CA21 CA32: a real C child gate and review hand back to B after service restart"
+      ],
+      "retainedFirstDiagnostics": [
+        "AssertionError: caught candidate/source/audit/Ramify failures: expected [ Array(1) ] to deeply equal []",
+        "AssertionError: caught Git assertions or unstated operations: expected [ Array(1) ] to deeply equal []",
+        "AssertionError: caught Git assertions or unstated operations: expected [ Array(1) ] to deeply equal []"
+      ]
+    },
+    {
+      "stage": "strict ownership arguments",
+      "source": "uncommitted authoring candidate; exact source hash not captured",
+      "passed": 14,
+      "failed": 3,
+      "diagnosis": "Scratch paths used by real write-scope resolution were not yet declared in the fixture argument set",
+      "failedTitles": [
+        "CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while parent B assignment waits",
+        "CA19 CA21 CA32: a real C child gate and review hand back to B",
+        "CA19 CA21 CA32: a real C child gate and review hand back to B after service restart"
+      ],
+      "retainedFirstDiagnostics": [
+        "AssertionError: [{\"sequence\":70,\"jobId\":\"20261008T050829Z-3e707e\",\"at\":\"2026-10-08T05:08:29.970Z\",\"type\":\"session-opened\",\"data\":{\"session\":\"ses-0012\",\"role\":\"engineer\",\"work\":{\"workItem\":\"wi-001\",\"iteration\":\"cap-001.i01\"},\"executor\":\"scripted\",\"model\":null,\"replaces\":{\"session\":\"ses-0009\",\"reason\"",
+        "AssertionError: {\"events\":[{\"sequence\":72,\"jobId\":\"20261008T050832Z-4c9b27\",\"at\":\"2026-10-08T05:08:32.537Z\",\"type\":\"gate-committing\",\"data\":{\"gate\":\"ga-0002\",\"checkpoint\":\"iteration\"}},{\"sequence\":73,\"jobId\":\"20261008T050832Z-4c9b27\",\"at\":\"2026-10-08T05:08:32.542Z\",\"type\":\"gate-attempted\",\"data\":{\"g",
+        "Error: Timed out waiting for a condition"
+      ]
+    },
+    {
+      "stage": "exact trailer gate arguments",
+      "source": "uncommitted authoring candidate; exact source hash not captured",
+      "passed": 14,
+      "failed": 3,
+      "diagnosis": "Readiness occupies ga-0001: scheduling uses ga-0002 and child-gate flow uses ga-0002 through ga-0005",
+      "failedTitles": [
+        "CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while parent B assignment waits",
+        "CA19 CA21 CA32: a real C child gate and review hand back to B",
+        "CA19 CA21 CA32: a real C child gate and review hand back to B after service restart"
+      ],
+      "retainedFirstDiagnostics": [
+        "AssertionError: [{\"sequence\":71,\"jobId\":\"20261008T051123Z-bfc62f\",\"at\":\"2026-10-08T05:11:23.904Z\",\"type\":\"invocation-started\",\"data\":{\"invocation\":\"inv-0014\",\"role\":\"engineer\",\"session\":\"ses-0012\",\"work\":{\"workItem\":\"wi-001\",\"iteration\":\"cap-001.i01\"},\"start\":\"opened\"}},{\"sequence\":72,\"jobId\":\"20261",
+        "AssertionError: {\"events\":[{\"sequence\":118,\"jobId\":\"20261008T051126Z-20cf45\",\"at\":\"2026-10-08T05:11:26.718Z\",\"type\":\"invocation-ended\",\"data\":{\"invocation\":\"inv-0021\",\"ended\":\"ended\",\"submission\":null,\"session\":\"ses-0016\",\"kept\":false,\"finished\":\"work-closed\"}},{\"sequence\":119,\"jobId\":\"20261008T0511",
+        "AssertionError: {\"events\":[{\"sequence\":120,\"jobId\":\"20261008T051126Z-211a78\",\"at\":\"2026-10-08T05:11:27.264Z\",\"type\":\"gate-committing\",\"data\":{\"gate\":\"ga-0004\",\"checkpoint\":\"work-item\"}},{\"sequence\":121,\"jobId\":\"20261008T051126Z-211a78\",\"at\":\"2026-10-08T05:11:27.268Z\",\"type\":\"gate-attempted\",\"data\":{"
+      ]
+    }
+  ],
+  "outstanding": [
+    "Coordinator integrated check and merge",
+    "Exact boundary registration in later runner-enforcement optimization",
+    "Coordinator full audit of integrated candidate",
+    "Responsible architect semantic preservation judgment"
+  ]
+}
