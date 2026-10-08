@@ -70,7 +70,8 @@ export interface SessionDriverInvocation {
   readonly key: SessionOperationKey; readonly session: AgentSessionSnapshot; readonly task: SessionTaskInput;
   readonly recovering: boolean; readonly effects: readonly SessionEffectRecord[];
 }
-/** Implementations own opaque provider encoding; display events never become provider history. */
+/** Implementations own opaque provider encoding; display events never become provider history.
+ * Dispatch must drain its provider work before returning. Admitted runtime calls are also drained by the engine. */
 export interface SessionOperationDriver { dispatch(input: SessionDriverInvocation, runtime: SessionDriverRuntime): Promise<SessionOutcome> }
 export interface CreateSessionInput extends SessionOperationKey { readonly initialInstructions: string; readonly declarations: readonly SessionToolDeclaration[]; readonly activate: readonly string[]; readonly policy: SessionExecutionPolicy }
 export interface ContinueSessionInput extends SessionOperationKey { readonly sessionId: AgentSessionId; readonly expectedPoint: AgentSessionPoint; readonly task: SessionTaskInput; readonly additions: readonly SessionContextAddition[]; readonly toolChange: SessionToolChange; readonly policy: SessionExecutionPolicy; readonly bindings: SessionExecutionBindings }
@@ -79,7 +80,16 @@ export interface AppendSessionContextInput extends SessionOperationKey { readonl
 export interface ChangeSessionToolsInput extends SessionOperationKey { readonly sessionId: AgentSessionId; readonly expectedPoint: AgentSessionPoint; readonly toolChange: SessionToolChange }
 export interface RetrySessionInput extends SessionOperationKey { readonly bindings: SessionExecutionBindings }
 export interface StopSessionInput extends SessionOperationKey { readonly sessionId: AgentSessionId }
-export interface SessionOperationHandle { readonly receipt: Promise<SessionOperationReceipt>; readonly outcome: Promise<SessionOutcome | null>; stop(): Promise<SessionOperationReceipt>; settled(): Promise<SessionOperationReceipt> }
+export interface SessionOperationHandle {
+  /** Durable terminal decision; Stop can resolve it while interrupted work is still draining. */
+  readonly receipt: Promise<SessionOperationReceipt>;
+  readonly outcome: Promise<SessionOutcome | null>;
+  /** Fence/abort promptly, then wait for actual driver, runtime calls and publication drainage. The caller bounds this wait. */
+  stop(): Promise<SessionOperationReceipt>;
+  /** Actual quiescence, independently of receipt. Rejects when a foreign live owner's idle evidence is unavailable.
+   * A caller must retain its existing settlement bound and cannot interpret a receipt alone as idle. */
+  settled(): Promise<SessionOperationReceipt>;
+}
 export interface SessionOperations {
   create(input: CreateSessionInput): Promise<SessionOperationReceipt>;
   continue(input: ContinueSessionInput): Promise<SessionOperationHandle>;

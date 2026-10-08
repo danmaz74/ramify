@@ -258,9 +258,12 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     const atHook = new Promise<void>(resolve => { entered = resolve; }); const gate = new Promise<void>(resolve => { release = resolve; });
     const f = await fixture([], [read, orientation], [pi => { pi.on('before_provider_request', async () => { entered(); await gate; }); }]);
     const handle = await f.operations.continue(f.next(f.P.sessionId, f.P.point!, 'stop-final')); await atHook;
-    const stopped = await handle.stop(); const record = await f.store.read('run-A', 'operation:stop-final'); release();
-    await new Promise(resolve => setTimeout(resolve, 10));
-    expect(stopped).toMatchObject({ status: 'stopped', point: null }); expect(await handle.receipt).toEqual(stopped); expect(await f.store.read('run-A', 'operation:stop-final')).toEqual(record); expect(f.native.dispatches()).toBe(0); f.native.verify();
+    const stopping = handle.stop(); const idle = handle.settled(); let stopEnded = false; let idleEnded = false;
+    void stopping.then(() => { stopEnded = true; }); void idle.then(() => { idleEnded = true; });
+    const stopped = await handle.receipt; const record = await f.store.read('run-A', 'operation:stop-final');
+    expect(stopEnded).toBe(false); expect(idleEnded).toBe(false); expect(record?.body['quiescent']).not.toBe(true); release();
+    expect(await stopping).toEqual(stopped); expect(await idle).toEqual(stopped);
+    expect(stopped).toMatchObject({ status: 'stopped', point: null }); expect(await handle.receipt).toEqual(stopped); expect((await f.store.read('run-A', 'operation:stop-final'))?.body).toEqual({ ...record!.body, quiescent: true }); expect(f.native.dispatches()).toBe(0); f.native.verify();
   });
   it.each(['solo', 'with-completed-read', 'with-coerced-read'])('accepted %s submission without provider result or terminal receipt recovers exact native results with zero new model requests', async shape => {
     const readArgs = shape === 'with-coerced-read' ? { offset: '2' } : {};

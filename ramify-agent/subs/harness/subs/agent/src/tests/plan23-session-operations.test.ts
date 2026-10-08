@@ -33,6 +33,8 @@ function continuation(sessionId: string, expectedPoint: AgentSessionPoint, opera
   return { runId: 'run-A', operationId, sessionId, expectedPoint, task: bound.task, policy: bound.policy, additions: [], toolChange: { add: [], activate: [], inactivate: [] }, bindings: bound };
 }
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
+function observation(promise: Promise<unknown>) { let ended = false; void promise.then(() => { ended = true; }, () => { ended = true; }); return () => ended; }
+async function flush() { for (let index = 0; index < 8; index++) await Promise.resolve(); }
 
 describe('Plan 23 F1 high-level session operations', () => {
   it('durably fences typed unavailable provider history while leaving historic settled points forkable', async () => {
@@ -108,13 +110,91 @@ describe('Plan 23 F1 high-level session operations', () => {
     const P = await operations.create(create);
     const bound = bindings({ tools: [{ ...tools[1]!, execute: async () => { effects++; entered.resolve(); await late.promise; return { text: 'actually wrote' }; } }], submission: { name: 'submit_orientation', accept: async () => { accepted++; return { accepted: true }; } } });
     const handle = await operations.continue(continuation(P.sessionId, P.point!, 'delayed', bound)); await entered.promise;
-    const stopped = await operations.stop({ runId: 'run-A', operationId: 'delayed', sessionId: P.sessionId });
+    const stopping = operations.stop({ runId: 'run-A', operationId: 'delayed', sessionId: P.sessionId });
+    const stopEnded = observation(stopping); const idle = handle.settled(); const idleEnded = observation(idle);
+    const stopped = await handle.receipt;
     expect(stopped.status).toBe('stopped'); expect(stopped.point).toBeNull(); expect(stopped.reason).toMatch(/unknown/);
     const settledRecord = await store.read('run-A', 'operation:delayed');
-    late.resolve(); await new Promise(resolve => setTimeout(resolve, 10));
-    expect(await handle.receipt).toEqual(stopped); expect(await store.read('run-A', 'operation:delayed')).toEqual(settledRecord); expect(accepted).toBe(0); expect(effects).toBe(1);
+    await flush(); expect(stopEnded()).toBe(false); expect(idleEnded()).toBe(false); expect(settledRecord?.body['quiescent']).not.toBe(true);
+    late.resolve(); expect(await stopping).toEqual(stopped); expect(await idle).toEqual(stopped);
+    const drained = await store.read('run-A', 'operation:delayed');
+    expect(drained?.body).toEqual({ ...settledRecord!.body, quiescent: true }); expect(accepted).toBe(0); expect(effects).toBe(1);
     expect(await (await operations.retry({ runId: 'run-A', operationId: 'delayed', bindings: bound })).receipt).toEqual(stopped);
     expect(await operations.inspect('run-A', P.sessionId)).toBeNull();
+  });
+  it('waits for an interrupted mutation hook without rewriting its terminal effect evidence', async () => {
+    const entered = deferred(); const release = deferred(); const store = memoryStore(); let submissions = 0;
+    const operations = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'tool', tool: 'write', input: {} }, { kind: 'submit', input: {} }]) });
+    const P = await operations.create(create);
+    const bound = bindings({ afterMutation: async () => { entered.resolve(); await release.promise; return { text: 'late check' }; }, submission: { name: 'submit_orientation', accept: async () => { submissions++; return { accepted: true }; } } });
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'hook', bound)); await entered.promise;
+    const stop = handle.stop(); const idle = handle.settled(); const idleEnded = observation(idle); const stopEnded = observation(stop);
+    const receipt = await handle.receipt; const fenced = await store.read('run-A', 'operation:hook');
+    expect(receipt.point).toBeNull(); expect(fenced?.body['effects']).toMatchObject([{ phase: 'completed' }, { phase: 'intent' }]);
+    await flush(); expect(idleEnded()).toBe(false); expect(stopEnded()).toBe(false);
+    release.resolve(); expect(await stop).toEqual(receipt); expect(await idle).toEqual(receipt);
+    expect((await store.read('run-A', 'operation:hook'))?.body).toEqual({ ...fenced!.body, quiescent: true }); expect(submissions).toBe(0);
+  });
+  it('drains a tool admitted by a driver that returns without awaiting it before publishing a point', async () => {
+    const entered = deferred(); const release = deferred(); const returned = deferred(); const store = memoryStore();
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_input, runtime) { void runtime.callTool('orphan', 'write', {}); await entered.promise; returned.resolve(); return { kind: 'ended' }; } } });
+    const P = await operations.create(create); let hooks = 0;
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'orphan', bindings({ tools: [{ ...tools[1]!, execute: async () => { entered.resolve(); await release.promise; return { text: 'write finished' }; } }], afterMutation: async () => { hooks++; return null; } })));
+    const receiptEnded = observation(handle.receipt); const idleEnded = observation(handle.settled()); await returned.promise; await flush();
+    expect(receiptEnded()).toBe(false); expect(idleEnded()).toBe(false); expect((await store.read('run-A', 'operation:orphan'))?.body['phase']).toBe('dispatched');
+    release.resolve(); const receipt = await handle.settled(); expect(receipt.status).toBe('completed'); expect(receipt.point).not.toBeNull(); expect(hooks).toBe(1);
+    expect((await store.read('run-A', 'operation:orphan'))?.body).toMatchObject({ quiescent: true, effects: [{ phase: 'completed' }, { phase: 'completed' }] });
+  });
+  it('shares terminal drainage across factories by persisted owner token and never redispatches', async () => {
+    const entered = deferred(); const release = deferred(); const store = memoryStore(); let dispatches = 0;
+    const driver: SessionOperationDriver = { async dispatch(_input, runtime) { dispatches++; await runtime.callTool('shared', 'write', {}); return { kind: 'ended' }; } };
+    const operations = createSessionOperations({ sessionStore: store, driver }); const other = createSessionOperations({ sessionStore: store, driver });
+    const P = await operations.create(create); const bound = bindings({ tools: [{ ...tools[1]!, execute: async () => { entered.resolve(); await release.promise; return { text: 'late' }; } }] });
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'shared', bound)); await entered.promise;
+    const stop = other.stop({ runId: 'run-A', operationId: 'shared', sessionId: P.sessionId }); const value = await handle.receipt;
+    const duplicate = await other.retry({ runId: 'run-A', operationId: 'shared', bindings: bindings() }); expect(await duplicate.receipt).toEqual(value);
+    const duplicateIdle = duplicate.settled(); const duplicateStop = duplicate.stop(); const terminalStop = other.stop({ runId: 'run-A', operationId: 'shared', sessionId: P.sessionId });
+    const observed = [stop, duplicateIdle, duplicateStop, terminalStop].map(observation); await flush(); expect(observed.map(ended => ended())).toEqual([false, false, false, false]);
+    release.resolve(); expect(await Promise.all([stop, duplicateIdle, duplicateStop, terminalStop])).toEqual([value, value, value, value]); expect(dispatches).toBe(1);
+  });
+  it('attests ordinary completed quiescence durably so another live server can reuse the terminal receipt', async () => {
+    const store = memoryStore(); const operations = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'submit', input: { ok: true } }]) });
+    const P = await operations.create(create); const handle = await operations.continue(continuation(P.sessionId, P.point!, 'ordinary')); const receipt = await handle.settled();
+    const terminal = (await store.read('run-A', 'operation:ordinary'))!; expect(terminal.body['quiescent']).toBe(true); expect(terminal.body['receipt']).toEqual(receipt);
+    await store.commit({ runId: 'run-A', expected: [{ id: terminal.id, revision: terminal.revision }], records: [{ ...terminal, revision: terminal.revision + 1, body: { ...terminal.body, owner: { token: 'foreign-completed-owner', pid: 999999 } } }], payloads: [] });
+    let probes = 0; let dispatches = 0;
+    const other = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } }, isExecutionOwnerAlive: async () => { probes++; return true; } });
+    const retry = await other.retry({ runId: 'run-A', operationId: 'ordinary', bindings: bindings({ currentAuthority: async () => false }) });
+    expect(await retry.receipt).toEqual(receipt); expect(await retry.settled()).toEqual(receipt); expect(await retry.stop()).toEqual(receipt); expect(probes).toBe(0); expect(dispatches).toBe(0);
+    const current = (await store.read('run-A', 'operation:ordinary'))!;
+    const { quiescent: _marker, ...withoutMarker } = current.body; void _marker;
+    await store.commit({ runId: 'run-A', expected: [{ id: current.id, revision: current.revision }], records: [{ ...current, revision: current.revision + 1, body: withoutMarker }], payloads: [] });
+    const old = await other.retry({ runId: 'run-A', operationId: 'ordinary', bindings: bindings() }); expect(await old.receipt).toEqual(receipt);
+    await expect(old.settled()).rejects.toThrow('quiescence is unavailable'); await expect(old.stop()).rejects.toThrow('quiescence is unavailable'); expect(dispatches).toBe(0);
+    const dead = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([]), isExecutionOwnerAlive: async () => false });
+    expect(await (await dead.retry({ runId: 'run-A', operationId: 'ordinary', bindings: bindings() })).settled()).toEqual(receipt);
+  });
+  it('tracks detached provider persistence through its store write and final operation append', async () => {
+    const entered = deferred(); const release = deferred(); const store = memoryStore(); const put = store.putPayload;
+    store.putPayload = async bytes => { if (new TextDecoder().decode(bytes) === 'native-orphan') { entered.resolve(); await release.promise; } return put(bytes); };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_input, runtime) { void runtime.persistPayload('native-orphan', new TextEncoder().encode('native-orphan')); await entered.promise; return { kind: 'ended' }; } } });
+    const P = await operations.create(create); const handle = await operations.continue(continuation(P.sessionId, P.point!, 'payload')); const ended = observation(handle.settled()); const receiptEnded = observation(handle.receipt);
+    await entered.promise; await flush(); expect(ended()).toBe(false); expect(receiptEnded()).toBe(false); release.resolve(); const receipt = await handle.settled();
+    expect(receipt.status).toBe('completed'); expect((await store.read('run-A', 'operation:payload'))?.body).toMatchObject({ quiescent: true, provider: [{ key: 'native-orphan' }] });
+  });
+  it('waits for admitted guard work and terminal publication independently of receipt', async () => {
+    const entered = deferred(); const release = deferred(); const store = memoryStore(); let executed = 0;
+    const operations = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'tool', tool: 'write', input: {} }]) });
+    const P = await operations.create(create); const handle = await operations.continue(continuation(P.sessionId, P.point!, 'guard', bindings({ guard: async () => { entered.resolve(); await release.promise; return { allow: true }; }, tools: [{ ...tools[1]!, execute: async () => { executed++; return { text: 'forbidden late write' }; } }] })));
+    await entered.promise; const stop = handle.stop(); const value = await handle.receipt; const ended = observation(handle.settled()); await flush(); expect(ended()).toBe(false);
+    release.resolve(); expect(await stop).toEqual(value); expect(executed).toBe(0);
+    const publishing = deferred(); const published = deferred(); const other = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const Q = await other.create({ ...create, operationId: 'create-publisher' });
+    const publisher = await other.continue(continuation(Q.sessionId, Q.point!, 'publisher', bindings({ publish: async () => { publishing.resolve(); await published.promise; } })));
+    await publishing.promise; const terminal = await store.read('run-A', 'operation:publisher'); expect(terminal?.body['phase']).toBe('terminal'); expect(terminal?.body['quiescent']).not.toBe(true);
+    const retry = await operations.retry({ runId: 'run-A', operationId: 'publisher', bindings: bindings() }); expect(await retry.receipt).toEqual(terminal?.body['receipt']);
+    const idle = publisher.settled(); const retryIdle = retry.settled(); const observed = [idle, retryIdle].map(observation); await flush(); expect(observed.map(ended => ended())).toEqual([false, false]);
+    published.resolve(); expect(await idle).toEqual(await publisher.receipt); expect(await retryIdle).toEqual(await publisher.receipt);
   });
   it('S06 enforces actual policy values and current authority before dispatch', async () => {
     let calls = 0;

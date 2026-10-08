@@ -189,8 +189,13 @@ describe('Plan 23 ledger session store', () => {
     const first = createSessionOperations({ sessionStore: store, driver }); const P = await first.create(create);
     const handle = await first.continue(input(P.sessionId, P.point!, bound({ onEvent: () => { lateEvents++; } }))); await entered.promise;
     const second = createSessionOperations({ sessionStore: (await setup(path)).store, driver });
-    const stopped = await second.stop({ runId: 'A', operationId: 'orient', sessionId: P.sessionId });
+    const stopping = second.stop({ runId: 'A', operationId: 'orient', sessionId: P.sessionId });
+    const idle = handle.settled(); let stopEnded = false; let idleEnded = false;
+    void stopping.then(() => { stopEnded = true; }); void idle.then(() => { idleEnded = true; });
+    const stopped = await handle.receipt;
+    expect(stopped.point).toBeNull(); expect(stopEnded).toBe(false); expect(idleEnded).toBe(false);
     transformed.resolve();
+    expect(await stopping).toEqual(stopped); expect(await idle).toEqual(stopped);
     expect(stopped.status).toBe('stopped'); expect(await handle.receipt).toEqual(stopped); expect(actualDispatches).toBe(0); expect(lateEvents).toBe(0);
   });
   it('two reconstructed stores/agents cannot Retry the same live intent twice', async () => {
