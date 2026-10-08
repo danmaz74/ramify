@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { lstat, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart, ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
-import { gitCandidateSource, gitService, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
+import { gitCandidateSource, gitChangeHistory, gitService, type CandidateSource, type ChangeHistory, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
@@ -115,7 +115,11 @@ import {
   renderNonfunctionalRepairPrompt, renderExtractionPrompt, renderCapabilityArchitectPrompt,
   type ExtractionTurn, type LoadedPackage,
 } from '../prompts/packages.js';
-import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
+import {
+  baselineScope, captureSnapshot, invocationScope, revisionMismatch, rootModuleOfSnapshot, scopeSize, supportDocument, writeScopeMeasurement,
+  type DeclaredScope,
+} from '../kpi/capture.js';
+import { cachedChangeHistory } from '../kpi/delivered.js';
 import { lineEvents, takeLineSnapshot, type LineSnapshot } from '../kpi/lines.js';
 import { writeFileAtomic, writeFileExclusive } from '../../subs/ledger/src/atomic.js';
 import type { ProjectLock } from '../store/lock.js';
@@ -340,6 +344,8 @@ export interface RunServiceOptions {
   readonly git?: GitService | undefined;
   /** Where a review reads its frozen candidate from: Git's objects by default; tests script it like Git. */
   readonly candidates?: CandidateSource | undefined;
+  /** The history a run's delivered change is read from: Git's objects by default, its answers kept; tests script it like Git. */
+  readonly changeHistory?: ChangeHistory | undefined;
   /** External index/blob reads for provisional capability snapshots. */
   readonly provisionalSourceGit?: ProvisionalSourceGit | undefined;
   /**
@@ -406,6 +412,12 @@ interface InvocationRequest<T> {
    */
   readonly acceptedText?: ((value: T) => string) | undefined;
   readonly scope: Invocation['scope'];
+  /**
+   * The snapshot and the declared scope `S_s` is measured from when the
+   * invocation starts, with its own prompt package, the plan and the brief
+   * it is delivered as its support documents. Without it `scope.size` stands.
+   */
+  readonly measured?: { readonly snapshot: MeasurementSnapshot; readonly scope: DeclaredScope } | undefined;
   /** Whether this invocation holds the run's one writer. */
   readonly writer?: boolean | undefined;
   /** Exact tree at writer start when task-local mutation attribution is required. */
@@ -716,10 +728,13 @@ export class RunService {
 
   private readonly git: GitService;
   private readonly candidates: CandidateSource;
+  /** What the run queries read each run's delivered change from. */
+  readonly changeHistory: ChangeHistory;
 
   private constructor(private readonly options: RunServiceOptions, private readonly workflow: CapabilityWorkflow | null) {
     this.git = options.git ?? gitService;
     this.candidates = options.candidates ?? gitCandidateSource;
+    this.changeHistory = options.changeHistory ?? cachedChangeHistory(gitChangeHistory);
   }
 
   /**
@@ -3114,18 +3129,29 @@ export class RunService {
     const support: Array<{ path: string; bytes: number }> = [];
     const plan = await supportDocument(this.projectRoot, join(this.projectRoot, 'plans', planId, 'plan.md'));
     if (plan !== null) support.push(plan);
+    // Each file once, though several roles' packages carry it.
     for (const loaded of packages.values()) {
-      for (const file of loaded.files) support.push({ path: file.path, bytes: file.bytes });
+      for (const file of loaded.files) if (!support.some(entry => entry.path === file.path)) support.push({ path: file.path, bytes: file.bytes });
     }
     const id = snapshotId(1);
-    const snapshot = await captureSnapshot({
+    const capture = (view: ViewIdentity) => captureSnapshot({
       id,
       ramify: this.options.ramify,
       projectRoot: this.projectRoot,
       head: '',
-      view: manifest.architectView,
+      view,
       supplementary: support,
     });
+    // The measurement and the view must describe one state. A revision that
+    // moved between them is retried, a bounded number of times, against a
+    // refreshed view; a mismatch that remains is recorded, and every size
+    // taken from it is unavailable with the reason.
+    let snapshot = await capture(manifest.architectView);
+    for (let retry = 0; retry < 2 && revisionMismatch(snapshot) !== null; retry += 1) {
+      const index = await this.options.inputs.refresh(this.projectRoot);
+      if (index === null) break;
+      snapshot = await capture(await this.viewIdentityOf(index));
+    }
     const path = join(directory, runLayout.measurement(id));
     const content = `${JSON.stringify(snapshot, null, 2)}\n`;
     await writeOnce(path, content);
@@ -3713,6 +3739,10 @@ export class RunService {
       [...await this.deniedFiles(run), ...assignment.guarded.map(file => file.path)]), this.options.ramify);
     const commandTimeoutMs = engineerBoundsOf(run.record.policy.limits).defaults.commandTimeoutMs;
     const tools = this.implementationTools(run, { workingDirectory, scopeRevision: 1, guarded, commandTimeoutMs });
+    // A writer like any other: its scope size from the frozen baseline, and
+    // its line events from the snapshots around it.
+    const baseline = await this.baselineSnapshot(run);
+    const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
     const result = await this.runInvocation<NonfunctionalRepairSubmission>(run, agent, {
       role: 'nonfunctional-repair-engineer', work: { nonfunctionalRepair: assignment.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-repair-engineer').length + 1,
@@ -3724,9 +3754,12 @@ export class RunService {
       description: 'Report the authorized non-functional repair batch and remaining work.',
       inputSchema: nonfunctionalRepairJsonSchema, submissionSchema: 'ramify-agent.nonfunctional-repair/1',
       validate: input => validateAgainst(nonfunctionalRepairSubmissionSchema, input),
-      keep: () => finished('work-closed'), scope: { write: 1, measurement: null, size: null },
+      keep: () => finished('work-closed'),
+      scope: { write: 1, measurement: baseline === null ? null : this.baselineReference(run), size: null },
+      ...(baseline === null ? {} : { measured: { snapshot: baseline, scope: writeScopeMeasurement(assignment.scope) } }),
       writer: true, guarded, workingDirectory, equip: tools.equip,
     });
+    await this.recordLineEvents(run, result.id, before, await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git));
     if (result.ended !== 'submitted' || result.value === undefined) {
       await this.fail(run, 'agent-failed', `Non-functional repair ended ${result.ended}`);
       return false;
@@ -3964,7 +3997,11 @@ export class RunService {
       attempt: request.attempt,
       session: requestedSession(request),
       prompt: { package: request.loaded.package, hash: request.loaded.hash, inputsHash: inputsHash([request.systemPrompt, request.prompt]) },
-      scope: request.scope,
+      scope: request.measured === undefined ? request.scope : {
+        ...request.scope,
+        size: scopeSize(request.measured.snapshot,
+          await invocationScope(this.projectRoot, run.record.planId, request.measured.scope, request.loaded, request.prompt)),
+      },
       writer: request.writer === true,
       ...(request.candidateBefore === undefined ? {} : { candidateBefore: request.candidateBefore }),
       base: this.accepted(run),
@@ -4309,7 +4346,8 @@ export class RunService {
     const prompt = analysisMessage(run.record, plan, inputs, incorporatedExtraction(evidence));
     const scope = baselineScope(
       this.options.rootModule ?? rootModuleOf(run.index) ?? rootModuleOfSnapshot(baseline) ?? 'root',
-      baseline.supplementary.map(entry => entry.path),
+      // Each invocation's own package and the plan are its support documents.
+      [],
     );
 
     const result = await this.runInvocation<InitialAnalysisSubmission>(run, agent, {
@@ -4331,8 +4369,9 @@ export class RunService {
       scope: {
         write: null,
         measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
-        size: scopeSize(baseline, scope),
+        size: null,
       },
+      measured: { snapshot: baseline, scope: scope },
     });
 
     if (this.ignoring(run)) return false;
@@ -5111,7 +5150,7 @@ export class RunService {
       ? moduleSource
       : this.projectRoot;
     const systemPrompt = renderLocalArchitectPrompt(loaded, this.projectRoot, workingDirectory);
-    const scope = baselineScope(item.module, baseline.supplementary.map(entry => entry.path));
+    const scope = baselineScope(item.module, []);
     const integration = await this.integrationOfItem(run, item);
 
     let sessionRef: string | undefined;
@@ -5468,8 +5507,9 @@ export class RunService {
         scope: {
           write: null,
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
-          size: scopeSize(baseline, scope),
+          size: null,
         },
+        measured: { snapshot: baseline, scope: scope },
       });
       sessionRef = result.kept && result.ref !== '' ? result.ref : undefined;
       session = sessionRef === undefined ? undefined : result.session;
@@ -5902,7 +5942,8 @@ export class RunService {
     const bound = run.record.policy.limits.forkRetriesPerRequest;
     const measured = baselineScope(
       this.options.rootModule ?? rootModuleOf(run.index) ?? rootModuleOfSnapshot(baseline) ?? 'root',
-      baseline.supplementary.map(entry => entry.path),
+      // Each invocation's own package and the plan are its support documents.
+      [],
     );
     let partial: { attempt: number; findings: string[]; gaps: string[] } | undefined = existingId === undefined
       ? undefined : await this.recoveredBoundaryPartial(run, id);
@@ -5973,8 +6014,9 @@ export class RunService {
         scope: {
           write: null,
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
-          size: scopeSize(baseline, measured),
+          size: null,
         },
+        measured: { snapshot: baseline, scope: measured },
       });
 
       if (this.ignoring(run)) return null;
@@ -6177,7 +6219,8 @@ export class RunService {
     const bound = run.record.policy.limits.forkRetriesPerRequest;
     const measured = baselineScope(
       this.options.rootModule ?? rootModuleOf(run.index) ?? rootModuleOfSnapshot(baseline) ?? 'root',
-      baseline.supplementary.map(entry => entry.path),
+      // Each invocation's own package and the plan are its support documents.
+      [],
     );
     let partial: { attempt: number; findings: string[]; gaps: string[] } | undefined = existingId === undefined
       ? undefined : await this.recoveredBoundaryPartial(run, id);
@@ -6247,8 +6290,9 @@ export class RunService {
         scope: {
           write: null,
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
-          size: scopeSize(baseline, measured),
+          size: null,
         },
+        measured: { snapshot: baseline, scope: measured },
       });
 
       if (this.ignoring(run)) return null;
@@ -8234,13 +8278,9 @@ export class RunService {
     const bounds = this.engineerBounds(run, assignment);
     const workingDirectory = await engineerWorkingDirectory(this.projectRoot, assignment.scope, run.index, this.git);
     const systemPrompt = renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs, workingDirectory);
-    const measurementScope = {
-      exactOwners: 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules,
-      subtrees: 'module' in assignment.scope.base ? assignment.scope.resolved.included.filter(entry => entry.kind === 'child-subtree').map(entry => entry.owner) : [],
-      apiViews: true,
-      architectView: false,
-      supportDocuments: baseline.supplementary.map(entry => entry.path),
-    };
+    // What the assignment gave it to write: its base modules, included
+    // subtrees, bootstrapped modules and extra locations.
+    const measurementScope = writeScopeMeasurement(assignment.scope);
 
     const priorStarts = run.log.all('invocation-started').filter(event =>
       event.data.role === 'engineer' && event.data.work.iteration === assignment.id);
@@ -8454,8 +8494,9 @@ export class RunService {
         scope: {
           write: assignment.scope.revision,
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
-          size: scopeSize(baseline, measurementScope),
+          size: null,
         },
+        measured: { snapshot: baseline, scope: measurementScope },
         writer: true,
         ...(beforeTree === undefined ? {} : { candidateBefore: beforeTree }),
         guarded,
@@ -8471,16 +8512,14 @@ export class RunService {
       session = sessionRef === undefined ? undefined : result.session;
       replacing = undefined;
 
-      // The line events of this writer, from the two snapshots around it.
-      // Two snapshots see the tree and not the history between them, so a
-      // command that changed a file and put it back is invisible to them.
+      // The line events of this writer: its net change, from the two
+      // snapshots around it. A change made and put back between them,
+      // through any tool, delivered nothing and is rightly not counted.
       const after = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       const savedLines = replayed ? await readIfExists(run.path(runLayout.lineEvents(result.id))) : undefined;
       const parsedLines = savedLines === undefined ? null : lineEventSummarySchema.safeParse(JSON.parse(savedLines.toString('utf8')));
       const lines = parsedLines?.success ? parsedLines.data : replayed ? null
-        : await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
-          ? ['unguarded-shell: this invocation ran unguarded commands, so a change one of them made and reverted is not in these counts']
-          : []);
+        : await this.recordLineEvents(run, result.id, before, after);
       if (this.ignoring(run)) return null;
 
       if (result.ended === 'context-budget-reached') {
@@ -8965,13 +9004,9 @@ export class RunService {
     // the policy's.
     const bounds = this.engineerBounds(run, assignment);
     const systemPrompt = renderContractPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs);
-    const measurementScope = {
-      exactOwners: [item.module, subject.provider],
-      subtrees: [],
-      apiViews: true,
-      architectView: false,
-      supportDocuments: baseline.supplementary.map(entry => entry.path),
-    };
+    // Its write scope, and the provider whole: the agreement is written on
+    // the provider's side of the boundary.
+    const measurementScope = writeScopeMeasurement(assignment.scope, [subject.provider]);
     const invocations: string[] = [];
     const findings: string[] = [];
     let sessionRef: string | undefined;
@@ -9042,8 +9077,9 @@ export class RunService {
         scope: {
           write: assignment.scope.revision,
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
-          size: scopeSize(baseline, measurementScope),
+          size: null,
         },
+        measured: { snapshot: baseline, scope: measurementScope },
         writer: true,
         guarded,
         equip: tools.equip,
@@ -9055,9 +9091,7 @@ export class RunService {
       session = sessionRef === undefined ? undefined : result.session;
 
       const after = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const lines = await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
-        ? ['unguarded-shell: this invocation ran unguarded commands, so a change one of them made and reverted is not in these counts']
-        : []);
+      const lines = await this.recordLineEvents(run, result.id, before, after);
       if (this.ignoring(run)) return null;
 
       // A threshold return registers nothing, as an `incomplete` submission
@@ -9926,17 +9960,30 @@ export class RunService {
     await this.write(run, { type: 'iteration-closed', data: closing.data }, [closing.record]);
   }
 
+  /** The frozen baseline's snapshot, or null where it cannot be read, which leaves a size unmeasured rather than zero. */
+  private async baselineSnapshot(run: Run): Promise<MeasurementSnapshot | null> {
+    try {
+      return measurementSnapshotSchema.parse(JSON.parse(await readFile(run.path(runLayout.measurement(snapshotId(1))), 'utf8')));
+    } catch {
+      return null;
+    }
+  }
+
+  /** The reference to the frozen baseline an invocation records, or null where the run has none. */
+  private baselineReference(run: Run): Invocation['scope']['measurement'] {
+    return run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null;
+  }
+
   /** Captures one writer invocation's line events from the two snapshots around it. */
   private async recordLineEvents(
     run: Run,
     invocation: string,
     before: LineSnapshot,
     after: LineSnapshot,
-    gaps: readonly string[] = [],
   ): Promise<LineEventSummary | null> {
     // An invocation the run's bounds refused was never started, and has no line events.
     if (invocation === '') return null;
-    const summary = lineEvents({ invocation, before, after, index: run.index, gaps });
+    const summary = lineEvents({ invocation, before, after, index: run.index });
     await writeFileAtomic(run.path(runLayout.lineEvents(invocation)), `${JSON.stringify(summary, null, 2)}\n`);
     return summary;
   }

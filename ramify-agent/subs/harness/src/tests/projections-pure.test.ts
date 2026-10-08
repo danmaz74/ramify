@@ -11,7 +11,7 @@ import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { treeInputs } from './helpers/iterations.js';
 import { fileHashes, protocolPolicy, protocolScript, protocolTarget } from './helpers/protocol.js';
 import { protocolPorts } from './helpers/protocol-ports.js';
-import { openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { openRuns, runEventsOnDisk, runPath, startRun, unscriptedChangeHistory } from './helpers/runs.js';
 
 /*
  * A projection never writes, and no query appends an event.
@@ -85,7 +85,7 @@ describe('a projection never writes, and no query appends an event', () => {
     const { script: _script, ...serverPorts } = ports;
     const server = await startServerWith({
       projectRoot: root, port: 0, ramify: new FakeRamifyCli(),
-      runs: { ...serverPorts, inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined },
+      runs: { ...serverPorts, inputs: treeInputs(), changeHistory: unscriptedChangeHistory, policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined },
     });
     try {
       const paths: string[] = [

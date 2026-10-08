@@ -124,7 +124,6 @@ export interface EngineerEquipment {
   readonly equip: (session: EquipContext) => Equipment;
   /** Whether a tool's bound on invalid inputs was reached. */
   readonly exhausted: () => boolean;
-  readonly shellCalls: () => number;
   /** The Ramify findings this session's edits introduced that no later check has cleared. */
   readonly openFindings: () => readonly HookFinding[];
   /**
@@ -205,8 +204,9 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       // The call itself is already an `activity` observation holding
       // the command text, recorded from the port's own event before
       // the command runs. What is added here is the gap that qualifies
-      // every later count: this invocation wrote through a tool no
-      // guard judged.
+      // the guarding counts: this invocation wrote through a tool no
+      // guard judged. The line counts need no such gap, since they are
+      // the net change the tree shows afterwards.
       starting: async call => {
         // The complete output is a file of the invocation, which the
         // call's result in the transcript names rather than copies.
@@ -373,7 +373,6 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
   return {
     equip,
     exhausted: () => shellJudge?.exhausted === true,
-    shellCalls: () => shell?.calls ?? 0,
     openFindings: () => seen?.open() ?? [],
     findingsAtCompletion,
     completionCheck: () => completion,

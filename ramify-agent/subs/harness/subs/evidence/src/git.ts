@@ -632,6 +632,131 @@ export interface CandidateSource {
 /** The process-backed candidate source. */
 export const gitCandidateSource: CandidateSource = { commitTree, treeEntries, readBlob, grepTree, diffNameStatus, diffPatch };
 
+// The history a run's delivered change is attributed from: which commit
+// introduced each line the run added and which removed each line it
+// deleted. These read Git's objects only, so a later working tree cannot
+// change what they answer.
+
+/** A run of consecutive line numbers: its first line and how many lines follow from it. */
+export type LineRange = readonly [start: number, count: number];
+
+/** One path the diff between two commits changed, with renames detected. */
+export interface ChangedFile {
+  /** The path at the earlier commit; null for a file it did not have. */
+  readonly before: string | null;
+  /** The path at the later commit; null for a file it no longer has. */
+  readonly after: string | null;
+  /** Git reports no lines for a binary file. */
+  readonly binary: boolean;
+  /** Lines of `after` that are not in `before`. */
+  readonly added: readonly LineRange[];
+  /** Lines of `before` that are not in `after`. */
+  readonly deleted: readonly LineRange[];
+}
+
+/** One line of a file and the commit Git names for it. */
+export interface LineCommit {
+  readonly line: number;
+  readonly commit: string;
+  /** Whether the line is the earlier commit's own, older than the range. */
+  readonly boundary: boolean;
+}
+
+/** The read-only history boundary of delivered-change attribution. Consumer tests script it. */
+export interface ChangeHistory {
+  /** The commits after `from` up to and including `to`, oldest first, along the first-parent chain. */
+  readonly commitsBetween: (root: string, from: string, to: string, signal?: AbortSignal) => Promise<string[]>;
+  /** What the direct diff between the two commits added and deleted, per path, with renames detected. */
+  readonly changedFiles: (root: string, from: string, to: string, signal?: AbortSignal) => Promise<ChangedFile[]>;
+  /** For lines of `path` at `to`, the commit after `from` that introduced each; a boundary line is older. */
+  readonly lineOrigins: (root: string, from: string, to: string, path: string, lines: readonly LineRange[], signal?: AbortSignal) => Promise<LineCommit[]>;
+  /** For lines of `path` at `from`, the last commit up to `to` that still held each. */
+  readonly lineLastSeen: (root: string, from: string, to: string, path: string, lines: readonly LineRange[], signal?: AbortSignal) => Promise<LineCommit[]>;
+}
+
+export async function commitsBetween(root: string, from: string, to: string, signal?: AbortSignal): Promise<string[]> {
+  const run = await gitOk(root, ['rev-list', '--first-parent', '--reverse', `${from}..${to}`], signal);
+  return run.stdout.split('\n').map(line => line.trim()).filter(line => line !== '');
+}
+
+/**
+ * The paths are the project's own, relative to its root: `--relative` keeps
+ * a project inside a larger repository to its own files, and blame resolves
+ * them from the same directory.
+ */
+export async function changedFiles(root: string, from: string, to: string, signal?: AbortSignal): Promise<ChangedFile[]> {
+  const statuses = await gitOk(root, ['diff', '--relative', '--name-status', '-z', '-M', from, to], signal);
+  const numstat = await gitOk(root, ['diff', '--relative', '--numstat', '-z', '-M', from, to], signal);
+  const binary = new Set<string>();
+  const counts = numstat.stdout.split('\0');
+  for (let index = 0; index < counts.length; index += 1) {
+    const entry = counts[index];
+    if (entry === undefined || entry === '') continue;
+    const [added, deleted, inline] = entry.split('\t');
+    if (added === undefined || deleted === undefined) continue;
+    let path = inline ?? '';
+    // A rename: its old and new names follow as fields of their own.
+    if (path === '') { path = counts[index + 2] ?? ''; index += 2; }
+    if (added === '-' && deleted === '-') binary.add(path);
+  }
+  const files: ChangedFile[] = [];
+  const fields = statuses.stdout.split('\0');
+  for (let index = 0; index < fields.length; index += 1) {
+    const status = fields[index];
+    if (status === undefined || status === '') continue;
+    const renamed = /^[RC]/u.test(status);
+    const first = fields[index + 1] ?? '';
+    const second = renamed ? fields[index + 2] ?? '' : first;
+    index += renamed ? 2 : 1;
+    const before = status.startsWith('A') ? null : first;
+    const after = status.startsWith('D') ? null : second;
+    const isBinary = binary.has(after ?? before ?? '');
+    if (isBinary) { files.push({ before, after, binary: true, added: [], deleted: [] }); continue; }
+    const paths = [...new Set([before, after].filter((path): path is string => path !== null))];
+    const patch = await gitOk(root, ['--literal-pathspecs', 'diff', '--relative', '-U0', '--no-color', '--no-ext-diff', '-M', from, to, '--', ...paths], signal);
+    const added: LineRange[] = [];
+    const deleted: LineRange[] = [];
+    for (const line of patch.stdout.split('\n')) {
+      const hunk = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/u.exec(line);
+      if (hunk === null) continue;
+      const deletedCount = hunk[2] === undefined ? 1 : Number.parseInt(hunk[2], 10);
+      const addedCount = hunk[4] === undefined ? 1 : Number.parseInt(hunk[4], 10);
+      if (deletedCount > 0) deleted.push([Number.parseInt(hunk[1]!, 10), deletedCount]);
+      if (addedCount > 0) added.push([Number.parseInt(hunk[3]!, 10), addedCount]);
+    }
+    files.push({ before, after, binary: false, added, deleted });
+  }
+  return files;
+}
+
+/** `git blame --line-porcelain` over the given ranges: the commit of each line, and whether it is a boundary line. */
+async function blameRanges(root: string, range: readonly string[], path: string, lines: readonly LineRange[], signal?: AbortSignal): Promise<LineCommit[]> {
+  const ranges = lines.filter(([, count]) => count > 0);
+  if (ranges.length === 0) return [];
+  const run = await gitOk(root, ['--literal-pathspecs', 'blame', '--line-porcelain', ...ranges.flatMap(([start, count]) => ['-L', `${start},+${count}`]), ...range, '--', path], signal);
+  const answers: LineCommit[] = [];
+  let current: { line: number; commit: string; boundary: boolean } | null = null;
+  for (const line of run.stdout.split('\n')) {
+    const header = /^([0-9a-f]{40}|[0-9a-f]{64}) \d+ (\d+)/u.exec(line);
+    if (header !== null) { current = { commit: header[1]!, line: Number.parseInt(header[2]!, 10), boundary: false }; continue; }
+    if (current === null) continue;
+    if (line === 'boundary') current.boundary = true;
+    else if (line.startsWith('\t')) { answers.push(current); current = null; }
+  }
+  return answers;
+}
+
+export async function lineOrigins(root: string, from: string, to: string, path: string, lines: readonly LineRange[], signal?: AbortSignal): Promise<LineCommit[]> {
+  return blameRanges(root, [`${from}..${to}`], path, lines, signal);
+}
+
+export async function lineLastSeen(root: string, from: string, to: string, path: string, lines: readonly LineRange[], signal?: AbortSignal): Promise<LineCommit[]> {
+  return blameRanges(root, ['--reverse', `${from}..${to}`], path, lines, signal);
+}
+
+/** The process-backed history. */
+export const gitChangeHistory: ChangeHistory = { commitsBetween, changedFiles, lineOrigins, lineLastSeen };
+
 /** Fixed read-only Git operations for coordinating architects. No caller supplies command flags. */
 export interface GitInspection {
   readonly operation: 'status' | 'diff' | 'log' | 'show';

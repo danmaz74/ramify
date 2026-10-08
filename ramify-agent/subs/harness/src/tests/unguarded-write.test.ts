@@ -134,11 +134,12 @@ describe('X6: an unguarded shell mutation and an outside read make the MVP\'s li
     expect(report.gaps.map(gap => gap.kind)).toContain('unguarded-shell');
     expect(report.statement).toContain('not evidence');
 
-    // Line events cannot see what an unguarded command changed and put back,
-    // so they say so rather than reporting a complete count.
+    // The shell limits guarding, not the line counts: the two snapshots
+    // give the invocation's net change, the shell's write included.
     const lines = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.lineEvents(invocation)), 'utf8')) as LineEventSummary;
-    expect(lines.coverage).toBe('partial');
-    expect(lines.gaps.some(gap => gap.startsWith('unguarded-shell'))).toBe(true);
+    expect(lines.coverage).toBe('complete');
+    expect(lines.gaps).toEqual([]);
+    expect(lines.paths).toContainEqual(expect.objectContaining({ path: outsidePath, added: 1, deleted: 0 }));
 
     expect(result.commit).toBeNull();
     const events = await runEventsOnDisk(root, 'review-notes', runId);

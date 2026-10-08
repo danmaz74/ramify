@@ -15,7 +15,7 @@ const core = JSON.parse(JSON.stringify(canvasMap)
   .replaceAll('ses-engineer', 'ses-0003')) as ExecutionMapSnapshot;
 const complete = (total: number) => ({ state: 'complete' as const, known: total, total });
 const emptyLines = { totals: { added: 0, deleted: 0, textPaths: 0, invocationIds: [] }, coverage: 'complete' as const,
-  gaps: [], binary: { paths: 0, invocationIds: [] }, methodLimit: 'Two worktree snapshots can miss edits reverted before the second snapshot.' as const };
+  gaps: [], binary: { paths: 0, invocationIds: [] }, methodLimit: 'Per-writer net changes are summed, so a line a later writer changes again can count more than once.' as const };
 const partialLines = { ...emptyLines, totals: { added: 18, deleted: 7, textPaths: 2, invocationIds: [] },
   coverage: 'partial' as const, gaps: ['One writer snapshot was incomplete.'] };
 const tree = { status: 'available' as const, revision: 'tree-browser', input: 'input-browser', modules: [

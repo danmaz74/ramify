@@ -34,6 +34,10 @@ expose-src commitNameStatus, diffNameStatus, worktreeLineChanges, worktreePatch,
 // served from: its tree, its files, a search and its diff from a base.
 expose-src CandidateSource, gitCandidateSource, TreeEntry, TreeMatch, commitTree, treeEntries, readBlob, grepTree, diffPatch from "git.ts" to parent
 
+// The history a run's delivered change is attributed from: the commits of
+// a range, its direct diff and the commit Git names for each changed line.
+expose-src ChangeHistory, ChangedFile, LineRange, LineCommit, gitChangeHistory from "git.ts" to parent
+
 // Consumers inject this boundary; real Git integration tests live with the adapter.
 expose-src GitService, gitService, currentHead, runBranchName from "git.ts" to parent
 expose-src trackedPaths, ignoreStatus, IgnoreRule, IgnoreStatus from "git.ts" to parent

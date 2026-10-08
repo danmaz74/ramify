@@ -3,6 +3,8 @@ import type { Role } from '../interfaces/protocol/runs.js';
 import { rawOutputGapKinds, type Observation } from '../run/observations.js';
 import type { InvocationOutcome, LineEventSummary, ScopeSize } from '../run/records.js';
 import { roles } from '../run/records.js';
+import { scopeSizePolicy } from './capture.js';
+import type { DeliveredChange } from './delivered.js';
 
 /*
  * The KPI projection, `kpi/1`. Every metric is computed here from what the
@@ -19,12 +21,13 @@ import { roles } from '../run/records.js';
  *   - input, cache-read, cache-write and output tokens stay separate, and no
  *     usage is converted to a price.
  *
- * The measurement policy of the sizes, `scope-size/1`, is versioned apart
- * from this projection and travels with every metric that reads a size.
+ * The measurement policy of the sizes, `scope-size/2`, is versioned apart
+ * from this projection and travels with every metric that reads a size. A
+ * size taken under another policy is refused, never mixed with it.
  */
 
 export const kpiPolicyVersion = 'kpi/1' as const;
-export const measurementPolicyVersion = 'scope-size/1' as const;
+export const measurementPolicyVersion = scopeSizePolicy;
 
 /** What the KPIs know of one invocation, read from its records and its observation log. */
 export interface InvocationFacts {
@@ -58,6 +61,8 @@ export interface MetricInputs {
   /** The frozen baseline `B`, or why the producer gave none. */
   readonly baseline: { readonly bytes: number; readonly snapshot: string } | { readonly unavailable: string };
   readonly invocations: readonly InvocationFacts[];
+  /** The run's delivered change, which gives each writer its change weight `w_e`. */
+  readonly delivered: DeliveredChange;
   /** Every committed gate attempt. */
   readonly gateAttempts: readonly string[];
   /** Every accepted iteration result. */
@@ -101,72 +106,89 @@ function observedCount(id: string, unit: string, count: number, covered: number,
 
 const readable = (facts: InvocationFacts): readonly Observation[] | null => (Array.isArray(facts.observations) ? facts.observations as readonly Observation[] : null);
 
-/** The change weight of one invocation: text lines added and deleted. A binary path carries none. */
-function weightOf(lines: LineEventSummary): number {
-  return lines.paths.reduce((total, path) => total + (path.binary ? 0 : path.added + path.deleted), 0);
+/** Why a size cannot stand for `S_e`, or null where it can. */
+function sizeGap(size: ScopeSize | null): string | null {
+  if (size === null) return 'no scope size was captured';
+  if (size.policy !== measurementPolicyVersion) return `its size was taken under ${size.policy}, which is not comparable with ${measurementPolicyVersion}`;
+  if (size.bytes !== null) return null;
+  return size.components.filter(component => component.state !== 'measured')
+    .map(component => `${component.component} ${component.state}${component.reason === undefined ? '' : `: ${component.reason}`}`).join('; ');
 }
 
+const lines = (count: number): string => `${Number.isInteger(count) ? count : count.toFixed(2)} lines`;
+
 /**
- * `sum(w_e * S_e) / sum(w_e)` over the writers' line events. A writer whose
- * scope size is unknown and that changed lines makes the metric unavailable,
- * with the known subtotal; a writer whose line events are partial, as after
- * the unguarded shell, makes it partial.
+ * `sum(w_e * S_e) / sum(w_e)` over the writers: the change-weighted mean of
+ * the declared scope bytes, in bytes. `w_e` is each writer's share of the
+ * delivered change, the run base to its last accepted commit, so a line is
+ * counted once in its delivered form (docs/measurements-and-kpis.md,
+ * "Changed lines"). A writer that delivered lines and whose scope size is
+ * unknown makes the metric unavailable; delivered lines no writer can be
+ * named for make it partial. Either state shows the subtotal and the change
+ * weight it covers, and no value.
  */
 function bytesPerChangedLine(inputs: MetricInputs): Metric {
   const id = 'scope-bytes-per-changed-line';
-  const unit = 'bytes per changed line';
+  const unit = 'bytes (change-weighted mean)';
   const writers = inputs.invocations.filter(facts => facts.writer && facts.outcome !== null);
   const common = { measurementPolicy: measurementPolicyVersion };
-  if (writers.length === 0) {
-    return metric({ id, unit, state: 'not-applicable', numerator: 0, denominator: 0, coverage: { covered: 0, total: 0 }, note: 'No writer session ended, so no line changed', ...common });
+  const delivered = inputs.delivered;
+  if (delivered.state === 'not-applicable') {
+    return metric({ id, unit, state: 'not-applicable', numerator: 0, denominator: 0, coverage: { covered: writers.length, total: writers.length }, note: `${delivered.reason}, so no line was delivered`, ...common });
   }
+  if (delivered.state === 'unavailable') {
+    return metric({ id, unit, state: 'unavailable', coverage: { covered: 0, total: writers.length }, evidence: [delivered.reason], note: 'The delivered change is unknown, so no writer has a change weight', ...common });
+  }
+
   let numerator = 0;
-  let denominator = 0;
+  let known = 0;
+  let total = 0;
   let covered = 0;
+  const evidence: string[] = [`delivered change ${delivered.base.slice(0, 12)}..${delivered.final.slice(0, 12)}`];
   const unknownSize: string[] = [];
-  const partialLines: string[] = [];
-  const unreadableLines: string[] = [];
-  for (const facts of writers) {
-    if (facts.lines === null || 'unavailable' in facts.lines) {
-      unreadableLines.push(`${facts.id}: ${facts.lines === null ? 'no line events were captured' : facts.lines.unavailable}`);
+  const byId = new Map(inputs.invocations.map(facts => [facts.id, facts]));
+  const weighted = new Set(delivered.weights.keys());
+  for (const facts of writers) if (!weighted.has(facts.id)) { covered += 1; evidence.push(`${facts.id}: w_e = 0, it delivered no line`); }
+  for (const [invocation, weight] of delivered.weights) {
+    total += weight;
+    const gap = sizeGap(byId.get(invocation)?.size ?? null);
+    if (gap !== null) {
+      unknownSize.push(`${invocation}: w_e = ${lines(weight)}, S_e unknown: ${gap}`);
       continue;
     }
-    const weight = weightOf(facts.lines);
-    if (facts.lines.coverage === 'partial') {
-      partialLines.push(`${facts.id}: ${facts.lines.gaps.join('; ') || 'partial'}`);
-      continue;
-    }
-    if (weight > 0 && (facts.size === null || facts.size.bytes === null)) {
-      const missing = facts.size === null
-        ? ['no scope size was captured']
-        : facts.size.components.filter(component => component.state !== 'measured').map(component => `${component.component} ${component.state}${component.reason === undefined ? '' : `: ${component.reason}`}`);
-      unknownSize.push(`${facts.id}: ${missing.join('; ')}`);
-      denominator += weight;
-      continue;
-    }
+    const bytes = byId.get(invocation)!.size!.bytes!;
     covered += 1;
-    denominator += weight;
-    numerator += weight * (facts.size?.bytes ?? 0);
+    known += weight;
+    numerator += weight * bytes;
+    evidence.push(`${invocation}: w_e = ${lines(weight)}, S_e = ${bytes} bytes`);
   }
-  const coverage = { covered, total: writers.length };
-  if (unknownSize.length > 0 || unreadableLines.length > 0) {
-    // The subtotal is what the known sessions contribute; the total is not
-    // known, and it is not zero.
+  const unattributed = [...delivered.unattributed].reduce((sum, [, count]) => sum + count, 0);
+  for (const [reason, count] of delivered.unattributed) evidence.push(`unattributed: ${lines(count)}: ${reason}`);
+  if (delivered.harness > 0) evidence.push(`harness: ${lines(delivered.harness)} the harness delivered, which no writer is weighted by`);
+  if (delivered.binaryPaths.length > 0) evidence.push(`binary, without line weight: ${delivered.binaryPaths.join(', ')}`);
+  const coverage = { covered, total: Math.max(writers.length, covered + unknownSize.length) };
+
+  if (unknownSize.length > 0) {
+    // The subtotal and the denominator are the known writers' alone: the
+    // total is not known, and it is not zero.
     return metric({
-      id, unit, state: 'unavailable', subtotal: covered > 0 ? numerator : null, denominator: unreadableLines.length > 0 ? null : denominator, coverage,
-      evidence: [...unknownSize, ...unreadableLines], note: 'A size component or a line count is missing, so the total is unknown; the known subtotal is shown', ...common,
+      id, unit, state: 'unavailable', subtotal: known > 0 ? numerator : null, denominator: known, coverage,
+      evidence: [...unknownSize, ...evidence],
+      note: `A writer's scope size is unknown, so the total is unknown. The subtotal is sum(w_e * S_e) over the writers of known size, and the denominator their ${lines(known)} of the ${lines(total + unattributed)} delivered`,
+      ...common,
     });
   }
-  if (partialLines.length > 0) {
+  if (unattributed > 0) {
     return metric({
-      id, unit, state: 'partial', numerator, denominator, coverage, evidence: partialLines,
-      note: 'Refused as a whole-run ratio: some line counts are partial. The covered sessions and change weight are shown instead', ...common,
+      id, unit, state: 'partial', numerator, denominator: known, coverage, evidence,
+      note: `Refused as a whole-run ratio: ${lines(unattributed)} of the ${lines(total + unattributed)} delivered are attributed to no writer. The numerator and denominator are the attributed writers' alone`,
+      ...common,
     });
   }
-  if (denominator === 0) {
-    return metric({ id, unit, state: 'not-applicable', numerator: 0, denominator: 0, coverage, note: 'sum(w_e) = 0: no text line changed', ...common });
+  if (total === 0) {
+    return metric({ id, unit, state: 'not-applicable', numerator: 0, denominator: 0, coverage, evidence, note: 'sum(w_e) = 0: no writer delivered a text line', ...common });
   }
-  return metric({ id, unit, state: 'measured', value: numerator / denominator, numerator, denominator, coverage, ...common });
+  return metric({ id, unit, state: 'measured', value: numerator / total, numerator, denominator: total, coverage, evidence, ...common });
 }
 
 /** A metric that divides another by `B`: it inherits every state but `measured`. */
@@ -223,8 +245,8 @@ function sessionWeightedTotal(inputs: MetricInputs): Metric {
   for (const [session, list] of sessions) {
     const largest = new Map<string, number | null>();
     for (const facts of list) {
-      if (facts.size === null) {
-        largest.set('scope', null);
+      if (facts.size === null || facts.size.policy !== measurementPolicyVersion) {
+        largest.set(facts.size === null ? 'scope' : `${facts.size.policy} scope`, null);
         continue;
       }
       for (const component of facts.size.components) {
@@ -423,12 +445,12 @@ function observationCoverage(inputs: MetricInputs): Metric[] {
 /** Every KPI of the run, in the order of the plan's list. */
 export function kpiMetrics(inputs: MetricInputs, guarding: { readonly statement: string; readonly complete: boolean }): Metric[] {
   const perLine = bytesPerChangedLine(inputs);
-  const ratioMetric = overBaseline('scope-size-ratio', 'baselines per changed line', perLine, inputs);
+  const ratioMetric = overBaseline('scope-size-ratio', 'dimensionless (mean over B)', perLine, inputs);
   const sessions = sessionsOf(inputs);
   return [
     perLine,
     ratioMetric,
-    overBaseline('reduction-factor', 'changed lines per baseline', perLine, inputs, true),
+    overBaseline('reduction-factor', 'dimensionless (B over mean)', perLine, inputs, true),
     metric({
       id: 'session-count', unit: 'sessions', state: 'measured', value: sessions.size, numerator: sessions.size,
       coverage: { covered: inputs.invocations.length, total: inputs.invocations.length },

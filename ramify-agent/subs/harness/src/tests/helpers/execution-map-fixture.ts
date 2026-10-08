@@ -19,7 +19,7 @@ const moduleAt = (module: string, role: ExecutionModuleRelation['role'], sequenc
 const base = (key: string, label: string, sequence: number, modules: ExecutionModuleRelation[] = []) =>
   ({ key, label, runVersion: version, sourceRefs: [source(sequence)], modules });
 const complete = (total: number) => ({ state: 'complete' as const, known: total, total });
-const methodLimit = 'Two worktree snapshots can miss edits reverted before the second snapshot.' as const;
+const methodLimit = 'Per-writer net changes are summed, so a line a later writer changes again can count more than once.' as const;
 const fixtureLines = (added: number, deleted: number, textPaths: number, invocationIds: string[], binaryPaths = 0,
   binaryInvocations: string[] = []) => ({ totals: { added, deleted, textPaths, invocationIds }, coverage: 'partial' as const,
     gaps: ['Writer inv-repair has partial coverage.'], binary: { paths: binaryPaths, invocationIds: binaryInvocations }, methodLimit });

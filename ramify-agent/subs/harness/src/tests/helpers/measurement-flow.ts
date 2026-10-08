@@ -39,7 +39,7 @@ export function measurementCase(environment: MeasurementEnvironment, number: num
     expect(record.baseline.measurement.hash).toMatch(/^[0-9a-f]{64}$/);
 
     const snapshot = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.measurement('ms-0001')), 'utf8')) as MeasurementSnapshot;
-    expect(snapshot.policy).toBe('scope-size/1');
+    expect(snapshot.policy).toBe('scope-size/2');
     expect('unavailable' in snapshot.measure).toBe(false);
     if ('unavailable' in snapshot.measure) throw new Error('unavailable');
     expect(snapshot.measure.revision).toMatch(/^rev\//);
@@ -73,7 +73,7 @@ export function measurementCase(environment: MeasurementEnvironment, number: num
     expect(invocation.role).toBe('initial-architect');
     expect(invocation.scope.measurement).toMatchObject({ id: 'ms-0001', revision: 1 });
     const size = invocation.scope.size!;
-    expect(size.policy).toBe('scope-size/1');
+    expect(size.policy).toBe('scope-size/2');
     expect(size.snapshot).toBe('ms-0001');
     expect(size.components.map(component => component.component)).toEqual([
       'owned-source', 'api-views', 'architect-view', 'support-documents',

@@ -51,7 +51,7 @@ export const canvasLinks: ExecutionLink[] = [
   link('l18', 'depends-on', 'capability:theme-tokens', 'capability:status-badge', 40),
 ];
 const noLines = { totals: { added: 0, deleted: 0, textPaths: 0, invocationIds: [] }, coverage: 'unavailable' as const,
-  gaps: ['No retained lines.'], binary: { paths: 0, invocationIds: [] }, methodLimit: 'Two worktree snapshots can miss edits reverted before the second snapshot.' as const };
+  gaps: ['No retained lines.'], binary: { paths: 0, invocationIds: [] }, methodLimit: 'Per-writer net changes are summed, so a line a later writer changes again can count more than once.' as const };
 const tree = { status: 'unavailable' as const, message: 'No current tree.' };
 export const canvasMap: ExecutionMapSnapshot = { runVersion: version, tree,
   moduleMap: { tree, modules: [], outsideTree: [], proposed: [], unplaced: [], unmapped: noLines, lines: noLines },

@@ -4,6 +4,7 @@ import {
   type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunEventPage, type RunListResponse, type RunResponse,
   type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../interfaces/protocol/runs.js';
+import type { ChangeHistory } from '../../subs/evidence/src/git.js';
 import type { PlanDecisionWait } from '../interfaces/protocol/queries.js';
 import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
@@ -45,6 +46,8 @@ export interface RunSource {
   committedRuns(planId: string): CommittedRun[];
   /** Every run it serves, of every plan, with the sequence of its last event. */
   runVersions(): ReadonlyArray<{ readonly planId: string; readonly runId: string; readonly version: number }>;
+  /** The project's Git history, which a run's delivered change is read from; without it the change weights are unavailable. */
+  readonly changeHistory?: ChangeHistory | undefined;
 }
 
 export class RunQueries {
@@ -233,7 +236,8 @@ export class RunQueries {
   }
 
   async metrics(planId: string, runId: string): Promise<MetricsResponse> {
-    return metricsOf(await this.view(planId, runId));
+    const history = this.source.changeHistory;
+    return metricsOf(await this.view(planId, runId), history === undefined ? undefined : { projectRoot: this.source.projectRoot, changes: history });
   }
 
   /** The view of one served run, refused as stale when the caller named another version. */

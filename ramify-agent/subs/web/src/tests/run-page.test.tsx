@@ -229,10 +229,10 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
       obligations: [],
     }),
     metrics: metricsResponseSchema.parse({
-      policyVersion: 'kpi/1', measurementPolicy: 'scope-size/1',
+      policyVersion: 'kpi/1', measurementPolicy: 'scope-size/2',
       baseline: { state: 'unavailable', reason: 'ramify measure could not be run', subtotal: null },
       metrics: [
-        { id: 'scope-bytes-per-changed-line', unit: 'bytes per changed line', policyVersion: 'kpi/1', measurementPolicy: 'scope-size/1', state: 'unavailable', value: null, numerator: null, denominator: 13, subtotal: 10000, coverage: { covered: 1, total: 2 }, evidence: ['inv-0006: owned-source unknown'], note: 'A size component is missing' },
+        { id: 'scope-bytes-per-changed-line', unit: 'bytes (change-weighted mean)', policyVersion: 'kpi/1', measurementPolicy: 'scope-size/2', state: 'unavailable', value: null, numerator: null, denominator: 13, subtotal: 10000, coverage: { covered: 1, total: 2 }, evidence: ['inv-0006: owned-source unknown'], note: 'A size component is missing' },
         { id: 'session-count', unit: 'sessions', policyVersion: 'kpi/1', measurementPolicy: null, state: 'measured', value: 6, numerator: 6, denominator: null, subtotal: null, coverage: { covered: 6, total: 6 }, evidence: [], note: null },
       ],
       lineage: {

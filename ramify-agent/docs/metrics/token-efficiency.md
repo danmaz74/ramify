@@ -63,6 +63,11 @@ omitted source scopes must remain visible as coverage limits.
 C = A + D
 ```
 
+`C` is a proxy for useful change: the change delivered, not the work spent
+producing it. A line written, rewritten or reverted along the way counts once,
+in its delivered form; a change made and then undone counts not at all.
+Editing effort is not measured.
+
 Compute `A` and `D` from the baseline-to-final text diff. A replacement counts
 as a deletion plus an addition; this is not the signed net change `A - D`.
 

@@ -10,7 +10,8 @@ import { analysis } from './helpers/analysis.js';
 import { submit, write } from './helpers/iterations.js';
 import { RunQueries } from '../projections/queries.js';
 import { emptyAnalysis, freeze, onlyRun, openRuns,
-  runEventsOnDisk, staleCrashLock, startRun, until } from './helpers/runs.js';
+  runEventsOnDisk, runPath, staleCrashLock, startRun, until } from './helpers/runs.js';
+import { runLayout, type Invocation } from '../run/records.js';
 import type { RunWrite } from '../run/service.js';
 
 import { nfrBoundaries } from './helpers/nonfunctional-boundaries.js';
@@ -167,6 +168,18 @@ for (const { boundary, ...variant } of repairCrashes) {
       expect(events.filter(event => event.type === 'nonfunctional-round-closed')).toHaveLength(1);
       expect(firstAgent.sessions.filter(session => session.spec.role === 'nonfunctional-repair-engineer').length
         + resumedAgent.sessions.filter(session => session.spec.role === 'nonfunctional-repair-engineer').length).toBe(1);
+      // The repair engineer is a writer like any other: it has a scope
+      // size, measured under the current policy, and its line events.
+      const repair = events.find(event => event.type === 'invocation-started' && event.data.role === 'nonfunctional-repair-engineer');
+      const id = repair?.type === 'invocation-started' ? repair.data.invocation : '';
+      const invocation = JSON.parse(await readFile(runPath(fixture.root, 'review-notes', runId, runLayout.invocation(id)), 'utf8')) as Invocation;
+      expect(invocation.writer).toBe(true);
+      expect(invocation.scope.size).toMatchObject({ policy: 'scope-size/2', components: expect.arrayContaining([expect.objectContaining({ component: 'owned-source' })]) });
+      // A crash once it ended leaves no snapshot after it; the line events
+      // are then missing, which leaves a shared commit unattributed, not zero.
+      if (boundary !== 'invocation-ended') {
+        expect(JSON.parse(await readFile(runPath(fixture.root, 'review-notes', runId, runLayout.lineEvents(id)), 'utf8'))).toMatchObject({ schema: 'ramify-agent.line-events/1', invocation: id });
+      }
     }
   }, 60_000);
 }

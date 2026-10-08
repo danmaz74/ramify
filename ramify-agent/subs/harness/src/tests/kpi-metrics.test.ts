@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { metricSchema, type Metric } from '../interfaces/protocol/runs.js';
+import type { DeliveredChange } from '../kpi/delivered.js';
 import { kpiMetrics, type InvocationFacts, type MetricInputs } from '../kpi/metrics.js';
 import { runView } from '../projections/inputs.js';
 import { metricsOf } from '../projections/metrics.js';
@@ -30,7 +31,7 @@ function size(bytes: number | null, missing?: string): ScopeSize {
     { component: 'support-documents', detail: 'x', bytes: 0, state: 'measured' },
   ];
   const known = components.filter(component => component.state === 'measured').reduce((total, component) => total + (component.bytes ?? 0), 0);
-  return { policy: 'scope-size/1', snapshot: 'ms-0001', components, bytes: missing === undefined ? known : null, subtotal: known, coverage: missing === undefined ? 'complete' : 'partial' };
+  return { policy: 'scope-size/2', snapshot: 'ms-0001', components, bytes: missing === undefined ? known : null, subtotal: known, coverage: missing === undefined ? 'complete' : 'partial' };
 }
 
 function lines(invocation: string, added: number, deleted: number, coverage: 'complete' | 'partial' = 'complete'): LineEventSummary {
@@ -38,7 +39,7 @@ function lines(invocation: string, added: number, deleted: number, coverage: 'co
     schema: 'ramify-agent.line-events/1', invocation,
     paths: added + deleted === 0 ? [] : [{ path: 'subs/x/src/a.ts', owner: 'p/x', added, deleted, binary: false, bytes: null }],
     unmapped: { paths: 0, added: 0, deleted: 0 },
-    coverage, gaps: coverage === 'partial' ? ['unguarded-shell: the shell ran'] : [],
+    coverage, gaps: coverage === 'partial' ? ['changed-paths-unknown: the snapshot after the session failed (git exited 128)'] : [],
   };
 }
 
@@ -52,8 +53,21 @@ function writer(id: string, extra: Partial<InvocationFacts> = {}): InvocationFac
   };
 }
 
+/** A delivered change in which each writer delivered what its line events say, and nothing else was delivered. */
+function delivered(weights: ReadonlyArray<readonly [string, number]>, unattributed: ReadonlyArray<readonly [string, number]> = []): DeliveredChange {
+  return { state: 'measured', base: 'a'.repeat(40), final: 'f'.repeat(40), weights: new Map(weights), unattributed: new Map(unattributed), harness: 0, binaryPaths: [] };
+}
+
 function inputs(invocations: InvocationFacts[], extra: Partial<MetricInputs> = {}): MetricInputs {
-  return { baseline: { bytes: 10_000, snapshot: 'ms-0001' }, invocations, gateAttempts: ['ga-0002', 'ga-0003'], acceptedIterations: ['wi-001.i01'], ...extra };
+  const weights = invocations.flatMap(facts => {
+    if (!facts.writer || facts.lines === null || 'unavailable' in facts.lines) return [];
+    const weight = facts.lines.paths.reduce((total, path) => total + path.added + path.deleted, 0);
+    return weight > 0 ? [[facts.id, weight] as const] : [];
+  });
+  return {
+    baseline: { bytes: 10_000, snapshot: 'ms-0001' }, invocations, delivered: delivered(weights),
+    gateAttempts: ['ga-0002', 'ga-0003'], acceptedIterations: ['wi-001.i01'], ...extra,
+  };
 }
 
 function find(metrics: readonly Metric[], id: string): Metric {
@@ -71,11 +85,14 @@ function computed(value: MetricInputs, guarding = guarded): Metric[] {
 describe('M4: every metric keeps its numerator, denominator, version and coverage', () => {
   test('measured: sum(w_e * S_e) / sum(w_e), over B, and its inverse', () => {
     const metrics = computed(inputs([writer('inv-0002'), writer('inv-0003', { size: size(3000), lines: lines('inv-0003', 20, 10) })]));
-    // (10 * 1000 + 30 * 3000) / 40 = 2500 bytes per changed line.
+    // (10 * 1000 + 30 * 3000) / 40 = 2500 bytes, the change-weighted mean.
     expect(find(metrics, 'scope-bytes-per-changed-line')).toMatchObject({
       state: 'measured', value: 2500, numerator: 100_000, denominator: 40, coverage: { covered: 2, total: 2 },
-      policyVersion: 'kpi/1', measurementPolicy: 'scope-size/1',
+      policyVersion: 'kpi/1', measurementPolicy: 'scope-size/2',
     });
+    expect(find(metrics, 'scope-bytes-per-changed-line').evidence).toEqual([
+      `delivered change ${'a'.repeat(12)}..${'f'.repeat(12)}`, 'inv-0002: w_e = 10 lines, S_e = 1000 bytes', 'inv-0003: w_e = 30 lines, S_e = 3000 bytes',
+    ]);
     expect(find(metrics, 'scope-size-ratio')).toMatchObject({ state: 'measured', value: 0.25, numerator: 2500, denominator: 10_000 });
     expect(find(metrics, 'reduction-factor')).toMatchObject({ state: 'measured', value: 4 });
     expect(find(metrics, 'gate-attempts-per-accepted-iteration')).toMatchObject({ state: 'measured', value: 2, numerator: 2, denominator: 1, measurementPolicy: null });
@@ -89,10 +106,11 @@ describe('M4: every metric keeps its numerator, denominator, version and coverag
     const perLine = find(metrics, 'scope-bytes-per-changed-line');
     expect(perLine).toMatchObject({
       state: 'unavailable', value: null, numerator: null,
-      // The known part: inv-0002's 10 lines at 1000 bytes.
-      subtotal: 10_000, denominator: 13, coverage: { covered: 1, total: 2 },
+      // The known part, and the weight it covers: inv-0002's 10 lines at 1000 bytes.
+      subtotal: 10_000, denominator: 10, coverage: { covered: 1, total: 2 },
+      note: expect.stringContaining('10 lines of the 13 lines delivered'),
     });
-    expect(perLine.evidence.join('\n')).toContain('inv-0003: owned-source unknown');
+    expect(perLine.evidence.join('\n')).toContain('inv-0003: w_e = 3 lines, S_e unknown: owned-source unknown');
     // What divides it by B inherits its state, with the same subtotal.
     expect(find(metrics, 'scope-size-ratio')).toMatchObject({ state: 'unavailable', value: null, subtotal: 10_000 });
     expect(find(metrics, 'session-weighted-total')).toMatchObject({ state: 'unavailable', value: null, coverage: { covered: 1, total: 2 } });
@@ -104,11 +122,46 @@ describe('M4: every metric keeps its numerator, denominator, version and coverag
     expect(find(metrics, 'scope-size-ratio')).toMatchObject({ state: 'not-applicable', value: null });
   });
 
-  test('a whole-run ratio over partial line counts is refused; the covered sessions and weight are shown', () => {
-    const metrics = computed(inputs([writer('inv-0002'), writer('inv-0003', { lines: lines('inv-0003', 50, 0, 'partial') })]));
-    expect(find(metrics, 'scope-bytes-per-changed-line')).toMatchObject({
-      state: 'partial', value: null, numerator: 10_000, denominator: 10, coverage: { covered: 1, total: 2 },
+  test('delivered lines no writer can be named for refuse a whole-run ratio; the attributed numerator and weight are shown', () => {
+    const facts = [writer('inv-0002'), writer('inv-0003', { lines: lines('inv-0003', 50, 0, 'partial') })];
+    const metrics = computed(inputs(facts, { delivered: delivered([['inv-0002', 10]], [['commit 0123456789ab holds no recorded writer\'s work', 50]]) }));
+    const perLine = find(metrics, 'scope-bytes-per-changed-line');
+    expect(perLine).toMatchObject({
+      state: 'partial', value: null, numerator: 10_000, denominator: 10, coverage: { covered: 2, total: 2 },
+      note: expect.stringContaining('50 lines of the 60 lines delivered are attributed to no writer'),
     });
+    expect(perLine.evidence).toContain('inv-0003: w_e = 0, it delivered no line');
+    expect(perLine.evidence).toContain('unattributed: 50 lines: commit 0123456789ab holds no recorded writer\'s work');
+    expect(find(metrics, 'scope-size-ratio')).toMatchObject({ state: 'partial', value: null, numerator: 10_000, denominator: 10 });
+  });
+
+  test('w_e is the delivered share: a writer whose lines a later writer replaced is weighted by what survived, a shared commit by its split', () => {
+    // inv-0002 recorded 10 lines but delivered 4; inv-0003 and inv-0004
+    // shared one commit, split 4.5 and 1.5 by their recorded increases.
+    const facts = [writer('inv-0002'), writer('inv-0003', { size: size(3000) }), writer('inv-0004', { size: size(5000) })];
+    const metrics = computed(inputs(facts, { delivered: delivered([['inv-0002', 4], ['inv-0003', 4.5], ['inv-0004', 1.5]]) }));
+    // (4 * 1000 + 4.5 * 3000 + 1.5 * 5000) / 10 = 2500.
+    expect(find(metrics, 'scope-bytes-per-changed-line')).toMatchObject({ state: 'measured', value: 2500, numerator: 25_000, denominator: 10 });
+    expect(find(metrics, 'scope-bytes-per-changed-line').evidence).toContain('inv-0003: w_e = 4.50 lines, S_e = 3000 bytes');
+  });
+
+  test('no accepted commit is not-applicable, and a delivered change Git cannot answer is unavailable, never zero', () => {
+    const none = computed(inputs([writer('inv-0002')], { delivered: { state: 'not-applicable', reason: 'No commit was accepted after the run base' } }));
+    expect(find(none, 'scope-bytes-per-changed-line')).toMatchObject({ state: 'not-applicable', value: null, numerator: 0, denominator: 0, note: expect.stringContaining('No commit was accepted') });
+    expect(find(none, 'scope-size-ratio')).toMatchObject({ state: 'not-applicable', value: null });
+
+    const unknown = computed(inputs([writer('inv-0002')], { delivered: { state: 'unavailable', reason: 'The delivered change could not be read from Git: git exited 128' } }));
+    expect(find(unknown, 'scope-bytes-per-changed-line')).toMatchObject({ state: 'unavailable', value: null, subtotal: null, denominator: null, evidence: [expect.stringContaining('git exited 128')] });
+    expect(find(unknown, 'reduction-factor')).toMatchObject({ state: 'unavailable', value: null });
+  });
+
+  test('a size taken under another measurement policy is refused, never mixed with the current one', () => {
+    const old = { ...size(1000), policy: 'scope-size/1' as const };
+    const metrics = computed(inputs([writer('inv-0002'), writer('inv-0003', { size: old })]));
+    const perLine = find(metrics, 'scope-bytes-per-changed-line');
+    expect(perLine).toMatchObject({ state: 'unavailable', value: null, subtotal: 10_000, denominator: 10 });
+    expect(perLine.evidence.join('\n')).toContain('inv-0003: w_e = 10 lines, S_e unknown: its size was taken under scope-size/1, which is not comparable with scope-size/2');
+    expect(find(metrics, 'session-weighted-total')).toMatchObject({ state: 'unavailable', value: null, coverage: { covered: 1, total: 2 } });
   });
 
   test('an unavailable baseline makes every ratio over B unavailable, with the reason', () => {

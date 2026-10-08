@@ -26,7 +26,7 @@ import {
   draftsDirectory, drafts, fileHashes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
 } from './helpers/protocol.js';
 import {
-  emptyAnalysis, installTestRunner, openRuns as openRealRuns, runEventsOnDisk, runPath, startRun, testPolicy, until,
+  emptyAnalysis, installTestRunner, openRuns as openRealRuns, runEventsOnDisk, runPath, startRun, testPolicy, unscriptedChangeHistory, until,
 } from './helpers/runs.js';
 import { copyFixture } from './helpers/fixture.js';
 import { fixtureScratchGit } from './helpers/mock-git.js';
@@ -129,7 +129,7 @@ async function serve(
     ramify: new FakeRamifyCli(), ...extra,
     ...(ports && extra.agent ? { agent: createScriptedAgent(ports.script) } : {}),
     runs: {
-      inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
+      inputs: treeInputs(), changeHistory: unscriptedChangeHistory, policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
       ...extra.runs,
       ...(ports ?? { git: fixtureScratchGit(unchangedGit(root, unchangedCheckpoints, unchangedCheckpoints.length ? 4 : 0)),
         candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, configuredAudit: passingAudit() }),
@@ -286,14 +286,14 @@ describe('every query of a completed run, over HTTP', () => {
     // blocked calls as compliance.
     const metrics = metricsResponseSchema.parse((await get(server, protocolPaths.runMetrics(plan, runId))).body);
     expect(metrics.policyVersion).toBe('kpi/1');
-    expect(metrics.measurementPolicy).toBe('scope-size/1');
+    expect(metrics.measurementPolicy).toBe('scope-size/2');
     expect(metrics.evaluation.outsideScope.map(entry => entry.path)).toContain(outsidePath);
     expect(metrics.evaluation.guarding.guarded).toContain('edit');
     expect(metrics.evaluation.guarding.unguarded).toEqual(['shell']);
     expect(metrics.evaluation.guarding.complete).toBe(false);
     expect(metrics.evaluation.guarding.statement).toContain('A count of blocked calls is not evidence that every write respected its scope');
-    // The run tests' baseline is unavailable, and the unguarded shell makes
-    // one writer's line counts partial: no ratio is reported, and no zero.
+    // The run tests' baseline is unavailable, so no writer's scope size is
+    // known: no ratio is reported, and no zero.
     expect(metrics.baseline.state).toBe('unavailable');
     for (const id of ['scope-bytes-per-changed-line', 'scope-size-ratio', 'reduction-factor', 'session-weighted-total']) {
       const metric = metrics.metrics.find(candidate => candidate.id === id)!;

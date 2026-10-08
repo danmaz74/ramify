@@ -97,11 +97,12 @@ threshold as an overflow.
 | Preferred term | Existing quantity | Distinction |
 | --- | --- | --- |
 | Delivered change volume | `C = A + D` under `token-efficiency/1` | Accepted endpoint difference, with the policy's source and line exclusions. |
-| Cumulative edit volume | Mutation-event weights in the older KPI design | Repeated edits and reversions count again; process activity rather than delivered output. |
-| Invocation numstat increase | Current [line-event collector](../../subs/harness/src/kpi/lines.ts) | Positive differences of before/after per-path numstat counts; neither exact cumulative edits nor the whole-run final diff. |
+| Cumulative edit volume | None | Editing effort, in which repeated edits and reversions count again. No metric measures it: changed lines measure useful change ([definition](../measurements-and-kpis.md#changed-lines)). |
+| Invocation numstat increase | Current [line-event collector](../../subs/harness/src/kpi/lines.ts) | Positive differences of before/after per-path numstat counts against the last accepted commit; it splits a commit several writers share and is not the whole-run final diff. |
+| Change weight | [Delivered-change attribution](../../subs/harness/src/kpi/delivered.ts), `w_e` of the KPI contract | Each writer's share of the base-to-last-accepted-commit text diff, by the commits Git blames its lines on; harness commits and feature files weigh no writer. |
 | Token cost | `T`, or compatible provider usage categories | Observed consumption; not an estimate of intrinsic difficulty. |
 | Tokens per 100 changed source lines, with or without search-space adjustment | `U` and `K` in the new policy | Explicit ratios used to evaluate token efficiency; lower is better under the stated policy. |
-| Scope-size ratio | `scope-size-ratio` in the [current KPI projection](../../subs/harness/src/kpi/metrics.ts) | Assigned scope bytes weighted by reported changes, normalized by `B`; it is not a token-cost ratio. |
+| Scope-size ratio | `scope-size-ratio` in the [current KPI projection](../../subs/harness/src/kpi/metrics.ts) | The change-weighted mean of assigned scope bytes divided by `B`, dimensionless; it is not a token-cost ratio. |
 | Reduction factor | `reduction-factor` in that projection | Inverse scope-size ratio; it does not by itself establish actual token savings. |
 | Solution efficiency | Assessment of the delivered solution relative to alternatives | Separate from the economy of the process that produced it; outside the current metric's scope. |
 

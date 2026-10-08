@@ -244,7 +244,7 @@ describe('the record unions', () => {
     const store = await ledger();
     const available = await store.roundTrip(runLayout.measurement('ms-0001'), {
       schema: 'ramify-agent.measurement-snapshot/1',
-      id: 'ms-0001', policy: 'scope-size/1', head: 'abc',
+      id: 'ms-0001', policy: 'scope-size/2', head: 'abc',
       measure: { revision: 'rev/1:x:1', document: { schema: 'ramify.measure/1' }, hash: 'a'.repeat(64) },
       view: { status: 'materialized', revision: 'rev/1:x:1', input: 'input/1:abc', coverageLimits: [] },
       supplementary: [{ path: 'plans/p/plan.md', bytes: 12 }],
@@ -890,7 +890,8 @@ describe('the protocol vocabulary', () => {
   });
 
   test('every measurement snapshot and scope component state is representable', () => {
-    expect(measurementSnapshotSchema.shape.policy.value).toBe('scope-size/1');
+    // An earlier run's snapshot stays readable; its sizes are refused by the KPIs.
+    expect(measurementSnapshotSchema.shape.policy.options).toEqual(['scope-size/1', 'scope-size/2']);
   });
 });
 

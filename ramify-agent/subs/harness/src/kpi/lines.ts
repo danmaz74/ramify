@@ -19,10 +19,11 @@ import { lineEventSummarySchema, type LineEventSummary } from '../run/records.js
  * the `unmapped` bucket rather than to the root, which owns its own source
  * area and not everything beneath the project.
  *
- * Two snapshots see the tree, not the history between them. A command that
- * changed a file and put it back is invisible to them, so an invocation that
- * used the unguarded shell says so in its gaps instead of reporting a
- * complete count.
+ * The difference is the invocation's net change, which is what a changed
+ * line measures: useful change, not the effort spent on it
+ * (docs/measurements-and-kpis.md, "Changed lines"). A change made and put
+ * back between the snapshots, through the shell or any other tool, delivered
+ * nothing and is rightly absent; it is not a gap in the count.
  */
 
 /** What one path changed, as git reports it. */
@@ -55,11 +56,6 @@ export interface LineEventRequest {
   readonly after: LineSnapshot;
   /** The refreshed architect view, for the owner of each path. */
   readonly index: ArchitectIndex | null;
-  /**
-   * Gaps the caller observed that these two snapshots cannot show, such as
-   * an invocation that used the unguarded shell.
-   */
-  readonly gaps?: readonly string[] | undefined;
 }
 
 /**
@@ -68,7 +64,7 @@ export interface LineEventRequest {
  * in `unmapped` rather than attributed to a module that does not own it.
  */
 export function lineEvents(request: LineEventRequest): LineEventSummary {
-  const gaps: string[] = [...(request.gaps ?? [])];
+  const gaps: string[] = [];
   if (!request.before.available) gaps.push(`changed-paths-unknown: the snapshot before the session failed (${request.before.reason})`);
   if (!request.after.available) gaps.push(`changed-paths-unknown: the snapshot after the session failed (${request.after.reason})`);
   if (request.index === null) gaps.push('the architect view was unavailable, so no path could be attributed to an owner');

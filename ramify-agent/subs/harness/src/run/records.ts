@@ -492,7 +492,8 @@ export type InfrastructureRecovery = z.infer<typeof infrastructureRecoverySchema
 export const measurementSnapshotSchema = z.object({
   schema: z.literal('ramify-agent.measurement-snapshot/1'),
   id: text,
-  policy: z.literal('scope-size/1'),
+  /** `scope-size/1` snapshots of earlier runs stay readable; their sizes are not comparable with `scope-size/2`. */
+  policy: z.enum(['scope-size/1', 'scope-size/2']),
   /** The run branch's head when it was taken. */
   head: z.string(),
   /** The captured `ramify.measure/2` document, verbatim, with its revision. */
@@ -524,7 +525,8 @@ export const scopeComponentSchema = z.object({
 export type ScopeComponent = z.infer<typeof scopeComponentSchema>;
 
 export const scopeSizeSchema = z.object({
-  policy: z.literal('scope-size/1'),
+  /** A size of another policy than the current one is refused by the KPIs, never mixed with it. */
+  policy: z.enum(['scope-size/1', 'scope-size/2']),
   snapshot: text,
   components: z.array(scopeComponentSchema),
   /** The deduplicated union in bytes, or null when a component is unavailable. */

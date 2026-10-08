@@ -1,7 +1,7 @@
 import { chmod, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { GitError, gitCandidateSource as candidate, gitService as git, inspectGit } from '../git.js';
+import { GitError, gitCandidateSource as candidate, gitChangeHistory, gitService as git, inspectGit } from '../git.js';
 import { symlink } from 'node:fs/promises';
 import { testRepository, withoutGitConfiguration } from './helpers/git.js';
 import type { TestRepository } from './helpers/git.js';
@@ -180,6 +180,54 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       expect(await candidate.diffNameStatus(root, base, commit)).toEqual([{ status: 'A', path: 'src/link' }, { status: 'A', path: 'src/one.ts' }]);
       expect(await candidate.diffPatch(root, base, commit, 'src/one.ts')).toContain('+export const one = 1;');
       await expect(candidate.readBlob(root, commit, 'src/two.ts')).rejects.toBeInstanceOf(GitError);
+    });
+  });
+
+  it('names the commit that delivered each changed line, and the one that removed each deleted line, over the direct diff', async () => {
+    await withRepository(async repository => {
+      const identity = ['-c', 'user.name=Test', '-c', 'user.email=test@localhost'];
+      const commit = async (message: string) => {
+        await repository.git('add', '--all');
+        await repository.git(...identity, 'commit', '--message', message);
+        return (await repository.git('rev-parse', 'HEAD')).trim();
+      };
+      await repository.write('project/src/a.ts', 'one\ntwo\nthree\n');
+      await repository.write('project/src/moved.ts', 'kept\nlines\n');
+      await repository.write('outside.txt', 'not the project\n');
+      const base = await commit('base');
+      // The first writer adds two lines, and a line the second rewrites.
+      await repository.write('project/src/a.ts', 'one\ntwo\nthree\nfour\nfive\n');
+      await repository.write('project/logo.bin', '\u0000\u0001binary');
+      const first = await commit('first');
+      // The second rewrites `five`, deletes base line `two`, moves a file and
+      // edits it, and changes a file outside the project.
+      await repository.write('project/src/a.ts', 'one\nthree\nfour\nFIVE\n');
+      await rm(join(repository.root, 'project/src/moved.ts'));
+      await repository.write('project/src/renamed.ts', 'kept\nlines\nadded\n');
+      await repository.write('outside.txt', 'changed\n');
+      const second = await commit('second');
+
+      const project = join(repository.root, 'project');
+      expect(await gitChangeHistory.commitsBetween(project, base, second)).toEqual([first, second]);
+      const files = await gitChangeHistory.changedFiles(project, base, second);
+      expect(files).toEqual([
+        { before: null, after: 'logo.bin', binary: true, added: [], deleted: [] },
+        { before: 'src/a.ts', after: 'src/a.ts', binary: false, added: [[3, 2]], deleted: [[2, 1]] },
+        { before: 'src/moved.ts', after: 'src/renamed.ts', binary: false, added: [[3, 1]], deleted: [] },
+      ]);
+      // `four` from the first writer and `FIVE` from the second, in the final tree.
+      expect(await gitChangeHistory.lineOrigins(project, base, second, 'src/a.ts', [[3, 2]])).toEqual([
+        { line: 3, commit: first, boundary: false },
+        { line: 4, commit: second, boundary: false },
+      ]);
+      expect(await gitChangeHistory.lineOrigins(project, base, second, 'src/renamed.ts', [[1, 3]])).toEqual([
+        { line: 1, commit: base, boundary: true },
+        { line: 2, commit: base, boundary: true },
+        { line: 3, commit: second, boundary: false },
+      ]);
+      // Base line `two` was last held by the first commit, so the second removed it.
+      expect(await gitChangeHistory.lineLastSeen(project, base, second, 'src/a.ts', [[2, 1]])).toEqual([{ line: 2, commit: first, boundary: false }]);
+      await expect(gitChangeHistory.changedFiles(project, base, 'no-such-revision')).rejects.toThrow();
     });
   });
 

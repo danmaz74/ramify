@@ -10,7 +10,7 @@ search-space measures it builds on are summarized in the
 The [metrics documentation](metrics/README.md) records the newly agreed
 delivered-change token-efficiency policy and its rationale. Its source-line
 baseline and final-diff denominator are distinct from the scope-byte and
-mutation-event measures below; exploration measurement is deferred for that
+change-weight measures below; exploration measurement is deferred for that
 policy.
 
 ## Terminology and implementation boundary
@@ -22,12 +22,14 @@ the starting search-space size (source-line proxy) in `token-efficiency/1`.
 Ramify's inventory context-size buckets are counts and bytes; model context
 usage is a token observation.
 
-The mutation-event design below targets **cumulative edit volume**. The current
-[line-event collector](../subs/harness/src/kpi/lines.ts) instead records
-**invocation numstat increases**: positive differences in per-path Git counts.
-It can miss edits that preserve those counts and reversions that reduce them.
-Its `LineEventSummary` name does not establish exact cumulative edit volume.
-Neither measure is **delivered change volume**, the accepted endpoint diff.
+The change weight below measures useful change, not editing effort; see
+[changed lines](#changed-lines). It attributes the run's base-to-final text
+diff to its writers. The
+[line-event collector](../subs/harness/src/kpi/lines.ts) records
+**invocation numstat increases**: positive differences in per-path Git counts
+against the last accepted commit, which split a commit several writers share.
+Neither is the **delivered change volume** of `token-efficiency/1`, whose line
+eligibility differs.
 
 The existing `scope-size-ratio` and `reduction-factor` describe declared scope
 bytes relative to `B`. Their names do not establish observed token savings.
@@ -127,6 +129,34 @@ policy version. Later project growth or extra support may make `S_s / B` exceed
 1; never clamp it or silently change B. B is a common reference universe, not
 evidence that an actual root-scoped agent loaded every component.
 
+### Scope size policy v2
+
+The harness measures under `scope-size/2`, which applies the recipe above as
+follows:
+
+- Every file counts once, in `B` and in each `S_s`, however many roles'
+  packages name it. The architect view counts only as component 3, never as
+  a support document as well.
+- An invocation's support documents are its own role's prompt package and
+  the captured plan. The brief it is delivered is a handoff document and
+  counts in component 4, in a bucket of its own. `B` holds no brief, because
+  it is frozen before the first one exists.
+- A writer's declared scope is the write scope it was given: its base modules
+  exactly, each included child subtree, each module it may bootstrap and each
+  extra location. An extra location adds the inventoried files beneath it that
+  the selected modules do not already hold, or its bytes on disk when the
+  invocation started where Ramify inventories nothing there. An included owned
+  nested project is named without bytes: Ramify does not inventory it, and `B`
+  leaves it out too. A contract engineer's provider counts whole. The soft read
+  scope is not part of the declared scope.
+- Sizes are taken from the frozen baseline snapshot rather than from a
+  pre-attempt snapshot, so a module created during the run has an unknown size.
+- The snapshot's measurement document and its architect view must have one
+  revision. The baseline capture retries a mismatch twice against a refreshed
+  view. A mismatch that remains makes the owned-source, API-view and
+  architect-view components unavailable with the reason.
+- The KPIs refuse a `scope-size/1` size; they never mix it with `scope-size/2`.
+
 Undefined/zero B makes normalized values unavailable. A missing size component
 makes the total unavailable, with any known subtotal and coverage shown
 separately. A new module has no observed pre-creation size: mark its proposed
@@ -154,9 +184,9 @@ No extra human confirmation or numerical planning optimizer is introduced.
 
 ## Implementation activity and declared-scope KPIs
 
-For change-weighted arithmetic, index each attributable mutation event e with
-weight `w_e` (nonmechanical added/deleted text lines) and the enclosing attempt's
-declared scope bytes `S_e`. For session-weighted arithmetic use the model
+For change-weighted arithmetic, index each writer invocation e with its change
+weight `w_e` ([changed lines](#changed-lines)) and its attempt's declared scope
+bytes `S_e`. For session-weighted arithmetic use the model
 context histories s of the harness sessions.
 The included session/attempt set covers initial architecture, later architects,
 contract/engineering/integration work and failures/retries linked to this run.
@@ -169,9 +199,9 @@ compaction alone do not create a new session or history.
 
 | KPI | Definition |
 | --- | --- |
-| Mean declared scope bytes per cumulative edit line | `sum(w_e * S_e) / sum(w_e)` |
-| Declared-scope ratio (`scope-size-ratio`) | Mean declared scope bytes per cumulative edit line divided by frozen B |
-| Inverse declared-scope ratio (`reduction-factor`) | `1 / scope-size ratio`, only when defined and positive |
+| Change-weighted mean declared scope bytes (`scope-bytes-per-changed-line`) | `sum(w_e * S_e) / sum(w_e)`, in bytes |
+| Declared-scope ratio (`scope-size-ratio`) | The change-weighted mean divided by frozen B; dimensionless |
+| Inverse declared-scope ratio (`reduction-factor`) | `1 / scope-size ratio`, only when defined and positive; dimensionless |
 | Session count | Distinct harness sessions in the included run, including no-change/failed sessions |
 | Session-weighted total | `sum(S_s / B)` over the model context histories of the included sessions |
 | Adaptation session share | Distinct sessions caused by a recorded adaptation / all included sessions |
@@ -193,14 +223,44 @@ present it as the full run. Keep input, cache-read/cache-write and output tokens
 separate with provider definitions; combine only proven compatible categories.
 Subscription usage is not converted to a hypothetical API invoice.
 
+### Changed lines
+
+Changed lines are a proxy for **useful change**: the change delivered, not the
+work spent producing it. A line written, rewritten or reverted along the way
+counts once, in its delivered form; a change made and then undone counts not
+at all. Editing effort is not measured.
+
+The change weight `w_e` of a writer invocation is its share of the run's
+**delivered change**: the text lines added and deleted by the direct diff from
+the run's base commit to its last accepted commit. A replacement counts as a
+deletion and an addition. No mechanical classification is recorded, so no text
+line is excluded as mechanical. A change made and reverted, by any tool
+including the shell, is absent from that diff, and so is work no gate
+accepted; neither is a coverage gap.
+
+Each added line belongs to the commit `git blame` names for it. Each deleted
+base line belongs to the commit that removed it: the successor of the last
+commit `git blame --reverse` names as still holding it. A commit belongs to the
+writer invocations whose work its gate committed. Where several writers share
+one commit, as an engineer and its repair, each path's lines are split by
+their recorded invocation numstat increases, so a weight can be fractional.
+
+The harness's own commits (scratch setup, feature-file materialization and
+rewording) and the run's feature files, whose pending tags gate commits drop,
+weigh no writer; their lines are shown beside the metric. Binary paths carry
+no lines. A delivered line no writer can be named for stays unattributed with
+its reason: one blamed on the base, one in a commit no writer is recorded for,
+and one in a shared commit whose writers' line events cannot be read or name
+no line there. Unattributed lines make the metric partial. With no commit
+accepted after the base the metric is not applicable, and a Git history that
+cannot answer leaves it unavailable.
+
 ### Changed-line attribution and exclusions
 
-Record before/after text deltas at observable mutation boundaries, including
+Record before/after text deltas around each writer invocation, including
 untracked additions and deletions. Serialize mutating tool execution or record
 an explicitly unattributable overlap; never assign another writer's edits to
-the active session by guesswork. A line event is an addition or deletion; a
-replacement counts both. Changes to the same line in later edits count again,
-including repair/revert work. The final net Git diff is a separate output.
+the active session by guesswork.
 
 Resolve deleted lines with pre-change ownership and additions with post-change
 Ramify facts; an unobserved/new path remains provisional until refresh confirms
@@ -208,10 +268,9 @@ it. Mixed ownership transitions retain both identities. Unmapped changes count
 in overall change totals with a separate unmapped share, not as root-owned.
 Binary deltas have file/byte counts but no invented line count.
 
-A shell command may change and revert files internally between snapshots; those
-line events are unknown. Report mutation coverage, not an exact all-write/rework
-claim. Prefer direct edit/write deltas and instrumented snapshots. Failed calls
-with actual deltas still contribute. No background competing writer is allowed.
+The shell's writes pass no guard. That limits guarding and is reported with
+it, not with the line counts. Failed calls with actual deltas still
+contribute. No background competing writer is allowed.
 
 Exclude generated/dependency/run-state paths under a fixed recorded policy.
 Pure renames with identical content have zero text events; moves with edits

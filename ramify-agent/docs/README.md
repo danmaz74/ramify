@@ -2,12 +2,24 @@
 
 Design documents for the separate agent harness:
 
+- [Plan 23: session reuse and real-run corrections](plans/23-session-reuse-and-run-efficiency/main-plan.md),
+  proposed implementation of exact session continuation/forks, task-specific
+  submission tools, shell/scenario/briefing corrections and exploration metrics;
+  independent provider iterations run in parallel before ordered runtime integration
 - [Plan 22: enforced test boundaries and prompt command cleanup](plans/22-test-boundaries/main-plan.md),
   qualified on committed source: scripted ordinary scenarios, automatic process
   guarding, explicit native selection and prompt command cleanup;
   [final results](plans/22-test-boundaries/final-results.md) retain the aggregate
   timing limitation and failed working-tree materializer observation
 - [Harness principles](harness.principles.md)
+- [Session reuse and system prompts](analysis/2026-10-08-session-reuse-and-system-prompts.md),
+  ordinary continuation as the default, forks that preserve the complete
+  inherited prefix, current history reuse with prompt/tool replacement, and
+  predetermined workflow strategies and high-level session operations;
+  implementation is planned in Plan 23
+- [Status-badge-tone real-run findings](analysis/2026-10-08-status-badge-tone-real-run.md),
+  correctness, exploration, cost and metric corrections covered by the proposed
+  Plan 23; original run observations remain historical evidence
 - [Agent declarations and automated audit evidence](analysis/2026-10-07-agent-declarations-and-audit-responsibilities.md),
   desired responsibility boundary and issues in the current implementation and
   Plan 21, with relevant principles, adopted decisions and remaining design

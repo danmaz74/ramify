@@ -22,7 +22,7 @@ the intrinsic difficulty of a plan or the efficiency of its solution.
 | [Lineage measurements](lineage.md) | `lineage/1`: forks, continuations, repairs, degraded starts and replacements, by the start each segment made. |
 
 The [earlier measurements and KPIs document](../measurements-and-kpis.md)
-describes broader scope-size, session, adaptation and mutation-event measures.
+describes broader scope-size, session, adaptation and change-weight measures.
 Those measures have different purposes and denominators. This directory is the
 reference for the newly agreed delivered-change token-efficiency policy; it
 does not require implementing the earlier exploration or activity measurements.

@@ -5,7 +5,7 @@ import type {
 import { invocationSchema, lineEventSummarySchema, runLayout, type LineEventSummary } from '../run/records.js';
 import { readRunFile, type RunView } from './inputs.js';
 
-const methodLimit = 'Two worktree snapshots can miss edits reverted before the second snapshot.' as const;
+const methodLimit = 'Per-writer net changes are summed, so a line a later writer changes again can count more than once.' as const;
 type Totals = ExecutionLineSummary['totals'];
 type Bucket = { totals: Totals; binary: ExecutionLineSummary['binary'] };
 const bucket = (): Bucket => ({ totals: { added: 0, deleted: 0, textPaths: 0, invocationIds: [] },

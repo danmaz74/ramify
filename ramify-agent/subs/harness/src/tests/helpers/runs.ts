@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { createScriptedAgent, type Script, type ScriptedAgent, type ScriptedAgentOptions } from '../../../subs/agent/src/scripted.js';
 import { declaringScenarios } from './declarations.js';
 import { childEnvironment } from '../../../subs/evidence/src/run-command.js';
-import { gitService } from '../../../subs/evidence/src/git.js';
+import { gitChangeHistory, gitService, type ChangeHistory } from '../../../subs/evidence/src/git.js';
 import { readJsonLines } from '../../../subs/ledger/src/jsonl.js';
 import { checkCommand } from '../../checks/records.js';
 import { privateRamify, RamifyCli, ramifyExecutable } from '../../../subs/evidence/src/ramify-cli.js';
@@ -237,6 +237,14 @@ export interface OpenRunsOptions extends Partial<RunServiceOptions> {
   readonly agentOptions?: ScriptedAgentOptions | undefined;
 }
 
+/** A history that answers nothing: no test reads a delivered change it did not script. */
+export const unscriptedChangeHistory: ChangeHistory = {
+  commitsBetween: () => Promise.reject(new Error('No Git history is scripted for this test')),
+  changedFiles: () => Promise.reject(new Error('No Git history is scripted for this test')),
+  lineOrigins: () => Promise.reject(new Error('No Git history is scripted for this test')),
+  lineLastSeen: () => Promise.reject(new Error('No Git history is scripted for this test')),
+};
+
 /** The scripted fake a test drove the run with, where it gave a script. */
 export type TestAgent = ScriptedAgent | undefined;
 
@@ -268,6 +276,10 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
     warn: message => warnings.push(message),
     ...rest,
     git: scratchGit === 'provided' || options.git === gitService ? options.git : fixtureScratchGit(options.git),
+    // A run's delivered change is read from the real history only where the
+    // test chose real Git; elsewhere every question is refused, which leaves
+    // the change weights unavailable rather than launching Git.
+    changeHistory: options.changeHistory ?? (options.git === gitService ? gitChangeHistory : unscriptedChangeHistory),
     ...(agent === undefined ? {} : { agent }),
   };
   const { service, recovery } = production === true

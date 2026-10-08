@@ -154,23 +154,17 @@ describe('what one writer invocation changed', () => {
     expect(summary.coverage).toBe('complete');
   });
 
-  test('an invocation that used the unguarded shell says so rather than reporting a complete count', async () => {
+  test('a change made and put back between the snapshots delivered nothing, and the count stays complete', async () => {
     const index = architectIndex([moduleEntry(notes, notesDirectory, null)]);
     const before = await snapshot();
     // A command that changed a file and put it back leaves the two
-    // snapshots identical; what the invocation did is not in them.
+    // snapshots identical: its net change is none, which is what is counted.
 
-    const summary = lineEvents({
-      invocation: 'inv-0010',
-      before,
-      after: await snapshot(),
-      index,
-      gaps: ['unguarded-shell: this invocation ran unguarded commands'],
-    });
+    const summary = lineEvents({ invocation: 'inv-0010', before, after: await snapshot(), index });
 
     expect(summary.paths).toEqual([]);
-    expect(summary.coverage).toBe('partial');
-    expect(summary.gaps).toEqual(['unguarded-shell: this invocation ran unguarded commands']);
+    expect(summary.coverage).toBe('complete');
+    expect(summary.gaps).toEqual([]);
   });
 
   test('the owner of a path is the module whose own contents hold it', () => {

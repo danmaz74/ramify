@@ -5,7 +5,7 @@ import { ExecutionPageError, executionPageOf } from '../projections/execution-pa
 import { executionMapFixtureNodes, executionMapFixturePage } from './helpers/execution-map-fixture.js';
 
 const version = 42;
-const methodLimit = 'Two worktree snapshots can miss edits reverted before the second snapshot.' as const;
+const methodLimit = 'Per-writer net changes are summed, so a line a later writer changes again can count more than once.' as const;
 const summary = () => ({ totals: { added: 5, deleted: 2, textPaths: 1,
   invocationIds: Array.from({ length: 130 }, (_, i) => `inv-${i}`) }, coverage: 'partial' as const,
   gaps: Array.from({ length: 110 }, (_, i) => `Gap ${i}`),

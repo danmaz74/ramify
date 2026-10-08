@@ -27,7 +27,7 @@ import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { copyFixture } from './helpers/fixture.js';
 import { readDeclaredTree, shell, treeInputs, unsuitableScope } from './helpers/iterations.js';
 import { fixtureScratchGit, mockGit } from './helpers/mock-git.js';
-import { emptyAnalysis, runEventsOnDisk, runPath, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
+import { emptyAnalysis, runEventsOnDisk, runPath, startRun, stopRun, testPolicy, unscriptedChangeHistory, until } from './helpers/runs.js';
 import { scriptedGit } from './helpers/scripted-git.js';
 import { runSessionScenario } from './helpers/session-scenario.js';
 
@@ -118,7 +118,7 @@ describe('ST09: the project\'s sessions, a run\'s sessions, their transcripts an
 
     const server = await startServerWith({
       projectRoot: root, port: 0, assetsDirectory: join(root, 'no-such-build'), ramify: new FakeRamifyCli(),
-      runs: { inputs: treeInputs(), git: fixtureScratchGit(mockGit()), warn: () => undefined },
+      runs: { inputs: treeInputs(), git: fixtureScratchGit(mockGit()), changeHistory: unscriptedChangeHistory, warn: () => undefined },
     });
     cleanups.push(() => server.close());
     const origin = server.url;

@@ -1,6 +1,9 @@
+import type { ChangeHistory } from '../../subs/evidence/src/git.js';
 import { readJsonLines } from '../../subs/ledger/src/jsonl.js';
+import { acceptedCommit } from '../checks/accepted.js';
 import type { InvocationEvaluation, MetricsResponse } from '../interfaces/protocol/runs.js';
 import { baselineScope, rootModuleOfSnapshot, scopeSize } from '../kpi/capture.js';
+import { deliveredChange, type DeliveredChange } from '../kpi/delivered.js';
 import { guardingReport } from '../kpi/guarding.js';
 import { lineageMetrics, lineagePolicyVersion } from '../kpi/lineage.js';
 import { kpiMetrics, kpiPolicyVersion, measurementPolicyVersion, type InvocationFacts } from '../kpi/metrics.js';
@@ -138,8 +141,63 @@ function scoped(invocation: string, observations: readonly Observation[]): Obser
   });
 }
 
-/** The KPIs and lineage measurements of a run with their policy versions and coverage, and its evaluation evidence. */
-export async function metricsOf(view: RunView): Promise<MetricsResponse> {
+/** The repository a run's history is read from. */
+export interface RunHistory {
+  readonly projectRoot: string;
+  readonly changes: ChangeHistory;
+}
+
+/**
+ * The run's delivered change, read from Git through `history`: the run base
+ * to its last accepted commit, each commit a gate made with the writer
+ * invocations whose work it holds, and the commits and paths the harness
+ * wrote itself. Without a history it is unavailable, never zero.
+ */
+async function deliveredOf(view: RunView, history: RunHistory | undefined, lines: ReadonlyMap<string, InvocationFacts['lines']>): Promise<DeliveredChange> {
+  const invocations = [...view.records.invocations.values()];
+  const base = view.record.manifest.source?.commit ?? invocations[0]?.base ?? null;
+  if (base === null) return { state: 'not-applicable', reason: 'The run names no base commit and started no invocation' };
+  let final: string;
+  try {
+    final = acceptedCommit(view.entries, base);
+  } catch (error) {
+    return { state: 'unavailable', reason: `The run's last accepted commit cannot be read: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  const writers = new Map<string, string[]>();
+  const harness = new Set<string>();
+  const harnessPaths = new Set<string>();
+  const seen = new Set<string>();
+  let pending: string[] = [];
+  for (const event of view.events) {
+    if (event.type === 'invocation-started') {
+      if (view.records.invocations.get(event.data.invocation)?.writer === true) pending.push(event.data.invocation);
+    } else if (event.type === 'scratch-setup-complete' || event.type === 'scenarios-reworded') {
+      if (event.data.commit !== null) harness.add(event.data.commit);
+    } else if (event.type === 'scenarios-materialized') {
+      if (event.data.commit !== null) harness.add(event.data.commit);
+      for (const file of event.data.files) harnessPaths.add(file);
+    } else if (event.type === 'scenarios-rewording') {
+      for (const file of event.data.files) harnessPaths.add(file);
+    } else if (event.type === 'gate-attempted' && !seen.has(event.data.gate)) {
+      seen.add(event.data.gate);
+      // A gate commits what the writers since the previous commit left.
+      const commit = view.gates.get(event.data.gate)?.body.commit ?? null;
+      if (commit === null || pending.length === 0) continue;
+      writers.set(commit, [...(writers.get(commit) ?? []), ...pending]);
+      pending = [];
+    }
+  }
+  if (history === undefined) return { state: 'unavailable', reason: 'No Git history is available to read the delivered change from' };
+  const recorded = new Map([...lines].map(([id, summary]) => [id, summary === null || 'unavailable' in summary ? null : summary]));
+  return deliveredChange(history.changes, { projectRoot: history.projectRoot, base, final, writers, harness, harnessPaths, recorded });
+}
+
+/**
+ * The KPIs and lineage measurements of a run with their policy versions and
+ * coverage, and its evaluation evidence. `history` answers the delivered
+ * change the change weights come from.
+ */
+export async function metricsOf(view: RunView, history?: RunHistory): Promise<MetricsResponse> {
   const baseline = await baselineOf(view);
   const adaptations = adaptationsOf(view);
   // Invocations are grouped into sessions by the harness session each one
@@ -153,11 +211,13 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
   const facts: InvocationFacts[] = [];
   const evaluations: InvocationEvaluation[] = [];
   const merged: Observation[] = [];
+  const recorded = new Map<string, InvocationFacts['lines']>();
+  for (const invocation of view.records.invocations.values()) recorded.set(invocation.id, await linesOf(view, invocation));
 
   for (const invocation of view.records.invocations.values()) {
     const outcome = view.records.outcomes.get(invocation.id) ?? null;
     const observations = logs.get(invocation.id)!;
-    const lines = await linesOf(view, invocation);
+    const lines = recorded.get(invocation.id) ?? null;
     facts.push({
       id: invocation.id,
       role: invocation.role,
@@ -203,6 +263,7 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
   const metrics = kpiMetrics({
     baseline: baseline.state === 'measured' ? { bytes: baseline.bytes, snapshot: baseline.snapshot } : { unavailable: baseline.reason },
     invocations: facts,
+    delivered: await deliveredOf(view, history, recorded),
     gateAttempts,
     acceptedIterations,
   }, guarding);

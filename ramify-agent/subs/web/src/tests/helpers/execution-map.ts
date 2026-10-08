@@ -1,6 +1,6 @@
 import type { ExecutionMapPage, ExecutionNode } from '../../../../harness/src/interfaces/protocol/execution-map.js';
 
-const methodLimit = 'Two worktree snapshots can miss edits reverted before the second snapshot.' as const;
+const methodLimit = 'Per-writer net changes are summed, so a line a later writer changes again can count more than once.' as const;
 const source = { kind: 'work-item' as const, id: 'wi-000', sequence: 1, revision: 1 };
 const lines = (added = 0) => ({ totals: { added, deleted: 2, textPaths: 1, invocationIds: [] as string[] },
   coverage: 'partial' as const, gaps: [] as string[], binary: { paths: 0, invocationIds: [] as string[] }, methodLimit });

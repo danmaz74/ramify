@@ -207,12 +207,36 @@ role, prompt and scope, ending with at most one accepted submission.
 ## Session
 
 A **session** is the conversation that one or more
-[invocations](#invocation) share. A fresh or forked invocation opens a session;
-a continued invocation joins the session it continues. Each invocation is one
-contiguous segment of its session's history.
+[invocations](#invocation) share. It is created with initial context or by a
+[fork](#fork); a continued invocation joins the session it continues. Each
+invocation is one contiguous segment of its session's history.
 
 The harness owns a session's identity and lifecycle. The agent's own session
 file is the implementation's record, not the session.
+
+## Turn
+
+A **turn** is one numbered task invocation within a [session](#session),
+from its recorded input through its outcome. It may include multiple model
+responses and tool calls. Recovering the same interrupted invocation retains
+its turn number.
+
+## Fork
+
+A **fork** branches a [session](#session) at a selected [point](#point),
+preserving everything through that point exactly as it was. This includes
+system and role instructions, tool definitions, user and assistant messages,
+tool calls and results, and their order. The parent is unchanged, and its
+later history is not inherited.
+
+Everything new is appended after the fork point. New tasks, instructions or
+tool changes must be expressed there without rewriting, replacing, removing
+or prepending anything in the inherited prefix.
+
+Reusing conversation history under a replaced leading prompt or tool set is
+a different operation and must not be called a fork. Copying some session
+entries is insufficient: the complete inherited model-visible prefix must
+stay the same.
 
 ## Session state
 
@@ -229,8 +253,9 @@ and each invocation's end. It is raw output, never quoted in a record.
 ## Point
 
 A **point** is a place in a [session](#session) from which a later invocation
-may continue it or fork from it: the end of one of its invocations, or the
-result of one append to it.
+may continue it or [fork](#fork) from it: its initial context, the settled end
+of one of its invocations, or the result of one append to it. It identifies an
+immutable position within that session.
 
 ## Included child
 

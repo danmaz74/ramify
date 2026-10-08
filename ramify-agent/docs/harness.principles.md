@@ -84,8 +84,9 @@ Here, search space means the information available for an invocation to
 investigate, including selected source and generated views. Its declared byte
 size differs from the whole-project source-line baseline used in token-cost
 comparisons. Model context usage is the tokens currently occupying the model
-context. Bounded reasoning is a strategy intended to improve token efficiency;
-its benefit must be measured from run token cost and delivered work.
+context. Bounded reasoning is a strategy intended to improve efficiency;
+its benefit must be measured from elapsed time, run token cost and delivered
+work. A smaller context alone does not establish an improvement.
 
 Each agent invocation should have a manageable reasoning burden. Work can be
 bounded in two ways:
@@ -121,7 +122,8 @@ search space for that.
 Semantic specifications such as principles and engineering best practices need the same
 context management. Every requirement in a context is applied more weakly as the context
 grows, until it is ignored, so including all of them in every prompt dilutes each of them.
-Various strategies can be used.
+Bound the task's requirements and additional exploration while preserving
+useful knowledge already acquired.
 
 ### Principles Guide Implementation; Specifications Constrain the Plan
 
@@ -162,8 +164,9 @@ Forecasts and actual decisions remain separate. A forecast informs later
 choices but does not, by itself, create work or establish a contract.
 
 Forecasts, decisions and their rationale are recorded in the repository.
-Session continuity aims to reduce the token cost of repeated orientation and
-preserve consistency; it is never required for recovery or correctness.
+Session continuity aims to avoid repeated exploration, reduce elapsed time
+and token cost, and preserve consistency; it is never required for recovery
+or correctness.
 Making a forecast available for review is
 separate from requiring execution to wait for approval.
 
@@ -439,12 +442,40 @@ reading files and are able not to redo/undo what's already done. When useful,
 we can choose prompts which help with this, but most of the time that's
 not necessary.
 
+### Additional Instructions May Be Supplied in User Messages
+
+Task procedures, data submission requirements, response formats, schemas and
+other instructions may be supplied in user messages. They do not need to be
+in the system prompt. Including instructions in the system prompt is a
+convenience when they are already known to be relevant, never a prerequisite
+for supplying them later.
+
+For continuing work, retain general role instructions and supply each task's
+procedure and submission requirements with that task. A change of task does
+not by itself require replacing the system prompt. The task's submission
+interface may be expressed in its message without registering a new tool.
+
+A fork preserves the complete inherited context through its selected point,
+including system instructions, tool definitions, messages and results.
+Everything new is appended; nothing in the inherited prefix is changed.
+
 ### An Oriented Context Is Reused, Never Required
 
-Orientation is the largest fixed cost of a session: an architect reading the
-architect view, an engineer learning its module. An agent asked again about
-the same scope should not pay it again. A new invocation may continue, or
-fork from, an earlier session of the same role and scope.
+Orientation costs elapsed time as well as tokens. Searching, reading and
+understanding a project can dominate the time before an agent can act. Avoid
+repeating that exploration when relevant knowledge can be reused or
+transferred.
+
+Prefer continuation for ongoing work and forks for related independent tasks.
+A summary handoff requires a specific justification that accounts for summary
+generation, fresh ingestion and possible repeated exploration. Evaluate total
+time to an informed result and total token charges across the whole process.
+A shorter prompt or lower token bill alone does not establish an improvement.
+
+Cached input tokens cost several times less than new input tokens. Compare
+them at the model's respective rates rather than treating all input tokens
+as equally expensive. Reusing a larger cached context can cost less than
+reconstructing a smaller context through new exploration.
 
 A reused context is a cache, never the sole authority for decisions or progress.
 Any invocation must succeed from a fresh session and the repository alone.

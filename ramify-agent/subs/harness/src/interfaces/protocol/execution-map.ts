@@ -65,7 +65,7 @@ export const executionLineSummarySchema = z.object({
   coverage: z.enum(['complete', 'partial', 'pending', 'unavailable']),
   gaps: z.array(text),
   binary: z.object({ paths: count, invocationIds: z.array(text) }).strict(),
-  methodLimit: z.literal('Two worktree snapshots can miss edits reverted before the second snapshot.'),
+  methodLimit: z.literal('Per-writer net changes are summed, so a line a later writer changes again can count more than once.'),
 }).strict();
 export type ExecutionLineSummary = z.infer<typeof executionLineSummarySchema>;
 

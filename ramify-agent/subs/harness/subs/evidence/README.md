@@ -159,6 +159,14 @@ from; a symbolic link is an entry whose content is its target's name and is
 never followed. `gitCandidateSource` is its process adapter, and review
 tests script it as they script `GitService`.
 
+`ChangeHistory` is a third read-only boundary, the history a run's delivered
+change is attributed from: the first-parent commits of a range, the direct
+diff between two commits with renames detected and each changed line's range,
+and the commit `git blame` names for an added line or `git blame --reverse`
+for a deleted one. Its paths are the project's own, relative to its root, so
+a project inside a larger repository reads only its own files.
+`gitChangeHistory` is its process adapter; consumer tests script it.
+
 ## What is still elsewhere
 
 `mapping/validate.ts` decides what a map submission may cite and stays with

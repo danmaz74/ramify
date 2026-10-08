@@ -187,7 +187,7 @@ export const runQueryLimits = {
 } as const;
 
 /** The measurement policy the scope sizes were taken under. It is versioned apart from the KPIs. */
-export const measurementPolicySchema = z.literal('scope-size/1');
+export const measurementPolicySchema = z.literal('scope-size/2');
 /** The version of the KPI projection, versioned apart from the measurement policy. */
 export const kpiPolicySchema = z.literal('kpi/1');
 /** The version of the lineage measurements, versioned apart from the KPIs. */

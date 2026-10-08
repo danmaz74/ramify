@@ -867,6 +867,14 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  * a producer, so the list can neither hide a new gap nor outlive a closed one.
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
+  {
+    union: 'record ramify-agent.measurement-snapshot/1.policy', values: ['scope-size/1'],
+    reason: 'An earlier run\'s snapshot stays readable, but the harness now captures scope-size/2 only; the KPIs refuse a scope-size/1 size, which the KPI tests construct.',
+  },
+  {
+    union: 'record ramify-agent.invocation/1.scope.size.policy', values: ['scope-size/1'],
+    reason: 'An earlier run\'s invocation sizes stay readable, but the harness now measures under scope-size/2 only; the KPI tests construct a scope-size/1 size to show it is refused.',
+  },
   { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.ownership.exclusions[].kind', values: ['repository', 'packages', 'generated'], reason: 'The current public rooted ownership topology does not emit these synthesized reserved path facts. Real installed F1 queries their excluded descendants; that is a path-answer witness, not a producer of captured topology table entries.' },
   { union: 'submission local-architect[assign].assignment.scope.extra[].kind', values: ['directory'], reason: 'Current architect assignment validation rejects directory extras. Whole assigned child/project trees use included entries, and registry bootstrap creates its internal directory authority. Negative-input validation remains covered; no accepted submission produces this value.' },
 

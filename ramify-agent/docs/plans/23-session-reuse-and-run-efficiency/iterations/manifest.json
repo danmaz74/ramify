@@ -1,0 +1,228 @@
+{
+  "plan": "../main-plan.md",
+  "status": "proposed; implementation not started",
+  "execution": "dependency-ordered; disjoint iterations may run in parallel",
+  "iterations": [
+    {
+      "id": "0",
+      "file": "00-base-and-contracts.md",
+      "dependsOn": [],
+      "cases": [
+        "B01"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Plan artifacts and integration setup; no production implementation in this iteration."
+    },
+    {
+      "id": "1",
+      "file": "01-session-operations.md",
+      "dependsOn": [
+        "0"
+      ],
+      "cases": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness/agent port and scripted implementation; new harness session-store adapter and its own tests. Own run/sessions.ts if required; do not edit run/service.ts, pi or shared run records."
+    },
+    {
+      "id": "2",
+      "file": "02-task-prompts.md",
+      "dependsOn": [
+        "0"
+      ],
+      "cases": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness src/prompts/ templates/packages and new pure task/brief builders with isolated prompt tests. Do not edit run/service.ts or plan-evidence/scenarios implementations."
+    },
+    {
+      "id": "3",
+      "file": "03-mutation-checks.md",
+      "dependsOn": [
+        "0"
+      ],
+      "cases": [
+        "H01",
+        "H02",
+        "H03",
+        "H04"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness src/hooks/post-write.ts, src/tools/shell.ts and owner-local scheduling helpers/tests. Excludes shell-tests.ts, engineer-equipment.ts and run/service.ts."
+    },
+    {
+      "id": "4",
+      "file": "04-focused-scenarios.md",
+      "dependsOn": [
+        "0"
+      ],
+      "cases": [
+        "H05",
+        "H06"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness focused-config builder (new src/work/focused-scenarios.ts), tools/shell-tests.ts, evidence child adapter for effective project configuration if required, and their own tests. Excludes scenario form, run service and scenario-briefing wiring."
+    },
+    {
+      "id": "5",
+      "file": "05-catalog-contracts.md",
+      "dependsOn": [
+        "0"
+      ],
+      "cases": [
+        "C01",
+        "C02",
+        "C03"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness/plan-evidence catalog interface and tests; harness/scenarios form.ts and tests. Excludes prompt templates, focused command builder and run/service.ts."
+    },
+    {
+      "id": "6",
+      "file": "06-metric-calculations.md",
+      "dependsOn": [
+        "0"
+      ],
+      "cases": [
+        "M01",
+        "M02",
+        "M03",
+        "M04",
+        "M05"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness src/kpi/ calculations and local tests. Excludes run/service.ts, run/observations.ts, run/records.ts, protocol and web. Consume frozen proposed input types through owner-local types until integration."
+    },
+    {
+      "id": "7",
+      "file": "07-pi-preservation.md",
+      "dependsOn": [
+        "1"
+      ],
+      "cases": [
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness/agent/pi implementation and tests only; consume accepted agent/storage contract from 1."
+    },
+    {
+      "id": "8",
+      "file": "08-continuation-integration.md",
+      "dependsOn": [
+        "2",
+        "7"
+      ],
+      "cases": [
+        "W01",
+        "W02"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness run/service.ts, run/records.ts, sessions/single.ts, invocation integration and related helpers/tests. No parallel shared runtime writer."
+    },
+    {
+      "id": "9",
+      "file": "09-fork-integration.md",
+      "dependsOn": [
+        "8"
+      ],
+      "cases": [
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness run/service.ts and context-selection/review/consultation/recovery orchestration and tests; serial after 8."
+    },
+    {
+      "id": "10",
+      "file": "10-run-corrections.md",
+      "dependsOn": [
+        "3",
+        "4",
+        "5",
+        "9"
+      ],
+      "cases": [
+        "W08",
+        "W09",
+        "W10",
+        "W11"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness run/service.ts, work/engineer-equipment.ts, work/scenario-briefing.ts, work/session.ts and briefing/submission wiring/tests; serial shared-runtime owner."
+    },
+    {
+      "id": "11",
+      "file": "11-observation-integration.md",
+      "dependsOn": [
+        "6",
+        "10"
+      ],
+      "cases": [
+        "M06",
+        "M07",
+        "M08"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Harness run/service.ts, run/observations.ts, run/records.ts, interfaces/protocol and projections; agent event enrichment if required by frozen contract. Serial runtime owner; no web/trial edits."
+    },
+    {
+      "id": "12",
+      "file": "12-presentation.md",
+      "dependsOn": [
+        "11"
+      ],
+      "cases": [
+        "V01",
+        "V02"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Web run/session/metrics presentation and web tests only. Harness projection changes require coordination, not independent formula edits."
+    },
+    {
+      "id": "13",
+      "file": "13-trial-corrections.md",
+      "dependsOn": [
+        "10"
+      ],
+      "cases": [
+        "T01",
+        "T02"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Root scripts/live-trial.ts, trial fixtures/README, fixture-trials.test.ts and dedicated trial-verifier tests. Excludes runtime service, metrics, protocol and web."
+    },
+    {
+      "id": "14",
+      "file": "14-qualification.md",
+      "dependsOn": [
+        "12",
+        "13"
+      ],
+      "cases": [
+        "Q01",
+        "Q02",
+        "Q03"
+      ],
+      "status": "proposed",
+      "writeBoundary": "Integration verification, exact native test-boundary registrations/witnesses, final reports and owner-local corrections found by qualification."
+    }
+  ]
+}

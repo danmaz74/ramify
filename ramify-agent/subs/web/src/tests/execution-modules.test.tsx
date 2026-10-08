@@ -36,7 +36,7 @@ vi.mock('ramify.ts/module-tree', async () => {
 const line = (added: number, deleted: number, coverage: 'complete' | 'partial' | 'unavailable') => ({
   totals: { added, deleted, textPaths: added || deleted ? 1 : 0, invocationIds: added || deleted ? ['inv-1'] : [] },
   coverage, gaps: coverage === 'partial' ? ['One writer snapshot missing.'] : [], binary: { paths: 0, invocationIds: [] },
-  methodLimit: 'Two worktree snapshots can miss edits reverted before the second snapshot.' as const,
+  methodLimit: 'Per-writer net changes are summed, so a line a later writer changes again can count more than once.' as const,
 });
 const source = canvasMap.nodes[0]!.sourceRefs[0]!;
 const direct = (element: string, role: 'owner' | 'consumer' | 'provider') => ({ element, role, source });

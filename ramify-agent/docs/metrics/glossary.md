@@ -149,8 +149,14 @@ An observed intermediate change to project content during a run.
 
 ## Cumulative edit volume
 
-The older KPI design's sum of eligible additions and deletions across observed
-mutation events, including repeated edits and reversions.
+The sum of eligible additions and deletions across every observed mutation
+event, including repeated edits and reversions: a measure of editing effort.
+
+## Change weight
+
+One writer invocation's share of the run's delivered change, `w_e`: the text
+lines of the base-to-last-accepted-commit diff that Git attributes to the
+commits holding its work, under `kpi/1`.
 
 ## Invocation numstat increase
 

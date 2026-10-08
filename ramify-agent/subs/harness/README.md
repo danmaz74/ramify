@@ -707,10 +707,22 @@ hiding or measured complexity justifies it.
   back for a check the harness could not get an answer from.
 - `kpi/`: measurement capture. A snapshot holds one `ramify.measure/2`
   document verbatim with its hash, and `scopeSize` is the `S_s` recipe over
-  it. A missing component makes the total unavailable with its known
+  it, `scope-size/2`: each file once, a role's own package, the plan and the
+  brief it was delivered as its support documents, a writer's whole write
+  scope, and no numbers from a measurement and a view of two revisions
+  ([policy v2](../../docs/measurements-and-kpis.md#scope-size-policy-v2)).
+  A missing component makes the total unavailable with its known
   subtotal beside it, never a zero, and a module that does not exist yet has
-  an unknown size. `lines.ts` captures what one writer invocation changed,
-  from two snapshots of the working directory around it and from git alone;
+  an unknown size. `delivered.ts` gives each writer its change weight, its
+  share of the run's base-to-last-accepted-commit diff, through the
+  `ChangeHistory` Git boundary: a line counts once in its delivered form,
+  since a changed line measures useful change and not effort
+  ([changed lines](../../docs/measurements-and-kpis.md#changed-lines)).
+  It is a projection over the records and Git's objects, and the run
+  service keeps its answers, which commit ids do not change.
+  `lines.ts` captures one writer invocation's numstat increases,
+  from two snapshots of the working directory around it and from git alone,
+  which split a commit several writers share;
   `sessions.ts` counts every session, whatever ended it, and only the change
   weight tells a session that changed nothing from one that did. A binary
   file carries its byte count and no invented line count, and a path no
@@ -720,7 +732,8 @@ hiding or measured complexity justifies it.
   excursions the reads made, the gaps that qualify the totals, and the
   statement that a count of blocked calls is not evidence that every write
   respected its scope. `metrics.ts` is the KPI projection, `kpi/1`, versioned
-  apart from the measurement policy `scope-size/1`: every metric carries its
+  apart from the measurement policy `scope-size/2`, and it refuses a size of
+  another policy: every metric carries its
   unit, state, value, numerator, denominator, known subtotal, coverage and
   evidence. A missing observation is `unavailable`, a zero denominator
   `not-applicable`, and a whole-run ratio over partial coverage `partial`
@@ -1382,7 +1395,9 @@ The run's own tests are beside them.
   the files beside it; `stop-before-start.test.ts` lands a stop between an
   invocation's event and its session; `measurement.test.ts` covers the frozen
   baseline and the `S_s` recipe, including a component the producer cannot
-  supply; `union-values.test.ts` writes every value of every union and reads
+  supply, and `scope-size-recipe.test.ts` the `scope-size/2` rules over a
+  constructed snapshot; `delivered-change.test.ts` attributes a delivered
+  change over a scripted history; `union-values.test.ts` writes every value of every union and reads
   it back.
 - `write-guard.test.ts` runs a table of allowed and denied targets against a
   real directory with a real symlink out of it, a real new file in an
@@ -1436,7 +1451,7 @@ The run's own tests are beside them.
   the shell outside the scope appears in `git status` when the writer
   settles and in `outsideScope`, reported and not blocked, beside the
   `unguarded-shell` gap and the projection that states which tools were
-  guarded. `late-writes.test.ts` stops a run while a command is running and
+  guarded; its line counts stay complete and include the shell's write. `late-writes.test.ts` stops a run while a command is running and
   shows that the write it would have made never arrives and that what the
   session produced afterwards completes nothing.
 
