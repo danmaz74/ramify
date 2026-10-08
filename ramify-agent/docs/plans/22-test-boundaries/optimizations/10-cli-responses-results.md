@@ -101,8 +101,11 @@ revision pairs, undeclared source bytes, unknown ownership, exhausted branch
 mutation and refused provisional-index access. Caught failures persist to the
 completion check. All four compiler scopes passed `npm run type-check`.
 `npm run check:self` passed with 0 errors, 0 warnings and 313 analysis limits.
-Configured `vitest list --json` discovered 2,039 cases in 266 selected files,
-including all three newly added test files.
+Configured `vitest list --filesOnly --json` selected **267 files**, including
+all three newly added test files. The separate `vitest list --json` registered
+2,039 cases in 266 nonempty files. The existing conditional
+`subs/harness/src/tests/fixture-trials.test.ts` registers no cases without its
+optional trial inputs; it remains selected and retains that provenance.
 
 | Selection | Baseline file time | Qualified file time |
 | --- | --- | --- |
