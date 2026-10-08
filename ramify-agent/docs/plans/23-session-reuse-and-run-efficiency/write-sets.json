@@ -394,7 +394,8 @@
         "subs/harness/src/run/service.ts",
         "subs/harness/src/tests/check-findings-composition.test.ts",
         "subs/harness/src/tests/review-questions.test.ts",
-        "subs/harness/src/tests/helpers/acceptance-flow.ts"
+        "subs/harness/src/tests/helpers/acceptance-flow.ts",
+        "subs/harness/src/tests/helpers/dependency-flow.ts"
       ],
       "agentTestWorker": [
         "subs/harness/subs/agent/src/tests/port-additions.test.ts",
