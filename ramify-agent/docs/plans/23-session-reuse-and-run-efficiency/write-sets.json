@@ -173,6 +173,7 @@
       "subs/harness/subs/agent/src/scripted.ts",
       "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
       "docs/plans/23-session-reuse-and-run-efficiency/iterations/09-results.md",
+      "subs/harness/subs/agent/subs/pi/src/session-operations.ts",
       "subs/harness/src/architecture/context.ts",
       "subs/harness/src/capability/records.ts",
       "subs/harness/src/architecture/records.ts",
