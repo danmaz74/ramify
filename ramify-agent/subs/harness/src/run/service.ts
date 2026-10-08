@@ -12,7 +12,7 @@ import { acceptedCommit } from '../checks/accepted.js';
 import { type CheckExecutionPort, type GateCommandStarted } from '../checks/execution.js';
 import type { ConfiguredAuditPort } from '../../subs/audit/src/check-execution.js';
 import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
-import { resolveTestSelection, testArea } from '../checks/selection.js';
+import { resolveTestSelection } from '../checks/selection.js';
 import {
   planScenarioFindings, scenarioGatesToRead, scenarioObservations,
   type GateCheckFindingOutcome, type ScenarioFindingNote, type ScenarioGateInputs, type ScenarioObservation,
@@ -195,7 +195,7 @@ import {
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
 import {
-  bindingEventsToRecord, obligationBriefingLines, obligationEventsToRecord, obligationsOf, obligationsOwnedBy,
+  bindingEventsToRecord, obligationBriefingLines, obligationEventsToRecord, obligationsOf, obligationsOwnedBy, unreportedObligations, unreportedText,
   type ObligationActor, type ObligationBinding, type ObligationProjection, type ObligationRegistration, type ObligationReport,
 } from '../work/obligations.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
@@ -5610,7 +5610,7 @@ export class RunService {
           }),
           ...(this.workflow !== null || owed === null ? [] : [`${owed.id} is owed: the agreed conformance suite has not passed against the real provider yet`]),
           ...capabilityBlockers,
-          ...unbound.map(scenario => scenarioRefusal(scenario)),
+          ...unbound.map(scenario => unreportedText({ id: scenario.id, status: scenario.state })),
         ];
         if (refusals > bound) {
           await this.refuseCompletion(run, item, refusals, blocked, { open: this.workflow === null ? open : [], owed: this.workflow === null && owed !== null, scenarios: unbound });
@@ -7218,8 +7218,7 @@ export class RunService {
       schema: 'ramify-agent.capability-plan/1', task: task.id, revision: 1, basedOn: 0,
       updatedBy: qualification.id, revisionReason: 'Initial qualified request',
       need: request.original.need, proposedInterface: 'Undecided; the capability architect examines actual source and use',
-      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title,
-        derivedFrom: [example.id], coverage: { state: 'unresolved' as const, reason: 'Implementation and real use pending' } })),
+      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title, derivedFrom: [example.id] })),
       compatibility: [...request.original.constraints],
       outline: ['Review existing behavior and affected owners', 'Coordinate provider and consumer work', 'Verify real use and hand back'],
       decisions: [{ decision: `Coordinate in ${decision.provider}`, reason: decision.placementReason, evidence: [...decision.requirementRefs] }],
@@ -7378,7 +7377,7 @@ export class RunService {
         ] : [`Selected plan package ${selectedHash} was delivered in full in the earlier turn; it is unchanged.`,
           `Current plan: ${JSON.stringify(plan)}`, `Progress from the last turn: ${progress}`]),
         ...[obligationBriefingLines(obligationsOwnedBy(this.obligationProjection(run), { kind: 'capability-task', id: task.id })).join('\n')].filter(section => section !== ''),
-        `Inspect current source and Git directly. The latest task assignment results are ${[...records.results.values()].filter(result => result.coordination?.kind === 'capability-task' && result.coordination.id === task.id).map(result => `${result.iteration}: ${result.outcome}, gate ${result.gate ?? '(none)'}, commit ${result.commit ?? '(none)'}, findings ${result.findings.join('; ')}`).join(' | ') || '(none)'}. Gate reports are under ${runLayout.gateOutput('ga-0001').replace(/ga-0001.*/, '')}; inspect the named gate and review artifacts when needed. Request handback only after the bounded provider and consumer behavior is verified.`,
+        `Inspect current source and Git directly. The latest task assignment results are ${[...records.results.values()].filter(result => result.coordination?.kind === 'capability-task' && result.coordination.id === task.id).map(result => `${result.iteration}: ${result.outcome}, gate ${result.gate ?? '(none)'}, commit ${result.commit ?? '(none)'}, findings ${result.findings.join('; ')}`).join(' | ') || '(none)'}. Gate reports are under ${runLayout.gateOutput('ga-0001').replace(/ga-0001.*/, '')}; inspect the named gate and review artifacts when needed. Request handback when, in your judgment, the real provider and requesting consumer meet the original need: report ${task.id} and every obligation you registered done in the same or an earlier action. The original examples are the request's context; say what you concluded about one in your summary.`,
       ].join('\n\n'),
       start: coordinatorPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: coordinatorPoint },
       ...(coordinatorPoint === undefined || coordinatorSession === undefined
@@ -7614,7 +7613,10 @@ export class RunService {
 
   /** A task completion request uses the ordinary project gate and the
    * reviews already requested for its accepted iterations. Its result returns
-   * to this architect; failed iteration gates already returned to engineers. */
+   * to this architect; failed iteration gates already returned to engineers.
+   * The handback is the architect's done reports on the task's obligations:
+   * the harness checks that every one is reported, and the non-test workflow
+   * boundaries, never a cited file, an executed test or a per-example state. */
   private async verifyCapabilityHandback(
     run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, item: WorkItem, task: CapabilityTask,
     request: CapabilityRequest, plan: CapabilityPlan,
@@ -7629,6 +7631,12 @@ export class RunService {
     if (state === undefined || state.status !== 'coordinating' || state.planRevision !== plan.revision || state.activeChild !== null) {
       return { handedBack: false, guidance: 'The task, plan or child dependency is not ready for completion' };
     }
+    // Every obligation this architect is responsible for needs its done
+    // report before any gate runs; the request's own reports were recorded
+    // on acceptance. (Iteration 8 replaces this refusal with the general
+    // rejected submission.)
+    const unreported = unreportedObligations(this.obligationProjection(run), { kind: 'capability-task', id: task.id });
+    if (unreported.length > 0) return { handedBack: false, guidance: unreported.map(unreportedText).join('; ') };
     const records = committedRecords(run.log.ledger.replay());
     const assignments = [...records.assignments.values()].filter(entry =>
       entry.coordination?.kind === 'capability-task' && entry.coordination.id === task.id)
@@ -7651,15 +7659,6 @@ export class RunService {
       await this.candidates.commitTree(this.projectRoot, acceptedGate.data.audited) !== candidate) {
       return { handedBack: false, guidance: `Current source differs from the latest accepted iteration ${latestAccepted.id}; assign a repair and gate it` };
     }
-    const unresolved = request.original.examples.flatMap(example => {
-      const useCase = plan.useCases.find(entry => entry.id === example.id);
-      const reported = action.coverage.find(entry => entry.case === example.id);
-      if (useCase === undefined || useCase.coverage.state === 'unresolved' || reported === undefined) return [`Example ${example.id} lacks resolved coverage`];
-      const coverage = useCase.coverage;
-      return reported.evidence.some(evidence => !coverage.tests.includes(evidence))
-        ? [`Example ${example.id} cites evidence outside the current plan`] : [];
-    });
-    if (unresolved.length > 0) return { handedBack: false, guidance: unresolved.join('; ') };
     const correction = this.pendingCorrection(run, task.id);
     if (correction !== undefined) return { handedBack: false,
       guidance: `Reconciliation ${correction} requires an accepted correction assignment before another handback request` };
@@ -7711,50 +7710,11 @@ export class RunService {
         reconciliation: this.latestBasis(run, task.id)?.id ?? null, stage: 'completion', reason: basisRefusal } });
       return { handedBack: false, guidance: `Completion basis changed: ${basisRefusal}`, coordinator };
     }
-    const index = await this.refreshIndex(run);
-    const selected = this.executedTestFiles(gate);
-    const executedFor = (owner: string) => {
-      const module = index === null ? undefined : findModule(index, owner);
-      return module !== undefined && [...selected].some(path => path.startsWith(`${testArea(module).replace(/\/$/u, '')}/`));
-    };
-    const evidenceGaps = [task.provider, task.consumer].filter(owner => !executedFor(owner)).map(owner => `No selected passing test for ${owner}`);
-    for (const useCase of plan.useCases) {
-      if (useCase.coverage.state === 'unresolved') continue;
-      for (const test of useCase.coverage.tests) if (!selected.has(test)) evidenceGaps.push(`Case ${useCase.id} cites unexecuted test ${test}`);
-    }
-    if (evidenceGaps.length > 0) return { handedBack: false, guidance: evidenceGaps.join('; '), coordinator };
     await this.write(run, { type: 'capability-verification-started', data: { task: task.id, invocation, gate: gate.id } });
     await this.afterWrite('capability-verification-started', run.record.jobId);
     if (this.ignoring(run)) return null;
     await this.finishCapabilityHandback(run, task, request, plan, action, invocation, gate, currentTree, reviewStates);
     return { handedBack: true, guidance: `Capability ${task.id} accepted at ${currentTree}. ${action.summary}. Use ${action.interfaces.map(entry => `${entry.symbols.join(', ')} at ${entry.path}: ${entry.use}`).join('; ')}. Continue the original assignment from the current candidate; its remaining goal stays open.` };
-  }
-
-  /** Files the existing passing test command actually ran, as the audit
-   * provider's complete public Vitest result reports them. */
-  private executedTestFiles(gate: GateAttempt): Set<string> {
-    const files = new Set<string>();
-    const published = z.record(z.string(), z.unknown()).safeParse(gate.provider?.checks);
-    const check = z.object({ passed: z.literal(true),
-      vitest: z.object({ reason: z.literal('passed'), files: z.array(z.object({ path: z.string().min(1),
-        state: z.string() }).passthrough()) }).passthrough().optional(),
-      commands: z.record(z.string(), z.unknown()).optional(),
-    }).passthrough();
-    const include = (raw: unknown) => {
-      const parsed = check.safeParse(raw);
-      if (!parsed.success || parsed.data.vitest === undefined) return;
-      for (const file of parsed.data.vitest.files) if (file.state === 'passed') files.add(file.path.replaceAll('\\', '/').replace(/^\.\//u, ''));
-    };
-    for (const command of gate.commands) {
-      if (command.kind !== 'tests' || command.outcome !== 'passed') continue;
-      const raw = command.providerCheckId === undefined || !published.success
-        ? undefined : published.data[command.providerCheckId];
-      const parent = check.safeParse(raw);
-      if (!parent.success) continue;
-      include(raw);
-      for (const nested of Object.values(parent.data.commands ?? {})) include(nested);
-    }
-    return files;
   }
 
   private async finishCapabilityHandback(run: Run, task: CapabilityTask, request: CapabilityRequest,
@@ -7960,8 +7920,7 @@ export class RunService {
     const plan: CapabilityPlan = { schema: 'ramify-agent.capability-plan/1', task: child.id, revision: 1, basedOn: 0,
       updatedBy: qualification.id, revisionReason: 'Initial nested request', need: request.original.need,
       proposedInterface: 'Undecided; inspect actual source and consumer use',
-      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title,
-        derivedFrom: [example.id], coverage: { state: 'unresolved' as const, reason: 'Implementation and real use pending' } })),
+      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title, derivedFrom: [example.id] })),
       compatibility: [...request.original.constraints],
       outline: ['Review existing behavior and affected owners', 'Coordinate provider and requesting engineer', 'Verify use and hand back'],
       decisions: [{ decision: `Coordinate in ${decision.provider}`, reason: decision.placementReason,
@@ -11522,16 +11481,6 @@ export class RunService {
       await this.options.lock.release();
     });
   }
-}
-
-/**
- * Why a completion request is refused for one scenario of its entry, by its
- * state: only the architect's done report finishes a scenario.
- */
-function scenarioRefusal(scenario: { readonly id: string; readonly state: ScenarioState }): string {
-  return scenario.state === 'pending'
-    ? `${scenario.id} is pending and not reported done: report it done in \`reports\` where it holds, or assign an iteration that binds it`
-    : `${scenario.id} is bound and not reported done: report it done in \`reports\` where its binding holds, or assign the work that finishes it`;
 }
 
 /**

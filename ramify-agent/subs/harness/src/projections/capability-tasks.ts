@@ -2,12 +2,14 @@ import type { CapabilityTasksResponse, CapabilityTaskView } from '../interfaces/
 import { replayCapabilityState } from '../capability/state.js';
 import { capabilityReviewSchema } from '../capability/records.js';
 import { reviewStateOf } from '../reviews/state.js';
+import { obligationViewsOf } from './scenarios.js';
 import { ProjectionError, type RunView } from './inputs.js';
 
 /** Current task meaning comes from the event reducer; immutable content comes
  * from records committed on those same log lines. No record file is read. */
 export function capabilityTasksOf(view: RunView): CapabilityTasksResponse {
   const state = replayCapabilityState(view.events);
+  const obligations = obligationViewsOf(view);
   const requests = [...view.records.capabilityRequests.values()].map(record => {
     const current = state.requests.get(record.id);
     if (!current) throw new ProjectionError('unreadable', `Request ${record.id} has no committed transition`);
@@ -104,6 +106,7 @@ export function capabilityTasksOf(view: RunView): CapabilityTasksResponse {
         outline: plan.outline, decisions: plan.decisions, openQuestions: plan.openQuestions,
         requirementRefs: plan.requirementRefs },
       assignments, consultations,
+      obligations: obligations.filter(obligation => obligation.responsible.kind === 'capability-task' && obligation.responsible.id === record.id),
       children: [...state.tasks.values()].filter(child => child.parent === record.id).map(child => child.id),
       activeChild: current.activeChild,
       verification: { status: handback ? 'passed' : current.status === 'verifying' ? 'running'

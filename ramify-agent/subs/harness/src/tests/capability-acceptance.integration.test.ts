@@ -170,17 +170,21 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       if (architect === 3) return assignOwner(d, 'Migrate D typed use');
       if (architect === 4) return assignOwner(p, 'Expose the companion');
       if (architect === 5) return assignOwner(a, 'Integrate A');
+      // The handback is the architect's done report on the delegated
+      // outcome, made once at the revision its briefing shows. It cites no
+      // test file; what it concluded about the example is summary text.
+      const outcome = new RegExp(`- ${task} \\(delegated outcome\\): (pending|bound|done), revision (\\d+)`, 'u').exec(spec.prompt);
+      if (outcome === null) throw new Error(`The capability briefing lacks ${task}'s obligation line`);
       const handback = (atRevision: number) => ({ ...basis, planRevision: atRevision, kind: 'request-handback',
-        summary: 'B result is integrated in A and compatible with D',
-        coverage: [{ case: 'need-001.ex01', evidence: ['subs/a/src/tests/caller.test.ts'] }],
-        interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact', 'FactResult'], use: 'Call readFact and render its source' }], limitations: [] });
+        summary: 'B result is integrated in A and compatible with D; the original example renders the B fact with its source',
+        interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact', 'FactResult'], use: 'Call readFact and render its source' }], limitations: [],
+        reports: outcome[1] === 'done' ? [] : [{ id: task, judgment: 'done', basedOnRevision: Number(outcome[2]), where: 'subs/a/src/tests/caller.test.ts' }] });
       if (architect >= 6 && !planExercised) {
         planExercised = true;
         return [
           { kind: 'tool', tool: 'update_capability_plan', input: { task, basedOn: Number(revision), invocation,
-            reason: 'Record the executed A example while ordinary review judges its oracle',
-            changes: { useCases: [{ id: 'need-001.ex01', expectedBehavior: 'Fresh fact: old from B', derivedFrom: ['need-001.ex01'],
-              coverage: { state: 'exercised', tests: ['subs/a/src/tests/caller.test.ts'] } }] } } },
+            reason: 'State the A example as the consumer renders it while ordinary review judges its oracle',
+            changes: { useCases: [{ id: 'need-001.ex01', expectedBehavior: 'Fresh fact: old from B', derivedFrom: ['need-001.ex01'] }] } } },
           { kind: 'submit', input: handback(Number(revision) + 1) },
         ];
       }
@@ -188,11 +192,8 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       planCorrected = true;
       return [
         { kind: 'tool', tool: 'update_capability_plan', input: { task, basedOn: Number(revision), invocation,
-          reason: 'Record independent executable coverage after repairing the circular oracle',
-          changes: { useCases: [{ id: 'need-001.ex01', expectedBehavior: 'Fresh fact: old from B', derivedFrom: ['need-001.ex01'],
-            coverage: { state: 'corrected', reason: 'The earlier oracle compared the value to itself',
-              evidence: ['review of circular assertion', 'independent literal from original request'], decidedBy: invocation,
-              tests: ['subs/a/src/tests/caller.test.ts'] } }] } } },
+          reason: 'The earlier oracle compared the value to itself; the A test now asserts the independent literal from the original request',
+          changes: { useCases: [{ id: 'need-001.ex01', expectedBehavior: 'Renders the independent literal Fresh fact: old from B', derivedFrom: ['need-001.ex01'] }] } } },
         { kind: 'submit', input: handback(Number(revision) + 1) },
       ];
     }
@@ -405,6 +406,12 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     const job = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'job.json'), 'utf8')) as {
       policy: { limits: { repairRoundsPerWorkItemGate: number } } };
     expect(job.policy.limits.repairRoundsPerWorkItemGate).toBe(3);
+    // The architect's done report stands beside the raw failed gates: no
+    // failure rewrote it, and it did not pass the task's verification.
+    const outcomeReports = events.filter(event => event.type === 'obligation-reported' && event.data.id === 'cap-001');
+    expect(outcomeReports.map(event => event.type === 'obligation-reported' ? [event.data.judgment, event.data.revision] : null)).toEqual([['done', 1]]);
+    expect(failedGateIds.length).toBeGreaterThanOrEqual(4);
+    expect(attempts.every(attempt => attempt.cause !== null)).toBe(true);
     await opened.service.settled('need', receipt.jobId);
     return;
   }
@@ -431,6 +438,20 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       commands: lastGateBody.commands.map(command => [command.kind, command.outcome, command.output.tail.slice(-300)]) } })).toHaveLength(0);
   expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(1);
   if (mode === 'revision') expect(inheritedAuthorityChecked).toBe(true);
+  // PB3-D08: the handback followed the architect's done report on cap-001,
+  // which cited no test file and recorded no per-example state. PB3-D10: the
+  // consumer's own scenario is still its local architect's to report.
+  const handedBack = events.find(event => event.type === 'capability-handed-back')!;
+  const outcomeReport = events.find(event => event.type === 'obligation-reported' && event.data.id === 'cap-001');
+  expect(outcomeReport?.type === 'obligation-reported' ? [outcomeReport.data.judgment, outcomeReport.data.where] : null)
+    .toEqual(['done', 'subs/a/src/tests/caller.test.ts']);
+  expect(outcomeReport!.sequence).toBeLessThan(handedBack.sequence);
+  expect(events.some(event => event.type === 'obligation-reported' && event.data.id === 'sc-001')).toBe(false);
+  expect(events.some(event => event.type === 'work-item-completed' && event.data.workItem === 'wi-001')).toBe(false);
+  const plans = await Promise.all([1, 2, 3].map(async revision => JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+    `capabilities/cap-001/plan/${revision}.json`), 'utf8')) as { originalExamples: string[]; useCases: Array<Record<string, unknown>> }));
+  expect(plans.map(plan => plan.originalExamples)).toEqual([['need-001.ex01'], ['need-001.ex01'], ['need-001.ex01']]);
+  expect(plans.flatMap(plan => plan.useCases).every(useCase => !('coverage' in useCase))).toBe(true);
   const taskSettlements = events.filter((event): event is Extract<typeof event, { type: 'capability-assignment-settled' }> =>
     event.type === 'capability-assignment-settled' && event.data.task === 'cap-001');
   expect(taskSettlements.filter(event => event.data.outcome === 'partial')).toHaveLength(3);

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { RunLog } from '../run/log.js';
 import { commitCapabilityTransition } from '../capability/ledger.js';
-import { capabilityLayout, capabilityRequestSchema, capabilitySchemas, type CapabilityPlan } from '../capability/records.js';
+import { capabilityLayout, capabilityPlanSchema, capabilityRequestSchema, capabilitySchemas, type CapabilityPlan } from '../capability/records.js';
 import { committedRecords, recordHash } from '../work/committed.js';
 import { capabilityFixtureIds, copyCapabilityFixture, fixturePlan, fixtureRequest, fixtureTask } from './helpers/capability.js';
 import { obligationsOf } from '../work/obligations.js';
@@ -68,10 +68,7 @@ describe('capability records', () => {
       { path: capabilityLayout.plan(task.id, 1), id: task.id, revision: 1, body: plan },
     ]);
     const revision: CapabilityPlan = { ...plan, revision: 2, basedOn: 1, revisionReason: 'Independent D test disproved the expected value',
-      useCases: [{ ...plan.useCases[0]!, expectedBehavior: 'A formats the corrected value', coverage: {
-        state: 'corrected', reason: 'Original oracle used the wrong unit', evidence: ['check-1'], decidedBy: 'inv-0002',
-        tests: ['a-format'], candidate: 'tree-2', configuration: 'test-config-1',
-      } }],
+      useCases: [{ ...plan.useCases[0]!, expectedBehavior: 'A formats the corrected value' }],
     };
     await commitCapabilityTransition(log, { type: 'capability-plan-revised', data: { task: task.id, revision: 2, basedOn: 1, invocation: 'inv-0002' } },
       [{ path: capabilityLayout.plan(task.id, 2), id: task.id, revision: 2, body: revision }]);
@@ -79,12 +76,21 @@ describe('capability records', () => {
     expect(saved).toHaveLength(2);
     expect(saved?.[0]).toEqual(plan);
     expect(saved?.[1]?.originalExamples).toEqual([capabilityFixtureIds.example]);
+    // PB3-D09: the original request and its example stay as they were asked;
+    // the revised case carries no coverage state and requires no test.
+    expect(committedRecords(log.ledger.replay()).capabilityRequests.get(request.id)).toEqual(request);
+    expect(saved?.[1]?.useCases).toEqual([{ id: capabilityFixtureIds.example, expectedBehavior: 'A formats the corrected value', derivedFrom: [capabilityFixtureIds.example] }]);
+    expect(capabilityPlanSchema.safeParse({ ...revision, useCases: [{ ...revision.useCases[0]!, coverage: { state: 'exercised', tests: ['a-format'] } }] }).success).toBe(false);
+    await expect(commitCapabilityTransition(log, { type: 'capability-plan-revised', data: { task: task.id, revision: 3, basedOn: 2, invocation: 'inv-0002' } },
+      [{ path: capabilityLayout.plan(task.id, 3), id: task.id, revision: 3, body: { ...revision, revision: 3, basedOn: 2, useCases: [
+        { id: 'a-extra', expectedBehavior: 'A formats a second fact', derivedFrom: [capabilityFixtureIds.example] },
+      ] } }])).rejects.toThrow();
     await expect(commitCapabilityTransition(log, { type: 'capability-plan-revised', data: { task: task.id, revision: 3, basedOn: 2, invocation: 'inv-0002' } },
       [{ path: capabilityLayout.plan(task.id, 3), id: task.id, revision: 3, body: { ...revision, revision: 3, basedOn: 2, originalExamples: [] } }])).rejects.toThrow();
     expect(log.count('capability-plan-revised')).toBe(1);
   });
 
-  it('refuses unresolved handback and materializes a resolved handback without changing the request', async () => {
+  it('PB3-D08 refuses a handback outside verification and materializes one with no per-example coverage state, leaving the request unchanged', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'capability-handback-'));
     directories.push(directory);
     const path = join(directory, 'events.jsonl');
@@ -98,31 +104,32 @@ describe('capability records', () => {
       { path: capabilityLayout.task(task.id), id: task.id, revision: 1, body: task },
       { path: capabilityLayout.plan(task.id, 1), id: task.id, revision: 1, body: plan },
     ]);
-    await commitCapabilityTransition(log, { type: 'capability-verification-started', data: { task: task.id, invocation: 'inv-0002' } }, []);
-    const handbackFor = (current: CapabilityPlan) => ({
+    const handback = {
       schema: 'ramify-agent.capability-handback/1' as const, task: task.id, request: request.id,
-      plan: { id: task.id, revision: current.revision, hash: recordHash(current) },
+      plan: { id: task.id, revision: plan.revision, hash: recordHash(plan) },
       sourceRevision: 'source-1', returnedTree: 'b'.repeat(64), deltaFromSuspension: ['subs/a/src/caller.ts'],
-      summary: 'A uses B', interfaces: [{ path: 'subs/b/src/result.ts', symbols: ['readResult'], use: 'A formats the fact' }],
+      summary: 'A uses B; the original example now formats the fact as asked',
+      interfaces: [{ path: 'subs/b/src/result.ts', symbols: ['readResult'], use: 'A formats the fact' }],
       compatibility: [], checks: [{ id: 'gate-1', revision: 1, hash: 'c'.repeat(64) }], reviews: [], limitations: [],
-    });
-    await expect(commitCapabilityTransition(log, { type: 'capability-handed-back', data: { task: task.id, handback: task.id, invocation: 'inv-0002' } },
-      [{ path: capabilityLayout.handback(task.id), id: task.id, revision: 1, body: handbackFor(plan) }])).rejects.toThrow('resolved structural evidence');
-    expect(log.count('capability-handed-back')).toBe(0);
-    await commitCapabilityTransition(log, { type: 'capability-verification-failed', data: { task: task.id, finding: 'Unresolved example' } }, []);
-    const covered: CapabilityPlan = { ...plan, revision: 2, basedOn: 1, revisionReason: 'Real A test passed',
-      useCases: [{ ...plan.useCases[0]!, coverage: { state: 'exercised', tests: ['a-format'], candidate: 'source-1', configuration: 'vitest-1' } }],
     };
-    await commitCapabilityTransition(log, { type: 'capability-plan-revised', data: { task: task.id, revision: 2, basedOn: 1, invocation: 'inv-0002' } },
-      [{ path: capabilityLayout.plan(task.id, 2), id: task.id, revision: 2, body: covered }]);
+    // The structural boundaries stay: no handback while the task is not
+    // verifying, nor one naming a plan other than the current revision.
+    await expect(commitCapabilityTransition(log, { type: 'capability-handed-back', data: { task: task.id, handback: task.id, invocation: 'inv-0002' } },
+      [{ path: capabilityLayout.handback(task.id), id: task.id, revision: 1, body: handback }])).rejects.toThrow('verified coordinator authority is required');
     await commitCapabilityTransition(log, { type: 'capability-verification-started', data: { task: task.id, invocation: 'inv-0002' } }, []);
+    await expect(commitCapabilityTransition(log, { type: 'capability-handed-back', data: { task: task.id, handback: task.id, invocation: 'inv-0002' } },
+      [{ path: capabilityLayout.handback(task.id), id: task.id, revision: 1, body: { ...handback, plan: { ...handback.plan, hash: 'd'.repeat(64) } } }]))
+      .rejects.toThrow('resolved structural evidence');
+    expect(log.count('capability-handed-back')).toBe(0);
+    // The plan's one case still has no coverage, cited evidence or test list,
+    // and the handback is accepted: the outcome is the architect's to report.
+    expect(Object.keys(plan.useCases[0]!).sort()).toEqual(['derivedFrom', 'expectedBehavior', 'id']);
     await commitCapabilityTransition(log, { type: 'capability-handed-back', data: { task: task.id, handback: task.id, invocation: 'inv-0002' } },
-      [{ path: capabilityLayout.handback(task.id), id: task.id, revision: 1, body: handbackFor(covered) }]);
+      [{ path: capabilityLayout.handback(task.id), id: task.id, revision: 1, body: handback }]);
     const reopened = await RunLog.open(path, 'job-001');
-    expect(await reopened.ledger.readRecord(capabilityLayout.handback(task.id), capabilitySchemas.handback)).toEqual({
-      kind: 'valid', value: handbackFor(covered),
-    });
+    expect(await reopened.ledger.readRecord(capabilityLayout.handback(task.id), capabilitySchemas.handback)).toEqual({ kind: 'valid', value: handback });
     expect(committedRecords(reopened.ledger.replay()).capabilityRequests.get(request.id)).toEqual(request);
+    expect(committedRecords(reopened.ledger.replay()).capabilityPlans.get(task.id)).toEqual([plan]);
   });
 });
 

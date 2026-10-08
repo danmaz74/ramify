@@ -23,9 +23,11 @@ export const capabilityActionSchema = z.discriminatedUnion('kind', [
   action('delegate-capability', { request: text, provider: modulePathSchema, placementReason: text, constraints: z.array(text) }),
   action('request-placement', { problem: text, evidence: z.array(text).min(1) }),
   action('unresolved', { problem: text, evidence: z.array(text).min(1) }),
+  /** The architect's done reports on the task's obligations, in `reports`,
+   * are the handback; anything it says about an original example is free
+   * text in `summary` or a report's `where`. No cited file or test is checked. */
   action('request-handback', {
     summary: text,
-    coverage: z.array(z.object({ case: text, evidence: z.array(text).min(1) }).strict()).min(1),
     interfaces: z.array(z.object({ path: text, symbols: z.array(text).min(1), use: text }).strict()).min(1),
     limitations: z.array(text),
   }),

@@ -218,8 +218,9 @@ export function isCapabilityEvent(event: RunEvent): event is CapabilityEvent {
   return (capabilityTypes as readonly string[]).includes(event.type);
 }
 
-/** Structural readiness only. Test adequacy and real-provider use remain
- * agent/review judgments, while the gate later verifies recorded executions. */
+/** Structural readiness only. Test adequacy, real-provider use and every
+ * original example's outcome are the task architect's judgment, reported on
+ * its obligations; no per-example state or cited test is consulted. */
 export function capabilityHandbackReadiness(task: CapabilityTask, request: CapabilityRequest, plan: CapabilityPlan, state: CapabilityTaskState): readonly string[] {
   const failures: string[] = [];
   if (task.request !== request.id || plan.task !== task.id || state.id !== task.id) failures.push('Task, request and plan references differ');
@@ -227,10 +228,6 @@ export function capabilityHandbackReadiness(task: CapabilityTask, request: Capab
   if (plan.revision !== state.planRevision) failures.push('Plan revision is stale');
   if (state.activeAssignment || [...state.assignments.values()].some(outcome => outcome === 'active')) failures.push('An assignment is active');
   if (state.activeChild) failures.push('A child task is unfinished');
-  for (const example of request.original.examples) {
-    const useCase = plan.useCases.find(item => item.id === example.id);
-    if (!useCase || useCase.coverage.state === 'unresolved') failures.push(`Example ${example.id} lacks resolved coverage`);
-  }
   return failures;
 }
 

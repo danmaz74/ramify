@@ -104,24 +104,15 @@ export const capabilityTaskSchema = z.object({
 }).strict();
 export type CapabilityTask = z.infer<typeof capabilityTaskSchema>;
 
-const coverage = z.discriminatedUnion('state', [
-  z.object({ state: z.literal('unresolved'), reason: text }).strict(),
-  z.object({ state: z.literal('exercised'), tests: z.array(text).min(1) }).strict(),
-  z.object({ state: z.literal('corrected'), reason: text, evidence: z.array(text).min(1), decidedBy: text, tests: z.array(text).min(1) }).strict(),
-]);
-// Historical coverage records retain their model-authored identities verbatim.
-// New tools cannot author those fields: the common gate/handback binds source
-// and provider report identities, under the run's execution policy.
-const recordedCoverage = z.discriminatedUnion('state', [
-  coverage.options[0],
-  coverage.options[1].extend({ candidate: text.optional(), configuration: text.optional() }),
-  coverage.options[2].extend({ candidate: text.optional(), configuration: text.optional() }),
-]);
 /** The editable plan content is shared with the plan-update tool schema. */
 export const capabilityPlanContentSchema = z.object({
   need: text,
   proposedInterface: text,
-  useCases: z.array(z.object({ id: z.union([exampleId, id]), expectedBehavior: text, derivedFrom: z.array(exampleId).min(1), coverage }).strict()),
+  /** The plan's behavioral cases. An original example keeps its case
+   * through every revision as immutable request context; a case carries no
+   * coverage state, cited evidence or test list. A case is tracked on its own
+   * only when the task's architect registers it as an obligation. */
+  useCases: z.array(z.object({ id: z.union([exampleId, id]), expectedBehavior: text, derivedFrom: z.array(exampleId).min(1) }).strict()),
   compatibility: z.array(text),
   outline: z.array(text),
   decisions: z.array(z.object({ decision: text, reason: text, evidence: z.array(text) }).strict()),
@@ -137,7 +128,6 @@ export const capabilityPlanSchema = z.object({
   updatedBy: text,
   revisionReason: text,
   ...capabilityPlanContentSchema.shape,
-  useCases: z.array(capabilityPlanContentSchema.shape.useCases.element.extend({ coverage: recordedCoverage })),
   /** Original example IDs cannot disappear. Additional cases may be derived. */
   originalExamples: z.array(exampleId).min(1),
 }).strict().superRefine((plan, context) => {
@@ -148,7 +138,7 @@ export const capabilityPlanSchema = z.object({
   }
   for (const [index, item] of plan.useCases.entries()) {
     if (!item.derivedFrom.every(example => plan.originalExamples.includes(example))) {
-      context.addIssue({ code: 'custom', path: ['useCases', index, 'derivedFrom'], message: 'Coverage links name original examples' });
+      context.addIssue({ code: 'custom', path: ['useCases', index, 'derivedFrom'], message: 'A case derives from original examples' });
     }
   }
 });

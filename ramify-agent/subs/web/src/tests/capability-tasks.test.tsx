@@ -23,9 +23,7 @@ function response(version: number, stage: 'waiting' | 'repair' | 'handed-back'):
       placementReason: 'B owns source', relatedEntries: [{ entry: 'b-entry', reason: 'B has its own entry' }],
       deferredWorkItems: ['wi-002'], plan: { revision: handedBack ? 3 : 2, revisionReason: 'Consumer feedback',
         need: 'A needs B source', proposedInterface: 'B exports readWithSource',
-        useCases: [{ id: 'need-001.ex01', expectedBehavior: 'A displays B source', derivedFrom: ['need-001.ex01'],
-          coverage: handedBack ? { state: 'exercised', tests: ['A real test'], candidate: 'tree', configuration: 'vitest' }
-            : { state: 'unresolved', reason: 'Type migration still fails' } }],
+        useCases: [{ id: 'need-001.ex01', expectedBehavior: 'A displays B source', derivedFrom: ['need-001.ex01'] }],
         compatibility: ['D must migrate'], outline: ['Implement B', 'Migrate D', 'Integrate A'],
         decisions: [{ decision: 'Place in B', reason: 'B owns the fact', evidence: [] }],
         openQuestions: [], requirementRefs: [] },
@@ -34,6 +32,10 @@ function response(version: number, stage: 'waiting' | 'repair' | 'handed-back'):
         failures: handedBack ? [] : ['Type check failed in D'] }],
       consultations: [{ id: 'ex-001', question: 'What should A display?', references: ['subs/a/src/caller.ts'],
         answer: stage === 'waiting' ? null : 'B source metadata', objections: [] }],
+      obligations: [{ id: 'cap-001', kind: 'outcome', responsible: { kind: 'capability-task', id: 'cap-001' },
+        status: handedBack ? 'done' : 'pending', revision: handedBack ? 1 : 0, case: null, description: null, registeredBy: null,
+        binding: null, report: handedBack ? { judgment: 'done', revision: 1, basedOnRevision: 0, where: 'subs/b/src/source.ts readWithSource',
+          invocation: 'inv-0002', submission: 'c'.repeat(64), sequence: 9, at: '2026-10-07T12:00:00.000Z' } : null }],
       children: [], activeChild: null,
       verification: { status: handedBack ? 'passed' : stage === 'repair' ? 'failed' : 'pending',
         gates: stage === 'waiting' ? [] : ['ga-001'], reviews: [], findings: stage === 'repair' ? ['D type migration failed'] : [] },
@@ -62,6 +64,21 @@ test('CA23 CA34: the browser follows consultation, provisional failure and handb
   expect(await screen.findByText('B source is usable by A')).toBeTruthy();
   expect(screen.getByText(/Handback does not complete them/)).toBeTruthy();
   expect(screen.getByText(/Original assignment and separate entry work require their own completion/)).toBeTruthy();
+});
+
+test('PB3-D08: examples are the request\'s context and the handback is the architect\'s report, with no per-example state', async () => {
+  const pending = render(<CapabilityTasksArea client={client(async () => response(2, 'repair'))} planId="p" runId="r" version={2} />);
+  const reports = await screen.findByRole('region', { name: 'Architect reports of cap-001' });
+  expect(reports.textContent).toContain('cap-001 · delegated outcome · pending · no architect report');
+  expect(screen.getByText(/The request's original examples, unchanged by plan revisions/)).toBeTruthy();
+  expect(screen.getByText(/need-001.ex01/, { selector: 'strong' }).parentElement?.textContent).toBe('need-001.ex01: A displays B source');
+  for (const state of ['unresolved', 'exercised', 'corrected']) expect(screen.queryByText(new RegExp(state))).toBeNull();
+  pending.unmount();
+  render(<CapabilityTasksArea client={client(async () => response(3, 'handed-back'))} planId="p" runId="r" version={3} />);
+  expect((await screen.findByRole('region', { name: 'Architect reports of cap-001' })).textContent)
+    .toContain('cap-001 · delegated outcome · done · architect report done by inv-0002 (revision 1), where: subs/b/src/source.ts readWithSource');
+  expect(screen.getByText(/Handed back on the architect's report:/).textContent)
+    .toBe("Handed back on the architect's report: cap-001 done by inv-0002, where: subs/b/src/source.ts readWithSource.");
 });
 
 test('a slow old response cannot replace the newer task and plan revision', async () => {

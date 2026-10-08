@@ -605,6 +605,25 @@ export function obligationsOwnedBy(projection: ObligationProjection, actor: Pick
 }
 
 /**
+ * The obligations this actor is responsible for that its reports have not
+ * made `done`: what a completion or handback request still owes. The
+ * request's own reports count once recorded, so the projection passed in is
+ * read after they are applied. Only the registered IDs are consulted: an
+ * original example, a plan case nobody registered or an ordinary test owes
+ * nothing, and no file, test result or audit outcome is read.
+ */
+export function unreportedObligations(projection: ObligationProjection, actor: Pick<ObligationActor, 'kind' | 'id'>): Obligation[] {
+  return obligationsOwnedBy(projection, actor).filter(obligation => obligation.status !== 'done');
+}
+
+/** Why a request cannot finish while this obligation is not reported done, by its state. */
+export function unreportedText(obligation: Pick<Obligation, 'id' | 'status'>): string {
+  return obligation.status === 'pending'
+    ? `${obligation.id} is pending and not reported done: report it done in \`reports\` where it holds, or assign an iteration that binds it`
+    : `${obligation.id} is bound and not reported done: report it done in \`reports\` where its binding holds, or assign the work that finishes it`;
+}
+
+/**
  * The obligations an architect reports on, as its briefing shows them: the
  * status and revision its next report names, its own earlier judgment and
  * where text, and the reminder that gate and audit results are separate.

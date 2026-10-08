@@ -70,12 +70,16 @@ test('CA23 CA34: request, design, consultation and failed verification remain di
     requests: [{ id: 'need-001', outcome: 'delegated', task: 'cap-001' }],
     tasks: [{ id: 'cap-001', status: 'coordinating', active: true, provider: 'b',
       source: { delta: [{ path: 'subs/a/src/caller.ts' }] },
-      plan: { revision: 1, useCases: [{ coverage: { state: 'unresolved' } }] },
+      plan: { revision: 1, useCases: [{ id: 'need-001.ex01', expectedBehavior: 'A formats the fact', derivedFrom: ['need-001.ex01'] }] },
+      obligations: [{ id: 'cap-001', kind: 'outcome', status: 'pending', report: null }],
       consultations: [{ answer: 'Show B source metadata' }],
       verification: { status: 'failed', findings: ['A real test still fails'] }, handback: null,
       deferredWorkItems: ['wi-002'] }] });
   expect(answer.tasks[0]?.id).not.toBe('format-b-fact');
   expect(answer.tasks[0]?.deferredWorkItems).toEqual(['wi-002']);
+  // The examples are the request's context; no case carries a coverage state.
+  expect(answer.tasks[0]?.original.examples.map(example => example.id)).toEqual(['need-001.ex01']);
+  expect(answer.tasks[0]?.plan.useCases.every(useCase => !('coverage' in useCase))).toBe(true);
 });
 
 test('CA23: projection reconstructs the same task after the durable ledger is reopened', async () => {
@@ -144,7 +148,7 @@ test('CA23: nested dependency and settled partial blocker stay visible in the ta
   }]);
 });
 
-test('CA23 CA34: committed handback closes only the task and retains the separate B entry', () => {
+test('CA23 CA34 PB3-D08: committed handback closes only the task, shows the architect\'s report as its judgment and retains the separate B entry', () => {
   const request = fixtureRequest();
   const task = fixtureTask(request);
   const plan = fixturePlan(request, task);
@@ -154,6 +158,8 @@ test('CA23 CA34: committed handback closes only the task and retains the separat
     interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact'], use: 'A formats B fact' }],
     compatibility: [], checks: [{ id: 'ga-001', revision: 1, hash }], reviews: [], limitations: [] };
   const run = constructedRun([...lines().slice(0, 2),
+    { type: 'obligation-reported', data: { id: task.id, judgment: 'done', basedOnRevision: 0, revision: 1,
+      where: 'subs/b/src/fact.ts readFact', by: 'inv-0002', submission: hash } },
     { type: 'capability-verification-started', data: { task: task.id, invocation: 'inv-0002' } },
     { type: 'capability-handed-back', data: { task: task.id, handback: task.id, invocation: 'inv-0002' },
       records: [{ path: 'capabilities/cap-001/handback.json', body: handback }] },
@@ -162,7 +168,10 @@ test('CA23 CA34: committed handback closes only the task and retains the separat
   expect(answer.stack).toEqual(['wi-001']);
   expect(answer.tasks).toMatchObject([{ id: 'cap-001', status: 'handed-back', active: false,
     deferredWorkItems: ['wi-002'], verification: { status: 'passed' },
+    obligations: [{ id: 'cap-001', kind: 'outcome', status: 'done',
+      report: { judgment: 'done', revision: 1, where: 'subs/b/src/fact.ts readFact', invocation: 'inv-0002' } }],
     handback: { summary: 'B fact reader is available to A', checks: [{ id: 'ga-001', revision: 1 }] } }]);
+  expect(answer.tasks[0]?.handback).not.toHaveProperty('coverage');
   expect(answer.requests).toMatchObject([{ task: 'cap-001', outcome: 'delegated' }]);
 });
 

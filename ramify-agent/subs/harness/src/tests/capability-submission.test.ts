@@ -7,9 +7,9 @@ import { gitService } from '../../subs/evidence/src/git.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
 import { initRepository, runEventsOnDisk, startRun, until } from './helpers/runs.js';
-import { capabilityContext, registered, reported, submissionHash } from './helpers/obligations.js';
+import { capabilityContext, line, registered, reported, submissionHash } from './helpers/obligations.js';
 import { validateEngineer } from '../work/engineer.js';
-import { obligationEventsToRecord } from '../work/obligations.js';
+import { obligationEventsToRecord, unreportedObligations, unreportedText } from '../work/obligations.js';
 import type { RunEvent } from '../run/log.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -54,30 +54,35 @@ describe('capability submission', () => {
     expect(validateCapabilityPlanUpdate({ ...update, reason: '' }, basis).valid).toBe(false);
   });
 
-  it('CA11 builds a revision with stable case identity and refuses silent case deletion', () => {
+  it('CA11 PB3-D09 builds a revision with stable case identity, keeps the original examples, and refuses silent case deletion', () => {
     const previous = fixturePlan();
     const correction = { task: previous.task, basedOn: 1, invocation: 'inv-0002', reason: 'Independent test corrected the oracle',
-      changes: { useCases: [{ ...previous.useCases[0]!, expectedBehavior: 'Corrected value', coverage: {
-        state: 'corrected' as const, reason: 'Wrong unit', evidence: ['review-1'], decidedBy: 'inv-0002',
-        tests: ['a-format'],
-      } }] },
+      changes: { useCases: [{ ...previous.useCases[0]!, expectedBehavior: 'Corrected value' },
+        { id: 'derived-retry', expectedBehavior: 'A retries once', derivedFrom: [previous.originalExamples[0]!] }] },
     };
     const next = buildCapabilityPlanRevision(previous, correction);
     expect(next.originalExamples).toEqual(previous.originalExamples);
-    expect(next.useCases[0]?.id).toBe(previous.useCases[0]?.id);
-    expect(previous.useCases[0]?.coverage.state).toBe('unresolved');
+    expect(next.useCases.map(item => item.id)).toEqual([previous.useCases[0]!.id, 'derived-retry']);
+    expect(previous.useCases[0]).toEqual({ id: previous.originalExamples[0], expectedBehavior: 'A formats the fact', derivedFrom: previous.originalExamples });
     expect(() => buildCapabilityPlanRevision(previous, { ...correction, changes: { useCases: [] } })).toThrow();
+    // An added case registers nothing: the delegated outcome is still the task's only obligation.
+    expect([...capabilityContext().projection.obligations.values()].filter(obligation => obligation.responsible.id === 'cap-001').map(obligation => obligation.id)).toEqual(['cap-001']);
   });
 
-  it('SI13 asks agents for test associations without source hashes while retaining historical coverage records', () => {
+  it('PB3-D08 a case carries no coverage and a handback cites no evidence: both old fields are refused by the schemas', () => {
     const previous = fixturePlan();
-    const useCase = { ...previous.useCases[0]!, coverage: { state: 'exercised' as const, tests: ['subs/a/src/tests/use.test.ts'] } };
+    const covered = { ...previous.useCases[0]!, coverage: { state: 'exercised', tests: ['subs/a/src/tests/use.test.ts'] } };
     const update = { task: basis.task, basedOn: basis.planRevision, invocation: basis.coordinatorInvocation,
-      reason: 'Real consumer case executed', changes: { useCases: [useCase] } };
-    expect(validateCapabilityPlanUpdate(update, basis).valid).toBe(true);
-    const historical = { ...useCase, coverage: { ...useCase.coverage, candidate: 'old-tree', configuration: 'old-config' } };
-    expect(validateCapabilityPlanUpdate({ ...update, changes: { useCases: [historical] } }, basis).valid).toBe(false);
-    expect(capabilityPlanSchema.parse({ ...previous, useCases: [historical] }).useCases[0]!.coverage).toEqual(historical.coverage);
+      reason: 'Real consumer case executed', changes: { useCases: [covered] } };
+    expect(validateCapabilityPlanUpdate(update, basis).valid).toBe(false);
+    expect(capabilityPlanSchema.safeParse({ ...previous, useCases: [covered] }).success).toBe(false);
+    const handback = { task: 'cap-001', planRevision: 2, invocation: 'inv-0003', kind: 'request-handback',
+      summary: 'A renders the B fact; the original example holds as asked',
+      interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFactWithSource'], use: 'A renders it' }], limitations: [] };
+    expect(validateCapabilityAction(handback, basis).valid).toBe(true);
+    const cited = validateCapabilityAction({ ...handback, coverage: [{ case: 'need-001.ex01', evidence: ['subs/a/src/tests/use.test.ts'] }] }, basis);
+    expect(cited.valid).toBe(false);
+    if (!cited.valid) expect(cited.issues.every(issue => issue.kind === 'structure')).toBe(true);
   });
 });
 
@@ -146,6 +151,29 @@ describe('PB3-D01 PB3-D02 PB3-D04: capability registrations and reports', () => 
     expect(obligationEventsToRecord(submission, replayed.actor, { ...identity, submission: submissionHash('e') }, replayed.projection, both)
       .map(event => event.data.id)).toEqual(['test-002', 'cap-001']);
     expect(replayed.projection.obligations.get('cap-001')).toMatchObject({ status: 'done', revision: 1, report: { where: 'subs/b/src/fact.ts', by: 'inv-0003' } });
+  });
+
+  it('PB3-D08 PB3-D09 a handback owes a done report for each registered obligation of its task, outcome-only or separately tracked, and none for an example', () => {
+    const owed = (events: Parameters<typeof capabilityContext>[0]) =>
+      unreportedObligations(capabilityContext(events).projection, { kind: 'capability-task', id: 'cap-001' }).map(unreportedText);
+    // Outcome-only tracking: the delegated outcome is the one report owed.
+    expect(owed([])).toEqual(['cap-001 is pending and not reported done: report it done in `reports` where it holds, or assign an iteration that binds it']);
+    const doneOutcome = reported({ id: 'cap-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0003', submission: submissionHash('a') });
+    expect(owed([doneOutcome])).toEqual([]);
+    // Separate tracking: a registered case and test are owed beside it; the consumer's sc-001 is not the task's to report.
+    const separate = [
+      registered({ id: 'cap-001.case.need-001.ex01', kind: 'scenario', responsible: { kind: 'capability-task', id: 'cap-001' },
+        by: 'inv-0003', submission: submissionHash('b'), case: 'need-001.ex01' }),
+      registered({ id: 'test-001', kind: 'test', responsible: { kind: 'capability-task', id: 'cap-001' },
+        by: 'inv-0003', submission: submissionHash('b'), description: 'B keeps the old text for D' }),
+      doneOutcome,
+      line('obligation-bound', { id: 'test-001', fakes: ['FactSourceFake'], by: 'inv-0005', submission: submissionHash('c') }),
+    ];
+    expect(owed(separate).map(text => text.split(':')[0])).toEqual(['cap-001.case.need-001.ex01 is pending and not reported done', 'test-001 is bound and not reported done']);
+    expect(owed([...separate,
+      reported({ id: 'cap-001.case.need-001.ex01', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0006', submission: submissionHash('d') }),
+      reported({ id: 'test-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0006', submission: submissionHash('d') }),
+    ])).toEqual([]);
   });
 });
 

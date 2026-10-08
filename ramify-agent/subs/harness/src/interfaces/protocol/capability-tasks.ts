@@ -1,17 +1,13 @@
 import { z } from 'zod';
 import { jobVersionSchema } from './jobs.js';
+import { obligationViewSchema } from './runs.js';
 
 /* A browser-safe projection of durable capability coordination. A task ID is
- * never a registry capability ID or a module-capability comparison key. */
+ * never a registry capability ID or a module-capability comparison key. The
+ * original examples are the request's immutable context; a plan case carries
+ * no per-example state, and the task's architect reports on its obligations. */
 const text = z.string().min(1);
 const ref = z.object({ id: text, revision: z.int().nonnegative() }).strict();
-const coverage = z.discriminatedUnion('state', [
-  z.object({ state: z.literal('unresolved'), reason: text }).strict(),
-  z.object({ state: z.literal('exercised'), tests: z.array(text), candidate: text.optional(), configuration: text.optional() }).strict(),
-  z.object({ state: z.literal('corrected'), reason: text, evidence: z.array(text), decidedBy: text,
-    tests: z.array(text), candidate: text.optional(), configuration: text.optional() }).strict(),
-]);
-
 export const capabilityTaskViewSchema = z.object({
   id: text,
   request: text,
@@ -32,7 +28,7 @@ export const capabilityTaskViewSchema = z.object({
   relatedEntries: z.array(z.object({ entry: text, reason: text }).strict()),
   deferredWorkItems: z.array(text),
   plan: z.object({ revision: z.int().positive(), revisionReason: text, need: text, proposedInterface: text,
-    useCases: z.array(z.object({ id: text, expectedBehavior: text, derivedFrom: z.array(text), coverage }).strict()),
+    useCases: z.array(z.object({ id: text, expectedBehavior: text, derivedFrom: z.array(text) }).strict()),
     compatibility: z.array(text), outline: z.array(text), decisions: z.array(z.object({ decision: text, reason: text,
       evidence: z.array(text) }).strict()), openQuestions: z.array(text), requirementRefs: z.array(text) }).strict(),
   assignments: z.array(z.object({ id: text, owner: text, purpose: text, approach: text,
@@ -44,6 +40,10 @@ export const capabilityTaskViewSchema = z.object({
       result: z.enum(['complete', 'partial', 'not-verified']).nullable() }).strict()).optional() }).strict()),
   consultations: z.array(z.object({ id: text, question: text, references: z.array(text),
     answer: text.nullable(), objections: z.array(text) }).strict()),
+  /** The obligations this task's architect reports on: its delegated
+   * outcome and the cases and tests it registered, each with its latest
+   * binding and report. The outcome's done report is the handback's judgment. */
+  obligations: z.array(obligationViewSchema),
   children: z.array(text),
   activeChild: text.nullable(),
   verification: z.object({ status: z.enum(['pending', 'running', 'failed', 'passed']),

@@ -72,7 +72,7 @@ export function fixturePlan(request: CapabilityRequest = fixtureRequest(), task:
   return {
     schema: 'ramify-agent.capability-plan/1', task: task.id, revision: 1, basedOn: 0, updatedBy: 'inv-0002',
     revisionReason: 'Initial qualified plan', need: request.original.need, proposedInterface: 'B exports a result reader',
-    useCases: [{ id: example.id, expectedBehavior: 'A formats the fact', derivedFrom: [example.id], coverage: { state: 'unresolved', reason: 'Implementation pending' } }],
+    useCases: [{ id: example.id, expectedBehavior: 'A formats the fact', derivedFrom: [example.id] }],
     compatibility: ['D uses the old result shape'], outline: ['Implement B', 'Migrate D', 'Integrate A'],
     decisions: [{ decision: 'Place in B', reason: 'B owns fact source', evidence: ['architect-view'] }],
     openQuestions: [], requirementRefs: [], originalExamples: [example.id],
