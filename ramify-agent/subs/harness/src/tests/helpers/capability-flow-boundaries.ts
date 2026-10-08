@@ -167,7 +167,9 @@ export function capabilityFlowBoundaries(root: string, mode: FlowMode, entries: 
       expect(cwd).toBe(root); expect(['--version', 'measure', 'check']).toContain(args[0]);
       if (args[0] === '--version') expect(args).toEqual(['--version']);
       if (args[0] === 'measure') expect(args).toEqual(['measure', '--root', root, '--format', 'json']);
-      if (args[0] === 'check') {
+      if (args[0] === 'check' && args[1] === '--batch') {
+        expect(args).toEqual(['check', '--batch', '--root', root, '--format', 'json', '--no-snapshot']);
+      } else if (args[0] === 'check') {
         expect(args.slice(0, 2)).toEqual(['check', '--changed']); const format = args.indexOf('--format'); expect(format).toBeGreaterThan(2);
         for (const path of args.slice(2, format)) expect(Object.hasOwn(owners, path), `unstated hook path ${path}`).toBe(true);
         expect(args.slice(format, -1)).toEqual(['--format', 'json', '--deadline']);

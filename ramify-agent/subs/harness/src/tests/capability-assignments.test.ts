@@ -35,17 +35,17 @@ const b = 'capability-coordination/b';
 const d = 'capability-coordination/d';
 const p = 'capability-coordination';
 
-function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-blocker' = 'assignments',
+function script(root: string, seen: string[], mode: 'assignments' | 'boundary' | 'partial-blocker' = 'assignments',
   prompts: string[] = []): Script {
   let engineer = 0;
   let architect = 0;
   return spec => {
-    seen.push(`${spec.role}:${spec.submission.name}:${spec.session.mode}:${spec.builtinTools.join(',')}`);
+    seen.push(`${spec.role}:${spec.submission.name}:${spec.session.mode}:${spec.tools.map(tool => tool.name).filter(name => ['read', 'grep', 'ls', 'edit', 'write'].includes(name)).join(',')}`);
     prompts.push(spec.prompt);
     if (spec.role === 'initial-architect') return submit(analysis([entry('richer-a-fact', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -70,7 +70,9 @@ function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-bloc
       edit('caller.ts', 'Fact: ${value}', 'Fresh fact: ${value}'),
       write('extra.ts', "export const sourceHint = 'B';\n"),
       edit('tests/caller.test.ts', "toBe('Fact: old')", "toBe('this test still fails')"));
-      const owner = spec.prompt.includes('# Iteration cap-') ? /Your starting module is `([^`]+)`/u.exec(spec.prompt)?.[1] : undefined;
+      const objective = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gm)].at(-1);
+      const work = objective === undefined ? {} : JSON.parse(objective[1]!) as { iteration?: string };
+      const owner = work.iteration?.startsWith('cap-') ? [[a, 'subs/a/src'], [b, 'subs/b/src'], [d, 'subs/d/src'], [p, 'src']].find(([, directory]) => spec.scope.workingDirectory === join(root, directory!))?.[0] : undefined;
       if (mode === 'partial-blocker' && owner === a) return submit({
         kind: 'partial', done: ['A kept the readable selected denial'], unfinished: ['Root-owned stale assertion in src/tests/stale.test.ts'],
         findings: ['A cannot write the root test from its module scope'],
@@ -93,7 +95,7 @@ function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-bloc
     }
     if (spec.role === 'capability-architect') {
       architect += 1;
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
       if (mode === 'partial-blocker') return architect <= 2
         ? submit({ ...basis, kind: 'assign', assignment: assign(architect === 1 ? a : p, { goal: architect === 1 ? 'Render A denial' : 'Repair root-owned stale assertion', approach: 'Change only owned source or tests', completionEvidence: 'Owned source diff' }).assignment })
@@ -137,7 +139,7 @@ test('an explicit partial capability result returns its cross-owner blocker to t
 
   const seen: string[] = [], prompts: string[] = [];
   const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options,
-    script: script(seen, 'partial-blocker', prompts), inputs: treeInputs(),
+    script: script(fixture.root, seen, 'partial-blocker', prompts), inputs: treeInputs(),
     });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -170,7 +172,7 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
   const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'assignment', 'a+b'); answers.push(boundaryAnswers);
 
   const seen: string[] = [];
-  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(seen), inputs: treeInputs(),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(fixture.root, seen), inputs: treeInputs(),
     });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -193,7 +195,7 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
     observation.data.target === 'submit_capability_action')).toHaveLength(1);
   expect(architectObservations.find(observation => observation.type === 'rejection')?.data.errors)
     .toContainEqual(expect.objectContaining({ path: 'planRevision' }));
-  expect(seen.find(s => s.includes('answer_capability_consultation'))).toContain(':continue:read,grep,ls');
+  expect(seen.find(s => s.includes('answer_capability_consultation'))).toContain(':fork:read,grep,ls');
   expect(await readFile(join(fixture.root, 'subs/a/src/caller.ts'), 'utf8')).not.toContain('forbidden');
   expect(await readFile(join(fixture.root, 'subs/a/src/extra.ts'), 'utf8')).toContain('sourceHint');
   expect(events.filter(event => event.type === 'writer-acquired')).toHaveLength(5); // original A plus four X assignments
@@ -210,7 +212,10 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
   expect(originalObservations.length).toBeGreaterThan(0);
   const consultation = engineerStarts.find(event => event.data.work.capabilityTask === 'cap-001')!;
   const aExperiment = engineerStarts.find(event => event.data.work.iteration === 'cap-001.i04')!;
-  expect(consultation.data.session).toBe(original.data.session);
+  expect(consultation.data.session).not.toBe(original.data.session);
+  expect(consultation.data.start).toBe('opened');
+  const consultationOpened = events.find(event => event.type === 'session-opened' && event.data.session === consultation.data.session);
+  expect(consultationOpened?.data).toMatchObject({ fork: { from: { session: original.data.session, invocation: original.data.invocation } } });
   expect(aExperiment.data.session).not.toBe(original.data.session);
   expect(aExperiment.data.start).toBe('opened');
   const bInvocation = engineerStarts.find(event => event.data.work.iteration === 'cap-001.i01')!;
@@ -246,7 +251,7 @@ test('CA10: a wider boundary decision returns to the same capability architect',
   const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'boundary', 'a+b'); answers.push(boundaryAnswers);
 
   const seen: string[] = [];
-  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(seen, 'boundary'),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(fixture.root, seen, 'boundary'),
     inputs: treeInputs(), });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -290,7 +295,7 @@ test('PB3: unreadable inherited directory bytes cannot be captured as absent aut
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
   const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'unreadable', 'a+b'); answers.push(boundaryAnswers);
 
-  const baseScript = script([]);
+  const baseScript = script(fixture.root, []);
   let unreadableCandidate = false;
   const git = Object.assign(Object.create(boundaryAnswers.options.git), {
     changedPaths: async (root: string, base?: string) => unreadableCandidate ? ['subs/a/src'] : boundaryAnswers.options.git.changedPaths(root, base),

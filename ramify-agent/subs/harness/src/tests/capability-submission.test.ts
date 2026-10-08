@@ -233,7 +233,7 @@ function reportingScript(prompts: string[]): Script {
     if (spec.role === 'initial-architect') return submit(analysis([entry('richer-a-fact', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, { goal: 'Render the richer B fact in A.' }, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact and A owns integration', constraints: [], requirementRefs: [] });
     }
@@ -253,7 +253,7 @@ function reportingScript(prompts: string[]): Script {
     if (spec.role === 'capability-architect') {
       capabilityTurns += 1;
       prompts.push(spec.prompt);
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
       if (capabilityTurns === 1) {
         const progress = { kind: 'partial', ...basis, progress: 'Read A and B', unfinished: ['Assign B'] };
