@@ -3,12 +3,24 @@ import { basename, resolve } from 'node:path';
 export type ShellTestRun =
   | { readonly kind: 'none' }
   | { readonly kind: 'focused'; readonly segment: string }
+  | { readonly kind: 'non-executing'; readonly segment: string; readonly mode: 'help' | 'version' | 'dry-run' }
+  | { readonly kind: 'unverified'; readonly segment: string; readonly reason: string }
   | { readonly kind: 'whole-suite'; readonly segment: string; readonly reason: string };
+
+export interface FocusedCucumberSelection {
+  readonly cwd: string;
+  readonly config: string;
+  readonly profile: string;
+  readonly paths: readonly string[];
+  readonly configurationIdentity: string;
+}
 
 /** Package scripts are facts supplied by the shell owner, keyed by absolute directory. */
 export interface ShellTestFacts {
   readonly workingDirectory: string;
   readonly testScripts: Readonly<Record<string, string | null>>;
+  /** Generated config facts verified/prepared by the focused provider, never inferred from CLI paths. */
+  readonly focusedCucumber?: readonly FocusedCucumberSelection[];
 }
 
 /** Directories whose package script may matter to classification. */
@@ -40,16 +52,18 @@ export function classifyShellTestRun(command: string, facts: ShellTestFacts): Sh
       cwd = resolve(cwd, words[1].value);
     } else if (words.length > 0) {
       const segment = command.slice(words[0]!.start, words.at(-1)!.end);
-      const result = classifySegment(words.map(word => word.value), segment, facts.testScripts[cwd] ?? null);
+      const result = classifySegment(words.map(word => word.value), segment, facts.testScripts[cwd] ?? null, cwd, facts.focusedCucumber ?? []);
       if (result.kind === 'whole-suite') return result;
-      if (result.kind === 'focused') focused = result;
+      if (result.kind === 'focused' && focused.kind !== 'unverified') focused = result;
+      else if (result.kind === 'unverified') focused = result;
+      else if (result.kind === 'non-executing' && focused.kind === 'none') focused = result;
     }
     begin = index + 1;
   }
   return focused;
 }
 
-function classifySegment(raw: string[], segment: string, testScript: string | null): ShellTestRun {
+function classifySegment(raw: string[], segment: string, testScript: string | null, cwd: string, known: readonly FocusedCucumberSelection[]): ShellTestRun {
   const argv = [...raw];
   while (/^[A-Za-z_][A-Za-z0-9_]*=/u.test(argv[0] ?? '')) argv.shift();
   while (true) {
@@ -99,6 +113,20 @@ function classifySegment(raw: string[], segment: string, testScript: string | nu
     argv.unshift(...script.slice(1));
   }
   if (executable !== 'vitest' && executable !== 'cucumber-js') return { kind: 'none' };
+  if (argv.includes('--help') || argv.includes('-h')) return { kind: 'non-executing', segment, mode: 'help' };
+  if (argv.includes('--version') || argv.includes('-V') || argv.includes('-v')) return { kind: 'non-executing', segment, mode: 'version' };
+  if (executable === 'cucumber-js' && (argv.includes('--dry-run') || argv.includes('-d') || argv.includes('--dry-run=true'))) return { kind: 'non-executing', segment, mode: 'dry-run' };
+  if (executable === 'cucumber-js') {
+    const configAt = argv.indexOf('--config');
+    const profileAt = argv.indexOf('--profile');
+    const config = configAt < 0 || !argv[configAt + 1] ? null : resolve(cwd, argv[configAt + 1]!);
+    const profile = profileAt < 0 ? null : argv[profileAt + 1];
+    const exact = known.find(item => item.cwd === cwd && item.config === config && item.profile === profile && item.paths.length > 0 && item.configurationIdentity);
+    if (exact && argv.length === 4 && configAt !== profileAt && configAt % 2 === 0 && profileAt % 2 === 0) return { kind: 'focused', segment };
+    if (config || argv.some(word => !word.startsWith('-') && word.endsWith('.feature'))) return { kind: 'unverified', segment,
+      reason: 'CLI paths/config do not establish effective Cucumber focus; default profiles can merge broader paths and exclude pending scenarios' };
+    return { kind: 'whole-suite', segment, reason: 'no test file or directory was named' };
+  }
   if (argv[0] === 'run' || argv[0] === 'exec') argv.shift();
   if (argv[0] === 'related') return argv.length > 1 ? { kind: 'focused', segment } : { kind: 'whole-suite', segment, reason: 'no file or directory was named' };
   let focused = false;

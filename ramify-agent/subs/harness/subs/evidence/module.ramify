@@ -1,6 +1,9 @@
 ramify 1
 module evidence
 
+// Effective declared target Cucumber configuration, acquired through the injected command boundary.
+expose-src CucumberConfigurationSelection, EffectiveCucumberConfiguration, CucumberConfigurationResult, loadCucumberConfiguration from "cucumber-configuration.ts" to parent
+
 // Running the Ramify CLI: its exit codes and the private daemon stay here.
 // The executable's own path crosses, because a run captures the complete
 // command it ran the Ramify check with, environment included, and a captured
