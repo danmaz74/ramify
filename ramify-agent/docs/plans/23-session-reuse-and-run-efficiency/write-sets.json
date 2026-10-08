@@ -282,7 +282,8 @@
     "session-quiescence": [
       "subs/harness/subs/agent/src/session-operations.ts",
       "subs/harness/subs/agent/src/interfaces/session-operations.ts",
-      "subs/harness/subs/agent/src/tests/plan23-session-operations.test.ts"
+      "subs/harness/subs/agent/src/tests/plan23-session-operations.test.ts",
+      "subs/harness/subs/agent/subs/pi/src/tests/plan23-prefix-preservation.test.ts"
     ]
   }
 }
