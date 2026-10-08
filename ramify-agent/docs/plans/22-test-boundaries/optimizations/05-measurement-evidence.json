@@ -1,0 +1,213 @@
+{
+  "optimization": 5,
+  "capability": "measurement capture and raw producer document reader",
+  "baseCommit": "68cde9ecc8a2f29f2a01121f6357586c2b99c484",
+  "sourceFiles": {
+    "subs/harness/src/tests/measurement.test.ts": "cd906aaa623c44275cd86a5d69226b3dc0f61ed5792550e5a8168ee16bab3084",
+    "subs/harness/src/tests/measurement.boundary.test.ts": "468df962223bc8e6a15b35a28e0c571d97dc6aa2663fc05541381001d73f7100",
+    "subs/harness/src/tests/helpers/measurement-flow.ts": "ad63f6a09c2b021fc187082b3255d1e22c89795e2da1efe57c1de7ba0a4c1c08",
+    "subs/harness/src/tests/helpers/measurement-boundaries.ts": "6de8a68e057b4ebd24359fabbd2fde46fe868a922d999be597ec1e456e8d2c89",
+    "subs/harness/subs/evidence/src/tests/measure.test.ts": "27a735ca4914a91b7b64d44bc9ba809289db1ad877cb47ef471a395eb018674c"
+  },
+  "configurationHashes": {
+    "vitest.config.ts": "c0f54f605e468027bffb775b4847c487bb88fb59f1b06528dbacb09738f07e7e",
+    "package.json": "df8473368f6e34409bc6f7917ba183bda93db16cf2b75f8a561c42ab12c29551",
+    "package-lock.json": "9d0b5e4332475cfc10b20c6f8c3d2aff035703a25af88710bc2beeb361ea96d6",
+    "ramify-audit.json": "9bfaaa5d6b95d590cf044ecab60faec812b2e39fd5a7752be28e7190afa80baa"
+  },
+  "cases": [
+    {
+      "oldFile": "subs/harness/src/tests/measurement.test.ts",
+      "oldFullName": "the frozen baseline a run freezes B from its first snapshot, and job.json names it",
+      "ordinaryFile": "subs/harness/src/tests/measurement.test.ts",
+      "ordinaryFullName": "the frozen baseline a run freezes B from its first snapshot, and job.json names it",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": "subs/harness/src/tests/measurement.boundary.test.ts"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/measurement.test.ts",
+      "oldFullName": "the frozen baseline the initial architect's invocation records its snapshot reference and its S_s components",
+      "ordinaryFile": "subs/harness/src/tests/measurement.test.ts",
+      "ordinaryFullName": "the frozen baseline the initial architect's invocation records its snapshot reference and its S_s components",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/src/tests/measurement.test.ts",
+      "oldFullName": "a component the producer cannot supply a project the measurement producer cannot measure leaves the baseline unavailable, never a zero",
+      "ordinaryFile": "subs/harness/src/tests/measurement.test.ts",
+      "ordinaryFullName": "a component the producer cannot supply a project the measurement producer cannot measure leaves the baseline unavailable, never a zero",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/src/tests/measurement.test.ts",
+      "oldFullName": "a component the producer cannot supply a run whose measurement document is absent still starts, with the reason in job.json",
+      "ordinaryFile": "subs/harness/src/tests/measurement.test.ts",
+      "ordinaryFullName": "a component the producer cannot supply a run whose measurement document is absent still starts, with the reason in job.json",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/src/tests/measurement.test.ts",
+      "oldFullName": "the recipe a subtree root covers the owners beneath it, and each is counted once",
+      "ordinaryFile": "subs/harness/src/tests/measurement.test.ts",
+      "ordinaryFullName": "the recipe a subtree root covers the owners beneath it, and each is counted once",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/src/tests/measurement.test.ts",
+      "oldFullName": "the recipe a module that does not exist yet has an unknown size, not a zero one",
+      "ordinaryFile": "subs/harness/src/tests/measurement.test.ts",
+      "ordinaryFullName": "the recipe a module that does not exist yet has an unknown size, not a zero one",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/src/tests/measurement.test.ts",
+      "oldFullName": "the recipe the architect view is measured at its publication size when one is published",
+      "ordinaryFile": "subs/harness/src/tests/measurement.test.ts",
+      "ordinaryFullName": "the recipe the architect view is measured at its publication size when one is published",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": "subs/harness/src/tests/measurement.boundary.test.ts"
+    },
+    {
+      "oldFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "oldFullName": "readMeasurement answers the per-module buckets of a valid document, with the producer's own bytes",
+      "ordinaryFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "ordinaryFullName": "readMeasurement answers the per-module buckets of a valid document, with the producer's own bytes",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "oldFullName": "readMeasurement keeps unavailable API-view bytes unavailable in the current document",
+      "ordinaryFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "ordinaryFullName": "readMeasurement keeps unavailable API-view bytes unavailable in the current document",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "oldFullName": "readMeasurement is unavailable with its reason when the producer cannot be run",
+      "ordinaryFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "ordinaryFullName": "readMeasurement is unavailable with its reason when the producer cannot be run",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "oldFullName": "readMeasurement is unavailable when the producer prints no JSON document",
+      "ordinaryFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "ordinaryFullName": "readMeasurement is unavailable when the producer prints no JSON document",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "oldFullName": "readMeasurement is unavailable when the document declares another version",
+      "ordinaryFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "ordinaryFullName": "readMeasurement is unavailable when the document declares another version",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    },
+    {
+      "oldFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "oldFullName": "readMeasurement is unavailable, naming the path, when the document does not hold the buckets",
+      "ordinaryFile": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+      "ordinaryFullName": "readMeasurement is unavailable, naming the path, when the document does not hold the buckets",
+      "treatment": "same title and assertion outcomes; scripted external results",
+      "actualWitness": null
+    }
+  ],
+  "results": {
+    "baseline": {
+      "report": "/tmp/plan22-measurement-baseline.json",
+      "success": true,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "path": "subs/harness/src/tests/measurement.test.ts",
+          "state": "passed",
+          "caseDurationMs": 58572.895033999994
+        },
+        {
+          "path": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+          "state": "passed",
+          "caseDurationMs": 59.27927600000004
+        }
+      ]
+    },
+    "ordinary": {
+      "report": "/tmp/plan22-measurement-ordinary-final2.json",
+      "success": true,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "path": "subs/harness/src/tests/measurement.test.ts",
+          "state": "passed",
+          "caseDurationMs": 1396.219854
+        },
+        {
+          "path": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+          "state": "passed",
+          "caseDurationMs": 20.86333000000002
+        }
+      ]
+    },
+    "actual": {
+      "report": "/tmp/plan22-measurement-boundary-final.json",
+      "success": true,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "path": "subs/harness/src/tests/measurement.boundary.test.ts",
+          "state": "passed",
+          "caseDurationMs": 56751.817967
+        }
+      ]
+    },
+    "composition": {
+      "report": "/tmp/plan22-measurement-composition.json",
+      "success": true,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "path": "subs/harness/src/tests/composition.test.ts",
+          "state": "passed",
+          "caseDurationMs": 8537.7086
+        }
+      ]
+    }
+  },
+  "processAttempts": {
+    "ordinaryCore": 0,
+    "ordinaryDecoder": 0,
+    "scope": "locally installed pre-import child_process guards; setup, flow and cleanup"
+  },
+  "failureArtifacts": [
+    "/tmp/plan22-measurement-authoring1.json",
+    "/tmp/plan22-measurement-authoring2.json",
+    "/tmp/plan22-measurement-authoring3.json",
+    "/tmp/plan22-measurement-authoring4.json",
+    "/tmp/plan22-measurement-authoring5.json",
+    "/tmp/plan22-measurement-authoring6.json",
+    "/tmp/plan22-measurement-boundary.json"
+  ],
+  "failureSourceHashes": "Not captured at those intermediate runs; do not infer exact failed source from final hashes.",
+  "limits": [
+    "No full audit run by subagent; coordinator audits clean committed candidate before merge.",
+    "Host concurrently running other checks; timings are observations, not isolated performance qualification.",
+    "Actual first witness run had 2 passing assertions but failed file/exit1 with empty JSON message; retained, not counted as passing. Diagnostic final run on corrected literal-registration source passed file and exit0.",
+    "Local guards must be made compatible with or replaced by root persistent enforcement in cut6."
+  ]
+}
