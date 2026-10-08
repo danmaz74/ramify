@@ -1,0 +1,179 @@
+import type { LoadedPackage, ExtractionTurn } from './packages.js';
+import type { ReviewKind } from '../run/records.js';
+import { initialAnalysisToolName } from '../analysis/submission.js';
+import { intakeToolName, principleToolName, checkToolName } from '../analysis/extraction.js';
+import { localArchitectToolName } from '../work/submission.js';
+import { engineerToolName } from '../work/engineer.js';
+import { forkToolName } from '../architecture/submission.js';
+import { contractToolName } from '../contracts/submission.js';
+import { reviewToolName, orientationToolName } from '../reviews/submission.js';
+import { reconciliationToolName } from '../reviews/reconciliation.js';
+import { failureAnalysisToolName } from '../work/failure.js';
+import { workOrientationToolName, contextSelectorToolName } from '../context-selection/submissions.js';
+import { coordinatorActionJsonSchema, coordinatorActionToolName, coordinatorAssessmentToolName,
+  coordinatorInvestigationJsonSchema, coordinatorInvestigationToolName, nonfunctionalRepairToolName } from '../nonfunctional/submissions.js';
+import { buildDeliveredManifest, type DeliveredInput, type DeliveredManifest } from './delivered-manifest.js';
+import { taskBriefingRevision, type BriefingDelivery } from './briefings.js';
+
+export type TaskKind = 'initial-analysis' | ExtractionTurn | 'placement' | 'orientation' | 'assignment' | 'completion' | 'repair' | 'qualification'
+  | 'selection' | 'reselection' | 'capability' | 'engineering' | 'contract' | 'reconciliation' | ReviewKind | 'design-orientation'
+  | 'failure-analysis' | 'assessment' | 'action' | 'investigation' | 'standalone-command';
+
+export interface TaskEnvironment {
+  readonly projectRoot: string;
+  readonly workingDirectory: string;
+  readonly candidate: string | null;
+  readonly snapshot: string | null;
+  readonly limits: Readonly<Record<string, unknown>>;
+  readonly availableTools: readonly string[];
+  readonly views: readonly { readonly path: string; readonly revision: string | null; readonly modules: readonly string[]; readonly coverage: readonly string[] }[];
+  readonly supportPaths: readonly string[];
+  readonly cucumberConfiguration: string | null;
+}
+
+/** Required slots are declared, not inferred from arbitrary JSON/code braces. */
+export function renderRequiredSlots(template: string, values: Readonly<Record<string, string>>, required: readonly string[]): string {
+  for (const name of ['procedure', 'submissionTool']) {
+    if (new RegExp(`(?<!\\{)\\{${name}\\}(?!\\})`).test(template)) throw new Error(`Malformed required placeholder {${name}}`);
+  }
+  for (const name of required) {
+    if (!(name in values) || !values[name]?.trim()) throw new Error(`Missing required prompt input ${name}`);
+    if (new RegExp(`(?<!\\{)\\{${name}\\}(?!\\})`).test(template)) throw new Error(`Malformed required placeholder {${name}}`);
+  }
+  for (const match of template.matchAll(/\{\{(\w+)\}\}/g)) if (!(match[1]! in values)) throw new Error(`Unresolved required placeholder {{${match[1]}}}`);
+  return template.replace(/\{\{(\w+)\}\}/g, (_, name: string) => values[name]!);
+}
+
+export function stableRoleInstructions(loaded: LoadedPackage): string {
+  return renderRequiredSlots(loaded.system, { skill: loaded.skill, skillDirectory: loaded.skillDirectory, contractSkill: loaded.extraSkill }, []);
+}
+
+export interface TaskPacket {
+  readonly roleInstructions: string;
+  readonly message: string;
+  readonly submissionTool: string;
+  /** Schema appears once, in this declaration's description, matching the compact tool mechanism. */
+  readonly declaration: { readonly name: string; readonly description: string; readonly inputSchema: { readonly type: 'object' }; readonly mutating: false };
+  /** Manifest components. Role/tool entries are separate provider inputs; remaining entries occur once within message. */
+  readonly additions: readonly DeliveredInput[];
+  readonly manifest: DeliveredManifest;
+}
+
+export function buildTaskPacket(input: {
+  readonly loaded: LoadedPackage;
+  readonly kind: TaskKind;
+  readonly objective: string;
+  readonly goal: string;
+  readonly requirements: readonly string[];
+  readonly environment: TaskEnvironment;
+  readonly briefing: BriefingDelivery;
+  readonly inheritedPoint: string | null;
+  readonly inherited: readonly DeliveredInput[];
+  /** Supplied once for a fresh session or a role change, false for ordinary continuation. */
+  readonly supplyRoleInstructions: boolean;
+  readonly changedPaths?: readonly { readonly path: string; readonly annotation?: string }[];
+}): TaskPacket {
+  const { loaded, environment } = input;
+  if (!input.objective.trim() || !input.goal.trim() || input.requirements.length === 0 || input.requirements.some(requirement => !requirement.trim())) throw new Error('Task requires objective, goal and complete requirement text');
+  if (!environment.projectRoot.trim() || !environment.workingDirectory.trim()) throw new Error('Task environment requires project root and current working directory');
+  for (const key of ['candidate', 'snapshot', 'limits', 'availableTools', 'views', 'supportPaths', 'cucumberConfiguration'] as const) {
+    if (environment[key] === undefined) throw new Error(`Missing required environment input ${key}`);
+  }
+  if (!input.supplyRoleInstructions && !input.inherited.some(item => item.key === `role:${loaded.role}` && item.kind === 'role-instructions')) throw new Error(`Current role ${loaded.role} is not inherited; append its instructions explicitly`);
+  if (input.changedPaths && new Set(input.changedPaths.map(item => item.path)).size !== input.changedPaths.length) throw new Error('Canonical changed paths must be unique');
+  if (input.briefing.kind === 'unavailable') throw new Error(input.briefing.reason);
+  if (input.briefing.mode === 'full' && input.inherited.length > 0) throw new Error('Full fresh briefing cannot be appended to an inherited session; use its named delta or post-fork updates');
+  const canonical = taskBriefingRevision({ revision: input.briefing.revision, goal: input.goal, requirements: input.requirements, sections: [] });
+  for (const section of canonical.sections) {
+    if (!input.briefing.currentSections.some(current => current.key === section.key && current.text === section.text)) throw new Error(`Current task briefing requires canonical ${section.key} section matching its explicit inputs`);
+  }
+  const task = taskDefinition(loaded, input.kind);
+  if (!environment.availableTools.includes(task.tool)) throw new Error(`Current submission tool ${task.tool} is unavailable`);
+  if (['code', 'scope', 'design'].includes(input.kind) && (!environment.candidate || !environment.snapshot)) throw new Error('Review requires current candidate and snapshot identities');
+  const procedure = renderRequiredSlots(task.procedure, { submissionTool: task.tool }, ['submissionTool']);
+  const roleInstructions = stableRoleInstructions(loaded);
+  const declaration = { name: task.tool, description: `Submit this task using exactly this JSON schema: ${JSON.stringify(JSON.parse(task.schema))}`,
+    inputSchema: { type: 'object' as const }, mutating: false as const };
+  const previousDeclaration = input.inherited.find(item => item.kind === 'tool-declaration' && item.key === `tool:${task.tool}`);
+  if (previousDeclaration && previousDeclaration.text !== JSON.stringify(declaration)) throw new Error(`Immutable tool declaration changed for ${task.tool}; use a new tool name`);
+  const envText = `# Current environment\n${JSON.stringify(environment, null, 2)}`;
+  const procedureText = `# Current procedure\n${procedure}`;
+  const revisionText = `Briefing revision: ${input.briefing.revision}; based on: ${input.briefing.basedOnRevision ?? 'none'} (${input.briefing.mode})`;
+  const taskText = [`# Current task: ${input.kind}`, input.objective,
+    ...(input.changedPaths === undefined ? [] : ['', '# Canonical changed paths', ...input.changedPaths.map(item => `- ${item.path}${item.annotation ? ` (${item.annotation})` : ''}`)]),
+    '', `Submit only through \`${task.tool}\`. Only an accepted submission completes this task.`].join('\n');
+  const additions: DeliveredInput[] = [
+    ...(input.supplyRoleInstructions ? [{ key: `role:${loaded.role}`, kind: 'role-instructions' as const, text: roleInstructions,
+      source: loaded.files.find(file => file.kind === 'system')?.path ?? null, revision: loaded.package,
+      sources: loaded.files.filter(file =>
+        file.kind === 'system' && file.path === loaded.files.find(entry => entry.kind === 'system')?.path ||
+        file.kind === 'skill' && (loaded.embeddedSkillPaths ?? []).includes(file.path)) }] : []),
+    ...(!input.inherited.some(item => item.kind === 'tool-declaration' && item.key === `tool:${task.tool}` && item.text === JSON.stringify(declaration)) ? [{ key: `tool:${task.tool}`, kind: 'tool-declaration' as const, text: JSON.stringify(declaration), source: null, revision: null }] : []),
+    { key: 'briefing-state', kind: 'task', text: revisionText, source: null, revision: input.briefing.revision },
+    ...input.briefing.additions,
+    { key: `procedure:${input.kind}`, kind: 'procedure', text: procedureText, source: task.source, revision: loaded.package,
+      sources: loaded.files.filter(file => file.path === task.source) },
+    { key: 'environment', kind: 'environment', text: envText, source: null, revision: null },
+    { key: 'task', kind: 'task', text: taskText, source: null, revision: input.briefing.revision },
+  ];
+  const message = additions.filter(item => item.kind !== 'role-instructions' && item.kind !== 'tool-declaration').map(item => item.text).join('\n\n');
+  return { roleInstructions, message, submissionTool: task.tool, declaration, additions,
+    manifest: buildDeliveredManifest({ inheritedPoint: input.inheritedPoint, inherited: input.inherited, appended: additions, currentMessage: message }) };
+}
+
+function taskDefinition(loaded: LoadedPackage, kind: TaskKind): { tool: string; schema: string; procedure: string; source: string | null } {
+  let tool: string | undefined;
+  let schema = loaded.submissionSchema;
+  let procedure = loaded.procedure;
+  let source = loaded.files.find(file => file.kind === 'procedure')?.path ?? null;
+  const role = loaded.role;
+  if (role === 'initial-architect' && kind === 'initial-analysis') tool = initialAnalysisToolName;
+  if (role === 'catalog-extractor' && ['intake', 'principles', 'check'].includes(kind)) {
+    const turn = kind as ExtractionTurn;
+    const extraction = loaded.extraction?.[turn];
+    if (!extraction) throw new Error(`Missing ${turn} procedure`);
+    tool = { intake: intakeToolName, principles: principleToolName, check: checkToolName }[turn];
+    schema = extraction.submissionSchema; procedure = extraction.procedure;
+    source = `subs/harness/src/analysis/${turn}.procedure.md`;
+  }
+  if (role === 'global-fork' && kind === 'placement') tool = forkToolName;
+  if (role === 'local-architect' && ['assignment', 'completion', 'repair', 'qualification'].includes(kind)) tool = localArchitectToolName;
+  if (role === 'local-architect' && kind === 'orientation') {
+    if (!loaded.workOrientation) throw new Error('Missing work orientation procedure');
+    tool = workOrientationToolName; schema = loaded.workOrientation.submissionSchema; procedure = loaded.workOrientation.procedure;
+    source = 'subs/harness/src/context-selection/orientation.procedure.md';
+  }
+  if (role === 'context-selector' && ['selection', 'reselection'].includes(kind)) tool = contextSelectorToolName;
+  if (role === 'engineer' && ['engineering', 'repair', 'qualification', 'standalone-command'].includes(kind)) tool = engineerToolName;
+  if (role === 'capability-architect' && kind === 'capability') tool = 'submit_capability_action';
+  if (role === 'contract-engineer' && kind === 'contract') tool = contractToolName;
+  if (['local-architect', 'capability-architect'].includes(role) && kind === 'reconciliation') {
+    if (!loaded.reconciliation) throw new Error('Missing reconciliation procedure');
+    tool = reconciliationToolName; schema = loaded.reconciliation.submissionSchema; procedure = loaded.reconciliation.procedure;
+    source = 'subs/harness/src/prompts/reconciliation.procedure.md';
+  }
+  if (role === 'reviewer' && ['code', 'scope', 'design'].includes(kind)) {
+    tool = reviewToolName; procedure = loaded.reviewer!.procedures[kind as ReviewKind];
+    source = `subs/harness/src/prompts/${kind}-review.procedure.md`;
+  }
+  if (role === 'reviewer' && kind === 'design-orientation') {
+    tool = orientationToolName; schema = loaded.reviewer!.orientation.submissionSchema;
+    procedure = loaded.reviewer!.orientation.system;
+    source = 'subs/harness/src/prompts/reviewer-orientation.system.md';
+  }
+  if (role === 'failure-analyst' && kind === 'failure-analysis') tool = failureAnalysisToolName;
+  if (role === 'nonfunctional-coordinator' && kind === 'assessment') tool = coordinatorAssessmentToolName;
+  if (role === 'nonfunctional-coordinator' && kind === 'action') {
+    tool = coordinatorActionToolName; schema = JSON.stringify(coordinatorActionJsonSchema);
+    procedure = 'Choose only the next action the current harness decision permits. Submit the action with {{submissionTool}}; do not edit source.';
+    source = null;
+  }
+  if (role === 'nonfunctional-coordinator' && kind === 'investigation') {
+    tool = coordinatorInvestigationToolName; schema = JSON.stringify(coordinatorInvestigationJsonSchema);
+    procedure = 'Investigate only the named requirements against the supplied candidate. Report scope, evidence and uncertainty through {{submissionTool}}. Use read-only tools; make no repair or final satisfaction judgment.';
+    source = null;
+  }
+  if (role === 'nonfunctional-repair-engineer' && kind === 'repair') tool = nonfunctionalRepairToolName;
+  if (!tool) throw new Error(`Unsupported role/task pair ${role}/${kind}`);
+  return { tool, schema, procedure, source };
+}

@@ -14,6 +14,9 @@ them where they are not. You change nothing else.
    - `replace` elements whose cuts separate a rule from its conditions or
      fuse unrelated requirements, and an element of the wrong kind: name the
      IDs it `retire`s and the elements that take their place.
+   A replacement may retire elements without adding any: use an empty additions
+   list when the source contains no replacement requirement. Never copy Gherkin
+   into an element; cite registered scenario identities.
    Every element you add names this document. Keep the kinds' document
    rules: functional, non-functional and context elements come from plan
    documents, fixed ones from principles documents.
@@ -25,3 +28,8 @@ them where they are not. You change nothing else.
    stays cited by one of its scenarios.
 4. Submit with `{{submissionTool}}`; an empty `corrections` list, with no
    entries and no scenarios, says the reading is faithful.
+
+Reference lists retain their kind rules: requirementRefs names functional
+requirements; acceptanceRefs names functional acceptance; contextRefs names
+context. Submitted additions use local keys;
+rejections name those submitted keys before any durable IDs are allocated.

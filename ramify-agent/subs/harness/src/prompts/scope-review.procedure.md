@@ -8,7 +8,7 @@ Do this, in order:
    requirement. If this session holds an
    earlier conversation, what it said after the assignment is not part of
    that intent.
-2. List the changed paths with `snapshot_diff`, and read each patch.
+2. Use the supplied canonical changed-path list; if unavailable, list paths once with `snapshot_diff`, and read each patch.
 3. Ask of the candidate as a whole: does it do what the assignment asked,
    no less and no more? Name a promised case it leaves out, a behavior it
    adds that nobody asked for, and a change outside what the goal needs.

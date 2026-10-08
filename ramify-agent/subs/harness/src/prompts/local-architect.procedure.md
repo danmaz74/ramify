@@ -144,7 +144,8 @@ A gate that did not pass lists each failing scenario with its file and line,
 the failing step, its message and the steps no definition matches, and the
 runner's complete diagnostics. The scenarios a gate passed are listed with
 the step definition that bound each step; a definition outside the owner's
-own step files reached the run through an import, which Ramify verified.
+own step files is imported only when the evidence records that import.
+Otherwise retain its known source or state that provenance is unavailable.
 These results are evidence for your judgment; the harness infers no cause
 from them.
 

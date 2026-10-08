@@ -8,6 +8,7 @@ export function coordinatorAssessmentPrompt(assessmentPackage: string, candidate
     'Submit exactly one result for every element ID of the package.',
     'For each result, name inspected scope, evidence, and uncertainty. If a temporal condition lacks observed intermediate evidence, choose undetermined.',
     'Do not use capability progress or scenario coverage as a substitute for this assessment. Do not edit source.',
+    'Submit your assessment using `submit_nonfunctional_assessment`.',
     '',
     assessmentPackage.trimEnd(),
   ].join('\n');
@@ -34,6 +35,7 @@ export function coordinatorActionPrompt(candidate: Candidate, unresolved: readon
         : 'At this step, request a sequential read-only investigation.',
     'A repair of an undetermined NFR requires investigation evidence for that same NFR. One repair batch is allowed per round.',
     'If closing with unresolved NFRs, state an alternative or explicit uncertainty for each one. Do not claim the final gate has passed.',
+    'Submit the permitted action using `submit_nonfunctional_action`.',
   ].join('\n');
 }
 
@@ -46,9 +48,10 @@ export function repairPrompt(task: string, candidate: Candidate, repairPackage: 
     'The requirements this repair concerns are below, whole. Carry their wording and stated/inferred distinction forward unchanged.',
     repairPackage.trimEnd(),
     ...(context === undefined ? [] : [
-      `Coordinator evidence for this repair: ${JSON.stringify(context.evidence)}`,
-      `Coordinator uncertainty: ${context.uncertainty}`,
+      ...(context.evidence.length ? [`Coordinator evidence for this repair: ${JSON.stringify(context.evidence)}`] : []),
+      ...(context.uncertainty.trim() ? [`Coordinator uncertainty: ${context.uncertainty}`] : []),
     ]),
     'Report completed or partial work with evidence and any remaining work. This submission does not decide NFR satisfaction.',
+    'Submit the repair result using `submit_nonfunctional_repair`.',
   ].join('\n');
 }
