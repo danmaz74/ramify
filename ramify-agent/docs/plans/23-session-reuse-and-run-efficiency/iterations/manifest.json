@@ -153,8 +153,18 @@
         "M04",
         "M05"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness src/kpi/ calculations and local tests. Excludes run/service.ts, run/observations.ts, run/records.ts, protocol and web. Consume frozen proposed input types through owner-local types until integration."
+      "status": "accepted provider; observation/runtime consumers remain iteration 11",
+      "writeBoundary": "Harness src/kpi/ calculations and local tests. Excludes run/service.ts, run/observations.ts, run/records.ts, protocol and web. Consume frozen proposed input types through owner-local types until integration.",
+      "receipt": "06-results.md",
+      "providerHead": "a3b336ae29aea4d1d0b3e7c7268a18c1227f8ff9",
+      "integratedHead": "b194f61cb5baf943d6d7994fb94de46b9447638d",
+      "integrationVerification": {
+        "ordinaryFiles": 6,
+        "ordinaryTests": 67,
+        "typeCheck": "passed",
+        "structure": "passed; partial analysis coverage; 314 analysis limits",
+        "logs": "/tmp/ramify-plan23-integrated-metrics-*.log"
+      }
     },
     {
       "id": "7",
