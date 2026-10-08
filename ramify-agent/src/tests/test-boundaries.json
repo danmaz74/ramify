@@ -534,6 +534,27 @@
         "public trial attribution CLI refuses mixed unknown binary dirty and symlink setup exemptions",
         "prepared trial tool uses actual assigned module src cwd and external report destination"
       ]
+    },
+    {
+      "file": "subs/harness/src/tests/plan23-cucumber.boundary.test.ts",
+      "boundary": "Installed Cucumber pending selection, source-profile merge and declared support/world/loader execution",
+      "whyFakeCannotProve": "Only actual target-installed public configuration loading and CLI execution establish selected scenario counts, runtime support/world/loader behavior and nonexecution flags.",
+      "owningCases": [
+        "installed Cucumber executes only assigned pending A and B with declared support world and loader",
+        "installed Cucumber default profile merges broad paths while dedicated profile remains exact",
+        "installed Cucumber help version dry-run and changed scratch configuration do not earn focused execution"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/plan23-transport.boundary.test.ts",
+      "boundary": "Installed Pi kernel HTTP/SSE, exact requests, production ledger process restoration and original live prefix evidence",
+      "whyFakeCannotProve": "Actual installed serialization/parser, kernel HTTP bodies and dispatch counters, a separate OS process reopening production ledger, and original same-candidate live artifacts are required; scripted responses or the final outgoing prefix alone do not establish these claims.",
+      "owningCases": [
+        "installed Pi sends the exact final native request to an actual HTTP SSE endpoint with zero retries",
+        "installed Pi retains full terminal tool outputs across Continue siblings new tools and production ledger process restore",
+        "installed Pi final liveness fence prevents HTTP dispatch and late accepted submission after Stop",
+        "original live Pi artifacts preserve complete settled prefixes including terminal submission outputs across fork and new process restore"
+      ]
     }
   ]
 }
