@@ -172,3 +172,14 @@ expose-sub HarnessLineIdentities from harness to descendants
 
 // Exact pure line verifier; no Git adapter or provider state crosses this surface.
 expose-src verifySetupLineIdentities, SetupLineIdentityInput, SetupCandidatePartition, RecordedSetupDelta, SetupSourceLine, SetupLineMappingFacts, SetupAddedLineFact, SetupDeletedLineFact from "trial-attribution.ts" to descendants
+
+// Plain observation/metric projections owned by harness protocol/runs.ts.
+expose-sub operationIdentitySchema, OperationIdentity from harness to descendants
+expose-sub deliveredManifestViewSchema, DeliveredManifestView from harness to descendants
+expose-sub scopeSizeViewSchema, ScopeSizeView from harness to descendants
+expose-sub explorationObservationSchema, ExplorationObservationView from harness to descendants
+expose-sub explorationMetricsSchema, ExplorationMetricsView from harness to descendants
+expose-sub invocationTimingSchema, InvocationTimingView from harness to descendants
+expose-sub recordedChargeSchema, RecordedChargeView from harness to descendants
+expose-sub invocationEfficiencySchema, InvocationEfficiency from harness to descendants
+expose-sub scopeComparisonSchema, ScopeComparisonView from harness to descendants
