@@ -424,6 +424,18 @@
       "structure": "passed; partial analysis coverage; 317 retained analysis limits",
       "logs": "/tmp/ramify-plan23-integrated-attribution-helper-*.log",
       "limit": "Partial pure provider only; full13 collectors/fixtures and nativeGit remain pending."
+    },
+    "treeBlobObjectFacts": {
+      "providerHead": "5449a5ed2f7979b43e4bfcf960c7dcc7d20fc19c",
+      "integratedHead": "78635cd0",
+      "ordinaryFiles": 4,
+      "ordinaryTests": 93,
+      "nativeFiles": 1,
+      "nativeTests": 8,
+      "typeCheck": "passed all four configured scopes",
+      "structure": "passed; partial analysis coverage; 317 retained analysis limits",
+      "logs": "/tmp/ramify-plan23-integrated-blob-object-facts-*.log",
+      "limit": "Optional original blob IDs authenticate reencoded decoded text; missing metadata remains unknown. Native SHA1 repository verified; SHA256 parser-only controls."
     }
   }
 }
