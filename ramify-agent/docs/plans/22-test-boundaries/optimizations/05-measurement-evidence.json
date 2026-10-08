@@ -209,5 +209,18 @@
     "Host concurrently running other checks; timings are observations, not isolated performance qualification.",
     "Actual first witness run had 2 passing assertions but failed file/exit1 with empty JSON message; retained, not counted as passing. Diagnostic final run on corrected literal-registration source passed file and exit0.",
     "Local guards must be made compatible with or replaced by root persistent enforcement in cut6."
-  ]
+  ],
+  "implementationCommit": "00e91eba88604f118cc439e85bc32f52123aa462",
+  "reconciliation": {
+    "targetCommit": "0bdece70f995fd15e7c3cfbfd2c526a2397f7e2b",
+    "mergeCommit": "62dbc276a8d9915b64d572191f18ce472b485a51",
+    "scope": "5 documentation/evidence files; no source, runner or package changes; target dirty files were not copied",
+    "focusedReport": "/tmp/plan22-measurement-reconciled.json",
+    "checks": {
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0,
+      "scope": "18 ordinary measurement and decoder +11 composition cases"
+    }
+  }
 }

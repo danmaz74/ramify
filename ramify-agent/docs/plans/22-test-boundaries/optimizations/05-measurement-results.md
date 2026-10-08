@@ -82,3 +82,20 @@ That result remains failed; it cannot qualify the witnesses. The diagnostic fina
 run with default plus JSON reporters, after literal registration correction,
 passed the complete file. No unexplained first-run failure is labelled a pass or
 claimed to be diagnosed as flakiness.
+
+## Reconciliation before qualification audit
+
+Implementation commit: `00e91eba88604f118cc439e85bc32f52123aa462`.
+Merged target's committed `0bdece70f995fd15e7c3cfbfd2c526a2397f7e2b` into this
+optimization branch as `62dbc276a8d9915b64d572191f18ce472b485a51`.
+Only five documentation/evidence files changed: Plan21 iteration10 delivery
+receipts and Plan22's explicit full nested audit-before-merge contract. The
+Plan21 protocol/policy correction `8dc6068c` was already present in the base.
+No target unfinished changes were copied or committed. Code, runner and
+configuration hashes remain those qualified above; actual producer/type/module
+checks remain applicable to the identical source. The reconciled exact three
+ordinary/composition files passed all 29 cases with zero skipped in
+`/tmp/plan22-measurement-reconciled.json`. The coordinator must now run the
+released full nested audit on this clean committed branch before merging it
+into the concurrently used Plan21 target. Integration and that audit are unrun
+by this subagent; this receipt does not declare plan completion.
