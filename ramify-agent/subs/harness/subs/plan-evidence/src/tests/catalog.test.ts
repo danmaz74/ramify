@@ -97,7 +97,7 @@ describe('element catalog', () => {
     });
     expect(refused.ok ? [] : refused.errors).toEqual(['rewrite.0.id: unknown element fr-009', 'retire.1: nfr-001 is corrected twice']);
     const badAdd = reviseCatalog(catalog, { rewrite: [], retire: [], add: [element('bad', 'fixed', 'doc-001', 'A fixed requirement from a plan.')] });
-    expect(badAdd.ok ? [] : badAdd.errors).toEqual(['add.0.document: a fixed element cannot be read from a plan document']);
+    expect(badAdd.ok ? [] : badAdd.errors).toEqual(['add.0.document: a fixed element cannot be read from a plan document (submitted key "bad")']);
   });
 
   it('rejects an element whose document is not captured or cannot supply its kind, with its path', () => {
@@ -113,12 +113,12 @@ describe('element catalog', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors).toEqual([
-      '0.document: a functional element cannot be read from a principle document',
-      '1.document: a fixed element cannot be read from a plan document',
-      '2.document: a non-functional element cannot be read from a principle document',
-      '3.document: doc-009 is not a captured document',
+      '0.document: a functional element cannot be read from a principle document (submitted key "a")',
+      '1.document: a fixed element cannot be read from a plan document (submitted key "b")',
+      '2.document: a non-functional element cannot be read from a principle document (submitted key "c")',
+      '3.document: doc-009 is not a captured document (submitted key "d")',
       '4.key: duplicate submission-local key a',
-      '5.document: a context element cannot be read from a principle document',
+      '5.document: a context element cannot be read from a principle document (submitted key "e")',
     ]);
   });
 
@@ -128,8 +128,8 @@ describe('element catalog', () => {
       element('empty', 'functional', 'doc-001', ''),
     ]);
     expect(result).toEqual({ ok: false, errors: [
-      '0.key: a submission-local key cannot take the form of an element ID',
-      '1.text: Too small: expected string to have >=1 characters',
+      '0.key: a submission-local key cannot take the form of an element ID (submitted key "fr-002")',
+      '1.text: Too small: expected string to have >=1 characters (submitted key "empty")',
     ] });
   });
 
@@ -146,6 +146,8 @@ describe('element catalog', () => {
       .toEqual({ ok: true, ids: ['fr-001', 'fix-001'] });
     expect(resolveCitations(['fr-001', 'fr-009', 'render'], { elements }, 'citedElements'))
       .toEqual({ ok: false, errors: ['citedElements.1: unknown element fr-009', 'citedElements.2: unknown element render'] });
+    expect(resolveCitations(['stale-key'], { keys: new Map([['stale-key', 'fr-009']]), elements }, 'citedElements'))
+      .toEqual({ ok: false, errors: ['citedElements.0: unknown element stale-key'] });
   });
 
   it('serializes deterministically and hashes the serialized bytes', () => {

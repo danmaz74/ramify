@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { extractDocumentScenarios, extractPlanScenarios } from '../extraction.js';
-import { validateScenarioForm, type ScenarioFormEntry, type ScenarioFormResult, type ScenarioFormRule, type ScenarioFormSubmission } from '../form.js';
+import { scenarioSubmissionSchema, validateScenarioForm, type ScenarioFormEntry, type ScenarioFormResult, type ScenarioFormRule, type ScenarioFormSubmission } from '../form.js';
 
 /*
  * The plan of architecture §2's example: ps-01 belongs to one entry, ps-02
@@ -72,6 +72,50 @@ function rejected(result: ScenarioFormResult, rule: ScenarioFormRule, path: stri
   expect(result.message).toMatch(new RegExp(`^Scenario form rule ${rule} \\(`));
   return result.message;
 }
+
+describe('Plan 23 catalog form contracts', () => {
+  test('C02: a captured plan scenario is named by identity without duplicate Gherkin', () => {
+    const submission = valid(); delete submission.scenarios[0]!.gherkin;
+    expect(scenarioSubmissionSchema.safeParse(submission.scenarios[0]).success).toBe(true);
+    const accepted = validateScenarioForm(submission, planScenarios, entries);
+    expect(accepted.ok).toBe(true); if (!accepted.ok) return;
+    expect(accepted.form.scenarios[0]!.source).toEqual(planScenarios[0]!.source);
+    expect(accepted.form.scenarios[0]!.origin).toMatchObject({ kind: 'plan', planScenario: 'ps-01' });
+  });
+  test('C02: identity-only scenarios require a known plan origin, while architect scenarios require their text', () => {
+    const submission = valid(); delete submission.scenarios[0]!.gherkin; submission.scenarios[0]!.origin = { kind: 'plan', planScenario: 'ps-99' };
+    expect(rejected(validateScenarioForm(submission, planScenarios, entries), 3, 'scenarios.0.origin.planScenario')).toContain('ps-99');
+    const architect = valid(); delete architect.scenarios[1]!.gherkin;
+    expect(scenarioSubmissionSchema.safeParse(architect.scenarios[1]).success).toBe(false);
+    rejected(validateScenarioForm(architect, planScenarios, entries), 1, 'scenarios.1.gherkin');
+  });
+  test('C03: agent-declared non-behavioral acceptance may cite a registered test without scenario citation', () => {
+    const submission = valid(); submission.scenarios[1]!.refs = [];
+    const declared: ScenarioFormEntry[] = [entries[0]!, { ...entries[1]!, nonBehavioralAcceptance: [{ ref: 'history-accepted', kind: 'non-behavioral', test: 'test-001' }] }];
+    expect(validateScenarioForm(submission, planScenarios, declared, undefined, { registeredTests: new Set(['test-001']) }).ok).toBe(true);
+    // Neither classification nor whether this test proves the requirement is inferred.
+    expect(rejected(validateScenarioForm(submission, planScenarios, entries, undefined, { registeredTests: new Set(['test-001']) }), 6, 'entries.1.acceptanceRefs.0')).toContain('history-accepted');
+  });
+  test.each(['test-999', 'sc-001', 'src/tests/history.test.ts'])('C03: unknown or wrong-kind evidence %s is not a registered test', testId => {
+    const submission = valid(); submission.scenarios[1]!.refs = [];
+    const declared: ScenarioFormEntry[] = [entries[0]!, { ...entries[1]!, nonBehavioralAcceptance: [{ ref: 'history-accepted', kind: 'non-behavioral', test: testId }] }];
+    expect(rejected(validateScenarioForm(submission, planScenarios, declared, undefined, { registeredTests: new Set(['test-001']) }), 6, 'entries.1.nonBehavioralAcceptance.0.test')).toContain(testId);
+  });
+  test('C03: declarations are structurally checked even when a scenario already cites that acceptance', () => {
+    const declared: ScenarioFormEntry[] = [entries[0]!, { ...entries[1]!, nonBehavioralAcceptance: [{ ref: 'other-acceptance', kind: 'non-behavioral', test: 'test-001' }] }];
+    rejected(validateScenarioForm(valid(), planScenarios, declared, undefined, { registeredTests: new Set(['test-001']) }), 6, 'entries.1.nonBehavioralAcceptance.0.ref');
+    const declaration = { ref: 'history-accepted', kind: 'non-behavioral', test: 'test-001' } as const;
+    declared[1] = { ...entries[1]!, nonBehavioralAcceptance: [declaration, declaration] };
+    rejected(validateScenarioForm(valid(), planScenarios, declared, undefined, { registeredTests: new Set(['test-001']) }), 6, 'entries.1.nonBehavioralAcceptance.1.ref');
+    declared[1] = { ...entries[1]!, nonBehavioralAcceptance: [{ ...declaration, kind: 'behavioral' } as unknown as typeof declaration] };
+    rejected(validateScenarioForm(valid(), planScenarios, declared, undefined, { registeredTests: new Set(['test-001']) }), 6, 'entries.1.nonBehavioralAcceptance.0');
+  });
+  test('C03: non-behavioral acceptance does not silently waive other behavioral form rules', () => {
+    const declared: ScenarioFormEntry[] = [entries[0]!, { ...entries[1]!, nonBehavioralAcceptance: [{ ref: 'history-accepted', kind: 'non-behavioral', test: 'test-001' }] }];
+    const submission = valid(); submission.scenarios.pop(); submission.integrationScenarios[0]!.subScenarios = ['send-email'];
+    rejected(validateScenarioForm(submission, planScenarios, declared, undefined, { registeredTests: new Set(['test-001']) }), 4, 'entries.1');
+  });
+});
 
 describe('an accepted form', () => {
   test('identical headings and lines in two documents keep distinct origins and citations', () => {
@@ -198,7 +242,7 @@ describe('rule 3: every plan scenario exactly once', () => {
 
   test('a plan scenario restated in other words', () => {
     const submission = valid();
-    submission.scenarios[0]!.gherkin = submission.scenarios[0]!.gherkin.replace('receives one email', 'gets an email');
+    submission.scenarios[0]!.gherkin = submission.scenarios[0]!.gherkin!.replace('receives one email', 'gets an email');
     const message = rejected(validateScenarioForm(submission, planScenarios, entries), 3, 'scenarios.0.gherkin');
     expect(message).toContain('Then the customer ada@example.com receives one email');
   });
@@ -255,14 +299,14 @@ describe('rule 4: every entry has a scenario', () => {
 describe('rule 5: integration steps verbatim', () => {
   test('an integration step in no sub-scenario', () => {
     const submission = valid();
-    submission.scenarios[1]!.gherkin = submission.scenarios[1]!.gherkin.replace('When the user opens the email history', 'When the user views the history');
+    submission.scenarios[1]!.gherkin = submission.scenarios[1]!.gherkin!.replace('When the user opens the email history', 'When the user views the history');
     expect(rejected(validateScenarioForm(submission, planScenarios, entries), 5, 'integrationScenarios.0.subScenarios'))
       .toContain('"And the user opens the email history"');
   });
 
   test('a conjunction matches the step kind it continues, and a keyword of another kind does not', () => {
     const submission = valid();
-    submission.scenarios[1]!.gherkin = submission.scenarios[1]!.gherkin.replace('When the user opens', 'Given the user opens');
+    submission.scenarios[1]!.gherkin = submission.scenarios[1]!.gherkin!.replace('When the user opens', 'Given the user opens');
     rejected(validateScenarioForm(submission, planScenarios, entries), 5, 'integrationScenarios.0.subScenarios');
   });
 });
@@ -288,7 +332,7 @@ describe('rule 6: every acceptance element cited', () => {
 describe('warnings', () => {
   test('a step naming an exported symbol or a file of the view', () => {
     const submission = valid();
-    submission.scenarios[1]!.gherkin = submission.scenarios[1]!.gherkin
+    submission.scenarios[1]!.gherkin = submission.scenarios[1]!.gherkin!
       .replace('Given an email to ada@example.com was sent', 'Given sendEmail wrote to ada@example.com')
       .replace('When the user opens the email history', 'When the user opens history.ts and the email history');
     submission.integrationScenarios[0]!.subScenarios = ['send-email'];
@@ -322,7 +366,7 @@ describe('warnings', () => {
     const submission = valid();
     submission.scenarios.push({
       key: 'history-again', entry: 'email-history', origin: { kind: 'architect' },
-      gherkin: submission.scenarios[1]!.gherkin.replace('Sent emails appear in the history', 'The same steps again'),
+      gherkin: submission.scenarios[1]!.gherkin!.replace('Sent emails appear in the history', 'The same steps again'),
     });
     const result = validateScenarioForm(submission, planScenarios, entries);
     if (!result.ok) throw new Error(result.message);

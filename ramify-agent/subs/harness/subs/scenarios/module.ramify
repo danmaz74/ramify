@@ -15,6 +15,7 @@ expose-src validateScenarioForm, scenarioFormRules, ScenarioFormRule, ScenarioFo
 expose-src ScenarioFormSubmission, scenarioFormSubmissionSchema, ScenarioSubmission, scenarioSubmissionSchema from "form.ts" to parent
 expose-src IntegrationScenarioSubmission, integrationScenarioSubmissionSchema, scenarioOriginSubmissionSchema from "form.ts" to parent
 expose-src ScenarioElementRef, scenarioElementRefSchema, ScenarioFormEntry, ScenarioViewNames from "form.ts" to parent
+expose-src NonBehavioralAcceptance, nonBehavioralAcceptanceSchema, ScenarioFormEvidence from "form.ts" to parent
 expose-src ScenarioWarning, ScenarioWarningKind, AcceptedScenarioForm, FormScenario, FormIntegration from "form.ts" to parent
 
 expose-src assignScenarioIds, AssignedScenarios, ScenarioIdContext, ScenarioModule from "records.ts" to parent
