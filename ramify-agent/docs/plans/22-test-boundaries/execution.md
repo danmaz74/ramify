@@ -88,11 +88,12 @@ Delivery cuts qualified so far:
 | 9: guarded seventeen-case readiness policy/lifecycle matrix and three unchanged native provider/process witnesses | `8e478e95` | [Passing pre-merge released audit](optimizations/09-premerge-audit.md), [integrated verification](optimizations/09-integrated-results.md) |
 | 10: guarded hook/CLI reply matrices, strict consumption controls and retained native timeout with producer retirement | `531ee940` | [Passing pre-merge released audit](optimizations/10-premerge-audit.md), [integrated verification](optimizations/10-integrated-results.md) |
 | 11: guarded settlement/shell/session cases and nine retained real-process witnesses | `dfc8b4f2` (main) | [Passing pre-merge released audit](optimizations/11-premerge-audit.md), [integrated verification](optimizations/11-integrated-results.md) |
+| 12: six guarded pure provider/executor cases and 36 unchanged native cases | `d27e3839` (main) | [Passing pre-merge released audit](optimizations/12-premerge-audit.md), [integrated verification](optimizations/12-integrated-results.md) |
 
 Cuts 1–10 have integrated focused passes in the original Plan 21 target.
 Main received cuts 1–8 with the Plan21 merge and now contains cuts 9–10
 after the [audited reconciliation and integrated checks](optimizations/main-target-integrated.md).
-Cut 11 was created from, audited and integrated directly into main.
+Cuts 11–12 were created from, audited and integrated directly into main.
 Their earlier audits remain evidence for their recorded original inputs; the
 new reconciliation audit qualifies the combined main candidate. The initial full baseline failed one
 crash fixture, subsequently corrected with focused evidence. A later released
