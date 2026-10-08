@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "implementing; baseline audit has one retained native materializer failure",
+  "status": "implementing; failed baseline retained; focused native materializer repair passed",
   "execution": "dependency-ordered; disjoint iterations may run in parallel",
   "iterations": [
     {
@@ -278,5 +278,17 @@
     }
   ],
   "executionBase": "d01a57bdbac6a56c29a893519f70297513824313",
-  "contractFreeze": "74b314c8"
+  "contractFreeze": "74b314c8",
+  "baselineRepair": {
+    "head": "71e4fe31c90c29fc5bbe2a2ed62dc61a6f2aad5d",
+    "path": "subs/harness/src/work/scope.ts",
+    "nativeFiles": 1,
+    "nativeTests": 5,
+    "ordinaryFiles": 2,
+    "ordinaryTests": 10,
+    "typeCheck": "passed",
+    "structure": "passed; partial analysis coverage; 314 analysis limits",
+    "logs": "/tmp/ramify-plan23-integrated-scope-repair-*.log",
+    "finalFullAudit": "pending iteration 14"
+  }
 }

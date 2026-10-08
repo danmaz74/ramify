@@ -2,7 +2,8 @@
 
 **Date:** 2026-10-08. **Status:** implementation in progress in
 `/home/app/ramify-plan23-session-reuse`, branch `feat/plan23-session-reuse`.
-Iteration 0 is accepted with one retained native baseline failure; see
+Iteration 0 is accepted. Its failed baseline audit is retained; a focused native
+materializer repair now passes, while final full qualification remains pending. See
 [its receipt](iterations/00-results.md) and [execution manifest](iterations/manifest.json). This plan implements the selected changes in both the
 [session-reuse proposal](../../analysis/2026-10-08-session-reuse-and-system-prompts.md)
 and the [status-badge real-run proposals](../../analysis/2026-10-08-status-badge-tone-real-run.md#proposals).

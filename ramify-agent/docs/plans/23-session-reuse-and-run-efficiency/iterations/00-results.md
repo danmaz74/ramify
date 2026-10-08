@@ -153,3 +153,36 @@ continuation/fork/add-tool/restore remain iteration 14 work. No live calls,
 controlled comparison, status-badge run, toolkit long trial, performance claim,
 package publication or push occurred. Manifest execution statuses are left to
 the coordinator. No passing whole-plan receipt is created.
+
+## Preliminary qualification repair of the retained failure
+
+The failed baseline above remains the actual historical result. A bounded
+read-only trace identified `checkWriteScope` in harness `work/scope.ts`: installed
+TypeScript 7.0.2 received a four-byte signature response and attempted to decode
+a full AST header. An equivalent owner-local result alias avoids that rendering
+failure without changing either readonly result variant or the function body.
+No toolkit/package/configuration/test assertion was changed.
+
+Repair candidate `71e4fe31c90c29fc5bbe2a2ed62dc61a6f2aad5d`, from clean base
+`9901de0f64581bc8a95937658a0cdc57edf2a144`, changes only
+`subs/harness/src/work/scope.ts`. Its body is byte-identical to the base; SHA256
+`98ba75e1d19dc624476f7c14560900ffae3f4c9782da295d8d45606e5bf1a710`.
+The coordinator fast-forwarded that candidate and independently reran:
+
+- Existing registered native `project-boundary.test.ts`: one file, five tests
+  passed, including the formerly failing nested architect/API materialization;
+  61.68 seconds.
+- Existing ordinary scope checks: two files, ten tests passed.
+- Harness/web/scripts/browser-script type checks passed.
+- Structural check passed, zero errors/warnings; partial coverage with 314
+  analysis limits.
+
+Commands were the existing `npm run test:boundaries --` invocation for the exact
+native file, `npm run test:quick --` for `write-scope-submission.test.ts` and
+`contract-injection-scope.test.ts`, `npm run type-check`, and `npm run check:self`.
+Integrated logs: `/tmp/ramify-plan23-integrated-scope-repair-*.log`; diagnosis,
+original failing traces and the worker's repair receipt are retained separately
+in `/tmp/ramify-plan23-baseline-diagnosis/`. No assertions, skips, discovery,
+deadlines, authority or scope behavior were weakened. This clears the focused
+regression only; Q03 still requires the final clean configured full audit after
+all implementation joins, and Q01/Q02 native/live obligations remain open.
