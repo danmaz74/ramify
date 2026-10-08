@@ -740,7 +740,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[gate-command-waiting].data.kind', values: ['configured'], file: 'subs/harness/src/tests/gate-progress.test.ts', test: 'a composed readiness records the configured check wait and start' },
   { union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[].type', values: ['check-finding-reported'], file: 'subs/harness/src/tests/nonfunctional-deviation-runtime.test.ts', test: 'an NFR-only exhausted run completes pending review with an exact source-bound CheckFinding' },
   { union: 'query scenarios.scenarios[].gates[].status', values: ['passed', 'failed'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'the scenario list, the review, the progress counts, the gate summary and the event references agree with the run' },
-  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['guarded-change'], file: 'subs/harness/src/tests/breaking-work.test.ts', test: 'an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes' },
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['guarded-change'], file: 'subs/harness/src/tests/breaking-work.boundary.test.ts', test: 'an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes' },
   { union: 'record ramify-agent.gate-attempt/3.next', values: ['retry-infrastructure'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
   { union: 'record ramify-agent.capability/1.origin', values: ['global-decision'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the first creates a capability and revises its hypothesis; the second inherits its brief and reuses the entry' },
   { union: 'record ramify-agent.iteration-result/1.outcome', values: ['superseded'], file: 'subs/harness/src/tests/contract-revision.test.ts', test: 'an unfinished item is reused and its open assignment closes as superseded; a completed one is followed' },
@@ -1168,6 +1168,13 @@ interface MatrixCase {
   readonly document?: string;
 }
 
+// Current destinations of these two preserved acceptance groups. Historical
+// iteration receipts keep the original filenames they qualified at that time.
+const currentAcceptanceFiles: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  K6: { 'breaking-work.test.ts': 'breaking-work.boundary.test.ts' },
+  K7: { 'breaking-work.test.ts': 'breaking-work.boundary.test.ts' },
+};
+
 /** The iteration results note that owns a case, and the files its row names. */
 async function ownedCases(): Promise<Map<string, Array<{ iteration: number; files: string[] }>>> {
   const owned = new Map<string, Array<{ iteration: number; files: string[] }>>();
@@ -1187,7 +1194,7 @@ async function ownedCases(): Promise<Map<string, Array<{ iteration: number; file
         if (files.length === 0 && /[Tt]he same test/.test(line)) files = previous;
         previous = files;
         const list = owned.get(row[1]!) ?? [];
-        list.push({ iteration, files });
+        list.push({ iteration, files: files.map(file => currentAcceptanceFiles[row[1]!]?.[file] ?? file) });
         owned.set(row[1]!, list);
       }
     }
