@@ -388,7 +388,12 @@
         "subs/harness/src/tests/single-session.boundary.test.ts",
         "subs/harness/src/tests/single-session-integration.test.ts",
         "subs/harness/src/tests/single-session-fixture.ts",
-        "subs/harness/src/tests/writer-settlement.test.ts"
+        "subs/harness/src/tests/writer-settlement.test.ts",
+        "subs/harness/src/run/session-operations.ts",
+        "subs/harness/subs/agent/src/interfaces/port.ts",
+        "subs/harness/subs/agent/src/scripted.ts",
+        "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
+        "subs/harness/src/projections/session-queries.ts"
       ],
       "runtimeWorker": [
         "subs/harness/src/run/service.ts",
