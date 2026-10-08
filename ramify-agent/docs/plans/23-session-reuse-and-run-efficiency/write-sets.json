@@ -380,7 +380,15 @@
       "root": [
         "subs/harness/src/analysis/submission.ts",
         "subs/harness/src/tests/analysis-submission.test.ts",
-        "subs/harness/src/tests/analysis-scenarios.test.ts"
+        "subs/harness/src/tests/analysis-scenarios.test.ts",
+        "subs/harness/src/tests/engineer-submission.test.ts",
+        "subs/harness/src/tests/materialization.test.ts",
+        "subs/harness/src/tests/neutral-actions.test.ts",
+        "subs/harness/src/tests/breaking-work.boundary.test.ts",
+        "subs/harness/src/tests/single-session.boundary.test.ts",
+        "subs/harness/src/tests/single-session-integration.test.ts",
+        "subs/harness/src/tests/single-session-fixture.ts",
+        "subs/harness/src/tests/writer-settlement.test.ts"
       ],
       "runtimeWorker": [
         "subs/harness/src/run/service.ts",
@@ -426,7 +434,8 @@
         "subs/harness/src/tests/work-items.test.ts",
         "subs/harness/src/tests/iterations.test.ts",
         "subs/harness/src/tests/integration-scenarios.test.ts",
-        "subs/harness/src/tests/contract-revision-scripted.test.ts"
+        "subs/harness/src/tests/contract-revision-scripted.test.ts",
+        "subs/harness/src/tests/helpers/unchanged-run.ts"
       ]
     }
   }
