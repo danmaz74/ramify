@@ -1,0 +1,248 @@
+{
+  "producer": {
+    "name": "ramify-audit",
+    "version": "0.7.2"
+  },
+  "sourceCommit": "759fba7e6cfc759f926b7ac6e38293d832eb7f41",
+  "sourceTree": "7719ab8a2c04499cc9b9eb372483d07924b0b3b5",
+  "sourceBranch": "perf/plan22-readiness",
+  "auditedAt": "2026-10-08T07:55:42.939Z",
+  "durationSeconds": 361.769,
+  "mode": {
+    "requestedMode": "full",
+    "resolution": "requested",
+    "executedMode": "full"
+  },
+  "overall": "pass",
+  "coverage": {
+    "status": "declared",
+    "selector": {
+      "id": "full",
+      "version": "1",
+      "config": {},
+      "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    "universe": {
+      "id": "project:ramify-agent",
+      "digest": "sha256:d4afe35526504c886f5fb2297ea81eee1696808269a6989a99c24f28f754a455",
+      "checkIds": [
+        "agent-scenarios",
+        "agent-structure",
+        "agent-tests",
+        "agent-typecheck",
+        "agent-web-build",
+        "patch-integrity"
+      ],
+      "testUnitIds": [
+        "agent-check-self",
+        "agent-cucumber",
+        "agent-typecheck",
+        "agent-vitest",
+        "agent-web-build",
+        "git-diff-check"
+      ]
+    },
+    "selection": {
+      "kind": "full",
+      "selectedCheckIds": [
+        "agent-scenarios",
+        "agent-structure",
+        "agent-tests",
+        "agent-typecheck",
+        "agent-web-build",
+        "patch-integrity"
+      ],
+      "omittedCheckIds": [],
+      "selectedTestUnitIds": [
+        "agent-check-self",
+        "agent-cucumber",
+        "agent-typecheck",
+        "agent-vitest",
+        "agent-web-build",
+        "git-diff-check"
+      ],
+      "omittedTestUnitIds": []
+    },
+    "claim": {
+      "configuration": {
+        "blob": "066e759268e7aed1b9321d96b961b26305ad4518",
+        "path": "ramify-agent/ramify-audit.json",
+        "sourceCommit": "759fba7e6cfc759f926b7ac6e38293d832eb7f41"
+      },
+      "scope": "repository"
+    },
+    "projectRoot": "ramify-agent",
+    "ownershipAnswer": {
+      "ramifyVersion": "0.4.1",
+      "cliSchema": "ramify.affected-cli/4",
+      "selectionSchema": "ramify.affected/4",
+      "revision": {
+        "sequence": null,
+        "inputId": "input/1:bd6e59abcea8ce35a000c349639b9493a8e14be6cde96fea2db614970424be82"
+      },
+      "binaryPath": "ramify-agent/node_modules/.bin/ramify",
+      "modules": 12,
+      "exclusions": 17
+    },
+    "expectedFiles": {
+      "contract": "runner-configured-files/1",
+      "source": "ownership-answer",
+      "expected": 264,
+      "run": 264,
+      "missing": [],
+      "status": "complete",
+      "runnerConfigFiles": [
+        "vitest.config.ts"
+      ]
+    }
+  },
+  "failureLedger": {
+    "completeness": "complete",
+    "witness": [
+      {
+        "checkId": "agent-scenarios",
+        "command": "agent-cucumber",
+        "requestedTargets": [
+          {
+            "kind": "suite"
+          }
+        ],
+        "summaryRead": true,
+        "endReason": "passed",
+        "exitCode": 0,
+        "unhandledErrorsWithoutFile": [],
+        "carriedFilesNotRun": []
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "requestedTargets": [
+          {
+            "kind": "suite"
+          }
+        ],
+        "summaryRead": true,
+        "endReason": "passed",
+        "exitCode": 0,
+        "unhandledErrorsWithoutFile": [],
+        "carriedFilesNotRun": []
+      }
+    ],
+    "entries": []
+  },
+  "refs": {
+    "reportCommit": "da413cbc684caf5985029425eac83e394775d338",
+    "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T07-55-42Z-759fba7e6",
+    "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/7719ab8a2c04499cc9b9eb372483d07924b0b3b5"
+  },
+  "composition": {
+    "verdict": "pass",
+    "scoped": false,
+    "chainDepth": 0,
+    "reportCommit": "da413cbc684caf5985029425eac83e394775d338",
+    "outstandingFailures": 0
+  },
+  "discovery": {
+    "status": "complete",
+    "skipped": [],
+    "unavailable": []
+  },
+  "invocationVerdict": "pass",
+  "checks": {
+    "agent-scenarios": {
+      "status": "pass",
+      "durationSeconds": 0.578,
+      "commands": {
+        "agent-cucumber": {
+          "status": "pass",
+          "passed": true,
+          "durationSeconds": 0.572,
+          "counts": {
+            "scenarios": {
+              "failed": 0,
+              "passed": 0,
+              "skipped": 0,
+              "total": 0
+            },
+            "steps": {
+              "failed": 0,
+              "passed": 0,
+              "skipped": 0,
+              "total": 0,
+              "undefined": 0
+            }
+          }
+        }
+      }
+    },
+    "agent-structure": {
+      "status": "pass",
+      "durationSeconds": 18.183,
+      "commands": {
+        "agent-check-self": {
+          "status": "pass",
+          "passed": true,
+          "durationSeconds": 18.183
+        }
+      }
+    },
+    "agent-tests": {
+      "status": "pass",
+      "durationSeconds": 322.475,
+      "commands": {
+        "agent-vitest": {
+          "status": "pass",
+          "passed": true,
+          "durationSeconds": 322.467,
+          "counts": {
+            "files": {
+              "failed": 0,
+              "passed": 263,
+              "skipped": 1,
+              "total": 264
+            },
+            "tests": {
+              "failed": 0,
+              "passed": 2026,
+              "skipped": 2,
+              "total": 2028
+            }
+          }
+        }
+      }
+    },
+    "agent-typecheck": {
+      "status": "pass",
+      "durationSeconds": 7.731,
+      "commands": {
+        "agent-typecheck": {
+          "status": "pass",
+          "passed": true,
+          "durationSeconds": 7.731
+        }
+      }
+    },
+    "agent-web-build": {
+      "status": "pass",
+      "durationSeconds": 0.677,
+      "commands": {
+        "agent-web-build": {
+          "status": "pass",
+          "passed": true,
+          "durationSeconds": 0.677
+        }
+      }
+    },
+    "patch-integrity": {
+      "status": "pass",
+      "durationSeconds": 0.005,
+      "commands": {
+        "git-diff-check": {
+          "status": "pass",
+          "passed": true,
+          "durationSeconds": 0.004
+        }
+      }
+    }
+  }
+}

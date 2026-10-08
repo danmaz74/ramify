@@ -1,0 +1,386 @@
+{
+  "schema": "plan22.optimization.readiness/1",
+  "baseCommit": "b52aa48ff2ba7e34b4b158e99dac32b8312c649d",
+  "targetCommittedHeadAtQualification": "b52aa48ff2ba7e34b4b158e99dac32b8312c649d",
+  "implementationSourceSha256": {
+    "subs/harness/src/tests/readiness.test.ts": "ed5fe32ba4b65f8f0d42498e03918365d435dc685324477c5f5e8f5d6e4adc68",
+    "subs/harness/src/tests/readiness.boundary.test.ts": "e1a7fc348c6e3ab3d4d6c18f78bbc86202ea04419b201d839a635b744617ecbf",
+    "subs/harness/src/tests/readiness-boundaries.test.ts": "9501a6475c7fd7396f3d35e296d4904b21ec8b60d5d5603ea537e0a392911f96",
+    "subs/harness/src/tests/helpers/readiness-boundaries.ts": "0571655aaebbd1f96a3c6b9912f89ebcbe16864621c34d99f50fed2b66342345"
+  },
+  "configurationSha256": {
+    "package.json": "df8473368f6e34409bc6f7917ba183bda93db16cf2b75f8a561c42ab12c29551",
+    "package-lock.json": "9d0b5e4332475cfc10b20c6f8c3d2aff035703a25af88710bc2beeb361ea96d6",
+    "vitest.config.ts": "c0f54f605e468027bffb775b4847c487bb88fb59f1b06528dbacb09738f07e7e",
+    "ramify-audit.json": "9bfaaa5d6b95d590cf044ecab60faec812b2e39fd5a7752be28e7190afa80baa",
+    "module.ramify": "be5d636f908aac52567e918dd1810b3cf429aed750a46f1d023e79b425398535",
+    "subs/harness/module.ramify": "1236f0bf27b5ec513879601bc1d7f983d6a155d13f3b6adf1d12808304908288"
+  },
+  "caseMapping": [
+    {
+      "number": 1,
+      "title": "the installed provider runs full after local setup, then reuses full while local setup recreates deleted output",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.boundary.test.ts",
+      "treatment": "unchanged native callback",
+      "originalExpectCalls": 10,
+      "destinationExpectCalls": 10,
+      "callbackAndRegistrationSha256": "81923b443625b3a8f54b1870db9b28937f126a1a59a147758612c35b9bd95994"
+    },
+    {
+      "number": 2,
+      "title": "cancelling a native configured command settles its process and owned audit workspace before readiness returns",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.boundary.test.ts",
+      "treatment": "unchanged native callback",
+      "originalExpectCalls": 7,
+      "destinationExpectCalls": 7,
+      "callbackAndRegistrationSha256": "f6a45165952f4546b098d70ec560a21f37dd7cfc51a70076217dc59c69ab8a88"
+    },
+    {
+      "number": 3,
+      "title": "a scratch-only successor keeps captured audit policy while a committed policy change refuses native readiness",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.boundary.test.ts",
+      "treatment": "unchanged native callback",
+      "originalExpectCalls": 8,
+      "destinationExpectCalls": 8,
+      "callbackAndRegistrationSha256": "b4254510d27d02ff1360cd70fc3a0ef246f743d5af7c57bd19628dcb84e30d77"
+    },
+    {
+      "number": 4,
+      "title": "a setup-only deep package is required; an undeclared manifest creates no check",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 6,
+      "destinationExpectCalls": 6
+    },
+    {
+      "number": 5,
+      "title": "the committed setup runs before a reused full result and recreates deleted working output",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 5,
+      "destinationExpectCalls": 5
+    },
+    {
+      "number": 6,
+      "title": "a failed setup stops before the provider and leaves a named readiness failure",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 3,
+      "destinationExpectCalls": 3
+    },
+    {
+      "number": 7,
+      "title": "a symlinked setup cwd outside the project cannot run its marker command",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 3,
+      "destinationExpectCalls": 3
+    },
+    {
+      "number": 8,
+      "title": "provider failure and captured-policy conflict stop before branch creation",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 5,
+      "destinationExpectCalls": 5
+    },
+    {
+      "number": 9,
+      "title": "readiness asks the final gate's nested full request; a nested failure or an undecided answer refuses it before branch creation, and applicable reuse passes",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 15,
+      "destinationExpectCalls": 15
+    },
+    {
+      "number": 10,
+      "title": "a declared missing installation is repaired once, then readiness continues",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 3,
+      "destinationExpectCalls": 3
+    },
+    {
+      "number": 11,
+      "title": "timeout evidence qualifies a bounded rerun; failed tests and unavailable discovery do not",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 4,
+      "destinationExpectCalls": 4
+    },
+    {
+      "number": 12,
+      "title": "dirty and non-Git projects stop before preparation, audit, and branch creation",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 5,
+      "destinationExpectCalls": 5
+    },
+    {
+      "number": 13,
+      "title": "an install command into linked dependencies is refused before any setup process",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 3,
+      "destinationExpectCalls": 3
+    },
+    {
+      "number": 14,
+      "title": "RunService repairs a missing declared installation once and then completes readiness",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 6,
+      "destinationExpectCalls": 6
+    },
+    {
+      "number": 15,
+      "title": "RunService stops immediately when a declared installation repair is ineffective",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 5,
+      "destinationExpectCalls": 5
+    },
+    {
+      "number": 16,
+      "title": "RunService exhausts two bounded recoveries for recurring configured timeout evidence",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 5,
+      "destinationExpectCalls": 5
+    },
+    {
+      "number": 17,
+      "title": "RunService reruns once after configured timeout and stops on failing tests without recovery",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 6,
+      "destinationExpectCalls": 6
+    },
+    {
+      "number": 18,
+      "title": "RunService records a failed Ramify restart and performs no audit",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 4,
+      "destinationExpectCalls": 4
+    },
+    {
+      "number": 19,
+      "title": "RunService stop aborts active readiness, records the cancelled attempt, and waits for provider settlement before job-stopped",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 9,
+      "destinationExpectCalls": 9
+    },
+    {
+      "number": 20,
+      "title": "closing during readiness aborts and waits for settlement without writing a terminal event",
+      "originalFile": "subs/harness/src/tests/readiness.test.ts",
+      "destinationFile": "subs/harness/src/tests/readiness.test.ts",
+      "treatment": "strict guarded external responses with original assertions",
+      "originalExpectCalls": 3,
+      "destinationExpectCalls": 3
+    }
+  ],
+  "originalCases": 20,
+  "ordinaryOriginals": 17,
+  "retainedActualOriginals": 3,
+  "originalExpectCalls": 115,
+  "preservedCaseExpectCalls": 115,
+  "addedStrictControls": 9,
+  "baseline": {
+    "artifact": "/tmp/plan22-readiness-baseline.json",
+    "passed": 20,
+    "failed": 0,
+    "pending": 0,
+    "files": [
+      {
+        "path": "subs/harness/src/tests/readiness.test.ts",
+        "passed": 20,
+        "failed": 0,
+        "seconds": 6.203921875
+      }
+    ]
+  },
+  "baselineOriginalOrdinaryCaseSeconds": 4.895665059999998,
+  "baselineOriginalNativeCaseSeconds": 1.3081519809999993,
+  "finalFocused": {
+    "artifact": "/tmp/plan22-readiness-final-focused.json",
+    "passed": 40,
+    "failed": 0,
+    "pending": 0,
+    "files": [
+      {
+        "path": "subs/harness/src/tests/composition.test.ts",
+        "passed": 11,
+        "failed": 0,
+        "seconds": 4.832512451171875
+      },
+      {
+        "path": "subs/harness/src/tests/readiness-boundaries.test.ts",
+        "passed": 9,
+        "failed": 0,
+        "seconds": 0.030614990234375
+      },
+      {
+        "path": "subs/harness/src/tests/readiness.boundary.test.ts",
+        "passed": 3,
+        "failed": 0,
+        "seconds": 2.2153212890625
+      },
+      {
+        "path": "subs/harness/src/tests/readiness.test.ts",
+        "passed": 17,
+        "failed": 0,
+        "seconds": 3.3522451171875
+      }
+    ]
+  },
+  "ordinaryIntermediate": {
+    "artifact": "/tmp/plan22-readiness-final-ordinary.json",
+    "passed": 31,
+    "failed": 0,
+    "pending": 0,
+    "files": [
+      {
+        "path": "subs/harness/src/tests/check-findings-composition.integration.test.ts",
+        "passed": 1,
+        "failed": 0,
+        "seconds": 2.944939453125
+      },
+      {
+        "path": "subs/harness/src/tests/check-findings-composition.test.ts",
+        "passed": 4,
+        "failed": 0,
+        "seconds": 15.958178955078125
+      },
+      {
+        "path": "subs/harness/src/tests/readiness-boundaries.test.ts",
+        "passed": 9,
+        "failed": 0,
+        "seconds": 0.02650390625
+      },
+      {
+        "path": "subs/harness/src/tests/readiness.test.ts",
+        "passed": 17,
+        "failed": 0,
+        "seconds": 2.202830810546875
+      }
+    ]
+  },
+  "extraCheckFindingComposition": {
+    "unitCases": 4,
+    "integrationCases": 1,
+    "status": "passed; additional regression, does not substitute for required composition11"
+  },
+  "authoringRuns": [
+    {
+      "artifact": "/tmp/plan22-readiness-authoring1.json",
+      "passed": 14,
+      "failed": 3,
+      "pending": 0,
+      "files": [
+        {
+          "path": "subs/harness/src/tests/readiness.test.ts",
+          "passed": 14,
+          "failed": 3,
+          "seconds": 1.745544189453125
+        }
+      ]
+    },
+    {
+      "artifact": "/tmp/plan22-readiness-authoring2.json",
+      "passed": 1,
+      "failed": 2,
+      "pending": 14,
+      "files": [
+        {
+          "path": "subs/harness/src/tests/readiness.test.ts",
+          "passed": 1,
+          "failed": 2,
+          "seconds": 0.596900390625
+        }
+      ]
+    },
+    {
+      "artifact": "/tmp/plan22-readiness-authoring3.json",
+      "passed": 17,
+      "failed": 0,
+      "pending": 0,
+      "files": [
+        {
+          "path": "subs/harness/src/tests/readiness.test.ts",
+          "passed": 17,
+          "failed": 0,
+          "seconds": 1.860363037109375
+        }
+      ]
+    },
+    {
+      "artifact": "/tmp/plan22-readiness-authoring4.json",
+      "passed": 20,
+      "failed": 0,
+      "pending": 0,
+      "files": [
+        {
+          "path": "subs/harness/src/tests/readiness.boundary.test.ts",
+          "passed": 3,
+          "failed": 0,
+          "seconds": 1.36221044921875
+        },
+        {
+          "path": "subs/harness/src/tests/readiness.test.ts",
+          "passed": 17,
+          "failed": 0,
+          "seconds": 2.039615966796875
+        }
+      ]
+    }
+  ],
+  "configuredDiscovery": {
+    "artifact": "/tmp/plan22-readiness-configured-files.json",
+    "count": 264,
+    "projects": {
+      "node": 247,
+      "web": 17
+    },
+    "addedPaths": [
+      "subs/harness/src/tests/readiness.boundary.test.ts",
+      "subs/harness/src/tests/readiness-boundaries.test.ts"
+    ]
+  },
+  "processAttempts": {
+    "ordinaryOriginals": 0,
+    "strictControls": 0,
+    "method": "file-local child_process guard installed before imports/setup; persistent attempts asserted after reverse owned cleanup"
+  },
+  "checks": {
+    "typeCheck": "passed all four compiler scopes; /tmp/plan22-readiness-final-type-check.log",
+    "selfCheck": "passed completed partial coverage; 0 errors, 0 warnings, 313 analysis limits; /tmp/plan22-readiness-final-check-self.log"
+  },
+  "releasedAudit": "NOT RUN by optimization agent; coordinator pre-merge full nested audit required",
+  "limits": [
+    "Shared host and concurrent compiler/module checks affected final timings; no controlled whole-suite speedup claim.",
+    "Root automatic guard and explicit ordinary/boundary runner registry remain later Plan22 work.",
+    "Audit is execution health, not responsible architect semantic completion."
+  ]
+}
