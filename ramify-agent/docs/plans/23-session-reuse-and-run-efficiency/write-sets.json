@@ -277,5 +277,12 @@
     "Child module.ramify belongs to the indicated provider; shared harness exposure changes belong to coordinator.",
     "Iterations 8, 9, 10 and 11 serialize shared run files; 13 overlaps neither 11 nor 12.",
     "Iteration 14 owner-local qualification repairs require an exact additional reservation and focused regression evidence."
-  ]
+  ],
+  "providerAmendments": {
+    "session-quiescence": [
+      "subs/harness/subs/agent/src/session-operations.ts",
+      "subs/harness/subs/agent/src/interfaces/session-operations.ts",
+      "subs/harness/subs/agent/src/tests/plan23-session-operations.test.ts"
+    ]
+  }
 }
