@@ -163,6 +163,10 @@ case is accepted. Agent later appends `secret-source.ts` to the same `.gitignore
 that added delta remains unauthorized; no file-wide exemption. Preserve recorded
 project configuration and existing audited evidence obligations.
 
+The literal `src/tmp/` is the root-only scripted attribution input. The established
+runtime scratch rule is `**/src/tmp/`; the native witness records and verifies
+that actual rule without changing scratch policy to match the scripted example.
+
 Engineer cwd is the assigned module `src/`. A tool write uses `status.ts` relative
 to that cwd; scope/catalog fields retain project-relative module paths. Never
 prepend the module path twice. Fixture README offers requirements/context without
