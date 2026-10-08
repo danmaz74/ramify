@@ -351,6 +351,11 @@
       "subs/harness/subs/evidence/src/git.ts",
       "subs/harness/subs/evidence/src/tests/git.test.ts",
       "subs/harness/subs/evidence/src/tests/plan23-line-origin-facts.test.ts"
+    ],
+    "tree-blob-object-facts": [
+      "subs/harness/subs/evidence/src/git.ts",
+      "subs/harness/subs/evidence/src/tests/git.test.ts",
+      "subs/harness/subs/evidence/src/tests/plan23-blob-object-facts.test.ts"
     ]
   }
 }
