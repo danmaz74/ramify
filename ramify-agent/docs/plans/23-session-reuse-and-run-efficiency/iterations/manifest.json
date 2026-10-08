@@ -44,8 +44,18 @@
         "P04",
         "P05"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness src/prompts/ templates/packages and new pure task/brief builders with isolated prompt tests. Do not edit run/service.ts or plan-evidence/scenarios implementations."
+      "status": "accepted provider; runtime consumers remain iterations 8\u201310",
+      "writeBoundary": "Harness src/prompts/ templates/packages and new pure task/brief builders with isolated prompt tests. Do not edit run/service.ts or plan-evidence/scenarios implementations.",
+      "receipt": "02-results.md",
+      "providerHead": "8dece7e3f1dff9f536505bdf7debbd0bb42357a6",
+      "integratedHead": "a249014a33819467741b531250a587f7fe4ba5ee",
+      "integrationVerification": {
+        "ordinaryFiles": 5,
+        "ordinaryTests": 71,
+        "typeCheck": "passed",
+        "structure": "passed; partial analysis coverage",
+        "logs": "/tmp/ramify-plan23-integrated-prompts-*.log"
+      }
     },
     {
       "id": "3",
@@ -72,7 +82,7 @@
         "H05",
         "H06"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness focused-config builder (new src/work/focused-scenarios.ts), tools/shell-tests.ts, evidence child adapter for effective project configuration if required, and their own tests. Excludes scenario form, run service and scenario-briefing wiring."
     },
     {
