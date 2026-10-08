@@ -13,6 +13,8 @@ interface OperationBody {
   kind: string; input: Record<string, unknown>; sessionId: string; snapshot: Snapshot;
   effects: SessionEffectRecord[]; provider: SessionTranscriptEntry[];
   owner: { token: string; pid: number } | null;
+  /** Internal idle evidence, committed only after all execution and publication drains. */
+  quiescent?: boolean;
   phase: 'intent' | 'dispatched' | 'terminal'; receipt: SessionOperationReceipt | null;
 }
 interface Active { abort: AbortController; handle: SessionOperationHandle; stop: () => Promise<SessionOperationReceipt> }
@@ -20,6 +22,8 @@ const operationRecordId = (id: string) => `operation:${id}`;
 const sessionRecordId = (id: string) => `session:${id}`;
 const liveOwnerTokens = new Set<string>();
 const ownerControllers = new Map<string, AbortController>();
+// Persisted owner tokens identify runtime work across factories without conflating stores.
+const ownerRuntimes = new Map<string, Active>();
 const emptyChange: SessionToolChange = { add: [], activate: [], inactivate: [] };
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 /** Canonical JSON binds content, rather than trusting caller-supplied identity strings. */
@@ -162,10 +166,10 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     async stop(input) {
       const prior = await readOperation(input);
       if (!prior || prior.body.sessionId !== input.sessionId) return receipt(input, input.sessionId, 'unavailable', 'Active operation missing');
-      if (prior.body.receipt) return clone(prior.body.receipt);
-      const running = active.get(activeKey(input));
+      const running = prior.body.owner ? ownerRuntimes.get(prior.body.owner.token) : active.get(activeKey(input));
       if (running) return running.stop();
-      return settle(input, { kind: 'stopped' }, 'Stopped during recovery');
+      const value = prior.body.receipt ?? await settle(input, { kind: 'stopped' }, 'Stopped during recovery');
+      return (await completedHandle(value)).settled();
     },
     async inspect(runId, sessionId, expectedPoint) {
       const loaded = await readSession(runId, sessionId);
@@ -191,9 +195,33 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
   function validateBindings(task: SessionTaskInput, policy: Snapshot['policy'], bindings: SessionExecutionBindings): void {
     if (!equal(task, bindings.task) || !equal(policy, bindings.policy) || bindings.submission.name !== task.submissionTool) throw new Error('Retry/task bindings differ from immutable task, environment, policy, validator or destination');
   }
-  function completedHandle(value: SessionOperationReceipt): SessionOperationHandle {
+  async function completedHandle(value: SessionOperationReceipt): Promise<SessionOperationHandle> {
     const result = Promise.resolve(clone(value));
-    return { receipt: result, outcome: result.then(item => item.outcome), stop: () => result, settled: () => result };
+    const prior = await readOperation(value);
+    const owner = prior?.body.owner;
+    const running = owner ? ownerRuntimes.get(owner.token) : undefined;
+    const settled = async () => {
+      if (running) { await running.handle.settled(); return clone(value); }
+      const current = await readOperation(value);
+      if (current?.body.owner && current.body.quiescent !== true && await ownerAlive(current.body.owner)) {
+        throw new SessionDriverUnavailableError('Execution owner is still live; quiescence is unavailable');
+      }
+      return clone(value);
+    };
+    return { receipt: result, outcome: result.then(item => item.outcome), stop: settled, settled };
+  }
+  async function ownerAlive(owner: NonNullable<OperationBody['owner']>): Promise<boolean> {
+    if (options.isExecutionOwnerAlive) return options.isExecutionOwnerAlive(owner);
+    if (owner.pid === process.pid) return liveOwnerTokens.has(owner.token);
+    try { process.kill(owner.pid, 0); return true; }
+    catch (error) { return (error as NodeJS.ErrnoException).code !== 'ESRCH'; }
+  }
+  async function markQuiescent(key: SessionOperationKey, token: string): Promise<void> {
+    const prior = await readOperation(key);
+    if (!prior?.body.receipt || prior.body.phase !== 'terminal' || prior.body.owner?.token !== token) throw new Error('Cannot attest quiescence without the original terminal owner');
+    if (prior.body.quiescent === true) return;
+    const committed = await store.commit({ runId: key.runId, expected: [{ id: prior.record.id, revision: prior.record.revision }], records: [record(key, prior.record.id, prior.record.revision + 1, { ...prior.body, quiescent: true }, false)], payloads: [...prior.body.snapshot.transcript, ...prior.body.provider].map(item => item.payloadId) });
+    if (committed.kind === 'conflict') throw new Error(`Quiescence attestation conflicted: ${committed.reason}`);
   }
   // The durable operation revision fences every callback, including another recovering writer.
   async function updateOperation(key: SessionOperationKey, work: (body: OperationBody) => OperationBody, ownerToken?: string): Promise<OperationBody> {
@@ -219,7 +247,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     const terminal: OperationBody = { ...op.body, phase: 'terminal', receipt: result };
     const committed = await store.commit({ runId: key.runId, expected: [{ id: op.record.id, revision: op.record.revision }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(key, op.record.id, op.record.revision + 1, terminal, false), record(key, loaded.record.id, loaded.record.revision + 1, { snapshot, points: available ? [...loaded.body.points, snapshot] : loaded.body.points }, true)], payloads: snapshot.transcript.map(item => item.payloadId) });
     if (committed.kind === 'conflict') { const winner = await readOperation(key); if (winner?.body.receipt) return clone(winner.body.receipt); throw new Error(committed.reason); }
-    if (op.body.owner) { liveOwnerTokens.delete(op.body.owner.token); ownerControllers.get(op.body.owner.token)?.abort(); ownerControllers.delete(op.body.owner.token); }
+    if (op.body.owner) ownerControllers.get(op.body.owner.token)?.abort();
     return clone(result);
   }
   async function launch(key: SessionOperationKey, bindings: SessionExecutionBindings, recovering: boolean): Promise<SessionOperationHandle> {
@@ -230,14 +258,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     if (previous.body.receipt) return completedHandle(previous.body.receipt);
     const held = previous.body.owner;
     if (held) {
-      let live: boolean;
-      if (options.isExecutionOwnerAlive) live = await options.isExecutionOwnerAlive(held);
-      else if (held.pid === process.pid) live = liveOwnerTokens.has(held.token);
-      else {
-        try { process.kill(held.pid, 0); live = true; }
-        catch (error) { live = (error as NodeJS.ErrnoException).code !== 'ESRCH'; }
-      }
-      if (live) return completedHandle(receipt(key, previous.body.sessionId, 'conflict', 'Operation has a live execution owner'));
+      if (await ownerAlive(held)) return completedHandle(receipt(key, previous.body.sessionId, 'conflict', 'Operation has a live execution owner'));
     }
     const owner = { token: randomUUID(), pid: process.pid };
     liveOwnerTokens.add(owner.token);
@@ -250,20 +271,38 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     let queue: Promise<unknown> = Promise.resolve();
     const serial = <T>(work: () => Promise<T>): Promise<T> => { const next = queue.then(work, work); queue = next.then(() => undefined, () => undefined); return next; };
     const calls = new Map<string, Promise<ToolResult | SubmissionVerdict>>();
+    const pending = new Set<Promise<unknown>>();
+    let admissionClosed = false;
+    const track = <T>(work: Promise<T>): Promise<T> => {
+      pending.add(work);
+      void work.then(() => pending.delete(work), () => pending.delete(work));
+      return work;
+    };
+    const admit = <T>(work: () => Promise<T>): Promise<T> => {
+      if (admissionClosed) { const rejected = Promise.reject<T>(new Error('Operation runtime is closed')); void rejected.catch(() => undefined); return rejected; }
+      return track(work());
+    };
+    const drain = async () => { while (pending.size > 0) await Promise.allSettled([...pending]); await queue; };
     let resolveReceipt!: (value: SessionOperationReceipt) => void;
     let rejectReceipt!: (error: unknown) => void;
     const result = new Promise<SessionOperationReceipt>((resolve, reject) => { resolveReceipt = resolve; rejectReceipt = reject; });
+    let resolveIdle!: () => void;
+    let rejectIdle!: (error: unknown) => void;
+    const idle = new Promise<void>((resolve, reject) => { resolveIdle = resolve; rejectIdle = reject; });
+    void idle.catch(() => undefined);
+    const settled = async () => { await idle; return result; };
     let stopped = false;
     const stop = async () => {
-      stopped = true; abort.abort();
+      stopped = true; admissionClosed = true; abort.abort();
       const value = await serial(() => settle(key, { kind: 'stopped' }));
-      liveOwnerTokens.delete(owner.token); active.delete(activeKey(key));
-      resolveReceipt(value); return value;
+      resolveReceipt(value); await idle; return value;
     };
-    const handle: SessionOperationHandle = { receipt: result, outcome: result.then(value => value.outcome), settled: () => result, stop };
+    const handle: SessionOperationHandle = { receipt: result, outcome: result.then(value => value.outcome), settled, stop };
     // Avoid a separately unobserved rejection on the derived outcome promise.
     void handle.outcome.catch(() => undefined);
-    active.set(activeKey(key), { abort, handle, stop });
+    const runtimeOwner = { abort, handle, stop };
+    active.set(activeKey(key), runtimeOwner);
+    ownerRuntimes.set(owner.token, runtimeOwner);
     async function assertLive(): Promise<void> {
       if (stopped || abort.signal.aborted) throw new Error('Operation stopped');
       const current = await readOperation(key);
@@ -274,7 +313,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
       if (stopped || abort.signal.aborted) throw new Error('Operation stopped');
       validateBindings(original.task, original.policy, bindings);
     }
-    async function effect(callId: string, name: string, input: unknown, submission: boolean): Promise<ToolResult | SubmissionVerdict> {
+    function effect(callId: string, name: string, input: unknown, submission: boolean): Promise<ToolResult | SubmissionVerdict> {
       const cached = calls.get(callId); if (cached) return cached;
       const work = (async (): Promise<ToolResult | SubmissionVerdict> => {
         await assertLive();
@@ -353,16 +392,16 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         {
           const dispatched = await serial(() => updateOperation(key, body => ({ ...body, phase: 'dispatched' }), owner.token));
           await assertLive();
-          outcome = await options.driver.dispatch({ key: clone(key), task: clone((dispatched.input as unknown as Omit<ContinueSessionInput, 'bindings'>).task), session: clone({ ...dispatched.snapshot, transcript: [...dispatched.snapshot.transcript, ...dispatched.provider] }), recovering, effects: clone(dispatched.effects) }, {
-            signal: abort.signal, assertLive,
+          try { outcome = await options.driver.dispatch({ key: clone(key), task: clone((dispatched.input as unknown as Omit<ContinueSessionInput, 'bindings'>).task), session: clone({ ...dispatched.snapshot, transcript: [...dispatched.snapshot.transcript, ...dispatched.provider] }), recovering, effects: clone(dispatched.effects) }, {
+            signal: abort.signal, assertLive: () => admit(assertLive),
             describeTool(name, input) {
               const declaration = dispatched.snapshot.declarations.find(item => item.name === name);
               const handler = bindings.tools.find(item => item.name === name);
               return { action: handler?.action?.(input) ?? { kind: 'harness' }, mutating: declaration?.mutating ?? false };
             },
-            callTool: (callId, name, input) => effect(callId, name, input, false) as Promise<ToolResult>,
-            submit: (callId, input) => effect(callId, bindings.task.submissionTool, input, true) as Promise<SubmissionVerdict>,
-            async persistPayload(payloadKey, bytes) {
+            callTool: (callId, name, input) => admit(() => effect(callId, name, input, false)) as Promise<ToolResult>,
+            submit: (callId, input) => admit(() => effect(callId, bindings.task.submissionTool, input, true)) as Promise<SubmissionVerdict>,
+            persistPayload: (payloadKey, bytes) => admit(async () => {
               await assertLive();
               const id = await store.putPayload(bytes);
               await serial(() => updateOperation(key, body => {
@@ -371,10 +410,10 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
                 return prior ? body : { ...body, provider: [...body.provider, { key: payloadKey, payloadId: id, kind: 'provider' }] };
               }, owner.token));
               return id;
-            },
-            async readPayload(id) { const bytes = await store.getPayload(id); if (bytes === null) throw new SessionDriverUnavailableError(`Missing provider payload ${id}`); return bytes; },
-            onEvent(event) { if (!stopped && liveOwnerTokens.has(owner.token)) bindings.onEvent(event); },
-          });
+            }),
+            readPayload: id => admit(async () => { const bytes = await store.getPayload(id); if (bytes === null) throw new SessionDriverUnavailableError(`Missing provider payload ${id}`); return bytes; }),
+            onEvent(event) { if (!admissionClosed && !abort.signal.aborted && liveOwnerTokens.has(owner.token)) bindings.onEvent(event); },
+          }); } finally { admissionClosed = true; await drain(); }
           // A provider cannot claim acceptance it never durably obtained from the current validator.
           if (outcome.kind === 'submitted') {
             const latest = await readOperation(key);
@@ -391,7 +430,12 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         if (stopped) return;
         try { const value = await serial(() => settle(key, { kind: 'failed', error: errorText(error) }, errorText(error), error instanceof SessionDriverUnavailableError)); resolveReceipt(value); }
         catch (storageError) { rejectReceipt(storageError); }
-      } finally { liveOwnerTokens.delete(owner.token); ownerControllers.delete(owner.token); active.delete(activeKey(key)); }
+      } finally {
+        admissionClosed = true;
+        try { await drain(); await markQuiescent(key, owner.token); resolveIdle(); }
+        catch (error) { rejectIdle(error); }
+        finally { liveOwnerTokens.delete(owner.token); ownerControllers.delete(owner.token); ownerRuntimes.delete(owner.token); active.delete(activeKey(key)); }
+      }
     })();
     return handle;
   }
