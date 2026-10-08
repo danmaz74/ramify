@@ -1,0 +1,302 @@
+{
+  "schema": "plan21.iteration10.f4-cancellation/1",
+  "commit": "b8328afb97032c1ab81718e9db89703767a616c2",
+  "heldProcess": 1942667,
+  "cancelled": {
+    "verdict": "not-verified",
+    "cause": "infrastructure",
+    "audited": "b8328afb97032c1ab81718e9db89703767a616c2",
+    "evidence": {
+      "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+      "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+      "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+    },
+    "audit": {
+      "requestId": "run-configured-witness:ga-0001",
+      "mode": "full",
+      "nested": true,
+      "status": "completed",
+      "definition": {
+        "path": "ramify-audit.json",
+        "blob": "652662174f83964710cb7c6015d414e8bbcea16e"
+      },
+      "requestedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "requestedMode": "full",
+      "executedMode": "full",
+      "fallbackReason": null,
+      "reuse": null,
+      "verdict": "indeterminate",
+      "detail": "invocation indeterminate over 3 projects; indeterminate: engine/tools; skipped: vendor/lib (external)",
+      "projects": [
+        {
+          "projectRoot": ".",
+          "verdict": "pass",
+          "execution": "ran",
+          "status": "completed",
+          "failures": [],
+          "requestId": "run-configured-witness:ga-0001",
+          "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+          "requestedMode": "full",
+          "executedMode": "full",
+          "fallbackReason": null,
+          "reuse": null,
+          "evidence": {
+            "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+            "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+            "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit show b8328afb97032c1ab81718e9db89703767a616c2",
+            "git show refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+          ],
+          "durationSeconds": 0.067,
+          "counts": {
+            "checks": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "tests": null,
+            "scenarios": null
+          },
+          "detail": "composed pass"
+        },
+        {
+          "projectRoot": "engine",
+          "verdict": "pass",
+          "execution": "ran",
+          "status": "completed",
+          "failures": [],
+          "requestId": "eeff0c79-7fa8-4e5f-92f5-31953010d1c5",
+          "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+          "requestedMode": "full",
+          "executedMode": "full",
+          "fallbackReason": null,
+          "reuse": null,
+          "evidence": {
+            "reportCommit": "ab5ba7dc4750027ff118f31259c77045553545bb",
+            "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9",
+            "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit-projects/engine-ed9f6f250686 show b8328afb97032c1ab81718e9db89703767a616c2",
+            "git show refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+          ],
+          "durationSeconds": 0.066,
+          "counts": {
+            "checks": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "tests": null,
+            "scenarios": null
+          },
+          "detail": "composed pass"
+        },
+        {
+          "projectRoot": "engine/tools",
+          "verdict": "indeterminate",
+          "execution": "not-run",
+          "status": "cancelled",
+          "failures": [
+            "engine-tools: CANCELLED"
+          ],
+          "requestId": "b27bda3a-f59b-4b9c-b046-fdf0a4c0b734",
+          "auditedSourceCommit": null,
+          "requestedMode": null,
+          "executedMode": null,
+          "fallbackReason": null,
+          "reuse": null,
+          "evidence": null,
+          "retrievalCommands": [],
+          "durationSeconds": null,
+          "counts": null,
+          "detail": "engine-tools: CANCELLED"
+        }
+      ],
+      "discovery": {
+        "status": "complete",
+        "skipped": [
+          {
+            "projectRoot": "vendor/lib",
+            "enclosingProject": ".",
+            "reason": "external",
+            "directory": "vendor"
+          }
+        ],
+        "unavailable": []
+      }
+    },
+    "invocation": "indeterminate"
+  },
+  "replacement": {
+    "verdict": "passed",
+    "cause": null,
+    "audited": "b8328afb97032c1ab81718e9db89703767a616c2",
+    "evidence": {
+      "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+      "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+      "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+    },
+    "audit": {
+      "requestId": "run-configured-witness:ga-0002",
+      "mode": "full",
+      "nested": true,
+      "status": "completed",
+      "definition": {
+        "path": "ramify-audit.json",
+        "blob": "652662174f83964710cb7c6015d414e8bbcea16e"
+      },
+      "requestedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "requestedMode": "full",
+      "executedMode": "full",
+      "fallbackReason": null,
+      "reuse": {
+        "auditedCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+        "ignoredChangedPaths": [],
+        "requestedMode": "full",
+        "resolution": "requested"
+      },
+      "verdict": "pass",
+      "detail": "invocation pass over 3 projects; skipped: vendor/lib (external)",
+      "projects": [
+        {
+          "projectRoot": ".",
+          "verdict": "pass",
+          "execution": "reused",
+          "status": "completed",
+          "failures": [],
+          "requestId": "run-configured-witness:ga-0002",
+          "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+          "requestedMode": "full",
+          "executedMode": "full",
+          "fallbackReason": null,
+          "reuse": {
+            "auditedCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "ignoredChangedPaths": [],
+            "requestedMode": "full",
+            "resolution": "requested"
+          },
+          "evidence": {
+            "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+            "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+            "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit show b8328afb97032c1ab81718e9db89703767a616c2",
+            "git show refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+          ],
+          "durationSeconds": 0.067,
+          "counts": {
+            "checks": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "tests": null,
+            "scenarios": null
+          },
+          "detail": "composed pass"
+        },
+        {
+          "projectRoot": "engine",
+          "verdict": "pass",
+          "execution": "reused",
+          "status": "completed",
+          "failures": [],
+          "requestId": "e9e40970-5b3c-4c14-9c53-f13345f584b0",
+          "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+          "requestedMode": "full",
+          "executedMode": "full",
+          "fallbackReason": null,
+          "reuse": {
+            "auditedCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "ignoredChangedPaths": [],
+            "requestedMode": "full",
+            "resolution": "requested"
+          },
+          "evidence": {
+            "reportCommit": "ab5ba7dc4750027ff118f31259c77045553545bb",
+            "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9",
+            "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit-projects/engine-ed9f6f250686 show b8328afb97032c1ab81718e9db89703767a616c2",
+            "git show refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+          ],
+          "durationSeconds": 0.066,
+          "counts": {
+            "checks": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "tests": null,
+            "scenarios": null
+          },
+          "detail": "composed pass"
+        },
+        {
+          "projectRoot": "engine/tools",
+          "verdict": "pass",
+          "execution": "ran",
+          "status": "completed",
+          "failures": [],
+          "requestId": "ab37e4e6-d4ae-472d-9c5e-2c49ee2d3200",
+          "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+          "requestedMode": "full",
+          "executedMode": "full",
+          "fallbackReason": null,
+          "reuse": null,
+          "evidence": {
+            "reportCommit": "4006fe2286774240d8061b6fdbaf996aa2161509",
+            "runRef": "refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-13Z-b8328afb9",
+            "treeRef": "refs/audited/projects/tools-ae58fc96b90f/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit-projects/tools-ae58fc96b90f show b8328afb97032c1ab81718e9db89703767a616c2",
+            "git show refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-13Z-b8328afb9:reports/audit/summary.json"
+          ],
+          "durationSeconds": 0.07,
+          "counts": {
+            "checks": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "tests": null,
+            "scenarios": null
+          },
+          "detail": "composed pass"
+        }
+      ],
+      "discovery": {
+        "status": "complete",
+        "skipped": [
+          {
+            "projectRoot": "vendor/lib",
+            "enclosingProject": ".",
+            "reason": "external",
+            "directory": "vendor"
+          }
+        ],
+        "unavailable": []
+      }
+    },
+    "invocation": "pass"
+  },
+  "executions": {
+    "root": 1,
+    "engine": 1,
+    "engine/tools": 2,
+    "vendor/lib": 0
+  }
+}

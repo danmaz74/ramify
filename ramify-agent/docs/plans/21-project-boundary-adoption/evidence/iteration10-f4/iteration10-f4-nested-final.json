@@ -1,0 +1,607 @@
+{
+  "schema": "plan21.iteration10.f4-nested/1",
+  "providerVersion": "ramify-audit@0.7.2",
+  "ramifyVersion": "ramify.ts@0.4.1",
+  "commits": {
+    "failing": "853afc8a164ea6635be8cb60099d0864da7fe1c1",
+    "repaired": "bb4489796373762029239437c4150995bb60ff7f",
+    "docs": "74f720d5dc305650749400bf6c24f2028f8e934a"
+  },
+  "gates": {
+    "failing": {
+      "verdict": "failed",
+      "cause": "check-failed",
+      "audited": "853afc8a164ea6635be8cb60099d0864da7fe1c1",
+      "evidence": {
+        "reportCommit": "f2406af91ba71fa64cbaa62eeaf8f463299a39ca",
+        "runRef": "refs/audited/runs/2026-10-08T05-20-06Z-853afc8a1",
+        "treeRef": "refs/audited/by-tree/92ae5361a0de4e29cddf09221beff610acd81d45"
+      },
+      "audit": {
+        "requestId": "run-configured-witness:ga-0001",
+        "mode": "full",
+        "nested": true,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "21c4653f9cd58ab61f5124c52cf958b451871b3a"
+        },
+        "requestedSourceCommit": "853afc8a164ea6635be8cb60099d0864da7fe1c1",
+        "auditedSourceCommit": "853afc8a164ea6635be8cb60099d0864da7fe1c1",
+        "requestedMode": "full",
+        "executedMode": "full",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "fail",
+        "detail": "invocation fail over 3 projects; failed: engine/tools; skipped: vendor/lib (external)",
+        "projects": [
+          {
+            "projectRoot": ".",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "run-configured-witness:ga-0001",
+            "auditedSourceCommit": "853afc8a164ea6635be8cb60099d0864da7fe1c1",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "reportCommit": "f2406af91ba71fa64cbaa62eeaf8f463299a39ca",
+              "runRef": "refs/audited/runs/2026-10-08T05-20-06Z-853afc8a1",
+              "treeRef": "refs/audited/by-tree/92ae5361a0de4e29cddf09221beff610acd81d45"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit show 853afc8a164ea6635be8cb60099d0864da7fe1c1",
+              "git show refs/audited/runs/2026-10-08T05-20-06Z-853afc8a1:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.093,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "bbdd3b63-b08b-4722-b7a1-8ac8e3726243",
+            "auditedSourceCommit": "853afc8a164ea6635be8cb60099d0864da7fe1c1",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "reportCommit": "1fba244d2e9690f59436ec093d9b5c6eeb8594fe",
+              "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-07Z-853afc8a1",
+              "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/92ae5361a0de4e29cddf09221beff610acd81d45"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/engine-ed9f6f250686 show 853afc8a164ea6635be8cb60099d0864da7fe1c1",
+              "git show refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-07Z-853afc8a1:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.068,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine/tools",
+            "verdict": "fail",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [
+              "engine-tools-check: engine-tools: FAIL"
+            ],
+            "requestId": "2e49c4c3-d9d1-4b66-81da-5391c1bcdf03",
+            "auditedSourceCommit": "853afc8a164ea6635be8cb60099d0864da7fe1c1",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "reportCommit": "05aab4833c1a2020234197065da4c4000651f4ab",
+              "runRef": "refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-07Z-853afc8a1",
+              "treeRef": "refs/audited/projects/tools-ae58fc96b90f/by-tree/92ae5361a0de4e29cddf09221beff610acd81d45"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/tools-ae58fc96b90f show 853afc8a164ea6635be8cb60099d0864da7fe1c1",
+              "git show refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-07Z-853afc8a1:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.068,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 0,
+                "failed": 1,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "a check of the full audit failed"
+          }
+        ],
+        "discovery": {
+          "status": "complete",
+          "skipped": [
+            {
+              "projectRoot": "vendor/lib",
+              "enclosingProject": ".",
+              "reason": "external",
+              "directory": "vendor"
+            }
+          ],
+          "unavailable": []
+        }
+      },
+      "invocation": "fail"
+    },
+    "passing": {
+      "verdict": "passed",
+      "cause": null,
+      "audited": "bb4489796373762029239437c4150995bb60ff7f",
+      "evidence": {
+        "reportCommit": "f8fe0d4f95a9d1e975181c71cc56ac924a3113b1",
+        "runRef": "refs/audited/runs/2026-10-08T05-20-07Z-bb4489796",
+        "treeRef": "refs/audited/by-tree/5710027e2b3c84962d23ea8b449d0120d5eee1b1"
+      },
+      "audit": {
+        "requestId": "run-configured-witness:ga-0002",
+        "mode": "full",
+        "nested": true,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "21c4653f9cd58ab61f5124c52cf958b451871b3a"
+        },
+        "requestedSourceCommit": "bb4489796373762029239437c4150995bb60ff7f",
+        "auditedSourceCommit": "bb4489796373762029239437c4150995bb60ff7f",
+        "requestedMode": "full",
+        "executedMode": "full",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "invocation pass over 3 projects; skipped: vendor/lib (external)",
+        "projects": [
+          {
+            "projectRoot": ".",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "run-configured-witness:ga-0002",
+            "auditedSourceCommit": "bb4489796373762029239437c4150995bb60ff7f",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "reportCommit": "f8fe0d4f95a9d1e975181c71cc56ac924a3113b1",
+              "runRef": "refs/audited/runs/2026-10-08T05-20-07Z-bb4489796",
+              "treeRef": "refs/audited/by-tree/5710027e2b3c84962d23ea8b449d0120d5eee1b1"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit show bb4489796373762029239437c4150995bb60ff7f",
+              "git show refs/audited/runs/2026-10-08T05-20-07Z-bb4489796:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.092,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "12c8bdfb-84bf-4ea7-8fbf-71b0823bd1ee",
+            "auditedSourceCommit": "bb4489796373762029239437c4150995bb60ff7f",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "reportCommit": "dc88afb387f5dd32d85c1464cba12221373e177b",
+              "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-08Z-bb4489796",
+              "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/5710027e2b3c84962d23ea8b449d0120d5eee1b1"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/engine-ed9f6f250686 show bb4489796373762029239437c4150995bb60ff7f",
+              "git show refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-08Z-bb4489796:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.092,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine/tools",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "718a99f9-8fc2-4ca6-be71-9500868563e3",
+            "auditedSourceCommit": "bb4489796373762029239437c4150995bb60ff7f",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "reportCommit": "4e3391ba5b5ef05263a8dad19a3afcb94e07e10f",
+              "runRef": "refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-08Z-bb4489796",
+              "treeRef": "refs/audited/projects/tools-ae58fc96b90f/by-tree/5710027e2b3c84962d23ea8b449d0120d5eee1b1"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/tools-ae58fc96b90f show bb4489796373762029239437c4150995bb60ff7f",
+              "git show refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-08Z-bb4489796:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.088,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          }
+        ],
+        "discovery": {
+          "status": "complete",
+          "skipped": [
+            {
+              "projectRoot": "vendor/lib",
+              "enclosingProject": ".",
+              "reason": "external",
+              "directory": "vendor"
+            }
+          ],
+          "unavailable": []
+        }
+      },
+      "invocation": "pass"
+    },
+    "reused": {
+      "verdict": "passed",
+      "cause": null,
+      "audited": "74f720d5dc305650749400bf6c24f2028f8e934a",
+      "evidence": {
+        "reportCommit": "1b875e7475fdd11f13bf9f87e5a7b058bf4dc1e6",
+        "runRef": "refs/audited/runs/2026-10-08T05-20-08Z-74f720d5d",
+        "treeRef": "refs/audited/by-tree/e035a600c6232580797442868b307ea63871dc6b"
+      },
+      "audit": {
+        "requestId": "run-configured-witness:ga-0003",
+        "mode": "full",
+        "nested": true,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "21c4653f9cd58ab61f5124c52cf958b451871b3a"
+        },
+        "requestedSourceCommit": "74f720d5dc305650749400bf6c24f2028f8e934a",
+        "auditedSourceCommit": "74f720d5dc305650749400bf6c24f2028f8e934a",
+        "requestedMode": "full",
+        "executedMode": "full",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "invocation pass over 3 projects; skipped: vendor/lib (external)",
+        "projects": [
+          {
+            "projectRoot": ".",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "run-configured-witness:ga-0003",
+            "auditedSourceCommit": "74f720d5dc305650749400bf6c24f2028f8e934a",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "reportCommit": "1b875e7475fdd11f13bf9f87e5a7b058bf4dc1e6",
+              "runRef": "refs/audited/runs/2026-10-08T05-20-08Z-74f720d5d",
+              "treeRef": "refs/audited/by-tree/e035a600c6232580797442868b307ea63871dc6b"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit show 74f720d5dc305650749400bf6c24f2028f8e934a",
+              "git show refs/audited/runs/2026-10-08T05-20-08Z-74f720d5d:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.09,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine",
+            "verdict": "pass",
+            "execution": "reused",
+            "status": "completed",
+            "failures": [],
+            "requestId": "81cff701-47ab-4842-a0fc-aae14c9398e3",
+            "auditedSourceCommit": "bb4489796373762029239437c4150995bb60ff7f",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": {
+              "auditedCommit": "bb4489796373762029239437c4150995bb60ff7f",
+              "ignoredChangedPaths": [
+                "engine/docs/notes.md"
+              ],
+              "requestedMode": "full",
+              "resolution": "requested"
+            },
+            "evidence": {
+              "reportCommit": "dc88afb387f5dd32d85c1464cba12221373e177b",
+              "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-08Z-bb4489796",
+              "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/5710027e2b3c84962d23ea8b449d0120d5eee1b1"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/engine-ed9f6f250686 show bb4489796373762029239437c4150995bb60ff7f",
+              "git show refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-08Z-bb4489796:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.092,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine/tools",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "3c632b26-9666-483b-a18e-47a41a4a0cc8",
+            "auditedSourceCommit": "74f720d5dc305650749400bf6c24f2028f8e934a",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "reportCommit": "0fbbc610a976c07e37a1b92b3cf3d1512279cf8e",
+              "runRef": "refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-09Z-74f720d5d",
+              "treeRef": "refs/audited/projects/tools-ae58fc96b90f/by-tree/e035a600c6232580797442868b307ea63871dc6b"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/tools-ae58fc96b90f show 74f720d5dc305650749400bf6c24f2028f8e934a",
+              "git show refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-09Z-74f720d5d:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.093,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          }
+        ],
+        "discovery": {
+          "status": "complete",
+          "skipped": [
+            {
+              "projectRoot": "vendor/lib",
+              "enclosingProject": ".",
+              "reason": "external",
+              "directory": "vendor"
+            }
+          ],
+          "unavailable": []
+        }
+      },
+      "invocation": "pass"
+    }
+  },
+  "grandchildRecord": {
+    "auditedAt": "2026-10-08T05:20:07.643Z",
+    "checks": {
+      "engine-tools-check": {
+        "commands": {
+          "engine-tools": {
+            "durationSeconds": 0.028,
+            "output": "grandchild state is not pass\n\nCommand failed: node -e require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/runs\", \"engine/tools\\n\"); const fs = require('fs'); if (fs.existsSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/hold\")) { fs.writeFileSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/held\", String(process.pid)); setInterval(() => {}, 1000); } else if (fs.readFileSync('state.txt', 'utf8').trim() !== 'pass') { console.error('grandchild state is not pass'); process.exit(1); }",
+            "passed": false,
+            "status": "fail",
+            "summary": "Command failed: node -e require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/runs\", \"engine/tools\\n\"); const fs = require('fs'); if (fs.existsSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/ho..."
+          }
+        },
+        "durationSeconds": 0.033,
+        "output": "### engine-tools [FAIL]\ngrandchild state is not pass\n\nCommand failed: node -e require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/runs\", \"engine/tools\\n\"); const fs = require('fs'); if (fs.existsSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/hold\")) { fs.writeFileSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/held\", String(process.pid)); setInterval(() => {}, 1000); } else if (fs.readFileSync('state.txt', 'utf8').trim() !== 'pass') { console.error('grandchild state is not pass'); process.exit(1); }",
+        "passed": false,
+        "status": "fail",
+        "summary": "engine-tools: FAIL"
+      }
+    },
+    "coverage": {
+      "claim": {
+        "configuration": {
+          "blob": "8916d4609d81e98c6f19a5ed580f52e13bfccc7a",
+          "path": "engine/tools/ramify-audit.json",
+          "sourceCommit": "853afc8a164ea6635be8cb60099d0864da7fe1c1"
+        },
+        "scope": "repository"
+      },
+      "projectRoot": "engine/tools",
+      "selection": {
+        "kind": "full",
+        "omittedCheckIds": [],
+        "omittedTestUnitIds": [],
+        "selectedCheckIds": [
+          "engine-tools-check"
+        ],
+        "selectedTestUnitIds": [
+          "engine-tools"
+        ]
+      },
+      "selector": {
+        "config": {},
+        "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "id": "full",
+        "version": "1"
+      },
+      "status": "declared",
+      "universe": {
+        "checkIds": [
+          "engine-tools-check"
+        ],
+        "digest": "sha256:b96dc7a6067e898f72699bfbfd0ed81e4dc3e8824b0b5e99a4391cf9552e74fb",
+        "id": "project:engine/tools",
+        "testUnitIds": [
+          "engine-tools"
+        ]
+      }
+    },
+    "definitions": {
+      "digest": "sha256:a16b828133b9b061221a9de0cdf50e0d7a1ed5ea318753b0de7bb8eceb824e67",
+      "manifest": {
+        "checks": [
+          {
+            "dependsOn": [],
+            "executor": {
+              "commands": [
+                {
+                  "args": [
+                    "-e",
+                    "require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/runs\", \"engine/tools\\n\"); const fs = require('fs'); if (fs.existsSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/hold\")) { fs.writeFileSync(\"/tmp/ramify-agent-f4-nested-xRUTJn/held\", String(process.pid)); setInterval(() => {}, 1000); } else if (fs.readFileSync('state.txt', 'utf8').trim() !== 'pass') { console.error('grandchild state is not pass'); process.exit(1); }"
+                  ],
+                  "cmd": "node",
+                  "contracts": null,
+                  "env": {},
+                  "name": "engine-tools",
+                  "parser": "none",
+                  "timeoutMs": 120000
+                }
+              ],
+              "continueOnFailure": true,
+              "kind": "command",
+              "mutex": false,
+              "parallel": false
+            },
+            "id": "engine-tools-check",
+            "requiresPackageScripts": []
+          }
+        ],
+        "manifestVersion": 1,
+        "workingDirectory": "engine/tools",
+        "workspacePreparation": {
+          "optionsDigest": "sha256:b1a9cfd7e933eb26d4f32643287d5525998099b89bb4b3c69a7223ecc14683e7",
+          "preparationId": "nodejs"
+        }
+      }
+    },
+    "durationSeconds": 0.068,
+    "evidenceSchemaVersion": 4,
+    "execution": {
+      "requestId": "2e49c4c3-d9d1-4b66-81da-5391c1bcdf03",
+      "runId": "d4308aa7-bd16-4745-9cf1-9b641745f30e"
+    },
+    "mode": {
+      "executedMode": "full",
+      "requestedMode": "full",
+      "resolution": "requested"
+    },
+    "overall": "fail",
+    "producer": {
+      "name": "ramify-audit",
+      "version": "0.7.2"
+    },
+    "sourceBranch": "main",
+    "sourceCommit": "853afc8a164ea6635be8cb60099d0864da7fe1c1",
+    "sourceTree": "92ae5361a0de4e29cddf09221beff610acd81d45",
+    "undetectedConfigFilesForcingFullAudit": [],
+    "workspacePreparation": {
+      "payload": {
+        "linkedPackageDirectories": [],
+        "projectPrefix": "engine/tools",
+        "setupCommands": []
+      },
+      "preparationId": "nodejs"
+    }
+  },
+  "briefing": [
+    "- audit `run-configured-witness:ga-0001`, a full audit of `853afc8a164ea6635be8cb60099d0864da7fe1c1` under `ramify-audit.json`: requested full, executed full; composed verdict `fail`, invocation fail over 3 projects; failed: engine/tools; skipped: vendor/lib (external)",
+    "- the nested request answered 3 projects:",
+    "  - `.`: `pass`, ran, executed full; checks 1/1 passed; 0.093s",
+    "  - `engine`: `pass`, ran, executed full; checks 1/1 passed; 0.068s",
+    "  - `engine/tools`: `fail`, ran, executed full; checks 0/1 passed, 1 failed; 0.068s",
+    "    - engine-tools-check: engine-tools: FAIL",
+    "    - retrieve: `git notes --ref=audit-projects/tools-ae58fc96b90f show 853afc8a164ea6635be8cb60099d0864da7fe1c1`",
+    "    - retrieve: `git show refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-07Z-853afc8a1:reports/audit/summary.json`",
+    "- not audited: `vendor/lib` inside `.`, skipped as external (`vendor`)",
+    "- `root-check`: pass; the provider's record of it follows:",
+    "  - root-check status: pass; counts: unknown",
+    "  - summary: root: PASS",
+    "  - root. status: pass; counts: unknown",
+    "  - root.summary: Command completed with no output",
+    "  - the end of what it printed:",
+    "        ### root [PASS]",
+    "        Command completed with no output"
+  ],
+  "executions": {
+    "root": 3,
+    "engine": 2,
+    "engine/tools": 3,
+    "vendor/lib": 0
+  }
+}
