@@ -1,0 +1,137 @@
+{
+  "optimizationCommit": "18b7eccf89acb0a83589b69874ec3eb5870fb017",
+  "reconciliationMerge": "72bb060ddfbd54cdc27a16bac93f3326b5c17ab2",
+  "copiedPatch": {
+    "targetHead": "fd9bd91f82629ccc5523fc575b569e434e0af30d",
+    "patchSha256": "f606a9365add67f2874d0b9d021c08b9beeaac74499a4465c5aacd84c35c7377",
+    "patchBytes": 99639,
+    "status": " M ramify-agent/subs/harness/src/checks/checkpoint.ts\n M ramify-agent/subs/harness/src/checks/diagnostics.ts\n M ramify-agent/subs/harness/src/checks/gate.ts\n M ramify-agent/subs/harness/src/checks/records.ts\n M ramify-agent/subs/harness/src/interfaces/protocol/runs.ts\n M ramify-agent/subs/harness/src/projections/merge-readiness.ts\n M ramify-agent/subs/harness/src/projections/work.ts\n M ramify-agent/subs/harness/src/run/audit-workspaces.ts\n M ramify-agent/subs/harness/src/run/gates.ts\n M ramify-agent/subs/harness/src/run/merge-readiness.ts\n M ramify-agent/subs/harness/src/run/readiness.ts\n M ramify-agent/subs/harness/src/run/records.ts\n M ramify-agent/subs/harness/src/run/service.ts\n M ramify-agent/subs/harness/src/tests/accepted-commit.test.ts\n M ramify-agent/subs/harness/src/tests/gate-diagnostics.test.ts\n M ramify-agent/subs/harness/src/tests/helpers/configured-repository.ts\n M ramify-agent/subs/harness/src/tests/helpers/direct-check-execution.ts\n M ramify-agent/subs/harness/src/tests/merge-readiness.test.ts\n M ramify-agent/subs/harness/src/tests/readiness.test.ts\n M ramify-agent/subs/harness/src/tests/test-lock-bounds.test.ts\n M ramify-agent/subs/harness/src/tests/test-lock-gate.test.ts\n M ramify-agent/subs/harness/subs/audit/module.ramify\n M ramify-agent/subs/harness/subs/audit/src/check-execution.ts\n M ramify-agent/subs/web/src/tests/run-page.test.tsx\n?? ramify-agent/subs/harness/src/tests/project-boundary-audit.integration.test.ts\n",
+    "patchPath": "/tmp/plan22-acceptance-plan21-compatibility.patch"
+  },
+  "endTargetState": {
+    "targetHead": "1f2785f5c6dbfed794c0d52d4ae62e34de33bcb8",
+    "patchSha256": "f606a9365add67f2874d0b9d021c08b9beeaac74499a4465c5aacd84c35c7377",
+    "patchBytes": 99639,
+    "sameSnapshot": false
+  },
+  "temporaryPatchReversed": true,
+  "worktreeAfterReversal": "clean",
+  "typeCheck": "passed",
+  "reports": {
+    "focused-37": {
+      "sourceReport": "/tmp/plan22-acceptance-plan21-compatibility-tests.json",
+      "passed": 37,
+      "failed": 0,
+      "pendingOrFiltered": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/acceptance-boundaries.test.ts",
+          "elapsedMs": 16.4384765625,
+          "passedCaseTitles": [
+            "retains caught Git response errors",
+            "retains caught candidate response errors",
+            "retains caught candidate diff response errors",
+            "retains caught provisional source response errors",
+            "retains caught audit configuration response errors",
+            "retains caught Ramify response errors",
+            "unused required acceptance responses fail completion"
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.boundary.test.ts",
+          "elapsedMs": 7903.573974609375,
+          "passedCaseTitles": [
+            "CA08 CA11\u2013CA15 CA17 CA25 CA30: actual Git and local-command multi-owner migration, repair, handback and linked revision"
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+          "elapsedMs": 10800.446533203125,
+          "passedCaseTitles": [
+            "CA08 CA11\u2013CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision",
+            "CA28: deferred B entry receives accepted handback and replans from current source",
+            "CA31: source drift after a passing combined gate cannot be handed back",
+            "CA17 CA19 CA28 CA30: restart after handback continues the original A assignment once",
+            "CA17 CA20 CA30: restart after verification reuses the accepted gate and review for one handback",
+            "CA20 CA30: restart after the passing gate reuses its audited candidate",
+            "CA19: in-flight combined capability gate intent recovers one audited commit and handback",
+            "CA19: in-flight combined capability gate commit recovers one audited commit and handback",
+            "CA20 CA30: restart after the passing review reuses the same gate and review",
+            "CA19: accepted reviewer submissions replay before their combined review record",
+            "CA19: a submitted reviewer concern replays into one exact pending attempt and CheckFinding",
+            "CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback"
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/provisional-source.test.ts",
+          "elapsedMs": 60.475830078125,
+          "passedCaseTitles": [
+            "CA19 CA30 injected capture/reconcile preserve distinct binary bytes and refuse changed index/tree"
+          ]
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/candidate-tree.test.ts",
+          "elapsedMs": 1014.1484375,
+          "passedCaseTitles": [
+            "preview matches a whole-worktree commit and preserves staged user index bytes",
+            "a late source mutation changes the preview tree",
+            "nested cwd previews the entire eventual repository tree",
+            "a repository nested inside another uses its own root and index",
+            "a failed add cleans its isolated index and leaves the user index unchanged",
+            "an aborted preview leaves no temporary index"
+          ]
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/git.test.ts",
+          "elapsedMs": 1195.213134765625,
+          "passedCaseTitles": [
+            "the real Git adapter inspects committed, staged, unstaged, deleted and untracked source without changing files, index or refs",
+            "the real Git adapter creates and resumes a run branch, commits with its own policy, and recovers exact commit identities",
+            "the real Git adapter resumes a run on a branch of the earlier prefix, and commits there",
+            "the real Git adapter refuses a run branch git cannot create, with git's own message",
+            "the real Git adapter reports staged, untracked and renamed paths through the adapter",
+            "the real Git adapter reads path and line changes relative to the accepted revision even after a failed attempt commits",
+            "the real Git adapter serves a committed candidate from Git objects, whatever the working tree holds afterwards",
+            "the real Git adapter reports an unavailable head and a typed status error outside a repository"
+          ]
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/provisional-git.boundary.test.ts",
+          "elapsedMs": 99.114501953125,
+          "passedCaseTitles": [
+            "actual provisional Git reads binary committed/index bytes, exact staged paths and absent blobs",
+            "actual provisional Git propagates process/cwd errors rather than reporting absent blobs"
+          ]
+        }
+      ]
+    },
+    "CA20-corrected-selector": {
+      "sourceReport": "/tmp/plan22-acceptance-plan21-compatibility-ca20-corrected.json",
+      "passed": 1,
+      "failed": 0,
+      "pendingOrFiltered": 17,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/capability-recovery.test.ts",
+          "elapsedMs": 959.7080078125,
+          "passedCaseTitles": [
+            "CA20: a registered real process group survives a service crash and is settled before any successor work"
+          ]
+        }
+      ]
+    },
+    "CA20-first-selector-filtered-all": {
+      "sourceReport": "/tmp/plan22-acceptance-plan21-compatibility-ca20.json",
+      "passed": 0,
+      "failed": 0,
+      "pendingOrFiltered": 18,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/capability-recovery.test.ts",
+          "elapsedMs": 0,
+          "passedCaseTitles": []
+        }
+      ]
+    }
+  }
+}
