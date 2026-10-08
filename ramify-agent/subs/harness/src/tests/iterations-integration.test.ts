@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
@@ -6,12 +7,12 @@ import { iterationLayout, type IterationAssignment, type IterationResult } from 
 import { runLayout } from '../run/records.js';
 import type { Observation, ObservationOf } from '../run/observations.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
-import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
+import { createConfiguredAudit } from '../../subs/audit/src/check-execution.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import {
   addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline,
-  runScopeTests, submit, viewedInputs, write,
+  submit, viewedInputs, write,
 } from './helpers/iterations.js';
 import {
   git, initRepository, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun,
@@ -22,9 +23,9 @@ import { gitService } from '../../subs/evidence/src/git.js';
  * One accepted iteration, with every external system this project has.
  *
  * This is the retained witness of a passing commit publication: a real git
- * repository, the installed Ramify with a daemon of its own, the real audit
- * execution that makes the commit's worktree and publishes its refs, and the
- * mini runner really running the files the selection resolved to. What it
+ * repository, the installed Ramify with a daemon of its own, the project's
+ * committed audit definition that makes the commit's worktree, runs the mini
+ * runner over the tests it names and publishes its refs. What it
  * proves is the boundary itself — the commit the harness made, the note it
  * attached to it and the report that note names — which no scripted answer
  * can establish. Every other iteration scenario states Git's answers instead
@@ -51,19 +52,32 @@ describe('G8: one small work item completes in one iteration', () => {
         'import { noteLimit } from \'../notes.ts\';',
         '',
         'test(\'the note limit is what the plan asks for\', () => {',
-        '  expect(noteLimit).toBe(500);',
+        // Readiness audits the starting commit in full, so it starts passing.
+        '  expect(noteLimit).toBe(400);',
         '});',
         '',
       ].join('\n'),
     });
-    // A suite beside the fixture's own, which no runner the harness knows
-    // selects. The fixture's Cucumber script is not one: its configuration
-    // names the acceptance modes.
+    // A suite beside the fixture's own. The harness keeps no runner
+    // inventory: whether it runs is the committed audit definition's to say.
     const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
     manifest.scripts['test:e2e'] = 'playwright test';
     await writeFile(join(root, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     await installMiniRunner(root);
+    await writeFile(join(root, 'ramify-audit.json'), `${JSON.stringify({
+      ignorePaths: [],
+      workspace: { preparation: 'nodejs', options: { packageDirectories: [''], setupCommands: [] } },
+      checks: [{
+        id: 'notes-tests', name: 'Notes tests', description: 'The notes module\'s tests under the stand-in runner',
+        scope: 'both', category: 'deterministic', onFailure: 'record',
+        executor: { kind: 'command', commands: [
+          { name: 'tests', cmd: 'node_modules/.bin/vitest', args: ['run', `${notesDirectory}/src/tests/notes.test.ts`], parser: 'none', timeoutMs: 60_000 },
+        ], continueOnFailure: true },
+      }],
+    }, null, 2)}\n`);
     await initRepository(root);
+    const lockDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-iteration-lock-'));
+    cleanups.push(() => rm(lockDirectory, { recursive: true, force: true }));
     const daemon = await realRamify();
     cleanups.push(() => daemon.dispose());
 
@@ -79,12 +93,13 @@ describe('G8: one small work item completes in one iteration', () => {
           completionProposed('Raised the note limit to the 500 characters the plan asks for.'),
           write('tmp/draft.txt', 'throwaway note\n'),
           edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
-          runScopeTests(),
+          edit('tests/notes.test.ts', 'toBe(400)', 'toBe(500)'),
         )],
       }),
       ramify: daemon.ramify,
       inputs: viewedInputs(daemon.ramify),
-      checkExecution: createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(root) }),
+      configuredAudit: createConfiguredAudit({ workspaceOwnership: createAuditWorkspaceOwnership(root),
+        testLock: { lockPath: join(lockDirectory, 'machine-test.lock') } }),
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -118,12 +133,19 @@ describe('G8: one small work item completes in one iteration', () => {
     expect(result.gate).not.toBeNull();
     expect(result.commit).not.toBeNull();
 
-    // The gate ran the files the policy resolved to, and the repair the
-    // engineer made is what let it pass.
+    // The gate asked the committed audit about the commit it made; the
+    // harness listed no test of its own.
     const gate = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate(result.gate!)), 'utf8')) as GateAttempt;
     expect(gate.verdict).toBe('passed');
     expect(gate.subject).toEqual({ workItem: 'wi-001', iteration: 'wi-001.i01' });
-    expect(gate.commands[0]!.selection!.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
+    expect(gate.commands).toEqual([]);
+    expect(gate.audit).toMatchObject({ status: 'completed', verdict: 'pass', mode: 'project-default',
+      requestedSourceCommit: result.commit, auditedSourceCommit: result.commit });
+    // The provider chose the mode: partial was requested of a Ramify
+    // project, and the baseline readiness published, whose only check parses
+    // no runner, could not narrow it, so it ran full and said why.
+    expect(gate.audit).toMatchObject({ requestedMode: 'ramify-partial', executedMode: 'full', reuse: null });
+    expect(gate.audit!.fallbackReason).toContain('baseline-incompatible');
     expect(await readFile(join(root, notesDirectory, 'src', 'notes.ts'), 'utf8')).toBe('export const noteLimit = 500;\n');
 
     // One commit for the accepted iteration, with the harness's own message
@@ -147,25 +169,22 @@ describe('G8: one small work item completes in one iteration', () => {
     const currentAuditSummary = JSON.parse(await git(root, 'show', `${notedRunRef!}:reports/audit/summary.json`)) as unknown;
     expect(currentAuditSummary).toBeTypeOf('object');
     const auditSummary = JSON.parse(await git(root, 'show', `${gate.evidence!.runRef}:reports/audit/summary.json`)) as {
-      coverage: { claim: { owners?: string[] } };
+      coverage: { universe: { checkIds: string[] }; selection: { kind: string; selectedCheckIds: string[] } };
     };
-    expect(auditSummary.coverage.claim.owners).toEqual([`exact:${notes}`]);
+    // The provider selected from the committed definition's universe.
+    expect(auditSummary.coverage.universe.checkIds).toEqual(['notes-tests']);
+    expect(auditSummary.coverage.selection).toMatchObject({ kind: 'full', selectedCheckIds: ['notes-tests'] });
 
-    // A suite outside the one runner this MVP selects is a coverage gap on
-    // the attempt, never an absence of tests, and it is read from the
-    // project's own manifest. The fixture's Cucumber script is none, because
-    // its configuration names the acceptance modes that run its scenarios.
+    // The harness keeps no runner inventory: a script beside the configured
+    // checks is neither a coverage gap nor an absence of tests to it.
     const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations(result.invocations[0]!)), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as Observation)
       .filter((line): line is ObservationOf<'coverage-gap'> => line.type === 'coverage-gap');
-    const unsupported = observations.filter(line => line.data.kind === 'unsupported-runner');
-    expect(unsupported.map(line => line.data.detail)).toEqual([
-      'the project\'s "test:e2e" script is outside the one runner this MVP selects',
-    ]);
+    expect(observations.filter(line => line.data.kind === 'unsupported-runner')).toEqual([]);
 
-    // Readiness judged the configuration's support code against the view.
+    // Readiness judged the project configuration; no acceptance runner is the harness's to find.
     const readiness = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.readiness(1)), 'utf8')) as { steps: Array<{ step: string; outcome: string }> };
-    expect(readiness.steps.filter(step => step.step === 'project-config' || step.step === 'acceptance-runner').map(step => step.outcome))
-      .toEqual(['passed', 'passed']);
+    expect(readiness.steps.filter(step => step.step === 'project-config' || step.step === 'acceptance-runner').map(step => `${step.step} ${step.outcome}`))
+      .toEqual(['project-config passed']);
   }, 300_000);
 });

@@ -9,6 +9,7 @@ import { installTestRunner, openRuns, startRun } from './runs.js';
 import { scenariosCommit, scriptedGit, type GitCheckpoint } from './scripted-git.js';
 import { FakeRamifyCli } from './fake-ramify.js';
 import { createPassingCheckExecution } from './direct-check-execution.js';
+import { passingAudit } from './direct-check-execution.js';
 
 /*
  * The capability-progress fixture: one copy of the `collection-review`
@@ -278,7 +279,7 @@ export async function progressFixture(): Promise<ProgressFixture> {
         git, ...(final ? { candidates: final.candidates } : {}),
         ramify,
 
-        checkExecution: createPassingCheckExecution(),
+        configuredAudit: passingAudit(),
       });
       try {
         const runId = (await opened.service.execute(startRun(planId))).jobId;

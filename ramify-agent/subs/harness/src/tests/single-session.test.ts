@@ -163,7 +163,8 @@ function finding() {
 }
 
 const checked = (form: 'changed' | 'complete') => ({ form, outcome: 'checked' as const });
-const passingGate = [{}, {}, {}] as const;
+/** The in-place diagnosis's type check and Ramify check, both passing. */
+const passingGate = [{}, {}] as const;
 
 function finished(result: SingleSessionResult) {
   if (result.status !== 'finished') throw new Error(`the session did not start: ${result.reason}`);
@@ -446,7 +447,9 @@ describe('the gate option', () => {
     const attempt = gateAttemptSchema.parse(JSON.parse(await readFile(join(summary.records, 'gate', 'attempt.json'), 'utf8')));
     expect(attempt.checkpoint).toBe('iteration');
     expect(attempt.commit).toBeNull();
-    expect(attempt.commands.find(command => command.kind === 'tests')?.selection?.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
+    // A standalone diagnosis runs the project's type check and Ramify check in
+    // place; it selects and runs no test, which a committing gate's audit owns.
+    expect(attempt.commands.map(command => command.kind)).toEqual(['type-check', 'ramify-check']);
     expect((await outcomeOf(summary.records)).gate).toEqual({ attempt: join('gate', 'attempt.json'), verdict: 'passed', cause: attempt.cause });
     expect(git.commitAccepted).not.toHaveBeenCalled();
     expect(events.map(event => event.type).slice(-3)).toEqual(['gate-started', 'gate', 'summary']);
@@ -460,7 +463,7 @@ describe('the gate option', () => {
       { kind: 'submit', input: completionProposed('The limit is already right.') },
     ], { gate: true }, {
       ramify: [checked('changed')],
-      gate: [{ outcome: { kind: 'completed', exitCode: 1 } }, {}, {}],
+      gate: [{ outcome: { kind: 'completed', exitCode: 1 } }, {}],
     });
 
     const summary = finished(result);

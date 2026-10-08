@@ -8,9 +8,10 @@ import { checkCommand } from '../checks/records.js';
 import { projectEvent } from '../projections/events.js';
 import type { RunEvent } from '../run/log.js';
 import { copyFixture } from './helpers/fixture.js';
-import { announcingCheckExecution, createPassingCheckExecution } from './helpers/direct-check-execution.js';
-import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, scriptedConfiguredAudit, startRun } from './helpers/runs.js';
+import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, startRun } from './helpers/runs.js';
 import { assertUnchangedGit, openUnchangedRuns } from './helpers/unchanged-run.js';
+import { announcingAudit, passingAudit, type ScriptedAudit } from './helpers/direct-check-execution.js';
+import type { ConfiguredAuditInput } from '../../subs/audit/src/check-execution.js';
 
 /*
  * A running gate says which step it is on: each command it starts is a
@@ -37,7 +38,7 @@ describe('the in-place executor', () => {
       directory: join(root, 'gate'),
       head: 'HEAD',
       checks: [
-        { kind: 'tests', command: passes },
+        { kind: 'setup', name: 'build', command: passes },
         { kind: 'type-check', command: passes },
         { kind: 'ramify-check', command: passes },
       ],
@@ -46,7 +47,7 @@ describe('the in-place executor', () => {
 
     expect(gate.verdict).toBe('passed');
     expect(announced).toEqual([
-      { kind: 'tests', position: 1, total: 3 },
+      { kind: 'setup', name: 'build', position: 1, total: 3 },
       { kind: 'type-check', position: 2, total: 3 },
       { kind: 'ramify-check', position: 3, total: 3 },
     ]);
@@ -58,19 +59,11 @@ describe('a run', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    const base = scriptedConfiguredAudit(fixture.root, {});
-    const configuredAudit = { ...base, async runFull(input: Parameters<typeof base.runFull>[0]) {
-      const check = { kind: 'conformance' as const, name: 'scripted-provider-check', position: 1, total: 1 };
-      await input.waiting?.(check, 'Waiting for another test run (injected lock)');
-      input.lockAcquired?.();
-      await input.started?.(check);
-      return base.runFull(input);
-    } };
+    const configuredAudit = readinessProgress(passingAudit(), true);
     const { service } = await openUnchangedRuns(fixture.root, {
       script: [{ kind: 'submit', input: emptyAnalysis() }],
       unchangedCheckpoints: ['final verification of plan "review-notes"'],
       configuredAudit,
-      checkExecution: createPassingCheckExecution(),
     });
     cleanups.push(() => service.close());
 
@@ -79,7 +72,7 @@ describe('a run', () => {
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
     const waits = events.filter((event): event is Extract<RunEvent, { type: 'gate-command-waiting' }> => event.type === 'gate-command-waiting');
-    expect(waits.map(event => event.data.kind)).toEqual(['conformance']);
+    expect(waits.map(event => event.data.kind)).toEqual(['configured']);
     for (const wait of waits) {
       expect(wait.data).toMatchObject({ gate: 'ga-0001', checkpoint: 'readiness', line: 'Waiting for another test run (injected lock)' });
       const started = events.find(event => event.type === 'gate-command-started' &&
@@ -96,11 +89,7 @@ describe('a run', () => {
     const { service } = await openUnchangedRuns(fixture.root, {
       script: [{ kind: 'submit', input: emptyAnalysis() }],
       unchangedCheckpoints: ['final verification of plan "review-notes"'],
-      configuredAudit: { ...scriptedConfiguredAudit(fixture.root, {}), async runFull(input) {
-        await input.started?.({ kind: 'conformance', name: 'scripted-provider-check', position: 1, total: 1 });
-        return scriptedConfiguredAudit(fixture.root, {}).runFull(input);
-      } },
-      checkExecution: announcingCheckExecution(createPassingCheckExecution()),
+      configuredAudit: readinessProgress(announcingAudit(), false),
     });
     cleanups.push(() => service.close());
 
@@ -118,9 +107,10 @@ describe('a run', () => {
     expect(readiness.map(event => event.data)).toEqual(readiness.map((event, index) => ({
       gate: 'ga-0001', checkpoint: 'readiness', kind: event.data.kind, name: 'scripted-provider-check', position: index + 1, total: readiness.length,
     })));
-    expect(readiness.map(event => event.data.kind)).toEqual(['conformance']);
-    expect(final.map(event => [event.data.checkpoint, event.data.position, event.data.total]))
-      .toEqual(final.map((_, index) => ['final', index + 1, final.length]));
+    expect(readiness.map(event => event.data.kind)).toEqual(['configured']);
+    // The final gate's audit announces each configured check as the provider starts it.
+    expect(final.map(event => [event.data.checkpoint, event.data.kind, event.data.name, event.data.position, event.data.total]))
+      .toEqual(['tests', 'type-check', 'ramify-check'].map((name, index) => ['final', 'configured', name, index + 1, final.length]));
     // Each lies between its gate's start and its end.
     expect(types.indexOf('gate-started')).toBeLessThan(events.indexOf(readiness[0]!));
     expect(events.indexOf(readiness.at(-1)!)).toBeLessThan(types.indexOf('readiness-passed'));
@@ -129,8 +119,27 @@ describe('a run', () => {
 
     expect(projectEvent(final[1]!)).toMatchObject({
       transition: 'gate-command-started',
-      summary: `Gate ga-0002 (final): the type check started, command 2 of ${final.length}`,
+      summary: `Gate ga-0002 (final): the configured check "type-check" started, command 2 of ${final.length}`,
       refs: [{ kind: 'gate', id: 'ga-0002' }],
     });
   }, 120_000);
 });
+
+/**
+ * The scripted audit, whose readiness request (the run's first gate, which
+ * records no gate operation) announces one configured provider check, after
+ * waiting for the machine test lock where `waits` asks it to.
+ */
+function readinessProgress(base: ScriptedAudit, waits: boolean): ScriptedAudit {
+  return { ...base, async run(input: ConfiguredAuditInput) {
+    if (input.attemptId === 'ga-0001') {
+      const check = { kind: 'configured' as const, name: 'scripted-provider-check', position: 1, total: 1 };
+      if (waits) {
+        await input.waiting?.(check, 'Waiting for another test run (injected lock)');
+        input.lockAcquired?.();
+      }
+      await input.started?.(check);
+    }
+    return base.run(input);
+  } };
+}

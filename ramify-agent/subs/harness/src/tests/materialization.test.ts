@@ -158,21 +158,21 @@ describe('materializing the feature files', () => {
     const firstArchitect = JSON.parse(await readFile(runPath(project, plan, receipt.jobId, runLayout.invocation('inv-0004')), 'utf8')) as { role: string; base: string };
     expect(firstArchitect).toMatchObject({ role: 'local-architect', base: 'scenarios-revision' });
 
-    // Each work-item gate plans the scenario check over both owners with the
-    // pending tag excluded, and passes: the first runs its own declared
-    // scenario and excludes the other, still pending; the second runs both.
+    // Each work-item gate plans no scenario run of its own: it asks the
+    // committed audit about the commit it made, in the provider's default
+    // mode, and the definition's configured scenario check runs the bound
+    // scenarios. The harness records no command and no scenario selection.
     const gateIds = events.filter(event => event.type === 'gate-attempted').map(event => (event.data as { gate: string }).gate);
     const attempts = await Promise.all(gateIds.map(async id =>
       JSON.parse(await readFile(runPath(project, plan, receipt.jobId, runLayout.gate(id)), 'utf8')) as GateAttempt));
     const workItemGates = attempts.filter(attempt => attempt.checkpoint === 'work-item');
     expect(workItemGates).toHaveLength(2);
-    for (const [index, attempt] of workItemGates.entries()) {
+    for (const attempt of workItemGates) {
       expect(attempt.verdict).toBe('passed');
-      const scenarios = attempt.commands.find(command => command.kind === 'scenarios')!;
-      expect(scenarios.scenarios).toMatchObject({ mode: 'quick', selection: { kind: 'all-untagged' }, excluded: 1 - index, failures: [] });
-      expect(scenarios.scenarios!.runs.map(run => run.module)).toEqual(expect.arrayContaining([root, reviews]));
-      expect(scenarios.scenarios!.scenarios.map(result => `${result.id} ${result.status}`).sort())
-        .toEqual(index === 0 ? ['sc-001 passed'] : ['sc-001 passed', 'sc-002 passed']);
+      expect(attempt.commands).toEqual([]);
+      expect(attempt.audit).toMatchObject({ mode: 'project-default', status: 'completed', verdict: 'pass',
+        requestedSourceCommit: attempt.head, auditedSourceCommit: attempt.head });
+      expect(JSON.stringify(attempt)).not.toContain('all-untagged');
     }
   }, 300_000);
 
@@ -377,7 +377,7 @@ describe('the guarded list', () => {
     expect(allowed.guardedChanges.every(change => change.authorizedBy?.id === 'it-0001')).toBe(true);
   });
 
-  test('holds the configuration, the support files as they stand and each feature file at the hash of its expected rendering', async () => {
+  test('holds the configuration, the Cucumber configuration as it stands and each feature file at the hash of its expected rendering', async () => {
     const directory = await temporaryDirectory();
     cleanups.push(directory.remove);
     const write = async (path: string, content: string) => {
@@ -386,22 +386,25 @@ describe('the guarded list', () => {
     };
     await write('package.json', '{}\n');
     await write('ramify-agent.json', '{"schema":"ramify-agent.project/1"}\n');
+    await write('cucumber.json', '{"default":{"tags":"not @ramify-pending"}}\n');
+    // Support code is the project's own: the harness guards no file it names.
     await write('src/tests/support/world.ts', 'export {};\n');
     const expected = expectedFeatureFiles(tracked(), { planId: 'demo', runId: 'run-1' });
     // The tree holds a drifted copy of one file: the list is the rendering's, not the tree's.
     await write(expected[0]!.path, 'Feature: drifted\n');
 
     const guarded = await captureGuardedFiles(directory.path, [], {
-      support: ['src/tests/support/world.ts'],
       expected: expectedFeatureHashes(expected),
     });
-    expect(guarded.filter(file => file.hash !== null)).toEqual([
+    expect(guarded.filter(file => file.hash !== null)).toEqual(expect.arrayContaining([
       { path: 'package.json', hash: sha256('{}\n') },
       { path: 'ramify-agent.json', hash: sha256('{"schema":"ramify-agent.project/1"}\n') },
+      { path: 'cucumber.json', hash: sha256('{"default":{"tags":"not @ramify-pending"}}\n') },
       { path: expected[0]!.path, hash: contentHash(expected[0]!.content) },
-      { path: 'src/tests/support/world.ts', hash: sha256('export {};\n') },
       { path: expected[1]!.path, hash: contentHash(expected[1]!.content) },
-    ]);
+    ]));
+    expect(guarded.filter(file => file.hash !== null)).toHaveLength(5);
+    expect(guarded.map(file => file.path)).not.toContain('src/tests/support/world.ts');
   });
 
   test('a feature file that differs from its expected rendering at a gate is a guarded change', async () => {
@@ -512,14 +515,16 @@ describe('an engineer and the feature files', () => {
     const rendered = final.replace('  @ramify-sc-001\n', '  @ramify-sc-001 @ramify-pending\n');
 
     // The assignment guards the feature file at its rendering's hash, the
-    // configuration and the support files the configuration names.
+    // configuration, the audit definition and every Cucumber configuration
+    // the configured scenario check reads; support code stays the project's.
     const assignment = JSON.parse(await readFile(runPath(project, plan, runId, iterationLayout.assignment('wi-001', 1)), 'utf8')) as IterationAssignment;
     const guarded = new Map(assignment.guarded.map(file => [file.path, file.hash]));
     expect(guarded.get(notesFeature)).toBe(contentHash(rendered));
     expect(guarded.get('ramify-agent.json')).toBe(sha256(await readFile(join(project, 'ramify-agent.json'), 'utf8')));
     expect([...guarded.keys()]).toEqual(expect.arrayContaining([
-      'subs/integration-tests/src/support/world.ts', 'subs/integration-tests/src/support/hooks.ts',
+      'ramify-audit.json', 'cucumber.js', 'cucumber.cjs', 'cucumber.mjs', 'cucumber.json', 'cucumber.yaml', 'cucumber.yml',
     ]));
+    expect([...guarded.keys()].some(path => path.includes('/support/'))).toBe(false);
 
     // The two guarded writes were refused outright, the feature file although
     // it lies inside the scope; the observation says why.

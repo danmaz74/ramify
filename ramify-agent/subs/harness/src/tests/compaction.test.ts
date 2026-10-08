@@ -82,7 +82,7 @@ describe('compaction during a run', () => {
   }, 300_000);
 
   test('production compaction is allowed for coordinating architects and forbidden for writers', () => {
-    const policy = defaultRunPolicy({ projectRoot: '/work/project', nested: [] });
+    const policy = defaultRunPolicy({ projectRoot: '/work/project' });
     expect(policy.context['initial-architect']).toMatchObject({ compaction: 'allowed' });
     expect(policy.context['local-architect']).toMatchObject({ compaction: 'allowed' });
     expect(policy.context['capability-architect']).toMatchObject({ compaction: 'allowed' });

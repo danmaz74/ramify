@@ -9,7 +9,7 @@ import { intakeToolName } from '../analysis/extraction.js';
 import { withDefaultTurns } from './helpers/declarations.js';
 import { analysis } from './helpers/analysis.js';
 import { submit, treeInputs, write } from './helpers/iterations.js';
-import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
+import { auditDefinition, commandCheck, privateConfiguredAudit } from './helpers/configured-repository.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { RunQueries } from '../projections/queries.js';
 import { emptyAnalysis, freeze, initRepository, installTestRunner, onlyRun, openRuns,
@@ -179,12 +179,18 @@ test('round three exhausts and a late source change still refuses the final gate
   const obligation = 'The review must retain an audit record.';
   const plan = join(fixture.root, 'plans/review-notes/plan.md');
   await writeFile(plan, `${await readFile(plan, 'utf8')}\n${obligation}\n`);
+  await writeFile(join(fixture.root, 'ramify-audit.json'), auditDefinition([
+    commandCheck('passes', [{ name: 'passes', cmd: process.execPath, args: ['-e', 'process.exit(0)'] }]),
+  ]));
   await initRepository(fixture.root);
-  const audit = createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(fixture.root) });
+  const configured = await privateConfiguredAudit(createAuditWorkspaceOwnership(fixture.root));
+  cleanups.push(configured.remove);
+  let fullRequests = 0;
   const { service } = await openRuns(fixture.root, { git: gitService, agent: exhaustedAgent(obligation), inputs: treeInputs(),
-    checkExecution: { async run(checks, request) {
-      const result = await audit.run(checks, request);
-      if (request.context.checkpoint === 'final') {
+    configuredAudit: { read: configured.audit.read, async run(input) {
+      const result = await configured.audit.run(input);
+      // Readiness makes the first full request; the final gate the next.
+      if (input.mode === 'full' && ++fullRequests === 2) {
         await writeFile(join(fixture.root, 'late-after-round-three.ts'), 'export const stale = true;\n');
       }
       return result;

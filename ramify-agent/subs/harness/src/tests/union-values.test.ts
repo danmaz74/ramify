@@ -357,7 +357,7 @@ describe('the observation log', () => {
     // A tool that runs no command carries none, and nothing else is added.
     expect(observationSchema.safeParse({
       n: 1, at: '2026-09-20T10:15:00.000Z', type: 'activity',
-      data: { activity: { kind: 'tool', callId: 'c1', tool: 'run_scope_tests' } },
+      data: { activity: { kind: 'tool', callId: 'c1', tool: 'read' } },
     }).success).toBe(true);
     expect(observationSchema.safeParse({
       n: 1, at: '2026-09-20T10:15:00.000Z', type: 'activity',

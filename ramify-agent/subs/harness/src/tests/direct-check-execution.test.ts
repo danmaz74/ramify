@@ -19,10 +19,12 @@ async function fixture() {
   cleanups.push(root);
   const directory = join(root, 'gate');
   const command = checkCommand({ argv: [process.execPath, '-e', 'process.exit(99)'], cwd: root, timeoutMs: 1_000 });
+  // An in-place diagnosis runs type-check and ramify-check; a third command
+  // makes the sequence long enough to show interruption and exhaustion.
   const checks: PlannedCheck[] = [
-    { kind: 'tests', command },
     { kind: 'type-check', command },
     { kind: 'ramify-check', command },
+    { kind: 'type-check', name: 'second-type-check', command },
   ];
   return { root, directory, checks };
 }
@@ -175,7 +177,7 @@ describe('direct test check execution', () => {
       directory: f.directory,
       head: 'source-commit',
       checks: f.checks,
-    })).rejects.toThrow('No direct check result scripted for invocation 2 (iteration ramify-check)');
+    })).rejects.toThrow('No direct check result scripted for invocation 2 (iteration type-check)');
   });
 
   test('reports sequential results left unconsumed by the scenario', async () => {

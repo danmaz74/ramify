@@ -1,8 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { PlannedCheck } from '../checks/verify.js';
 import { workItemListResponseSchema } from '../interfaces/protocol/runs.js';
 import { RunQueries } from '../projections/queries.js';
 import { runLayout } from '../run/records.js';
@@ -15,12 +14,12 @@ import { scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/sr
 import type { RunEvent } from '../run/log.js';
 import { requestCompletion } from './helpers/analysis.js';
 import { accepted, modified, unchanged } from './helpers/contracts-git.js';
-import { passingScenarioSummary, type DirectCheckStep } from './helpers/direct-check-execution.js';
+import type { DirectCheckScript, DirectCheckStep, ScriptedScenario } from './helpers/direct-check-execution.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import {
   at, bindAtAncestor, bindCommit, bindTurn, entryCommits, entryTurns, featureOf, finalSubject, gates, integrationFeature,
   integrationProject, noteFeature, notes, noteSteps, notesDirectory, plan, planScenario, reviews, reviewsDirectory, runIntegration,
-  summaryOf, tagFeature, tags, tagsDirectory, tagSteps, tagStepFile, type Cleanups,
+  scenarioResults, tagFeature, tags, tagsDirectory, tagSteps, tagStepFile, type Cleanups,
 } from './helpers/integration-scenario.js';
 import { assign, completionProposed, submit, write } from './helpers/iterations.js';
 import { onlyRun, runEventsOnDisk, runPath } from './helpers/runs.js';
@@ -62,18 +61,34 @@ function obligationLines(log: readonly RunEvent[]): string[] {
     : event.type === 'obligation-reported' ? [`reported ${event.data.id} ${event.data.judgment}`] : []));
 }
 
-/** A scenario check whose runs reached the integration scenario and failed it, while everything else passed. */
-function failingIntegration(check: PlannedCheck): DirectCheckStep {
-  const passing = passingScenarioSummary(check);
+/**
+ * What the project's configured scenario check reports over the tree a
+ * gate's commit leaves: every tracked scenario without the pending tag, as
+ * its `not @ramify-pending` profile selects them, passing.
+ */
+function runnableScenarios(root: string): ScriptedScenario[] {
+  const files = (readdirSync(root, { recursive: true }) as string[])
+    .filter(path => path.endsWith('.feature') && !path.split('/').includes('node_modules')).sort();
+  return files.flatMap(file => readFileSync(join(root, file), 'utf8').split('\n').flatMap((text, index) => {
+    const tags = text.trim().split(/\s+/);
+    const identity = tags.find(tag => /^@ramify-sc-\d{3,}$/.test(tag));
+    if (identity === undefined || tags.includes('@ramify-pending')) return [];
+    return [{ id: identity.slice('@ramify-'.length), status: 'passed' as const, file, line: index + 1 }];
+  }));
+}
+
+/** The project's configured scenario check over the tree as each gate's commit leaves it. */
+function configuredScenarioCheck(root: string): DirectCheckScript {
+  return ({ check }) => (check.kind === 'scenarios' ? { scenarios: runnableScenarios(root) } : {});
+}
+
+/** A configured scenario check whose run reached the integration scenario and failed it, while everything else passed. */
+function failingIntegration(root: string): DirectCheckStep {
   return {
     outcome: { kind: 'completed', exitCode: 1 },
-    scenarios: {
-      ...passing,
-      scenarios: passing.scenarios.map(result => (result.id !== 'sc-003' ? result : {
-        ...result, status: 'failed' as const, failure: { step: 'Then the outcome review-tags promises is shown', message: 'expected the tag on the note, got no note' },
-      })),
-      failures: ['sc-003 failed at "Then the outcome review-tags promises is shown": expected the tag on the note, got no note'],
-    },
+    scenarios: runnableScenarios(root).map(result => (result.id !== 'sc-003' ? result : {
+      ...result, status: 'failed' as const, failure: { step: 'Then the outcome review-tags promises is shown', message: 'expected the tag on the note, got no note' },
+    })),
   };
 }
 
@@ -89,7 +104,7 @@ describe('the integration work item', () => {
         submit(requestCompletion()),
       ],
       'engineer:wi-003': [bindTurn],
-    }, [...entryCommits, bindCommit, unchanged('wi-003'), unchanged(finalSubject)]);
+    }, [...entryCommits, bindCommit, unchanged('wi-003'), unchanged(finalSubject)], configuredScenarioCheck(root));
 
     const snapshot = onlyRun(service, plan);
     expect(snapshot.failure).toBeNull();
@@ -164,15 +179,17 @@ describe('the integration work item', () => {
       expected: `the base { module: "${reviews}", included: [{ directory: "subs/workspace/subs/reviews/subs/notes", reason, instructions }, { directory: "subs/workspace/subs/reviews/subs/tags", reason, instructions }] }`,
     }]);
 
-    // The engineer's scope, the binding, and the iteration gate that ran
-    // the ancestor's feature file with the scenario selected by identity,
-    // beside the done sub-scenarios of its children.
+    // The engineer's scope, the binding, and the iteration gate whose
+    // committed audit's scenario check ran the ancestor's feature file, its
+    // pending tag removed by the gate's commit, beside the done
+    // sub-scenarios of its children. The harness selected none of them.
     const assignment = JSON.parse(await readFile(runPath(root, plan, runId, iterationLayout.assignment('wi-003', 1)), 'utf8')) as { scope: { base: unknown } };
     expect(assignment.scope.base).toEqual({ module: reviews, included: [notes, tags].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) });
     const bindGate = attempts.find(attempt => attempt.subject.iteration === 'wi-003.i01')!;
-    expect(summaryOf(bindGate)).toMatchObject({ selection: { kind: 'identity', scenarios: ['sc-001', 'sc-002', 'sc-003'] }, failures: [] });
-    expect(summaryOf(bindGate)!.runs.map(one => one.module).sort()).toEqual([reviews, notes, tags].sort());
-    expect(summaryOf(bindGate)!.scenarios.find(result => result.id === 'sc-003')).toMatchObject({ run: reviews, status: 'passed' });
+    expect(bindGate.commands).toEqual([]);
+    expect(bindGate.audit).toMatchObject({ mode: 'project-default', verdict: 'pass' });
+    expect(scenarioResults(bindGate).map(result => `${result.id} ${result.status}`).sort()).toEqual(['sc-001 passed', 'sc-002 passed', 'sc-003 passed']);
+    expect(scenarioResults(bindGate).find(result => result.id === 'sc-003')).toMatchObject({ check: 'scenarios', file: integrationFeature, status: 'passed' });
     const engineer = log.filter(event => event.type === 'invocation-started' && (event.data as { role: string }).role === 'engineer').at(-1)!.data as { invocation: string };
     expect(obligationLines(log)).toEqual([
       'bound sc-001', 'reported sc-001 done',
@@ -183,11 +200,12 @@ describe('the integration work item', () => {
       .toMatchObject({ id: 'sc-003', fakes: [], by: engineer.invocation });
     expect(at(log, 'obligation-reported', data => data.id === 'sc-003')).toBeGreaterThan(at(log, 'gate-passed', data => data.gate === bindGate.id));
 
-    // The work item completed at its own work-item gate, and the final gate
-    // ran every scenario in full mode.
+    // The work item completed at its own work-item gate, and the final
+    // gate's full audit ran every scenario.
     expect(at(log, 'work-item-completed', data => data.workItem === 'wi-003')).toBeGreaterThan(at(log, 'obligation-reported', data => data.id === 'sc-003'));
     const finalGate = attempts.find(attempt => attempt.checkpoint === 'final')!;
-    expect(summaryOf(finalGate)!.scenarios.map(result => `${result.id} ${result.status}`).sort()).toEqual(['sc-001 passed', 'sc-002 passed', 'sc-003 passed']);
+    expect(finalGate.audit).toMatchObject({ mode: 'full', verdict: 'pass' });
+    expect(scenarioResults(finalGate).map(result => `${result.id} ${result.status}`).sort()).toEqual(['sc-001 passed', 'sc-002 passed', 'sc-003 passed']);
     expect(log.at(-1)!.type).toBe('job-completed');
     expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, done: 3 });
     // The work items a client reads: the integration one by its origin, with no capability of its own.
@@ -214,10 +232,11 @@ describe('the integration work item', () => {
       ],
     }, [...entryCommits, bindCommit, accepted('wi-003.i01', 'revision-04', modified(tagSteps)), unchanged('wi-003'), unchanged(finalSubject)],
     ({ check, context }) => {
-      if (check.kind !== 'scenarios' || context.checkpoint !== 'iteration' || failed) return {};
-      if (!(check.scenarios?.selection.kind === 'identity' && check.scenarios.selection.scenarios.includes('sc-003'))) return {};
+      if (check.kind !== 'scenarios') return {};
+      const runnable = runnableScenarios(root);
+      if (context.checkpoint !== 'iteration' || failed || !runnable.some(result => result.id === 'sc-003')) return { scenarios: runnable };
       failed = true;
-      return failingIntegration(check);
+      return failingIntegration(root);
     });
 
     expect(onlyRun(service, plan).failure).toBeNull();
@@ -225,7 +244,7 @@ describe('the integration work item', () => {
     const log = await runEventsOnDisk(root, plan, runId);
     const attempts = (await gates(root, runId, log)).filter(attempt => attempt.subject.iteration === 'wi-003.i01');
     expect(attempts.map(attempt => attempt.verdict)).toEqual(['failed', 'passed']);
-    expect(summaryOf(attempts[0]!)!.scenarios.map(result => `${result.id} ${result.status}`)).toEqual(['sc-001 passed', 'sc-002 passed', 'sc-003 failed']);
+    expect(scenarioResults(attempts[0]!).map(result => `${result.id} ${result.status}`).sort()).toEqual(['sc-001 passed', 'sc-002 passed', 'sc-003 failed']);
 
     // The repair round's briefing carries the failure as the runner reported
     // it, and no generated diagnosis of its cause or of who repairs it.
@@ -235,8 +254,8 @@ describe('the integration work item', () => {
     expect(repair).not.toContain('suspect');
     // And the failing scenario itself, with its name, file, line, step and
     // message; each passing one with its binding.
-    expect(repair).toMatch(/ {2}- `sc-003` "A written note is shown with its tag" failed, at `[^`]+\.feature:\d+`:\n {4}- The failing step: `Then the outcome review-tags promises is shown`\.\n {4}- Its message: expected the tag on the note, got no note/);
-    expect(repair).toMatch(/ {2}- `sc-001` "A note is written for tagging" passed/);
+    expect(repair).toMatch(/- scenario `sc-003` "A written note is shown with its tag" failed in `scenarios`, at `[^`]+\.feature:\d+`:\n {2}- The failing step: `Then the outcome review-tags promises is shown`\.\n {2}- Its message: expected the tag on the note, got no note/);
+    expect(repair).toMatch(/`sc-001` "A note is written for tagging" passed/);
     // The failure moved nothing: the scenario stayed bound through the
     // repair, and only its architect's report made it done.
     expect(obligationLines(log).filter(entry => entry.includes('sc-003'))).toEqual(['bound sc-003', 'bound sc-003', 'reported sc-003 done']);

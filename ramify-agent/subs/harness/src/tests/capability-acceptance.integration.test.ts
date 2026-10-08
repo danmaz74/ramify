@@ -6,8 +6,9 @@ import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
 import { gitService } from '../../subs/evidence/src/git.js';
-import { checkCommand } from '../checks/records.js';
-import { createLocalCommandCheckExecution, createMappedCheckExecution } from './helpers/direct-check-execution.js';
+import { checkCommand, type Checkpoint } from '../checks/records.js';
+import type { ConfiguredAuditInput } from '../../subs/audit/src/check-execution.js';
+import { localCommandAudit, mappedAudit } from './helpers/direct-check-execution.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
@@ -36,13 +37,6 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     "Then('the outcome richer-a-fact promises is shown', function () { assert.match(this.result, /1 passed/); });",
     '',
   ].join('\n'));
-  // The real scenario runner is installed in this private project's bin
-  // directory. Declare its path before the run captures configuration;
-  // a bare command would require that directory on the captured PATH.
-  const configurationPath = join(fixture.root, 'ramify-agent.json');
-  const configuration = JSON.parse(await readFile(configurationPath, 'utf8'));
-  for (const mode of ['quick', 'full']) configuration.acceptance.modes[mode].command = ['node_modules/.bin/cucumber-js'];
-  await writeFile(configurationPath, `${JSON.stringify(configuration, null, 2)}\n`);
   await initRepository(fixture.root); await installMiniRunner(fixture.root);
   // Real Vitest compiles the fixture's TypeScript and resolves its .js source
   // specifiers; the small runner used by cooperation tests executes JS only.
@@ -204,21 +198,27 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
   let targetGateId: string | undefined;
   let closeVerification: (() => Promise<void>) | undefined;
   let activeService: Awaited<ReturnType<typeof openCapabilityRuns>>['service'] | undefined;
-  const realChecks = createLocalCommandCheckExecution();
-  const failingCombinedChecks = createMappedCheckExecution({ script: ({ check }) => check.kind === 'tests'
+  // The project's configured checks, answered in place: the three owners'
+  // real Vitest tests and the real type check. The definition names them;
+  // the harness selects no test of its own.
+  const realChecks = localCommandAudit({
+    tests: [join(fixture.root, 'node_modules/.bin/vitest'), 'run',
+      'subs/a/src/tests/caller.test.ts', 'subs/b/src/tests/fact.test.ts', 'subs/d/src/tests/consumer.test.ts'],
+    'type-check': [join(process.cwd(), 'node_modules/.bin/tsc'), '--noEmit', '-p', 'tsconfig.json'],
+  });
+  const failingCombinedChecks = mappedAudit(({ check }) => check.kind === 'tests'
     ? { outcome: { kind: 'completed', exitCode: 1 }, stdout: 'Combined capability repair fixture failure' }
-    : {} });
+    : {});
   const gateContexts: string[] = [];
   let inheritedAuthorityChecked = false;
   const options = { git: gitService, script: scripted, inputs: treeInputs(),
 
-    checkExecution: mode === 'repair-exhaustion' ? { run: (checks: Parameters<typeof realChecks.run>[0],
-      request: Parameters<typeof realChecks.run>[1]) => {
-        gateContexts.push(`${request.context.attemptId}:${request.context.checkpoint}`);
-        // Scoped assignments still use the real command runner; only the
-        // bounded task's ordinary completion gate is scripted to fail.
-        return request.context.checkpoint === 'work-item'
-          ? failingCombinedChecks.run(checks, request) : realChecks.run(checks, request);
+    configuredAudit: mode === 'repair-exhaustion' ? { read: realChecks.read, async run(input: ConfiguredAuditInput) {
+        const checkpoint = await gateCheckpoint(fixture.root, input);
+        gateContexts.push(`${input.attemptId}:${checkpoint}`);
+        // Scoped assignments still run the real commands; only the bounded
+        // task's ordinary completion gate is scripted to fail.
+        return checkpoint === 'work-item' ? failingCombinedChecks.run(input) : realChecks.run(input);
       } } : realChecks,
     afterWrite: async (write: string, runId: string) => {
       const event = activeService?.events('need', runId)?.at(-1);
@@ -285,8 +285,6 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     policy: root => {
       const base = testPolicy(root);
       return { ...base, reviews: testReviewPolicy(), commands: { ...base.commands,
-        allTests: checkCommand({ argv: [join(root, 'node_modules/.bin/vitest'), 'run',
-          'subs/a/src/tests/caller.test.ts', 'subs/b/src/tests/fact.test.ts', 'subs/d/src/tests/consumer.test.ts'], cwd: root, timeoutMs: 30_000 }),
         typeCheck: checkCommand({ argv: [join(process.cwd(), 'node_modules/.bin/tsc'), '--noEmit', '-p', 'tsconfig.json'], cwd: root, timeoutMs: 30_000 }),
         ramifyCheck: base.commands.ramifyCheck,
       } };
@@ -463,16 +461,15 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
   expect(events.filter(event => event.type === 'capability-assigned' && event.data.corrects === 'cap-001.rc01')).toHaveLength(1);
   expect(events.filter(event => event.type === 'iteration-closed' && event.data.checkFindings?.some(finding =>
     finding.type === 'check-finding-decided' && finding.data.decision.decision.action === 'claim-repair'))).toHaveLength(1);
-  expect(lastGateBody?.commands.filter(command => ['tests', 'type-check', 'ramify-check'].includes(command.kind))
-    .every(command => command.outcome === 'passed')).toBe(true);
-  const executedFiles = lastGateBody?.commands.filter(command => command.kind === 'tests' && command.outcome === 'passed')
-    .flatMap(command => {
-      const check = command.providerCheckId === undefined ? undefined : lastGateBody.provider?.checks[command.providerCheckId];
-      return check?.passed === true ? [check, ...Object.values(check.commands ?? {}).filter(nested => nested.passed)] : [];
-    }).filter(check => check.vitest?.reason === 'passed')
-    .flatMap(check => check.vitest?.files.filter(file => file.state === 'passed').map(file => file.path) ?? []) ?? [];
-  expect(executedFiles).toContain('subs/a/src/tests/caller.test.ts');
-  expect(executedFiles).toContain('subs/b/src/tests/fact.test.ts');
+  // The last gate's configured audit passed every check, and its tests
+  // check really ran the owners' tests over the handed-back source.
+  expect(lastGateBody?.commands).toEqual([]);
+  const lastChecks = lastGateBody?.provider?.checks as Record<string, { passed: boolean; output: string }> | undefined;
+  expect(Object.entries(lastChecks ?? {}).map(([id, check]) => [id, check.passed])).toEqual([
+    ['tests', true], ['type-check', true], ['ramify-check', true],
+  ]);
+  expect(lastChecks!['tests']!.output).toContain('subs/a/src/tests/caller.test.ts');
+  expect(lastChecks!['tests']!.output).toContain('subs/b/src/tests/fact.test.ts');
   const handback = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
     'capabilities/cap-001/handback.json'), 'utf8')) as { deltaFromSuspension: string[]; returnedTree: string };
   expect(handback.deltaFromSuspension).toContain('subs/b/src/fact.ts');
@@ -595,3 +592,14 @@ test('CA19: a submitted reviewer concern replays into one exact pending attempt 
   () => runAcceptedHandback('concern-submission-restart'), 180_000);
 test('CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback',
   () => runAcceptedHandback('repair-exhaustion'), 180_000);
+
+/** The checkpoint of the gate a configured request belongs to: its operation record, or readiness, which writes none. */
+async function gateCheckpoint(root: string, input: ConfiguredAuditInput): Promise<Checkpoint> {
+  try {
+    const operation = JSON.parse(await readFile(join(root, 'plans/need/.harness/jobs', input.runId, 'gates', input.attemptId, 'operation.json'), 'utf8')) as
+      { checkpoint?: Checkpoint; body?: { checkpoint?: Checkpoint } };
+    return operation.checkpoint ?? operation.body?.checkpoint ?? 'readiness';
+  } catch {
+    return 'readiness';
+  }
+}

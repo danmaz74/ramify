@@ -11,7 +11,6 @@ import { analysis } from './helpers/analysis.js';
 import { submit, treeInputs, write } from './helpers/iterations.js';
 import { initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
-import { checkpointPolicies } from '../checks/checkpoint.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -133,14 +132,12 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   expect(closed.sequence).toBeLessThan(finalGate.sequence);
   expect(finalGate.sequence).toBeLessThan(completed.sequence);
   const gateRecord = JSON.parse(await readFile(runPath(fixture.root, 'review-notes', receipt.jobId,
-    runLayout.gate(finalGate.data.gate)), 'utf8')) as { checkpoint: string; commands: Array<{
-    kind: string; selection?: { policy: string }; scenarios?: { mode: string; selection: { kind: string } };
-  }> };
+    runLayout.gate(finalGate.data.gate)), 'utf8')) as { checkpoint: string; commands: unknown[]; audit?: { mode: string } };
   expect(gateRecord.checkpoint).toBe('final');
-  expect(checkpointPolicies[gateRecord.checkpoint as 'final'].selection).toBe('all-project');
-  expect(gateRecord.commands.find(command => command.kind === 'tests')).toBeDefined();
-  const scenarioCheck = gateRecord.commands.find(command => command.kind === 'scenarios');
-  if (scenarioCheck) expect(scenarioCheck.scenarios).toMatchObject({ mode: 'full', selection: { kind: 'all' } });
+  // The final gate asks the committed audit for a full audit; the harness
+  // plans no test or scenario command of its own.
+  expect(gateRecord.audit).toMatchObject({ mode: 'full' });
+  expect(gateRecord.commands).toEqual([]);
   const finalAssessment = await readFile(runPath(fixture.root, 'review-notes', receipt.jobId,
     runLayout.assessment('nfa-002')), 'utf8').then(JSON.parse);
   expect(finalAssessment.results.map((item: { nfr: string; result: string }) => [item.nfr, item.result])).toEqual([

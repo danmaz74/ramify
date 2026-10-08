@@ -234,7 +234,7 @@ afterEach(async () => {
   repositories.clear();
 });
 
-describe('ramify-audit 0.7.1 conformance', () => {
+describe('ramify-audit 0.7.2 conformance', () => {
   it('fact 1: command summaries preserve status and runner errors but never an exit code', async () => {
     const repository = await createRepository();
     const request = auditRequest(repository, [commandCheck('commands', [
@@ -625,6 +625,34 @@ describe('ramify-audit 0.7.1 conformance', () => {
     if (forced.status !== 'completed') return;
     expect(forced.reused).toBeUndefined();
     expect(forced.refs.reportCommit).not.toBe(first.refs.reportCommit);
+  });
+
+  it('fact 14: evidence recorded under another ignore list is never reused, and the changed list starts a new record', async () => {
+    const repository = await createRepository({ 'source.txt': 'source\n', 'docs/guide.md': 'guide\n', 'notes/n.md': 'note\n' });
+    const docsOnly = { ...auditRequest(repository), force: false, full: true, ignorePaths: ['docs/**'] };
+    const first = await runPassing(repository, docsOnly);
+    expect(first.status).toBe('completed');
+    if (first.status !== 'completed') return;
+
+    await writeFile(join(repository.root, 'notes/n.md'), 'note, revised\n');
+    git(repository.root, ['add', '--all']);
+    git(repository.root, ['-c', 'user.name=Ramify Agent Test', '-c', 'user.email=ramify-agent-test@example.invalid', 'commit', '--no-gpg-sign', '-m', 'notes']);
+    const later = git(repository.root, ['rev-parse', 'HEAD']);
+    const widened = { ...docsOnly, ignorePaths: ['docs/**', 'notes/**'] };
+    // The earlier record ignored only docs/**: under the new list it does not apply.
+    const fresh = await runPassing(repository, { ...widened, requestId: 'new-list', source: { kind: 'existing-commit', revision: later } });
+    expect(fresh).toMatchObject({ status: 'completed', summary: { sourceCommit: later } });
+    if (fresh.status !== 'completed') return;
+    expect(fresh.reused).toBeUndefined();
+    expect(fresh.refs.reportCommit).not.toBe(first.refs.reportCommit);
+    // A later ignored-only change under the new list reuses the new record.
+    await writeFile(join(repository.root, 'notes/n.md'), 'note, revised again\n');
+    git(repository.root, ['add', '--all']);
+    git(repository.root, ['-c', 'user.name=Ramify Agent Test', '-c', 'user.email=ramify-agent-test@example.invalid', 'commit', '--no-gpg-sign', '-m', 'notes again']);
+    const last = git(repository.root, ['rev-parse', 'HEAD']);
+    const reused = await runPassing(repository, { ...widened, requestId: 'reuse-new-list', source: { kind: 'existing-commit', revision: last } });
+    expect(reused).toMatchObject({ status: 'completed', reused: { sourceCommit: last, auditedCommit: later, ignoredChangedPaths: ['notes/n.md'] },
+      refs: { reportCommit: fresh.refs.reportCommit } });
   });
 
   it('refuses duplicate check IDs, including two checks of kind tests', async () => {

@@ -4,7 +4,7 @@ import { runView } from '../projections/inputs.js';
 import { RunQueries } from '../projections/queries.js';
 import type { RunService } from '../run/service.js';
 import { analysis, entry } from './helpers/analysis.js';
-import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 import { emptyAnalysis } from './helpers/runs.js';
 import { copyFixture } from './helpers/fixture.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
@@ -35,11 +35,12 @@ describe('execution projection over a persisted run', () => {
     const fixture = await copyFixture();
     cleanup.push(fixture.remove);
     await installTestRunner(fixture.root);
-    const direct = createPassingCheckExecution();
+    // The final gate's configured audit composes `pass`, which the run
+    // publishes as the gate's independent audit outcome.
     const first = await openUnchangedRuns(fixture.root, {
       script: [{ kind: 'submit', input: emptyAnalysis() }],
       unchangedCheckpoints: ['final verification of plan "review-notes"'],
-      checkExecution: { run: async (checks, request) => ({ ...(await direct.run(checks, request)), auditOverall: 'pass' as const }) },
+      configuredAudit: passingAudit(),
     });
     cleanup.push(() => first.service.close());
     const receipt = await first.service.execute(startRun('review-notes'));

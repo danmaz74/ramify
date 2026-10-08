@@ -31,13 +31,7 @@ afterEach(async () => {
 function valid(): Record<string, unknown> {
   return {
     schema: 'ramify-agent.project/1',
-    acceptance: {
-      support: ['subs/integration-tests/src/support/world.ts', 'subs/integration-tests/src/support/hooks.ts'],
-      modes: {
-        quick: { command: ['npm', 'run', 'acceptance:quick', '--'] },
-        full: { command: ['npm', 'run', 'acceptance:full', '--'] },
-      },
-    },
+    typeCheck: { output: 'tsc' },
   };
 }
 
@@ -52,41 +46,19 @@ function changed(path: readonly string[], value: unknown): string {
 }
 
 describe('the ramify-agent.project/1 schema', () => {
-  test('accepts the fixture\'s file, with full mode\'s readiness defaulting to dry-run', async () => {
+  test('accepts the fixture\'s file, which names its type check\'s output and nothing of its tests or scenarios', async () => {
     const parsed = parseProjectConfig(await readFile(join(fixtureRoot, 'ramify-agent.json'), 'utf8'));
-    expect('config' in parsed).toBe(true);
-    if (!('config' in parsed)) return;
-    expect(parsed.config.acceptance.support).toEqual([
-      'subs/integration-tests/src/support/world.ts',
-      'subs/integration-tests/src/support/hooks.ts',
-    ]);
-    expect(parsed.config.acceptance.modes.quick).toEqual({ command: ['npm', 'run', 'acceptance:quick', '--'] });
-    expect(parsed.config.acceptance.modes.full.readiness).toBe('dry-run');
-    expect(parsed.config.typeCheck).toEqual({ output: 'tsc' });
-
-    const defaulted = parseProjectConfig(JSON.stringify(valid()));
-    expect('config' in defaulted && defaulted.config.acceptance.modes.full.readiness).toBe('dry-run');
+    expect(parsed).toEqual({ config: { schema: 'ramify-agent.project/1', typeCheck: { output: 'tsc' } } });
+    expect(parseProjectConfig(JSON.stringify({ schema: 'ramify-agent.project/1' }))).toEqual({ config: { schema: 'ramify-agent.project/1' } });
   });
 
-  test('accepts setup and teardown on either mode, globs in support, and readiness run', () => {
-    const config = valid();
-    const acceptance = config['acceptance'] as { support: string[]; modes: Record<string, Record<string, unknown>> };
-    acceptance.support = ['src/tests/support/*.ts'];
-    acceptance.modes['quick']!['setup'] = ['npm', 'run', 'db:start'];
-    acceptance.modes['full']!['setup'] = ['npm', 'run', 'acceptance:server:start'];
-    acceptance.modes['full']!['teardown'] = ['npm', 'run', 'acceptance:server:stop'];
-    acceptance.modes['full']!['readiness'] = 'run';
-
-    const parsed = parseProjectConfig(JSON.stringify(config));
-    expect('config' in parsed).toBe(true);
-    if (!('config' in parsed)) return;
-    expect(parsed.config.acceptance.modes.full).toEqual({
-      command: ['npm', 'run', 'acceptance:full', '--'],
-      setup: ['npm', 'run', 'acceptance:server:start'],
-      teardown: ['npm', 'run', 'acceptance:server:stop'],
-      readiness: 'run',
-    });
-    expect(parseProjectConfig(changed(['acceptance', 'support'], []))).toHaveProperty('config');
+  test('refuses the removed acceptance section: the project\'s scenarios run as a check of its committed audit definition', () => {
+    const acceptance = {
+      support: ['subs/integration-tests/src/support/world.ts'],
+      modes: { quick: { command: ['npm', 'run', 'acceptance:quick', '--'] }, full: { command: ['npm', 'run', 'acceptance:full', '--'] } },
+    };
+    const parsed = parseProjectConfig(changed(['acceptance'], acceptance));
+    expect('invalid' in parsed ? parsed.invalid : '').toMatch(/<root>: .*acceptance/);
   });
 
   test('accepts setup commands in order, each with an optional name, directory, bound and environment', () => {
@@ -121,21 +93,15 @@ describe('the ramify-agent.project/1 schema', () => {
   test.each([
     ['text that is not JSON', '{ "schema": ', /is not JSON/],
     ['another version', changed(['schema'], 'ramify-agent.project/2'), /schema: /],
-    ['no acceptance section', changed(['acceptance'], undefined), /acceptance: /],
-    ['no support list', changed(['acceptance', 'support'], undefined), /acceptance\.support: /],
-    ['a support entry that is empty', changed(['acceptance', 'support'], ['']), /acceptance\.support\.0: /],
-    ['no quick mode', changed(['acceptance', 'modes', 'quick'], undefined), /acceptance\.modes\.quick: /],
-    ['no full mode', changed(['acceptance', 'modes', 'full'], undefined), /acceptance\.modes\.full: /],
-    ['an empty command', changed(['acceptance', 'modes', 'quick', 'command'], []), /acceptance\.modes\.quick\.command: /],
-    ['a command that is a string', changed(['acceptance', 'modes', 'full', 'command'], 'npm run acceptance:full'), /acceptance\.modes\.full\.command: /],
-    ['an unknown readiness', changed(['acceptance', 'modes', 'full', 'readiness'], 'skip'), /acceptance\.modes\.full\.readiness: /],
-    ['readiness on quick mode', changed(['acceptance', 'modes', 'quick', 'readiness'], 'run'), /acceptance\.modes\.quick: .*readiness/],
-    ['a third mode', changed(['acceptance', 'modes', 'browser'], { command: ['x'] }), /acceptance\.modes: .*browser/],
+    ['an unknown type-check output', changed(['typeCheck'], { output: 'eslint' }), /typeCheck\.output: /],
     ['a field v1 does not define', changed(['tests'], { command: ['npm', 'test'] }), /<root>: .*tests/],
-    ['a timeout of zero', changed(['timeouts'], { tests: 0 }), /timeouts\.tests: /],
+    ['a timeout of zero', changed(['timeouts'], { typeCheck: 0 }), /timeouts\.typeCheck: /],
     ['a timeout that is not a whole number of milliseconds', changed(['timeouts'], { typeCheck: 1.5 }), /timeouts\.typeCheck: /],
     ['a timeout above the ceiling', changed(['timeouts'], { ramifyCheck: 7_200_001 }), /timeouts\.ramifyCheck: A command timeout is at most 7200000 ms \(two hours\)/],
     ['a timeout for a command the gate does not run', changed(['timeouts'], { lint: 60_000 }), /timeouts: .*lint/],
+    // The project's suites run as checks of its committed audit definition, which bounds them.
+    ['a timeout for the project\'s tests', changed(['timeouts'], { tests: 1_800_000 }), /timeouts: .*tests/],
+    ['a timeout for a scoped test run', changed(['timeouts'], { scopedTests: 700_000 }), /timeouts: .*scopedTests/],
   ])('rejects %s with the schema\'s message', (_name, text, message) => {
     const parsed = parseProjectConfig(text);
     expect(parsed).toHaveProperty('invalid');
@@ -144,30 +110,26 @@ describe('the ramify-agent.project/1 schema', () => {
   });
 
   test('accepts gate command timeouts, each up to the ceiling', () => {
-    const timeouts = { typeCheck: 600_000, tests: 7_200_000, scopedTests: 900_000, ramifyCheck: 1_200_000 };
+    const timeouts = { typeCheck: 600_000, ramifyCheck: 7_200_000 };
     const parsed = parseProjectConfig(changed(['timeouts'], timeouts));
     expect('config' in parsed && parsed.config.timeouts).toEqual(timeouts);
     expect(parseProjectConfig(changed(['timeouts'], {}))).toHaveProperty('config');
   });
 
-  test('its timeouts replace the policy\'s own gate command timeouts, and nothing else of the policy', () => {
-    const policy = testPolicy('/project', { nested: [{ directory: 'tools/catalog', testScript: 'vitest run' }] });
-    const captured = { path: 'ramify-agent.json', hash: 'a'.repeat(64), config: { ...minimalProjectConfig, timeouts: { typeCheck: 400_000, tests: 1_800_000, scopedTests: 700_000, ramifyCheck: 900_000 } } };
+  test('its timeouts replace the policy\'s own diagnosis command timeouts, and nothing else of the policy', () => {
+    const policy = testPolicy('/project');
+    const captured = { path: 'ramify-agent.json', hash: 'a'.repeat(64), config: { ...minimalProjectConfig, timeouts: { typeCheck: 400_000, ramifyCheck: 900_000 } } };
     const timed = withProjectTimeouts(policy, captured);
     expect(timed.commands.typeCheck.timeoutMs).toBe(400_000);
-    expect(timed.commands.allTests.timeoutMs).toBe(1_800_000);
-    expect(timed.commands.nestedPackages[0]!.tests!.timeoutMs).toBe(1_800_000);
-    expect(timed.commands.scopedTests.timeoutMs).toBe(700_000);
     expect(timed.commands.ramifyCheck.timeoutMs).toBe(900_000);
     // What the configuration does not name is the policy's.
     expect(timed.commands.ramifyChanged).toEqual(policy.commands.ramifyChanged);
-    expect(timed.commands.nestedPackages[0]!.install).toEqual(policy.commands.nestedPackages[0]!.install);
     expect({ ...timed, commands: undefined }).toEqual({ ...policy, commands: undefined });
     expect(timed.commands.typeCheck.argv).toEqual(policy.commands.typeCheck.argv);
 
     // One timeout replaces one command's; a missing or invalid file changes nothing.
-    const one = withProjectTimeouts(policy, { ...captured, config: { ...minimalProjectConfig, timeouts: { tests: 1_000_000 } } });
-    expect(one.commands.allTests.timeoutMs).toBe(1_000_000);
+    const one = withProjectTimeouts(policy, { ...captured, config: { ...minimalProjectConfig, timeouts: { ramifyCheck: 1_000_000 } } });
+    expect(one.commands.ramifyCheck.timeoutMs).toBe(1_000_000);
     expect(one.commands.typeCheck).toEqual(policy.commands.typeCheck);
     expect(withProjectTimeouts(policy, { path: 'ramify-agent.json', hash: null, invalid: 'missing' })).toBe(policy);
   });
@@ -178,10 +140,10 @@ describe('the ramify-agent.project/1 schema', () => {
 
     expect(await captureProjectConfig(directory.path)).toEqual({ path: 'ramify-agent.json', hash: null, invalid: 'ramify-agent.json is missing at the project root' });
 
-    await writeFile(join(directory.path, 'ramify-agent.json'), changed(['acceptance', 'modes', 'full'], undefined));
+    await writeFile(join(directory.path, 'ramify-agent.json'), changed(['typeCheck', 'output'], 'eslint'));
     const invalid = await captureProjectConfig(directory.path);
     expect(invalid).toMatchObject({ path: 'ramify-agent.json', hash: expect.stringMatching(/^[0-9a-f]{64}$/) as unknown });
-    expect('invalid' in invalid && invalid.invalid).toMatch(/^ramify-agent\.json does not validate against ramify-agent\.project\/1: acceptance\.modes\.full: /);
+    expect('invalid' in invalid && invalid.invalid).toMatch(/^ramify-agent\.json does not validate against ramify-agent\.project\/1: typeCheck\.output: /);
 
     await writeProjectConfig(directory.path);
     expect(await captureProjectConfig(directory.path)).toEqual({
@@ -216,7 +178,7 @@ describe('the test areas support code must lie in', () => {
   });
 });
 
-describe('the project-config and acceptance-runner readiness steps', () => {
+describe('the project-config readiness step', () => {
   /** A fresh copy of the fixture, with its runners installed, changed by `prepare`. */
   async function fixture(prepare: (root: string) => Promise<void> = async () => undefined): Promise<string> {
     const copy = await copyFixture();
@@ -247,63 +209,37 @@ describe('the project-config and acceptance-runner readiness steps', () => {
     return { snapshot: onlyRun(service, 'review-notes'), failures, attempt, record, step, git };
   }
 
-  test('the fixture passes both steps, after test-runner, and job.json captures its configuration beside the policy', async () => {
+  test('the fixture passes the step, no scenario-runner step follows it, and job.json captures its configuration beside the policy', async () => {
     const root = await fixture();
     const { snapshot, attempt, record, step } = await run(root, true);
 
     expect(snapshot.state).toBe('completed');
     const steps = attempt.steps.map(entry => entry.step);
-    expect(steps.slice(steps.indexOf('project-config'), steps.indexOf('project-config') + 2)).toEqual(['project-config', 'acceptance-runner']);
-    expect(step('project-config')).toMatchObject({ outcome: 'passed' });
-    expect(step('project-config').detail).toBe(
-      'ramify-agent.json validates against ramify-agent.project/1; its support code is subs/integration-tests/src/support/world.ts, subs/integration-tests/src/support/hooks.ts; full mode\'s readiness is dry-run',
-    );
-    expect(step('acceptance-runner')).toMatchObject({ outcome: 'passed' });
-    expect(step('acceptance-runner').detail).toContain('quick mode runs `npm run acceptance:quick --`, full mode `npm run acceptance:full --`');
+    expect(steps.slice(steps.indexOf('project-config'), steps.indexOf('project-config') + 2)).toEqual(['project-config', 'ramify-daemon']);
+    expect(steps).not.toContain('acceptance-runner');
+    expect(step('project-config')).toMatchObject({ outcome: 'passed', detail: 'ramify-agent.json validates against ramify-agent.project/1' });
 
     const keys = Object.keys(record);
     expect(keys.indexOf('projectConfig')).toBe(keys.indexOf('policy') + 1);
     expect(record.projectConfig).toEqual({
       path: 'ramify-agent.json',
       hash: expect.stringMatching(/^[0-9a-f]{64}$/) as unknown,
-      config: {
-        schema: 'ramify-agent.project/1',
-        typeCheck: { output: 'tsc' },
-        acceptance: {
-          support: ['subs/integration-tests/src/support/world.ts', 'subs/integration-tests/src/support/hooks.ts'],
-          modes: {
-            quick: { command: ['npm', 'run', 'acceptance:quick', '--'] },
-            full: { command: ['npm', 'run', 'acceptance:full', '--'], readiness: 'dry-run' },
-          },
-        },
-      },
+      config: { schema: 'ramify-agent.project/1', typeCheck: { output: 'tsc' } },
     });
   }, 180_000);
 
-  test('gate command timeouts the configuration declares are the ones job.json captures in the policy', async () => {
+  test('diagnosis command timeouts the configuration declares are the ones job.json captures in the policy', async () => {
     const root = await fixture(async path => {
       const config = JSON.parse(await readFile(join(path, 'ramify-agent.json'), 'utf8')) as Record<string, unknown>;
-      await writeProjectConfig(path, { ...config, timeouts: { tests: 1_800_000, typeCheck: 450_000 } });
+      await writeProjectConfig(path, { ...config, timeouts: { ramifyCheck: 1_800_000, typeCheck: 450_000 } });
     });
     const { snapshot, record } = await run(root, true);
 
     expect(snapshot.state).toBe('completed');
-    expect('config' in record.projectConfig && record.projectConfig.config.timeouts).toEqual({ tests: 1_800_000, typeCheck: 450_000 });
-    expect(record.policy.commands.allTests.timeoutMs).toBe(1_800_000);
+    expect('config' in record.projectConfig && record.projectConfig.config.timeouts).toEqual({ ramifyCheck: 1_800_000, typeCheck: 450_000 });
+    expect(record.policy.commands.ramifyCheck.timeoutMs).toBe(1_800_000);
     expect(record.policy.commands.typeCheck.timeoutMs).toBe(450_000);
-    expect(record.policy.commands.scopedTests.timeoutMs).toBe(testPolicy(root).commands.scopedTests.timeoutMs);
-  }, 180_000);
-
-  test('a configuration asking readiness to run full mode is captured with it', async () => {
-    const root = await fixture(async path => {
-      const config = valid();
-      ((config['acceptance'] as { modes: { full: Record<string, unknown> } }).modes.full)['readiness'] = 'run';
-      await writeProjectConfig(path, config);
-    });
-    const { snapshot, record } = await run(root, true);
-
-    expect(snapshot.state).toBe('completed');
-    expect('config' in record.projectConfig && record.projectConfig.config.acceptance.modes.full.readiness).toBe('run');
+    expect(record.policy.commands.ramifyChanged.timeoutMs).toBe(testPolicy(root).commands.ramifyChanged.timeoutMs);
   }, 180_000);
 
   test('a project without the file starts, and fails readiness with project-config-invalid and no recovery', async () => {
@@ -316,7 +252,7 @@ describe('the project-config and acceptance-runner readiness steps', () => {
     expect(snapshot.failure?.message).toContain('Readiness failed at project-config after 1 attempt: ramify-agent.json is missing at the project root');
     expect(failures).toEqual([{ attempt: 1, gate: 'ga-0001', step: 'project-config', detail: 'ramify-agent.json is missing at the project root', recovery: null, final: true }]);
     expect(step('project-config').outcome).toBe('failed');
-    expect(step('acceptance-runner')).toMatchObject({ outcome: 'not-verified' });
+    expect(attempt.steps.map(entry => entry.step)).not.toContain('acceptance-runner');
     expect(attempt.steps.filter(entry => entry.step.startsWith('baseline-')).every(entry => entry.outcome === 'not-verified')).toBe(true);
     expect(attempt.verdict).toBe('failed');
     // No code-repair assignment follows: the three invocations are the
@@ -325,63 +261,29 @@ describe('the project-config and acceptance-runner readiness steps', () => {
     expect(git.branch()).toBeNull();
   }, 180_000);
 
-  test('an invalid file fails the same step with the schema\'s message', async () => {
-    const root = await fixture(path => writeFile(join(path, 'ramify-agent.json'), changed(['acceptance', 'modes', 'quick'], undefined)));
+  test('a file that still declares the removed acceptance section fails the same step with the schema\'s message', async () => {
+    const root = await fixture(path => writeProjectConfig(path, {
+      schema: 'ramify-agent.project/1',
+      acceptance: { support: [], modes: { quick: { command: ['npm', 'run', 'acceptance:quick', '--'] }, full: { command: ['npm', 'run', 'acceptance:full', '--'] } } },
+    }));
     const { snapshot, step } = await run(root, false);
 
     expect(snapshot.failure?.reason).toBe('project-config-invalid');
-    expect(step('project-config').detail).toMatch(/^ramify-agent\.json does not validate against ramify-agent\.project\/1: acceptance\.modes\.quick: /);
+    expect(step('project-config').detail).toMatch(/^ramify-agent\.json does not validate against ramify-agent\.project\/1: <root>: .*acceptance/);
   }, 180_000);
 
-  test('a support entry that matches nothing, or matches source outside every test area, fails the step', async () => {
-    const root = await fixture(async path => {
-      const config = valid();
-      (config['acceptance'] as { support: string[] }).support = [
-        'subs/integration-tests/src/support/*.ts',
-        'subs/integration-tests/src/support/driver.ts',
-        'src/*.ts',
-      ];
-      await writeProjectConfig(path, config);
-    });
-    const { snapshot, step } = await run(root, false);
-
-    expect(snapshot.failure?.reason).toBe('project-config-invalid');
-    const detail = step('project-config').detail;
-    expect(detail).not.toContain('`subs/integration-tests/src/support/*.ts`');
-    expect(detail).toContain('`subs/integration-tests/src/support/driver.ts` matches no file');
-    expect(detail).toContain('`src/*.ts` matches src/assembly.ts, src/main.ts, src/protocol.ts, … outside every module\'s test area');
-  }, 180_000);
-
-  test('a project without cucumber-js fails acceptance-runner with acceptance-harness-missing and no recovery', async () => {
+  test('a project without cucumber-js passes readiness: the harness starts no scenario runner, its committed audit runs the scenarios', async () => {
     const root = await fixture(path => rm(join(path, 'node_modules', '.bin', 'cucumber-js')));
-    const { snapshot, failures, step } = await run(root, false);
+    const { snapshot, failures, attempt } = await run(root, true);
 
-    expect(snapshot.state).toBe('failed');
-    expect(snapshot.failure?.reason).toBe('acceptance-harness-missing');
-    expect(step('project-config').outcome).toBe('passed');
-    expect(failures).toEqual([{ attempt: 1, gate: 'ga-0001', step: 'acceptance-runner', detail: 'node_modules/.bin/cucumber-js is not installed', recovery: null, final: true }]);
+    expect(snapshot.state).toBe('completed');
+    expect(failures).toEqual([]);
+    expect(attempt.steps.map(entry => entry.step)).not.toContain('acceptance-runner');
   }, 180_000);
 
-  test('a mode whose npm script or executable does not exist fails acceptance-runner, naming each', async () => {
-    const root = await fixture(async path => {
-      const config = valid();
-      const modes = (config['acceptance'] as { modes: Record<string, Record<string, unknown>> }).modes;
-      modes['quick']!['command'] = ['npm', 'run', 'acceptance:missing', '--'];
-      modes['full']!['setup'] = ['no-such-server-command', 'start'];
-      await writeProjectConfig(path, config);
-    });
-    const { snapshot, step } = await run(root, false);
-
-    expect(snapshot.failure?.reason).toBe('acceptance-harness-missing');
-    expect(step('acceptance-runner').detail).toBe([
-      'quick mode\'s command `npm run acceptance:missing --` does not resolve: package.json declares no `acceptance:missing` script',
-      'full mode\'s setup `no-such-server-command start` does not resolve: `no-such-server-command` is neither in node_modules/.bin nor on the PATH',
-    ].join('; '));
-  }, 180_000);
-
-  test('every other step still fails as readiness-failed', () => {
+  test('every step but project-config fails as readiness-failed', () => {
     expect(readinessFailureReason('project-config')).toBe('project-config-invalid');
-    expect(readinessFailureReason('acceptance-runner')).toBe('acceptance-harness-missing');
+    expect(readinessFailureReason('acceptance-runner')).toBe('readiness-failed');
     expect(readinessFailureReason('test-runner')).toBe('readiness-failed');
     expect(readinessFailureReason(undefined)).toBe('readiness-failed');
   });

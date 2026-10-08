@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { commitMessage } from '../run/gates.js';
 import { acceptedCommit } from '../checks/accepted.js';
-import { checkOutputPath, type CheckExecutionPort } from '../checks/execution.js';
+import type { ConfiguredAuditPort } from '../../subs/audit/src/check-execution.js';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
@@ -11,7 +11,7 @@ import type { RunWrite } from '../run/service.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
@@ -200,7 +200,10 @@ describe('a change to the working directory blocks nothing', () => {
     expect(onlyRun(opened.service, 'review-notes').state, JSON.stringify(onlyRun(opened.service, 'review-notes').failure)).toBe('completed');
     const first = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as GateAttempt;
     expect(first).toMatchObject({ verdict: 'failed', cause: 'check-failed', commit: null, audited: null, next: 'repair' });
-    expect(first.commands.some(command => command.notVerified === 'local-rule-failed')).toBe(true);
+    // The rule failed before commit, so the audit was never asked, and no
+    // command record stands in for the checks it did not run.
+    expect(first.commands).toEqual([]);
+    expect(first.audit).toBeUndefined();
     expect(first.rules?.find(rule => rule.rule === 'scratch-safety')?.violations).toEqual([expect.objectContaining({
       path: `${notesDirectory}/src/tmp/`, detail: expect.stringContaining(`${notesDirectory}/src/.gitignore:1`),
     })]);
@@ -468,32 +471,18 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
         { commit: null, against: 'revision-01' },
       ],
     });
-    const direct = createPassingCheckExecution();
+    const passing = passingAudit();
     let failedOnce = false;
-    const checkExecution: CheckExecutionPort = {
-      async run(checks, request) {
-        if (!failedOnce && request.context.checkpoint === 'iteration') {
+    // The first iteration gate's request cannot be answered: the audit
+    // service is unavailable. Readiness made the one full request before it.
+    const configuredAudit: ConfiguredAuditPort = {
+      read: passing.read,
+      async run(input) {
+        if (!failedOnce && input.mode === 'project-default') {
           failedOnce = true;
-          await mkdir(request.directory, { recursive: true });
-          const commands = await Promise.all(checks.map(async (check, index) => {
-            const path = checkOutputPath(request.directory, index, check);
-            await writeFile(path, 'the audit service was unavailable\n');
-            return {
-              kind: check.kind,
-              command: check.command,
-              ...(check.selection === undefined ? {} : { selection: check.selection }),
-              startedAt: new Date().toISOString(),
-              elapsedMs: 0,
-              exitCode: null,
-              outcome: 'not-verified' as const,
-              notVerified: 'runner-error' as const,
-              runnerError: { kind: 'audit-infrastructure', message: 'the audit service was unavailable' },
-              output: { path, bytes: 34, truncated: false, tail: 'the audit service was unavailable\n' },
-            };
-          }));
-          return { commands, audited: null, evidence: null };
+          throw new Error('the audit service was unavailable');
         }
-        return direct.run(checks, request);
+        return passing.run(input);
       },
     };
     const opened = await openRuns(root, {
@@ -515,7 +504,7 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
       git: scripted.git,
       candidates: final.candidates,
 
-      checkExecution,
+      configuredAudit,
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -530,6 +519,8 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
     expect(failed).toMatchObject({ verdict: 'not-verified', cause: 'infrastructure' });
     expect(failed!.commit).toBe('revision-01');
     expect(failed!.audited).toBeNull();
+    expect(failed!.audit).toMatchObject({ status: 'failed', requestedSourceCommit: 'revision-01', auditedSourceCommit: null });
+    expect(failed!.audit!.detail).toContain('the audit service was unavailable');
     expect(retry).toMatchObject({ verdict: 'passed', commit: null, audited: 'revision-01' });
 
     const accepted = failed!.commit!;
@@ -583,15 +574,13 @@ describe('the message the harness writes', () => {
       subject: { workItem: 'wi-001', iteration: 'wi-001.i02' },
       proposedBy: 'inv-0014', repairRound: 1, infrastructureAttempt: 0,
       head: 'abc', commit: null, audited: 'abc', evidence: null, guardedChanges: [],
-      commands: [
-        { kind: 'ramify-check', command: { argv: ['ramify'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 1200, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'a', bytes: 0, truncated: false, tail: '' } },
-        { kind: 'type-check', command: { argv: ['npm'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 8400, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'b', bytes: 0, truncated: false, tail: '' } },
-        {
-          kind: 'tests', command: { argv: ['vitest'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 21000, exitCode: 0, outcome: 'passed', runnerError: null,
-          selection: { policy: 'owned-by-scope', exactOwners: ['workspace/reviews'], subtrees: ['reviews/core'], extraSuites: [], resolved: ['a.test.ts', 'b.test.ts'] },
-          output: { path: 'c', bytes: 0, truncated: false, tail: '' },
-        },
-      ],
+      commands: [],
+      audit: {
+        requestId: '20260920T101500Z-3f9a1c:ga-0012', mode: 'project-default', status: 'completed',
+        definition: { path: 'ramify-audit.json', blob: 'b'.repeat(40) },
+        requestedSourceCommit: 'abc', auditedSourceCommit: 'abc', requestedMode: 'ramify-partial', executedMode: 'ramify-partial',
+        fallbackReason: null, reuse: null, verdict: 'pass', detail: 'composed pass',
+      },
       verdict: 'passed', cause: null, next: 'accept',
     };
     const parts = {

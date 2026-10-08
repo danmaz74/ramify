@@ -30,6 +30,7 @@ import { fixtureScratchGit } from './helpers/mock-git.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
 import { withDefaultTurns } from './helpers/declarations.js';
 import { checkToolName, type CheckSubmission } from '../analysis/extraction.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 
 /*
  * The review stop, architecture §3. A run started with `reviewStop` waits
@@ -502,7 +503,7 @@ describe('over HTTP', () => {
       runs: {
         inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
         git: fixtureScratchGit(unchangedGit(root, [finalVerification], 4)), candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates,
-        checkExecution: createPassingCheckExecution(), configuredAudit: scriptedConfiguredAudit(root, {}),
+        configuredAudit: passingAudit(),
       },
     });
   }

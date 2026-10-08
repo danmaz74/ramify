@@ -47,14 +47,13 @@ async function project(): Promise<string> {
   return root;
 }
 
-/** An iteration gate over `root`: the scoped tests pass, the type check prints `printed`, the rest pass. */
-async function iterationGate(root: string, typeCheck: Omit<PlannedCheck, 'kind' | 'attribution'>, writeScope: readonly string[] | null = [scope], ramify = '{}'): Promise<GateAttempt> {
+/** An in-place iteration diagnosis over `root`: the type check prints `printed`, the Ramify check prints `ramify`. */
+async function iterationGate(root: string, typeCheck: Omit<PlannedCheck, 'kind'>, writeScope: readonly string[] | null = [scope], ramify = '{}'): Promise<GateAttempt> {
   const checks: PlannedCheck[] = [
-    { kind: 'tests', command: prints('ok\n', 0, root), attribution: 'in-scope' },
-    { kind: 'type-check', attribution: 'project', ...typeCheck },
-    { kind: 'ramify-check', command: prints(ramify, ramify === '{}' ? 0 : 1, root), attribution: 'project' },
+    { kind: 'type-check', ...typeCheck },
+    { kind: 'ramify-check', command: prints(ramify, ramify === '{}' ? 0 : 1, root) },
   ];
-  return runGate(createMappedCheckExecution({ script: ({ check }) => responses.get(check.command.argv[2]!)! }), 'iteration', {
+  return runGate(createMappedCheckExecution({ script: ({ checkIndex }) => responses.get(checks[checkIndex]!.command.argv[2]!)! }), 'iteration', {
     id: 'ga-0003',
     projectRoot: root,
     directory: join(root, 'gate'),
@@ -75,7 +74,7 @@ describe('a failed type check at an iteration gate', () => {
     expect(gate.cause).toBe('check-failed');
     expect(gate.attribution).toBeUndefined();
     expect(gate.next).toBe('repair');
-    expect(gate.commands[1]!.output.path).toBeTruthy();
+    expect(gate.commands[0]!.output.path).toBeTruthy();
   });
 
   test('an unlocated configuration error and a truncated output still reach the engineer', async () => {

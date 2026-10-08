@@ -1,7 +1,8 @@
 import { finalCandidate } from './final-candidate.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { GateAttempt, ScenarioCheckSummary } from '../../checks/records.js';
+import type { GateAttempt } from '../../checks/records.js';
+import { scenarioResultsOf, type ScenarioResult } from '../../checks/scenario-results.js';
 import type { RunEvent } from '../../run/log.js';
 import { runLayout } from '../../run/records.js';
 import { analysis, entry, requestCompletion } from './analysis.js';
@@ -215,8 +216,9 @@ export async function gates(root: string, runId: string, log: readonly RunEvent[
   return Promise.all(ids.map(async id => JSON.parse(await readFile(runPath(root, plan, runId, runLayout.gate(id)), 'utf8')) as GateAttempt));
 }
 
-export function summaryOf(attempt: GateAttempt): ScenarioCheckSummary | undefined {
-  return attempt.commands.find(command => command.kind === 'scenarios')?.scenarios;
+/** What the gate's audit said of each tracked scenario, read from the configured scenario check's raw output. */
+export function scenarioResults(attempt: GateAttempt): ScenarioResult[] {
+  return scenarioResultsOf(attempt);
 }
 
 /** The index of the first event of a type that matches. */

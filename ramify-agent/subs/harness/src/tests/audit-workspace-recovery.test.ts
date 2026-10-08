@@ -10,9 +10,22 @@ import { afterEach, describe, expect, test } from 'vitest';
 import type { IntendedAuditWorkspace } from '../../subs/audit/src/check-execution.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { initRepository } from './helpers/runs.js';
+import { auditDefinition, commandCheck } from './helpers/configured-repository.js';
 
 const exec = promisify(execFile);
 const killedAudit = fileURLToPath(new URL('./helpers/killed-audit.ts', import.meta.url));
+/**
+ * The committed check: pass, or wait (writing the marker first during
+ * execution) until the auditing process dies. The provider gives a check no
+ * ambient environment, so the killed-audit process writes what to do into a
+ * control file beside the repository, whose path the check names.
+ */
+const killableCheck = (control: string) => [
+  `const { mode, marker, owner } = JSON.parse(require("fs").readFileSync(${JSON.stringify(control)}, "utf8"));`,
+  'if (mode === "pass") process.exit(0);',
+  'if (mode === "during-execution") require("fs").writeFileSync(marker, "running");',
+  'setInterval(() => { try { process.kill(owner, 0); } catch { process.exit(0); } }, 25);',
+].join(' ');
 const cleanups: string[] = [];
 afterEach(async () => {
   const { rm } = await import('node:fs/promises');
@@ -23,6 +36,8 @@ async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'ramify-agent-workspace-owner-'));
   cleanups.push(root);
   await writeFile(join(root, 'module.ramify'), rootDescription('fixture'));
+  cleanups.push(`${root}.killed-audit.json`);
+  await writeFile(join(root, 'ramify-audit.json'), auditDefinition([commandCheck('killable', [{ name: 'killable', cmd: 'node', args: ['-e', killableCheck(`${root}.killed-audit.json`)] }])]));
   await mkdir(join(root, 'plans', 'plan', '.harness', 'jobs', '20260921T000000Z-aabbcc', 'gates', 'ga-0001'), { recursive: true });
   const commit = await initRepository(root);
   await mkdir(join(root, 'node_modules'), { recursive: true });
@@ -195,9 +210,10 @@ describe('durable audit workspace ownership', () => {
       expect(await exists(abandoned.worktreePath)).toBe(true);
 
       const retry = auditProcess('pass', f.root, f.commit, signal);
-      const attempt = JSON.parse((await output(retry)).trim()) as { audited: string | null; evidence: unknown };
-      expect(attempt.audited).toBe(f.commit);
-      expect(attempt.evidence).not.toBeNull();
+      const result = JSON.parse((await output(retry)).trim()) as { status: string; auditedSourceCommit: string | null; reportCommit: string | null; detail: string };
+      expect(result.status, result.detail).toBe('completed');
+      expect(result.auditedSourceCommit).toBe(f.commit);
+      expect(result.reportCommit).toMatch(/^[0-9a-f]{40}$/u);
       expect(await exists(abandoned.worktreePath)).toBe(false);
       const list = (await exec('git', ['worktree', 'list', '--porcelain'], { cwd: f.root })).stdout;
       expect(list).not.toContain(abandoned.worktreePath);

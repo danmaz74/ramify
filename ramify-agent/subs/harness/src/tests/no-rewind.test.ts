@@ -1,7 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { checkCommand } from '../checks/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { workLayout } from '../work/records.js';
@@ -9,8 +8,9 @@ import { runLayout } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
-import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
-import { createMappedCheckExecution, type DirectCheckInvocation, type DirectCheckStep } from './helpers/direct-check-execution.js';
+import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { gateDiagnostics } from '../checks/diagnostics.js';
+import { mappedAudit, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { accepted, answeredGit, modified, scenariosCommitted, unchanged } from './helpers/contracts-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
@@ -31,9 +31,9 @@ vi.mock('node:child_process', async original =>
  * the work item's own gate runs the whole project once, and its failure
  * returns to the active architect, who chooses the next scoped assignment.
  *
- * Which files each gate selects is the harness's own work over the tree.
- * What the runner reports for them, and what Git reports for each commit,
- * are this file's data: an external answer, never a simulated repository.
+ * Each gate asks the project's committed audit, which selects its checks.
+ * What the audit reports, and what Git reports for each commit, are this
+ * file's data: an external answer, never a simulated repository.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -108,27 +108,6 @@ const repairTheAlert = submit(
   edit('alerts.ts', 'alertsLimit = 4', 'alertsLimit = 5'),
 );
 
-/**
- * A policy whose whole-project test command names both modules' tests. The
- * runner itself is answered rather than run: what each command result is, is
- * this scenario's own data, and the selection each gate resolves is the
- * harness's own work over the tree.
- */
-function wholeProject(projectRoot: string) {
-  const base = testPolicy(projectRoot);
-  return {
-    ...base,
-    commands: {
-      ...base.commands,
-      allTests: checkCommand({
-        argv: [join(projectRoot, 'node_modules', '.bin', 'vitest'), 'run', `${notesDirectory}/src/tests/notes.test.ts`, `${alertsDirectory}/src/tests/alerts.test.ts`],
-        cwd: projectRoot,
-        timeoutMs: 60_000,
-      }),
-    },
-  };
-}
-
 /** What the project's runner reports where the alerts module's own test fails. */
 const alertsFailed: DirectCheckStep = {
   outcome: { kind: 'completed', exitCode: 1 },
@@ -153,11 +132,6 @@ const notesFailed: DirectCheckStep = {
   ].join('\n'),
 };
 
-/** The whole-project test command, as against the assignment's own selection. */
-function isProjectTests(invocation: DirectCheckInvocation): boolean {
-  return invocation.check.kind === 'tests' && invocation.check.attribution === 'project';
-}
-
 async function readResult(root: string, runId: string, workItem: string, number: number): Promise<IterationResult> {
   return JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result(workItem, number)), 'utf8')) as IterationResult;
 }
@@ -172,17 +146,14 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
 
     /*
      * The raised note limit breaks the alerts module, which is not the
-     * assignment's own. The project's runner reports that failure until the
-     * repair iteration has run the alerts module's own test, and the
-     * assignment's own selection passes throughout.
+     * assignment's own. The audit of the iteration's commit passes; the work
+     * item's own audit reports the alerts failure until the repair
+     * iteration over the alerts module has been accepted.
      */
     let repaired = false;
-    const checkExecution = createMappedCheckExecution({
-      script: invocation => {
-        const selection = invocation.check.selection?.resolved ?? [];
-        if (selection.some(path => path.startsWith(alertsDirectory))) { repaired = true; return {}; }
-        return isProjectTests(invocation) && !repaired ? alertsFailed : {};
-      },
+    const configuredAudit = mappedAudit(({ check, context }) => {
+      if (context.checkpoint === 'iteration' && context.sourceCommit === 'revision-02') repaired = true;
+      return check.kind === 'tests' && context.checkpoint === 'work-item' && !repaired ? alertsFailed : {};
     });
     const final = finalCandidate(root, 'revision-02');
     const git = answeredGit(root, {
@@ -218,8 +189,7 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
         engineer: [raiseTheNoteLimit, repairTheAlert],
       }),
       inputs: treeInputs(),
-      policy: wholeProject,
-      checkExecution,
+      configuredAudit,
 
       git,
       candidates: final.candidates,
@@ -242,10 +212,10 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
     expect(returned.cause).toBe('check-failed');
     expect(returned.attribution).toBeUndefined();
     expect(returned.next).toBe('repair');
-    const testCommands = returned.commands.filter(command => command.kind === 'tests');
-    expect(testCommands).toHaveLength(1);
-    expect(testCommands[0]!.outcome).toBe('failed');
-    expect(testCommands[0]!.output.tail).toContain('expected 400 to be 500');
+    // The audit's own answer carries the failure; no command record is made for it.
+    expect(returned.commands).toEqual([]);
+    expect(returned.audit).toMatchObject({ status: 'completed', verdict: 'fail', mode: 'project-default' });
+    expect((await gateDiagnostics(returned, 'local-architect')).summary.join('\n')).toContain('expected 400 to be 500');
 
     // The architect assigned the owner that failed, and the work item's gate
     // then passed.
@@ -278,18 +248,15 @@ describe('adding work leaves every completed piece completed', () => {
 
     /*
      * The first attempt raised the limit in the source and not in the test
-     * that states it, so the assignment's own selection fails once. Every
-     * later command passes: the repair states the new limit in the test, and
+     * that states it, so the first iteration audit's tests fail once. Every
+     * later check passes: the repair states the new limit in the test, and
      * the second iteration raises the alert the limit broke.
      */
-    let firstSelection = true;
-    const checkExecution = createMappedCheckExecution({
-      script: invocation => {
-        if (invocation.check.kind !== 'tests' || invocation.check.attribution !== 'in-scope') return {};
-        if (!firstSelection) return {};
-        firstSelection = false;
-        return notesFailed;
-      },
+    let firstFailure = true;
+    const configuredAudit = mappedAudit(({ check, context }) => {
+      if (check.kind !== 'tests' || context.checkpoint !== 'iteration' || !firstFailure) return {};
+      firstFailure = false;
+      return notesFailed;
     });
     const final = finalCandidate(root, 'revision-03');
     const git = answeredGit(root, {
@@ -326,8 +293,7 @@ describe('adding work leaves every completed piece completed', () => {
         ],
       }),
       inputs: treeInputs(),
-      policy: wholeProject,
-      checkExecution,
+      configuredAudit,
 
       git,
       candidates: final.candidates,

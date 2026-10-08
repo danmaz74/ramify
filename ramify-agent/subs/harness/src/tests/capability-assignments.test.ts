@@ -6,7 +6,7 @@ import type { Script } from '../../subs/agent/src/scripted.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
-import { assign, edit, installMiniRunner, outline, runScopeTests, submit, treeInputs, write } from './helpers/iterations.js';
+import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { initRepository, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import { decision, forkDecision } from './helpers/placement.js';
@@ -52,8 +52,7 @@ function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-bloc
       } },
       edit('caller.ts', 'Fact: ${value}', 'Fresh fact: ${value}'),
       write('extra.ts', "export const sourceHint = 'B';\n"),
-      edit('tests/caller.test.ts', "toBe('Fact: old')", "toBe('this test still fails')"),
-      runScopeTests());
+      edit('tests/caller.test.ts', "toBe('Fact: old')", "toBe('this test still fails')"));
       const owner = spec.prompt.includes('# Iteration cap-') ? /Your starting module is `([^`]+)`/u.exec(spec.prompt)?.[1] : undefined;
       if (mode === 'partial-blocker' && owner === a) return submit({
         kind: 'partial', done: ['A kept the readable selected denial'], unfinished: ['Root-owned stale assertion in src/tests/stale.test.ts'],
@@ -189,8 +188,10 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
     `invocations/${original.data.invocation}/observations.jsonl`), 'utf8')).trim().split('\n').map(line => JSON.parse(line) as {
       type: string; data: { outcome?: string };
     });
-  expect(originalObservations).toContainEqual(expect.objectContaining({ type: 'scope-tests',
-    data: expect.objectContaining({ outcome: 'failed' }) }));
+  // The engineer has no scoped test tool, and the harness writes no
+  // scope-tests observation: its writes are what the observations record.
+  expect(originalObservations.some(line => line.type === 'scope-tests')).toBe(false);
+  expect(originalObservations.length).toBeGreaterThan(0);
   const consultation = engineerStarts.find(event => event.data.work.capabilityTask === 'cap-001' &&
     event.data.work.capabilityAssignment === undefined)!;
   const aExperiment = engineerStarts.find(event => event.data.work.iteration === 'cap-001.i04')!;

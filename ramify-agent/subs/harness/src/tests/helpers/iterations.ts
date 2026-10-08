@@ -164,11 +164,6 @@ export function edit(path: string, oldText: string, newText: string): ScriptStep
   return { kind: 'tool', tool: 'edit', input: { path, edits: [{ oldText, newText }] } };
 }
 
-/** A call of the engineer's own test tool. */
-export function runScopeTests(input: unknown = {}): ScriptStep {
-  return { kind: 'tool', tool: 'run_scope_tests', input };
-}
-
 /** A call of the engineer's shell, whose writes pass no guard. */
 export function shell(command: string, extra: Record<string, unknown> = {}): ScriptStep {
   return { kind: 'tool', tool: 'shell', input: { command, ...extra } };

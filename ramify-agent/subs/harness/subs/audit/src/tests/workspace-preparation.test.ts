@@ -6,65 +6,15 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import type { CheckCommand } from '../../../../src/checks/records.js';
-import type { PlannedCheck } from '../../../../src/checks/verify.js';
 import { childEnvironment } from '../../../evidence/src/run-command.js';
-import { configuredAuditProgress, configuredFullResultMatches, readCommittedAuditConfiguration, workspacePreparationOf } from '../check-execution.js';
+import { configuredAuditProgress, configuredFullResultMatches, readCommittedAuditConfiguration } from '../check-execution.js';
 
 /*
- * The workspace preparation every audit request names: ramify-audit's
- * built-in `nodejs` preparation, with the project's dependency directories
- * and its declared setup commands. The harness registers none of its own.
+ * The workspace preparation every audit request names comes from the
+ * committed definition: ramify-audit's built-in `nodejs` preparation, with
+ * the declared package directories and setup commands. The harness builds
+ * and registers none of its own.
  */
-
-const projectRoot = '/repository/apps/web';
-
-function command(argv: string[], cwd: string, timeoutMs: number, envAdditions: Record<string, string> = {}): CheckCommand {
-  return { argv, cwd, env: [], envAdditions, timeoutMs };
-}
-
-describe('the audit request\'s workspace preparation', () => {
-  it('links the root and every nested package, and forwards each setup command in order, relative to the project', () => {
-    const setup: PlannedCheck[] = [
-      { kind: 'setup', name: 'build', command: command(['npm', 'run', 'build'], projectRoot, 900_000), attribution: 'project' },
-      { kind: 'setup', command: command(['npm', 'run', 'build'], `${projectRoot}/packages/ui`, 600_000, { NODE_ENV: 'production' }), attribution: 'project' },
-    ];
-
-    expect(workspacePreparationOf({
-      projectRoot,
-      projectPrefix: 'apps/web',
-      dependencyDirectories: ['packages/ui', 'packages/ui'],
-      directory: '/runs/r1/gates/ga-0004',
-      setup,
-    })).toEqual({
-      preparationId: 'nodejs',
-      options: {
-        projectPrefix: 'apps/web',
-        packageDirectories: ['', 'packages/ui'],
-        build: false,
-        setupCommands: [
-          { name: 'build', cmd: 'npm', args: ['run', 'build'], timeoutMs: 900_000 },
-          { cmd: 'npm', args: ['run', 'build'], timeoutMs: 600_000, cwd: 'packages/ui', env: { NODE_ENV: 'production' } },
-        ],
-      },
-    });
-  });
-
-  it('declares no setup command and runs no build where the project declares none', () => {
-    const preparation = workspacePreparationOf({ projectRoot, projectPrefix: '', dependencyDirectories: [], directory: '/runs/r1/gates/ga-0001', setup: [] });
-    expect(preparation.options).toMatchObject({ packageDirectories: [''], build: false, setupCommands: [] });
-  });
-
-  it('refuses a setup command whose directory lies outside the project', () => {
-    expect(() => workspacePreparationOf({
-      projectRoot,
-      projectPrefix: 'apps/web',
-      dependencyDirectories: [],
-      directory: '/runs/r1/gates/ga-0002',
-      setup: [{ kind: 'setup', command: command(['make'], '/repository/apps', 60_000) }],
-    })).toThrow(/outside project/u);
-  });
-});
 
 it('reads the installed provider F3 committed A/B definitions despite malformed working C, without execution', async () => {
   const bundle = fileURLToPath(new URL('../../../../../../docs/plans/21-project-boundary-adoption/evidence/iteration0-public-fixtures/f3.bundle', import.meta.url));
@@ -158,7 +108,7 @@ it('binds identical root and nested argv to their exact working directories befo
 
 it('keeps the readiness wait paused until every parallel provider command has acquired or settled', async () => {
   const events: string[] = [];
-  const check = { kind: 'conformance' as const, name: 'parallel-check', position: 1, total: 1 };
+  const check = { kind: 'configured' as const, name: 'parallel-check', position: 1, total: 1 };
   const progress = configuredAuditProgress(new Map([['parallel-check', check]]), {
     waiting: async (_command, line) => { events.push(`wait:${line}`); },
     lockAcquired: () => { events.push('released'); },

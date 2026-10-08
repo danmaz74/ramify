@@ -192,7 +192,7 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
   }, 120_000);
 });
 
-describe('K8: every gate resolves the current tests under the captured policy', () => {
+describe('K8: every gate audits its committed candidate under the captured definition', () => {
   test('a failing test added after the assignment, during repair, fails that attempt', async () => {
     const root = await target({ limit: 500 });
     let firstIteration: string | undefined;
@@ -244,14 +244,15 @@ describe('K8: every gate resolves the current tests under the captured policy', 
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const iterationGates = (await gates(root, runId)).filter(gate => gate.checkpoint === 'iteration');
-    // The first attempt ran the test the assignment had never seen, and failed on it.
-    expect(iterationGates[0]!.commands[0]!.selection!.resolved).toEqual([
-      `${notesDirectory}/src/tests/notes.test.ts`,
-      `${notesDirectory}/src/tests/second.test.ts`,
-    ]);
+    // The first attempt asked the audit about the commit holding the test the
+    // assignment had never seen, and failed on it; the harness listed no test.
     expect(iterationGates[0]!.verdict).toBe('failed');
+    expect(iterationGates[0]!.commands).toEqual([]);
+    expect(iterationGates[0]!.audit).toMatchObject({ mode: 'project-default', requestedSourceCommit: 'revision-01', auditedSourceCommit: 'revision-01' });
     expect(iterationGates[1]!.verdict).toBe('passed');
-    expect(iterationGates[1]!.commands[0]!.selection!.resolved).toEqual(iterationGates[0]!.commands[0]!.selection!.resolved);
+    expect(iterationGates[1]!.audit).toMatchObject({ mode: 'project-default', requestedSourceCommit: 'revision-02', auditedSourceCommit: 'revision-02' });
+    // Both requests carry the definition the run captured.
+    expect(iterationGates[1]!.audit!.definition).toEqual(iterationGates[0]!.audit!.definition);
     // A failing attempt commits the revision it was audited over, and the
     // repair that follows is a revision of its own, over that one.
     expect(iterationGates.map(gate => gate.commit)).toEqual(['revision-01', 'revision-02']);
@@ -261,84 +262,25 @@ describe('K8: every gate resolves the current tests under the captured policy', 
     scripted.assertComplete();
   }, 120_000);
 
-  test('an owner with no test yet can add its first one; leaving it testless is not-verified', async () => {
-    const root = await target({ tests: false, limit: 500 });
-    const { service, runId, scripted } = await run(root, {
-      'initial-architect': [submit(analysis([entry('review-note', notes)]))],
-      'local-architect': [
-        submit(assign(notes, {}, outline())),
-        // An empty required selection is never a pass and is never the
-        // engineer's to repair: it returns here, and the architect assigns
-        // the evidence as work of its own.
-        submit(assign(notes, { goal: 'Write the first test of this module.', completionEvidence: 'The module owns a passing test.' })),
-        submit(requestCompletion()),
-      ],
-      engineer: [
-        // Nothing is written, so the selection is still empty.
-        submit(completionProposed('I changed the source and wrote no test.'), write('tmp/unsuitable.txt', 'scratch\n')),
-        // The first test of the owner, written by the iteration that needs it.
-        submit(completionProposed('Added the first test of this module.'),
-          write('tests/notes.test.ts', limitTest)),
-      ],
-    }, {
-      commits: [
-        scenarios,
-        added('revision-01', `${notesDirectory}/src/tests/notes.test.ts`),
-        unchanged,
-        unchanged,
-      ],
-    });
-
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
-    const iterationGates = (await gates(root, runId)).filter(gate => gate.checkpoint === 'iteration');
-    expect(iterationGates[0]!.verdict).toBe('not-verified');
-    expect(iterationGates[0]!.commands[0]!.notVerified).toBe('empty-selection');
-    expect(iterationGates[0]!.commands[0]!.selection!.resolved).toEqual([]);
-    // Nothing ran: a checkpoint that cannot run what it requires runs nothing.
-    expect(iterationGates[0]!.commands.every(command => command.outcome === 'not-verified')).toBe(true);
-    expect(iterationGates[0]!.next).toBe('return-to-local-architect');
-    expect((await readResult(root, runId, 'wi-001', 1)).outcome).toBe('unsuitable');
-    await expect(readFile(join(root, notesDirectory, 'src/tmp/unsuitable.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
-    // An attempt that runs nothing commits nothing either.
-    expect(iterationGates[0]).toMatchObject({ commit: null, audited: null });
-
-    expect(iterationGates.at(-1)!.verdict).toBe('passed');
-    expect(iterationGates.at(-1)!.commands[0]!.selection!.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
-    expect((await readResult(root, runId, 'wi-001', 2)).outcome).toBe('accepted');
-    expect(scripted.revisions()).toEqual([materialized, 'revision-01']);
-    // No external tool was started for any of this.
-    expectNoProcesses();
-    scripted.assertComplete();
-  }, 120_000);
-
-  test('a discovery that fails never falls back to an earlier list', async () => {
-    const root = await target({ limit: 500 });
+  test('an owner with no test of its own is judged by the audit alone: the harness draws no empty-selection conclusion', async () => {
+    const root = await target({ tests: false });
     const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
-      engineer: [
-        submit(completionProposed('Done.')),
-        submit(completionProposed('Done again.')),
-      ],
-    }, { commits: [scenarios, unchanged, unchanged] }, {
-      // The second gate's refresh cannot answer, so its discovery fails.
-      inputs: failingRefreshAfter(1),
+      engineer: [submit(completionProposed('Raised the limit to 500.'), edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'))],
+    }, {
+      commits: [scenarios, modified('revision-01', `${notesDirectory}/src/notes.ts`), unchanged, unchanged],
     });
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const iterationGates = (await gates(root, runId)).filter(gate => gate.checkpoint === 'iteration');
-    const failedDiscovery = iterationGates.find(gate => gate.commands[0]!.notVerified === 'discovery-error');
-    expect(failedDiscovery).toBeDefined();
-    expect(failedDiscovery!.verdict).toBe('not-verified');
-    expect(failedDiscovery).toMatchObject({ commit: null, audited: null, evidence: null });
-    const events = await runEventsOnDisk(root, 'review-notes', runId);
-    expect(events.some(event => event.type === 'gate-committing' && event.data.gate === failedDiscovery!.id)).toBe(false);
-    // The selection is empty rather than the list the earlier attempt used.
-    expect(failedDiscovery!.commands[0]!.selection!.resolved).toEqual([]);
-    // An attempt that never reached the commit boundary asked Git for no
-    // commit: the boundaries this run reached are the ones scripted here.
-    expect(scripted.messages.every(message => !message.includes(failedDiscovery!.id))).toBe(true);
-    // No external tool was started for any of this.
+    expect(iterationGates).toHaveLength(1);
+    // The owner has no test; whether that is enough is the committed audit's
+    // answer, and here it passes. No command record is invented for it.
+    expect(iterationGates[0]).toMatchObject({ verdict: 'passed', commit: 'revision-01', audited: 'revision-01', commands: [] });
+    expect(iterationGates[0]!.audit).toMatchObject({ status: 'completed', verdict: 'pass', requestedSourceCommit: 'revision-01' });
+    expect((await readResult(root, runId, 'wi-001', 1)).outcome).toBe('accepted');
+    expect(scripted.revisions()).toEqual([materialized, 'revision-01']);
     expectNoProcesses();
     scripted.assertComplete();
   }, 120_000);
@@ -437,11 +379,11 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
       previews: [],
     }, {
       checkScript: ({ check }) => check.kind === 'tests'
-        ? { outcome: { kind: 'timed-out', timeoutMs: check.command.timeoutMs } }
+        ? { outcome: { kind: 'timed-out', timeoutMs: 600_000 } }
         : {},
     });
 
-    // The scoped run is the same command at every checkpoint, so the work
+    // The configured tests check times out at every checkpoint, so the work
     // item's own gate cannot answer either and the run ends with evidence.
     const snapshot = onlyRun(service, 'review-notes');
     expect(snapshot.state).toBe('failed');
@@ -466,16 +408,3 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
     scripted.assertComplete();
   }, 120_000);
 });
-
-/** Inputs whose refresh stops answering after `times`, so a later discovery fails. */
-function failingRefreshAfter(times: number) {
-  const base = treeInputs();
-  let seen = 0;
-  return {
-    ...base,
-    refresh: async (projectRoot: string) => {
-      seen += 1;
-      return seen > times ? null : base.refresh(projectRoot);
-    },
-  };
-}

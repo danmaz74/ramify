@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { createConfiguredAudit, type CommittedAuditConfiguration, type ConfiguredAuditPort, type ConfiguredFullAuditResult } from '../../subs/audit/src/check-execution.js';
+import { createConfiguredAudit, type CommittedAuditConfiguration, type ConfiguredAuditInput, type ConfiguredAuditPort, type ConfiguredFullAuditResult } from '../../subs/audit/src/check-execution.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { captureProjectConfig } from '../run/project-config.js';
@@ -37,16 +37,32 @@ function configuration(head: string, options: Partial<CommittedAuditConfiguratio
   };
 }
 
+/** A scripted provider answer to one readiness request: a completed full pass unless `answer` says otherwise. */
+function resultOf(input: ConfiguredAuditInput, answer: Partial<ConfiguredFullAuditResult> = {}): ConfiguredFullAuditResult {
+  return {
+    status: 'completed', requestId: `${input.runId}:${input.attemptId}`, mode: input.mode,
+    requestedSourceCommit: input.sourceCommit, auditedSourceCommit: input.sourceCommit, reused: false, reuse: null,
+    requestedMode: 'full', executedMode: 'full', fallbackReason: null, verdict: 'pass',
+    reportCommit: 'report', runRef: 'ref', treeRef: 'tree',
+    definition: { path: input.configuration.path, blob: input.configuration.blob },
+    detail: 'configured suite complete', provider: { source: 'scripted-readiness' }, checks: {}, ...answer,
+  };
+}
+
+/** A provider answer that settled after cancellation. */
+function cancelledResult(input: ConfiguredAuditInput): ConfiguredFullAuditResult {
+  return resultOf(input, { status: 'cancelled', auditedSourceCommit: null, requestedMode: null, executedMode: null,
+    verdict: null, reportCommit: null, runRef: null, treeRef: null,
+    detail: 'provider command cancelled and settled', provider: { status: 'cancelled', reason: 'signal' } });
+}
+
 function port(config: CommittedAuditConfiguration, answer?: Partial<ConfiguredFullAuditResult>) {
   const calls: string[] = [];
   const adapter: ConfiguredAuditPort = {
     async read(_root, head) { calls.push(`read:${head}`); return config; },
-    async runFull(request) {
-      calls.push(`full:${request.sourceCommit}`);
-      return { status: 'completed', requestedSourceCommit: request.sourceCommit,
-        auditedSourceCommit: request.sourceCommit, reused: false, verdict: 'pass',
-        reportCommit: 'report', runRef: 'ref', treeRef: 'tree', detail: 'configured suite complete',
-        provider: { source: 'scripted-readiness' }, ...answer };
+    async run(request) {
+      calls.push(`${request.mode}:${request.sourceCommit}`);
+      return resultOf(request, answer);
     },
   };
   return { adapter, calls };
@@ -428,8 +444,8 @@ describe('declared preparation and configured full readiness', () => {
     const config = configuration(fixture.head);
     const base = port(config).adapter;
     let calls = 0;
-    const configured: ConfiguredAuditPort = { read: base.read, async runFull(input) {
-      const result = await base.runFull(input);
+    const configured: ConfiguredAuditPort = { read: base.read, async run(input) {
+      const result = await base.run(input);
       return ++calls === 1 ? { ...result, verdict: 'fail', provider: { status: 'completed', summary: { checks: {
         'configured-tests': { termination: { reason: 'timeout' } },
       } } } } : result;
@@ -471,16 +487,14 @@ describe('declared preparation and configured full readiness', () => {
     let aborted = false;
     let release!: () => void;
     const processSettled = new Promise<void>(resolve => { release = resolve; });
-    const configured: ConfiguredAuditPort = { read: base.read, async runFull(input) {
+    const configured: ConfiguredAuditPort = { read: base.read, async run(input) {
       entered = true;
       await new Promise<void>(resolve => {
         if (input.signal?.aborted) { aborted = true; resolve(); }
         else input.signal?.addEventListener('abort', () => { aborted = true; resolve(); }, { once: true });
       });
       await processSettled;
-      return { status: 'cancelled', requestedSourceCommit: input.sourceCommit, auditedSourceCommit: null,
-        reused: false, verdict: null, reportCommit: null, runRef: null, treeRef: null,
-        detail: 'provider command cancelled and settled', provider: { status: 'cancelled', reason: 'signal' } };
+      return cancelledResult(input);
     } };
     const { service } = await openRuns(fixture.root, { git: gitService,
       script: [{ kind: 'submit', input: emptyAnalysis() }], configuredAudit: configured });
@@ -514,13 +528,11 @@ describe('declared preparation and configured full readiness', () => {
     let aborted = false;
     let release!: () => void;
     const processSettled = new Promise<void>(resolve => { release = resolve; });
-    const configured: ConfiguredAuditPort = { read: base.read, async runFull(input) {
+    const configured: ConfiguredAuditPort = { read: base.read, async run(input) {
       entered = true;
       await new Promise<void>(resolve => input.signal?.addEventListener('abort', () => { aborted = true; resolve(); }, { once: true }));
       await processSettled;
-      return { status: 'cancelled', requestedSourceCommit: input.sourceCommit, auditedSourceCommit: null,
-        reused: false, verdict: null, reportCommit: null, runRef: null, treeRef: null,
-        detail: 'provider command cancelled and settled', provider: { status: 'cancelled', reason: 'signal' } };
+      return cancelledResult(input);
     } };
     const { service } = await openRuns(fixture.root, { git: gitService,
       script: [{ kind: 'submit', input: emptyAnalysis() }], configuredAudit: configured });

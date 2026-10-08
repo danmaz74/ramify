@@ -16,7 +16,7 @@ import { startServerWith, type RunningServer } from '../http/server.js';
 import { terminalRunEvents } from '../run/log.js';
 import { treeInputs } from './helpers/iterations.js';
 import {
-  draftsDirectory, drafts, fileHashes, longOutputBytes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
+  draftsDirectory, drafts, fileHashes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
 } from './helpers/protocol.js';
 import {
   emptyAnalysis, git, initRepository, installTestRunner, openRuns, realRamify, runEventsOnDisk, runPath, startRun, stubRamify, testPolicy, until,

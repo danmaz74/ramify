@@ -30,9 +30,6 @@ export const draftsDirectory = `${notesDirectory}/subs/drafts`;
 export const reviews = 'collection-review/workspace/reviews';
 export const outsidePath = 'subs/workspace/subs/reviews/src/outside-the-scope.ts';
 
-/** How long the final gate's test command prints, in bytes: longer than the 8 KiB tail. */
-export const longOutputBytes = 20_000;
-
 /** A fixture copy with the notes module, the runner that really runs test files, and one commit. */
 export async function protocolTarget(realGit = true): Promise<{ root: string; remove: () => Promise<void> }> {
   const fixture = await copyFixture();
@@ -51,20 +48,13 @@ export async function protocolTarget(realGit = true): Promise<{ root: string; re
   return fixture;
 }
 
-/** The policy of the run: cheap real commands, and a project test command whose output exceeds the tail. */
+/**
+ * The policy of the run: cheap real commands. A gate's tests run as the
+ * configured audit's check, which the test scripts; its long output is the
+ * scripted check's, not a policy command's.
+ */
 export function protocolPolicy(projectRoot: string): RunPolicy {
-  const base = testPolicy(projectRoot);
-  return {
-    ...base,
-    commands: {
-      ...base.commands,
-      allTests: checkCommand({
-        argv: [process.execPath, '-e', `process.stdout.write('x'.repeat(${longOutputBytes - 12}) + '\\nall passed\\n')`],
-        cwd: projectRoot,
-        timeoutMs: 30_000,
-      }),
-    },
-  };
+  return testPolicy(projectRoot);
 }
 
 /** The script: two work items, one of which creates a module, each declaring its scenario with its completion request. */

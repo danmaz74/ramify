@@ -6,15 +6,15 @@ import { inPlaceCheckExecution } from '../checks/execution.js';
 import type { CheckExecutionPort } from '../checks/execution.js';
 import type { GateRequest } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
-import type { CheckCommand, TestSelection } from '../checks/records.js';
+import type { CheckCommand } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
 import { temporaryDirectory } from './helpers/fixture.js';
 
 /**
- * A check that did not run says why, and an empty required selection never
- * passes. Every command and every selection is verified before the first
- * command runs, so a checkpoint that cannot run what it requires runs nothing
- * at all.
+ * An in-place diagnosis whose command did not run says why. Every command is
+ * verified before the first one runs, so a checkpoint that cannot run what it
+ * requires runs nothing at all. (A committing gate plans no command: its
+ * configured audit selects and runs the checks.)
  */
 describe('a gate that cannot run what its checkpoint requires', () => {
   let directory: { path: string; remove: () => Promise<void> };
@@ -30,9 +30,6 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     ...checkCommand({ argv: ['bash', '-c', script], cwd: directory.path, timeoutMs: 30_000 }),
     ...overrides,
   });
-
-  const selection = (resolved: string[], extraSuites: string[] = []): TestSelection =>
-    ({ policy: 'owned-by-scope', exactOwners: ['project/reviews'], subtrees: [], extraSuites, resolved });
 
   const gate = (checks: readonly PlannedCheck[], overrides: Partial<GateRequest> = {}): Promise<ReturnType<typeof runGate> extends Promise<infer T> ? T : never> =>
     runGate(inPlaceCheckExecution, 'iteration', {
@@ -50,7 +47,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     const attempt = await gate([
       { kind: 'ramify-check', command: command(`touch ${marker('ran-ramify')}`) },
       { kind: 'type-check', command: { ...command('true'), argv: ['definitely-not-a-command-xyz'] } },
-      { kind: 'tests', command: command(`touch ${marker('ran-tests')}`) },
+      { kind: 'ramify-check', name: 'second', command: command(`touch ${marker('ran-tests')}`) },
     ]);
 
     expect(attempt.verdict).toBe('not-verified');
@@ -64,38 +61,9 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     await expect(stat(marker('ran-tests'))).rejects.toThrow();
   });
 
-  it('never passes an empty required selection', async () => {
-    const attempt = await gate([
-      { kind: 'type-check', command: command('true') },
-      { kind: 'tests', command: command(`touch ${marker('ran-tests')}`), selection: selection([]), requiresTests: true },
-    ]);
-
-    expect(attempt.verdict).toBe('not-verified');
-    expect(attempt.commands[1]?.notVerified).toBe('empty-selection');
-    expect(attempt.commands[1]?.selection?.resolved).toEqual([]);
-    expect(attempt.cause).toBe('unknown');
-    expect(attempt.next).toBe('return-to-local-architect');
-    await expect(stat(marker('ran-tests'))).rejects.toThrow();
-  });
-
-  it('refuses a selection that lost a required suite, and one discovery could not establish', async () => {
-    const missing = await gate([
-      { kind: 'tests', command: command('true'), selection: selection(['src/tests/one.test.ts'], ['subs/contracts/src/tests/conformance.test.ts']), requiresTests: true },
-    ]);
-    const failed = await gate([
-      { kind: 'tests', command: command('true'), discovery: { failed: 'discovery-error', detail: 'the architect view could not be read' } },
-    ]);
-
-    expect(missing.commands[0]?.notVerified).toBe('required-suite-missing');
-    expect(missing.commands[0]?.output.tail).toContain('subs/contracts/src/tests/conformance.test.ts');
-    expect(failed.commands[0]?.notVerified).toBe('discovery-error');
-    expect(failed.commands[0]?.output.tail).toBe('the architect view could not be read');
-    expect([missing.verdict, failed.verdict]).toEqual(['not-verified', 'not-verified']);
-  });
-
   it('records a timeout as a timeout, not as a failure', async () => {
     const attempt = await gate([
-      { kind: 'tests', command: command('sleep 30', { timeoutMs: 300 }) },
+      { kind: 'type-check', command: command('sleep 30', { timeoutMs: 300 }) },
     ]);
 
     expect(attempt.commands[0]?.notVerified).toBe('timeout');
@@ -112,7 +80,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
 
     const attempt = await gate([
       { kind: 'type-check', command: command(`rm -rf ${vanishing}`) },
-      { kind: 'tests', command: command('true', { cwd: vanishing }) },
+      { kind: 'ramify-check', command: command('true', { cwd: vanishing }) },
     ]);
 
     expect(attempt.commands[0]?.outcome).toBe('passed');
@@ -139,8 +107,8 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     setTimeout(() => controller.abort(), 200);
 
     const attempt = await gate([
-      { kind: 'tests', command: command('sleep 30') },
-      { kind: 'conformance', command: command(`touch ${marker('ran-conformance')}`) },
+      { kind: 'type-check', command: command('sleep 30') },
+      { kind: 'ramify-check', command: command(`touch ${marker('ran-conformance')}`) },
     ], { signal: controller.signal });
 
     expect(attempt.commands.map(entry => entry.notVerified)).toEqual(['interrupted', 'interrupted']);
@@ -169,7 +137,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     const attempt = await gate([
       { kind: 'ramify-check', command: command('echo checked') },
       { kind: 'type-check', command: command('echo typed') },
-      { kind: 'tests', command: command('echo tested'), selection: selection(['src/tests/one.test.ts']), requiresTests: true },
+      { kind: 'type-check', name: 'second', command: command('echo tested') },
     ]);
 
     expect(attempt.verdict).toBe('passed');
@@ -177,16 +145,15 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     expect(attempt.next).toBe('accept');
     expect(attempt.commit).toBeNull();
     expect(attempt.commands.map(entry => entry.exitCode)).toEqual([0, 0, 0]);
-    expect(attempt.commands[2]?.output.path).toBe(join(directory.path, 'gates', 'ga-0001', '03-tests.log'));
+    expect(attempt.commands[2]?.output.path).toBe(join(directory.path, 'gates', 'ga-0001', '03-type-check.log'));
     expect(await readFile(attempt.commands[2]?.output.path ?? '', 'utf8')).toBe('tested\n');
     expect(attempt.commands[2]?.output.tail).toBe('tested\n');
-    expect(attempt.commands[2]?.selection?.resolved).toEqual(['src/tests/one.test.ts']);
   });
 
   it('delegates every verified plan to the execution port and requires one record for each', async () => {
     const checks: PlannedCheck[] = [
       { kind: 'type-check', command: command('true') },
-      { kind: 'tests', command: command('true'), selection: selection(['src/tests/one.test.ts']), requiresTests: true },
+      { kind: 'ramify-check', command: command('true') },
     ];
     let received: readonly PlannedCheck[] = [];
     const execution: CheckExecutionPort = {
@@ -195,7 +162,6 @@ describe('a gate that cannot run what its checkpoint requires', () => {
         return { commands: planned.map((check, index) => ({
           kind: check.kind,
           command: check.command,
-          ...(check.selection === undefined ? {} : { selection: check.selection }),
           startedAt: '2026-09-21T00:00:00.000Z',
           elapsedMs: index + 1,
           exitCode: 0,
@@ -216,7 +182,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     expect(received).toBe(checks);
     expect(attempt.commands.map(entry => [entry.kind, entry.elapsedMs])).toEqual([
       ['type-check', 1],
-      ['tests', 2],
+      ['ramify-check', 2],
     ]);
     expect(attempt.verdict).toBe('passed');
 

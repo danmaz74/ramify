@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { copyFixture } from './helpers/fixture.js';
 import { emptyAnalysis, initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, startRun } from './helpers/runs.js';
 import { commitTree, gitService } from '../../subs/evidence/src/git.js';
-import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
 import { RunQueries } from '../projections/queries.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
-import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
+import { auditDefinition, commandCheck, privateConfiguredAudit } from './helpers/configured-repository.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
@@ -16,9 +16,14 @@ test('an empty fixed catalog records a candidate-bound empty assessment and audi
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
+  await writeFile(join(fixture.root, 'ramify-audit.json'), auditDefinition([
+    commandCheck('passes', [{ name: 'passes', cmd: process.execPath, args: ['-e', 'process.exit(0)'] }]),
+  ]));
   await initRepository(fixture.root);
+  const configured = await privateConfiguredAudit(createAuditWorkspaceOwnership(fixture.root));
+  cleanups.push(configured.remove);
   const { service } = await openRuns(fixture.root, { git: gitService,
-    checkExecution: createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(fixture.root) }),
+    configuredAudit: configured.audit,
     script: [{ kind: 'submit', input: emptyAnalysis() }] });
   cleanups.unshift(() => service.close());
 
@@ -42,6 +47,9 @@ test('an empty fixed catalog records a candidate-bound empty assessment and audi
   expect(readiness.readiness.status, readiness.readiness.reason).toBe('ready');
   expect(readiness.readiness).toMatchObject({ candidate: { tree: prepared.data.tree },
     finalGate: bound.data.gate, gateCommit: bound.data.commit, checkFindings: [] });
+  // The final gate asked the committed audit for a full audit of the bound commit.
+  const finalAttempted = events.find(event => event.type === 'gate-attempted' && event.data.gate === bound.data.gate);
+  expect(finalAttempted).toBeDefined();
 }, 30_000);
 
 test('a mutation during final verification refuses completion after auditing the assessed commit', async () => {
@@ -49,14 +57,17 @@ test('a mutation during final verification refuses completion after auditing the
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
   await initRepository(fixture.root);
-  const passing = createPassingCheckExecution();
+  const passing = passingAudit();
+  let fullRequests = 0;
   const { service } = await openRuns(fixture.root, {
     git: gitService,
     script: [{ kind: 'submit', input: emptyAnalysis() }],
-    checkExecution: {
-      async run(checks, request) {
-        const result = await passing.run(checks, request);
-        if (request.context.checkpoint === 'final') {
+    configuredAudit: {
+      read: passing.read,
+      async run(input) {
+        const result = await passing.run(input);
+        // Readiness makes the first full request; the final gate the next.
+        if (input.mode === 'full' && ++fullRequests === 2) {
           await writeFile(join(fixture.root, 'late-source.ts'), 'export const late = true;\n');
         }
         return result;

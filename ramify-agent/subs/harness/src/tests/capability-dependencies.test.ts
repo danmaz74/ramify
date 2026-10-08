@@ -19,6 +19,7 @@ import { analysis, entry } from './helpers/analysis.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { freeze, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { decision, forkDecision, forkPartial } from './helpers/placement.js';
+import { localCommandAudit } from './helpers/direct-check-execution.js';
 
 const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map(directory => rm(directory, { recursive: true, force: true }))); });
@@ -454,12 +455,14 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
           constraints: [], knownInterface: { kind: 'none-known' },
           examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
         } });
+        // B's work in flight keeps B's own test passing: every gate's audit,
+        // C's included, judges the whole candidate, B's edits with it.
         if (engineerTurns === 2) return submit({ kind: 'capability-needed', summary: 'B needs C normalization', request: {
           need: 'Normalize source in C for B', usage: [{ path: 'subs/b/src/fact.ts', use: 'Normalize B source', prospective: false }],
           constraints: [], knownInterface: { kind: 'none-known' },
           examples: [{ title: 'normalizes source', code: "expect(readFact()).toBe('B')", designation: 'pseudocode' }],
           suggestedProvider: { module: c, reason: 'C owns normalization' },
-        } }, edit('fact.ts', "return 'old';", "return 'old from C';"), write('tmp/parent.txt', 'parent scratch\n'));
+        } }, edit('fact.ts', "return 'old';", "return 'old'; /* until C normalizes it */"), write('tmp/parent.txt', 'parent scratch\n'));
         if (spec.prompt.includes('# Iteration cap-002.i01')) return submit({
           kind: 'completion-proposed', summary: 'C normalizes the source', findings: [],
         }, write('tmp/child.txt', 'child scratch\n'), write('source.ts', 'export function normalizeSource(value: string): string { return value.trim().toUpperCase(); }\n'),
@@ -509,7 +512,11 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
       return [];
     };
     const options = { git: gitService, script, inputs: treeInputs(),
-      checkExecution: createLocalCommandCheckExecution(),
+      // The gate's audit runs the two owners' real tests and type check in the project.
+      configuredAudit: localCommandAudit({
+        tests: [join(fixture.root, 'node_modules/.bin/vitest'), 'run', 'subs/b/src/tests/fact.test.ts', 'subs/c/src/tests/source.test.ts'],
+        'type-check': [join(process.cwd(), 'node_modules/.bin/tsc'), '--noEmit', '-p', 'tsconfig.json'],
+      }),
       afterWrite: async (event: string, runId: string) => {
         const last = service?.events('need', runId)?.at(-1);
         if (event === 'capability-assignment-settled' && childClosureScratch === null &&
@@ -528,8 +535,6 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
       policy: (root: string) => {
         const base = testPolicy(root);
         return { ...base, reviews: testReviewPolicy({ kinds: ['code'], concurrency: 1, settleMs: 120_000 }), commands: { ...base.commands,
-          allTests: checkCommand({ argv: [join(root, 'node_modules/.bin/vitest'), 'run',
-            'subs/b/src/tests/fact.test.ts', 'subs/c/src/tests/source.test.ts'], cwd: root, timeoutMs: 30_000 }),
           typeCheck: checkCommand({ argv: [join(process.cwd(), 'node_modules/.bin/tsc'), '--noEmit', '-p', 'tsconfig.json'], cwd: root, timeoutMs: 30_000 }),
         } };
       } } satisfies Parameters<typeof openCapabilityRuns>[1];

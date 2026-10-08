@@ -1,17 +1,10 @@
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, test } from 'vitest';
-import type { CommandRequest, CommandRun, CommandRunner } from '../../subs/evidence/src/run-command.js';
+import { describe, expect, test } from 'vitest';
 import { scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import type { ScenarioState } from '../../subs/scenarios/src/states.js';
-import { planScenarioCheck, type PlannedScenario, type ProjectCommands, type ScenarioCheckInputs } from '../checks/checkpoint.js';
-import { gateDiagnostics, scenarioCheckLines } from '../checks/diagnostics.js';
-import { checkCommand, type GateAttempt, type GateCommandRecord, type ScenarioCheckSummary } from '../checks/records.js';
-import { runScenarioCheck, type ScenarioCheckPlan } from '../checks/scenario-check.js';
+import { gateDiagnostics, passedScenarioLines } from '../checks/diagnostics.js';
+import type { GateAttempt } from '../checks/records.js';
 import { assignmentErrors, type AssignmentBody } from '../work/assignment.js';
-import { createScopeTestsTool, iterationMessage, type ScopeScenarioObservation } from '../work/engineer.js';
+import { iterationMessage } from '../work/engineer.js';
 import type { IntegrationBriefing } from '../work/integration.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import { obligationsOf } from '../work/obligations.js';
@@ -20,7 +13,6 @@ import { entryScenariosOf } from '../work/scenario-briefing.js';
 import { workItemMessage, type WorkItemBriefing } from '../work/session.js';
 import { validateLocalArchitect } from '../work/submission.js';
 import { assign, outline } from './helpers/iterations.js';
-import { architectIndex, moduleEntry } from './helpers/views.js';
 
 /*
  * What the agents of a work item are told about its scenarios, architecture
@@ -31,27 +23,15 @@ import { architectIndex, moduleEntry } from './helpers/views.js';
  * the obligations its assignment names, each scenario not done, the assigned
  * ones under "Scenarios to bind", and the three rules; an integration work item's engineer its scenario and the
  * step files it imports; a provider work item's briefings say nothing about
- * scenarios. `run_scope_tests` runs the scope's scenarios in quick mode, and
- * a failing gate names each scenario's failure and each passed one's
- * binding. The streams are the `scenarios` module's recordings of the real
- * cucumber-js; no process starts here.
+ * scenarios. No harness tool runs scenarios: the gate's committed audit
+ * runs them through the project's configured scenario check, and a failing
+ * gate names each tracked scenario's failure, a passed one its binding,
+ * read from the provider's parsed Cucumber run. No process starts here.
  */
 
-const streams = fileURLToPath(new URL('../../subs/scenarios/src/tests/fixtures/streams/', import.meta.url));
 const shelfFile = 'subs/shelf/src/tests/features/demo-plan/shelf.feature';
 const shelfSteps = 'subs/shelf/src/tests/steps/shelf.steps.ts';
 const shelf = 'sample/shelf';
-
-const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => {
-  await Promise.all(cleanups.splice(0).map(cleanup => cleanup()));
-});
-
-async function directory(): Promise<string> {
-  const path = await mkdtemp(join(tmpdir(), 'ramify-agent-scenario-briefings-'));
-  cleanups.push(() => rm(path, { recursive: true, force: true }));
-  return path;
-}
 
 function record(id: string, name: string, extra: Partial<ScenarioRecord> = {}): ScenarioRecord {
   const source = [`Scenario: ${name}`, '  Given an empty shelf', `  When the user shelves "${id}"`, '  Then the shelf lists 1 book'];
@@ -216,7 +196,8 @@ describe('the engineer\'s briefing', () => {
     expect(text).toContain('- Never edit a feature file.');
     expect(text).toContain('- Bind each assigned scenario in `bindings` of your completion proposal once its step definitions bind its steps, naming the fakes they rely on.');
     expect(text).toContain('never with a symbol-free\n  `import \'…\'`');
-    expect(text).toContain('It also runs, in quick mode, every scenario of your scope that is bound or done, selected by identity.');
+    expect(text).toContain('so the next gate\'s audit runs it through the project\'s configured scenario check');
+    expect(text).not.toContain('run_scope_tests');
   });
 
   test('without assigned scenarios, every open one of the entry and nothing to bind; with all done, only that they are', () => {
@@ -292,196 +273,84 @@ describe('assignment.obligations', () => {
   });
 });
 
-/** A command runner that answers the scoped tests and copies a recorded stream where each scenario run's profile asks. */
-function scriptedRunner(streamsInOrder: string[], exits: number[] = []): { runner: CommandRunner; calls: string[][] } {
-  const calls: string[][] = [];
-  let run = 0;
-  const runner: CommandRunner = async (request: CommandRequest): Promise<CommandRun> => {
-    calls.push([...request.argv]);
-    const config = request.argv.indexOf('--config');
-    let exitCode = 0;
-    if (config >= 0) {
-      const index = run++;
-      const profile = await readFile(resolve(request.cwd, request.argv[config + 1]!), 'utf8');
-      const target = /"message:([^"]+)"/u.exec(profile)![1]!;
-      await copyFile(join(streams, `${streamsInOrder[index]!}.ndjson`), target);
-      exitCode = exits[index] ?? 0;
-    }
-    return {
-      outcome: { kind: 'completed', exitCode },
-      startedAt: new Date(0).toISOString(),
-      elapsedMs: 1,
-      output: { path: null, bytes: 0, truncated: false, tail: config >= 0 ? '' : '1 passed' },
-      stdout: '',
-      stderr: '',
-    };
-  };
-  return { runner, calls };
-}
-
-const harness = { support: ['src/tests/support/world.ts'], modes: { quick: { command: ['npm', 'run', 'acceptance:quick', '--'] }, full: { command: ['npm', 'run', 'acceptance:full', '--'] } } };
-const shelfModule = { module: shelf, dir: 'subs/shelf', testing: false };
-
-describe('run_scope_tests', () => {
-  async function project(): Promise<string> {
-    const root = await directory();
-    await mkdir(join(root, 'subs/shelf/src/tests'), { recursive: true });
-    await writeFile(join(root, 'subs/shelf/src/tests/shelf.test.ts'), 'export {};\n');
-    return root;
-  }
-
-  function tool(root: string, runner: CommandRunner, scenarios: PlannedScenario[], include: string[], seen: ScopeScenarioObservation[], directories: string[]) {
-    const inputs: ScenarioCheckInputs = { harness, modules: [shelfModule], scenarios };
-    const index = architectIndex([moduleEntry('sample', '', null), moduleEntry(shelf, 'subs/shelf', 'sample')]);
-    let call = 0;
-    return createScopeTestsTool({
-      commandExecution: runner,
-      projectRoot: root,
-      commands: { scopedTests: checkCommand({ argv: ['vitest', 'run'], cwd: root, timeoutMs: 60_000 }) } as unknown as ProjectCommands,
-      policy: { policy: 'owned-by-scope', exactOwners: [shelf], subtrees: [], extraSuites: [] },
-      refresh: async () => index,
-      judge: async () => ({ ok: true }),
-      scenarios: {
-        plan: async () => planScenarioCheck('iteration', inputs, { projectRoot: root, scope: { exactOwners: [shelf], subtrees: [] }, include }),
-        directory: () => {
-          const path = join(root, '..', `scope-scenarios-${++call}`);
-          directories.push(path);
-          return path;
-        },
-        names: new Map(records.map(one => [one.id, one.name])),
-      },
-      observe: async observation => {
-        if (observation.scenarios !== undefined) seen.push(observation.scenarios);
-      },
-    });
-  }
-
-  test('runs the tests, then the scope\'s scenarios in quick mode by identity with the assigned pending one, and reports each', async () => {
-    const root = await project();
-    const { runner, calls } = scriptedRunner(['undefined']);
-    const seen: ScopeScenarioObservation[] = [];
-    const directories: string[] = [];
-    // sc-003 is pending and assigned; sc-007 is pending and not; sc-002 is bound.
-    const scenarios: PlannedScenario[] = [
-      { id: 'sc-002', owner: shelf, file: shelfFile, state: 'bound' },
-      { id: 'sc-003', owner: shelf, file: shelfFile, state: 'pending' },
-      { id: 'sc-007', owner: shelf, file: shelfFile, state: 'pending' },
-    ];
-    const result = await tool(root, runner, scenarios, ['sc-003'], seen, directories).execute({}, new AbortController().signal);
-
-    expect(calls[0]).toEqual(['vitest', 'run', 'subs/shelf/src/tests/shelf.test.ts']);
-    expect(calls[1]!.slice(0, 5)).toEqual(['npm', 'run', 'acceptance:quick', '--', '--config']);
-    const profile = await readFile(resolve(root, calls[1]![5]!), 'utf8');
-    expect(profile).toContain('"@ramify-sc-002 or @ramify-sc-003"');
-    expect(result.isError).toBe(true);
-    expect(result.text).toContain('Outcome: passed (exit 0)');
-    expect(result.text).toContain('Scenarios: failed; quick mode, selected by identity: sc-002, sc-003.');
-    expect(result.text).toContain(`- \`sc-003\` "A returned book is listed again" undefined, at \`${shelfFile}:22\`:`);
-    expect(result.text).toContain('  - The failing step: `the user lends "Dune" to Ada`.');
-    expect(result.text).toContain('  - No step definition matches "the user lends "Dune" to Ada".');
-    expect(result.text).toContain('- sc-002 was selected but no final scenario result was reported');
-    expect(seen).toEqual([{ selected: ['sc-002', 'sc-003'], passed: [], failures: 2 }]);
-    expect(await readFile(join(directories[0]!, 'scenarios.log'), 'utf8')).toContain('Scenario check, quick mode');
-  });
-
-  test('a passing scenario is reported with its binding, each call in a directory of its own, and a scope with nothing selected says so', async () => {
-    const root = await project();
-    const { runner } = scriptedRunner(['passing']);
-    const seen: ScopeScenarioObservation[] = [];
-    const directories: string[] = [];
-    const passing = tool(root, runner, [{ id: 'sc-001', owner: shelf, file: shelfFile, state: 'done' }], [], seen, directories);
-    const result = await passing.execute({}, new AbortController().signal);
-    expect(result.isError).toBe(false);
-    expect(result.text).toContain('Scenarios: passed; quick mode, selected by identity: sc-001.');
-    expect(result.text).toContain(`- \`sc-001\` "A shelved book is listed" passed, at \`${shelfFile}:10\`, bound by:\n  - \`an empty shelf\` → \`${shelfSteps}:8\``);
-    expect(seen).toEqual([{ selected: ['sc-001'], passed: ['sc-001'], failures: 0 }]);
-
-    const none = tool(root, scriptedRunner([]).runner, [{ id: 'sc-007', owner: shelf, file: shelfFile, state: 'pending' }], [], seen, directories);
-    const nothing = await none.execute({}, new AbortController().signal);
-    expect(nothing.isError).toBe(false);
-    expect(nothing.text).toContain('Scenarios: none of this scope is bound or done yet, and this work item has no pending one, so none ran.');
-    expect(seen.at(-1)).toEqual({ selected: [], passed: [], failures: 0 });
-    expect(new Set(directories).size).toBe(directories.length);
+describe('no harness scenario run', () => {
+  test('an engineer is told the gate\'s audit runs its scenarios through the configured check, and is offered no scope test tool', () => {
+    const entry = { kind: 'entry' as const, scenarios: entryScenariosOf(records, states([['sc-002', 'bound']]), 'shelve-books') };
+    const text = iterationMessage({ assignment: assignment({ obligations: ['sc-003'] }), projectRoot: '/p', base: 'abc', scenarios: entry,
+      obligations: [{ id: 'sc-003', text: 'scenario "A returned book is listed again"' }] });
+    expect(text).toContain('Binding removes its pending tag, so the next gate\'s audit runs it through the project\'s configured scenario check; a pending scenario is not run.');
+    expect(text).not.toContain('run_scope_tests');
+    expect(text).not.toContain('quick mode');
+    expect(text).not.toContain('selected by identity');
   });
 });
 
-describe('diagnostics from a recorded failing stream', () => {
-  /** One scenario check over the recordings, one run per stream, as a gate's `scenarios` command records it. */
-  async function recordedCheck(runs: Array<[string, string]>, exits: number[]): Promise<ScenarioCheckSummary> {
-    const root = await directory();
-    const plan: ScenarioCheckPlan = {
-      mode: 'quick',
-      selection: { kind: 'identity', scenarios: runs.map(([id]) => id) },
-      strict: true,
-      dryRun: false,
-      support: [],
-      runs: runs.map(([id]) => ({ module: shelfModule, selection: { kind: 'identity', scenarios: [id] } })),
-      setup: null,
-      teardown: null,
-      runTimeoutMs: 600_000,
-      tracked: ['sc-001', 'sc-002', 'sc-003', 'sc-004', 'sc-005', 'sc-006', 'sc-007'].map(id => ({ id, file: shelfFile })),
-    };
-    const { summary } = await runScenarioCheck({
-      command: checkCommand({ argv: ['npm', 'run', 'acceptance:quick', '--'], cwd: join(root, 'project'), timeoutMs: 1 }),
-      plan,
-      projectRoot: join(root, 'project'),
-      attemptDirectory: join(root, 'attempt'),
-      outputFile: join(root, 'check.log'),
-      signal: new AbortController().signal,
-      runner: scriptedRunner(runs.map(([, stream]) => stream), exits).runner,
-    });
-    return summary;
-  }
+/** A gate whose committed audit's configured Cucumber check reported `scenarios`, as the provider publishes its parsed run. */
+function auditedGate(scenarios: readonly unknown[], passed: boolean): GateAttempt {
+  const check = {
+    status: passed ? 'passed' : 'failed', passed, summary: passed ? 'scenarios passed' : 'scenarios failed', output: passed ? '' : '2 scenarios failed',
+    cucumberMessages: { status: 'read', run: { scenarios } },
+  };
+  return {
+    id: 'ga-0007', cause: passed ? null : 'check-failed', commands: [], guardedChanges: [], rules: [],
+    audit: {
+      requestId: 'run-1:ga-0007', mode: 'project-default', status: 'completed', definition: { path: 'ramify-audit.json', blob: 'b'.repeat(40) },
+      requestedSourceCommit: 'c'.repeat(40), auditedSourceCommit: 'c'.repeat(40), requestedMode: 'ramify-partial', executedMode: 'ramify-partial',
+      fallbackReason: null, reuse: null, verdict: passed ? 'pass' : 'fail', detail: passed ? 'composed pass' : 'composed fail',
+    },
+    provider: { result: { status: 'completed', summary: { coverage: { universe: { checkIds: ['agent-scenarios'] } } } }, checks: { 'agent-scenarios': check } },
+  } as unknown as GateAttempt;
+}
 
-  function gate(summary: ScenarioCheckSummary, outcome: 'passed' | 'failed'): GateAttempt {
-    const command = {
-      kind: 'scenarios', outcome, exitCode: outcome === 'passed' ? 0 : 1, runnerError: null,
-      output: { path: '/nowhere/check.log', bytes: 0, truncated: false, tail: summary.failures.join('\n') },
-      scenarios: summary,
-    } as unknown as GateCommandRecord;
-    const typeCheck = {
-      kind: 'type-check', outcome: 'failed', exitCode: 2, runnerError: null,
-      output: { path: '/nowhere/type-check.log', bytes: 0, truncated: false, tail: 'error TS2322' },
-    } as unknown as GateCommandRecord;
-    return { id: 'ga-0007', cause: 'in-scope', commands: [command, typeCheck], guardedChanges: [], rules: [] } as unknown as GateAttempt;
-  }
+/** One scenario of a provider's parsed Cucumber run. */
+function parsed(id: string | null, line: number, outcome: 'passed' | 'failed' | 'skipped', steps: unknown[]) {
+  return { uri: shelfFile, line, name: id ?? 'An unplanned scenario', tags: id === null ? ['@smoke'] : [`@ramify-${id}`], outcome, steps };
+}
 
+const step = (text: string, status: string, line?: number, errorMessage?: string) => ({
+  text, status, definitionLocations: line === undefined ? [] : [{ uri: shelfSteps, line }], ...(errorMessage === undefined ? {} : { errorMessage }),
+});
+
+const passing = parsed('sc-001', 10, 'passed', [step('an empty shelf', 'PASSED', 8), step('the user shelves "Dune"', 'PASSED', 12), step('the shelf lists 1 book', 'PASSED', 28)]);
+
+describe('diagnostics from the raw runner output of the configured scenario check', () => {
   const names = new Map([['sc-001', 'A shelved book is listed'], ['sc-002', 'A miscounted shelf fails'], ['sc-003', 'Lending is not defined yet']]);
 
-  test('per failing scenario its name, file and line, failing step, message and undefined steps; per passed one its binding', async () => {
-    const summary = await recordedCheck([['sc-002', 'failing'], ['sc-003', 'undefined'], ['sc-001', 'passing']], [1, 1, 0]);
+  test('per failing tracked scenario its name, check, file and line, failing step, message and undefined steps; the project\'s own failures by count', async () => {
+    const gate = auditedGate([
+      parsed('sc-002', 16, 'failed', [step('an empty shelf', 'PASSED', 8), step('the shelf lists 2 books', 'FAILED', 28, 'AssertionError [ERR_ASSERTION]: 1 !== 2\n    at World.<anonymous>')]),
+      parsed('sc-003', 22, 'failed', [step('an empty shelf', 'PASSED', 8), step('the user lends "Dune" to Ada', 'UNDEFINED')]),
+      passing,
+      parsed(null, 40, 'failed', [step('something unplanned', 'FAILED', 3, 'boom')]),
+    ], false);
     for (const audience of ['engineer', 'local-architect'] as const) {
-      const { summary: lines } = await gateDiagnostics(gate(summary, 'failed'), audience, names);
+      const { summary: lines } = await gateDiagnostics(gate, audience, names);
       const text = lines.join('\n');
-      expect(lines[0]).toBe('- `scenarios`: failed, exit 1; quick mode, selected by identity: sc-002, sc-003, sc-001:');
-      expect(text).toContain(`  - \`sc-002\` "A miscounted shelf fails" failed, at \`${shelfFile}:16\`:\n    - The failing step: \`the shelf lists 2 books\`.\n    - Its message`);
+      expect(lines[0]).toBe('- audit `run-1:ga-0007`, the project\'s default audit of `' + 'c'.repeat(40) + '` under `ramify-audit.json`: requested ramify-partial, executed ramify-partial; composed verdict `fail`, composed fail');
+      expect(text).toContain('- `agent-scenarios`: failed; the provider\'s record of it follows:');
+      expect(text).toContain(`- scenario \`sc-002\` "A miscounted shelf fails" failed in \`agent-scenarios\`, at \`${shelfFile}:16\`:\n  - The failing step: \`the shelf lists 2 books\`.\n  - Its message:`);
       expect(text).toMatch(/AssertionError/);
       expect(text).toContain('1 !== 2');
-      expect(text).toContain(`  - \`sc-003\` "Lending is not defined yet" undefined, at \`${shelfFile}:22\`:`);
-      expect(text).toContain('    - No step definition matches "the user lends "Dune" to Ada".');
-      expect(text).toContain([
-        `  - \`sc-001\` "A shelved book is listed" passed, at \`${shelfFile}:10\`, bound by:`,
-        `    - \`an empty shelf\` → \`${shelfSteps}:8\``,
-        `    - \`the user shelves "Dune"\` → \`${shelfSteps}:12\``,
-        `    - \`the shelf lists 1 book\` → \`${shelfSteps}:28\``,
-      ].join('\n'));
-      // The failure lines of the check that are not about one scenario stay;
-      // the per-scenario ones are not repeated.
-      expect(text).toContain('  - the run of sample/shelf exited with 1');
-      expect(lines.some(line => /^ {2}- sc-00\d (failed|undefined):/.test(line))).toBe(false);
-      // Other commands keep their own lines.
-      expect(text).toContain('- `type-check`: failed, exit 2; full output: `/nowhere/type-check.log`; the end of what it printed:');
+      expect(text).toContain(`- scenario \`sc-003\` "Lending is not defined yet" undefined in \`agent-scenarios\`, at \`${shelfFile}:22\`:`);
+      expect(text).toContain('  - No step definition matches "the user lends "Dune" to Ada".');
+      // A passed scenario is not repeated as a failure; an untracked one is counted, not named.
+      expect(text).not.toContain('`sc-001` "A shelved book is listed" failed');
+      expect(text).toContain('- 1 of the project\'s own scenarios failed.');
+      expect(text).not.toContain('An unplanned scenario');
     }
   });
 
-  test('a message is bounded, and a scenario check that passed in a failing gate carries the binding of each scenario', async () => {
-    const passed = await recordedCheck([['sc-001', 'passing']], [0]);
-    const { summary: lines } = await gateDiagnostics(gate(passed, 'passed'), 'engineer', names);
-    expect(lines[0]).toBe('- `scenarios`: passed, exit 0; each scenario it passed, and the step definitions that bound it:');
-    expect(lines[1]).toBe(`  - \`sc-001\` "A shelved book is listed" passed, at \`${shelfFile}:10\`, bound by:`);
+  test('a passed gate carries the binding of each scenario, and a message is bounded', async () => {
+    const passed = auditedGate([passing], true);
+    expect(passedScenarioLines(passed, names)).toEqual([
+      `- \`sc-001\` "A shelved book is listed" passed in \`agent-scenarios\`, at \`${shelfFile}:10\`, bound by:`,
+      `  - \`an empty shelf\` → \`${shelfSteps}:8\``,
+      `  - \`the user shelves "Dune"\` → \`${shelfSteps}:12\``,
+      `  - \`the shelf lists 1 book\` → \`${shelfSteps}:28\``,
+    ]);
 
-    const long = { ...passed, scenarios: [{ ...passed.scenarios[0]!, status: 'failed' as const, failure: { step: 'Then it fails', message: Array.from({ length: 40 }, (_, line) => `line ${line}`).join('\n') } }] };
-    const bounded = scenarioCheckLines(long);
+    const long = auditedGate([parsed('sc-001', 10, 'failed', [step('Then it fails', 'FAILED', 3, Array.from({ length: 40 }, (_, line) => `line ${line}`).join('\n'))])], false);
+    const bounded = (await gateDiagnostics(long, 'engineer', names)).summary;
     expect(bounded).toContain('        line 11');
     expect(bounded).not.toContain('        line 12');
     expect(bounded).toContain('        …');

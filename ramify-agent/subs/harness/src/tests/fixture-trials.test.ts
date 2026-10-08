@@ -11,16 +11,20 @@ import { runLayout } from '../run/records.js';
 import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { workLayout, type WorkItemOutline } from '../work/records.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
-import { assign, byRole, completionProposed, outline, runScopeTests, submit, viewedInputs, write } from './helpers/iterations.js';
+import { assign, byRole, completionProposed, outline, submit, viewedInputs, write } from './helpers/iterations.js';
 import { git, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { badgeAnalysis, badgeImplementation, badgeStepFile, badgeSteps } from './helpers/badge-scenarios.js';
 import { gitService as productionGit } from '../../subs/evidence/src/git.js';
+import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
+import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
+import { auditDefinition, commandCheck, privateConfiguredAudit } from './helpers/configured-repository.js';
 
 /*
  * The fixture trials: implementation runs on a disposable copy of the
- * `collection-review` fixture with its own toolchain installed. Readiness,
- * every gate and the final gate run the fixture's real `npm test`, its real
- * `npm run type-check` and a complete `ramify check --batch`; the architect
+ * `collection-review` fixture with its own toolchain installed. The copy is
+ * given a committed audit definition whose checks are the fixture's real
+ * `npm test`, its real `npm run type-check` and a complete `ramify check
+ * --batch`, and readiness, every gate and the final gate ask that audit; the architect
  * view is materialized and refreshed by the installed Ramify through a
  * private daemon, stopped before the copy is removed. The agent is the
  * scripted fake, which writes each stage's source through the implementation's
@@ -103,11 +107,22 @@ async function trial(plan: string, script: Parameters<typeof byRole>[0], check: 
 
     // The run, in this process, with a private daemon disposed before the
     // copy is verified or removed.
+    // The copy's committed audit definition: the project's own checks.
+    await writeFile(join(project!, 'ramify-audit.json'), auditDefinition([
+      commandCheck('fixture-tests', [{ name: 'npm-test', cmd: 'npm', args: ['test'], timeoutMs: 600_000 }]),
+      commandCheck('fixture-type-check', [{ name: 'npm-type-check', cmd: 'npm', args: ['run', 'type-check'], timeoutMs: 600_000 }]),
+      commandCheck('fixture-structure', [{ name: 'ramify-check', cmd: ramifyExecutable, args: ['check', '--batch', '--format', 'json', '--no-snapshot'], timeoutMs: 600_000 }]),
+    ]));
+    await exec('git', ['add', 'ramify-audit.json'], { cwd: project! });
+    await exec('git', ['-c', 'user.name=trial', '-c', 'user.email=trial@localhost', 'commit', '--quiet', '--no-gpg-sign', '-m', 'Declare the trial\'s audit definition'], { cwd: project! });
+    const configured = await privateConfiguredAudit(createAuditWorkspaceOwnership(project!));
+
     const daemon = await realRamify();
     let runId: string;
     try {
       const opened = await openRuns(project!, {
         git: productionGit,
+        configuredAudit: configured.audit,
         script: byRole(script),
         ramify: daemon.ramify,
         inputs: viewedInputs(daemon.ramify),
@@ -125,6 +140,7 @@ async function trial(plan: string, script: Parameters<typeof byRole>[0], check: 
       }
     } finally {
       await daemon.dispose();
+      await configured.remove();
     }
 
     const verified = await exec(tsx, ['scripts/live-trial.ts', 'verify', project!, '--run', runId, '--json', join(parent, 'verification.json')], {
@@ -178,30 +194,25 @@ async function retain(directory: string, project: string, plan: string, runId: s
       verdict: attempt.verdict,
       cause: attempt.cause,
       commit: attempt.commit,
-      commands: attempt.commands.map(command => ({
-        kind: command.kind,
-        argv: command.command.argv.map(part => (part.startsWith(project) ? `<project>${part.slice(project.length)}` : part)),
-        outcome: command.outcome,
-        exitCode: command.exitCode,
-        elapsedMs: command.elapsedMs,
-        selection: command.selection?.resolved ?? null,
-      })),
+      audit: attempt.audit ?? null,
+      checks: Object.fromEntries(Object.entries((attempt.provider?.checks ?? {}) as Record<string, { passed?: boolean }>)
+        .map(([id, check]) => [id, check.passed ?? null])),
     });
   }
   await writeFile(join(directory, 'gates.json'), `${JSON.stringify(gates, null, 2)}\n`);
 }
 
-/** The every-command-passed shape of a gate over the real toolchain. */
+/** The every-check-passed shape of a gate over the real toolchain. */
 function expectRealGatePassed(attempt: GateAttempt, checkpoint: GateAttempt['checkpoint']): void {
   expect(attempt.checkpoint).toBe(checkpoint);
   expect(attempt.verdict).toBe('passed');
   expect(attempt.cause).toBeNull();
-  expect(attempt.commands.every(command => command.outcome === 'passed')).toBe(true);
-  const argv = attempt.commands.map(command => command.command.argv.join(' '));
+  // The committed audit answered it; the harness ran no command of its own.
+  expect(attempt.commands).toEqual([]);
+  expect(attempt.audit).toMatchObject({ status: 'completed', verdict: 'pass' });
   // The project's own suite and type check through npm, and a complete Ramify check.
-  expect(argv.some(line => /\bnpm\b.*\btest\b/.test(line))).toBe(true);
-  expect(argv.some(line => /\bnpm\b.*\btype-check\b/.test(line))).toBe(true);
-  expect(argv.some(line => /ramify check --batch --root /.test(line))).toBe(true);
+  const checks = (attempt.provider?.checks ?? {}) as Record<string, { passed?: boolean }>;
+  for (const id of ['fixture-tests', 'fixture-type-check', 'fixture-structure']) expect(checks[id]?.passed, id).toBe(true);
 }
 
 describe.runIf(selected.includes('status-badge-tone'))('the status-badge-tone trial on the real fixture toolchain', () => {
@@ -221,7 +232,7 @@ describe.runIf(selected.includes('status-badge-tone'))('the status-badge-tone tr
       ],
       engineer: [submit(
         completionProposed('The badge carries its tone, neutral by default, with its own tests; both scenarios bind to its step file.', { bindings: [{ id: 'sc-001' }, { id: 'sc-002' }] }),
-        ...writes(stage), write(badgeSteps, badgeStepFile), runScopeTests(),
+        ...writes(stage), write(badgeSteps, badgeStepFile),
       )],
     }, async result => {
       expect(result.snapshot.state).toBe('completed');
@@ -299,9 +310,9 @@ describe.runIf(selected.includes('reviewer-identity'))('T3: reviewer-identity on
         submit(requestCompletion({ changes: 'Every stage is accepted; the reviewer is carried and shown.', revisionReason: 'The last stage is accepted.' })),
       ],
       engineer: [
-        submit(completionProposed('The shared vocabulary has the structured reviewer.'), ...writes(prepare!), runScopeTests()),
-        submit(completionProposed('The outcome requires the reviewer, and the runtime, both surfaces and every caller carry it.'), ...writes(surfaces!), runScopeTests()),
-        submit(completionProposed('The review panel shows the reviewer\'s name and role above the verdict.'), ...writes(views!), runScopeTests()),
+        submit(completionProposed('The shared vocabulary has the structured reviewer.'), ...writes(prepare!)),
+        submit(completionProposed('The outcome requires the reviewer, and the runtime, both surfaces and every caller carry it.'), ...writes(surfaces!)),
+        submit(completionProposed('The review panel shows the reviewer\'s name and role above the verdict.'), ...writes(views!)),
       ],
     }, async result => {
       expect(result.snapshot.failure).toBeNull();

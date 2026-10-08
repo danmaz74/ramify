@@ -1,12 +1,9 @@
-import { execFile } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { readFile, symlink, writeFile } from 'node:fs/promises';
+import { readdirSync, readFileSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
-import type { CheckExecutionPort } from '../checks/execution.js';
-import type { GateAttempt, ScenarioCheckSummary } from '../checks/records.js';
-import type { PlannedCheck } from '../checks/verify.js';
+import { afterEach, describe, expect, test } from 'vitest';
+import type { GateAttempt } from '../checks/records.js';
+import { scenarioResultsOf } from '../checks/scenario-results.js';
 import { scenarioListResponseSchema } from '../interfaces/protocol/runs.js';
 import { RunQueries } from '../projections/queries.js';
 import type { RunEvent } from '../run/log.js';
@@ -19,13 +16,13 @@ import {
   consumerAgainstReal, consumerStub, consumerTest, contractNeeded, contractWrites, established, paths, providerWrites, type Seam,
 } from './helpers/contracts.js';
 import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged, type CommitResponse } from './helpers/contracts-git.js';
-import { createLocalCommandCheckExecution, createMappedCheckExecution, passingScenarioSummary, type DirectCheckStep } from './helpers/direct-check-execution.js';
+import type { DirectCheckScript, ScriptedScenario } from './helpers/direct-check-execution.js';
 import { copyFixture } from './helpers/fixture.js';
 import {
   ancestorSteps, bindAtAncestor, bindTurn, integrationFeature, integrationAnalysis, noteFeature, noteSteps, noteStepFile, notes, notesDirectory,
   notesModule, plan, planScenario, reviews, tagFeature, tagSteps, tagStepFile, tags, tagsDirectory, tagsModule,
 } from './helpers/integration-scenario.js';
-import { addModule, assign, byWork, completionProposed, installMiniRunner, outline, partialReport, submit, treeInputs, write } from './helpers/iterations.js';
+import { addModule, assign, byWork, completionProposed, outline, partialReport, submit, treeInputs, write } from './helpers/iterations.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { approveRun, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, until } from './helpers/runs.js';
 import { finalCandidate } from './helpers/final-candidate.js';
@@ -36,7 +33,7 @@ import { finalCandidate } from './helpers/final-candidate.js';
  * the acceptance scenarios with scripted agents.
  *
  * The run starts with the review stop and waits there until it is approved.
- * Readiness passes its four acceptance steps, and the plan's feature files
+ * Readiness passes its configuration and audit steps, and the plan's feature files
  * are materialized. The plan states one integration scenario over two
  * entries, a note and its tags, which the analysis decomposes into one
  * sub-scenario each. The note's work item needs a limit it does not own: a
@@ -50,29 +47,16 @@ import { finalCandidate } from './helpers/final-candidate.js';
  * iteration, and its architect reports it done; the second sub-scenario
  * reported done creates the integration work item at their common
  * ancestor, which binds the integration scenario through `expose-test`. The
- * final gate runs every
- * module's scenarios in full mode.
+ * final gate asks for the full audit, whose scenario check passes all three.
  *
- * Git is answered from the trial's own data. Every gate but the final one
- * runs through the direct executor. The final gate runs its commands for
- * real in the project, the scenario check through the fixture's
- * `acceptance:full` script. By default that script's `cucumber-js` is the
- * scripted one, and the trial is fast. With the fixture's toolchain
- * installed, it is the real `cucumber-js` 13.2.1 against the step files the
- * engineers wrote, and the fixture's own scenario runs beside them over
- * HTTP. That variant installs the toolchain with `npm ci`, so it runs only
- * with
- *
- *   RAMIFY_AGENT_FIXTURE_ACCEPTANCE=1 node_modules/.bin/vitest run subs/harness/src/tests/acceptance-trial.test.ts
+ * Git is answered from the trial's own data. Every gate asks the scripted
+ * configured audit, whose scenario check reports each scenario the tree
+ * carries without its pending tag, as the project's own configured check
+ * would run it. The harness runs no scenario itself.
  *
  * A second, smaller run binds the fixture plan `status-badge-tone`'s own two
- * scenarios in `shared-ui`, with a step file that needs no World.
+ * scenarios in `shared-ui`.
  */
-
-const exec = promisify(execFile);
-const installed = process.env.RAMIFY_AGENT_FIXTURE_ACCEPTANCE === '1';
-
-type Toolchain = { readonly kind: 'scripted' } | { readonly kind: 'installed'; readonly modules: string };
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -107,7 +91,7 @@ const placeTheLimit = localDecision(
 );
 
 /** A copy of the fixture with the trial's modules and plan scenario, and the toolchain its gates run. */
-async function trialProject(toolchain: Toolchain): Promise<string> {
+async function trialProject(): Promise<string> {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   const root = fixture.root;
@@ -116,56 +100,51 @@ async function trialProject(toolchain: Toolchain): Promise<string> {
   await addModule(root, limitsDirectory, 'limits', {});
   const planPath = join(root, 'plans', plan, 'plan.md');
   await writeFile(planPath, [(await readFile(planPath, 'utf8')).trimEnd(), '', '## Scenarios', '', '```gherkin', ...planScenario, '```', ''].join('\n'));
-  await useToolchain(root, toolchain);
   return root;
 }
 
 /** A plain copy of the fixture, for the badge's plan. */
-async function badgeProject(toolchain: Toolchain): Promise<string> {
+async function badgeProject(): Promise<string> {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
-  await useToolchain(fixture.root, toolchain);
   return fixture.root;
 }
 
-async function useToolchain(root: string, toolchain: Toolchain): Promise<void> {
-  if (toolchain.kind === 'scripted') await installMiniRunner(root);
-  else await symlink(toolchain.modules, join(root, 'node_modules'), 'dir');
-}
-
-/** A scenario check whose runs reached the scenario and failed it at its last step. */
-function failingScenario(check: PlannedCheck, id: string): DirectCheckStep {
-  const passing = passingScenarioSummary(check);
-  const step = 'Then the outcome promised is shown';
-  return {
-    outcome: { kind: 'completed', exitCode: 1 },
-    scenarios: {
-      ...passing,
-      scenarios: passing.scenarios.map(result => (result.id !== id ? result : { ...result, status: 'failed' as const, failure: { step, message: 'expected the outcome, got nothing' } })),
-      failures: [`${id} failed at "${step}": expected the outcome, got nothing`],
-    },
-  };
+/** Every tracked scenario the tree carries without its pending tag, passed where its feature file states it. */
+function runnableScenarios(root: string): ScriptedScenario[] {
+  const files = (readdirSync(root, { recursive: true }) as string[])
+    .filter(path => path.endsWith('.feature') && !path.split('/').includes('node_modules'))
+    .sort();
+  return files.flatMap(file => readFileSync(join(root, file), 'utf8').split('\n').flatMap((text, index) => {
+    const tags = text.trim().split(/\s+/);
+    const identity = tags.find(tag => /^@ramify-sc-\d{3,}$/.test(tag));
+    if (identity === undefined || tags.includes('@ramify-pending')) return [];
+    return [{ id: identity.slice('@ramify-'.length), status: 'passed' as const, file, line: index + 1 }];
+  }));
 }
 
 /**
- * The trial's gates: the final gate runs its commands in the project, every
- * other gate is answered directly, and the first iteration gates that
- * select a scenario of `failing` fail it, as many times as it says.
+ * The trial's configured audit: every check passes, and the scenario check
+ * runs every runnable scenario. The first iteration gates whose scenario
+ * check runs a scenario of `failing` fail it at its last step, as many
+ * times as it says.
  */
-function trialExecution(failing: Readonly<Record<string, number>>): CheckExecutionPort {
+function trialAudit(root: string, failing: Readonly<Record<string, number>>): DirectCheckScript {
   const left = new Map(Object.entries(failing));
-  const direct = createMappedCheckExecution({
-    script: ({ check, context }) => {
-      if (check.kind !== 'scenarios' || context.checkpoint !== 'iteration') return {};
-      const selected = check.scenarios!.runs.flatMap(run => (run.selection.kind === 'identity' ? run.selection.scenarios : []));
-      const id = selected.find(scenario => (left.get(scenario) ?? 0) > 0);
-      if (id === undefined) return {};
-      left.set(id, left.get(id)! - 1);
-      return failingScenario(check, id);
-    },
-  });
-  const local = createLocalCommandCheckExecution();
-  return { run: (checks, request) => (request.context.checkpoint === 'final' ? local : direct).run(checks, request) };
+  const step = 'Then the outcome promised is shown';
+  return ({ check, context }) => {
+    if (check.kind !== 'scenarios') return {};
+    const scenarios = runnableScenarios(root);
+    const id = context.checkpoint !== 'iteration' ? undefined
+      : scenarios.map(scenario => scenario.id).find(scenario => (left.get(scenario) ?? 0) > 0);
+    if (id === undefined) return { scenarios };
+    left.set(id, left.get(id)! - 1);
+    return {
+      outcome: { kind: 'completed', exitCode: 1 },
+      scenarios: scenarios.map(result => (result.id !== id ? result
+        : { ...result, status: 'failed' as const, failure: { step, message: 'expected the outcome, got nothing' } })),
+    };
+  };
 }
 
 interface Trial {
@@ -189,8 +168,7 @@ async function reviewedRun(root: string, planId: string, script: Parameters<type
     inputs: treeInputs(),
     git,
     candidates: final.candidates,
-
-    checkExecution: trialExecution(failing),
+    checkScript: trialAudit(root, failing),
     stopGraceMs: 30_000,
   });
   cleanups.push(() => opened.service.close());
@@ -204,10 +182,6 @@ async function reviewedRun(root: string, planId: string, script: Parameters<type
 
 async function gateOf(trial: Trial, id: string): Promise<GateAttempt> {
   return JSON.parse(await readFile(runPath(trial.root, trial.planId, trial.runId, runLayout.gate(id)), 'utf8')) as GateAttempt;
-}
-
-function summaryOf(attempt: GateAttempt): ScenarioCheckSummary | undefined {
-  return attempt.commands.find(command => command.kind === 'scenarios')?.scenarios;
 }
 
 /**
@@ -307,8 +281,8 @@ const trialCommits: CommitResponse[] = [
 /** The iteration gates that fail a scenario: the note's first, the tags' first three. */
 const trialFailures = { 'sc-001': 1, 'sc-002': 3 };
 
-/** What every trial asserts, whichever runner its final gate used. */
-async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
+/** What the trial asserts. */
+async function expectTrial(trial: Trial): Promise<void> {
   const { service, log, root } = trial;
   const snapshot = onlyRun(service, plan);
   expect(snapshot.failure).toBeNull();
@@ -318,11 +292,12 @@ async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
   expect(trial.waiting).toEqual({ phase: 'awaiting-review', branch: null, commits: 0 });
   expect(snapshot.review).toMatchObject({ reviewer: 'dana@example.com', duringRun: false });
 
-  // The scenario harness is available, and configured audit readiness passed.
+  // Configured audit readiness passed, with no scenario runner of the harness's own.
   const readiness = JSON.parse(await readFile(runPath(root, plan, trial.runId, runLayout.readiness(1)), 'utf8')) as ReadinessAttempt;
   const steps = new Map(readiness.steps.map(step => [step.step, step.outcome]));
-  expect(['project-config', 'acceptance-runner', 'audit-config', 'configured-full-audit'].map(step => `${step} ${steps.get(step as never)}`))
-    .toEqual(['project-config passed', 'acceptance-runner passed', 'audit-config passed', 'configured-full-audit passed']);
+  expect((['project-config', 'audit-config', 'configured-full-audit'] as const).map(step => `${step} ${steps.get(step)}`))
+    .toEqual(['project-config passed', 'audit-config passed', 'configured-full-audit passed']);
+  expect(readiness.steps.map(step => step.step)).not.toContain('acceptance-runner');
 
   // The course of the run.
   expect(course(log)).toEqual([
@@ -367,7 +342,7 @@ async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
   expect(trial.git.messages().filter(message => message.startsWith('Withdraw'))).toEqual([]);
 
   // The final states: every scenario reported done, untagged in its file, and
-  // passed in full mode by the final gate.
+  // passed by the final gate's full audit.
   expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, done: 3 });
   const list = scenarioListResponseSchema.parse(await new RunQueries(service).scenarios(plan, trial.runId));
   expect(list.scenarios.map(scenario => `${scenario.id} ${scenario.kind} ${scenario.state} ${scenario.workItem} ${scenario.owner}`)).toEqual([
@@ -381,12 +356,11 @@ async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
   }
   const final = await gateOf(trial, (log.find(event => event.type === 'job-completed')!.data as { gate: string }).gate);
   expect(final.checkpoint).toBe('final');
-  const summary = summaryOf(final)!;
-  expect(summary).toMatchObject({ mode: 'full', selection: { kind: 'all' }, dryRun: false, excluded: 0, failures: [] });
-  expect(summary.runs.map(run => `${run.module} ${run.exit}`)).toEqual([
-    'collection-review/integration-tests 0', `${reviews} 0`, `${notes} 0`, `${tags} 0`,
-  ].sort());
-  expect(summary.scenarios.map(result => `${result.id} ${result.status}`).sort()).toEqual(['sc-001 passed', 'sc-002 passed', 'sc-003 passed']);
+  expect(final.commands).toEqual([]);
+  expect(final.audit).toMatchObject({ mode: 'full', status: 'completed', verdict: 'pass' });
+  expect(scenarioResultsOf(final).map(result => `${result.id} ${result.status} ${result.check} ${result.file}`).sort()).toEqual([
+    `sc-001 passed scenarios ${noteFeature}`, `sc-002 passed scenarios ${tagFeature}`, `sc-003 passed scenarios ${integrationFeature}`,
+  ]);
   // Plan 11's disk-backed provider witness: query the same completed scripted
   // run that drove real workflow records, then cross one bounded page boundary.
   const queries = new RunQueries(service);
@@ -404,7 +378,7 @@ async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
   expect(noteScenario.detail).toMatchObject({ state: 'available' });
   if (noteScenario.detail.state === 'available') {
     expect(noteScenario.detail.source.join('\n')).toContain('Scenario:');
-    expect(noteScenario.detail.gates.some(gate => !gate.dryRun && gate.status === 'passed')).toBe(true);
+    expect(noteScenario.detail.gates.some(gate => gate.check === 'scenarios' && gate.status === 'passed')).toBe(true);
   }
   const firstPage = await queries.executionMapPage(plan, trial.runId, { version: execution.runVersion, limit: 1 });
   expect(firstPage.nextCursor).not.toBeNull();
@@ -432,15 +406,6 @@ async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
     ] as const)));
     await writeFile(process.env.PLAN11_EXECUTION_EXPORT, JSON.stringify({ planId: plan, runId: trial.runId,
       pages, capabilities, scenarios }, null, 2));
-  }
-  if (toolchain.kind === 'installed') {
-    // The real runner: every step bound to a definition the owner's step
-    // files wrote or imported, and the project's own scenario passed over HTTP.
-    const bindings = new Map(summary.scenarios.map(result => [result.id, result.binding.map(step => step.definition.replace(/:\d+$/u, ''))]));
-    expect(new Set(bindings.get('sc-001'))).toEqual(new Set([noteSteps]));
-    expect(new Set(bindings.get('sc-002'))).toEqual(new Set([tagSteps]));
-    expect(new Set(bindings.get('sc-003'))).toEqual(new Set([noteSteps, tagSteps]));
-    expect(summary.untracked).toEqual({ passed: 1, skipped: 0, failed: 0 });
   }
   trial.git.assertAnswered();
 }
@@ -471,7 +436,7 @@ async function badgeRun(root: string): Promise<Trial> {
   ], {});
 }
 
-async function expectBadgeRun(trial: Trial, toolchain: Toolchain): Promise<void> {
+async function expectBadgeRun(trial: Trial): Promise<void> {
   const snapshot = onlyRun(trial.service, badgePlan);
   expect(snapshot.failure).toBeNull();
   expect(snapshot.state).toBe('completed');
@@ -487,54 +452,18 @@ async function expectBadgeRun(trial: Trial, toolchain: Toolchain): Promise<void>
   expect(feature).toContain('  @ramify-sc-001\n  Scenario: A badge given a tone carries that tone in its markup\n');
   expect(feature).toContain('    Then its markup carries the tone "neutral"\n');
   const final = await gateOf(trial, (trial.log.find(event => event.type === 'job-completed')!.data as { gate: string }).gate);
-  const summary = summaryOf(final)!;
-  expect(summary).toMatchObject({ mode: 'full', dryRun: false, failures: [] });
-  expect(summary.scenarios.map(result => `${result.id} ${result.status} ${result.run}`)).toEqual([`sc-001 passed ${sharedUi}`, `sc-002 passed ${sharedUi}`]);
-  if (toolchain.kind === 'installed') {
-    for (const result of summary.scenarios) {
-      expect(result.binding.length).toBeGreaterThan(0);
-      expect(new Set(result.binding.map(step => step.definition.replace(/:\d+$/u, '')))).toEqual(new Set([badgeSteps]));
-    }
-  }
+  expect(final.audit).toMatchObject({ mode: 'full', status: 'completed', verdict: 'pass' });
+  expect(scenarioResultsOf(final).map(result => `${result.id} ${result.status} ${result.file}`)).toEqual([`sc-001 passed ${badgeFeature}`, `sc-002 passed ${badgeFeature}`]);
   trial.git.assertAnswered();
 }
 
-describe('the scripted acceptance trial, with the scripted cucumber-js', () => {
-  const toolchain: Toolchain = { kind: 'scripted' };
-
-  test('passes the review stop, readiness, materialization, a binding over a fake, done reports, an exhausted iteration that leaves a binding, an integration work item and the final gate in full mode', async () => {
-    const root = await trialProject(toolchain);
-    await expectTrial(await reviewedRun(root, plan, trialScript(root), trialCommits, trialFailures), toolchain);
+describe('the scripted acceptance trial', () => {
+  test('passes the review stop, readiness, materialization, a binding over a fake, done reports, an exhausted iteration that leaves a binding, an integration work item and the final gate\'s full audit', async () => {
+    const root = await trialProject();
+    await expectTrial(await reviewedRun(root, plan, trialScript(root), trialCommits, trialFailures));
   }, 120_000);
 
-  test('status-badge-tone: the plan\'s two scenarios are bound in shared-ui and pass in full mode', async () => {
-    await expectBadgeRun(await badgeRun(await badgeProject(toolchain)), toolchain);
+  test('status-badge-tone: the plan\'s two scenarios are bound in shared-ui and pass the final gate\'s full audit', async () => {
+    await expectBadgeRun(await badgeRun(await badgeProject()));
   }, 120_000);
-});
-
-describe.runIf(installed)('the acceptance trial with the fixture\'s toolchain and the real cucumber-js', () => {
-  let toolchain: Toolchain = { kind: 'scripted' };
-  let remove: () => Promise<void> = async () => undefined;
-
-  beforeAll(async () => {
-    const copy = await copyFixture();
-    remove = copy.remove;
-    // Node's own flags for vitest must not reach the fixture's processes.
-    const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'NODE_OPTIONS'));
-    await exec('npm', ['ci', '--no-audit', '--no-fund'], { cwd: copy.root, env, timeout: 600_000 });
-    toolchain = { kind: 'installed', modules: join(copy.root, 'node_modules') };
-  }, 660_000);
-
-  afterAll(async () => {
-    await remove();
-  });
-
-  test('the same trial: the final gate runs every module\'s scenarios for real, bound by the step files the engineers wrote', async () => {
-    const root = await trialProject(toolchain);
-    await expectTrial(await reviewedRun(root, plan, trialScript(root), trialCommits, trialFailures), toolchain);
-  }, 300_000);
-
-  test('status-badge-tone: the step file renders the badge without a World, and both scenarios pass in full mode', async () => {
-    await expectBadgeRun(await badgeRun(await badgeProject(toolchain)), toolchain);
-  }, 300_000);
 });

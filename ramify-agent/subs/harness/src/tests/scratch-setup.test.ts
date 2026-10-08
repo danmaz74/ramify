@@ -87,9 +87,6 @@ describe('scratch setup before a run uses it', () => {
   test('a root-only project with only /src/tmp/ still receives the general rule', async () => {
     const root = await project();
     await rm(join(root, 'subs'), { recursive: true, force: true });
-    const configuration = JSON.parse(await readFile(join(root, 'ramify-agent.json'), 'utf8')) as { acceptance: { support: string[] } };
-    configuration.acceptance.support = [];
-    await writeFile(join(root, 'ramify-agent.json'), `${JSON.stringify(configuration)}\n`);
     await writeFile(join(root, '.gitignore'), '/src/tmp/\n');
     const result = await successfulRun(root, { setup: true });
     expect(onlyRun(result.service, plan).state).toBe('completed');
@@ -177,8 +174,8 @@ describe('scratch setup before a run uses it', () => {
       previews: Array.from({ length: 3 }, () => ({ repositoryRoot: root, head: source, tree: 'a'.repeat(40) })) });
     let audits = 0;
     const base = scriptedConfiguredAudit(root, {});
-    const configuredAudit = { ...base, async runFull(input: Parameters<typeof base.runFull>[0]) {
-      const result = await base.runFull(input);
+    const configuredAudit = { ...base, async run(input: Parameters<typeof base.run>[0]) {
+      const result = await base.run(input);
       return ++audits === 1 ? { ...result, verdict: 'fail' as const, detail: 'Scripted first baseline failed' } : result;
     } };
     const opened = await openRuns(root, { git, script: [{ kind: 'submit', input: emptyAnalysis() }],

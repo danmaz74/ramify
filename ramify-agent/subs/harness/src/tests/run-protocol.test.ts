@@ -4,7 +4,6 @@ import type { GitCheckpoint } from './helpers/scripted-git.js';
 import { protocolPorts } from './helpers/protocol-ports.js';
 import { openUnchangedRuns, unchangedGit, assertUnchangedGit, type UnchangedRunsOptions } from './helpers/unchanged-run.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
-import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -24,16 +23,17 @@ import { startServerWith, type RunningServer } from '../http/server.js';
 import { terminalRunEvents } from '../run/log.js';
 import { treeInputs } from './helpers/iterations.js';
 import {
-  draftsDirectory, drafts, fileHashes, longOutputBytes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
+  draftsDirectory, drafts, fileHashes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
 } from './helpers/protocol.js';
 import {
-  emptyAnalysis, installTestRunner, openRuns as openRealRuns, runEventsOnDisk, runPath, scriptedConfiguredAudit, startRun, testPolicy, until,
+  emptyAnalysis, installTestRunner, openRuns as openRealRuns, runEventsOnDisk, runPath, startRun, testPolicy, until,
 } from './helpers/runs.js';
 import { copyFixture } from './helpers/fixture.js';
 import { fixtureScratchGit } from './helpers/mock-git.js';
 import { acquireProjectLock } from '../store/lock.js';
 import { ObservationLog } from '../run/observations.js';
 import { runLayout } from '../run/records.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 
 /*
  * The run protocol over HTTP, read by a plain Node client: `fetch` and the
@@ -132,8 +132,7 @@ async function serve(
       inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
       ...extra.runs,
       ...(ports ?? { git: fixtureScratchGit(unchangedGit(root, unchangedCheckpoints, unchangedCheckpoints.length ? 4 : 0)),
-        candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, checkExecution: createPassingCheckExecution(),
-        configuredAudit: scriptedConfiguredAudit(root, {}) }),
+        candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, configuredAudit: passingAudit() }),
     },
   });
 }
@@ -271,16 +270,16 @@ describe('every query of a completed run, over HTTP', () => {
       ['note-search', 'todo', true],
     ]);
 
-    // The final gate's project tests printed more than a client receives:
-    // the tail is bounded at 8 KiB and the complete output stays a file.
+    // The final gate asked the committed audit in full and plans no command
+    // of its own: a client reads the request and its answer, and no
+    // environment of any command.
     const final = items.workItems.length > 0 ? (await allEvents(server, runId)).events.find(event => event.transition === 'job-completed')!.refs.find(ref => ref.kind === 'gate')!.id : '';
     const gate = gateResponseSchema.parse((await get(server, protocolPaths.runGate(plan, runId, final))).body).gate;
     expect(gate.checkpoint).toBe('final');
-    const tests = gate.commands.find(command => command.kind === 'tests')!;
-    expect(tests.output.bytes).toBe(longOutputBytes);
-    expect(Buffer.byteLength(tests.output.tail, 'utf8')).toBe(runQueryLimits.outputTailBytes);
-    expect(tests.output.tail.endsWith('all passed\n')).toBe(true);
-    expect(Object.keys(tests)).not.toContain('env');
+    expect(gate.commands).toEqual([]);
+    expect(gate.audit).toMatchObject({ mode: 'full', status: 'completed', verdict: 'pass', requestedSourceCommit: gate.audited, executedMode: 'full' });
+    expect(gate.verdict).toBe('passed');
+    expect(JSON.stringify(gate)).not.toContain('envAdditions');
 
     // The evaluation projection shows every change outside a write scope,
     // which tools were guarded, and the sentence that refuses to read zero

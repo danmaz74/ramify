@@ -18,16 +18,14 @@ import { defaultContextPolicies, defaultRunPolicy } from '../../run/policy.js';
 import type { RunPolicy } from '../../run/records.js';
 import type { RunInputs } from '../../run/inputs.js';
 import { RunService, type RunServiceOptions } from '../../run/service.js';
-import { captureProjectConfig } from '../../run/project-config.js';
-import type { ConfiguredAuditPort, CommittedAuditConfiguration } from '../../../subs/audit/src/check-execution.js';
+import type { ConfiguredAuditPort } from '../../../subs/audit/src/check-execution.js';
 import type { CapabilityWorkflow } from '../../capability/workflow.js';
 import { acquireProjectLock, lockPath } from '../../store/lock.js';
 import { FakeRamifyCli } from './fake-ramify.js';
 import { fixtureScratchGit } from './mock-git.js';
 import { installScriptedCucumber } from './project-config.js';
 import {
-  createDirectCheckExecution, createMappedCheckExecution, createPassingCheckExecution,
-  type DirectCheckScript, type DirectCheckStep,
+  mappedAudit, passingAudit, sequentialAudit, type DirectCheckScript, type DirectCheckStep,
 } from './direct-check-execution.js';
 
 const exec = promisify(execFile);
@@ -37,8 +35,8 @@ const exec = promisify(execFile);
  * a git repository, a policy whose commands are valid but cheap, inputs that
  * need no materialized view, and the scripted agent fake.
  *
- * `openRuns` uses a direct check-execution fake by default. Tests of actual
- * command execution or audit publication opt into those executors explicitly.
+ * `openRuns` uses a scripted configured audit by default. Tests of actual
+ * command execution or audit publication opt into those explicitly.
  */
 
 const identity = ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost'];
@@ -61,12 +59,10 @@ export async function initRepository(root: string): Promise<string> {
 }
 
 /**
- * The test runners readiness looks for. The fixture project carries no
- * `node_modules`, so a copy that a run works in is given the two binaries the
- * `test-runner` and `acceptance-runner` steps require. Neither runs anything:
- * the commands a lifecycle test's gates run are its policy's, and the
- * scenario runner is a scripted command wherever one runs, which writes a
- * message stream of a successful run with no scenario in it.
+ * Stand-in test runners for a fixture copy that carries no `node_modules`:
+ * a `vitest` that passes and a scripted `cucumber-js`. A lifecycle test's
+ * gates ask the scripted audit and run neither; a test that runs the
+ * project's own commands finds them.
  */
 export async function installTestRunner(root: string): Promise<void> {
   const directory = join(root, 'node_modules', '.bin');
@@ -100,17 +96,12 @@ export function exitsAfter(failFrom: number, cwd: string, counter: string, timeo
 }
 
 export interface TestPolicyOptions {
-  /** Which of the three baseline commands fails, and with which code. */
-  readonly failing?: 'allTests' | 'typeCheck' | 'ramifyCheck' | undefined;
+  /** Which of the standalone diagnosis's commands fails, and with which code. */
+  readonly failing?: 'typeCheck' | 'ramifyCheck' | undefined;
   /** Runs the installed Ramify CLI for the complete check instead of a cheap command. */
   readonly realRamifyCheck?: boolean | undefined;
   /** A command whose executable is not there, which is never recoverable. */
-  readonly missingCommand?: 'allTests' | 'typeCheck' | undefined;
-  /** A test command that passes at readiness and fails from the given run on. */
-  readonly testsFailFrom?: { readonly run: number; readonly counter: string } | undefined;
-  /** A command that never answers, so its checkpoint records a timeout. */
-  readonly timingOut?: 'allTests' | undefined;
-  readonly nested?: ReadonlyArray<{ directory: string; testScript: string | null }> | undefined;
+  readonly missingCommand?: 'typeCheck' | undefined;
   /**
    * The review policy the run captures. A test policy requests no reviews
    * unless it says so, so the invocations and events of every other
@@ -120,24 +111,16 @@ export interface TestPolicyOptions {
 }
 
 /**
- * A policy over one project whose commands are cheap. Its limits and its
- * context policies are the hardcoded ones: only the commands differ, and a
- * run records the policy it ran under, so what it ran is in `job.json`.
+ * A policy over one project whose standalone commands are cheap. Its limits
+ * and its context policies are the hardcoded ones: only the commands differ,
+ * and a run records the policy it ran under, so what it ran is in `job.json`.
+ * A run's gates run no policy command: they ask the configured audit.
  */
 export function testPolicy(projectRoot: string, options: TestPolicyOptions = {}): RunPolicy {
-  const base = defaultRunPolicy({
-    projectRoot,
-    nested: (options.nested ?? []).map(entry => ({ directory: entry.directory, manifest: `${entry.directory}/package.json`, installed: true, testScript: entry.testScript })),
-  });
-  const command = (name: 'allTests' | 'typeCheck' | 'ramifyCheck') => {
+  const base = defaultRunPolicy({ projectRoot });
+  const command = (name: 'typeCheck' | 'ramifyCheck') => {
     if (options.missingCommand === name) {
       return checkCommand({ argv: [join(projectRoot, 'no-such-command')], cwd: projectRoot, timeoutMs: 30_000 });
-    }
-    if (name === 'allTests' && options.timingOut === 'allTests') {
-      return checkCommand({ argv: [process.execPath, '-e', 'setTimeout(() => undefined, 60000)'], cwd: projectRoot, timeoutMs: 500 });
-    }
-    if (name === 'allTests' && options.testsFailFrom !== undefined) {
-      return exitsAfter(options.testsFailFrom.run, projectRoot, options.testsFailFrom.counter);
     }
     if (name === 'ramifyCheck' && options.realRamifyCheck === true) {
       return { ...base.commands.ramifyCheck, argv: [ramifyExecutable, 'check', '--batch', '--root', projectRoot, '--format', 'json', '--no-snapshot'] };
@@ -154,14 +137,8 @@ export function testPolicy(projectRoot: string, options: TestPolicyOptions = {})
     ...(options.reviews === undefined ? {} : { reviews: options.reviews }),
     commands: {
       ...base.commands,
-      allTests: command('allTests'),
       typeCheck: command('typeCheck'),
       ramifyCheck: command('ramifyCheck'),
-      nestedPackages: base.commands.nestedPackages.map(entry => ({
-        ...entry,
-        install: exits(0, entry.install.cwd, 60_000),
-        tests: entry.tests === null ? null : exits(0, entry.tests.cwd),
-      })),
     },
   };
 }
@@ -253,7 +230,7 @@ export interface OpenRunsOptions extends Partial<RunServiceOptions> {
   /** Every test chooses its Git boundary explicitly; this helper has no production fallback. */
   readonly git: NonNullable<RunServiceOptions['git']>;
   readonly script?: Script | undefined;
-  /** Script for the direct test executor. Ignored when `checkExecution` is supplied. */
+  /** Script for the scripted configured audit. Ignored when `configuredAudit` is supplied. */
   readonly checkScript?: readonly DirectCheckStep[] | DirectCheckScript | undefined;
   /** What the scripted fake declares, such as a fork it lacks. */
   readonly agentOptions?: ScriptedAgentOptions | undefined;
@@ -274,18 +251,17 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
   const agent = scripted ?? options.agent;
   const warnings: string[] = [];
   const { script: _script, checkScript, agentOptions: _agentOptions, capabilityWorkflowFactory, production, scratchGit, ...rest } = options;
-  const checkExecution = checkScript === undefined
-    ? createPassingCheckExecution()
+  const configuredAudit = checkScript === undefined
+    ? passingAudit()
     : typeof checkScript === 'function'
-      ? createMappedCheckExecution({ script: checkScript })
-      : createDirectCheckExecution({ script: checkScript });
+      ? mappedAudit(checkScript)
+      : sequentialAudit(checkScript);
   const serviceOptions: RunServiceOptions = {
     projectRoot: root,
     lock,
     inputs: shapeOnlyInputs,
     ramify: options.ramify ?? new FakeRamifyCli(),
-    checkExecution,
-    configuredAudit: scriptedConfiguredAudit(root, options),
+    configuredAudit,
     stopGraceMs: 500,
     ...(production === true ? {} : { policy: (projectRoot: string) => testPolicy(projectRoot) }),
     warn: message => warnings.push(message),
@@ -302,28 +278,8 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
 }
 
 /** Scripted lifecycle answer only; it is not a provider conformance witness. */
-export function scriptedConfiguredAudit(root: string, options: Partial<OpenRunsOptions>): ConfiguredAuditPort {
-  const read = async (_projectRoot: string, sourceCommit: string): Promise<CommittedAuditConfiguration> => {
-    const policy = options.policy?.(root, []);
-    const packages = policy?.commands.nestedPackages.map(entry => entry.directory) ?? [];
-    const agent = await captureProjectConfig(root);
-    const setup = 'config' in agent ? agent.config.setup ?? [] : [];
-    return {
-      sourceCommit, path: 'ramify-audit.json', blob: 'scripted-lifecycle-configuration', projectRoot: '.',
-      checks: [{ id: 'scripted-lifecycle-check' }], ignorePaths: [], undetectedConfigFilesForcingFullAudit: [],
-      workspace: { preparationId: 'nodejs', packageDirectoriesDeclared: packages.length > 0,
-        linkNodeModules: true, packageDirectories: packages.length > 0 ? packages : [''],
-        setupCommands: setup.map(command => ({ ...(command.name === undefined ? {} : { name: command.name }),
-          argv: [...command.command], cwd: command.cwd ?? '.', env: command.env ?? {}, timeoutMs: command.timeoutMs ?? 600_000 })) },
-    };
-  };
-  return { read, async runFull(input) {
-    const configuration = await read(input.projectRoot, input.sourceCommit);
-    if (JSON.stringify(configuration) !== JSON.stringify(input.configuration)) throw new Error('Scripted configuration mismatch');
-    return { status: 'completed', requestedSourceCommit: input.sourceCommit, auditedSourceCommit: input.sourceCommit,
-      reused: false, verdict: 'pass', reportCommit: 'scripted-report', runRef: 'scripted-ref', treeRef: 'scripted-tree',
-      detail: 'Scripted lifecycle result; no provider ran', provider: { scripted: true } };
-  } };
+export function scriptedConfiguredAudit(_root?: string, _options?: unknown): ConfiguredAuditPort {
+  return passingAudit();
 }
 
 let commandCount = 0;

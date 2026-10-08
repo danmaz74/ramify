@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { candidateModuleIndex } from '../reviews/signals.js';
 import { parseModuleHeader } from '../run/module-header.js';
-import { moduleTestAreas, scenarioModules } from '../run/project-config.js';
+import { moduleTestAreas } from '../run/project-config.js';
 import { openCandidateSnapshot } from '../reviews/snapshot.js';
 import { scriptedCandidates } from './helpers/candidates.js';
 import { temporaryDirectory } from './helpers/fixture.js';
@@ -51,7 +51,6 @@ describe('module header recognition', () => {
       { module: 'cart', area: 'subs/cart/src/tests' },
       { module: 'pricing', area: 'subs/cart/subs/pricing/src' },
     ]);
-    expect(await scenarioModules(directory.path, null)).toEqual([{ module: 'shop', dir: '', testing: false }]);
 
     const source = scriptedCandidates(directory.path, {
       c1: { tree: 't1', base: 'c0', changes: [], files },

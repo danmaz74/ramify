@@ -291,20 +291,7 @@
     {
       "case": "K3",
       "owner": 6,
-      "tests": [
-        {
-          "file": "subs/harness/src/tests/iterations.test.ts",
-          "titles": [
-            "K3: exact-owner and included-subtree selections at gate time"
-          ]
-        },
-        {
-          "file": "subs/harness/src/tests/test-selection.test.ts",
-          "titles": [
-            "K3: an exact owner and an included child subtree"
-          ]
-        }
-      ]
+      "document": "../21-project-boundary-adoption/iterations/iteration9-results.md"
     },
     {
       "case": "K4",
@@ -371,20 +358,7 @@
     {
       "case": "K8",
       "owner": 6,
-      "tests": [
-        {
-          "file": "subs/harness/src/tests/iteration-gate.test.ts",
-          "titles": [
-            "K8: every gate resolves the current tests under the captured policy"
-          ]
-        },
-        {
-          "file": "subs/harness/src/tests/test-selection.test.ts",
-          "titles": [
-            "K8: every resolution reads the tree as it stands"
-          ]
-        }
-      ]
+      "document": "../21-project-boundary-adoption/iterations/iteration9-results.md"
     },
     {
       "case": "X1a",

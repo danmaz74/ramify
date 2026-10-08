@@ -27,7 +27,7 @@ export async function copyCapabilityFixture(nested = false): Promise<{ root: str
  * capturing the current shared-lifecycle policy. This seam lives only in the harness test tree. */
 export function openCapabilityRuns(root: string, options: OpenRunsOptions) {
   return openRuns(root, { ...options, capabilityWorkflowFactory: createCapabilityWorkflow,
-    policy: (projectRoot, nested) => capabilityPolicyFrom(options.policy?.(projectRoot, nested) ?? testPolicy(projectRoot)) });
+    policy: (projectRoot: string) => capabilityPolicyFrom(options.policy?.(projectRoot) ?? testPolicy(projectRoot)) });
 }
 
 /** Small record builders for scripted Plan 16 transitions. Later fixtures

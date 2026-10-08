@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { GateAttempt, ScenarioCheckSummary } from '../checks/records.js';
-import type { PlannedCheck } from '../checks/verify.js';
+import type { GateAttempt } from '../checks/records.js';
+import { scenarioResultsOf, type ScenarioResult } from '../checks/scenario-results.js';
 import { incompleteScenarios } from '../run/feature-files.js';
 import { runEventSchema, type RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
@@ -16,7 +16,7 @@ import { consumerStub, consumerTest } from './helpers/contracts.js';
 import {
   accepted, added, answeredGit, modified, unchanged, scenariosCommitted, type AnsweredGit, type CommitResponse,
 } from './helpers/contracts-git.js';
-import { passingScenarioSummary, type DirectCheckScript, type DirectCheckStep } from './helpers/direct-check-execution.js';
+import type { DirectCheckScript, DirectCheckStep, ScriptedScenario } from './helpers/direct-check-execution.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { copyFixture } from './helpers/fixture.js';
 import { treeCandidates } from './helpers/candidates.js';
@@ -115,7 +115,7 @@ async function run(root: string, script: Parameters<typeof byRole>[0], commits: 
     git,
 
     candidates,
-    ...(options.checkScript === undefined ? {} : { checkScript: options.checkScript }),
+    checkScript: options.checkScript ?? configuredScenarioCheck(root),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun(plan));
@@ -137,8 +137,32 @@ async function gates(root: string, runId: string): Promise<GateAttempt[]> {
   return Promise.all(ids.map(id => gateOf(root, runId, id)));
 }
 
-function summaryOf(attempt: GateAttempt): ScenarioCheckSummary | undefined {
-  return attempt.commands.find(command => command.kind === 'scenarios')?.scenarios;
+/** What the gate's audit said of each tracked scenario, read from its configured scenario check's raw output. */
+function resultsOf(attempt: GateAttempt): ScenarioResult[] {
+  return scenarioResultsOf(attempt);
+}
+
+/**
+ * The tracked scenarios the project's configured scenario check runs at a
+ * gate: every one in the tree's feature files without the pending tag, as
+ * its `not @ramify-pending` profile selects them, each passing. The
+ * harness selects none of them; the scripted audit stands in for Cucumber.
+ */
+function runnableScenarios(root: string): ScriptedScenario[] {
+  const files = (readdirSync(root, { recursive: true }) as string[])
+    .filter(path => path.endsWith('.feature') && !path.split('/').includes('node_modules'))
+    .sort();
+  return files.flatMap(file => read(root, file).split('\n').flatMap((text, index) => {
+    const tags = text.trim().split(/\s+/);
+    const identity = tags.find(tag => /^@ramify-sc-\d{3,}$/.test(tag));
+    if (identity === undefined || tags.includes('@ramify-pending')) return [];
+    return [{ id: identity.slice('@ramify-'.length), status: 'passed' as const, file, line: index + 1 }];
+  }));
+}
+
+/** The project's configured scenario check over the tree as each gate's commit leaves it; every other check passes. */
+function configuredScenarioCheck(root: string): DirectCheckScript {
+  return ({ check }) => (check.kind === 'scenarios' ? { scenarios: runnableScenarios(root) } : {});
 }
 
 /** The obligation events of the log that name a scenario, as `bound sc (fakes)` and `reported sc judgment` lines. */
@@ -177,18 +201,13 @@ function at(log: readonly RunEvent[], type: string, match: (data: Record<string,
   return log.findIndex(event => event.type === type && match(event.data as Record<string, unknown>));
 }
 
-/** A scenario check whose runs reached the scenario and failed it at its last step. */
-function failingScenario(check: PlannedCheck, id: string): DirectCheckStep {
-  const passing = passingScenarioSummary(check);
+/** A configured scenario check whose run reached the scenario and failed it at its last step. */
+function failingScenario(root: string, id: string): DirectCheckStep {
   return {
     outcome: { kind: 'completed', exitCode: 1 },
-    scenarios: {
-      ...passing,
-      scenarios: passing.scenarios.map(result => (result.id !== id ? result : {
-        ...result, status: 'failed' as const, failure: { step: 'Then the outcome review-note promises is shown', message: 'expected the note, got nothing' },
-      })),
-      failures: [`${id} failed at "Then the outcome review-note promises is shown": expected the note, got nothing`],
-    },
+    scenarios: runnableScenarios(root).map(result => (result.id !== id ? result : {
+      ...result, status: 'failed' as const, failure: { step: 'Then the outcome review-note promises is shown', message: 'expected the note, got nothing' },
+    })),
   };
 }
 
@@ -230,9 +249,9 @@ describe('PB3-D12, PB3-D06: binding, the done report and the pending tag', () =>
       accepted('wi-002', 'revision-02', modified(tagFeature)),
       unchanged(finalSubject),
     ], {
-      checkScript: ({ check, context }) => {
-        if (check.kind === 'scenarios') seen.set(context.attemptId, { note: read(root, noteFeature), tag: read(root, tagFeature) });
-        return {};
+      checkScript: invocation => {
+        if (invocation.check.kind === 'scenarios') seen.set(invocation.context.attemptId, { note: read(root, noteFeature), tag: read(root, tagFeature) });
+        return configuredScenarioCheck(root)(invocation);
       },
     });
 
@@ -255,23 +274,23 @@ describe('PB3-D12, PB3-D06: binding, the done report and the pending tag', () =>
       expect(architects).toContain((report.data as { by: string }).by);
     }
 
-    // The iteration gate selected the bound scenario by identity, in its
-    // owner's run, and its commit had removed the pending tag already.
-    expect(summaryOf(iterationGate)).toMatchObject({
-      mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-001'] },
-      runs: [{ module: notes }], scenarios: [{ id: 'sc-001', status: 'passed' }], failures: [],
-    });
+    // The iteration gate's commit had removed the bound scenario's pending
+    // tag already, so the committed audit's configured scenario check, whose
+    // profile excludes the pending tag, ran it; the harness selected nothing.
+    expect(iterationGate.audit).toMatchObject({ mode: 'project-default', verdict: 'pass' });
+    expect(iterationGate.commands).toEqual([]);
+    expect(resultsOf(iterationGate)).toEqual([expect.objectContaining({ id: 'sc-001', status: 'passed', check: 'scenarios' })]);
     expect(seen.get(iterationGate.id)!.note).toContain('  @ramify-sc-001\n');
     expect(seen.get(iterationGate.id)!.tag).toContain('  @ramify-sc-002 @ramify-pending\n');
     // wi-002's direct done report took its tag off at its gate's commit.
-    expect(summaryOf(noteGate!)).toMatchObject({ selection: { kind: 'all-untagged' }, excluded: 1, scenarios: [{ id: 'sc-001', status: 'passed' }] });
+    expect(resultsOf(noteGate!).map(result => `${result.id} ${result.status}`)).toEqual(['sc-001 passed']);
     expect(seen.get(tagGate!.id)!.tag).toContain('  @ramify-sc-002\n');
-    expect(summaryOf(tagGate!)!.scenarios.map(result => result.id)).toEqual(['sc-001', 'sc-002']);
+    expect(resultsOf(tagGate!).map(result => result.id).sort()).toEqual(['sc-001', 'sc-002']);
 
-    // §11: the final gate ran everything in full mode, and the run completed
-    // with every tracked scenario done.
-    expect(summaryOf(finalGate)).toMatchObject({ mode: 'full', selection: { kind: 'all' }, dryRun: false, failures: [] });
-    expect(summaryOf(finalGate)!.scenarios.map(result => `${result.id} ${result.status}`)).toEqual(['sc-001 passed', 'sc-002 passed']);
+    // §11: the final gate asked the full audit, its scenario check ran
+    // every scenario, and the run completed with every tracked one done.
+    expect(finalGate.audit).toMatchObject({ mode: 'full', verdict: 'pass' });
+    expect(resultsOf(finalGate).map(result => `${result.id} ${result.status}`).sort()).toEqual(['sc-001 passed', 'sc-002 passed']);
     expect(log.at(-1)!.type).toBe('job-completed');
     expect(onlyRun(service, plan).counts.scenarios).toEqual({ pending: 0, bound: 0, done: 2 });
     expect(read(root, noteFeature)).toContain('  @ramify-sc-001\n');
@@ -350,7 +369,7 @@ describe('PB3-D03: the audit result is evidence beside the state, never the stat
     const log = await events(root, runId);
     const iterationGate = (await gates(root, runId)).find(attempt => attempt.checkpoint === 'iteration')!;
     expect(iterationGate.verdict).toBe('passed');
-    expect(summaryOf(iterationGate)!.scenarios).toEqual([expect.objectContaining({ id: 'sc-001', status: 'passed' })]);
+    expect(resultsOf(iterationGate)).toEqual([expect.objectContaining({ id: 'sc-001', status: 'passed' })]);
     // The pass reported nothing: the only report is the architect's last.
     expect(scenarioLines(log)).toEqual(['bound sc-001 (FakeNoteLimit)', 'reported sc-001 done']);
     expect(at(log, 'obligation-reported')).toBeGreaterThan(at(log, 'gate-passed', data => data.gate === iterationGate.id));
@@ -395,15 +414,16 @@ describe('PB3-D03: the audit result is evidence beside the state, never the stat
       accepted('wi-001.i02', 'revision-02', modified(source)),
       unchanged('wi-001.i02'),
       unchanged('wi-001.i02'),
-      // The exhausted iteration's reviews ask for one more work-item gate.
-      unchanged('wi-001'),
+      // The failing scenario results are display only: they record no
+      // finding, so no reconciliation asks for a second work-item gate.
       unchanged('wi-001'),
       unchanged(finalSubject),
     ], {
       checkScript: ({ check, context }) => {
-        if (check.kind !== 'scenarios' || context.checkpoint !== 'iteration') return {};
+        if (check.kind !== 'scenarios') return {};
+        if (context.checkpoint !== 'iteration') return { scenarios: runnableScenarios(root) };
         iterationGates += 1;
-        return iterationGates === 1 ? {} : failingScenario(check, 'sc-001');
+        return iterationGates === 1 ? { scenarios: runnableScenarios(root) } : failingScenario(root, 'sc-001');
       },
     });
 
@@ -414,9 +434,13 @@ describe('PB3-D03: the audit result is evidence beside the state, never the stat
     const failed = (await gates(root, runId)).filter(attempt => attempt.checkpoint === 'iteration' && attempt.verdict === 'failed');
     expect(failed).toHaveLength(3);
     // Every failure stays raw in its gate; none moved the state.
-    expect(summaryOf(failed[0]!)!.failures).toEqual(['sc-001 failed at "Then the outcome review-note promises is shown": expected the note, got nothing']);
+    expect(resultsOf(failed[0]!)).toEqual([expect.objectContaining({ id: 'sc-001', status: 'failed',
+      failure: { step: 'Then the outcome review-note promises is shown', message: 'expected the note, got nothing' } })]);
+    expect(failed[0]!.audit).toMatchObject({ verdict: 'fail' });
     expect(scenarioLines(log)).toEqual(['bound sc-001 (FakeNoteLimit)', 'reported sc-001 done']);
     expect(log.find(event => event.type === 'obligation-reported')!.data).toMatchObject({ where: 'review-note steps', basedOnRevision: 0, revision: 1 });
+    expect(log.filter(event => event.type === 'check-findings-recorded')).toEqual([]);
+    expect((await gates(root, runId)).filter(attempt => attempt.checkpoint === 'work-item').map(attempt => attempt.verdict)).toEqual(['passed']);
     expect(onlyRun(service, plan).counts.scenarios).toEqual({ pending: 0, bound: 0, done: 1 });
     expect(read(root, feature)).toContain('  @ramify-sc-001\n');
     git.assertAnswered();
@@ -643,16 +667,17 @@ describe('§9: work-item completion', () => {
       unchanged(finalSubject),
     ], {
       checkScript: ({ check, context }) => {
-        if (check.kind !== 'scenarios' || context.checkpoint !== 'work-item' || regressions > 0) return {};
+        if (check.kind !== 'scenarios') return {};
+        if (context.checkpoint !== 'work-item' || regressions > 0) return { scenarios: runnableScenarios(root) };
         regressions += 1;
-        return failingScenario(check, 'sc-001');
+        return failingScenario(root, 'sc-001');
       },
     });
 
     expect(onlyRun(service, plan).state).toBe('completed');
     const attempts = (await gates(root, runId)).filter(attempt => attempt.checkpoint === 'work-item');
     expect(attempts.map(attempt => attempt.verdict)).toEqual(['failed', 'passed']);
-    expect(summaryOf(attempts[0]!)!.scenarios).toEqual([expect.objectContaining({ id: 'sc-001', status: 'failed' })]);
+    expect(resultsOf(attempts[0]!)).toEqual([expect.objectContaining({ id: 'sc-001', status: 'failed' })]);
     // The failure changed no state and the file kept no pending tag.
     expect(scenarioLines(await events(root, runId))).toEqual(['bound sc-001 (no fakes)', 'reported sc-001 done']);
     expect(read(root, feature)).toContain('  @ramify-sc-001\n');
@@ -680,9 +705,8 @@ describe('§11: the final gate', () => {
       'local-architect': [submit(requestCompletion())],
     }, [unchanged('wi-001'), unchanged(finalSubject)], {
       // The final run did not execute the scenario, and reported nothing failed.
-      checkScript: ({ check, context }) => (check.kind === 'scenarios' && context.checkpoint === 'final'
-        ? { scenarios: { ...passingScenarioSummary(check), scenarios: [] } }
-        : {}),
+      checkScript: ({ check, context }) => (check.kind !== 'scenarios' ? {}
+        : context.checkpoint === 'final' ? { scenarios: [] } : { scenarios: runnableScenarios(root) }),
     });
 
     const snapshot = onlyRun(service, plan);
@@ -690,7 +714,8 @@ describe('§11: the final gate', () => {
     expect(snapshot.state).toBe('completed');
     const finalGate = (await gates(root, runId)).find(attempt => attempt.checkpoint === 'final')!;
     expect(finalGate.verdict).toBe('passed');
-    expect(summaryOf(finalGate)!.scenarios).toEqual([]);
+    expect(finalGate.audit).toMatchObject({ mode: 'full', verdict: 'pass' });
+    expect(resultsOf(finalGate)).toEqual([]);
   }, 120_000);
 });
 

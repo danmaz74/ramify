@@ -110,7 +110,7 @@ describe('an implementation run with no entry capabilities', () => {
     expect(attempt.verdict).toBe('passed');
     expect(attempt.steps.every(step => step.outcome === 'passed')).toBe(true);
     expect(attempt.steps.map(step => step.step)).toEqual([
-      'project-root', 'scratch-cleanup', 'git-clean', 'compiler-config', 'project-config', 'acceptance-runner',
+      'project-root', 'scratch-cleanup', 'git-clean', 'compiler-config', 'project-config',
       'ramify-daemon', 'audit-config', 'declared-packages', 'declared-preparation', 'configured-full-audit', 'run-branch',
     ]);
   }, 120_000);

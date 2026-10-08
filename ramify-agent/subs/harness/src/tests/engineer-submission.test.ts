@@ -5,18 +5,18 @@ import { changedResult } from './helpers/check-payloads.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { scenariosCommit, scriptedGit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { commandResult } from './helpers/command-result.js';
-import { scriptedScenarioRun } from './helpers/project-config.js';
-import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { engineerJsonSchema, engineerToolName, scopeTestsJsonSchema, scopeTestsToolName, validateEngineer } from '../work/engineer.js';
+import { engineerJsonSchema, engineerToolName, validateEngineer } from '../work/engineer.js';
+import { shellToolName } from '../tools/shell.js';
+import type { CommandRequest } from '../../subs/evidence/src/run-command.js';
 import type { HookFinding } from '../hooks/post-write.js';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
-import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, runScopeTests, submit, treeInputs } from './helpers/iterations.js';
+import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, shell, submit, treeInputs } from './helpers/iterations.js';
 import { openRuns as openRunsWithGit, onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
@@ -25,7 +25,7 @@ import { openRuns as openRunsWithGit, onlyRun, runEventsOnDisk, runPath, startRu
  * every error names its path, a corrected input is accepted, and the bound
  * ends the invocation as `invalid-submission`.
  *
- * Its one harness tool is judged the same way. A tool is not a submission —
+ * Its shell tool's input is judged the same way. A tool is not a submission —
  * a rejected input leaves the session running — but its bound is its own and
  * reaching it ends the invocation just the same.
  */
@@ -69,11 +69,6 @@ describe('the schema', () => {
     expect(missing.ok).toBe(false);
     if (missing.ok) return;
     expect(missing.errors[0]!.path).toBe('summary');
-  });
-
-  test('the harness tool takes nothing, and an input with a field in it is refused', () => {
-    expect(scopeTestsJsonSchema).toMatchObject({ type: 'object' });
-    expect(JSON.stringify(scopeTestsJsonSchema)).not.toContain('iteration');
   });
 });
 
@@ -183,7 +178,7 @@ describe('a rejected submission in a run', () => {
 
   async function run(
     inputs: readonly unknown[],
-    toolCalls: readonly unknown[] = [],
+    toolCalls: ReadonlyArray<ReturnType<typeof shell>> = [],
     unchangedCheckpoints: ReadonlyArray<string | GitCheckpoint> = [],
   ) {
     const fixture = await copyFixture();
@@ -199,20 +194,19 @@ describe('a rejected submission in a run', () => {
       ].join('\n'),
     });
     await installMiniRunner(fixture.root);
+    // Every command the engineer's shell runs is answered here, in this
+    // process, and recorded.
+    const commands: CommandRequest[] = [];
     const { service, agent } = await openRuns(fixture.root, {
       commandExecution: async request => {
-        // The tool runs the scope's scenarios beside its tests, answered by
-        // the scripted runner in this process.
-        const scenarios = await scriptedScenarioRun(request);
-        if (scenarios !== undefined) return scenarios;
-        expect(request.argv).toContain(`${notesDirectory}/src/tests/notes.test.ts`);
-        return commandResult(request, { outcome: { kind: 'completed', exitCode: 0 } });
+        commands.push(request);
+        return commandResult(request, { outcome: { kind: 'completed', exitCode: 0 }, stdout: 'ok 1 - the limit is the one the plan asks for\n' });
       },
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
         engineer: [[
-          ...toolCalls.map(input => runScopeTests(input)),
+          ...toolCalls,
           ...inputs.map(input => ({ kind: 'submit' as const, input })),
         ]],
       }),
@@ -222,7 +216,7 @@ describe('a rejected submission in a run', () => {
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
-    return { root: fixture.root, runId: receipt.jobId, service, agent };
+    return { root: fixture.root, runId: receipt.jobId, service, agent, commands };
   }
 
   test('a broken schema returns every error to the same session, and a corrected input is accepted', async () => {
@@ -288,9 +282,10 @@ describe('a rejected submission in a run', () => {
   }, 300_000);
 
   test('a harness tool\'s input is judged too: the call is answered with its errors and the bound ends the invocation', async () => {
-    const { root, runId, service, agent } = await run(
+    const malformed = { kind: 'tool' as const, tool: shellToolName, input: { suite: 'everything' } };
+    const { root, runId, service, agent, commands } = await run(
       [completionProposed('Left the limit as the plan asks.')],
-      [{ suite: 'everything' }, { suite: 'everything' }, { suite: 'everything' }],
+      [malformed, malformed, malformed],
       returnedCheckpoints,
     );
 
@@ -300,58 +295,50 @@ describe('a rejected submission in a run', () => {
     // Each rejected call was answered in the same session, as that call's
     // error result, and nothing ran for it.
     const engineer = agent!.sessions.find(session => session.spec.role === 'engineer')!;
-    const answers = engineer.results.filter(result => result.tool === scopeTestsToolName);
+    const answers = engineer.results.filter(result => result.tool === shellToolName);
     expect(answers).toHaveLength(3);
     for (const answer of answers) {
       expect(answer.isError).toBe(true);
       const body = JSON.parse(answer.text.split('\n\n')[0]!) as { accepted: boolean; errors: Array<{ path: string; message: string }> };
       expect(body.accepted).toBe(false);
-      // The tool takes nothing, so a field in its input is an unrecognized
-      // key of the input itself, and the answer names it.
-      expect(body.errors[0]!.path).toBe('(root)');
-      expect(body.errors[0]!.message).toContain('suite');
+      // The shell takes a command and an optional timeout: the input names
+      // neither, and the answer says what is wrong with it.
+      expect(body.errors.length).toBeGreaterThan(0);
+      expect(JSON.stringify(body.errors)).toMatch(/command|suite/);
     }
+    expect(commands).toEqual([]);
 
     const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0007')), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { target?: string } });
-    expect(observations.filter(line => line.type === 'rejection' && line.data.target === scopeTestsToolName)).toHaveLength(3);
-    // No test run was recorded for a call that never ran.
-    expect(observations.some(line => line.type === 'scope-tests')).toBe(false);
+    expect(observations.filter(line => line.type === 'rejection' && line.data.target === shellToolName)).toHaveLength(3);
     const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0007')), 'utf8')) as InvocationOutcome;
     expect(outcome.ended).toBe('invalid-submission');
     const result = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;
     expect(result.outcome).toBe('partial');
-    expect(result.failure?.digest.rejected).toMatchObject({ count: 3, target: scopeTestsToolName });
+    expect(result.failure?.digest.rejected).toMatchObject({ count: 3, target: shellToolName });
   }, 300_000);
 
-  test('the tool that takes nothing runs the selection the assignment fixed, and records what it ran', async () => {
-    const { root, runId, service, agent } = await run(
+  test('the engineer runs its named test through the shell and is answered with that command\'s result; a whole-suite run is refused and runs nothing', async () => {
+    const named = `npx vitest run ${notesDirectory}/src/tests/notes.test.ts`;
+    const { service, agent, commands } = await run(
       [completionProposed('Left the limit as the plan asks.')],
-      [{}],
+      [shell(named), shell('npx vitest run')],
       completedCheckpoints,
     );
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
 
     const engineer = agent!.sessions.find(session => session.spec.role === 'engineer')!;
-    const answer = engineer.results.find(result => result.tool === scopeTestsToolName)!;
-    expect(answer.isError).toBe(false);
-    expect(answer.text).toContain(`${notesDirectory}/src/tests/notes.test.ts`);
-    expect(answer.text).toContain('Outcome: passed');
-    // The work item's pending scenario ran beside the tests, selected by its
-    // identity although nothing has declared it, and passed.
-    expect(answer.text).toContain('Scenarios: passed; quick mode, selected by identity: sc-001.');
-    expect(answer.text).toMatch(/- `sc-001` ".+" passed, at `.+\.feature:\d+`, with no step bound\./);
-
-    const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0007')), 'utf8'))
-      .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { resolved?: string[]; outcome?: string; scenarios?: unknown } });
-    const ran = observations.filter(line => line.type === 'scope-tests');
-    expect(ran).toHaveLength(1);
-    expect(ran[0]!.data.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
-    expect(ran[0]!.data.outcome).toBe('passed');
-    expect(ran[0]!.data.scenarios).toEqual({ selected: ['sc-001'], passed: ['sc-001'], failures: 0 });
-    // Its profile and stream are the invocation's, outside the worktree.
-    expect(existsSync(runPath(root, 'review-notes', runId, join(runLayout.scopeScenarios('inv-0007', 1), 'scenarios.log')))).toBe(true);
-    expect(existsSync(join(root, notesDirectory, 'src', 'notes.ts'))).toBe(true);
+    const [ran, refused] = engineer.results.filter(result => result.tool === shellToolName);
+    // The named run is the command the engineer gave, and its answer is the
+    // command's own exit code and output.
+    expect(ran!.isError).toBe(false);
+    expect(ran!.text).toContain('ok 1 - the limit is the one the plan asks for');
+    // The whole suite is the gate's audit's to run: refused before anything spawned.
+    expect(refused!.isError).toBe(true);
+    expect(refused!.text).toContain('Refused, nothing ran: `npx vitest run`');
+    expect(refused!.text).toContain('npx vitest run <path/to/file.test.ts>');
+    const shellRuns = commands.filter(request => request.argv[0] === 'bash');
+    expect(shellRuns.map(request => request.argv)).toEqual([['bash', '-c', named]]);
   }, 300_000);
 });
 

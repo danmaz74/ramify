@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
-import { checkpointPolicies, allProjectChecks } from '../checks/checkpoint.js';
+import { checkpointPolicies, diagnosisChecks } from '../checks/checkpoint.js';
 import { commandTimeouts, defaultLimits, defaultRunPolicy } from '../run/policy.js';
 import { runPolicySchema } from '../run/records.js';
 import { RunService, type RunServiceOptions } from '../run/service.js';
@@ -24,11 +24,11 @@ afterEach(async () => {
 
 describe('the captured commands', () => {
   test('production constructor refuses policy injection before creating a service', async () => {
-    await expect(RunService.open({ policy: () => defaultRunPolicy({ projectRoot: '/project', nested: [] }) } as unknown as RunServiceOptions))
+    await expect(RunService.open({ policy: () => defaultRunPolicy({ projectRoot: '/project' }) } as unknown as RunServiceOptions))
       .rejects.toThrow('Production run policy is fixed');
   });
   test('are the main plan\'s table, naming the environment the harness built', () => {
-    const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
+    const policy = defaultRunPolicy({ projectRoot: '/project' });
     expect(policy.version).toBe('run-policy/7');
     expect(policy.limits.maxIterationsPerCapabilityTask).toBe(24);
     expect(policy.limits.nonfunctionalRoundsPerPlan).toBe(3);
@@ -38,15 +38,16 @@ describe('the captured commands', () => {
     // The transcript's inline body limit is a recorded policy value.
     expect(policy.transcript).toEqual({ inlineBodyBytes: 8192 });
     expect(policy.commands.typeCheck.argv).toEqual(['npm', 'run', 'type-check']);
-    expect(policy.commands.allTests.argv).toEqual(['npm', 'test']);
+    // No test command is captured: a run's gates ask the committed audit,
+    // whose definition names the project's suites and scenario checks.
+    expect(Object.keys(policy.commands).sort()).toEqual(['hookTimeoutMs', 'ramifyChanged', 'ramifyCheck', 'typeCheck']);
     expect(policy.commands.ramifyCheck.argv).toEqual([ramifyExecutable, 'check', '--batch', '--root', '/project', '--format', 'json', '--no-snapshot']);
     expect(policy.commands.ramifyChanged.argv).toEqual([ramifyExecutable, 'check', '--changed', '--format', 'json', '--deadline', '5000']);
     expect(policy.commands.hookTimeoutMs).toBe(commandTimeouts.hook);
     expect(policy.commands.typeCheck.timeoutMs).toBe(300_000);
-    expect(policy.commands.allTests.timeoutMs).toBe(900_000);
     expect(policy.commands.ramifyCheck.timeoutMs).toBe(600_000);
     expect(policy.commands.ramifyChanged.timeoutMs).toBe(5_000);
-    for (const command of [policy.commands.typeCheck, policy.commands.allTests, policy.commands.ramifyCheck]) {
+    for (const command of [policy.commands.typeCheck, policy.commands.ramifyCheck]) {
       expect(command.cwd).toBe('/project');
       expect(command.env).toContain('PATH');
       expect(command.env).not.toContain('NODE_OPTIONS');
@@ -54,23 +55,8 @@ describe('the captured commands', () => {
     }
   });
 
-  test('a nested package gets its install and its test command, or none where it has no test script', () => {
-    const policy = defaultRunPolicy({
-      projectRoot: '/project',
-      nested: [
-        { directory: 'tools', manifest: 'tools/package.json', installed: true, testScript: 'vitest run' },
-        { directory: 'docs', manifest: 'docs/package.json', installed: true, testScript: null },
-      ],
-    });
-    expect(policy.commands.nestedPackages.map(entry => entry.directory)).toEqual(['tools', 'docs']);
-    expect(policy.commands.nestedPackages[0]!.install.argv).toEqual(['npm', 'ci']);
-    expect(policy.commands.nestedPackages[0]!.install.cwd).toBe(join('/project', 'tools'));
-    expect(policy.commands.nestedPackages[0]!.tests?.argv).toEqual(['npm', 'test']);
-    expect(policy.commands.nestedPackages[1]!.tests).toBeNull();
-  });
-
   test('the limits are the plan\'s, and the policy validates as one record', () => {
-    const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
+    const policy = defaultRunPolicy({ projectRoot: '/project' });
     expect(policy.limits).toEqual(defaultLimits);
     expect(defaultLimits).toMatchObject({
       repairRoundsPerIteration: 3, repairRoundsPerWorkItemGate: 3, infrastructureRetriesPerGate: 2,
@@ -85,7 +71,7 @@ describe('the captured commands', () => {
   });
 
   test('every role has its context policy, and a role with none is refused', () => {
-    const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
+    const policy = defaultRunPolicy({ projectRoot: '/project' });
     expect(policy.context['initial-architect']).toEqual({ compaction: 'allowed', budgetTokens: 150_000, budgetFraction: 0.75, reportReserveTokens: 16_000 });
     expect(policy.context['global-fork']).toEqual({ compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 16_000 });
     expect(policy.context['engineer']).toEqual({ compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 });
@@ -98,40 +84,37 @@ describe('the captured commands', () => {
 });
 
 describe('new-run policy does not infer packages', () => {
-  test('an unrelated manifest and a deep setup-only manifest do not add test commands', async () => {
+  test('an unrelated manifest and a deep setup-only manifest add no command to the policy', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     for (const directory of ['subs/unrelated', 'subs/a/subs/b/subs/c/subs/d/tools']) {
       await mkdir(join(fixture.root, directory), { recursive: true });
       await writeFile(join(fixture.root, directory, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }));
     }
-    expect(defaultRunPolicy({ projectRoot: fixture.root }).commands.nestedPackages).toEqual([]);
+    const policy = defaultRunPolicy({ projectRoot: fixture.root });
+    expect(Object.keys(policy.commands).sort()).toEqual(['hookTimeoutMs', 'ramifyChanged', 'ramifyCheck', 'typeCheck']);
   }, 60_000);
 });
 
 describe('the checkpoint policy', () => {
-  test('readiness and the final gate require all project tests; only the final one commits', () => {
-    expect(checkpointPolicies.readiness).toEqual({
-      selection: 'all-project', nestedTests: true, committing: false, scenarios: { mode: 'quick', selection: 'all-untagged', strict: true },
+  test('readiness and the final gate request the full audit; ordinary gates leave the mode to the provider; readiness alone commits nothing', () => {
+    expect(checkpointPolicies).toEqual({
+      readiness: { committing: false, audit: 'full' },
+      iteration: { committing: true, audit: 'project-default' },
+      contract: { committing: true, audit: 'project-default' },
+      'breaking-iteration': { committing: true, audit: 'project-default' },
+      'work-item': { committing: true, audit: 'project-default' },
+      final: { committing: true, audit: 'full' },
     });
-    expect(checkpointPolicies.final).toEqual({
-      selection: 'all-project', nestedTests: false, committing: true, scenarios: { mode: 'full', selection: 'all', strict: true },
-    });
-    expect(checkpointPolicies.iteration.selection).toBe('owned-by-scope');
   });
 
-  test('every checkpoint also runs the type check and a complete Ramify check', () => {
-    const policy = defaultRunPolicy({
-      projectRoot: '/project',
-      nested: [{ directory: 'tools', manifest: 'tools/package.json', installed: true, testScript: 'vitest run' }],
-    });
-    const readiness = allProjectChecks(policy.commands, checkpointPolicies.readiness);
-    expect(readiness.map(check => check.kind)).toEqual(['tests', 'tests', 'type-check', 'ramify-check']);
-    expect(readiness[1]!.command.cwd).toBe(join('/project', 'tools'));
-
-    const final = allProjectChecks(policy.commands, checkpointPolicies.final);
-    expect(final.map(check => check.kind)).toEqual(['tests', 'type-check', 'ramify-check']);
-    // No selection is attached: the project's own runner does the selecting.
-    expect(final.every(check => check.selection === undefined)).toBe(true);
+  test('a standalone diagnosis runs the project\'s setup, its type check and a complete Ramify check, and no test', () => {
+    const policy = defaultRunPolicy({ projectRoot: '/project' });
+    const checks = diagnosisChecks(policy.commands, [{ name: 'build', command: ['npm', 'run', 'build'] }], '/project');
+    expect(checks.map(check => check.kind)).toEqual(['setup', 'type-check', 'ramify-check']);
+    expect(checks[0]!.command.cwd).toBe('/project');
+    expect(checks[1]!.command).toEqual(policy.commands.typeCheck);
+    expect(checks[2]!.command).toEqual(policy.commands.ramifyCheck);
+    expect(diagnosisChecks(policy.commands, [], '/project').map(check => check.kind)).toEqual(['type-check', 'ramify-check']);
   });
 });

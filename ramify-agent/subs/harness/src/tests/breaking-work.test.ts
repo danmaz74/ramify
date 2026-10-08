@@ -2,7 +2,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { checkCommand } from '../checks/records.js';
+import { gateDiagnostics } from '../checks/diagnostics.js';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
@@ -11,13 +11,13 @@ import { localArchitectToolName } from '../work/submission.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry } from './helpers/analysis.js';
 import {
-  addModule, assign, byRole, completionProposed, installMiniRunner, read, runScopeTests,
+  addModule, assign, byRole, completionProposed, installMiniRunner, read,
   shell, submit, treeInputs, write, type Turn,
 } from './helpers/iterations.js';
 import {
-  onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy,
+  onlyRun, openRuns, runEventsOnDisk, runPath, startRun,
 } from './helpers/runs.js';
-import { createLocalCommandCheckExecution } from './helpers/direct-check-execution.js';
+import { localCommandAudit } from './helpers/direct-check-execution.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
 
@@ -391,17 +391,23 @@ async function run(
     git: scripted.git,
     ...(final === undefined ? {} : { candidates: final.candidates }),
 
-    policy: projectRoot => { const policy = testPolicy(projectRoot); return { ...policy, commands: { ...policy.commands,
-      allTests: checkCommand({ argv: [join(projectRoot, 'node_modules/.bin/vitest'), 'run',
-        `${dirA}/src/tests/adapters.test.ts`, `${dirC}/src/tests/outcome.test.ts`,
-        `${dirP}/src/tests/result.test.ts`, `${dirV}/src/tests/panel.test.ts`], cwd: projectRoot, timeoutMs: 30_000 }),
-    } }; },
     ...options,
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun(plan));
   await opened.service.settled(plan, receipt.jobId);
   return { ...opened, runId: receipt.jobId, scripted };
+}
+
+/**
+ * The project's configured audit for these scenarios, answered in place: its
+ * test check runs the four modules' real tests with the stand-in runner,
+ * whatever the gate. The definition names them; the harness selects none.
+ */
+function projectAudit(root: string) {
+  return localCommandAudit({ tests: [join(root, 'node_modules/.bin/vitest'), 'run',
+    `${dirA}/src/tests/adapters.test.ts`, `${dirC}/src/tests/outcome.test.ts`,
+    `${dirP}/src/tests/result.test.ts`, `${dirV}/src/tests/panel.test.ts`] });
 }
 
 async function readGate(root: string, runId: string, id: string): Promise<GateAttempt> {
@@ -504,8 +510,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
         submit(completionProposed('Added the structured reviewer beside the plain field, both filled.'),
           read(join(root, dirC, 'src/outcome.ts')),
           write(join(root, dirC, 'src/outcome.ts'), coreV1),
-          write(join(root, dirC, 'src/tests/outcome.test.ts'), coreTestV1),
-          runScopeTests()),
+          write(join(root, dirC, 'src/tests/outcome.test.ts'), coreTestV1)),
         submit(completionProposed('The outcome is made from a reviewer, and both surfaces and both views carry it.'),
           write(join(root, dirC, 'src/outcome.ts'), coreV2),
           write(join(root, dirC, 'src/tests/outcome.test.ts'), coreTestV2),
@@ -514,8 +519,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
           write(join(root, dirP, 'src/result.ts'), pureV2),
           write(join(root, dirP, 'src/tests/result.test.ts'), pureTestV2),
           write(join(root, dirV, 'src/panel.ts'), panelV2),
-          write(join(root, dirV, 'src/tests/panel.test.ts'), panelTestV2),
-          runScopeTests()),
+          write(join(root, dirV, 'src/tests/panel.test.ts'), panelTestV2)),
         submit(completionProposed('Removed the plain reviewer field from the outcome and from the surface that answered it.'),
           write(join(root, dirC, 'src/outcome.ts'), coreV3),
           write(join(root, dirC, 'src/tests/outcome.test.ts'), coreTestV3),
@@ -534,7 +538,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
         unchanged,
       ],
       finalHead: 'revision-03',
-    }, { checkExecution: createLocalCommandCheckExecution() });
+    }, { configuredAudit: projectAudit(root) });
 
     expect(onlyRun(service, plan).state, JSON.stringify({ tail: (await runEventsOnDisk(root, plan, runId)).slice(-8), gates: (await gates(root, runId)).map(gate => ({ id: gate.id, verdict: gate.verdict, commands: gate.commands.map(command => ({ kind: command.kind, outcome: command.outcome, output: command.output.tail.slice(-1000) })) })) })).toBe('completed');
 
@@ -557,9 +561,8 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
       expect(base.rationale.length).toBeGreaterThan(0);
     }
 
-    // Every accepted boundary: one breaking-iteration gate, passed, with the
-    // project's own tests, the type check, the complete Ramify check, the
-    // project's untagged scenarios in quick mode. The test command runs once.
+    // Every accepted boundary: one breaking-iteration gate, passed, whose
+    // configured audit ran the definition's checks once over its commit.
     const attempts = await gates(root, runId);
     const breaking = attempts.filter(attempt => attempt.checkpoint === 'breaking-iteration');
     expect(breaking).toHaveLength(3);
@@ -567,14 +570,13 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
       expect(attempt.verdict).toBe('passed');
       expect(attempt.cause).toBeNull();
       expect(attempt.guardedChanges).toEqual([]);
-      expect(attempt.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check', 'scenarios']);
-      for (const command of attempt.commands) expect(command.outcome).toBe('passed');
-      const tests = attempt.commands.filter(command => command.kind === 'tests');
-      expect(tests).toHaveLength(1);
-      expect(tests[0]!.exitCode).toBe(0);
-      for (const owner of [dirA, dirC, dirP, dirV]) {
-        expect(tests[0]!.command.argv.some(argument => argument.startsWith(`${owner}/src/tests/`))).toBe(true);
-      }
+      expect(attempt.commands).toEqual([]);
+      expect(attempt.audit).toMatchObject({ status: 'completed', verdict: 'pass', requestedSourceCommit: attempt.commit });
+      const checks = attempt.provider!.checks as Record<string, { passed: boolean; output: string }>;
+      expect(Object.keys(checks)).toEqual(['tests', 'type-check', 'ramify-check']);
+      for (const check of Object.values(checks)) expect(check.passed).toBe(true);
+      // The configured tests check ran every owner's real tests.
+      for (const owner of [dirA, dirC, dirP, dirV]) expect(checks['tests']!.output).toContain(`ok ${owner}/src/tests/`);
     }
     // The work item's own gate, all-project, closes it.
     expect(attempts.filter(attempt => attempt.checkpoint === 'work-item').every(attempt => attempt.verdict === 'passed')).toBe(true);
@@ -642,21 +644,22 @@ describe('the breaking-iteration boundary is not green by default', () => {
         to: 'revision-02',
         changes: [{ status: 'M', path: `${dirC}/src/outcome.ts` }, { status: 'M', path: `${dirA}/src/adapters.ts` }],
       }],
-    }, { checkExecution: createLocalCommandCheckExecution() });
+    }, { configuredAudit: projectAudit(root) });
 
     expect(onlyRun(service, plan).state, JSON.stringify({ tail: (await runEventsOnDisk(root, plan, runId)).slice(-8), gates: (await gates(root, runId)).map(gate => ({ id: gate.id, verdict: gate.verdict, commands: gate.commands.map(command => ({ kind: command.kind, outcome: command.outcome, output: command.output.tail.slice(-1000) })) })) })).toBe('completed');
     const breaking = (await gates(root, runId)).filter(attempt => attempt.checkpoint === 'breaking-iteration');
     expect(breaking.map(attempt => attempt.verdict)).toEqual(['failed', 'passed']);
-    // The required whole-project test command ran the consumers over
-    // the committed unadapted tree and failed with evidence bound to it.
+    // The configured audit ran the consumers' tests over the committed
+    // unadapted tree and failed with evidence bound to it.
     const refused = breaking[0]!;
     expect(refused.cause).toBe('check-failed');
     expect(refused.next).toBe('repair');
     expect(refused.commit).not.toBeNull();
     expect(refused.audited).toBe(refused.commit);
     expect(refused.evidence).not.toBeNull();
-    expect(refused.commands.find(command => command.kind === 'tests')!.outcome).toBe('failed');
-    expect(refused.commands.find(command => command.kind === 'tests')!.output.tail).toContain('not ok');
+    expect(refused.commands).toEqual([]);
+    expect(refused.audit).toMatchObject({ status: 'completed', verdict: 'fail', requestedSourceCommit: refused.commit });
+    expect((await gateDiagnostics(refused, 'engineer')).summary.join('\n')).toContain('not ok');
     // Only the adapted state is accepted, after one repair round.
     expect(breaking[1]!.repairRound).toBe(1);
     expect(breaking[1]!.commit).toBe('revision-02');

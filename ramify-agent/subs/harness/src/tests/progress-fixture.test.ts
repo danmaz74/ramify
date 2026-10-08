@@ -16,6 +16,7 @@ import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
 import { scriptedGit, type ScriptedGit } from './helpers/scripted-git.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -44,7 +45,7 @@ beforeAll(async () => {
       inputs: treeInputs(),
       git: serverGit,
 
-      checkExecution: createPassingCheckExecution(),
+      configuredAudit: passingAudit(),
       policy: projectRoot => testPolicy(projectRoot),
       stopGraceMs: 500,
       warn: () => undefined,
