@@ -1,10 +1,10 @@
 # Plan 21 final results
 
-**Date:** 2026-10-08. **Status:** awaiting-protected-patch-approval. Every
+**Date:** 2026-10-08. **Status:** complete. Every
 iteration (0–11) is complete and every acceptance row has its witness; the
-final full nested audit passes on the delivered source. Plan 21 is not
-marked complete because the two authorized `docs/harness.spec.md`
-corrections are not applied and await Dan's approval
+final full nested audit passes on the delivered source and applies to the
+delivered head. Dan approved the two `docs/harness.spec.md` corrections on
+2026-10-08 and the coordinator applied them exactly
 ([below](#protected-file-review)). This receipt makes no new real-Pi trial
 claim; Plan 18's historical live-trial gaps remain separately described.
 
@@ -54,6 +54,17 @@ from the repository root on clean `f2968d17`:
 - [projection](evidence/iteration11-audit/final-audit.json). The earlier
   failing audit of `cc27f03c` is kept beside it
   ([projection](evidence/iteration11-audit/final-audit-1-failed.json)).
+
+Plan 22 later merged audited test-performance work into this branch
+(`25ea4b8b`, recorded by `b52aa48f`). The same final-gate request at the clean
+head `b52aa48f` returned `completed`, invocation verdict `pass`, overall
+`pass`, executed `full`, nested discovery `complete`, composition `pass` with
+no outstanding failures, request `26064e83-e15d-429c-bd73-4d10e38c6152`. It
+executed nothing: the provider reused its passing full audit of `4531e00a`
+(Plan 22's pre-merge audit, which contains `f2968d17`), and every path changed
+since is ignored documentation
+([projection](evidence/iteration11-audit/final-head-reuse.json)). This is
+reuse, not a fresh execution at `b52aa48f`.
 
 ## Nested-project results
 
@@ -186,23 +197,25 @@ clarification and the two applied `harness.spec.md` scope hunks of
 2026-10-07.
 
 Two further `ramify-agent/docs/harness.spec.md` patches were authorized by
-the previous coordinator for later iterations and are **pending Dan's
-approval**; they are not applied:
+the previous coordinator for later iterations. Dan approved both on
+2026-10-08 ("I approve both spec changes"), and the coordinator applied them
+exactly as recorded:
 
 1. the replacement of the whole body of "Verification Follows Scope And
    Audit Policy" with the [proposed verification paragraph](protected-wording-proposal.md#proposed-verification-paragraph);
 2. the replacement of one sentence of "A Small Closed Set of Outcomes Is the
    Whole Protocol" with the [authorized outcome-protocol sentence](protected-wording-proposal.md#authorized-outcome-protocol-sentence-2026-10-07).
 
-The live `harness.spec.md` SHA-256 is
-`f3635d7e25b8b6d175e543197be9c7d12356048f92266fbf1c5df6431ff948bc`, equal to
-the baseline both patches were prepared against. The implementation already
-follows the behavior both patches describe; applying them is the remaining
-condition for marking the plan complete.
+Before the patches `harness.spec.md` hashed to
+`f3635d7e25b8b6d175e543197be9c7d12356048f92266fbf1c5df6431ff948bc`, the
+baseline both were prepared against; after them it is
+`58f680061c9a108445ee8f475c4407e1b69f9467aeb944df09bb063225386ad5`. No other
+protected file changed. The patches change documentation only, under the
+audit's ignored `docs/**`, and describe behavior the implementation already
+has.
 
 ## Handoff
 
-The coordinator reviews this receipt, pushes the branch and verifies
-synchronization. After Dan approves and the coordinator applies the two
-patches, the plan and manifest can be marked complete; the patches change
-documentation only and do not affect the audited source.
+The coordinator reviewed this receipt, applied the two approved patches and
+marked the plan and manifest complete. The branch is pushed and its live
+remote verified after this commit.

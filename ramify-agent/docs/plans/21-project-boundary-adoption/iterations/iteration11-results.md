@@ -1,8 +1,8 @@
 # Iteration 11: integration acceptance and handoff results
 
-**Date:** 2026-10-08. **Status:** iteration 11 complete; Plan 21 awaits Dan's
-approval of the two pending protected `harness.spec.md` patches (see
-[final results](../final-results.md#protected-file-review)). The branch push
+**Date:** 2026-10-08. **Status:** iteration 11 complete. Dan later approved the two
+protected `harness.spec.md` patches and the coordinator applied them, completing
+Plan 21 (see [final results](../final-results.md#protected-file-review)). The branch push
 awaits coordinator review. **Entry source:** `42253094` (clean).
 **Source commits** on `feat/plan21-project-boundary-adoption`:
 

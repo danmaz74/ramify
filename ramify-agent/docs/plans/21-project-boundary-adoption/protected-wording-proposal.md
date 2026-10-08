@@ -168,3 +168,14 @@ continues without modifying protected files. Later receipts compare HEAD,
 index, working tree and renamed/untracked protected files against the baseline
 and authorized changes. Do not reuse historical hashes as proof that Dan's
 new edit is absent or unauthorized.
+
+## Applied, 2026-10-08
+
+Dan approved both pending patches ("I approve both spec changes"): the
+[proposed verification paragraph](#proposed-verification-paragraph), replacing
+the whole body of "Verification Follows Scope And Audit Policy", and the
+[authorized outcome-protocol sentence](#authorized-outcome-protocol-sentence-2026-10-07).
+The coordinator applied both exactly as written, from the baseline
+`f3635d7e25b8b6d175e543197be9c7d12356048f92266fbf1c5df6431ff948bc`. `docs/harness.spec.md`
+now hashes to `58f680061c9a108445ee8f475c4407e1b69f9467aeb944df09bb063225386ad5`.
+No protected authorization remains pending.

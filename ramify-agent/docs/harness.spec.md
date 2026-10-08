@@ -51,18 +51,23 @@ not substitute the module root or a child module for either source location.
 
 ### Verification Follows Scope And Audit Policy
 
-An iteration's scoped verification selects its module and explicitly included
-child subtrees using ramify-audit's ownership-based test-selection policy.
-Owned non-source changes follow their owner's impact; project-wide inputs
-follow the audit's declared full-audit policy. Ownership, source classification
-and the tests selected by a runner are distinct. Excluded source receives a
-not-analyzed answer, never a passing source-check claim.
-
-The harness consumes ramify-audit's combined evidence across required commands
-and configurations. It cannot accept missing required tests or incomplete
-execution as passing. An included ignored tree is verified by its owner's
-tests during ordinary iterations; a project's own nested audit is required
-at the plan's final gate. Preserve each project's audit result separately.
+Verification executes the project's configured checks through ramify-audit.
+For committed partial audits, impact selection comes from Ramify and the
+project's audit policy; inert and excluded paths need not select their owner.
+Detected shared inputs and explicitly listed undetected configuration files
+follow the provider's full-audit policy. The harness records complete audit
+results and preserves producer verdicts. The responsible architect evaluates
+implementation, tests and relevant audit diagnostics and declares whether a
+registered requirement is correctly implemented and passing. The harness
+trusts that declaration and asks the architect about missing reports; it does
+not match declarations or references to test files or execution results.
+Final verification is a full audit of the configured suite, including required
+nested projects. Architect declarations and that audit result remain separate.
+An owned-unwired tree is verified by its owner's tests; an included
+owned-nested-project tree needs its own nested audit at the plan's final
+gate, and each project's audit result is preserved separately.
+Ownership, source classification and configured test execution are distinct.
+A not-analyzed path is never presented as passing source analysis.
 
 ### Scratch Has The Iteration's Lifetime
 
@@ -106,8 +111,12 @@ Each role submits from a closed action union. A requesting engineer can
 propose completion, report partial work or request a capability. The local
 architect qualifies reuse or delegates. The capability architect consults,
 revises its plan, assigns scoped work, delegates a nested need, records a
-placement conflict or requests handback. An accepted submission changes the
-orchestration; it does not claim that implementation is accepted. Read,
+placement conflict or requests handback. An accepted engineer completion
+proposal advances orchestration to verification; it does not establish correct
+implementation. An authorized architect's accepted done report records that
+architect's judgment that its registered obligation is correctly implemented
+and passing. The harness trusts the report and does not infer that judgment
+from gate results. Read,
 plan-update and prevalidation tools have explicit recorded effects but do not
 complete work. The harness applies only accepted actions and current gates.
 

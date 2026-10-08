@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "awaiting-protected-patch-approval",
+  "status": "complete",
   "execution": "serial",
   "iterations": [
     {

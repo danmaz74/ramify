@@ -2,8 +2,7 @@
 
 The [manifest](manifest.json) is the single serial schedule for expanded
 [Plan 21](../main-plan.md). Iterations 0–11 are complete, each with its
-`iterationN-results.md` receipt; the plan awaits approval of two protected
-patches ([final results](../final-results.md)). See [execution](../execution.md).
+`iterationN-results.md` receipt; the plan is complete ([final results](../final-results.md)). See [execution](../execution.md).
 
 The unstarted scope-certification iteration is replaced; audit delivery is
 split into 9 and 10 and final qualification moves to 11. No implementation
