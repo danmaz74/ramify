@@ -1,7 +1,9 @@
 # Plan 21: provider adoption and architect-owned completion
 
-**Date:** 2026-10-06. **Expanded:** 2026-10-07. **Status:** implementation in
-progress; iteration 0 provider and responsibility prerequisites complete.
+**Date:** 2026-10-06. **Expanded:** 2026-10-07. **Status:**
+awaiting-protected-patch-approval: iterations 0–11 are complete and the final
+full nested audit passes ([final results](final-results.md)); the two
+authorized `docs/harness.spec.md` corrections await Dan's approval.
 Dan chose to consolidate provider adoption and responsibility corrections into
 this plan rather than introduce another plan. At initial plan authoring, only
 planning was authorized; that historical limit did not authorize runtime

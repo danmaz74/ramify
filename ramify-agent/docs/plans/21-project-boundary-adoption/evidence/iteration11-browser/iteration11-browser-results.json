@@ -1,0 +1,218 @@
+{
+  "revision": "323bdc13460f8c003f7cf61e8fd7062a805bc55a",
+  "dirtyAtStart": true,
+  "chromium": "/usr/bin/chromium",
+  "viewports": [
+    "1440x900",
+    "480x700"
+  ],
+  "source": "projects kept by plan21-workflows.integration.test.ts (production wiring, scripted agents, installed providers), served by startCliServer, as `ramify-agent serve` starts it",
+  "observed": {
+    "runs": {
+      "failed": "20261008T065252Z-ca784d",
+      "repaired": "20261008T065415Z-12a9ed",
+      "capability": "20261008T065729Z-eab60c",
+      "engineerSession": "ses-0006",
+      "architectSession": "ses-0004",
+      "standalone": "20261008T065842Z-e2f174"
+    },
+    "recorded": {
+      "gates": {
+        "failedGate": {
+          "id": "ga-0005",
+          "verdict": "failed",
+          "nested": true,
+          "projects": [
+            ".: pass, reused, executed full",
+            "subs/workspace/subs/reviews/subs/notes/report: fail, ran, executed full"
+          ]
+        },
+        "repairedGate": {
+          "id": "ga-0006",
+          "verdict": "passed",
+          "nested": true,
+          "projects": [
+            ".: pass, reused, executed full",
+            "subs/workspace/subs/reviews/subs/notes/report: pass, ran, executed full"
+          ]
+        },
+        "capabilityGate": {
+          "id": "ga-0006",
+          "verdict": "passed",
+          "nested": true,
+          "projects": [
+            ".: pass, reused, executed full"
+          ]
+        }
+      },
+      "obligations": {
+        "failedObligations": [
+          {
+            "id": "sc-001",
+            "status": "done",
+            "fakes": [
+              "FakeReportReader"
+            ],
+            "report": "done",
+            "where": "notes.test.ts — the note limit test"
+          },
+          {
+            "id": "test-001",
+            "status": "done",
+            "fakes": null,
+            "report": "done",
+            "where": null
+          }
+        ],
+        "repairedObligations": [
+          {
+            "id": "sc-001",
+            "status": "done",
+            "fakes": [],
+            "report": "done",
+            "where": "notes.test.ts — both limit tests"
+          },
+          {
+            "id": "test-001",
+            "status": "done",
+            "fakes": null,
+            "report": "done",
+            "where": null
+          }
+        ],
+        "capabilityObligations": [
+          {
+            "id": "sc-001",
+            "status": "done",
+            "fakes": [],
+            "report": "done",
+            "where": "subs/a/src/tests/caller.test.ts"
+          },
+          {
+            "id": "cap-001",
+            "status": "done",
+            "fakes": null,
+            "report": "done",
+            "where": "subs/b/src/tests/fact.test.ts"
+          }
+        ]
+      }
+    },
+    "desktop-engineer-dispositions": [
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/src/tmp/draft.txt · module collection-review/workspace/reviews/notes · in the scratch tree subs/workspace/subs/reviews/subs/notes/src/tmp of collection-review/workspace/reviews/notes: scratch",
+      "checked subs/workspace/subs/reviews/subs/notes/src/notes.ts · module collection-review/workspace/reviews/notes",
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/report/limit.json · module collection-review/workspace/reviews/notes · in the owned-nested-project tree subs/workspace/subs/reviews/subs/notes/report of collection-review/workspace/reviews/notes: owned-nested-project",
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/report/check.mjs · module collection-review/workspace/reviews/notes · in the owned-nested-project tree subs/workspace/subs/reviews/subs/notes/report of collection-review/workspace/reviews/notes: owned-nested-project",
+      "checked subs/workspace/subs/reviews/subs/notes/src/notes.ts · module collection-review/workspace/reviews/notes",
+      "checked subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts · module collection-review/workspace/reviews/notes",
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/report/check.mjs · module collection-review/workspace/reviews/notes · in the owned-nested-project tree subs/workspace/subs/reviews/subs/notes/report of collection-review/workspace/reviews/notes: owned-nested-project",
+      "checked subs/workspace/subs/reviews/subs/notes/src/notes.ts · module collection-review/workspace/reviews/notes",
+      "checked subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts · module collection-review/workspace/reviews/notes",
+      "checked subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts · module collection-review/workspace/reviews/notes",
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/report/check.mjs · module collection-review/workspace/reviews/notes · in the owned-nested-project tree subs/workspace/subs/reviews/subs/notes/report of collection-review/workspace/reviews/notes: owned-nested-project",
+      "checked subs/workspace/subs/reviews/subs/notes/src/notes.ts · module collection-review/workspace/reviews/notes",
+      "checked subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts · module collection-review/workspace/reviews/notes"
+    ],
+    "desktop-architect-brief": [
+      "- sc-001 (scenario): bound, revision 0; bound by inv-0009 relying on fakes FakeReportReader; no report yet",
+      "- test-001 (registered test: The notes test states the plan limit): pending, revision 0; not bound; no report yet"
+    ],
+    "desktop-standalone-dispositions": [
+      "checked subs/b/src/fact.ts · module capability-coordination/b",
+      "not-analyzed subs/b/src/tmp/notes.txt · module capability-coordination/b · in the scratch tree subs/b/src/tmp of capability-coordination/b: scratch",
+      "not-analyzed subs/b/docs/source.md · module capability-coordination/b · owned-non-source",
+      "checked subs/b/src/fact.ts · module capability-coordination/b",
+      "checked subs/b/src/tests/fact.test.ts · module capability-coordination/b"
+    ],
+    "narrow-engineer-dispositions": [
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/src/tmp/draft.txt · module collection-review/workspace/reviews/notes · in the scratch tree subs/workspace/subs/reviews/subs/notes/src/tmp of collection-review/workspace/reviews/notes: scratch",
+      "checked subs/workspace/subs/reviews/subs/notes/src/notes.ts · module collection-review/workspace/reviews/notes",
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/report/limit.json · module collection-review/workspace/reviews/notes · in the owned-nested-project tree subs/workspace/subs/reviews/subs/notes/report of collection-review/workspace/reviews/notes: owned-nested-project",
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/report/check.mjs · module collection-review/workspace/reviews/notes · in the owned-nested-project tree subs/workspace/subs/reviews/subs/notes/report of collection-review/workspace/reviews/notes: owned-nested-project",
+      "checked subs/workspace/subs/reviews/subs/notes/src/notes.ts · module collection-review/workspace/reviews/notes",
+      "checked subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts · module collection-review/workspace/reviews/notes",
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/report/check.mjs · module collection-review/workspace/reviews/notes · in the owned-nested-project tree subs/workspace/subs/reviews/subs/notes/report of collection-review/workspace/reviews/notes: owned-nested-project",
+      "checked subs/workspace/subs/reviews/subs/notes/src/notes.ts · module collection-review/workspace/reviews/notes",
+      "checked subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts · module collection-review/workspace/reviews/notes",
+      "checked subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts · module collection-review/workspace/reviews/notes",
+      "not-analyzed subs/workspace/subs/reviews/subs/notes/report/check.mjs · module collection-review/workspace/reviews/notes · in the owned-nested-project tree subs/workspace/subs/reviews/subs/notes/report of collection-review/workspace/reviews/notes: owned-nested-project",
+      "checked subs/workspace/subs/reviews/subs/notes/src/notes.ts · module collection-review/workspace/reviews/notes",
+      "checked subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts · module collection-review/workspace/reviews/notes"
+    ],
+    "narrow-architect-brief": [
+      "- sc-001 (scenario): bound, revision 0; bound by inv-0009 relying on fakes FakeReportReader; no report yet",
+      "- test-001 (registered test: The notes test states the plan limit): pending, revision 0; not bound; no report yet"
+    ],
+    "narrow-standalone-dispositions": [
+      "checked subs/b/src/fact.ts · module capability-coordination/b",
+      "not-analyzed subs/b/src/tmp/notes.txt · module capability-coordination/b · in the scratch tree subs/b/src/tmp of capability-coordination/b: scratch",
+      "not-analyzed subs/b/docs/source.md · module capability-coordination/b · owned-non-source",
+      "checked subs/b/src/fact.ts · module capability-coordination/b",
+      "checked subs/b/src/tests/fact.test.ts · module capability-coordination/b"
+    ]
+  },
+  "checks": [
+    "the kept projects hold the failed and the repaired ordinary runs and the completed capability run",
+    "the failing final audit is nested with a passing root and a failing report project",
+    "the repaired and the capability final audits pass every project",
+    "desktop: the failing final audit shows each recorded project's own verdict and execution",
+    "desktop: the failing project's failures and record are shown",
+    "desktop: the failing audit fits the page width",
+    "desktop: the failed run lists its registered test and scenario with their done reports and where hints",
+    "desktop: the declarations stay done although the final audit failed",
+    "desktop: the obligation list fits the page width",
+    "desktop: the engineer's writes keep their dispositions: source checked, scratch not analyzed without a passing label",
+    "desktop: the transcript fits the page width",
+    "desktop: the architect's brief lists each obligation with its state and report revision",
+    "desktop: the brief fits the page width",
+    "desktop: the repaired final audit passes the root and the report project",
+    "desktop: the repaired run's obligations match the recorded bindings and reports",
+    "desktop: the capability task shows the coordinator's done report with its where hint and the accepted handback",
+    "desktop: the capability task fits the page width",
+    "desktop: the capability run lists the delegated outcome and the consumer scenario, both done with where hints",
+    "desktop: the capability run's final audit is the root project's nested audit",
+    "desktop: the standalone session checks its source write and leaves its scratch write not analyzed",
+    "desktop: the standalone session shows the write refused inside the nested project",
+    "desktop: the standalone transcript fits the page width",
+    "desktop: Chromium reports no page exceptions",
+    "narrow: the failing final audit shows each recorded project's own verdict and execution",
+    "narrow: the failing project's failures and record are shown",
+    "narrow: the failing audit fits the page width",
+    "narrow: the failed run lists its registered test and scenario with their done reports and where hints",
+    "narrow: the declarations stay done although the final audit failed",
+    "narrow: the obligation list fits the page width",
+    "narrow: the engineer's writes keep their dispositions: source checked, scratch not analyzed without a passing label",
+    "narrow: the transcript fits the page width",
+    "narrow: the architect's brief lists each obligation with its state and report revision",
+    "narrow: the brief fits the page width",
+    "narrow: the repaired final audit passes the root and the report project",
+    "narrow: the repaired run's obligations match the recorded bindings and reports",
+    "narrow: the capability task shows the coordinator's done report with its where hint and the accepted handback",
+    "narrow: the capability task fits the page width",
+    "narrow: the capability run lists the delegated outcome and the consumer scenario, both done with where hints",
+    "narrow: the capability run's final audit is the root project's nested audit",
+    "narrow: the standalone session checks its source write and leaves its scratch write not analyzed",
+    "narrow: the standalone session shows the write refused inside the nested project",
+    "narrow: the standalone transcript fits the page width",
+    "narrow: Chromium reports no page exceptions"
+  ],
+  "screenshots": [
+    "iteration11-w1-failed-final-gate-desktop-1440x900.png",
+    "iteration11-w1-failed-obligations-desktop-1440x900.png",
+    "iteration11-w1-engineer-dispositions-desktop-1440x900.png",
+    "iteration11-w1-architect-brief-desktop-1440x900.png",
+    "iteration11-w1-repaired-final-gate-desktop-1440x900.png",
+    "iteration11-w2-capability-task-desktop-1440x900.png",
+    "iteration11-w2-obligations-desktop-1440x900.png",
+    "iteration11-w3-standalone-dispositions-desktop-1440x900.png",
+    "iteration11-w1-failed-final-gate-narrow-480x700.png",
+    "iteration11-w1-failed-obligations-narrow-480x700.png",
+    "iteration11-w1-engineer-dispositions-narrow-480x700.png",
+    "iteration11-w1-architect-brief-narrow-480x700.png",
+    "iteration11-w1-repaired-final-gate-narrow-480x700.png",
+    "iteration11-w2-capability-task-narrow-480x700.png",
+    "iteration11-w2-obligations-narrow-480x700.png",
+    "iteration11-w3-standalone-dispositions-narrow-480x700.png"
+  ],
+  "failure": null
+}

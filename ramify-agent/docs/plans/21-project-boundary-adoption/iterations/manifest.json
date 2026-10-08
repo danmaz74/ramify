@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "implementation-in-progress",
+  "status": "awaiting-protected-patch-approval",
   "execution": "serial",
   "iterations": [
     {
@@ -208,7 +208,7 @@
         "PB3-R03",
         "PB3-R04"
       ],
-      "status": "not-started"
+      "status": "complete"
     }
   ]
 }
