@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
 import { dispatchHarnessCommand } from '../../subs/audit/src/focused-check.js';
-import type { CommandRun } from '../../subs/evidence/src/run-command.js';
+import type { CommandRun, CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { checkCommandEnvironment } from './records.js';
 import type { CheckCommandKind, Checkpoint, GateCommandRecord, GateEvidence } from './records.js';
 import type { PlannedCheck } from './verify.js';
@@ -90,7 +90,7 @@ export interface CheckExecutionResult {
  * them has not passed, no later command runs, and each is recorded as not
  * run because of it.
  */
-export function createInPlaceCheckExecution(): CheckExecutionPort {
+export function createInPlaceCheckExecution(runner: CommandRunner = runCommand): CheckExecutionPort {
   return {
     async run(checks, request) {
       const commands: GateCommandRecord[] = [];
@@ -107,7 +107,7 @@ export function createInPlaceCheckExecution(): CheckExecutionPort {
         }
         await request.started?.(commandStart(checks, index));
         if (check.kind === 'setup') {
-          const run = await runCommand({ argv: check.command.argv, cwd: check.command.cwd,
+          const run = await runner({ argv: check.command.argv, cwd: check.command.cwd,
             env: checkCommandEnvironment(check.command), timeoutMs: check.command.timeoutMs, outputFile, signal: request.signal });
           const record = request.classify(check, run, outputFile);
           commands.push(record);
@@ -116,7 +116,7 @@ export function createInPlaceCheckExecution(): CheckExecutionPort {
           continue;
         }
         const id = `check-${String(index + 1).padStart(2, '0')}-${check.kind}`;
-        const executed = await dispatchHarnessCommand({ command: check.command, signal: request.signal, outputFile, checkId: id });
+        const executed = await dispatchHarnessCommand({ command: check.command, signal: request.signal, runner, outputFile, checkId: id });
         const record = request.classify(check, executed.run, outputFile);
         const decided: GateCommandRecord = executed.passed || record.outcome !== 'passed' ? record
           : executed.runnerError === null ? { ...record, outcome: 'failed' }

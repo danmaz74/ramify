@@ -336,7 +336,7 @@
       "owner": 10,
       "tests": [
         {
-          "file": "subs/harness/src/tests/breaking-work.test.ts",
+          "file": "subs/harness/src/tests/breaking-work.boundary.test.ts",
           "titles": [
             "K6: the gate is not satisfied by weakening what it checks"
           ]
@@ -348,7 +348,7 @@
       "owner": 10,
       "tests": [
         {
-          "file": "subs/harness/src/tests/breaking-work.test.ts",
+          "file": "subs/harness/src/tests/breaking-work.boundary.test.ts",
           "titles": [
             "K7: a breaking feature is isolated into iterations that are green at every accepted boundary"
           ]

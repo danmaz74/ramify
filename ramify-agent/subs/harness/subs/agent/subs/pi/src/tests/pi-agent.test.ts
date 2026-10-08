@@ -1,9 +1,10 @@
+import { declareGrep, assertGrepConsumed } from './helpers/scripted-grep.js';
 import { rootDescription } from '../../../../../../src/tests/helpers/root-description.js';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeAll, describe, expect, test } from 'vitest';
+import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { AgentEvent, SessionOutcome, SessionSpec, SubmissionVerdict, ToolDefinition } from '../../../../src/interfaces/port.js';
 import { createPiAgentOn, permissiveSchema } from '../pi-agent.js';
 import { call, calls, scriptedProvider, scriptedRuntime, text, type ReplyStep, type ScriptedProvider } from './helpers/scripted-provider.js';
@@ -19,9 +20,15 @@ const submissionSchema = {
   additionalProperties: false,
 };
 
+vi.mock('@earendil-works/pi-coding-agent', async importOriginal => {
+  const actual = await importOriginal<typeof import('@earendil-works/pi-coding-agent')>();
+  const { scriptedGrepSession } = await import('./helpers/scripted-grep.js');
+  return { ...actual, createAgentSession: (options: Parameters<typeof actual.createAgentSession>[0]) => scriptedGrepSession(actual, options) };
+});
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  try { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); } finally { assertGrepConsumed(); }
 });
 
 interface Harness {
@@ -102,6 +109,7 @@ describe('the pi adapter', () => {
   });
 
   test('translates tool calls by call ID and assistant messages with their usage', async () => {
+    declareGrep('expose-sub', 'subs', 'notes.md:1:expose-sub appears here');
     const echo: ToolDefinition = {
       name: 'echo', description: 'Echoes', inputSchema: { type: 'object', properties: { word: { type: 'string' } } },
       execute: async input => ({ text: `echo ${(input as { word: string }).word}` }),

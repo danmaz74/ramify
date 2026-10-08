@@ -1,6 +1,6 @@
 # Automatic guard investigation handoff
 
-**Status:** implementation considerations for iteration 6, pending experiments.
+**Status:** historical considerations below; automatic enforcement implemented in optimization 13, pending full audit and integration.
 These notes add no runner exemption or settled implementation choice.
 
 The migrated acceptance files currently install
@@ -35,3 +35,65 @@ Outer audit Git, test discovery and Vitest worker creation are infrastructure
 outside ordinary test execution. They do not justify an opt-out available to
 ordinary tests. The committed complete audit still discovers and executes the
 union of ordinary and explicitly registered actual-boundary files.
+
+## Delivered investigation
+
+The installed Vitest 4.1.11 experiments demonstrated that native builtin
+instrumentation followed by `syncBuiltinESMExports` reaches named/default,
+promisified, both CommonJS spellings and `vi.importActual` routes. The builtin
+wrappers retain private state across module resets and reused workers. Root
+setup derives permission from actual testPath and the exact registry. Reinstall
+of the current file preserves attempts; switching files cannot drop unfinalized
+refusals. Root `aroundAll` wraps user setup, cleanup and teardown, and preserves
+both an original thrown error and an enforcement error.
+
+Actual child runners proved both ordinary/native orders with isolate:false in
+one PID, sharing cached CommonJS and promisified exports. Native controls return
+actual Node stdout; ordinary attempts fail the file despite catches and never
+write the process-side marker. The retained harness compatibility recorder may
+reset its local observations only; root enforcement remains independent. The
+decoder's cloned hoisted recorder has been replaced by root forwarding.
+
+Config validation asks the public installed `createVitest` /
+`globTestSpecifications` for original include/exclude discovery, then closes all
+owned projects/servers before returning configuration. It starts no workers or
+test setup. Exact registration errors fail configuration; the aggregate audit
+check remains unchanged. Per-file command observations are generated under the
+installed package cache without changing guard permission.
+
+Forwarding qualification also proves both worker orders through cached root and
+harness adapters. Promisified exec/execFile retain stdout and stderr; native
+ENOENT keeps its outcome and contributes no refused local observation. Local
+recorder resets do not erase root enforcement. The committed MAIN fixture-trial
+advance b23db328 was adopted before final qualification, preserving its ten
+changed files verbatim.
+
+## First complete enforcement audit and repair
+
+The first automatic enforcement audit of `953ab293` failed in twelve previously
+unclassified files; the [complete failure receipt](optimizations/13-failed-enforcement-audit.md)
+retains the ledger. Ten genuine native cases moved without changing their case
+bodies, and the single contract-delegation fixture test was explicitly
+registered. Policy/decoder, HTTP and SDK adapter cases remain guarded with
+finite literal command, candidate, materialization and search replies. The real
+in-place executor accepts the existing external CommandRunner port while
+preserving its production default and provider dispatch. Cleanup aggregates
+errors, and two transport controls show caught/unused/exhausted replies cannot
+silently pass. Repaired core `06d833cf` qualifies 255 focused passes and the
+282-file configured partition; another released full nested audit is still
+required. See the [current receipt](optimizations/13-automatic-boundaries-results.md).
+
+## Second audit: current composition metadata and SDK signature printing
+
+The second full audit recorded zero process calls in all 234 ordinary files,
+while two composition metadata checks and the real project materializer failed.
+The exact native panic reproduced before editing. A named three-method SDK
+facade and explicit return types qualified the same materializer invocation,
+and all five native project-boundary cases then passed. Exact K6/K7 historical
+filename translations preserve their ownership checks without rewriting old
+receipts; composition's eleven cases pass. The retained mixed batch includes
+two original five-second threshold failures during observed concurrent native
+and MAIN computation, and the residual historical-reference failure. See the
+[second failure receipt](optimizations/13-second-failed-audit.md) and
+[current correction qualification](optimizations/13-automatic-boundaries-results.md).
+Core `49ebd333` is ready for the coordinator's serialized full nested audit.

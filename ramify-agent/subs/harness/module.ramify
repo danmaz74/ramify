@@ -65,4 +65,4 @@ expose-sub commitAccepted, createRunBranch, isCleanRepository from evidence to d
 expose-sub runCommand, childEnvironment, outputTailBytes, CommandRequest, CommandRun, CommandOutcome, CommandOutput, CommandRunner from evidence to descendants
 
 // Temporary local guards forward to root enforcement in Plan 22 iteration 6.
-expose-test guardedChildProcess, SpawnAttempt, ProcessSpawnGuardError, spawnAttempts from "helpers/process-guard.ts" to descendants
+expose-test guardedChildProcess, spawnAttempts from "helpers/process-guard.ts" to descendants

@@ -162,3 +162,7 @@ expose-sub sessionCursorSchema, SessionCursor, sessionUpdatesResponseSchema from
 expose-sub SessionUpdatesResponse, sessionBodyResponseSchema, SessionBodyResponse from harness to descendants
 expose-sub sessionBodyHashSchema, standaloneSessionResponseSchema from harness to descendants
 expose-sub StandaloneSessionResponse from harness to descendants
+
+// Automatic ordinary-test boundary and isolated recorder controls.
+expose-test SpawnAttempt, ProcessSpawnGuardError, ChildProcess, ProcessGuardRecorder, createProcessGuard from "helpers/process-guard.ts" to descendants
+expose-test guardedChildProcess, spawnAttempts from "helpers/process-guard.ts" to descendants

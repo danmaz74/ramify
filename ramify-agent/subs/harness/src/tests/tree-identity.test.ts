@@ -3,11 +3,12 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { guardedFilesHash } from '../../subs/evidence/src/guarded-files.js';
 import { runGate } from '../checks/gate.js';
-import { inPlaceCheckExecution } from '../checks/execution.js';
+import { createInPlaceCheckExecution } from '../checks/execution.js';
 import type { GateRequest } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
 import type { CheckCommand, GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
+import { inPlaceReplies } from './helpers/in-place-replies.js';
 import { temporaryDirectory } from './helpers/fixture.js';
 
 /**
@@ -38,14 +39,22 @@ describe('the evidence a gate is bound to', () => {
     { kind: 'type-check', command: command('true') },
   ];
 
-  const gate = (overrides: Partial<GateRequest> = {}): Promise<GateAttempt> => runGate(inPlaceCheckExecution, 'iteration', {
+  const gate = async (overrides: Partial<GateRequest> = {}): Promise<GateAttempt> => {
+    const transport = inPlaceReplies(directory.path, [
+      { argv: ['bash', '-c', 'echo \"0 findings\"'], stdout: '0 findings\n' },
+      { argv: ['bash', '-c', 'true'] },
+    ]);
+    const attempt = await runGate(createInPlaceCheckExecution(transport.runner), 'iteration', {
     id: 'ga-0007',
     projectRoot: directory.path,
     directory: join(directory.path, 'gates', 'ga-0007'),
     head: 'a'.repeat(40),
     checks: passing(),
     ...overrides,
-  });
+    });
+    transport.assertComplete();
+    return attempt;
+  };
 
   const captured = () => guardedFilesHash(directory.path, ['package.json', 'tsconfig.json', 'vitest.config.ts'])
     .then(files => files.map(file => ({ path: file.path, hash: file.hash ?? '' })));

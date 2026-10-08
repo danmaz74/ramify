@@ -3,15 +3,9 @@ import { measureSchemaVersion, readMeasurement } from '../measure.js';
 import { RamifyCli } from '../ramify-cli.js';
 import { temporaryDirectory } from './helpers/temporary.js';
 
-const attempts = vi.hoisted(() => [] as string[]);
-vi.mock('node:child_process', async importOriginal => {
-  const actual = await importOriginal<typeof import('node:child_process')>();
-  const guarded = { ...actual };
-  for (const api of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork'] as const) {
-    Object.assign(guarded, { [api]: (...args: unknown[]) => { attempts.push(`${api} ${String(args[0])}`); throw new Error('Ordinary decoder starts no process'); } });
-  }
-  return { ...guarded, default: guarded };
-});
+import { spawnAttempts } from '../../../../../../src/tests/helpers/process-guard.js';
+vi.mock('node:child_process', async importOriginal =>
+  (await import('../../../../../../src/tests/helpers/process-guard.js')).guardedChildProcess(await importOriginal<typeof import('node:child_process')>()));
 
 /**
  * The measurement document's format stays in this module, and a producer that
@@ -22,12 +16,11 @@ describe('readMeasurement', () => {
   let directory: { path: string; remove: () => Promise<void> };
 
   beforeEach(async () => {
-    attempts.length = 0;
     directory = await temporaryDirectory();
   });
   afterEach(async () => {
     try { await directory.remove(); } finally {
-      expect(attempts, 'decoder setup/flow/teardown process attempts').toEqual([]);
+      expect(spawnAttempts(), 'decoder setup/flow/teardown process attempts').toEqual([]);
       expect(failures, 'caught producer assertion failures').toEqual([]);
       expect(answerCalls.length).toBe(expectedCalls);
       answerCalls.length = 0; failures.length = 0; expectedCalls = 0;

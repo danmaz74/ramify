@@ -1,8 +1,9 @@
-import { readFile, stat } from 'node:fs/promises';
+import { inPlaceReplies } from './helpers/in-place-replies.js';
+import { mkdir, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runGate } from '../checks/gate.js';
-import { inPlaceCheckExecution } from '../checks/execution.js';
+import { createInPlaceCheckExecution } from '../checks/execution.js';
 import type { CheckExecutionPort } from '../checks/execution.js';
 import type { GateRequest } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
@@ -19,11 +20,15 @@ import { temporaryDirectory } from './helpers/fixture.js';
 describe('a gate that cannot run what its checkpoint requires', () => {
   let directory: { path: string; remove: () => Promise<void> };
 
+  let replies: Parameters<typeof inPlaceReplies>[1][number][];
+  let transport: ReturnType<typeof inPlaceReplies>;
   beforeEach(async () => {
     directory = await temporaryDirectory();
+    replies = [];
+    transport = inPlaceReplies(directory.path, replies);
   });
   afterEach(async () => {
-    await directory.remove();
+    try { transport.assertComplete(); } finally { await directory.remove(); }
   });
 
   const command = (script: string, overrides: Partial<CheckCommand> = {}): CheckCommand => ({
@@ -32,7 +37,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
   });
 
   const gate = (checks: readonly PlannedCheck[], overrides: Partial<GateRequest> = {}): Promise<ReturnType<typeof runGate> extends Promise<infer T> ? T : never> =>
-    runGate(inPlaceCheckExecution, 'iteration', {
+    runGate(createInPlaceCheckExecution(transport.runner), 'iteration', {
       id: 'ga-0001',
       projectRoot: directory.path,
       directory: join(directory.path, 'gates', 'ga-0001'),
@@ -62,6 +67,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
   });
 
   it('records a timeout as a timeout, not as a failure', async () => {
+    replies.push({ argv: ['bash', '-c', 'sleep 30'], timeoutMs: 300, outcome: { kind: 'timed-out', timeoutMs: 300 } });
     const attempt = await gate([
       { kind: 'type-check', command: command('sleep 30', { timeoutMs: 300 }) },
     ]);
@@ -76,6 +82,11 @@ describe('a gate that cannot run what its checkpoint requires', () => {
 
   it('records a runner error with the structured error the spawn gave it', async () => {
     const vanishing = join(directory.path, 'vanishing');
+    replies.push(
+      { argv: ['bash', '-c', `mkdir -p ${vanishing}`], effect: async () => { await mkdir(vanishing); } },
+      { argv: ['bash', '-c', `rm -rf ${vanishing}`], effect: () => rm(vanishing, { recursive: true }) },
+      { argv: ['bash', '-c', 'true'], cwd: vanishing, outcome: { kind: 'runner-error', error: { kind: 'ENOENT', message: 'The declared child working directory vanished' } } },
+    );
     await gate([{ kind: 'type-check', command: command(`mkdir -p ${vanishing}`) }]);
 
     const attempt = await gate([
@@ -91,6 +102,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
   });
 
   it('never reads a Ramify check that exited 2 as a pass', async () => {
+    replies.push({ argv: ['bash', '-c', 'echo \'{"outcome":"not-checked","reason":"cold"}\'; exit 2'], stdout: '{"outcome":"not-checked","reason":"cold"}\n', outcome: { kind: 'completed', exitCode: 2 } });
     const attempt = await gate([
       { kind: 'ramify-check', command: command('echo \'{"outcome":"not-checked","reason":"cold"}\'; exit 2') },
     ]);
@@ -104,7 +116,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
 
   it('reports what a cancelled attempt did not reach as interrupted', async () => {
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 200);
+    replies.push({ argv: ['bash', '-c', 'sleep 30'], outcome: { kind: 'cancelled' }, effect: async () => { controller.abort(); } });
 
     const attempt = await gate([
       { kind: 'type-check', command: command('sleep 30') },
@@ -122,6 +134,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
       { kind: 'type-check', command: command('echo "src/one.ts(3,5): error TS2322" >&2; exit 2') },
     ];
 
+    replies.push(...Array.from({ length: 2 }, () => ({ argv: ['bash', '-c', 'echo \"src/one.ts(3,5): error TS2322\" >&2; exit 2'], stderr: 'src/one.ts(3,5): error TS2322\n', outcome: { kind: 'completed' as const, exitCode: 2 } })));
     const first = await gate(failing, { repairRound: 0, limits: { repairRounds: 2 } });
     const last = await gate(failing, { repairRound: 1, limits: { repairRounds: 2 } });
 
@@ -134,6 +147,11 @@ describe('a gate that cannot run what its checkpoint requires', () => {
   });
 
   it('passes when every verified command exited zero, and keeps the complete output beside the attempt', async () => {
+    replies.push(
+      { argv: ['bash', '-c', 'echo checked'], stdout: 'checked\n' },
+      { argv: ['bash', '-c', 'echo typed'], stdout: 'typed\n' },
+      { argv: ['bash', '-c', 'echo tested'], stdout: 'tested\n' },
+    );
     const attempt = await gate([
       { kind: 'ramify-check', command: command('echo checked') },
       { kind: 'type-check', command: command('echo typed') },

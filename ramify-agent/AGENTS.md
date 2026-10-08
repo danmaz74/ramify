@@ -47,3 +47,11 @@ repository.
 - `docs/.superseded/` holds replaced designs kept for comparison. Never read,
   search or cite it unless the user names it. Current design starts at
   [docs/README.md](docs/README.md).
+
+## Test boundaries
+
+Follow [Testing ramify-agent](docs/testing.spec.md). Ordinary tests must script
+external Git, CLI, audit and command answers; the configured runner refuses all
+process launches automatically. Actual tool/kernel claims require an exact
+reviewed entry in `src/tests/test-boundaries.json`. Full audits retain every
+configured project.

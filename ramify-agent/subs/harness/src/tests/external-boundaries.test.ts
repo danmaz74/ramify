@@ -1,7 +1,7 @@
 import childProcess from 'node:child_process';
 import { describe, expect, test, vi } from 'vitest';
 import { commitForGate } from '../run/gates.js';
-import { guardedChildProcess, ProcessSpawnGuardError, resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
+import { createProcessGuard, ProcessSpawnGuardError } from '../../../../src/tests/helpers/process-guard.js';
 
 describe('external boundary controls', () => {
   test('commit orchestration uses exact recovery identity and propagates the scripted outcome', async () => {
@@ -25,18 +25,16 @@ describe('external boundary controls', () => {
   });
 
   test('the subprocess guard rejects named and default exports without starting a process', () => {
-    resetSpawnAttempts();
-    try {
-      const guarded = guardedChildProcess(childProcess) as unknown as Record<string, (...args: unknown[]) => unknown> & {
+    const recorder = createProcessGuard(childProcess);
+    {
+      const guarded = recorder.childProcess as unknown as Record<string, (...args: unknown[]) => unknown> & {
         default: Record<string, (...args: unknown[]) => unknown>;
       };
       for (const api of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork']) {
         expect(() => guarded[api]!('not-an-executable')).toThrow(ProcessSpawnGuardError);
         expect(() => guarded.default[api]!('not-an-executable')).toThrow(ProcessSpawnGuardError);
       }
-      expect(spawnAttempts()).toHaveLength(14);
-    } finally {
-      resetSpawnAttempts();
+      expect(recorder.attempts()).toHaveLength(14);
     }
   });
 });

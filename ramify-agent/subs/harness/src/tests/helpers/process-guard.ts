@@ -1,63 +1,34 @@
-/*
- * The negative control for a scenario that claims to need no external tool.
- *
- * A test file installs this over `node:child_process`. Every call that would
- * start a process is recorded and then refused, so a boundary the fakes miss
- * fails loudly and names itself instead of quietly paying for a subprocess.
- * The guard counts attempts rather than successes: the count a converted
- * scenario asserts is the number of processes it would have started.
- */
-
-/** One refused attempt to start a process. */
-export interface SpawnAttempt {
-  /** The `node:child_process` export that was called. */
-  readonly api: string;
-  /** The command and its arguments, as far as the call named them. */
-  readonly argv: readonly string[];
-}
-
+import { promisify } from 'node:util';
+import { guardedChildProcess as rootGuarded, spawnAttempts as rootAttempts, type SpawnAttempt } from '../../../../../src/tests/helpers/process-guard.js';
+export { ProcessSpawnGuardError } from '../../../../../src/tests/helpers/process-guard.js';
+export type { SpawnAttempt } from '../../../../../src/tests/helpers/process-guard.js';
 const attempts: SpawnAttempt[] = [];
-
-/** Every attempt refused since the last reset, in order. */
+/** Local refused observations; automatic enforcement is independently persistent. */
 export function spawnAttempts(): readonly SpawnAttempt[] {
-  return attempts;
+  return Object.freeze(attempts.map(attempt => Object.freeze({ ...attempt, argv: Object.freeze([...attempt.argv]) })));
 }
-
-export function resetSpawnAttempts(): void {
-  attempts.length = 0;
-}
-
-/** What a guarded `node:child_process` throws. */
-export class ProcessSpawnGuardError extends Error {
-  constructor(readonly attempt: SpawnAttempt) {
-    super(`This test starts no process: \`${attempt.api}\` was called with \`${attempt.argv.join(' ')}\``);
-    this.name = 'ProcessSpawnGuardError';
-  }
-}
-
-/** The `node:child_process` exports that start a process. */
-const spawning = ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork'] as const;
-
-/**
- * The module a `vi.mock('node:child_process')` factory returns: the real
- * module with every process-starting export replaced by a refusal.
- */
+export function resetSpawnAttempts(): void { attempts.length = 0; }
 export function guardedChildProcess(actual: typeof import('node:child_process')): typeof import('node:child_process') {
-  const guarded: Record<string, unknown> = { ...actual };
-  for (const api of spawning) {
-    guarded[api] = (...args: unknown[]) => {
-      const attempt: SpawnAttempt = { api, argv: argvOf(args) };
-      attempts.push(attempt);
-      throw new ProcessSpawnGuardError(attempt);
+  const root = rootGuarded(actual);
+  const guarded = { ...root } as unknown as Record<string, unknown>;
+  for (const api of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork'] as const) {
+    const recordRefusal = (previous: number, args: unknown[]) => {
+      if (rootAttempts().length > previous) attempts.push(Object.freeze({ api, argv: Object.freeze([String(args[0]), ...(Array.isArray(args[1]) ? args[1].map(String) : [])]) }));
     };
+    const wrapper = (...args: unknown[]) => {
+      const previous = rootAttempts().length;
+      try { return (root[api] as (...input: unknown[]) => unknown)(...args); }
+      catch (error) { recordRefusal(previous, args); throw error; }
+    };
+    if (api === 'exec' || api === 'execFile') Object.defineProperty(wrapper, promisify.custom, {
+      value: async (...args: unknown[]) => {
+        const previous = rootAttempts().length;
+        try { return await (promisify(root[api]) as (...input: unknown[]) => Promise<unknown>)(...args); }
+        catch (error) { recordRefusal(previous, args); throw error; }
+      },
+    });
+    guarded[api] = wrapper;
   }
-  guarded['default'] = guarded;
-  return guarded as typeof import('node:child_process');
-}
-
-/** The command of a call, from whichever of the two argument shapes it used. */
-function argvOf(args: readonly unknown[]): string[] {
-  const command = typeof args[0] === 'string' ? args[0] : String(args[0]);
-  const rest = Array.isArray(args[1]) ? args[1].map(String) : [];
-  return [command, ...rest];
+  guarded.default = guarded;
+  return guarded as unknown as typeof import('node:child_process');
 }

@@ -1,3 +1,4 @@
+import { scratchCandidateReplies } from './helpers/scratch-candidate-replies.js';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -19,8 +20,10 @@ const source = 'source-before-setup';
 const setupCommit = 'scratch-setup-commit';
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
-  assertUnchangedGit();
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) { try { await cleanup(); } catch (error) { errors.push(error); } }
+  try { assertUnchangedGit(); } catch (error) { errors.push(error); }
+  if (errors.length > 0) throw new AggregateError(errors, 'Scratch cleanup or scripted boundary verification failed');
 });
 
 async function project(rule = false): Promise<string> {
@@ -57,7 +60,8 @@ async function successfulRun(root: string, inputs: { setup: boolean }) {
 }
 
 async function failedRun(root: string, git: ScriptedGit) {
-  const opened = await openRuns(root, { git, scratchGit: 'provided', script: [{ kind: 'submit', input: emptyAnalysis() }],
+  const candidates = strictScratchCandidates(root, []);
+  const opened = await openRuns(root, { candidates, git, scratchGit: 'provided', script: [{ kind: 'submit', input: emptyAnalysis() }],
     });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun(plan));
@@ -171,7 +175,7 @@ describe('scratch setup before a run uses it', () => {
     const root = await project(true);
     const before = await readFile(join(root, '.gitignore'));
     const git = scriptedGit(root, { head: source, checkpoints: [{ subject: `final verification of plan "${plan}"`, commit: null, changes: [] }],
-      previews: Array.from({ length: 3 }, () => ({ repositoryRoot: root, head: source, tree: 'a'.repeat(40) })) });
+      previews: Array.from({ length: 4 }, () => ({ repositoryRoot: root, head: source, tree: 'a'.repeat(40) })) });
     let audits = 0;
     const base = scriptedConfiguredAudit(root, {});
     const configuredAudit = { ...base, async run(input: Parameters<typeof base.run>[0]) {
@@ -179,7 +183,7 @@ describe('scratch setup before a run uses it', () => {
       return ++audits === 1 ? { ...result, verdict: 'fail' as const, detail: 'Scripted first baseline failed' } : result;
     } };
     const opened = await openRuns(root, { git, script: [{ kind: 'submit', input: emptyAnalysis() }],
-      configuredAudit });
+      configuredAudit, candidates: strictScratchCandidates(root, [{ operation: 'commitTree', args: [root, source], answer: 'a'.repeat(40) }]) });
     cleanups.push(() => opened.service.close());
     const first = await opened.service.execute(startRun(plan));
     await opened.service.settled(plan, first.jobId);
@@ -302,3 +306,10 @@ describe('a single session prepares scratch without a commit', () => {
     expect(await readFile(join(root, '.gitignore'))).toEqual(before);
   });
 });
+
+
+function strictScratchCandidates(root: string, replies: Parameters<typeof scratchCandidateReplies>[1]) {
+  const script = scratchCandidateReplies(root, replies);
+  cleanups.push(async () => { script.assertComplete(); });
+  return script.candidates;
+}

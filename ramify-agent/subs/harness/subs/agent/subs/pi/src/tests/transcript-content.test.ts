@@ -1,6 +1,7 @@
+import { declareGrep, assertGrepConsumed } from './helpers/scripted-grep.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, beforeAll, describe, expect, test } from 'vitest';
+import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { AgentEvent, MessageEvent } from '../../../../src/interfaces/port.js';
 import { startPi, validMap } from './helpers/session.js';
 import { calls, type Reply } from './helpers/scripted-provider.js';
@@ -15,9 +16,15 @@ import { calls, type Reply } from './helpers/scripted-provider.js';
 
 beforeAll(() => { process.env.PI_OFFLINE = '1'; });
 
+vi.mock('@earendil-works/pi-coding-agent', async importOriginal => {
+  const actual = await importOriginal<typeof import('@earendil-works/pi-coding-agent')>();
+  const { scriptedGrepSession } = await import('./helpers/scripted-grep.js');
+  return { ...actual, createAgentSession: (options: Parameters<typeof actual.createAgentSession>[0]) => scriptedGrepSession(actual, options) };
+});
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  try { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); } finally { assertGrepConsumed(); }
 });
 
 const rates = { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 };
@@ -36,6 +43,7 @@ function piFileMessages(sessionDirectory: string): Array<{ role: string; toolCal
 
 describe('ST06: transcript content through the port', () => {
   test('one scripted pi session: the first prompt, every assistant block, every tool result by call ID, and pi\'s optional detail', async () => {
+    declareGrep('demo', 'module.ramify', '1:root module demo');
     let seen: readonly AgentEvent[] = [];
     let promptBeforeModel: boolean | undefined;
     const thinkingReply: Reply = {
