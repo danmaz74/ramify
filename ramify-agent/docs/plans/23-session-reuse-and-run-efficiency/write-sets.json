@@ -211,6 +211,7 @@
       "subs/harness/src/work/engineer-equipment.ts",
       "subs/harness/src/work/scenario-briefing.ts",
       "subs/harness/src/work/session.ts",
+      "subs/harness/src/work/task-support.ts",
       "subs/harness/src/work/submission.ts",
       "subs/harness/src/analysis/extraction.ts",
       "subs/harness/src/capability/authorization.ts",
