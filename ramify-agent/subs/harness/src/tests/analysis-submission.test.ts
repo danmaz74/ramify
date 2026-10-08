@@ -9,7 +9,7 @@ import { initialAnalysisJsonSchema, initialAnalysisToolName, validateInitialAnal
 import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { acceptElements, openElementCatalog } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { extensionIsANewForecast } from '../analysis/records.js';
-import { runLayout, type InvocationOutcome } from '../run/records.js';
+import { runLayout, type Invocation, type InvocationOutcome } from '../run/records.js';
 import { loadPromptPackages } from '../prompts/packages.js';
 import { copyFixture, fixtureRoot } from './helpers/fixture.js';
 import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
@@ -419,7 +419,15 @@ describe('a rejected submission in a run', () => {
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     // The intake's session, then the architect's, and nothing of the catalog is durable.
     expect(events.map(event => event.type)).toEqual(['job-started', 'document-manifest-committed',
-      'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'job-failed']);
+      'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended',
+      'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended', 'job-failed']);
+    expect(events.filter(event => event.type === 'invocation-prepared').map(event => event.data.invocation))
+      .toEqual(['inv-0001', 'inv-0001', 'inv-0002', 'inv-0002']);
+    for (const id of ['inv-0001', 'inv-0002']) {
+      const invocation = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.invocation(id)), 'utf8')) as Invocation;
+      expect(invocation.sessionOperation).toMatchObject({ runId, operationId: id, turn: 1, sourcePoint: { kind: 'checkpoint', turn: 0 } });
+      expect(invocation.prompt.inputsHash).toMatch(/^[0-9a-f]{64}$/u);
+    }
     expect(events.filter(event => event.type === 'invocation-started').map(event => event.type === 'invocation-started' && event.data.role))
       .toEqual(['catalog-extractor', 'initial-architect']);
   }, 180_000);

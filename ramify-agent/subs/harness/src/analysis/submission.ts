@@ -209,6 +209,9 @@ export function analysisElementReferences(analysis: Pick<ResolvedAnalysis, 'entr
 /** The architect's elements are functional or context, read from captured plan documents, and every citation names one of them. */
 function elementErrors(submission: InitialAnalysisSubmission, evidence: AnalysisEvidence): SubmissionError[] {
   const errors: SubmissionError[] = [];
+  const kinds = new Map(submission.elements.map(element => [element.key, element.kind]));
+  const citations = analysisCitationErrors(submission, key => kinds.get(key), 'the key of an element of this submission');
+  const citationPaths = new Set(citations.map(error => error.path));
   const plans = new Set(evidence.catalog.documents.filter(document => document.kind === 'plan').map(document => document.id));
   submission.elements.forEach((element, index) => {
     if (element.kind !== 'functional' && element.kind !== 'context') errors.push({ path: `elements.${index}.kind`, message: `The initial architect does not submit ${element.kind} elements`, expected: 'functional or context' });
@@ -218,11 +221,14 @@ function elementErrors(submission: InitialAnalysisSubmission, evidence: Analysis
     const accepted = acceptElements(evidence.catalog, submission.elements, analysisElementReferences(submission));
     if (!accepted.ok) for (const error of accepted.errors) {
       const split = error.indexOf(': ');
-      errors.push({ path: `elements.${error.slice(0, split)}`, message: error.slice(split + 2) });
+      const path = error.slice(0, split);
+      // The catalog checks typed references before proposing IDs. Initial
+      // analysis reports each reference once using its submitted path and
+      // stricter submission-local citation contract below.
+      if (!citationPaths.has(path)) errors.push({ path: `elements.${path}`, message: error.slice(split + 2) });
     }
   }
-  const kinds = new Map(submission.elements.map(element => [element.key, element.kind]));
-  errors.push(...analysisCitationErrors(submission, key => kinds.get(key), 'the key of an element of this submission'));
+  errors.push(...citations);
   return errors;
 }
 
