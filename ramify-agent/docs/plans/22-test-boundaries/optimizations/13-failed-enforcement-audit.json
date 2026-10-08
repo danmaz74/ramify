@@ -1,0 +1,884 @@
+{
+  "kind": "failed premerge enforcement qualification; integration prohibited",
+  "source": "953ab293db4285771985c831d44e9fbcb7c779bd",
+  "tree": "9ecbd06695d6517bfee5a5f4aec58554ecd48918",
+  "auditRefs": {
+    "reportCommit": "2295636ff82e04e0878a07127d1ea1c508cc98f2",
+    "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T10-24-01Z-953ab293d",
+    "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/9ecbd06695d6517bfee5a5f4aec58554ecd48918"
+  },
+  "durationSeconds": 363.505,
+  "counts": {
+    "files": {
+      "failed": 12,
+      "passed": 264,
+      "skipped": 1,
+      "total": 277
+    },
+    "tests": {
+      "failed": 26,
+      "passed": 2060,
+      "skipped": 2,
+      "total": 2088
+    }
+  },
+  "checkStatuses": {
+    "agent-scenarios": "pass",
+    "agent-structure": "pass",
+    "agent-tests": "fail",
+    "agent-typecheck": "pass",
+    "agent-web-build": "pass",
+    "patch-integrity": "pass"
+  },
+  "failureLedger": {
+    "completeness": "complete",
+    "witness": [
+      {
+        "checkId": "agent-scenarios",
+        "command": "agent-cucumber",
+        "requestedTargets": [
+          {
+            "kind": "suite"
+          }
+        ],
+        "summaryRead": true,
+        "endReason": "passed",
+        "exitCode": 0,
+        "unhandledErrorsWithoutFile": [],
+        "carriedFilesNotRun": []
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "requestedTargets": [
+          {
+            "kind": "suite"
+          }
+        ],
+        "summaryRead": true,
+        "endReason": "failed",
+        "exitCode": 1,
+        "unhandledErrorsWithoutFile": [],
+        "carriedFilesNotRun": []
+      }
+    ],
+    "entries": [
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/breaking-work.test.ts",
+        "kind": "test",
+        "testId": "K6: the gate is not satisfied by weakening what it checks > a deleted guarded file is recorded as after: null and does not pass as an absent file"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/breaking-work.test.ts",
+        "kind": "test",
+        "testId": "K6: the gate is not satisfied by weakening what it checks > an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/breaking-work.test.ts",
+        "kind": "test",
+        "testId": "K7: a breaking feature is isolated into iterations that are green at every accepted boundary > the reviewer-identity run stages the break, and every accepted boundary passes the breaking-iteration gate"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/breaking-work.test.ts",
+        "kind": "test",
+        "testId": "the breaking-iteration boundary is not green by default > a break that leaves a consumer unadapted fails the whole-project gate, and only the adapted state is accepted"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/breaking-work.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/contract-delegation-integration.test.ts",
+        "kind": "test",
+        "testId": "P1: one consumer delegates, resumes after provider conformance and verifies against the real provider > K4: the contract gate runs the suite against the fake and the provider gate runs it against the real provider"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/contract-delegation-integration.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/engineer-api-preparation.test.ts",
+        "kind": "test",
+        "testId": "an included child prepares all descendant owners, while a broad scope retains its exact modules"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/engineer-api-preparation.test.ts",
+        "kind": "test",
+        "testId": "cold Analysis and Model preparation publishes real separate source-area views and refreshes changed APIs on every invocation"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/engineer-api-preparation.test.ts",
+        "kind": "test",
+        "testId": "failed refresh never presents leftover views as current; a missing expected area remains explicit alongside available evidence"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/engineer-api-preparation.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/gate-not-verified.test.ts",
+        "kind": "test",
+        "testId": "a gate that cannot run what its checkpoint requires > is a failure, and its next is repair until the rounds are spent"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/gate-not-verified.test.ts",
+        "kind": "test",
+        "testId": "a gate that cannot run what its checkpoint requires > never reads a Ramify check that exited 2 as a pass"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/gate-not-verified.test.ts",
+        "kind": "test",
+        "testId": "a gate that cannot run what its checkpoint requires > passes when every verified command exited zero, and keeps the complete output beside the attempt"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/gate-not-verified.test.ts",
+        "kind": "test",
+        "testId": "a gate that cannot run what its checkpoint requires > records a runner error with the structured error the spawn gave it"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/gate-not-verified.test.ts",
+        "kind": "test",
+        "testId": "a gate that cannot run what its checkpoint requires > records a timeout as a timeout, not as a failure"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/gate-not-verified.test.ts",
+        "kind": "test",
+        "testId": "a gate that cannot run what its checkpoint requires > reports what a cancelled attempt did not reach as interrupted"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/gate-not-verified.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/gate-progress.test.ts",
+        "kind": "test",
+        "testId": "the in-place executor > announces each command as it starts, in order, with its place among the gate's commands"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/gate-progress.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/http.test.ts",
+        "kind": "test",
+        "testId": "the module tree, through the one load the comparison shares > unavailable before the view is materialized, unreadable when it is broken, and available with each module's name, directory and parent"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/http.test.ts",
+        "kind": "test",
+        "testId": "the web assets, when built > are served, with the index for other pages"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/http.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/lock.test.ts",
+        "kind": "test",
+        "testId": "a lock whose process is gone is taken over"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/lock.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/recorded-environment.test.ts",
+        "kind": "test",
+        "testId": "a gate attempt > records the names of a command's environment, and no secret reaches the command or the record"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/recorded-environment.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/scratch-setup.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/tree-identity.test.ts",
+        "kind": "test",
+        "testId": "the evidence a gate is bound to > compares nothing when the checkpoint captured no guarded file"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/tree-identity.test.ts",
+        "kind": "test",
+        "testId": "the evidence a gate is bound to > lets a change no one guards through: the working directory blocks nothing"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/tree-identity.test.ts",
+        "kind": "test",
+        "testId": "the evidence a gate is bound to > names the record that authorized a guarded change, and passes with it"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/tree-identity.test.ts",
+        "kind": "test",
+        "testId": "the evidence a gate is bound to > never passes an unauthorized guarded change, whatever the commands said"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/tree-identity.test.ts",
+        "kind": "test",
+        "testId": "the evidence a gate is bound to > takes no identity of the working tree and compares none"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/tree-identity.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/pi-agent.test.ts",
+        "kind": "test",
+        "testId": "the pi adapter > translates tool calls by call ID and assistant messages with their usage"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/pi-agent.test.ts",
+        "kind": "file-error"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/transcript-content.test.ts",
+        "kind": "test",
+        "testId": "ST06: transcript content through the port > one scripted pi session: the first prompt, every assistant block, every tool result by call ID, and pi's optional detail"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/transcript-content.test.ts",
+        "kind": "file-error"
+      }
+    ]
+  },
+  "refusedAttemptsByFile": [
+    {
+      "file": "subs/harness/src/tests/recorded-environment.test.ts",
+      "refused": [
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "env"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/transcript-content.test.ts",
+      "refused": [
+        {
+          "api": "spawnSync",
+          "argv": [
+            "rg",
+            "--version"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/contract-delegation-integration.test.ts",
+      "refused": [
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "sh",
+            "-c",
+            "exec '/tmp/ramify-agent-3dTqci/collection-review/node_modules/.bin/vitest' run $(find subs/workspace/subs/reviews/subs/notes subs/workspace/subs/reviews/subs/limits -path '*/src/tests/*.test.ts' | sort)"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/breaking-work.test.ts",
+      "refused": [
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "/tmp/ramify-agent-Wz4JKY/collection-review/node_modules/.bin/vitest",
+            "run",
+            "subs/workspace/subs/reviews/subs/attribution/src/tests/adapters.test.ts",
+            "subs/workspace/subs/reviews/subs/attribution/subs/core/src/tests/outcome.test.ts",
+            "subs/workspace/subs/reviews/subs/attribution/subs/views/subs/pure/src/tests/result.test.ts",
+            "subs/workspace/subs/reviews/subs/attribution/subs/views/src/tests/panel.test.ts"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "/tmp/ramify-agent-tNms5a/collection-review/node_modules/.bin/vitest",
+            "run",
+            "subs/workspace/subs/reviews/subs/attribution/src/tests/adapters.test.ts",
+            "subs/workspace/subs/reviews/subs/attribution/subs/core/src/tests/outcome.test.ts",
+            "subs/workspace/subs/reviews/subs/attribution/subs/views/subs/pure/src/tests/result.test.ts",
+            "subs/workspace/subs/reviews/subs/attribution/subs/views/src/tests/panel.test.ts"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "cat > '/tmp/ramify-agent-WhqNkF/collection-review/vitest.config.ts' <<'EOF'\nimport { defineConfig } from 'vitest/config';\n\nexport default defineConfig({\n  test: {\n    environment: 'node',\n    include: ['src/tests/**/*.test.ts'],\n    exclude: ['**/node_modules/**', '**/subs/**'],\n  },\n});\nEOF"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "rm '/tmp/ramify-agent-JxN9Tz/collection-review/vitest.config.ts'"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/gate-not-verified.test.ts",
+      "refused": [
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "sleep 30"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "mkdir -p /tmp/ramify-agent-Jaum9F/vanishing"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo '{\"outcome\":\"not-checked\",\"reason\":\"cold\"}'; exit 2"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "sleep 30"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "touch /tmp/ramify-agent-eyeysc/ran-conformance"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo \"src/one.ts(3,5): error TS2322\" >&2; exit 2"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo \"src/one.ts(3,5): error TS2322\" >&2; exit 2"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo checked"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo typed"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo tested"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/lock.test.ts",
+      "refused": [
+        {
+          "api": "spawn",
+          "argv": [
+            "/usr/local/bin/node",
+            "-e",
+            ""
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/scratch-setup.test.ts",
+      "refused": [
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "git",
+            "rev-parse",
+            "--verify",
+            "source-before-setup^{tree}"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/pi-agent.test.ts",
+      "refused": [
+        {
+          "api": "spawnSync",
+          "argv": [
+            "rg",
+            "--version"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/tree-identity.test.ts",
+      "refused": [
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo \"0 findings\""
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "true"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo \"0 findings\""
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "true"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo \"0 findings\""
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "true"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo \"0 findings\""
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "true"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo \"0 findings\""
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "true"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "echo \"0 findings\""
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "bash",
+            "-c",
+            "true"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/gate-progress.test.ts",
+      "refused": [
+        {
+          "api": "execFile",
+          "argv": [
+            "bash",
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/subs/harness/subs/evidence/src/run-command-with-cleanup.sh",
+            "/usr/local/bin/node",
+            "-e",
+            ""
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/http.test.ts",
+      "refused": [
+        {
+          "api": "execFile",
+          "argv": [
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/node_modules/.bin/ramify",
+            "daemon",
+            "stop"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/node_modules/.bin/ramify",
+            "daemon",
+            "stop"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/node_modules/.bin/ramify",
+            "daemon",
+            "stop"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/engineer-api-preparation.test.ts",
+      "refused": [
+        {
+          "api": "execFile",
+          "argv": [
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/node_modules/.bin/ramify",
+            "materialize",
+            "--view",
+            "architect",
+            "--view",
+            "api",
+            "--from",
+            "subs/cli",
+            "--root",
+            "/tmp/ramify-agent-GRFrLU"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/node_modules/.bin/ramify",
+            "daemon",
+            "stop"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/node_modules/.bin/ramify",
+            "materialize",
+            "--view",
+            "architect",
+            "--view",
+            "api",
+            "--from",
+            "subs/cli",
+            "--root",
+            "/tmp/ramify-agent-UdOxcE"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/node_modules/.bin/ramify",
+            "daemon",
+            "stop"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/node_modules/.bin/ramify",
+            "materialize",
+            "--view",
+            "architect",
+            "--view",
+            "api",
+            "--from",
+            "subs/cli",
+            "--root",
+            "/tmp/ramify-agent-pGHxek"
+          ]
+        },
+        {
+          "api": "execFile",
+          "argv": [
+            "/tmp/ramify-audit-worktree-bnwKy9/source/ramify-agent/node_modules/.bin/ramify",
+            "daemon",
+            "stop"
+          ]
+        }
+      ]
+    }
+  ],
+  "rawReport": "/tmp/plan22-opt13-failed-enforcement-audit.json",
+  "rawStderr": "/tmp/plan22-opt13-failed-enforcement-audit.stderr.log"
+}
