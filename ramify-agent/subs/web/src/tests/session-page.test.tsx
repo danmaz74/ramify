@@ -388,4 +388,3 @@ test('PB3-E07: a post-write check shows each path\'s disposition, and a not-anal
   expect(screen.queryByText('passed')).toBeNull();
   expect(document.body.textContent).toContain('ramify.check/1');
 });
-
