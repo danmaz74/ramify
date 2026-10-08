@@ -81,7 +81,7 @@ export function mergeReadinessOf(view: RunView, evidence: AcceptedEvidence): Mer
   const accepted = view.events.find(event => event.type === 'analysis-accepted');
   const marker = view.events.find(event => event.type === 'nonfunctional-phase-started');
   if (accepted?.type !== 'analysis-accepted' || marker?.type !== 'nonfunctional-phase-started'
-    || accepted.data.evidence?.catalog.hash !== marker.data.catalogHash) {
+    || accepted.data.evidence.catalog.hash !== marker.data.catalogHash) {
     return unavailable('The assessment phase is not bound to the accepted catalog');
   }
   const completed = view.events.find(event => event.type === 'job-completed');

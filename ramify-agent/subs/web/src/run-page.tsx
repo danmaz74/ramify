@@ -15,7 +15,7 @@ import { Markdown } from './markdown.js';
 import { chapterHref, routeHref } from './routes.js';
 import { counted, figure, metricValue, RunState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
-import { ApproveForm, canApprove, reviewText, ReviewPanel, GateScenarioResults, ScenarioReview, ScenarioTable } from './run-scenarios.js';
+import { ApproveForm, canApprove, reviewText, ReviewPanel, GateScenarioResults, ObligationList, ScenarioReview, ScenarioTable } from './run-scenarios.js';
 import type { DiagramSessions } from './session-marks.js';
 import { SessionTimeline } from './session-timeline.js';
 
@@ -601,7 +601,7 @@ function Scenarios({ client, planId, runId, version }: AreaProps) {
   return (
     <div className="area area-broad" aria-label="Scenarios">
       <Loading state={state} what="the scenarios">
-        {data => <ScenarioTable scenarios={data.scenarios} total={data.total} />}
+        {data => <><ScenarioTable scenarios={data.scenarios} total={data.total} /><ObligationList obligations={data.obligations} /></>}
       </Loading>
     </div>
   );
@@ -654,7 +654,7 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
             {data.audit !== undefined && <AuditRequestFacts audit={data.audit} />}
             <GateScenarioResults scenarios={data.scenarios} />
             {data.provider === undefined
-              ? <p className="muted">Complete provider diagnostics are unavailable for this historical attempt.</p>
+              ? <p className="muted">This attempt recorded no provider results, so complete provider diagnostics are unavailable.</p>
               : <details><summary>Complete provider report and diagnostics</summary>
                 <p>Producer results, counts, qualifications and artifact references are shown as recorded.</p>
                 <pre aria-label="Complete provider evidence">{JSON.stringify(data.provider, null, 2)}</pre>

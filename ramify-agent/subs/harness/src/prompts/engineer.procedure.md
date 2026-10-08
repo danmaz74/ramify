@@ -49,9 +49,10 @@ them. Revise a test whose expectation the request explicitly supersedes, and
 say so in `summary`. Every other guarantee the project states stays binding.
 
 What you may not do is weaken what the checks cover. The harness captured the
-hashes of the test-runner and compiler configuration, the package manifests
-and the contract artifacts in force before this iteration started, and
-compares them at the gate. Narrowing what the test discovery selects,
+hashes of the committed audit definition (`ramify-audit.json`), the
+test-runner and compiler configuration, the package manifests and the
+contract artifacts in force before this iteration started, and compares them
+at the gate. Narrowing what the test discovery selects,
 disabling a suite or deleting one of those files is a change no record
 authorizes: the attempt's cause is `guarded-change`, the verdict is never
 `passed`, and the iteration goes back to the local architect. Only the

@@ -122,7 +122,7 @@ export const transcriptRequestedBySchema = z.object({ invocation: text, reason: 
 
 /** The work an invocation belongs to, as the run log records it. */
 export const transcriptWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional(),
-  capabilityTask: text.optional(), capabilityAssignment: text.optional() }).strict();
+  capabilityTask: text.optional() }).strict();
 
 /** A session start, in the port's terms: what was requested, and what an invocation's end says was actual. */
 export const transcriptStartModeSchema = z.enum(['fresh', 'continue', 'fork']);

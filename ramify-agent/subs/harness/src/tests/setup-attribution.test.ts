@@ -64,7 +64,6 @@ async function attempt(setup: DirectCheckStep, checkpoint: GateAttempt['checkpoi
     head: 'HEAD',
     checks,
     limits: { repairRounds: 2, infrastructureRetries: 2 },
-    writeScope: ['src'],
   });
 }
 

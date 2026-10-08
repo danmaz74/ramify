@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { modulePathSchema, sha256Schema } from '../interfaces/protocol/evidence.js';
 import { recordRefSchema } from '../run/records.js';
 import { elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
-import { writeScopeSchema, testSelectionPolicySchema } from '../work/iterations.js';
 
 /* Durable capability coordination records. The original request and every
  * plan revision are immutable; the event log, rather than a mutable status
@@ -156,29 +155,6 @@ export const capabilityExchangeSchema = z.object({
 }).strict();
 export type CapabilityExchange = z.infer<typeof capabilityExchangeSchema>;
 
-export const capabilityAssignmentSchema = z.object({
-  schema: z.literal('ramify-agent.capability-assignment/1'),
-  id: text,
-  task: id,
-  sequence: positive,
-  owner: modulePathSchema,
-  plan: recordRefSchema,
-  purpose: text,
-  approach: text,
-  requirementRefs: z.array(elementIdSchema),
-  intendedEvidence: z.array(text).min(1),
-  scope: writeScopeSchema,
-  gate: z.object({ tests: testSelectionPolicySchema }).strict(),
-  startingTree: treeIdentity,
-  /** Dirty paths that predate this writer, retained for attribution after restart. */
-  startingPaths: z.array(z.object({ path: location, hash: z.string().nullable() }).strict()).optional(),
-}).strict().superRefine((assignment, context) => {
-  if (assignment.id !== capabilityAssignmentId(assignment.task, assignment.sequence)) {
-    context.addIssue({ code: 'custom', path: ['id'], message: 'Assignment ID contains its task and sequence' });
-  }
-});
-export type CapabilityAssignment = z.infer<typeof capabilityAssignmentSchema>;
-
 export const capabilityHandbackSchema = z.object({
   schema: z.literal('ramify-agent.capability-handback/1'),
   task: id,
@@ -196,26 +172,13 @@ export const capabilityHandbackSchema = z.object({
 }).strict();
 export type CapabilityHandback = z.infer<typeof capabilityHandbackSchema>;
 
-export const capabilityReviewSchema = z.object({
-  schema: z.literal('ramify-agent.capability-review/1'), task: id, planRevision: positive,
-  tree: treeIdentity, gate: text,
-  outcome: z.enum(['passed', 'failed']), findings: z.array(text),
-  assessments: z.array(z.object({ kind: z.enum(['code', 'scope', 'design']), invocation: text,
-    inspected: z.array(location), missing: z.array(z.object({ path: location, reason: text }).strict()),
-    findings: z.array(text) }).strict()).length(3),
-}).strict();
-export type CapabilityReview = z.infer<typeof capabilityReviewSchema>;
-
 export const capabilityLayout = {
   /** A request may be satisfied by existing behavior before a task exists. */
   request: (request: string): string => join('capabilities', 'requests', `${request}.json`),
   task: (task: string): string => join('capabilities', task, 'task.json'),
   plan: (task: string, revision: number): string => join('capabilities', task, 'plan', `${revision}.json`),
   exchange: (task: string, exchange: string, revision: number): string => join('capabilities', task, 'exchanges', `${exchange}.${revision}.json`),
-  assignment: (task: string, assignment: string): string => join('capabilities', task, 'assignments', `${assignment}.json`),
   handback: (task: string): string => join('capabilities', task, 'handback.json'),
-  review: (task: string, gate: string, planRevision: number): string =>
-    join('capabilities', task, 'reviews', `${gate}.p${planRevision}.json`),
 } as const;
 
 export const capabilitySchemas = {
@@ -223,6 +186,5 @@ export const capabilitySchemas = {
   task: { schema: 'ramify-agent.capability-task/1', body: capabilityTaskSchema },
   plan: { schema: 'ramify-agent.capability-plan/1', body: capabilityPlanSchema },
   exchange: { schema: 'ramify-agent.capability-exchange/1', body: capabilityExchangeSchema },
-  assignment: { schema: 'ramify-agent.capability-assignment/1', body: capabilityAssignmentSchema },
   handback: { schema: 'ramify-agent.capability-handback/1', body: capabilityHandbackSchema },
 } as const;

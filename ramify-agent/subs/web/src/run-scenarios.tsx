@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type {
-  AnalysisScenario, RunReview, RunSnapshot, GateScenarioResultView, ScenarioGateResult, ScenarioOriginView, ScenarioView, ScenarioWarningView,
+  AnalysisScenario, ObligationView, RunReview, RunSnapshot, GateScenarioResultView, ScenarioGateResult, ScenarioOriginView, ScenarioView,
+  ScenarioWarningView,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, newCommandId, type ProtocolClient } from './client.js';
 
@@ -197,16 +198,16 @@ export function ScenarioTable({ scenarios, total }: { readonly scenarios: readon
         <tbody>
           {scenarios.map(scenario => (
             <tr key={scenario.id} data-scenario={scenario.id}>
-              <td><code>{scenario.id}</code><div>{scenario.name}</div></td>
-              <td><span className={`badge scenario-state-${scenario.state}`}>{scenario.state}</span></td>
-              <td>{originText(scenario.origin)}</td>
-              <td>
+              <td data-label="Scenario"><code>{scenario.id}</code><div>{scenario.name}</div></td>
+              <td data-label="State"><span className={`badge scenario-state-${scenario.state}`}>{scenario.state}</span></td>
+              <td data-label="Origin">{originText(scenario.origin)}</td>
+              <td data-label="Belongs to">
                 {scenario.kind === 'integration'
                   ? <>integration of {scenario.subScenarios.join(', ')}; {scenario.workItem ? <>work item {scenario.workItem}</> : 'no work item until its sub-scenarios are reported done'}</>
                   : <>entry <code>{scenario.entry}</code>{scenario.workItem ? <>, work item {scenario.workItem}</> : ''}{scenario.partOf ? <>; sub-scenario of {scenario.partOf}</> : ''}</>}
               </td>
-              <td><code>{scenario.owner}</code><div className="muted"><code>{scenario.file}</code></div></td>
-              <td>
+              <td data-label="Owner and file"><code>{scenario.owner}</code><div className="muted"><code>{scenario.file}</code></div></td>
+              <td data-label="Gates">
                 {scenario.gates.length === 0 ? <span className="muted">not run yet</span> : (
                   <ul className="scenario-gates" aria-label={`Gates of ${scenario.id}`}>
                     {scenario.gates.map(gate => (
@@ -224,6 +225,46 @@ export function ScenarioTable({ scenarios, total }: { readonly scenarios: readon
         </tbody>
       </table>
     </>
+  );
+}
+
+/** What an obligation is, in the words of the briefing that lists it. */
+function obligationSubject(obligation: ObligationView): string {
+  if (obligation.kind === 'test') return `registered test: ${obligation.description ?? ''}`;
+  if (obligation.kind === 'outcome') return 'delegated outcome';
+  return obligation.case === null ? 'scenario' : `registered case ${obligation.case}`;
+}
+
+/**
+ * Every registered obligation beside the scenarios: its status, the latest
+ * binding's fakes and its responsible architect's own report with the
+ * optional where hint, as recorded. The report is the architect's judgment;
+ * gate results stand beside it, in the Checks area, and never change one.
+ */
+export function ObligationList({ obligations }: { readonly obligations: readonly ObligationView[] }) {
+  if (obligations.length === 0) return null;
+  const owed = obligations.filter(obligation => obligation.status !== 'done');
+  return (
+    <section className="obligations" aria-label="Registered obligations">
+      <h3>Registered obligations</h3>
+      <p className="muted" aria-label="Outstanding reports">
+        {owed.length === 0 ? "Every obligation has its architect's done report."
+          : `A done report is outstanding on ${owed.map(obligation => obligation.id).join(', ')}.`}
+      </p>
+      <ul>
+        {obligations.map(obligation => (
+          <li key={obligation.id} aria-label={`Obligation ${obligation.id}`}>
+            <code>{obligation.id}</code> · {obligationSubject(obligation)} · <span className={`badge scenario-state-${obligation.status}`}>{obligation.status}</span>
+            {' '}· reported on by {obligation.responsible.kind} <code>{obligation.responsible.id}</code>
+            {obligation.binding === null ? ' · not bound'
+              : <> · bound by <code>{obligation.binding.invocation}</code>{obligation.binding.fakes.length > 0 ? `, fakes: ${obligation.binding.fakes.join(', ')}` : ', no fakes'}</>}
+            {obligation.report === null ? ' · no architect report yet'
+              : <> · architect report <strong>{obligation.report.judgment}</strong> by <code>{obligation.report.invocation}</code> (revision {obligation.report.revision})
+                {obligation.report.where !== null && <span className="obligation-where">, where: {obligation.report.where}</span>}</>}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

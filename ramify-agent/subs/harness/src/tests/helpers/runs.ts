@@ -10,7 +10,7 @@ import { childEnvironment } from '../../../subs/evidence/src/run-command.js';
 import { gitService } from '../../../subs/evidence/src/git.js';
 import { checkCommand } from '../../checks/records.js';
 import { privateRamify, RamifyCli, ramifyExecutable } from '../../../subs/evidence/src/ramify-cli.js';
-import type { InputManifest } from '../../interfaces/protocol/evidence.js';
+import type { CapturedInputManifest } from '../../interfaces/protocol/evidence.js';
 import type { RunCommand } from '../../interfaces/protocol/runs.js';
 import { sha256 } from '../../prompts/packages.js';
 import type { RunEvent } from '../../run/log.js';
@@ -131,8 +131,8 @@ export function testPolicy(projectRoot: string, options: TestPolicyOptions = {})
   return {
     ...unreviewed,
     version: 'run-policy/7',
-    // Historical fixture runs use the captured contract role. New production
-    // policy/5 deliberately omits it from its context and prompt manifest.
+    // These fixture runs exercise the contract engineer, which the default
+    // policy omits from its context and prompt manifest, so they capture it.
     context: { ...base.context, 'contract-engineer': defaultContextPolicies['contract-engineer'] },
     ...(options.reviews === undefined ? {} : { reviews: options.reviews }),
     commands: {
@@ -155,7 +155,7 @@ export const shapeOnlyInputs: RunInputs = {
       source: null,
       versions: { architectPrompt: null, procedure: null, skill: null, ramify: null },
       architectView: { status: 'placeholder' },
-    } satisfies InputManifest;
+    } satisfies CapturedInputManifest;
   },
   async index() {
     return null;

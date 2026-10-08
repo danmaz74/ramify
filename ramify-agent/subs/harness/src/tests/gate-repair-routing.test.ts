@@ -48,7 +48,7 @@ async function project(): Promise<string> {
 }
 
 /** An in-place iteration diagnosis over `root`: the type check prints `printed`, the Ramify check prints `ramify`. */
-async function iterationGate(root: string, typeCheck: Omit<PlannedCheck, 'kind'>, writeScope: readonly string[] | null = [scope], ramify = '{}'): Promise<GateAttempt> {
+async function iterationGate(root: string, typeCheck: Omit<PlannedCheck, 'kind'>, ramify = '{}'): Promise<GateAttempt> {
   const checks: PlannedCheck[] = [
     { kind: 'type-check', ...typeCheck },
     { kind: 'ramify-check', command: prints(ramify, ramify === '{}' ? 0 : 1, root) },
@@ -60,7 +60,6 @@ async function iterationGate(root: string, typeCheck: Omit<PlannedCheck, 'kind'>
     head: 'HEAD',
     checks,
     limits: { repairRounds: 3, infrastructureRetries: 1 },
-    ...(writeScope === null ? {} : { writeScope }),
   });
 }
 
@@ -72,7 +71,6 @@ describe('a failed type check at an iteration gate', () => {
 
     expect(gate.verdict).toBe('failed');
     expect(gate.cause).toBe('check-failed');
-    expect(gate.attribution).toBeUndefined();
     expect(gate.next).toBe('repair');
     expect(gate.commands[0]!.output.path).toBeTruthy();
   });
@@ -81,9 +79,8 @@ describe('a failed type check at an iteration gate', () => {
     const root = await project();
     const gate = await iterationGate(root, {
       command: prints('error TS5023: Unknown compiler option.\n', 1, root, true), output: 'tsc',
-    }, null);
+    });
     expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'check-failed', 'repair']);
-    expect(gate.attribution).toBeUndefined();
   });
 
   test('a simultaneous Ramify violation does not automatically summon an architect', async () => {
@@ -95,7 +92,7 @@ describe('a failed type check at an iteration gate', () => {
       original: { kind: 'code', owner: 'core', file: 'model.ts', binding: 'Model' },
     };
     const report = JSON.stringify({ schemaVersion: 'ramify.check/1', outcome: 'findings', findings: [finding] });
-    const gate = await iterationGate(root, { command: prints(run4, 1, root), output: 'tsc' }, [scope], report);
+    const gate = await iterationGate(root, { command: prints(run4, 1, root), output: 'tsc' }, report);
     expect(gate.commands.filter(command => command.outcome === 'failed').map(command => command.kind)).toEqual(['type-check', 'ramify-check']);
     expect([gate.cause, gate.next]).toEqual(['check-failed', 'repair']);
   });

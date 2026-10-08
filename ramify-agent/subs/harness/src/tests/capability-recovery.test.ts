@@ -552,7 +552,6 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
   const partialResult = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
     'work-items/cap-001/iterations/01/result.json'), 'utf8')) as { outcome: string; findings: string[] };
   expect(partialResult).toMatchObject({ outcome: 'partial', findings: expect.arrayContaining(['unfinished: Submit provider result']) });
-  expect(after.filter(event => event.type === 'capability-assignment-interrupted')).toHaveLength(0);
   expect(after.filter(event => event.type === 'invocation-started' && event.data.role === 'engineer' && event.data.work.iteration === 'cap-001.i01'), JSON.stringify(after.slice(-25))).toHaveLength(1);
   expect(await readFile(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')).toContain('old from B');
   for (let attempt = 0; attempt < 20; attempt += 1) {

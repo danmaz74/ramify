@@ -25,20 +25,14 @@ import type { previewCandidateTree } from './candidate-tree.js';
  */
 export const runBranchPrefix = 'ramify-agent-run/';
 
-/**
- * The prefix of run branches created before `ramify-agent-run/`. A run that
- * recorded one is still resumed on it, and the harness still commits there.
- */
-export const legacyRunBranchPrefix = 'ramify-agent/run-';
-
 /** The branch of one run: `ramify-agent-run/<run-id>`. */
 export function runBranchName(runId: string): string {
   return `${runBranchPrefix}${runId}`;
 }
 
-/** Whether a branch is a run's own, by the current prefix or the earlier one. */
+/** Whether a branch is a run's own. */
 export function isRunBranch(branch: string): boolean {
-  return branch.startsWith(runBranchPrefix) || branch.startsWith(legacyRunBranchPrefix);
+  return branch.startsWith(runBranchPrefix);
 }
 
 /** The identity the harness commits under, so that no person's configuration is needed. */
@@ -226,19 +220,17 @@ function validateProjectPath(path: string): void {
 /**
  * The run's branch, `ramify-agent-run/<run-id>`, checked out. A run repeated
  * after a crash finds its branch and stays on it; the branch is never reset,
- * so the commits of the earlier attempt are kept. A run whose branch was
- * created under the earlier prefix, `ramify-agent/run-<run-id>`, is found
- * there. Git refusing the branch, as it refuses one beneath an existing
- * branch's name, is a `GitError` that carries git's own message.
+ * so the commits of the earlier attempt are kept. Git refusing the branch,
+ * as it refuses one beneath an existing branch's name, is a `GitError` that
+ * carries git's own message.
  */
 export async function createRunBranch(root: string, runId: string, signal?: AbortSignal): Promise<{ readonly branch: string; readonly created: boolean }> {
-  for (const existing of [runBranchName(runId), `${legacyRunBranchPrefix}${runId}`]) {
-    const found = await git(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${existing}`], signal);
-    if (found.exitCode !== 0) continue;
-    await gitOk(root, ['switch', existing], signal);
-    return { branch: existing, created: false };
-  }
   const branch = runBranchName(runId);
+  const found = await git(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], signal);
+  if (found.exitCode === 0) {
+    await gitOk(root, ['switch', branch], signal);
+    return { branch, created: false };
+  }
   await gitOk(root, ['switch', '--create', branch], signal);
   return { branch, created: true };
 }

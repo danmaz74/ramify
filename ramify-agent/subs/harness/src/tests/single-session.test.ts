@@ -32,8 +32,7 @@ vi.mock('node:child_process', async original =>
  * One engineer session on one module, from a prompt, on the scripted fake.
  *
  * The session is given the equipment of an implementation run: the guard,
- * the hook check, the shell, the scoped test tool and the validated
- * submission. What these tests hold it to is what the command promises: it
+ * the hook check, the shell and the validated submission. What these tests hold it to is what the command promises: it
  * refuses before any agent starts when it cannot run, it never commits, its
  * records are plain files git ignores, and nothing follows a submission.
  */

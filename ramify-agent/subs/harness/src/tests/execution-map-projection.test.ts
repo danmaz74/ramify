@@ -118,6 +118,22 @@ describe('execution core from committed run records', () => {
     ]);
     expect(executionCoreOf(runView(run)).nodes.find(node => node.key === 'gate:ga-audit-open')).toMatchObject({ audit: 'indeterminate', evidencePresent: true });
   });
+  it('projects a readiness gate\'s recorded audit outcome, never not applicable', () => {
+    const audited = (id: string) => gateAttemptSchema.parse({ ...gate(id, 'passed', false, 'readiness'), audited: 'audited-commit',
+      evidence: { runRef: 'refs/audited/run', reportCommit: 'report', treeRef: 'refs/audited/tree' } });
+    const outcome = (id: string, overall: 'pass' | 'fail') => ({ path: `gates/${id}/audit-outcome.json`, body: gateAuditOutcomeSchema.parse({
+      schema: 'ramify-agent.gate-audit-outcome/1', gate: id, overall, audited: 'audited-commit',
+    }) });
+    const run = recordedRun([
+      { type: 'readiness-failed', data: { attempt: 1, gate: 'ga-ready-failed', step: 'configured-full-audit', detail: 'failure', recovery: null, final: false },
+        records: [{ path: 'gates/ga-ready-failed/attempt.json', body: audited('ga-ready-failed') }, outcome('ga-ready-failed', 'fail')] },
+      { type: 'readiness-passed', data: { attempt: 2, gate: 'ga-ready-passed' },
+        records: [{ path: 'gates/ga-ready-passed/attempt.json', body: audited('ga-ready-passed') }, outcome('ga-ready-passed', 'pass')] },
+    ]);
+    const nodes = executionCoreOf(runView(run)).nodes;
+    expect(nodes.find(node => node.key === 'gate:ga-ready-failed')).toMatchObject({ checkpoint: 'readiness', audit: 'failed', evidencePresent: true });
+    expect(nodes.find(node => node.key === 'gate:ga-ready-passed')).toMatchObject({ checkpoint: 'readiness', audit: 'passed', evidencePresent: true });
+  });
   it('keeps full descriptions, latest real scenario status, every gate and every session', () => {
     const run = recordedRun([
       { type: 'session-opened', data: { session: 'ses-initial', role: 'initial-architect', work: {}, executor: 'scripted', model: null } },
@@ -144,7 +160,8 @@ describe('execution core from committed run records', () => {
     expect(index.nodes.find(node => node.key === 'capability:full-description')).toMatchObject({ scenarios: { failed: 1, passed: 0 } });
     expect(index.nodes.find(node => node.key === 'gate:ga-later')).toMatchObject({ verdict: 'failed', audit: 'unavailable', evidencePresent: true,
       cause: 'check-failed', subject: { workItem: 'wi-001', iteration: 'wi-001.i01' } });
-    expect(index.nodes.find(node => node.key === 'gate:ga-ready')).toMatchObject({ audit: 'not-applicable' });
+    // A readiness gate that recorded no audit reads as one that has not started its audit.
+    expect(index.nodes.find(node => node.key === 'gate:ga-ready')).toMatchObject({ audit: 'not-started' });
     expect(index.gaps).toContain('Audit result for gate ga-later is unavailable: the gate retains publication refs but no overall outcome.');
     expect(index.links.some(link => link.kind === 'tracks-scenario' && link.to.key === 'scenario:sc-001')).toBe(true);
     expect(executionCapabilityDetailSchema.parse(executionCapabilityDetailOf(view, 'full-description')).detail).toMatchObject({

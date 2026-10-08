@@ -6,10 +6,9 @@ import { scenarioResultsOf, untrackedScenarioCounts, type ScenarioResult } from 
 /*
  * What a failing gate says to the agent that receives it.
  *
- * A verdict alone is not a diagnosis. The cause names where the failure lies
+ * A verdict alone is not a diagnosis. The cause names the kind of failure
  * and nothing about what failed, so a briefing that carries only the cause
- * asks its reader to guess: an architect that read `outside-assignment` and
- * nothing else narrowed a file list and the same failure came back.
+ * asks its reader to guess.
  *
  * So a briefing names what the gate's audit asked and answered, and each
  * configured check that did not pass with what the provider recorded of it:

@@ -301,6 +301,7 @@ test('a plan deviation reads as a departure from the plan: the elements it amend
       options: [{ id: 'accept', summary: 'Accept the deviation', consequence: 'It stands.' }, { id: 'reject', summary: 'Reject the deviation', consequence: 'A follow-up run meets it.' }],
     },
     planDeviation: {
+      origin: { kind: 'work-item-conflict', request: 'ur-001', workItem: 'wi-001', architectInvocation: 'inv-0001' },
       id: 'pd-001', request: 'ur-001', workItems: ['wi-001'], plan: 'plans/review-notes/plan.md',
       amends: [{ id: 'fr-003', path: 'plans/review-notes/plan.md', text: 'Serve it over MCP too.' }],
       instead: 'Serve it over tRPC only.', why: 'No module serves MCP.', rejected: [{ alternative: 'A new MCP module', reason: 'beyond the plan' }], loss: 'No MCP tool.',

@@ -473,7 +473,7 @@ export const infrastructureRecoverySchema = z.object({
     readiness: z.int().positive().optional(),
     invocation: text.optional(),
   }).strict(),
-  cause: z.enum(['in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown', 'session-lost', 'daemon-unavailable']),
+  cause: z.enum(['infrastructure', 'timeout', 'daemon-unavailable']),
   action: z.enum(['restart-daemon', 'reinstall-nested', 'rerun-command', 'reconstruct-session', 'none']),
   /** Counted over committed history for this subject. */
   attempt: z.int().positive(),
@@ -561,7 +561,7 @@ export const usageSchema = z.object({
 
 /** The work one invocation, and the session it belongs to, is for: none for the initial architect. */
 export const invocationWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional(),
-  capabilityTask: text.optional(), capabilityAssignment: text.optional(),
+  capabilityTask: text.optional(),
   nonfunctionalRepair: text.optional(),
 }).strict();
 export type InvocationWork = z.infer<typeof invocationWorkSchema>;
@@ -680,7 +680,7 @@ export const invocationSchema = z.object({
     size: scopeSizeSchema.nullable(),
   }).strict(),
   writer: z.boolean(),
-  /** Exact candidate tree before a writer started; legacy records omit it. */
+  /** Exact candidate tree before a writer started; absent where the writer was started without one. */
   candidateBefore: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u).optional(),
   supersedes: text.optional(),
   /** The latest passed committing checkpoint's audited hash when it started, or the run base before one exists. */
@@ -725,7 +725,7 @@ export const invocationOutcomeSchema = z.object({
   }).strict(),
   /** Writers only: uncommitted changed paths outside the write scope when it settled. */
   outsideScope: z.array(z.string()),
-  /** Exact candidate tree after this writer settled; legacy records omit it. */
+  /** Exact candidate tree after this writer settled; absent without a starting tree or when the scratch rule failed at settlement. */
   candidateAfter: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u).optional(),
   usage: z.union([usageSchema, z.object({ unavailable: text }).strict()]),
   elapsedMs: z.int().nonnegative(),
@@ -853,17 +853,7 @@ export const gateAttemptSchema = z.object({
     outputIncomplete: z.literal(true).optional(),
   }).strict()),
   verdict: z.enum(['passed', 'failed', 'not-verified']),
-  cause: z.enum(['check-failed', 'in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']).nullable(),
-  /**
-   * Where a failed Ramify check's own findings and a failed type check's
-   * errors lie, against the write scope the attempt followed. Absent for an
-   * attempt with neither.
-   */
-  attribution: z.object({
-    basis: z.enum(['ramify-findings', 'type-check-errors', 'ramify-findings-and-type-check-errors']),
-    inScope: z.array(z.string()),
-    outside: z.array(z.string()),
-  }).strict().optional(),
+  cause: z.enum(['check-failed', 'infrastructure', 'timeout', 'guarded-change', 'unknown']).nullable(),
   next: z.enum(['accept', 'repair', 'retry-infrastructure', 'return-to-local-architect', 'exhausted']),
 }).strict();
 
@@ -895,7 +885,6 @@ export const gateOperationSchema = z.object({
     proposedBy: z.string().nullable(),
     repairRound: z.int().nonnegative(),
     infrastructureAttempt: z.int().nonnegative(),
-    writeScope: z.array(z.string()),
     limits: z.object({ repairRounds: z.int().positive(), infrastructureRetries: z.int().positive() }).strict(),
   }).strict(),
   guardedChanges: z.array(z.object({
@@ -962,8 +951,6 @@ export const runLayout = {
   shellOutput: (id: InvocationId, call: number): string => join('invocations', id, 'shell', `${String(call).padStart(3, '0')}.log`),
   /** What one post-write hook check printed, which its observation names. */
   hookOutput: (id: InvocationId, check: number): string => join('invocations', id, 'hooks', `${String(check).padStart(3, '0')}.json`),
-  /** The profiles, streams and log of one scenario check the former scoped test tool ran, kept for earlier runs. */
-  scopeScenarios: (id: InvocationId, call: number): string => join('invocations', id, 'scenarios', String(call).padStart(3, '0')),
   /** The harness's transcript of one session: raw output, never a record. */
   transcript: (session: SessionId): string => join('transcripts', `${session}.jsonl`),
   /** The content store the run's transcripts name bodies in, `blobs/<sha256>`. */

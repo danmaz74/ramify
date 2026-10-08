@@ -64,7 +64,6 @@ function Task({ task, onOpenWorkItem, onOpenGate }: { task: CapabilityTaskView;
     <section><h4>Verification</h4><p className={task.verification.status === 'failed' ? 'failure' : ''}>{task.verification.status === 'pending' ? 'Real combined verification pending.' : `Combined verification ${task.verification.status}.`}</p>
       {task.verification.gates.length > 0 && <p>Checks: {task.verification.gates.map(gate => onOpenGate
         ? <button key={gate} type="button" onClick={() => onOpenGate(gate)}>{gate}</button> : <code key={gate}>{gate}</code>)}.</p>}
-      {task.verification.reviews.length > 0 && <ul>{task.verification.reviews.map((review, index) => <li key={`${review.gate}:${index}`}>Review of {review.gate} against plan revision {review.planRevision}: {review.outcome}{review.findings.length ? ` · ${review.findings.join('; ')}` : ''}</li>)}</ul>}
       {task.verification.findings.length > 0 && <ul>{task.verification.findings.map((finding, index) => <li key={index} className="failure">{finding}</li>)}</ul>}
     </section>
     {task.handback ? <section><h4>Accepted handback</h4>
@@ -92,7 +91,7 @@ function AtVersion({ client, planId, runId, version, onOpenWorkItem, onOpenGate 
       {data.tasks.some(task => task.handback === null) || data.requests.some(request => request.task === null && request.outcome !== 'satisfied')
         ? ' Unfinished capability work has no accepted handback.' : ''}
     </p>}
-    {data.requests.length === 0 ? <p>No capability request is recorded for this run. Historical contract work remains in its original views.</p>
+    {data.requests.length === 0 ? <p>No capability request is recorded for this run. Its contract work appears in the contract views.</p>
       : <><p>Coordination stack: {data.stack.length ? data.stack.join(' → ') : 'no active task'}.</p>
         {data.requests.filter(request => request.task === null).map(request => <p key={request.id} className="warn"><code>{request.id}</code> · {request.outcome}: {request.need}{request.evidence.length ? ` · ${request.evidence.join('; ')}` : ''}</p>)}
         {data.tasks.map(task => <Task key={task.id} task={task} onOpenWorkItem={onOpenWorkItem} onOpenGate={onOpenGate} />)}</>}

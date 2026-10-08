@@ -56,7 +56,7 @@ describe('assignment element citations', () => {
       consumer: { module: 'app/reviews', iteration: null }, provider: 'app/core', existingConsumers: [], package: packageText });
     const continuedContract = contractMessage({ assignment, projectRoot: '/p', base: 'abc',
       consumer: { module: 'app/reviews', iteration: null }, provider: 'app/core', existingConsumers: [], package: packageText,
-      failedGate: { id: 'ga-002', cause: 'in-scope', summary: ['The conformance test failed'] } });
+      failedGate: { id: 'ga-002', cause: 'check-failed', summary: ['The conformance test failed'] } });
     expect(engineer).toContain(`## What the plan asks of this iteration\n\nThe elements your assignment cites, whole, with the plan deviations in force when it was assigned. The captured documents are not yours to read: what these elements do not settle is a finding.\n\n${packageText.trimEnd()}\n`);
     expect(contract).toContain(`## What the plan asks of the requesting iteration\n\nThe elements its assignment cites, whole, with the plan deviations in force when it was assigned.\n\n${packageText.trimEnd()}\n`);
     expect(continuedContract).toContain(packageText.trimEnd());

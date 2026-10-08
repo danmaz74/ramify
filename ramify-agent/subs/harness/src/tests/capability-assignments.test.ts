@@ -148,7 +148,6 @@ test('an explicit partial capability result returns its cross-owner blocker to t
   }, 40_000);
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
   expect(events.filter(event => event.type === 'job-failed'), JSON.stringify(events.slice(-8))).toHaveLength(0);
-  expect(events.filter(event => event.type === 'capability-assignment-interrupted')).toHaveLength(0);
   const settled = events.filter(event => event.type === 'capability-assignment-settled');
   expect(settled).toHaveLength(2);
   expect(settled[0]?.data).toMatchObject({ assignment: 'cap-001.i01', outcome: 'partial',
@@ -207,12 +206,9 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
     `invocations/${original.data.invocation}/observations.jsonl`), 'utf8')).trim().split('\n').map(line => JSON.parse(line) as {
       type: string; data: { outcome?: string };
     });
-  // The engineer has no scoped test tool, and the harness writes no
-  // scope-tests observation: its writes are what the observations record.
-  expect(originalObservations.some(line => line.type === 'scope-tests')).toBe(false);
+  // Its writes are what the observations record.
   expect(originalObservations.length).toBeGreaterThan(0);
-  const consultation = engineerStarts.find(event => event.data.work.capabilityTask === 'cap-001' &&
-    event.data.work.capabilityAssignment === undefined)!;
+  const consultation = engineerStarts.find(event => event.data.work.capabilityTask === 'cap-001')!;
   const aExperiment = engineerStarts.find(event => event.data.work.iteration === 'cap-001.i04')!;
   expect(consultation.data.session).toBe(original.data.session);
   expect(aExperiment.data.session).not.toBe(original.data.session);

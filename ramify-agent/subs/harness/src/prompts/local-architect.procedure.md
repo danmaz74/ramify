@@ -217,9 +217,10 @@ break in `breakingChanges`, restage, and reassign — or answer `unresolved`.
 ## Guarded files
 
 The harness captures the hashes of the files that decide what the checks
-discover and run — the test-runner and compiler configuration, the package
-manifests and the contract artifacts in force — before each iteration starts,
-and compares them at the gate. A change no record authorizes makes the
+discover and run — the committed audit definition (`ramify-audit.json`), the
+test-runner and compiler configuration, the package manifests and the
+contract artifacts in force — before each iteration starts, and compares them
+at the gate. A change no record authorizes makes the
 attempt's cause `guarded-change`; the verdict is never `passed`, and the
 iteration comes back to you. A deletion is a change like any other.
 

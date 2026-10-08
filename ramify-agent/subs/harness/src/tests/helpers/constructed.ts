@@ -28,7 +28,7 @@ export function constructedRecord(extra: Partial<RunRecord> = {}): RunRecord {
     agent: 'scripted',
     createdAt: '2026-09-21T08:00:00.000Z',
     manifest: {
-      planHash: hash, source: null,
+      planHash: hash, documentManifest: { path: 'input/documents.json', hash }, source: null,
       versions: { architectPrompt: null, procedure: null, skill: null, ramify: null },
       architectView: { status: 'placeholder' },
     },

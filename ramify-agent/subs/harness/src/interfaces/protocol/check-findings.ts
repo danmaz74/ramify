@@ -160,8 +160,8 @@ export type CheckFindingMaterialChoice = z.infer<typeof checkFindingMaterialChoi
  * requirement a follow-up run must meet, which `followUp` then holds.
  */
 const workItemDeviationViewSchema = z.object({
-  /** Projected from legacy records; absent only in older wire snapshots. */
-  origin: z.object({ kind: z.literal('work-item-conflict'), request: text, workItem: text, architectInvocation: text }).strict().optional(),
+  /** The request, work item and architect invocation it answers, as the deviation record names them. */
+  origin: z.object({ kind: z.literal('work-item-conflict'), request: text, workItem: text, architectInvocation: text }).strict(),
   id: text,
   /** The unresolved request it answers. */
   request: text,

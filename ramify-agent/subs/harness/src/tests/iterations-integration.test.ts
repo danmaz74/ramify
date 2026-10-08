@@ -5,7 +5,6 @@ import { afterEach, describe, expect, test } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
-import type { Observation, ObservationOf } from '../run/observations.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { createConfiguredAudit } from '../../subs/audit/src/check-execution.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -174,13 +173,6 @@ describe('G8: one small work item completes in one iteration', () => {
     // The provider selected from the committed definition's universe.
     expect(auditSummary.coverage.universe.checkIds).toEqual(['notes-tests']);
     expect(auditSummary.coverage.selection).toMatchObject({ kind: 'full', selectedCheckIds: ['notes-tests'] });
-
-    // The harness keeps no runner inventory: a script beside the configured
-    // checks is neither a coverage gap nor an absence of tests to it.
-    const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations(result.invocations[0]!)), 'utf8'))
-      .split('\n').filter(Boolean).map(line => JSON.parse(line) as Observation)
-      .filter((line): line is ObservationOf<'coverage-gap'> => line.type === 'coverage-gap');
-    expect(observations.filter(line => line.data.kind === 'unsupported-runner')).toEqual([]);
 
     // Readiness judged the project configuration; no acceptance runner is the harness's to find.
     const readiness = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.readiness(1)), 'utf8')) as { steps: Array<{ step: string; outcome: string }> };

@@ -77,7 +77,7 @@ describe('the captured commands', () => {
     expect(policy.context['engineer']).toEqual({ compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 });
     const { engineer: _dropped, ...partial } = policy.context;
     expect(runPolicySchema.safeParse({ ...policy, context: partial }).success).toBe(false);
-    // A run captured before the reviewer existed has no context for it, and reads back.
+    // A policy without the reviewer's context is refused.
     const { reviewer: _reviewer, ...earlier } = policy.context;
     expect(runPolicySchema.safeParse({ ...policy, version: 'run-policy/2', context: earlier, reviews: undefined }).success).toBe(false);
   });

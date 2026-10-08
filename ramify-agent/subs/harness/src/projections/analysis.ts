@@ -70,7 +70,7 @@ async function evidenceOf(view: RunView): Promise<NonNullable<Extract<AnalysisRe
   try {
     const paths = new Map(evidence.manifest.documents.map(document => [document.id, document.path]));
     const accepted = view.events.find(event => event.type === 'analysis-accepted');
-    const findings = accepted?.type === 'analysis-accepted' ? accepted.data.findings ?? [] : [];
+    const findings = accepted?.type === 'analysis-accepted' ? accepted.data.findings : [];
     return {
       status: 'available',
       catalogHash: evidence.catalogHash,

@@ -14,7 +14,7 @@ import { reviewPolicyVersion, roles, runPolicySchema, type CapturedProjectConfig
  * own settings, built again at the moment of the spawn.
  */
 
-/** New runs use capability coordination. Earlier policy versions remain readable. */
+/** New runs use capability coordination. A run captured under another policy version is refused. */
 export const runPolicyVersion = 'run-policy/7';
 
 /** The bounds of the main plan's policy table. */

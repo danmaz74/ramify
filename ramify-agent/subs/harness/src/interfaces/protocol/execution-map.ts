@@ -114,7 +114,7 @@ export const executionProviderStageSchema = z.enum([
   'not-started', 'working', 'conformed', 'access-established', 'unavailable',
 ]);
 export const executionAuditLifecycleSchema = z.enum([
-  'not-applicable', 'not-started', 'passed', 'failed', 'indeterminate', 'incomplete', 'unavailable',
+  'not-started', 'passed', 'failed', 'indeterminate', 'incomplete', 'unavailable',
 ]);
 export type ExecutionAuditLifecycle = z.infer<typeof executionAuditLifecycleSchema>;
 
@@ -225,8 +225,8 @@ export type ExecutionLink = z.infer<typeof executionLinkSchema>;
  * event: its kind and its place among the gate's commands, counted from one.
  */
 export const executionGateCommandSchema = z.object({
-  /** `configured` is a check of the committed audit; `tests`, `conformance` and `scenarios` are read from earlier runs' logs. */
-  kind: z.enum(['setup', 'ramify-check', 'type-check', 'configured', 'tests', 'conformance', 'scenarios']),
+  /** `configured` is a check of the committed audit. */
+  kind: z.enum(['setup', 'ramify-check', 'type-check', 'configured']),
   /** A setup command's declared name, such as `build`, or a configured check's ID. */
   name: text.optional(),
   position: z.int().positive(),

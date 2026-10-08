@@ -587,7 +587,7 @@ describe('the message the harness writes', () => {
       runId: '20260920T101500Z-3f9a1c', planId: 'review-notes', gate,
       goal: 'send the customer email from the page',
       summary: 'Send the customer email from the page.',
-      earlier: [{ id: 'ga-0011', verdict: 'failed', cause: 'in-scope' }],
+      earlier: [{ id: 'ga-0011', verdict: 'failed', cause: 'check-failed' }],
       notCovered: ['test:cucumber (one supported runner)'],
       invocations: ['inv-0012', 'inv-0014'],
       modules: [{ kind: 'module-created' as const, module: 'workspace/reviews/notes', declaration: 'subs/workspace/subs/reviews/subs/notes/module.ramify' }],
@@ -598,7 +598,7 @@ describe('the message the harness writes', () => {
     expect(message).toContain('wi-001.i02: send the customer email from the page');
     expect(message).toContain('Send the customer email from the page.');
     expect(message).not.toContain('Checks:');
-    expect(message).toContain('Earlier attempts: ga-0011 failed (in-scope)');
+    expect(message).toContain('Earlier attempts: ga-0011 failed (check-failed)');
     expect(message).toContain('Not covered: test:cucumber (one supported runner)');
     expect(message).toContain('Modules created: workspace/reviews/notes (subs/workspace/subs/reviews/subs/notes/module.ramify)');
     expect(message).toContain('Ramify-Run: 20260920T101500Z-3f9a1c');
