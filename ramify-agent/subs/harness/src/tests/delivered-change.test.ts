@@ -184,7 +184,7 @@ describe('Plan23 F6 exact setup deltas and independent writer attribution', () =
 
   test('unknown overlap stays unattributed while an unrelated writer retains its known subtotal', async () => {
     const path = 'subs/a/src/a.ts';
-    const history = scripted({ commits: [first, second, final], files: [file(path, [range(1, 4)])], origins: { [path]: [...lines(first, 1, 2), ...lines(second, 3, 4)] } });
+    const history = scripted({ commits: [first, second, final], files: [file(path, [range(1, 2)]), file('subs/a/src/known.ts', [range(1, 2)])], origins: { [path]: lines(first, 1, 2), 'subs/a/src/known.ts': lines(second, 1, 2) } });
     const result = await deliveredChange(history, request({ writers: new Map([[first, ['one', 'two']], [second, ['three']]]),
       recorded: new Map([['one', summary('one', [[path, 2, 0]])], ['two', summary('two', [[path, 2, 0]])]]), overlappingPaths: new Set([path]) }));
     if (result.state !== 'measured') throw new Error(result.reason);
@@ -269,4 +269,23 @@ test('Plan23 unknown setup mapping retains unattributed weight instead of a path
   expect(result.harness).toBe(0);
   expect([...result.weights]).toEqual([]);
   expect([...result.unattributed.values()]).toEqual([2]);
+});
+
+
+test('Plan23 one recorded writer cannot claim an uncertain overlapping path; its unrelated path stays known', async () => {
+  const unknown = 'subs/a/src/overlap.ts';
+  const known = 'subs/a/src/known.ts';
+  const history = scripted({ commits: [first, final], files: [file(unknown, [range(1, 3)]), file(known, [range(1, 2)])],
+    origins: { [unknown]: lines(first, 1, 2, 3), [known]: lines(first, 1, 2) } });
+  const result = await deliveredChange(history, request({ overlappingPaths: new Set([unknown]) }));
+  if (result.state !== 'measured') throw new Error(result.reason);
+  expect([...result.weights]).toEqual([['inv-0007', 2]]);
+  expect([...result.unattributed]).toEqual([[expect.stringContaining('uncertain overlapping writer attribution'), 3]]);
+  // A recorded global overlap gap also refuses guessing, regardless of the
+  // number of named owners; guard coverage alone never adds such a gap.
+  const overlap = { ...summary('inv-0007', [[known, 2, 0]]), coverage: 'partial' as const, gaps: ['overlapping-writers: inv-0007, unfinished; intervals overlap'] };
+  const withGap = await deliveredChange(history, request({ recorded: new Map([['inv-0007', overlap]]) }));
+  if (withGap.state !== 'measured') throw new Error(withGap.reason);
+  expect([...withGap.weights]).toEqual([]);
+  expect([...withGap.unattributed.values()].reduce((sum, count) => sum + count, 0)).toBe(5);
 });

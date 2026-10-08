@@ -149,10 +149,20 @@ export async function deliveredChange(history: ChangeHistory, request: Delivered
   const weights = new Map<string, number>();
   const add = (writer: string, lines: number) => weights.set(writer, (weights.get(writer) ?? 0) + lines);
   for (const [commit, paths] of byCommit) {
-    const total = [...paths.values()].reduce((sum, entry) => sum + entry.added + entry.deleted, 0);
-    if (request.harness.has(commit)) { harness += total; continue; }
+    const originalTotal = [...paths.values()].reduce((sum, entry) => sum + entry.added + entry.deleted, 0);
+    if (request.harness.has(commit)) { harness += originalTotal; continue; }
     const owners = request.writers.get(commit) ?? [];
-    if (owners.length === 0) { unattribute(`commit ${commit.slice(0, 12)} holds no recorded writer's work`, total); continue; }
+    if (owners.length === 0) { unattribute(`commit ${commit.slice(0, 12)} holds no recorded writer's work`, originalTotal); continue; }
+    // An explicit uncertain overlap applies even when only one writer was
+    // recorded. Preserve other paths rather than attributing an unknown
+    // external/unfinished writer's contribution to that recorded writer.
+    for (const [path, entry] of paths) {
+      if (!request.overlappingPaths?.has(path) && !owners.some(writer => request.recorded.get(writer)?.gaps.some(gap => gap.startsWith('overlapping-writers:')))) continue;
+      unattribute(`commit ${commit.slice(0, 12)} has uncertain overlapping writer attribution in ${path}`, entry.added + entry.deleted);
+      paths.delete(path);
+    }
+    const total = [...paths.values()].reduce((sum, entry) => sum + entry.added + entry.deleted, 0);
+    if (total === 0) continue;
     if (owners.length === 1) { add(owners[0]!, total); continue; }
     const unreadable = owners.filter(writer => (request.recorded.get(writer) ?? null) === null);
     if (unreadable.length > 0) {
@@ -160,7 +170,7 @@ export async function deliveredChange(history: ChangeHistory, request: Delivered
       continue;
     }
     for (const [path, entry] of paths) {
-      if (request.overlappingPaths?.has(path) || owners.some(writer => request.recorded.get(writer)!.gaps.some(gap => gap.startsWith('changed-paths-unknown:') || gap.startsWith('overlapping-writers:')))) {
+      if (owners.some(writer => request.recorded.get(writer)!.gaps.some(gap => gap.startsWith('changed-paths-unknown:')))) {
         unattribute(`commit ${commit.slice(0, 12)} has uncertain overlapping writer attribution in ${path}`, entry.added + entry.deleted);
         continue;
       }
