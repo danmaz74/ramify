@@ -7,6 +7,52 @@ export type PiTranscriptMessage = PiSession['agent']['state']['messages'][number
 export type PiChosenModel = NonNullable<PiSession['model']>;
 export type PiTranscriptTool = { name: string; description: string; parameters: Record<string, unknown> };
 export interface NativePrefix { readonly instructions: string; readonly tools: readonly unknown[]; readonly input: readonly unknown[] }
+/** The credential-free final request artifact, not evidence that HTTP dispatch
+ * passed the later liveness fence. Input items remain opaque JSON; callers
+ * retain the original payload bytes separately when recording byte evidence.
+ */
+export interface PiNativeRequestArtifact {
+  readonly schema: 'ramify.pi-native-request/1';
+  readonly packageVersion: '0.87.1';
+  readonly transport: 'sse';
+  readonly model: 'openai-codex/gpt-5.6-sol';
+  readonly instructions: string;
+  readonly tools: readonly unknown[];
+  readonly input: readonly unknown[];
+  readonly request: Readonly<Record<string, unknown>>;
+}
+
+/** Reads only this owner's final-request artifact. Other JSON artifacts,
+ * including opaque provider transcripts, are neither validated nor exposed.
+ * Claimed request artifacts must agree with their complete original body,
+ * including field order in every native tool and input item.
+ */
+export function readPiNativeRequestArtifact(bytes: Uint8Array): PiNativeRequestArtifact | null {
+  let parsed: unknown;
+  try { parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+  catch { throw new Error('Malformed pi request artifact JSON or UTF-8'); }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const artifact = parsed as Record<string, unknown>;
+  if (typeof artifact['schema'] !== 'string' || !artifact['schema'].startsWith('ramify.pi-native-request')) return null;
+  if (artifact['schema'] !== 'ramify.pi-native-request/1' || artifact['packageVersion'] !== '0.87.1' ||
+    artifact['transport'] !== 'sse' || artifact['model'] !== 'openai-codex/gpt-5.6-sol') {
+    throw new Error('Unsupported pi native request artifact identity');
+  }
+  const body = artifact['request'];
+  if (typeof artifact['instructions'] !== 'string' || artifact['instructions'].length === 0 ||
+    !Array.isArray(artifact['tools']) || !Array.isArray(artifact['input']) ||
+    body === null || typeof body !== 'object' || Array.isArray(body)) {
+    throw new Error('Malformed pi native request artifact body');
+  }
+  const request = body as Record<string, unknown>;
+  if (request['model'] !== 'gpt-5.6-sol' || request['instructions'] !== artifact['instructions'] ||
+    !Array.isArray(request['input']) ||
+    (request['tools'] !== undefined && !Array.isArray(request['tools'])) ||
+    !sameNative(request['tools'] ?? [], artifact['tools']) || !sameNative(request['input'], artifact['input'])) {
+    throw new Error('Pi native request artifact differs from its original request');
+  }
+  return artifact as unknown as PiNativeRequestArtifact;
+}
 export interface PreservedPiTranscript {
   readonly schema: 'ramify.pi-transcript/1'; readonly packageVersion: '0.87.1'; readonly transport: 'sse'; readonly model: string;
   readonly messages: readonly PiTranscriptMessage[]; readonly appliedAgentKeys: readonly string[];
