@@ -154,6 +154,7 @@
       "subs/harness/src/run/sessions.ts",
       "subs/harness/src/run/session-operations.ts",
       "subs/harness/src/context-selection/recorded.ts",
+      "subs/harness/src/sessions/single.ts",
       "subs/harness/src/context-selection/contracts.ts",
       "subs/harness/src/context-selection/delivery.ts",
       "subs/harness/src/reviews/records.ts",
