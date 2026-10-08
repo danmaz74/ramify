@@ -74,6 +74,7 @@ Delivery cuts qualified so far:
 | 2: guarded twelve-case acceptance matrix and retained actual witness | `b8b3e055` | [Integrated focused verification](optimizations/02-integrated-results.md) |
 | 3: guarded thirteen-case dependency matrix and retained nested actual witness | `bf1261cb` | [Integrated focused verification](optimizations/03-integrated-results.md) |
 | 4: guarded ten-case write matrix and six retained actual provider controls | `cf813618` | [Integrated focused verification](optimizations/04-integrated-results.md) |
+| 5: guarded measurement capture/decoder cases and two retained actual producer witnesses | `77eac8be` | [Passing pre-merge released audit](optimizations/05-premerge-audit.md), [integrated verification](optimizations/05-integrated-results.md) |
 
 These cuts have integrated focused passes. The initial full baseline failed one
 crash fixture, subsequently corrected with focused evidence. A later released
