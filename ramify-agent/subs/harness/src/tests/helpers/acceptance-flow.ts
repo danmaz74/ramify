@@ -14,6 +14,7 @@ import { analysis, entry, requestCompletion } from './analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './capability.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './iterations.js';
 import { rootDescription } from './root-description.js';
+import { runLayout } from '../../run/records.js';
 import { testReviewPolicy } from './candidates.js';
 import { freeze, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './runs.js';
 
@@ -65,16 +66,22 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
   let resuming = false;
   let suspendedContinuationStarted = false;
   const scripted: Script = spec => {
+    // Callback perception includes inherited packets. Route only by the newest
+    // renderer-owned objective and the actual current working directory.
+    const objective = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gmu)].at(-1);
+    const work = objective === undefined ? {} : JSON.parse(objective[1]!) as { workItem?: string; iteration?: string };
+    const current = spec.prompt.slice(spec.prompt.lastIndexOf('Briefing revision:'));
+    const latest = (expression: RegExp) => [...spec.prompt.matchAll(expression)].at(-1);
     if (spec.role === 'initial-architect') return submit(analysis([entry('richer-a-fact', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') {
-      if (spec.prompt.includes('# Work item wi-002')) {
+      if (work.workItem === 'wi-002') {
         deferredBriefing = spec.prompt;
         return [{ kind: 'wait', ms: 60_000 }];
       }
       return localTurn++ === 0 ? submit(assign(a, {}, outline())) : submit(requestCompletion());
     }
     if (spec.submission.name === 'submit_capability_qualification') {
-      const [, request, invocation] = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const [, request, invocation] = latest(/Use request (need-\d+) and invocation (inv-\d+)/gu)!;
       return submit({ kind: 'delegate-capability', request, invocation, provider: b,
         placementReason: 'B owns the source fact', constraints: [], requirementRefs: [] });
     }
@@ -90,7 +97,7 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
         write('extra.ts', "export const sourceHint = 'B';\n"),
         edit('tests/caller.test.ts', "toBe('Fact: old')", "toBe('unfinished')"));
       }
-      const owner = spec.prompt.includes('# Iteration cap-') ? /Your starting module is `([^`]+)`/u.exec(spec.prompt)?.[1] : undefined;
+      const owner = work.iteration?.startsWith('cap-') ? [[a, 'subs/a/src'], [b, 'subs/b/src'], [d, 'subs/d/src'], [p, 'src']].find(([, directory]) => spec.scope.workingDirectory === join(fixture.root, directory!))?.[0] : undefined;
       if (owner === b) { external?.stage('provider'); return submit({ kind: 'partial', summary: 'B added the source field for combined verification', findings: [], unfinished: [] },
         write('../docs/prior.txt', 'B-owned prior assignment documentation\n'),
         write('fact.ts', "export interface FactResult { text: string; source: string }\nexport const readFact = (): FactResult => ({ text: 'old', source: 'B' });\n"),
@@ -100,7 +107,7 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
       if (owner === p) { external?.stage('exposed'); return submit({ kind: 'partial', summary: 'P exposed the signature companion for combined verification', findings: [], unfinished: [] },
         write('../module.ramify', rootDescription('capability-coordination', 'expose-sub readFact, FactResult from b to descendants\n')),
         write('assembly.ts', "import { renderA } from '../subs/a/src/caller.js';\nexport const render = () => renderA();\n")); }
-      if (owner === a && spec.prompt.includes('independent literal')) { external?.stage('corrected'); return submit({ kind: 'completion-proposed', summary: 'A repaired the circular oracle', findings: [] },
+      if (owner === a && current.includes('independent literal')) { external?.stage('corrected'); return submit({ kind: 'completion-proposed', summary: 'A repaired the circular oracle', findings: [] },
         write('tests/caller.test.ts', "import { expect, test } from 'vitest';\nimport { renderA } from '../caller.js';\ntest('A renders the source', () => expect(renderA()).toBe('Fresh fact: old from B'));\n")); }
       if (owner === a) { external?.stage('integrated'); return submit({ kind: 'completion-proposed', summary: 'A integrated the real B result', findings: [] },
         write('caller.ts', "import { readFact } from '../../b/src/fact.js';\nexport function renderA(): string { const fact = readFact(); return `Fresh fact: ${fact.text} from ${fact.source}`; }\n"),
@@ -123,7 +130,7 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
     }
     if (spec.role === 'reviewer') {
       reviewer += 1;
-      const changedPaths = spec.prompt.split('## The changed paths\n\n')[1]?.split('\n\n')[0] ?? '';
+      const changedPaths = spec.prompt.split('## The changed paths\n\n').at(-1)?.split('\n\n')[0] ?? '';
       const paths = [...changedPaths.matchAll(/^- [A-Z] (.+)$/gmu)].map(match => match[1]!);
       const concern = { summary: 'A expected value copies the implementation', consequence: 'The assertion cannot catch a wrong result',
         rationale: 'The candidate calls renderA on both sides', uncertainty: 'low', remedy: 'Use an independent literal',
@@ -135,11 +142,11 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
         { kind: 'submit', input: { inspected: paths, missing: [], concerns: shouldRaise ? [concern] : [] } }];
     }
     if (spec.submission.name === 'submit_reconciliation') {
-      const id = /### `(cf-\d+)`/u.exec(spec.prompt)?.[1];
+      const id = latest(/### `(cf-\d+)`/gu)?.[1];
       if (id === undefined) return submit({ relations: [], dispositions: [], next: { kind: 'complete' },
         brief: 'The accepted correction closed the finding; no new concern needs attention.' });
-      const firstRound = spec.prompt.includes('round 1 of');
-      const report = /- `(cfr-\d+)` by /u.exec(spec.prompt)?.[1];
+      const firstRound = latest(/round (\d+) of/gu)?.[1] === '1';
+      const report = latest(/- `(cfr-\d+)` by /gu)?.[1];
       if (!firstRound && report === undefined) throw new Error(`Reconciliation lacks its report: ${spec.prompt}`);
       return submit({ relations: [], dispositions: [{ checkFinding: id,
         rationale: firstRound ? 'The circular test oracle needs an independent expected value.'
@@ -151,18 +158,18 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
     }
     if (spec.role === 'capability-architect') {
       lastCapabilityPrompt = spec.prompt;
-      const [, task, revision, invocation] = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const [, task, revision, invocation] = latest(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)!;
       if (task === 'cap-002') return [{ kind: 'wait', ms: 60_000 }];
       architect += 1;
       const basis = { task, planRevision: Number(revision), invocation };
       const assignOwner = (owner: string, purpose: string) => submit({ ...basis, kind: 'assign', assignment: assign(owner, {
         goal: purpose, approach: purpose, completionEvidence: 'Real source and tests',
       }).assignment });
-      if (spec.prompt.includes('requires a correction assignment')) {
+      if (current.includes('requires a correction assignment')) {
         correctionAssigned = true;
         return assignOwner(a, 'Repair the A test with an independent literal');
       }
-      if (mode === 'drift' && spec.prompt.includes('Source changed after gate')) {
+      if (mode === 'drift' && current.includes('Source changed after gate')) {
         driftFeedback = spec.prompt;
         return [{ kind: 'wait', ms: 60_000 }];
       }
@@ -173,8 +180,9 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
       // The handback is the architect's done report on the delegated
       // outcome, made once at the revision its briefing shows. It cites no
       // test file; what it concluded about the example is summary text.
-      const outcome = new RegExp(`- ${task} \\(delegated outcome\\): (pending|bound|done), revision (\\d+)`, 'u').exec(spec.prompt);
-      if (outcome === null) throw new Error(`The capability briefing lacks ${task}'s obligation line`);
+      const outcomePattern = new RegExp(`- ${task} \\(delegated outcome\\): (pending|bound|done), revision (\\d+)`, 'gu');
+      const outcome = latest(outcomePattern);
+      if (outcome === undefined) throw new Error(`The capability briefing lacks ${task}'s obligation line`);
       const handback = (atRevision: number) => ({ ...basis, planRevision: atRevision, kind: 'request-handback',
         summary: 'B result is integrated in A and compatible with D; the original example renders the B fact with its source',
         interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact', 'FactResult'], use: 'Call readFact and render its source' }], limitations: [],
@@ -546,7 +554,12 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
     return;
   }
   await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'capability-delegated' &&
-    event.data.task === 'cap-002'), 30_000);
+    event.data.task === 'cap-002'), 30_000).catch(async error => {
+      const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+      const failed = events.filter(event => event.type === 'invocation-ended' && event.data.ended === 'failed').at(-1);
+      const failedOutcome = failed?.type === 'invocation-ended' ? await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.outcome(failed.data.invocation)), 'utf8') : null;
+      throw new Error(`${String(error)}; failed outcome ${failedOutcome}; post-handback events ${JSON.stringify(events.slice(-20))}`);
+    });
   // The ledger event becomes observable before its record files finish
   // materializing. Wait for the projection this assertion actually reads.
   let revisionTaskText = '';
@@ -561,6 +574,17 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
     }
   }, 30_000);
   const revisionTask = JSON.parse(revisionTaskText) as { revises?: { handback: { id: string; hash: string }; sourceRevision: string } };
+  const localQualifications = (opened.service.events('need', receipt.jobId) ?? []).filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect' && event.data.work.request !== undefined);
+  expect(localQualifications).toHaveLength(2);
+  const firstQualification = localQualifications[0]!;
+  const nextQualification = localQualifications[1]!;
+  if (firstQualification.type !== 'invocation-started' || nextQualification.type !== 'invocation-started') throw new Error('Qualification identities are unavailable');
+  const acceptedParent = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.outcome(firstQualification.data.invocation)), 'utf8')) as { session: { ref: string } };
+  const originalAction = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.invocation(firstQualification.data.invocation)), 'utf8')) as { session: { from: string } };
+  const nextAction = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.invocation(nextQualification.data.invocation)), 'utf8')) as { session: { from: string } };
+  expect(nextQualification.data.session).toBe(firstQualification.data.session);
+  expect(nextAction.session.from).toBe(acceptedParent.session.ref);
+  expect(nextAction.session.from).not.toBe(originalAction.session.from);
   expect(revisionTask.revises?.handback.id).toBe('cap-001');
   expect(revisionTask.revises?.sourceRevision).toBeTruthy();
   expect((opened.service.events('need', receipt.jobId) ?? []).filter(event => event.type === 'capability-handed-back' &&

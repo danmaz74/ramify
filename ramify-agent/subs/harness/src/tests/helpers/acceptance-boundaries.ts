@@ -176,11 +176,15 @@ export function acceptanceBoundaries(root: string, mode: string) {
       if (args[0] === '--version') expect(args).toEqual(['--version']);
       else if (args[0] === 'measure') expect(args).toEqual(['measure', '--root', root, '--format', 'json']);
       else {
-        expect(args.slice(0, 2)).toEqual(['check', '--changed']);
-        const format = args.indexOf('--format'); expect(format).toBeGreaterThan(2);
-        for (const path of args.slice(2, format)) expect(fixturePaths.has(path), `unstated hook path ${path}`).toBe(true);
-        expect(args.slice(format, -1)).toEqual(['--format', 'json', '--deadline']);
-        expect([String(testPolicy(root).commands.hookTimeoutMs), String(completionCheckDeadlineMs)]).toContain(args.at(-1));
+        if (args[1] === '--batch') {
+          expect(args).toEqual(['check', '--batch', '--root', root, '--format', 'json', '--no-snapshot']);
+        } else {
+          expect(args.slice(0, 2)).toEqual(['check', '--changed']);
+          const format = args.indexOf('--format'); expect(format).toBeGreaterThan(2);
+          for (const path of args.slice(2, format)) expect(fixturePaths.has(path), `unstated hook path ${path}`).toBe(true);
+          expect(args.slice(format, -1)).toEqual(['--format', 'json', '--deadline']);
+          expect([String(testPolicy(root).commands.hookTimeoutMs), String(completionCheckDeadlineMs)]).toContain(args.at(-1));
+        }
       }
       return super.run(args, cwd, signal);
     }

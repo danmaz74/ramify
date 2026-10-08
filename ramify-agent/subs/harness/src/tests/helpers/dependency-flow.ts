@@ -51,7 +51,7 @@ export async function runDependencyScheduling(): Promise<void> {
       if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
       if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
       if (spec.submission.name === 'submit_capability_qualification') {
-        const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2],
           provider: ids[1] === 'need-001' ? b : c, placementReason: 'Source owner supplies its own behavior',
           constraints: [], requirementRefs: [] });
@@ -76,7 +76,7 @@ export async function runDependencyScheduling(): Promise<void> {
       }
       if (spec.role === 'capability-architect') {
         if (spec.submission.name !== 'submit_capability_action') throw new Error('Unexpected child action');
-        const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
         if (basis.task === 'cap-001') {
           parentTurns += 1;
@@ -195,7 +195,7 @@ export async function runDependencyDecision(boundary: 'request-placement' | 'unr
       if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
       if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
       if (spec.submission.name === 'submit_capability_qualification') {
-        const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         if (ids[1] === 'need-002') {
           nestedTurns += 1;
           if (nestedTurns === 1) return submit({ kind: boundary, request: ids[1], invocation: ids[2],
@@ -232,7 +232,7 @@ export async function runDependencyDecision(boundary: 'request-placement' | 'unr
         } });
       }
       if (spec.role === 'capability-architect') {
-        const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         if (ids[1] === 'cap-001' && parentTurns++ === 0) return submit({ kind: 'assign', task: ids[1],
           planRevision: Number(ids[2]), invocation: ids[3], assignment: assign(b, { goal: 'Provide B source', approach: 'Read C source', completionEvidence: 'B returns source' }).assignment });
         return [{ kind: 'wait', ms: 60_000 }];
@@ -334,12 +334,14 @@ export async function runDependencyGate(restartAfterHandback: boolean, realBound
       if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
       if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
       if (spec.submission.name === 'submit_capability_qualification') {
-        const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2],
           provider: ids[1] === 'need-001' ? b : c, placementReason: 'Source owner supplies its behavior',
           constraints: [], requirementRefs: [] });
       }
       if (spec.role === 'engineer') {
+        const objective = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gmu)].at(-1);
+        const work = objective === undefined ? {} : JSON.parse(objective[1]!) as { iteration?: string };
         engineerTurns += 1;
         if (engineerTurns === 1) return submit({ kind: 'capability-needed', summary: 'A needs B source', request: {
           need: 'B fact with source for A', usage: [{ path: 'subs/a/src/caller.ts', use: 'Display source', prospective: false }],
@@ -354,11 +356,11 @@ export async function runDependencyGate(restartAfterHandback: boolean, realBound
           examples: [{ title: 'normalizes source', code: "expect(readFact()).toBe('B')", designation: 'pseudocode' }],
           suggestedProvider: { module: c, reason: 'C owns normalization' },
         } }, edit('fact.ts', "return 'old';", "return 'old'; /* until C normalizes it */"), write('tmp/parent.txt', 'parent scratch\n')); }
-        if (spec.prompt.includes('# Iteration cap-002.i01')) { boundaries?.stage('child'); return submit({
+        if (work.iteration === 'cap-002.i01') { boundaries?.stage('child'); return submit({
           kind: 'completion-proposed', summary: 'C normalizes the source', findings: [],
         }, write('tmp/child.txt', 'child scratch\n'), write('source.ts', 'export function normalizeSource(value: string): string { return value.trim().toUpperCase(); }\n'),
         write('tests/source.test.ts', "import { expect, test } from 'vitest';\nimport { normalizeSource } from '../source.js';\ntest('C normalizes source', () => expect(normalizeSource(' b ')).toBe('B'));\n")); }
-        if (spec.prompt.includes('# Iteration cap-002.i02')) { boundaries?.stage('integrated'); return submit({
+        if (work.iteration === 'cap-002.i02') { boundaries?.stage('integrated'); return submit({
           kind: 'completion-proposed', summary: 'B uses the real C normalizer', findings: [],
         }, write('fact.ts', "import { normalizeSource } from '../../c/src/source.js';\nexport function readFact(): string { return normalizeSource(' b '); }\n"),
         write('tests/fact.test.ts', "import { expect, test } from 'vitest';\nimport { readFact } from '../fact.js';\ntest('B uses C normalized source', () => expect(readFact()).toBe('B'));\n")); }
@@ -369,7 +371,7 @@ export async function runDependencyGate(restartAfterHandback: boolean, realBound
         throw new Error(`Unexpected engineer turn ${engineerTurns}: ${spec.prompt.slice(0, 300)}`);
       }
       if (spec.role === 'capability-architect') {
-        const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
         if (basis.task === 'cap-001') {
           parentTurns += 1;
@@ -396,7 +398,7 @@ export async function runDependencyGate(restartAfterHandback: boolean, realBound
             interfaces: [{ path: 'subs/c/src/source.ts', symbols: ['normalizeSource'], use: 'Call from B' }], limitations: [] } }];
       }
       if (spec.role === 'reviewer') {
-        const paths = /Changed paths: ([^\n]+)/u.exec(spec.prompt)?.[1]?.split(', ') ?? [];
+        const paths = [...spec.prompt.matchAll(/Changed paths: ([^\n]+)/gu)].at(-1)?.[1]?.split(', ') ?? [];
         return [...paths.map(path => ({ kind: 'tool' as const, tool: 'snapshot_diff', input: { path } })),
           { kind: 'submit', input: { inspected: paths, missing: [], concerns: [] } }];
       }

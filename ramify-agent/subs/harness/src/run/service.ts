@@ -462,10 +462,10 @@ interface InvocationRequest<T> {
   /** A tighter absolute bound than the run policy's, such as a review attempt's. */
   readonly absoluteMs?: number | undefined;
   /**
-   * An engineer's own idle and absolute bounds, which replace the policy's:
+   * An engineer's effective command, idle and absolute bounds, which replace the policy's:
    * the policy's defaults, or what its assignment raised them to.
    */
-  readonly bounds?: { readonly idleMs: number; readonly absoluteMs: number } | undefined;
+  readonly bounds?: { readonly idleMs: number; readonly absoluteMs: number; readonly commandTimeoutMs?: number } | undefined;
   /** Called once `invocation-started` is committed and before the session starts, such as to commit what the invocation is for. */
   readonly onStarted?: ((invocation: string, session: SessionId) => Promise<void>) | undefined;
   /**
@@ -4279,6 +4279,7 @@ export class RunService {
     const policyLimits = run.record.policy.limits;
     const limits = {
       ...policyLimits,
+      commandTimeoutMs: request.bounds?.commandTimeoutMs ?? policyLimits.commandTimeoutMs,
       invocationIdleMs: request.bounds?.idleMs ?? policyLimits.invocationIdleMs,
       invocationAbsoluteMs: request.bounds?.absoluteMs
         ?? (request.absoluteMs === undefined ? policyLimits.invocationAbsoluteMs : Math.min(policyLimits.invocationAbsoluteMs, request.absoluteMs)),
@@ -5450,6 +5451,7 @@ export class RunService {
         const answer = await this.coordinateCapabilityNeed(run, agent, packages, baseline, item, assignment, suspended,
           undefined, { session: undefined, point: undefined, workingDirectory }, unqualified);
         if (answer === null || answer.kind === 'delegated') return null;
+        session = answer.parent.session; sessionRef = answer.parent.point;
         lastAssignment = assignment;
         let resumed = await this.takeIteration(run, agent, packages, baseline, item, assignment, await this.refreshIndex(run), {
           session: suspended.session, point: suspended.point, priorInvocation: suspended.invocation, guidance: answer.guidance,
@@ -5459,6 +5461,7 @@ export class RunService {
           const next = await this.coordinateCapabilityNeed(run, agent, packages, baseline, item, assignment, resumed, undefined,
             { session, point: sessionRef, workingDirectory });
           if (next === null || next.kind === 'delegated') return null;
+          session = next.parent.session; sessionRef = next.parent.point;
           resumed = await this.takeIteration(run, agent, packages, baseline, item, assignment, await this.refreshIndex(run), {
             session: resumed.session, point: resumed.point, priorInvocation: resumed.invocation, guidance: next.guidance,
           });
@@ -5479,6 +5482,13 @@ export class RunService {
           await this.fail(run, 'recovery-exhausted', `Original assignment ${assignment.id} has no captured engineer continuation point`);
           return null;
         }
+        const qualified = await this.replayAcceptedCapabilityQualification(run, pending, 'local-architect');
+        if (qualified === null) return null;
+        if (qualified === undefined) {
+          await this.fail(run, 'recovery-exhausted', `Handback ${handback.task} has no accepted original local qualification point`);
+          return null;
+        }
+        session = qualified.session; sessionRef = qualified.ref;
         lastAssignment = assignment;
         const guidance = [
           `Capability ${handback.task} handed back at ${handback.returnedTree}.`,
@@ -5495,6 +5505,7 @@ export class RunService {
           const answer = await this.coordinateCapabilityNeed(run, agent, packages, baseline, item, assignment, resumed, undefined,
             { session, point: sessionRef, workingDirectory });
           if (answer === null || answer.kind === 'delegated') return null;
+          session = answer.parent.session; sessionRef = answer.parent.point;
           resumed = await this.takeIteration(run, agent, packages, baseline, item, assignment, await this.refreshIndex(run), {
             session: resumed.session, point: resumed.point, priorInvocation: resumed.invocation, guidance: answer.guidance,
           });
@@ -5868,6 +5879,7 @@ export class RunService {
             { session, point: sessionRef, workingDirectory });
           if (answer === null) return null;
           if (answer.kind === 'delegated') return 'reported';
+          session = answer.parent.session; sessionRef = answer.parent.point;
           outcome = await this.takeIteration(run, agent, packages, baseline, item, assigned, index, {
             session: outcome.session, point: outcome.point, priorInvocation: outcome.invocation, guidance: answer.guidance,
           });
@@ -7461,7 +7473,7 @@ export class RunService {
     contextPackage: WorkPackage | undefined,
     parent: { readonly session: SessionId | undefined; readonly point: string | undefined; readonly workingDirectory: string },
     existingRequest?: CapabilityRequest,
-  ): Promise<{ readonly kind: 'satisfied'; readonly guidance: string } | { readonly kind: 'delegated' } | null> {
+  ): Promise<{ readonly kind: 'satisfied'; readonly guidance: string; readonly parent: { readonly session: SessionId; readonly point: string } } | { readonly kind: 'delegated' } | null> {
     if (this.workflow === null || run.record.policy.version !== capabilityRunPolicyVersion) {
       await this.fail(run, 'internal', 'A capability request reached a run without its captured workflow');
       return null;
@@ -7587,7 +7599,7 @@ export class RunService {
       await this.write(run, { type: 'capability-qualified', data: {
         request: request.id, invocation: qualification.id, outcome: 'satisfied', evidence: decision.evidence,
       } });
-      return { kind: 'satisfied', guidance: [
+      return { kind: 'satisfied', parent: { session: qualification.session, point: qualification.ref }, guidance: [
         `Request ${request.id} was satisfied by existing behavior. Verify it from your original calling code and examples.`,
         `API: ${decision.api.owner}, ${decision.api.path}, ${decision.api.symbol}`,
         `Guidance: ${decision.guidance}`, `Evidence: ${decision.evidence.join('; ')}`,
@@ -7676,8 +7688,11 @@ export class RunService {
       }
       selected = delivered.packageText;
     }
-    return this.runCapabilityCoordinator(run, agent, packages, baseline, item, task, request, plan,
+    const coordinated = await this.runCapabilityCoordinator(run, agent, packages, baseline, item, task, request, plan,
       qualification.id, selected, providerItems, providerDecisions);
+    // Qualification advanced this exact local action session. Hand its accepted
+    // point back explicitly; the earlier context checkpoint remains fork authority.
+    return coordinated?.kind === 'satisfied' ? { ...coordinated, parent: { session: qualification.session, point: qualification.ref } } : coordinated;
   }
 
   /** Drives one delegated task; the same path is used for a nested child. */
@@ -8795,7 +8810,7 @@ export class RunService {
         ...(beforeTree === undefined ? {} : { candidateBefore: beforeTree }),
         guarded,
         equip: tools.equip,
-        bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs },
+        bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs, commandTimeoutMs: bounds.commandTimeoutMs },
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
       const replayed = replay !== undefined;
@@ -9395,7 +9410,7 @@ export class RunService {
         writer: true,
         guarded,
         equip: tools.equip,
-        bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs },
+        bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs, commandTimeoutMs: bounds.commandTimeoutMs },
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
       if (!invocations.includes(result.id)) invocations.push(result.id);
