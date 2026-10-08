@@ -2,6 +2,8 @@ import { ModelRuntime } from '@earendil-works/pi-coding-agent';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { installedPiPublicExport } from '../../preservation.js';
+import * as zlib from 'node:zlib';
 
 /*
  * A scripted model provider for pi, written against the provider interface
@@ -204,6 +206,43 @@ export async function scriptedRuntime(scripted: ScriptedProvider): Promise<{ run
   });
   runtime.registerNativeProvider(scripted.provider);
   return { runtime, agentDirectory, remove: () => rm(agentDirectory, { recursive: true, force: true }) };
+}
+
+export interface NativeCodexRuntime { readonly runtime: ModelRuntime; readonly model: Model; readonly agentDirectory: string; readonly requests: Record<string, unknown>[]; readonly wireRequests: Record<string, unknown>[]; readonly transports: unknown[]; dispatches(): number; push(...items: Array<readonly Record<string, unknown>[]>): void; verify(): void; remove(): Promise<void> }
+/** Real installed Codex serializer/parser, with only its HTTP transport intercepted. */
+export async function nativeCodexRuntime(outputs: readonly (readonly Record<string, unknown>[])[]): Promise<NativeCodexRuntime> {
+  const agentDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-native-pi-'));
+  const runtime = await ModelRuntime.create({ authPath: join(agentDirectory, 'auth.json'), modelsPath: null, modelsStorePath: join(agentDirectory, 'models-store.json'), allowModelNetwork: false, refreshOnCreate: false });
+  const model = runtime.getModel('openai-codex', 'gpt-5.6-sol');
+  if (!model) throw new Error('Installed pi catalog lacks the qualified model');
+  const native = await import(await installedPiPublicExport('./api/openai-codex-responses')) as { streamSimple: StreamFunction; stream: StreamFunction };
+  const queue = [...outputs]; const requests: Record<string, unknown>[] = []; const wireRequests: Record<string, unknown>[] = []; const transports: unknown[] = []; let dispatches = 0; let exhausted = false;
+  const token = `fixture.${Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'fixture-account' } })).toString('base64')}.fixture`;
+  const intercept: StreamFunction = (selected, context, options) => { transports.push(options?.transport); return native.streamSimple(selected, context, {
+    ...options, transport: 'sse', maxRetries: 0,
+    onPayload: async (payload, requestModel) => {
+      const transformed = await options?.onPayload?.(payload, requestModel);
+      const body = transformed ?? payload; requests.push(structuredClone(body) as Record<string, unknown>); return body;
+    },
+    fetch: async (_url: string | URL | Request, init?: RequestInit) => {
+      const index = ++dispatches; const output = queue.shift();
+      if (!output) { exhausted = true; throw new Error('Unexpected native provider request'); }
+      const wire = typeof init?.body === 'string' ? init.body : zlib.zstdDecompressSync(init?.body as Uint8Array).toString('utf8');
+      wireRequests.push(JSON.parse(wire) as Record<string, unknown>);
+      const event = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`;
+      let sse = event({ type: 'response.created', response: { id: `resp_fixture_${index}` } });
+      output.forEach((item, output_index) => {
+        sse += event({ type: 'response.output_item.added', output_index, item });
+        sse += event({ type: 'response.output_item.done', output_index, item });
+      });
+      sse += event({ type: 'response.completed', response: { id: `resp_fixture_${index}`, status: 'completed', output, usage: { input_tokens: 30, output_tokens: 5, total_tokens: 35, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 1 } } } });
+      return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+    },
+  } as StreamOptions); };
+  runtime.registerNativeProvider({ id: 'openai-codex', name: 'Intercepted installed Codex', auth: { apiKey: { name: 'Fixture', resolve: async () => ({ auth: { apiKey: token } }) } }, getModels: () => [model], stream: intercept, streamSimple: intercept } as Provider);
+  return { runtime, model, agentDirectory, requests, wireRequests, transports, dispatches: () => dispatches, push: (...items: Array<readonly Record<string, unknown>[]>) => queue.push(...items),
+    verify: () => { if (exhausted || queue.length || JSON.stringify(wireRequests) !== JSON.stringify(requests)) throw new Error(`Native script exhaustion=${exhausted}, unused=${queue.length}, final payload/wire equality=${JSON.stringify(wireRequests) === JSON.stringify(requests)}`); },
+    remove: () => rm(agentDirectory, { recursive: true, force: true }) };
 }
 
 type AssistantMessage = {
