@@ -338,6 +338,15 @@
       "typeCheck": "passed",
       "structure": "passed; partial analysis coverage; 317 analysis limits",
       "logs": "/tmp/ramify-plan23-integrated-store-cache-*.log"
+    },
+    "cucumberConfigPath": {
+      "providerHead": "ebe1fd88ac9712dc383e44f62a4906468f7cbdd1",
+      "integratedHead": "7b06f768d45f42546681903d60e5c04fe7b259fd",
+      "ordinaryFiles": 3,
+      "ordinaryTests": 46,
+      "typeCheck": "passed",
+      "structure": "passed; partial analysis coverage; 317 analysis limits",
+      "logs": "/tmp/ramify-plan23-integrated-cucumber-path-*.log"
     }
   }
 }

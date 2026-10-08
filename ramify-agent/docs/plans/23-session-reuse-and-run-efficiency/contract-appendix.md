@@ -256,6 +256,9 @@ required support/loaders/imports/require/world setup from the effective config,
 then writes a dedicated scratch config containing exact paths and execution
 filters that permit all assigned pending scenarios. Native command uses explicit
 `--config <generated>` and the generated profile; no broader defaults are merged.
+The command argument is normalized relative to the declared cwd because installed
+Cucumber 13.2.1 joins cwd to this argument. The generated write path and
+selection identity remain absolute; the consumer executes the returned argv.
 Unknown/dynamic selection returns a limitation instead of verified focus.
 Loading target config is external execution; put the adapter behind evidence
 using its injected command boundary. Ordinary tests script that answer; Q01

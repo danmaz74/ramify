@@ -168,3 +168,29 @@ failure and final configured audit remain iteration 14 debt.
 - `ramify-agent/subs/harness/subs/evidence/src/cucumber-configuration.ts`
 - `ramify-agent/subs/harness/subs/evidence/src/tests/cucumber-configuration.test.ts`
 - `ramify-agent/docs/plans/23-session-reuse-and-run-efficiency/iterations/04-results.md`
+
+## Accepted installed config-path correction
+
+Native-witness preparation found that installed Cucumber 13.2.1 loads its
+explicit configuration with `path.join(cwd, file)`. The earlier absolute
+`--config` argument therefore prepended cwd again. Provider amendment
+`ebe1fd88ac9712dc383e44f62a4906468f7cbdd1`, integrated at
+`7b06f768d45f42546681903d60e5c04fe7b259fd`, supplies a normalized cwd-relative
+command argument while retaining the absolute `configPath` and selection
+identity for writes and validation. Source configuration, exact pending A/B
+selection, cleared filters, support, world, loader and environment are unchanged.
+
+The integrator ran the shell classifier, focused scenario builder and effective
+configuration adapter files together: **3 files, 46 tests passed**, including
+independently specified internal and external quoted scratch paths, the old
+absolute-argument negative control and changed-authority refusal. All four
+configured type checks passed. Structural validation passed with zero errors,
+zero warnings and 317 analysis limits; it completed every configured stage with
+partial analysis coverage. Logs are
+`/tmp/ramify-plan23-integrated-cucumber-path-{focused,types,structure}.log`.
+
+This is ordinary command/path validation, not native execution. Iteration 10
+must deliver the returned command unchanged; iteration 14 must execute it with
+the actual installed CLI at the declared cwd. Native preparation is recorded in
+`/tmp/plan23-native-cucumber-inventory.md`, with fixed A=1, B=1, U=0 execution
+counts and separate broad-default and nonexecution controls. Q01 remains open.
