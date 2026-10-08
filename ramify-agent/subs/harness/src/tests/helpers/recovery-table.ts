@@ -108,7 +108,7 @@ export const scratchRecoveryBoundaries = {
   'scratch-setup-complete': 'scratch-setup.test.ts',
 } as const satisfies Partial<Record<RunWrite, string>>;
 export const capabilityRecoveryBoundaries = {
-  'writer-process-registered': 'capability-recovery.test.ts',
+  'writer-process-registered': 'capability-recovery.boundary.test.ts',
   'capability-coordinator-resumed': 'capability-recovery.test.ts',
   'capability-source-captured': 'capability-recovery.test.ts',
   'capability-exchange-opened': 'capability-recovery.test.ts',

@@ -1,0 +1,268 @@
+{
+  "schema": "ramify-agent.plan22-optimization-evidence/1",
+  "optimization": 6,
+  "baseCommit": "fcc89393e9f9daa357476236fb397c3aa3a79ce0",
+  "sourceHashes": {
+    "subs/harness/src/tests/capability-recovery.test.ts": "ec069096af1481eda1d62894981e86921efecd788dfb8f9a8647248232570da9",
+    "subs/harness/src/tests/capability-recovery.boundary.test.ts": "f80104e15874298dc54ee1deb4774cd5402196fb3ed12f4395ed6ee29aed51cf",
+    "subs/harness/src/tests/recovery-boundaries.test.ts": "59c9b97f7566889adb165f9cb00a0799ec2ce4953cc4342516855e8a233a4eea",
+    "subs/harness/src/tests/helpers/recovery-boundaries.ts": "f634583adf79e0f28b846c73db67df36c8f1f11d807269bbc8ac1527a542f83f",
+    "subs/harness/src/tests/helpers/recovery-files.ts": "979fa20cc935f0d3da103ffbfad69bef7f0e679caede6c9cf017a326a0df2220",
+    "subs/harness/src/tests/composition.test.ts": "ab528ba687bb847e5b1f0e67d4d3e7b072a4fca656505847a510c4c761293200",
+    "subs/harness/src/tests/helpers/recovery-table.ts": "e8983101eb758b9bfd67fb7e4b386b1ad73b7b5d75923ea470ccd889dd89e9b6",
+    "package.json": "df8473368f6e34409bc6f7917ba183bda93db16cf2b75f8a561c42ab12c29551",
+    "package-lock.json": "9d0b5e4332475cfc10b20c6f8c3d2aff035703a25af88710bc2beeb361ea96d6",
+    "vitest.config.ts": "c0f54f605e468027bffb775b4847c487bb88fb59f1b06528dbacb09738f07e7e",
+    "ramify-audit.json": "9bfaaa5d6b95d590cf044ecab60faec812b2e39fd5a7752be28e7190afa80baa"
+  },
+  "baselineSourceHash": "6283e099797f16c40b2189ad95283c66f5f923438459ec56c51ed11abf1ce4df",
+  "actualMovedBlockHash": "020e1324c2d5d4fe2caddfc51e12b345fa2be328d742d21b73196c786e114687",
+  "preservation": {
+    "originalCases": 18,
+    "ordinaryCases": 15,
+    "actualCases": 3,
+    "originalAssertionLinesPreserved": 105,
+    "movedActualRegistrationsAndCallbackBodiesByteIdentical": true,
+    "extraNegativeControls": 10
+  },
+  "configuredDiscovery": {
+    "files": 256,
+    "runner": "Vitest 4.1.11 configured list --filesOnly --json",
+    "snapshotHash": "37a795a12f3d7a36f9299b5c32796ab767597d537cc466129cff46b49dede9dd",
+    "partitionImplemented": false
+  },
+  "verification": {
+    "originalBaseline": {
+      "passed": 18,
+      "failed": 0,
+      "fileSeconds": 14.362667724609375,
+      "ordinaryCaseSeconds": 12.85747117
+    },
+    "fourFileQualification": {
+      "passed": 38,
+      "failed": 0,
+      "skipped": 0,
+      "note": "9 controls at this run; the added tenth control is included in subsequent 36-case scripted verification"
+    },
+    "finalScriptedAndComposition": {
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0,
+      "ordinaryFileSeconds": 4.664215576171875,
+      "processAttempts": 0
+    },
+    "actualCases": {
+      "passed": 3,
+      "failed": 0,
+      "fileSeconds": 1.877548828125,
+      "runtimeUntouchedAfterQualification": true
+    },
+    "audit": "unrun; coordinator must run released full nested audit on clean combined committed candidate before merge"
+  },
+  "cases": [
+    {
+      "originalTitle": "CA20: a registered real process group survives a service crash and is settled before any successor work",
+      "destination": "subs/harness/src/tests/capability-recovery.boundary.test.ts",
+      "treatment": "move unchanged registration and callback",
+      "baselineSeconds": 0.978358,
+      "qualifiedSeconds": 1.218526
+    },
+    {
+      "originalTitle": "CA19 CA30: a snapshot written before its request commit is adopted with the exact dirty index and tree",
+      "destination": "subs/harness/src/tests/capability-recovery.boundary.test.ts",
+      "treatment": "move unchanged registration and callback",
+      "baselineSeconds": 0.324201,
+      "qualifiedSeconds": 0.359125
+    },
+    {
+      "originalTitle": "CA19: retry refuses a changed staged or untracked candidate and preserves its bytes",
+      "destination": "subs/harness/src/tests/capability-recovery.boundary.test.ts",
+      "treatment": "move unchanged registration and callback",
+      "baselineSeconds": 0.202194,
+      "qualifiedSeconds": 0.299549
+    },
+    {
+      "originalTitle": "CA18 CA26 CA29: an ended B writer keeps dirty source and closes partial through ordinary failure analysis",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.876821,
+      "qualifiedSeconds": 0.543089
+    },
+    {
+      "originalTitle": "CA18 CA26 CA29: restart after an ended B writer preserves its ordinary partial result without a second writer",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.917261,
+      "qualifiedSeconds": 0.346511
+    },
+    {
+      "originalTitle": "CA05 CA19 CA22 CA32: service restart reconstructs the active architect without dispatching the B entry",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.977423,
+      "qualifiedSeconds": 0.36776
+    },
+    {
+      "originalTitle": "a restart after a capability architect budget return reconstructs from committed task state",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.712184,
+      "qualifiedSeconds": 0.281431
+    },
+    {
+      "originalTitle": "CA19: accepted qualification before delegation replays one decision after restart",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.518997,
+      "qualifiedSeconds": 0.235333
+    },
+    {
+      "originalTitle": "CA19: accepted assign action before its effect replays without a second coordinator",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 1.273977,
+      "qualifiedSeconds": 0.323121
+    },
+    {
+      "originalTitle": "PB3-C04 PB3-C05: restart after invocation-ended keeps the accepted action's report once, with no second coordinator or writer, and the next turn retrieves it",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 1.033616,
+      "qualifiedSeconds": 0.349006
+    },
+    {
+      "originalTitle": "PB3-C04 PB3-C05: restart after obligation-reported keeps the accepted action's report once, with no second coordinator or writer, and the next turn retrieves it",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.964505,
+      "qualifiedSeconds": 0.335714
+    },
+    {
+      "originalTitle": "CA18 CA19 CA26 CA29: restart after capability-assigned settles an explicit partial once",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.892118,
+      "qualifiedSeconds": 0.311236
+    },
+    {
+      "originalTitle": "CA18 CA19 CA26 CA29: restart after invocation-ended settles an explicit partial once",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 1.008715,
+      "qualifiedSeconds": 0.293538
+    },
+    {
+      "originalTitle": "CA19: accepted B completion before assignment settlement replays without a second writer",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 1.083711,
+      "qualifiedSeconds": 0.342101
+    },
+    {
+      "originalTitle": "CA20 CA32: restart with a B writer lacking confirmed release stops the stack and frontier",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.675655,
+      "qualifiedSeconds": 0.226966
+    },
+    {
+      "originalTitle": "CA19 CA30: service restart adopts a source snapshot before its request ledger commit",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.713077,
+      "qualifiedSeconds": 0.226229
+    },
+    {
+      "originalTitle": "CA05 CA20: restart after capability-exchange-opened keeps one consumer question and answer",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.693743,
+      "qualifiedSeconds": 0.235911
+    },
+    {
+      "originalTitle": "CA05 CA20: restart after capability-exchange-answered keeps one consumer question and answer",
+      "destination": "subs/harness/src/tests/capability-recovery.test.ts",
+      "treatment": "retain callback outcomes and assertions with strict declared external ports",
+      "baselineSeconds": 0.515668,
+      "qualifiedSeconds": 0.245216
+    }
+  ],
+  "retainedArtifactHashes": {
+    "/tmp/plan22-recovery-baseline.json": "7814afa70ef2664fbb07f0a5266cd0e9139adf68ad07cc5a030bcd0b7ac40a98",
+    "/tmp/plan22-recovery-baseline.log": "bb38f38d40185d2ba65bd7096747d5efbb3e1a220f6cb4ce18c12f1088bed463",
+    "/tmp/plan22-recovery-authoring-first.log": "35b3f062625c7f534d395563a388fee90a7d85cdda8d9ec56860d7f09a4eb390",
+    "/tmp/plan22-recovery-authoring02.log": "9fd9557742159329d0a08e1117350ceb6519a5a2f1f12db1a7b142c857ff74cf",
+    "/tmp/plan22-recovery-authoring03.json": "a4c1dbc78c9304371adcd2ad737ef30ea365a436b9bb838690573de67ddf9de1",
+    "/tmp/plan22-recovery-authoring03.log": "cb98519e301dc725eb2a2a59924b077ca5e9434abf5a8bb2d0e23ebbbafe2d3b",
+    "/tmp/plan22-recovery-authoring04.json": "e79bc5d633c992a7ec287f40d6ac29e4c548402fe737174408f648d3f6b61280",
+    "/tmp/plan22-recovery-authoring04.log": "9e6b3aad8c9bf303e93729ab5a939e21388189a05aab137611130375b839e46a",
+    "/tmp/plan22-recovery-authoring05.json": "1f13a2ba38055d41f6de85a2685c1b3d4eab8349b70dad4001090c6eaee439b0",
+    "/tmp/plan22-recovery-authoring05.log": "5c0fdec2c200660dd2ba72261753de46f76ca97d97b67ed7b4c9ce25a21621af",
+    "/tmp/plan22-recovery-authoring06.json": "aa5cf599ec6a3e43d7307d07cb546e20f0d9df8f5cd8a9b786502dea175dcb51",
+    "/tmp/plan22-recovery-authoring06.log": "f113a581b978f41a990244bc57e84d14a70b314287563f7901f4a8780cc51f1c",
+    "/tmp/plan22-recovery-authoring07.log": "e46f489630b65c39bee5169dc5f3783451373cd3ed15b0a55967df7697decd85",
+    "/tmp/plan22-recovery-authoring08.json": "363ba6cd3f6d04f74ed589c76bf5c136ae4033e990835245b64d3543776ae10e",
+    "/tmp/plan22-recovery-authoring08.log": "d7cadc0157948743e88218d3bb04cea3bdbedec042a879d11ca4f6062c4f1837",
+    "/tmp/plan22-recovery-authoring09.json": "e0f6c08208ab8b792b6e3e4440139e5afcb48ce4f8a1f0e5e4473cf04b641800",
+    "/tmp/plan22-recovery-authoring09.log": "986d25826dbf3add641376380d054a59e85de0bd861a916f79eb007b8fb8506d",
+    "/tmp/plan22-recovery-ordinary-final.json": "d4bde86d68bcc6baa92512f49c4714da22c7b53c623784675d91d660bfc6d2bd",
+    "/tmp/plan22-recovery-ordinary-final.log": "77465596cd363194b937e4052b68dc6a2b35d30d99e22ff267aee5a538607978",
+    "/tmp/plan22-recovery-final.json": "29b6fc423805a050d5d4f528f1d309a3ae7bcd6b38424eb7e9eacac8daa80048",
+    "/tmp/plan22-recovery-final.log": "1bc340e5bce2335e899a35335eae033f13f02d9dbfb3cdb55b23ab22cb98a064",
+    "/tmp/plan22-recovery-qualified.json": "ff9e8da29db2dead3544ca7c61f6128a1a9e7bfa88e3c27360e43a6901db4dee",
+    "/tmp/plan22-recovery-qualified.log": "5219a50affbd77887d7295e4301fd9df9085cc0bb942f457f0d9672f36a719dd",
+    "/tmp/plan22-recovery-controls-final.json": "2de3eb6e0e137111c70c5cc2e4cf82b536d05a199262f107f5c37bb6a70a6113",
+    "/tmp/plan22-recovery-controls-final.log": "6bbc5231c4be3cdf959a3881a7866d440f2edcd8efc6a0cf7b8b013985a1ab0f",
+    "/tmp/plan22-recovery-script-qualified.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/tmp/plan22-recovery-script-final.json": "e121de2a0cfeacf8343d28f8075e5ec3cf8820dc62715f7376d407bb09f9aa67",
+    "/tmp/plan22-recovery-script-final.log": "6aa2d7578ab8f1ecefc96f2904473fcc58397a566e1e58440f7b9d38102d49f6",
+    "/tmp/plan22-recovery-types01.log": "cc20c8cd61ad65bc7bb1f956b6c3edae16121fe0425f7fd5894d9eb76fe49c3c",
+    "/tmp/plan22-recovery-types02.log": "d2d803b4c90169ac4f118085a809e7870aff2f786e85817e58b1cdc67dc12331",
+    "/tmp/plan22-recovery-types03.log": "cc20c8cd61ad65bc7bb1f956b6c3edae16121fe0425f7fd5894d9eb76fe49c3c",
+    "/tmp/plan22-recovery-types-final.log": "cc20c8cd61ad65bc7bb1f956b6c3edae16121fe0425f7fd5894d9eb76fe49c3c",
+    "/tmp/plan22-recovery-types-qualified.log": "cc20c8cd61ad65bc7bb1f956b6c3edae16121fe0425f7fd5894d9eb76fe49c3c",
+    "/tmp/plan22-recovery-self01.log": "ae16807550bfd4f05a768e6d2eacdf6dfcccfac814c85729884135809ddbd07b",
+    "/tmp/plan22-recovery-self-final.log": "ae16807550bfd4f05a768e6d2eacdf6dfcccfac814c85729884135809ddbd07b",
+    "/tmp/plan22-recovery-self-qualified.log": "ae16807550bfd4f05a768e6d2eacdf6dfcccfac814c85729884135809ddbd07b",
+    "/tmp/plan22-recovery-configured-files.json": "37a795a12f3d7a36f9299b5c32796ab767597d537cc466129cff46b49dede9dd",
+    "/tmp/plan22-recovery-configured-files.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "commands": [
+    {
+      "cwd": "ramify-agent",
+      "command": "node_modules/.bin/vitest run subs/harness/src/tests/capability-recovery.test.ts --reporter=json --outputFile=/tmp/plan22-recovery-baseline.json",
+      "status": "18 passed"
+    },
+    {
+      "cwd": "ramify-agent",
+      "command": "node_modules/.bin/vitest run subs/harness/src/tests/capability-recovery.test.ts subs/harness/src/tests/recovery-boundaries.test.ts subs/harness/src/tests/capability-recovery.boundary.test.ts subs/harness/src/tests/composition.test.ts --reporter=json --outputFile=/tmp/plan22-recovery-qualified.json",
+      "status": "38 passed"
+    },
+    {
+      "cwd": "ramify-agent",
+      "command": "node_modules/.bin/vitest run subs/harness/src/tests/capability-recovery.test.ts subs/harness/src/tests/recovery-boundaries.test.ts subs/harness/src/tests/composition.test.ts --reporter=json --outputFile=/tmp/plan22-recovery-script-final.json",
+      "status": "36 passed"
+    },
+    {
+      "cwd": "ramify-agent",
+      "command": "npm run type-check",
+      "status": "all four scopes passed"
+    },
+    {
+      "cwd": "ramify-agent",
+      "command": "npm run check:self",
+      "status": "zero errors and warnings; 313 analysis limits"
+    },
+    {
+      "cwd": "ramify-agent",
+      "command": "node_modules/.bin/vitest list --filesOnly --json",
+      "status": "256 configured files, not execution"
+    },
+    {
+      "cwd": "repository root",
+      "command": "ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent --cwd . --full --nested --json",
+      "status": "UNRUN, coordinator pre-merge requirement"
+    }
+  ],
+  "actualMovedBlockHashBasis": "Exact registration statements and callback bodies, excluding trailing EOF whitespace"
+}
