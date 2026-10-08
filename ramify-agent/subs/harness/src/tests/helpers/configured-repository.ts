@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 
 import {
   createConfiguredAudit,
+  type AuditInvocationReceipt,
   type AuditWorkspaceOwnershipRecorder,
   type ConfiguredAuditMode,
   type ConfiguredAuditPort,
@@ -97,14 +98,21 @@ export async function configuredRepository(files: Readonly<Record<string, string
 }
 
 /** Ownership that records what the audit intended and cleaned, without durable files. */
-export function recordingOwnership(): AuditWorkspaceOwnershipRecorder & { readonly intended: IntendedAuditWorkspace[]; readonly cleaned: IntendedAuditWorkspace[] } {
+export function recordingOwnership(): AuditWorkspaceOwnershipRecorder & {
+  readonly intended: IntendedAuditWorkspace[];
+  readonly cleaned: IntendedAuditWorkspace[];
+  readonly invocations: Map<string, AuditInvocationReceipt>;
+} {
   const intended: IntendedAuditWorkspace[] = [];
   const cleaned: IntendedAuditWorkspace[] = [];
+  const invocations = new Map<string, AuditInvocationReceipt>();
   return {
-    intended, cleaned,
+    intended, cleaned, invocations,
     async recordIntendedWorkspace(workspace) { intended.push(workspace); },
     async recoverAbandonedWorkspaces() {},
     async recordWorkspaceCleaned(workspace) { cleaned.push(workspace); },
+    async recordAuditInvocation(receipt) { invocations.set(`${receipt.runId}:${receipt.attemptId}`, structuredClone(receipt)); },
+    async auditInvocation(runId, attemptId) { return structuredClone(invocations.get(`${runId}:${attemptId}`) ?? null); },
   };
 }
 
@@ -125,6 +133,7 @@ export async function configuredGate(audit: ConfiguredAuditPort, repository: { r
   readonly captured: string;
   readonly sourceCommit: string;
   readonly mode?: ConfiguredAuditMode;
+  readonly nested?: boolean;
   readonly checkpoint?: Checkpoint;
   readonly runId?: string;
   readonly attemptId: string;
@@ -144,14 +153,14 @@ export async function configuredGate(audit: ConfiguredAuditPort, repository: { r
       directory,
       head: options.sourceCommit as GateAttempt['head'],
       checks: [],
-      audit: { mode: options.mode ?? 'project-default', timeoutMs: options.timeoutMs ?? 300_000 },
+      audit: { mode: options.mode ?? 'project-default', ...(options.nested === true ? { nested: true } : {}), timeoutMs: options.timeoutMs ?? 300_000 },
       ...(options.rules === undefined ? {} : { rules: options.rules }),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
     if ('schema' in prepared) return prepared;
     const runId = options.runId ?? 'run-configured-witness';
     return await executeConfiguredGate(request => audit.run({
-      projectRoot: request.projectRoot, sourceCommit: request.sourceCommit, configuration, mode: request.mode,
+      projectRoot: request.projectRoot, sourceCommit: request.sourceCommit, configuration, mode: request.mode, nested: request.nested,
       runId, attemptId: request.attemptId, signal: request.signal,
       ...(options.started === undefined ? {} : { started: async (command: GateCommandStart) => { options.started!.push(command); } }),
     }), prepared, options.sourceCommit, options.sourceCommit);

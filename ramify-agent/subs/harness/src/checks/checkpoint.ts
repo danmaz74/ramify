@@ -11,7 +11,7 @@ import type { ConfiguredAuditMode } from '../../subs/audit/src/check-execution.j
  * A committing checkpoint asks the project's committed audit about its
  * commit: ordinary gates in the provider's default mode, which audits a
  * Ramify project `ramify-partial` from its baseline, and the final gate in
- * full. The audit definition names every check, its scenarios among them;
+ * full over every tracked nested definition the provider discovers. The audit definition names every check, its scenarios among them;
  * the harness adds none. A standalone session's in-place diagnosis runs the
  * project's setup, its type check and a complete Ramify check.
  */
@@ -22,15 +22,17 @@ export interface CheckpointPolicy {
   readonly committing: boolean;
   /** The mode a committing checkpoint requests of the committed audit. */
   readonly audit: ConfiguredAuditMode;
+  /** Whether it audits the tracked nested definitions too: only the final gate's full verification does. */
+  readonly nested: boolean;
 }
 
 export const checkpointPolicies: Record<Checkpoint, CheckpointPolicy> = {
-  readiness: { committing: false, audit: 'full' },
-  iteration: { committing: true, audit: 'project-default' },
-  contract: { committing: true, audit: 'project-default' },
-  'breaking-iteration': { committing: true, audit: 'project-default' },
-  'work-item': { committing: true, audit: 'project-default' },
-  final: { committing: true, audit: 'full' },
+  readiness: { committing: false, audit: 'full', nested: false },
+  iteration: { committing: true, audit: 'project-default', nested: false },
+  contract: { committing: true, audit: 'project-default', nested: false },
+  'breaking-iteration': { committing: true, audit: 'project-default', nested: false },
+  'work-item': { committing: true, audit: 'project-default', nested: false },
+  final: { committing: true, audit: 'full', nested: true },
 };
 
 /** The commands of the project an in-place diagnosis runs, through the policy the run captured. */

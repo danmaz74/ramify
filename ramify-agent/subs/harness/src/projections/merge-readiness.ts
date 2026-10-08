@@ -8,12 +8,13 @@ import { replayCheckFindingState } from '../check-findings/state.js';
 import { replayNonfunctionalPhase } from '../run/nonfunctional-phase.js';
 import { decideNonfunctionalRound } from '../../subs/nonfunctional/src/rounds.js';
 import { assessedElements } from '../nonfunctional/submissions.js';
-import { projectMergeReadiness, type ReadinessDeviation } from '../run/merge-readiness.js';
+import { projectMergeReadiness, type FinalAuditFacts, type ReadinessDeviation } from '../run/merge-readiness.js';
 import {
   nonfunctionalDeviationSchema,
   type MergeReadiness,
 } from '../run/nonfunctional-records.js';
 import { invocationOutcomeSchema, runLayout } from '../run/records.js';
+import type { GateAttempt } from '../checks/records.js';
 import type { RunView, CommittedLine } from './inputs.js';
 
 const unavailable = (reason: string): MergeReadiness => ({
@@ -55,11 +56,23 @@ function authenticCoordinator(view: RunView, invocation: string): boolean {
     && outcome.submission?.hash === end.transaction.event.data.submission;
 }
 
+/** The final gate's recorded audit request and answer, as merge readiness judges it. */
+function finalAuditFacts(gate: GateAttempt): FinalAuditFacts | null {
+  const audit = gate.audit;
+  if (audit === undefined) return null;
+  return {
+    mode: audit.mode, nested: audit.nested, status: audit.status, executedMode: audit.executedMode, verdict: audit.verdict,
+    discovery: audit.discovery?.status ?? null,
+    projects: audit.projects?.map(project => ({ projectRoot: project.projectRoot, verdict: project.verdict, status: project.status,
+      executedMode: project.executedMode })) ?? null,
+  };
+}
+
 /** One immutable run view supplies every identity; disk reads happen before this pure composition. */
 export function mergeReadinessOf(view: RunView, evidence: AcceptedEvidence): MergeReadiness {
   const final = [...view.gates.values()].filter(entry => entry.body.checkpoint === 'final').at(-1)?.body;
   if (final && final.verdict !== 'passed') return projectMergeReadiness({
-    completed: false, candidate: null, finalGate: { id: final.id, tree: '', assessment: '', passed: false },
+    completed: false, candidate: null, finalGate: { id: final.id, tree: '', assessment: '', passed: false, audit: finalAuditFacts(final) },
     nfrIds: null, assessment: null, deviations: [],
   });
   if (evidence.status === 'unavailable') {
@@ -165,6 +178,6 @@ export function mergeReadinessOf(view: RunView, evidence: AcceptedEvidence): Mer
     decision: current ? { standing: current.standing, revision: current.revision } : null });
   }
   return projectMergeReadiness({ completed: true, candidate: settled.candidate,
-    finalGate: { id: gate.id, tree: bound.data.tree, assessment: settled.assessment.id, passed: true },
+    finalGate: { id: gate.id, tree: bound.data.tree, assessment: settled.assessment.id, passed: true, audit: finalAuditFacts(gate) },
     nfrIds, assessment: settled.assessment, deviations });
 }

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
@@ -12,10 +13,14 @@ import {
   readRawCheckResults,
   resolveRepositoryExecutionLeaseIdentity,
   TEST_LOCK_HELD_ENVIRONMENT,
+  type AuditCheckSummary,
   type AuditEvent,
+  type AuditProjectOutcome,
   type AuditResult,
   type GitExecutorPort,
+  type NestedDiscoveryOutcome,
   type ProcessExecutorPort,
+  type ProjectAuditResult,
 } from 'ramify-audit';
 
 import { childEnvironment } from '../../evidence/src/run-command.js';
@@ -72,6 +77,65 @@ export interface AuditWorkspaceOwnershipRecorder {
   }): Promise<void>;
   /** Called only after ramify-audit's own worktree cleanup has returned. */
   recordWorkspaceCleaned(workspace: IntendedAuditWorkspace): Promise<void>;
+  /**
+   * Persist a completed nested invocation's identities as soon as the
+   * provider answers it, before anything else reads the answer. Returning
+   * means the receipt is durable.
+   */
+  recordAuditInvocation(receipt: AuditInvocationReceipt): Promise<void>;
+  /** The receipt recorded for this run's attempt, or null when none was. */
+  auditInvocation(runId: string, attemptId: string): Promise<AuditInvocationReceipt | null>;
+}
+
+/**
+ * One project of a nested invocation as the provider answered it, by its
+ * durable identities: the request and report that hold its evidence. A
+ * project the provider did not run keeps the provider's own answer, since
+ * nothing was published for it.
+ */
+export interface AuditInvocationProject {
+  readonly projectRoot: string;
+  readonly verdict: 'pass' | 'fail' | 'indeterminate';
+  readonly execution: 'ran' | 'reused' | 'not-run';
+  readonly failures: readonly string[];
+  /** The request the provider answered this project under. */
+  readonly requestId: string;
+  readonly runId: string | null;
+  /** The published record's own request and source commit: where its evidence is found again. */
+  readonly record: {
+    readonly requestId: string;
+    readonly sourceCommit: string;
+    readonly reportCommit: string;
+    readonly runRef: string;
+    readonly treeRef: string;
+  } | null;
+  /** The provider's account of a reused record, kept as it answered it. */
+  readonly reused: {
+    readonly sourceCommit: string;
+    readonly auditedCommit: string;
+    readonly ignoredChangedPaths: readonly string[];
+    readonly requestedMode: 'full' | 'ramify-partial';
+    readonly resolution: 'requested' | 'defaulted';
+  } | null;
+  /** A project that did not complete: the provider's answer, which nothing published. */
+  readonly unpublished: unknown;
+}
+
+/**
+ * The durable receipt of one completed nested invocation: the request, the
+ * source it answered, every project's identities, and the invocation's own
+ * discovery and verdict, which the provider publishes in no project's record.
+ */
+export interface AuditInvocationReceipt {
+  readonly schema: 'ramify-agent.audit-invocation/1';
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly requestId: string;
+  readonly projectRoot: string;
+  readonly sourceCommit: string;
+  readonly projects: readonly AuditInvocationProject[];
+  readonly discovery: ConfiguredNestedDiscovery;
+  readonly invocationVerdict: 'pass' | 'fail' | 'indeterminate';
 }
 
 export interface AuditCheckExecutionOptions {
@@ -124,6 +188,64 @@ export interface ConfiguredAuditReuse {
   readonly resolution: 'requested' | 'defaulted';
 }
 
+/** A count of one kind, summed over a project's checks. */
+export interface ConfiguredCountBucket {
+  readonly total: number;
+  readonly passed: number;
+  readonly failed: number;
+  readonly skipped: number;
+}
+
+/**
+ * One project of a nested invocation, the requested root first: the
+ * provider's verdict, failures and execution for it, and the identities of
+ * the record that answers it. Counts and duration are the record's own;
+ * a reused record's are those of the run that produced it.
+ */
+export interface ConfiguredProjectResult {
+  readonly projectRoot: string;
+  readonly verdict: 'pass' | 'fail' | 'indeterminate';
+  /** `ran` this invocation, `reused` an applicable earlier record, or `not-run`. */
+  readonly execution: 'ran' | 'reused' | 'not-run';
+  readonly failures: readonly string[];
+  /** `refused` when its completed record does not answer the request. */
+  readonly status: 'completed' | 'failed' | 'cancelled' | 'refused';
+  readonly requestId: string;
+  readonly auditedSourceCommit: string | null;
+  readonly requestedMode: 'full' | 'ramify-partial' | null;
+  readonly executedMode: 'full' | 'ramify-partial' | null;
+  readonly fallbackReason: string | null;
+  readonly reuse: ConfiguredAuditReuse | null;
+  readonly reportCommit: string | null;
+  readonly runRef: string | null;
+  readonly treeRef: string | null;
+  /** The provider's commands that retrieve the record. */
+  readonly retrievalCommands: readonly string[];
+  readonly durationSeconds: number | null;
+  readonly counts: {
+    readonly checks: ConfiguredCountBucket;
+    readonly tests: ConfiguredCountBucket | null;
+    readonly scenarios: ConfiguredCountBucket | null;
+  } | null;
+  readonly detail: string;
+}
+
+/** What nested discovery skipped and could not decide, as the provider answered it. */
+export interface ConfiguredNestedDiscovery {
+  readonly status: 'complete' | 'indeterminate';
+  readonly skipped: readonly {
+    readonly projectRoot: string;
+    readonly enclosingProject: string;
+    readonly reason: 'external' | 'output' | 'repository' | 'packages' | 'generated';
+    readonly directory: string;
+  }[];
+  readonly unavailable: readonly {
+    readonly enclosingProject: string;
+    readonly reason: string;
+    readonly definitions: readonly string[];
+  }[];
+}
+
 /**
  * One configured audit request's outcome, in the harness's vocabulary. A
  * `completed` result carries the provider's composed verdict, which is the
@@ -132,11 +254,21 @@ export interface ConfiguredAuditReuse {
  * partial record for a full request), which the harness never treats as a
  * pass. The provider result and its published check results are retained
  * whole.
+ *
+ * A nested request's verdict is the provider's invocation verdict: a
+ * nested project's failure fails it, and indeterminate discovery or an
+ * unrun project leaves it indeterminate, whatever the root answered.
  */
 export interface ConfiguredAuditResult {
   readonly status: 'completed' | 'failed' | 'cancelled' | 'refused';
   readonly requestId: string;
   readonly mode: ConfiguredAuditMode;
+  /** Whether the request audited the tracked nested definitions too. */
+  readonly nested: boolean;
+  /** Every project of a nested invocation, the root first; null for a request of the root alone. */
+  readonly projects: readonly ConfiguredProjectResult[] | null;
+  /** What nested discovery skipped or could not decide; null for a request of the root alone. */
+  readonly discovery: ConfiguredNestedDiscovery | null;
   readonly requestedSourceCommit: string;
   /** The commit the returned record audited: the requested one, or the original one of a reused record. */
   readonly auditedSourceCommit: string | null;
@@ -184,6 +316,8 @@ export interface ConfiguredAuditInput {
   /** The configuration the run captured; the commit's own must equal it. */
   readonly configuration: CommittedAuditConfiguration;
   readonly mode: ConfiguredAuditMode;
+  /** Audit the tracked nested definitions too, as the final gate does. */
+  readonly nested?: boolean;
   readonly runId: string;
   readonly attemptId: string;
   readonly signal?: AbortSignal;
@@ -243,9 +377,10 @@ export async function runConfiguredAudit(input: ConfiguredAuditInput & {
   if (!sameAuditPolicy(current, input.configuration)) {
     throw new Error(`Captured audit policy conflicts with ${current.path} at ${input.sourceCommit}; start a new run after reconciling the configuration`);
   }
+  const nested = input.nested === true;
   const request = await requestFromCommittedConfiguration({
     git: baseGit, repositoryPath: mapping.repositoryRoot, sourceCommit: input.sourceCommit,
-    projectRoot: mapping.projectPrefix || '.', full: input.mode === 'full', force: false,
+    projectRoot: mapping.projectPrefix || '.', full: input.mode === 'full', force: false, nested,
   });
   request.requestId = `${input.runId}:${input.attemptId}`;
   const repository = await resolveRepositoryExecutionLeaseIdentity(mapping.repositoryRoot, { git: baseGit });
@@ -275,8 +410,21 @@ export async function runConfiguredAudit(input: ConfiguredAuditInput & {
     },
     validateOwnership: baseLease.validateOwnership.bind(baseLease),
   };
-  const recovered = await findCompletedAuditRequest({ repositoryPath: mapping.repositoryRoot,
-    projectRoot: mapping.projectPrefix || '.', requestId: request.requestId, sourceCommit: input.sourceCommit, git: baseGit });
+  // A completed request is retrieved by its durable identities, never run
+  // again. A root alone is found by its request; a nested invocation by the
+  // receipt the harness recorded when the provider answered it. A root
+  // record without a receipt is an invocation interrupted before its nested
+  // projects completed: the provider is asked again, and answers every
+  // project it already published from that evidence.
+  const receipt = nested ? await input.workspaceOwnership.auditInvocation(input.runId, input.attemptId) : null;
+  if (receipt !== null && (receipt.requestId !== request.requestId || receipt.sourceCommit !== input.sourceCommit
+    || receipt.projectRoot !== (mapping.projectPrefix || '.'))) {
+    throw new Error(`The recorded audit invocation of ${input.attemptId} answers request ${receipt.requestId} at ${receipt.sourceCommit}, not ${request.requestId} at ${input.sourceCommit}`);
+  }
+  const recovered = receipt !== null
+    ? await retrieveInvocation(receipt, mapping.repositoryRoot, baseGit)
+    : nested ? null : await findCompletedAuditRequest({ repositoryPath: mapping.repositoryRoot,
+      projectRoot: mapping.projectPrefix || '.', requestId: request.requestId, sourceCommit: input.sourceCommit, git: baseGit });
   if (recovered?.status === 'completed') {
     // Settle any abandoned workspace of this request before its recovered result is used.
     const ownership = await executionLease.acquire({ repositoryPath: mapping.repositoryRoot,
@@ -290,23 +438,108 @@ export async function runConfiguredAudit(input: ConfiguredAuditInput & {
   const result = recovered ?? await createAuditService({ git, processExecutor: configuredProcessExecutor(input.configuration, () => {
     if (workspace === null) throw new Error('The configured audit workspace was not recorded before process execution');
     return mapping.projectRootIn(workspace.worktreePath);
-  }), executionLease,
+  }, nested ? nestedDefinitionCommands(baseGit, mapping.repositoryRoot, input.sourceCommit, () => {
+    if (workspace === null) throw new Error('The configured audit workspace was not recorded before process execution');
+    return workspace.worktreePath;
+  }) : undefined), executionLease,
     ...(input.testLock === undefined ? {} : { machineTestLock: input.testLock }),
     eventSink: { emit: progress.emit },
   }).run(request, signal).finally(progress.settleAll);
   if (workspace !== null) await input.workspaceOwnership.recordWorkspaceCleaned(workspace);
-  return configuredAuditResult(result, input, request.requestId, mapping.repositoryRoot);
+  // A cancelled invocation keeps no receipt: asked again, the provider
+  // answers the projects it published and runs the ones it did not.
+  if (nested && recovered === null && !signal.aborted
+    && result.projects !== undefined && result.discovery !== undefined && result.invocationVerdict !== undefined) {
+    await input.workspaceOwnership.recordAuditInvocation(invocationReceipt(result, input, request.requestId, mapping.projectPrefix || '.'));
+  }
+  return configuredAuditResult(result, { ...input, nested }, request.requestId, mapping.repositoryRoot);
+}
+
+/** The identities of a nested invocation's answer, as its durable receipt holds them. */
+function invocationReceipt(
+  result: AuditResult,
+  input: Pick<ConfiguredAuditInput, 'runId' | 'attemptId' | 'sourceCommit'>,
+  requestId: string,
+  projectRoot: string,
+): AuditInvocationReceipt {
+  return {
+    schema: 'ramify-agent.audit-invocation/1', runId: input.runId, attemptId: input.attemptId, requestId, projectRoot,
+    sourceCommit: input.sourceCommit,
+    projects: (result.projects ?? []).map(project => {
+      const answer = project.result;
+      return {
+        projectRoot: project.projectRoot, verdict: project.verdict, execution: project.execution, failures: [...project.failures],
+        requestId: answer.requestId, runId: answer.status === 'failed' ? answer.runId ?? null : answer.runId,
+        record: answer.status === 'completed' ? {
+          requestId: answer.summary.execution?.requestId ?? answer.requestId, sourceCommit: answer.summary.sourceCommit,
+          reportCommit: answer.refs.reportCommit, runRef: answer.refs.runRef, treeRef: answer.refs.treeRef,
+        } : null,
+        reused: answer.status === 'completed' && answer.reused !== undefined ? {
+          sourceCommit: answer.reused.sourceCommit, auditedCommit: answer.reused.auditedCommit,
+          ignoredChangedPaths: [...answer.reused.ignoredChangedPaths],
+          requestedMode: answer.reused.requestedMode, resolution: answer.reused.resolution,
+        } : null,
+        unpublished: answer.status === 'completed' ? null : structuredClone(answer),
+      };
+    }),
+    discovery: structuredClone(result.discovery!) as ConfiguredNestedDiscovery,
+    invocationVerdict: result.invocationVerdict!,
+  };
+}
+
+/**
+ * A recorded nested invocation, rebuilt from its projects' exact published
+ * records: each found again by its own request and source commit, never by
+ * a mutable latest ref, and checked against the receipt. Nothing runs. The
+ * invocation's discovery and verdict are the receipt's, which no project
+ * record holds.
+ */
+async function retrieveInvocation(receipt: AuditInvocationReceipt, repositoryRoot: string, git: GitExecutorPort): Promise<AuditResult> {
+  const projects: NonNullable<AuditResult['projects']> = [];
+  for (const project of receipt.projects) {
+    let answer: ProjectAuditResult;
+    if (project.record === null) {
+      answer = structuredClone(project.unpublished) as ProjectAuditResult;
+      if (typeof answer !== 'object' || answer === null || answer.status === 'completed') {
+        throw new Error(`The recorded audit invocation keeps no answer for unpublished project ${project.projectRoot}`);
+      }
+    } else {
+      const found = await findCompletedAuditRequest({ repositoryPath: repositoryRoot, projectRoot: project.projectRoot,
+        requestId: project.record.requestId, sourceCommit: project.record.sourceCommit, git });
+      if (found?.status !== 'completed' || found.refs.reportCommit !== project.record.reportCommit || found.refs.runRef !== project.record.runRef) {
+        throw new Error(`The recorded audit report ${project.record.reportCommit} of project ${project.projectRoot} is not retrievable`);
+      }
+      if (found.composition.verdict !== project.verdict) {
+        throw new Error(`The recorded audit report of project ${project.projectRoot} composes ${found.composition.verdict}, not the recorded ${project.verdict}`);
+      }
+      answer = {
+        ...found, requestId: project.requestId, runId: project.runId ?? found.runId,
+        ...(project.reused === null ? {} : { reused: { ...project.reused, ignoredChangedPaths: [...project.reused.ignoredChangedPaths] } }),
+      };
+    }
+    projects.push({ projectRoot: project.projectRoot, verdict: project.verdict, execution: project.execution,
+      failures: [...project.failures], result: answer });
+  }
+  const root = projects.find(project => project.projectRoot === receipt.projectRoot);
+  if (root === undefined) throw new Error(`The recorded audit invocation has no result for its root ${receipt.projectRoot}`);
+  return { ...root.result, projects, discovery: structuredClone(receipt.discovery) as NestedDiscoveryOutcome,
+    invocationVerdict: receipt.invocationVerdict };
 }
 
 /** The harness's account of one provider result, refusing completed evidence that does not answer the request. */
 async function configuredAuditResult(
   result: AuditResult,
-  input: Pick<ConfiguredAuditInput, 'sourceCommit' | 'configuration' | 'mode'>,
+  input: Pick<ConfiguredAuditInput, 'sourceCommit' | 'configuration' | 'mode'> & { readonly nested: boolean },
   requestId: string,
   repositoryRoot: string,
 ): Promise<ConfiguredAuditResult> {
+  const nested = input.nested;
+  const projects = nested && result.projects !== undefined
+    ? result.projects.map(project => configuredProjectResult(project, input.configuration.projectRoot, input.mode, input.sourceCommit))
+    : null;
+  const discovery = nested && result.discovery !== undefined ? structuredClone(result.discovery) as ConfiguredNestedDiscovery : null;
   const base = {
-    requestId, mode: input.mode, requestedSourceCommit: input.sourceCommit,
+    requestId, mode: input.mode, nested, projects, discovery, requestedSourceCommit: input.sourceCommit,
     definition: { path: input.configuration.path, blob: input.configuration.blob },
   };
   if (result.status !== 'completed') return {
@@ -327,15 +560,133 @@ async function configuredAuditResult(
     reportCommit: result.refs.reportCommit, runRef: result.refs.runRef, treeRef: result.refs.treeRef,
     provider: result,
   };
-  const refusal = configuredResultRefusal(result, input.configuration, input.mode, input.sourceCommit);
+  const refusal = configuredResultRefusal(result, input.configuration, input.mode, input.sourceCommit)
+    ?? (nested ? nestedInvocationRefusal(result, projects ?? []) : null);
   if (refusal !== null) return { ...completed, status: 'refused', verdict: null, detail: refusal, checks: {} };
   // The record's published check results carry each command's complete
   // runner evidence; the run-local summary is never read in their place.
   const checks = await readRawCheckResults(result.summary, result.refs.reportCommit, repositoryRoot, gitWithHarnessEnvironment());
+  if (nested) {
+    // The invocation's verdict, never the root's alone: a nested failure,
+    // an unrun project or indeterminate discovery decides it.
+    const verdict = result.invocationVerdict!;
+    return { ...completed, status: 'completed', verdict, detail: invocationDetail(verdict, projects ?? [], discovery!), checks };
+  }
   return {
     ...completed, status: 'completed', verdict: result.composition.verdict,
     detail: result.composition.reason ?? `composed ${result.composition.verdict}`, checks,
   };
+}
+
+/**
+ * Why a completed nested invocation does not answer the request, or null
+ * when it does: it must carry every project, its discovery and its verdict,
+ * name the root first, and every nested project's completed record must
+ * answer the request as the root's does. A project that did not complete is
+ * an unrun project, which the invocation verdict already accounts for.
+ */
+export function nestedInvocationRefusal(result: AuditResult, projects: readonly ConfiguredProjectResult[]): string | null {
+  if (result.projects === undefined || result.discovery === undefined || result.invocationVerdict === undefined) {
+    return 'a nested request was answered without its project results, discovery and invocation verdict';
+  }
+  const root = result.status === 'completed' ? result.summary.coverage.projectRoot : null;
+  if (projects[0]?.projectRoot !== root) return `a nested request was answered without the root project ${root ?? 'unknown'} first`;
+  if (new Set(projects.map(project => project.projectRoot)).size !== projects.length) return 'a nested request was answered with a project twice';
+  const refused = projects.find(project => project.status === 'refused');
+  return refused === undefined ? null : `nested project ${refused.projectRoot}: ${refused.detail}`;
+}
+
+/** One provider project outcome in the harness's vocabulary, its completed record checked as the root's is. */
+export function configuredProjectResult(
+  outcome: AuditProjectOutcome,
+  rootProject: string,
+  mode: ConfiguredAuditMode,
+  sourceCommit: string,
+): ConfiguredProjectResult {
+  const answer = outcome.result;
+  const common = {
+    projectRoot: outcome.projectRoot, verdict: outcome.verdict, execution: outcome.execution, failures: [...outcome.failures],
+    requestId: answer.requestId,
+  };
+  if (answer.status !== 'completed') return {
+    ...common, status: answer.status, auditedSourceCommit: null, requestedMode: null, executedMode: null, fallbackReason: null,
+    reuse: null, reportCommit: null, runRef: null, treeRef: null, retrievalCommands: [], durationSeconds: null, counts: null,
+    detail: answer.status === 'failed' ? `${answer.error.code}: ${answer.error.message}` : answer.reason,
+  };
+  // The root is checked against the captured definition; a nested project
+  // against its own record: the same project, source and full execution.
+  const refusal = outcome.projectRoot === rootProject ? null : nestedProjectRefusal(answer, outcome.projectRoot, mode, sourceCommit);
+  return {
+    ...common, status: refusal === null ? 'completed' : 'refused',
+    auditedSourceCommit: answer.summary.sourceCommit,
+    requestedMode: answer.summary.mode.requestedMode, executedMode: answer.summary.mode.executedMode,
+    fallbackReason: answer.summary.mode.fallbackReason ?? null,
+    reuse: answer.reused === undefined ? null : {
+      auditedCommit: answer.reused.auditedCommit, ignoredChangedPaths: [...answer.reused.ignoredChangedPaths],
+      requestedMode: answer.reused.requestedMode, resolution: answer.reused.resolution,
+    },
+    reportCommit: answer.refs.reportCommit, runRef: answer.refs.runRef, treeRef: answer.refs.treeRef,
+    retrievalCommands: [...answer.retrievalCommands],
+    durationSeconds: answer.summary.durationSeconds ?? null,
+    counts: countsOf(answer.summary.checks),
+    detail: refusal ?? answer.composition.reason ?? `composed ${answer.composition.verdict}`,
+  };
+}
+
+/** Why a nested project's completed record does not answer the request, or null when it does. */
+function nestedProjectRefusal(
+  answer: Extract<ProjectAuditResult, { status: 'completed' }>,
+  projectRoot: string,
+  mode: ConfiguredAuditMode,
+  sourceCommit: string,
+): string | null {
+  if (answer.summary.evidenceSchemaVersion !== 4 || answer.summary.producer.name !== 'ramify-audit') return 'the result is not schema-4 ramify-audit evidence';
+  if (answer.summary.coverage.projectRoot !== projectRoot) return `the result audited project ${answer.summary.coverage.projectRoot}, not ${projectRoot}`;
+  if (answer.reused === undefined ? answer.summary.sourceCommit !== sourceCommit
+    : answer.reused.sourceCommit !== sourceCommit || answer.reused.auditedCommit !== answer.summary.sourceCommit) {
+    return `the result does not answer source ${sourceCommit}`;
+  }
+  if (mode === 'full' && (answer.summary.mode.executedMode !== 'full' || answer.composition.scoped || answer.summary.coverage.selection.kind !== 'full')) {
+    return 'a full request was answered by evidence that is not an executed full audit';
+  }
+  return null;
+}
+
+/** The record's own counts: its checks by status, and its tests and scenarios summed over every check that reports them. */
+function countsOf(checks: Readonly<Record<string, AuditCheckSummary>>): ConfiguredProjectResult['counts'] {
+  const bucket = () => ({ total: 0, passed: 0, failed: 0, skipped: 0 });
+  const tally = bucket();
+  let tests: ConfiguredCountBucket | null = null;
+  let scenarios: ConfiguredCountBucket | null = null;
+  const add = (into: ConfiguredCountBucket | null, value: unknown): ConfiguredCountBucket | null => {
+    if (typeof value !== 'object' || value === null) return into;
+    const counts = value as Partial<Record<keyof ConfiguredCountBucket, unknown>>;
+    const number = (key: keyof ConfiguredCountBucket) => (typeof counts[key] === 'number' ? counts[key] as number : 0);
+    const base = into ?? bucket();
+    return { total: base.total + number('total'), passed: base.passed + number('passed'), failed: base.failed + number('failed'), skipped: base.skipped + number('skipped') };
+  };
+  for (const check of Object.values(checks)) {
+    tally.total += 1;
+    const status = check.status ?? (check.passed ? 'pass' : 'fail');
+    if (status === 'pass' || status === 'warn') tally.passed += 1;
+    else if (status === 'fail') tally.failed += 1;
+    else tally.skipped += 1;
+    tests = add(tests, check.counts?.['tests']);
+    scenarios = add(scenarios, check.counts?.['scenarios']);
+  }
+  return { checks: tally, tests, scenarios };
+}
+
+/** One sentence for a nested invocation's verdict: which projects failed or did not run, and what discovery could not decide. */
+function invocationDetail(verdict: 'pass' | 'fail' | 'indeterminate', projects: readonly ConfiguredProjectResult[], discovery: ConfiguredNestedDiscovery): string {
+  const parts = [`invocation ${verdict} over ${projects.length} project${projects.length === 1 ? '' : 's'}`];
+  const failed = projects.filter(project => project.verdict === 'fail').map(project => project.projectRoot);
+  const unsettled = projects.filter(project => project.verdict === 'indeterminate').map(project => project.projectRoot);
+  if (failed.length > 0) parts.push(`failed: ${failed.join(', ')}`);
+  if (unsettled.length > 0) parts.push(`indeterminate: ${unsettled.join(', ')}`);
+  if (discovery.status === 'indeterminate') parts.push(`discovery indeterminate beneath ${discovery.unavailable.map(gap => gap.enclosingProject).join(', ')}`);
+  if (discovery.skipped.length > 0) parts.push(`skipped: ${discovery.skipped.map(skip => `${skip.projectRoot} (${skip.reason})`).join(', ')}`);
+  return parts.join('; ');
 }
 
 /**
@@ -491,30 +842,55 @@ export function configuredAuditProgress(
   };
 }
 
-/** Keep the harness's inherited environment boundary while retaining declared/provider-added values. */
-export function configuredProcessExecutor(configuration: CommittedAuditConfiguration, projectRoot: () => string): ProcessExecutorPort {
-  const node = createNodeProcessExecutor();
-  const providerEnvironment = new Set([
-    TEST_LOCK_HELD_ENVIRONMENT, 'RAMIFY_AUDIT_VITEST_SUMMARY', 'RAMIFY_AUDIT_VITEST_ROOT',
-    'RAMIFY_AUDIT_VITEST_DISCOVERY', 'RAMIFY_AUDIT_VITEST_EXCLUDES',
-    'RAMIFY_AUDIT_CUCUMBER_SELECTION', 'CUCUMBER_SUMMARY_FILE',
-  ]);
-  const commands: Array<{ command: string; args: readonly string[]; cwd: string; env: Readonly<Record<string, string>> }> =
-    configuration.workspace.setupCommands.map(command => ({ command: command.argv[0]!, args: command.argv.slice(1),
-      cwd: command.cwd, env: command.env }));
-  for (const check of configuration.checks) {
+/** One command a committed definition declares: a setup command or a check's command. */
+interface DeclaredCommand {
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+  readonly env: Readonly<Record<string, string>>;
+}
+
+/** The commands a nested project's own committed definition declares, and its directory in the audit worktree. */
+type NestedCommands = (workingDirectory: string) => Promise<{ readonly root: string; readonly commands: readonly DeclaredCommand[] } | null>;
+
+function checkCommands(checks: readonly unknown[]): DeclaredCommand[] {
+  const commands: DeclaredCommand[] = [];
+  for (const check of checks) {
     if (typeof check !== 'object' || check === null) continue;
     const executor = (check as { executor?: { kind?: string; commands?: Array<{ cmd: string; args: string[]; cwd?: string; env?: Record<string, string> }> } }).executor;
     if (executor?.kind !== 'command') continue;
     for (const command of executor.commands ?? []) commands.push({ command: command.cmd, args: command.args,
       cwd: command.cwd ?? '.', env: command.env ?? {} });
   }
-  const declaredNames = new Set(commands.flatMap(command => Object.keys(command.env)));
-  return { execute(request, signal) {
+  return commands;
+}
+
+/**
+ * Keep the harness's inherited environment boundary while retaining
+ * declared/provider-added values. A command of a nested project, which a
+ * nested invocation runs from that project's directory, is matched against
+ * that project's own committed definition rather than the root's.
+ */
+export function configuredProcessExecutor(configuration: CommittedAuditConfiguration, projectRoot: () => string, nested?: NestedCommands): ProcessExecutorPort {
+  const node = createNodeProcessExecutor();
+  const providerEnvironment = new Set([
+    TEST_LOCK_HELD_ENVIRONMENT, 'RAMIFY_AUDIT_VITEST_SUMMARY', 'RAMIFY_AUDIT_VITEST_ROOT',
+    'RAMIFY_AUDIT_VITEST_DISCOVERY', 'RAMIFY_AUDIT_VITEST_EXCLUDES',
+    'RAMIFY_AUDIT_CUCUMBER_SELECTION', 'CUCUMBER_SUMMARY_FILE',
+  ]);
+  const rootCommands: DeclaredCommand[] = [
+    ...configuration.workspace.setupCommands.map(command => ({ command: command.argv[0]!, args: command.argv.slice(1),
+      cwd: command.cwd, env: command.env })),
+    ...checkCommands(configuration.checks),
+  ];
+  return { async execute(request, signal) {
+    const owner = (await nested?.(request.workingDirectory)) ?? { root: projectRoot(), commands: rootCommands };
+    const commands = owner.commands;
+    const declaredNames = new Set(commands.flatMap(command => Object.keys(command.env)));
     const allowed = childEnvironment();
     const environment = { ...allowed };
     const matches = commands.filter(command => command.command === request.command && command.args.every((arg, index) => request.args[index] === arg)
-      && resolve(projectRoot(), command.cwd) === resolve(request.workingDirectory));
+      && resolve(owner.root, command.cwd) === resolve(request.workingDirectory));
     const longestArgs = Math.max(0, ...matches.map(command => command.args.length));
     const exact = matches.filter(command => command.args.length === longestArgs);
     if (exact.length === 0 && Object.keys(request.environment ?? {}).some(name => declaredNames.has(name))) {
@@ -532,6 +908,40 @@ export function configuredProcessExecutor(configuration: CommittedAuditConfigura
     }
     return node.execute({ ...request, environment }, signal);
   } };
+}
+
+/**
+ * The nested project a working directory of the audit worktree lies in:
+ * the nearest directory below the worktree root with its own
+ * `ramify-audit.json`, whose definition is read from the audited commit
+ * through the provider. Null for the root project's own directories.
+ */
+function nestedDefinitionCommands(git: GitExecutorPort, repositoryRoot: string, sourceCommit: string, worktree: () => string): NestedCommands {
+  const read = new Map<string, Promise<readonly DeclaredCommand[]>>();
+  return async workingDirectory => {
+    const top = resolve(worktree());
+    let directory = resolve(workingDirectory);
+    while (directory !== top && directory.startsWith(`${top}${sep}`) && !existsSync(join(directory, 'ramify-audit.json'))) directory = dirname(directory);
+    if (directory === top || !directory.startsWith(`${top}${sep}`)) return null;
+    const projectRoot = relative(top, directory).split(sep).join('/');
+    let commands = read.get(projectRoot);
+    if (commands === undefined) {
+      commands = requestFromCommittedConfiguration({ git, repositoryPath: repositoryRoot, sourceCommit, projectRoot, full: true, force: false })
+        .then(request => {
+          const setup = request.workspacePreparation?.options?.['setupCommands'];
+          const declared: DeclaredCommand[] = Array.isArray(setup) ? setup.flatMap(value => {
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) return [];
+            const item = value as { cmd?: unknown; args?: unknown; cwd?: unknown; env?: unknown };
+            if (typeof item.cmd !== 'string' || !Array.isArray(item.args)) return [];
+            return [{ command: item.cmd, args: item.args.map(String), cwd: typeof item.cwd === 'string' ? item.cwd : '.',
+              env: typeof item.env === 'object' && item.env !== null ? item.env as Record<string, string> : {} }];
+          }) : [];
+          return [...declared, ...checkCommands(request.checks)];
+        });
+      read.set(projectRoot, commands);
+    }
+    return { root: directory, commands: await commands };
+  };
 }
 
 interface PathMapping {

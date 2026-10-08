@@ -420,8 +420,8 @@ async function checkpointOf(input: ConfiguredAuditInput): Promise<Checkpoint> {
 
 function base(input: ConfiguredAuditInput, configuration: CommittedAuditConfiguration) {
   return {
-    requestId: `${input.runId}:${input.attemptId}`, mode: input.mode, requestedSourceCommit: input.sourceCommit,
-    reused: false, reuse: null, definition: { path: configuration.path, blob: configuration.blob },
+    requestId: `${input.runId}:${input.attemptId}`, mode: input.mode, nested: input.nested === true, projects: null, discovery: null,
+    requestedSourceCommit: input.sourceCommit, reused: false, reuse: null, definition: { path: configuration.path, blob: configuration.blob },
   } as const;
 }
 
@@ -475,6 +475,18 @@ function composed(
     requestedMode: mode, executedMode: mode, fallbackReason: null, verdict,
     reportCommit: evidence.reportCommit, runRef: evidence.runRef, treeRef: evidence.treeRef,
     detail: verdict === 'pass' ? 'Scripted audit passed; no provider ran' : `Scripted audit composed ${verdict}`,
+    // A nested request of a scripted project, which has no nested definition:
+    // the root is its only project and discovery skipped nothing.
+    ...(input.nested === true ? {
+      projects: [{
+        projectRoot: configuration.projectRoot, verdict, execution: 'ran' as const, status: 'completed' as const,
+        failures: verdict === 'pass' ? [] : [`Scripted audit composed ${verdict}`], requestId: `${input.runId}:${input.attemptId}`,
+        auditedSourceCommit: input.sourceCommit, requestedMode: mode, executedMode: mode, fallbackReason: null, reuse: null,
+        reportCommit: evidence.reportCommit, runRef: evidence.runRef, treeRef: evidence.treeRef, retrievalCommands: [],
+        durationSeconds: null, counts: null, detail: 'scripted',
+      }],
+      discovery: { status: 'complete' as const, skipped: [], unavailable: [] },
+    } : {}),
     provider: {
       status: 'completed', scripted: true,
       summary: { overall: verdict, checks, coverage: { universe: { checkIds: Object.keys(checks) } } },

@@ -8,9 +8,10 @@ import { createAuditWorkspaceOwnership } from '../../run/audit-workspaces.js';
  * committed check reads what to do from the environment this process gives
  * it: write the marker and wait (`during-execution`), wait without it
  * (`after-creation`), or pass. A waiting check stops once this process dies.
+ * A fifth argument `nested` asks a nested invocation.
  */
 
-const [mode, projectRoot, sourceCommit, marker] = process.argv.slice(2);
+const [mode, projectRoot, sourceCommit, marker, scope] = process.argv.slice(2);
 if (mode === undefined || projectRoot === undefined || sourceCommit === undefined || marker === undefined) {
   throw new Error('mode, project root, source commit and marker are required');
 }
@@ -19,6 +20,11 @@ writeFileSync(`${projectRoot}.killed-audit.json`, JSON.stringify({ mode, marker,
 const audit = createConfiguredAudit({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) });
 const configuration = await audit.read(projectRoot, sourceCommit);
 const result = await audit.run({
-  projectRoot, sourceCommit, configuration, mode: 'full', runId: '20260921T000000Z-aabbcc', attemptId: 'ga-0001',
+  projectRoot, sourceCommit, configuration, mode: 'full', runId: '20260921T000000Z-aabbcc', attemptId: 'ga-0001', nested: scope === 'nested',
 });
-process.stdout.write(`${JSON.stringify({ status: result.status, auditedSourceCommit: result.auditedSourceCommit, reportCommit: result.reportCommit, detail: result.detail })}\n`);
+process.stdout.write(`${JSON.stringify({
+  status: result.status, auditedSourceCommit: result.auditedSourceCommit, reportCommit: result.reportCommit, detail: result.detail,
+  verdict: result.verdict, discovery: result.discovery,
+  projects: result.projects?.map(project => ({ projectRoot: project.projectRoot, verdict: project.verdict, execution: project.execution,
+    reportCommit: project.reportCommit, runRef: project.runRef })) ?? null,
+})}\n`);

@@ -4,14 +4,14 @@ import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { checkOutputPath } from './execution.js';
 import type { CheckExecutionPort, CheckExecutionResult, GateCommandStart, GateCommandStarted } from './execution.js';
 import type {
-  AcceptedCommit, Checkpoint, GateAttempt, GateAttemptId, GateAuditRecord, GateCause,
+  AcceptedCommit, Checkpoint, GateAttempt, GateAttemptId, GateAuditProjectRecord, GateAuditRecord, GateCause,
   GateCommandRecord, GateNext, GateRuleRecord, NotVerified, RecordReference,
 } from './records.js';
 import { gateAttemptSchema } from './records.js';
 import { verifyChecks } from './verify.js';
 import { PausableDeadline } from '../run/pausable-deadline.js';
 import type { PlannedCheck, VerificationFailure } from './verify.js';
-import type { ConfiguredAuditMode, ConfiguredAuditResult } from '../../subs/audit/src/check-execution.js';
+import type { ConfiguredAuditMode, ConfiguredAuditResult, ConfiguredProjectResult } from '../../subs/audit/src/check-execution.js';
 
 /*
  * Gate policy compares guarded files and verifies the harness's own rules
@@ -42,7 +42,12 @@ export interface GateRequest {
    * committed definition and the bound of the whole request, lock waits
    * excepted.
    */
-  readonly audit?: { readonly mode: ConfiguredAuditMode; readonly timeoutMs: number } | undefined;
+  readonly audit?: {
+    readonly mode: ConfiguredAuditMode;
+    /** Audit the tracked nested definitions too: the final gate's full nested verification. */
+    readonly nested?: boolean | undefined;
+    readonly timeoutMs: number;
+  } | undefined;
   readonly subject?: { readonly workItem?: string; readonly iteration?: string } | undefined;
   readonly proposedBy?: string | null | undefined;
   readonly repairRound?: number | undefined;
@@ -79,6 +84,7 @@ export type ConfiguredGateAudit = (request: {
   readonly projectRoot: string;
   readonly sourceCommit: string;
   readonly mode: ConfiguredAuditMode;
+  readonly nested: boolean;
   readonly signal: AbortSignal;
   readonly started?: GateCommandStarted | undefined;
   readonly waiting?: ((command: GateCommandStart, line: string) => Promise<void>) | undefined;
@@ -199,7 +205,7 @@ export async function executeConfiguredGate(
   try {
     result = await audit({
       runId: request.runId, attemptId: request.id, checkpoint, projectRoot: request.projectRoot, sourceCommit,
-      mode: request.audit.mode, signal, started,
+      mode: request.audit.mode, nested: request.audit.nested === true, signal, started,
       waiting: async (command, line) => { releaseWait ??= bound.pause(); await waiting?.(command, line); },
       lockAcquired: () => { releaseWait?.(); releaseWait = undefined; },
     });
@@ -207,7 +213,7 @@ export async function executeConfiguredGate(
     // An exception is the request's own failure: no answer exists for the commit.
     result = {
       status: signal.aborted ? 'cancelled' : 'failed', requestId: `${request.runId}:${request.id}`, mode: request.audit.mode,
-      requestedSourceCommit: sourceCommit, auditedSourceCommit: null, reused: false, reuse: null,
+      nested: request.audit.nested === true, projects: null, discovery: null, requestedSourceCommit: sourceCommit, auditedSourceCommit: null, reused: false, reuse: null,
       requestedMode: null, executedMode: null, fallbackReason: null, verdict: null,
       reportCommit: null, runRef: null, treeRef: null, definition: { path: '', blob: '' },
       detail: error instanceof Error ? error.message : String(error), provider: { error: String(error) }, checks: {},
@@ -228,6 +234,7 @@ function finishConfiguredGate(prepared: PreparedGate, result: ConfiguredAuditRes
   const record: GateAuditRecord = {
     requestId: result.requestId,
     mode: result.mode,
+    nested: result.nested,
     status: result.status,
     definition: { ...result.definition },
     requestedSourceCommit: result.requestedSourceCommit,
@@ -238,6 +245,12 @@ function finishConfiguredGate(prepared: PreparedGate, result: ConfiguredAuditRes
     reuse: result.reuse === null ? null : { ...result.reuse, ignoredChangedPaths: [...result.reuse.ignoredChangedPaths] },
     verdict: result.status === 'completed' ? result.verdict : null,
     detail: result.detail,
+    projects: result.projects === null ? null : result.projects.map(projectRecord),
+    discovery: result.discovery === null ? null : {
+      status: result.discovery.status,
+      skipped: result.discovery.skipped.map(skip => ({ ...skip })),
+      unavailable: result.discovery.unavailable.map(gap => ({ ...gap, definitions: [...gap.definitions] })),
+    },
   };
   const answered = result.status === 'completed';
   // The candidate's own declared setup, such as its build, exiting non-zero
@@ -273,6 +286,25 @@ function finishConfiguredGate(prepared: PreparedGate, result: ConfiguredAuditRes
     verdict,
     cause,
     next: nextOf(request, verdict, cause),
+  };
+}
+
+/** One project of a nested audit as the attempt keeps it: its verdict, execution, failures, counts and record identities. */
+function projectRecord(project: ConfiguredProjectResult): GateAuditProjectRecord {
+  return {
+    projectRoot: project.projectRoot, verdict: project.verdict, execution: project.execution, status: project.status,
+    failures: [...project.failures], requestId: project.requestId, auditedSourceCommit: project.auditedSourceCommit,
+    requestedMode: project.requestedMode, executedMode: project.executedMode, fallbackReason: project.fallbackReason,
+    reuse: project.reuse === null ? null : { ...project.reuse, ignoredChangedPaths: [...project.reuse.ignoredChangedPaths] },
+    evidence: project.reportCommit === null || project.runRef === null || project.treeRef === null ? null
+      : { reportCommit: project.reportCommit, runRef: project.runRef, treeRef: project.treeRef },
+    retrievalCommands: [...project.retrievalCommands], durationSeconds: project.durationSeconds,
+    counts: project.counts === null ? null : {
+      checks: { ...project.counts.checks },
+      tests: project.counts.tests === null ? null : { ...project.counts.tests },
+      scenarios: project.counts.scenarios === null ? null : { ...project.counts.scenarios },
+    },
+    detail: project.detail,
   };
 }
 

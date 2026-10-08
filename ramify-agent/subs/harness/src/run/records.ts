@@ -747,6 +747,44 @@ export const gateRuleSchema = z.object({
   limits: z.array(text).optional(),
 }).strict();
 
+const gateAuditCountSchema = z.object({ total: z.int().nonnegative(), passed: z.int().nonnegative(), failed: z.int().nonnegative(), skipped: z.int().nonnegative() }).strict();
+const gateAuditReuseSchema = z.object({
+  auditedCommit: text,
+  ignoredChangedPaths: z.array(z.string()),
+  requestedMode: z.enum(['full', 'ramify-partial']),
+  resolution: z.enum(['requested', 'defaulted']),
+}).strict();
+
+/** One project of a nested audit: its verdict, execution, failures, counts and record identities. */
+const gateAuditProjectRecordSchema = z.object({
+  projectRoot: text,
+  verdict: z.enum(['pass', 'fail', 'indeterminate']),
+  execution: z.enum(['ran', 'reused', 'not-run']),
+  status: z.enum(['completed', 'failed', 'cancelled', 'refused']),
+  failures: z.array(z.string()),
+  requestId: text,
+  auditedSourceCommit: text.nullable(),
+  requestedMode: z.enum(['full', 'ramify-partial']).nullable(),
+  executedMode: z.enum(['full', 'ramify-partial']).nullable(),
+  fallbackReason: z.string().nullable(),
+  reuse: gateAuditReuseSchema.nullable(),
+  evidence: z.object({ runRef: text, reportCommit: text, treeRef: text }).strict().nullable(),
+  retrievalCommands: z.array(z.string()),
+  durationSeconds: z.number().nonnegative().nullable(),
+  counts: z.object({ checks: gateAuditCountSchema, tests: gateAuditCountSchema.nullable(), scenarios: gateAuditCountSchema.nullable() }).strict().nullable(),
+  detail: z.string(),
+}).strict();
+
+/** What nested discovery skipped, with reasons, and what it could not decide. */
+const gateAuditDiscoverySchema = z.object({
+  status: z.enum(['complete', 'indeterminate']),
+  skipped: z.array(z.object({
+    projectRoot: text, enclosingProject: text,
+    reason: z.enum(['external', 'output', 'repository', 'packages', 'generated']), directory: text,
+  }).strict()),
+  unavailable: z.array(z.object({ enclosingProject: text, reason: z.string(), definitions: z.array(z.string()) }).strict()),
+}).strict();
+
 /** What a committing gate asked of the committed audit and what the provider answered. */
 const gateAuditRecordSchema = z.object({
   requestId: text,
@@ -766,6 +804,9 @@ const gateAuditRecordSchema = z.object({
   }).strict().nullable(),
   verdict: z.enum(['pass', 'fail', 'indeterminate']).nullable(),
   detail: z.string(),
+  nested: z.boolean(),
+  projects: z.array(gateAuditProjectRecordSchema).nullable(),
+  discovery: gateAuditDiscoverySchema.nullable(),
 }).strict();
 
 export const gateAttemptSchema = z.object({
@@ -849,7 +890,7 @@ export const gateOperationSchema = z.object({
     directory: text,
     head: z.string(),
     /** The mode the gate requests of the committed audit, and the bound of the request. */
-    audit: z.object({ mode: z.enum(['project-default', 'full']), timeoutMs: z.int().positive() }).strict(),
+    audit: z.object({ mode: z.enum(['project-default', 'full']), nested: z.boolean().optional(), timeoutMs: z.int().positive() }).strict(),
     subject: z.object({ workItem: text.optional(), iteration: text.optional() }).strict(),
     proposedBy: z.string().nullable(),
     repairRound: z.int().nonnegative(),

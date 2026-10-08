@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { AuditResult } from 'ramify-audit';
 
-import { configuredResultRefusal, sameAuditPolicy, type CommittedAuditConfiguration } from '../check-execution.js';
+import {
+  configuredProjectResult, configuredResultRefusal, nestedInvocationRefusal, sameAuditPolicy, type CommittedAuditConfiguration,
+} from '../check-execution.js';
 
 /*
  * A gate asks the committed audit about the commit it made and accepts the
@@ -118,6 +120,70 @@ describe('a completed audit as a gate\'s answer', () => {
     expect(refusal(completed({ executedMode: 'ramify-partial', selected: ['scenarios'], omitted: ['tests'], records: [] })))
       .toBe('the result has no record of selected check scenarios');
     expect(refusal(completed({ selected: ['tests'], omitted: [] }))).toBe('the result\'s selection does not account for every configured check');
+  });
+});
+
+/*
+ * A nested request is answered by the invocation: every project's own
+ * record, the discovery outcome and the invocation verdict. A result
+ * without them, or with a nested project's record that does not answer the
+ * request, is refused rather than read as the root's pass (PB3-E08).
+ */
+describe('a nested invocation as a gate\'s answer', () => {
+  type Outcome = NonNullable<AuditResult['projects']>[number];
+  const project = (projectRoot: string, result: Completed, verdict: Outcome['verdict'] = 'pass'): Outcome =>
+    ({ projectRoot, verdict, execution: 'ran', failures: verdict === 'fail' ? ['check failed'] : [], result });
+  const nestedRecord = (shape: Shape = {}) => completed({ projectRoot: 'engine', ...shape });
+  const invocation = (projects: readonly Outcome[], extra: Partial<AuditResult> = {}): AuditResult => ({
+    ...completed(), projects: [...projects], discovery: { status: 'complete', skipped: [], unavailable: [] }, invocationVerdict: 'pass', ...extra,
+  } as AuditResult);
+  const accounted = (result: AuditResult, mode: 'project-default' | 'full' = 'full') =>
+    nestedInvocationRefusal(result, (result.projects ?? []).map(outcome => configuredProjectResult(outcome, '.', mode, made)));
+
+  it('accepts every project\'s executed full record with the root first', () => {
+    expect(accounted(invocation([project('.', completed()), project('engine', nestedRecord())]))).toBeNull();
+  });
+
+  it('refuses a nested request answered without its projects, discovery or invocation verdict', () => {
+    const message = 'a nested request was answered without its project results, discovery and invocation verdict';
+    expect(accounted(completed())).toBe(message);
+    const { discovery: _discovery, ...withoutDiscovery } = invocation([project('.', completed())]) as AuditResult & { discovery: unknown };
+    expect(accounted(withoutDiscovery as AuditResult)).toBe(message);
+    const { invocationVerdict: _verdict, ...withoutVerdict } = invocation([project('.', completed())]) as AuditResult & { invocationVerdict: unknown };
+    expect(accounted(withoutVerdict as AuditResult)).toBe(message);
+  });
+
+  it('refuses an invocation that does not name the root first or names a project twice', () => {
+    expect(accounted(invocation([project('engine', nestedRecord()), project('.', completed())])))
+      .toBe('a nested request was answered without the root project . first');
+    expect(accounted(invocation([project('.', completed()), project('engine', nestedRecord()), project('engine', nestedRecord())])))
+      .toBe('a nested request was answered with a project twice');
+  });
+
+  it('refuses a nested project\'s partial pass as the answer to a full request', () => {
+    const partial = nestedRecord({ executedMode: 'ramify-partial', selected: ['tests'], omitted: ['scenarios'] });
+    expect(accounted(invocation([project('.', completed()), project('engine', partial)])))
+      .toBe('nested project engine: a full request was answered by evidence that is not an executed full audit');
+    expect(accounted(invocation([project('.', completed()), project('engine', partial)]), 'project-default')).toBeNull();
+  });
+
+  it('refuses a nested record of another project, commit or producer', () => {
+    expect(accounted(invocation([project('.', completed()), project('engine', completed({ projectRoot: 'other' }))])))
+      .toBe('nested project engine: the result audited project other, not engine');
+    expect(accounted(invocation([project('.', completed()), project('engine', nestedRecord({ sourceCommit: earlier }))])))
+      .toBe(`nested project engine: the result does not answer source ${made}`);
+    expect(accounted(invocation([project('.', completed()), project('engine', nestedRecord({ schema: 3 }))])))
+      .toBe('nested project engine: the result is not schema-4 ramify-audit evidence');
+  });
+
+  it('keeps a root pass beside a composed nested failure, so the invocation verdict, not the root\'s, decides', () => {
+    const result = invocation([project('.', completed()), project('engine', nestedRecord(), 'fail')], { invocationVerdict: 'fail' });
+    expect(accounted(result)).toBeNull();
+    const projects = result.projects!.map(outcome => configuredProjectResult(outcome, '.', 'full', made));
+    expect(projects.map(entry => [entry.projectRoot, entry.status, entry.verdict, entry.failures])).toEqual([
+      ['.', 'completed', 'pass', []], ['engine', 'completed', 'fail', ['check failed']],
+    ]);
+    expect(projects[1]!.counts).toEqual({ checks: { total: 2, passed: 2, failed: 0, skipped: 0 }, tests: null, scenarios: null });
   });
 });
 

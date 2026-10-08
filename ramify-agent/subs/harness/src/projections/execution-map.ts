@@ -84,7 +84,9 @@ function auditOf(view: RunView, gate: GateAttempt) {
   if (gate.checkpoint === 'readiness') return 'not-applicable' as const;
   const outcome = view.gateAuditOutcomes.get(gate.id)?.body;
   if (outcome !== undefined && outcome.audited === gate.audited && gate.evidence !== null) {
-    return outcome.overall === 'pass' ? 'passed' as const : 'failed' as const;
+    // A nested request's overall is its invocation verdict: indeterminate
+    // discovery or an unrun project is neither a pass nor a failure.
+    return outcome.overall === 'pass' ? 'passed' as const : outcome.overall === 'fail' ? 'failed' as const : 'indeterminate' as const;
   }
   // Evidence refs certify publication, not the report's overall outcome.
   if (gate.evidence !== null) return 'unavailable' as const;

@@ -1,7 +1,8 @@
 import {
   runQueryLimits,
-  type GateView, type WorkItemResponse, type WorkItemSummary,
+  type GateAuditView, type GateView, type WorkItemResponse, type WorkItemSummary,
 } from '../interfaces/protocol/runs.js';
+import type { GateAttempt } from '../checks/records.js';
 import { digestLines } from '../work/failure.js';
 import { originKindOf, type WorkItem } from '../work/records.js';
 import type { IterationAssignment } from '../work/iterations.js';
@@ -247,6 +248,25 @@ export function boundedTail(text: string, bytes: number = runQueryLimits.outputT
   return encoded.subarray(start).toString('utf8');
 }
 
+/** A gate's audit record as its view carries it: every nested project and discovery result, copied as recorded. */
+function gateAuditView(audit: NonNullable<GateAttempt['audit']>): GateAuditView {
+  const reuse = (value: NonNullable<GateAttempt['audit']>['reuse']) => value === null ? null : { ...value, ignoredChangedPaths: [...value.ignoredChangedPaths] };
+  return {
+    ...audit, definition: { ...audit.definition }, reuse: reuse(audit.reuse),
+    projects: audit.projects === null ? null : audit.projects.map(project => ({
+      ...project, failures: [...project.failures], reuse: reuse(project.reuse),
+      evidence: project.evidence === null ? null : { ...project.evidence }, retrievalCommands: [...project.retrievalCommands],
+      counts: project.counts === null ? null : { checks: { ...project.counts.checks },
+        tests: project.counts.tests === null ? null : { ...project.counts.tests },
+        scenarios: project.counts.scenarios === null ? null : { ...project.counts.scenarios } },
+    })),
+    discovery: audit.discovery === null ? null : {
+      status: audit.discovery.status, skipped: audit.discovery.skipped.map(skip => ({ ...skip })),
+      unavailable: audit.discovery.unavailable.map(gap => ({ ...gap, definitions: [...gap.definitions] })),
+    },
+  };
+}
+
 /** One gate attempt with bounded output tails and no command environment. */
 export function gateOf(view: RunView, id: string): GateView {
   const gate = view.gates.get(id)?.body;
@@ -262,8 +282,7 @@ export function gateOf(view: RunView, id: string): GateView {
     audited: gate.audited,
     evidence: gate.evidence === null ? null : { ...gate.evidence },
     ...(gate.provider === undefined ? {} : { provider: gate.provider }),
-    ...(gate.audit === undefined ? {} : { audit: { ...gate.audit, definition: { ...gate.audit.definition },
-      reuse: gate.audit.reuse === null ? null : { ...gate.audit.reuse, ignoredChangedPaths: [...gate.audit.reuse.ignoredChangedPaths] } } }),
+    ...(gate.audit === undefined ? {} : { audit: gateAuditView(gate.audit) }),
     scenarios: gateScenarioViewsOf(gate),
     verdict: gate.verdict,
     cause: gate.cause,

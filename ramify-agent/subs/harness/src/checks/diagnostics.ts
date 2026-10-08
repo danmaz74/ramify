@@ -166,6 +166,7 @@ function auditLines(gate: GateAttempt, names: ReadonlyMap<string, string>, waiti
     const ignored = audit.reuse.ignoredChangedPaths.length === 0 ? 'no changed path' : audit.reuse.ignoredChangedPaths.map(path => `\`${path}\``).join(', ');
     lines.push(`  - it reused the record of \`${audit.reuse.auditedCommit}\`, which applies to this commit: its policy ignores ${ignored}`);
   }
+  lines.push(...nestedAuditLines(audit));
   for (const line of waiting.values()) lines.push(`- a configured check waited for the machine test lock: ${line}`);
   const checks = gate.provider?.checks;
   const published = isRecord(checks) ? checks : {};
@@ -191,6 +192,46 @@ function auditLines(gate: GateAttempt, names: ReadonlyMap<string, string>, waiti
   }
   lines.push(...scenarioLines(scenarioResultsOf(gate), names, untrackedScenarioCounts(gate)));
   return lines;
+}
+
+/**
+ * A nested request's projects, each with the provider's verdict, whether this
+ * request ran, reused or did not run it, its failures, counts, duration and
+ * how to retrieve its record; then what discovery skipped and why. The root
+ * line above carries the invocation's composed verdict.
+ */
+function nestedAuditLines(audit: NonNullable<GateAttempt['audit']>): string[] {
+  if (!audit.nested) return [];
+  const lines: string[] = [];
+  if (audit.projects === null) {
+    lines.push('- the nested request carries no project results');
+  } else {
+    lines.push(`- the nested request answered ${audit.projects.length} project${audit.projects.length === 1 ? '' : 's'}:`);
+    for (const project of audit.projects) {
+      const counts = project.counts === null ? '' : `; ${bucketText('checks', project.counts.checks)}${project.counts.tests === null ? '' : `, ${bucketText('tests', project.counts.tests)}`}${project.counts.scenarios === null ? '' : `, ${bucketText('scenarios', project.counts.scenarios)}`}`;
+      const duration = project.durationSeconds === null ? '' : `; ${project.durationSeconds}s`;
+      const executed = project.executedMode === null ? '' : `, executed ${project.executedMode}`;
+      lines.push(`  - \`${project.projectRoot}\`: \`${project.verdict}\`, ${project.execution}${executed}${counts}${duration}${project.status === 'completed' ? '' : `; ${project.status}: ${project.detail}`}`);
+      for (const failure of project.failures) lines.push(`    - ${failure}`);
+      if (project.verdict !== 'pass') for (const command of project.retrievalCommands) lines.push(`    - retrieve: \`${command}\``);
+    }
+  }
+  if (audit.discovery === null) {
+    lines.push('- the nested request carries no discovery outcome');
+  } else {
+    if (audit.discovery.status !== 'complete') lines.push(`- nested discovery is ${audit.discovery.status}`);
+    for (const skipped of audit.discovery.skipped) {
+      lines.push(`- not audited: \`${skipped.projectRoot}\` inside \`${skipped.enclosingProject}\`, skipped as ${skipped.reason} (\`${skipped.directory}\`)`);
+    }
+    for (const unavailable of audit.discovery.unavailable) {
+      lines.push(`- nested definitions of \`${unavailable.enclosingProject}\` could not be decided: ${unavailable.reason}${unavailable.definitions.length === 0 ? '' : ` (${unavailable.definitions.map(path => `\`${path}\``).join(', ')})`}`);
+    }
+  }
+  return lines;
+}
+
+function bucketText(label: string, bucket: { readonly total: number; readonly passed: number; readonly failed: number; readonly skipped: number }): string {
+  return `${label} ${bucket.passed}/${bucket.total} passed${bucket.failed === 0 ? '' : `, ${bucket.failed} failed`}${bucket.skipped === 0 ? '' : `, ${bucket.skipped} skipped`}`;
 }
 
 /**
