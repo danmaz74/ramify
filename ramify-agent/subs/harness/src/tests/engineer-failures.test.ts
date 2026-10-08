@@ -170,8 +170,9 @@ describe('an engineer ended by a bound in the middle of a command', () => {
     // The analysis ran in a reader session of its own, over the evidence the harness wrote.
     expect(result.failure!.analysis).toMatchObject({ outcome: 'analyzed', cause: 'bound-too-tight' });
     const [analyst] = role('failure-analyst');
-    expect(analyst!.builtinTools).toEqual(['read', 'grep', 'ls']);
-    expect(analyst!.tools).toEqual([]);
+    // The durable driver privately rebinds provider builtins as admitted tool declarations.
+    expect(analyst!.builtinTools).toEqual([]);
+    expect(analyst!.tools.map(tool => tool.name)).toEqual(['read', 'grep', 'ls']);
     const workspace = analyst!.scope.workingDirectory;
     expect(workspace).toBe(join(runPath(root, plan, runId, dirname(iterationLayout.result('wi-001', 1))), 'failure-evidence'));
     expect(await readFile(join(workspace, 'digest.md'), 'utf8')).toContain('The absolute bound fired');
@@ -203,6 +204,13 @@ describe('an engineer ended by a bound in the middle of a command', () => {
     expect(`${next!.systemPrompt}\n${next!.prompt}`).toMatch(/"commandTimeoutMs"\s*:\s*"?1200000"?/);
     const initial = role('engineer')[0]!;
     expect(`${initial.systemPrompt}\n${initial.prompt}`).toMatch(/"commandTimeoutMs"\s*:\s*"?600000"?/);
+    const currentEnvironment = (spec: SessionSpec) => {
+      const matches = [...spec.prompt.matchAll(/^# Current environment\n([\s\S]*?)\n\n# Current task:/gm)];
+      expect(matches.length).toBeGreaterThan(0);
+      return JSON.parse(matches.at(-1)![1]!) as { limits: { commandTimeoutMs: number } };
+    };
+    expect(currentEnvironment(next!).limits.commandTimeoutMs).toBe(1_200_000);
+    expect(currentEnvironment(initial).limits.commandTimeoutMs).toBe(600_000);
     // The larger timeout was accepted, and the command ran with it.
     expect(asked).toEqual([
       { command: 'npm run test:slow', timeoutMs: 600_000 },

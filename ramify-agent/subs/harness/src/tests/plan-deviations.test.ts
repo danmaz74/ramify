@@ -274,7 +274,8 @@ describe('a deviation that rewords a pending scenario', () => {
     // The next work item's architect was briefed with the reworded scenario.
     const architects = agent.sessions.filter(session => session.spec.role === 'local-architect'
       && session.spec.submission.name === 'submit_work_item_result');
-    expect(architects[2]!.spec.prompt).toContain('Scenario: A person compares revisions over tRPC');
+    expect(architects[2]!.inherited.join('\n\n')).toContain('Scenario: A person compares revisions over tRPC');
+    expect(architects[2]!.spec.prompt).not.toContain('Scenario: A person compares revisions over tRPC');
 
     // The CheckFinding shows the old text and the new.
     const deviation = checkFindingListResponseSchema.parse(await get(origin, protocolPaths.runCheckFindings(plan, runId, { select: 'all' }))).items[0]!.planDeviation;
