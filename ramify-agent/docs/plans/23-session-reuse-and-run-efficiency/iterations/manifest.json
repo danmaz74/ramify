@@ -188,8 +188,18 @@
         "S10",
         "S11"
       ],
-      "status": "in progress in isolated worktree",
-      "writeBoundary": "Harness/agent/pi implementation and tests only; consume accepted agent/storage contract from 1."
+      "status": "accepted provider; ordinary runtime wiring remains iterations 8\u20139 and live qualification 14",
+      "writeBoundary": "Harness/agent/pi implementation and tests only; consume accepted agent/storage contract from 1.",
+      "receipt": "07-results.md",
+      "providerHead": "d67738425bd248aa06126b1a49c465b285617c36",
+      "integratedHead": "c1e8b891b2f7396ed71cd382b22149da5762bbf7",
+      "integrationVerification": {
+        "ordinaryFiles": 5,
+        "ordinaryTests": 72,
+        "typeCheck": "passed",
+        "structure": "passed; partial analysis coverage; 317 analysis limits",
+        "logs": "/tmp/ramify-plan23-integrated-pi-*.log"
+      }
     },
     {
       "id": "8",
@@ -202,7 +212,7 @@
         "W01",
         "W02"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness run/service.ts, run/records.ts, sessions/single.ts, invocation integration and related helpers/tests. No parallel shared runtime writer."
     },
     {

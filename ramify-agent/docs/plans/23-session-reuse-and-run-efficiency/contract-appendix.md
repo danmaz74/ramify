@@ -351,3 +351,26 @@ Workers send requested harness exposure lines to the integrator. The test-bounda
 registry and shared runner config are reserved to the integrator/iteration 14.
 The refreshed API views report coverage/truncation limits; current declarations
 are decisive for exposed access and generated absence proves no missing API.
+
+## Accepted preserving-provider refinement (iteration 7)
+
+The agent exports `SessionDriverUnavailableError(reason)` as a typed driver
+signal. With intact durable data, the engine records terminal unavailable status
+and no usable point; terminal Retry dispatches nothing. A missing immutable blob
+is corrupt storage and cannot receive a fabricated committed receipt: preflight
+returns explicit unavailable without intent or dispatch. Neither path starts fresh.
+
+The qualified implementation target is installed pi 0.87.1, model
+`openai-codex/gpt-5.6-sol`, full-payload SSE with provider retry disabled. The final
+payload seam validates exact native instructions, ordered tool definitions and
+inherited input after extension transforms and immediately before HTTP dispatch.
+Cached websocket/auto transports are unavailable because their later incremental
+payload rewrite would escape that seam. Full live qualification remains Q02 in
+iteration 14. Pi-private JSON builtin results preserve native content and details
+through opaque journaling; harness callers receive only provider-neutral values.
+
+The provider-neutral `piBuiltinDeclarations(names, workingDirectory)` exposes
+plain immutable declarations; executable SDK builtin handlers stay inside pi and
+are rebound to each task's current working directory and authority. Consumers
+must use accepted task packets and their compact declaration schema so each full
+submission schema is delivered once; actual validators retain the owning schema.
