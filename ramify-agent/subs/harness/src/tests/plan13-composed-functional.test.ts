@@ -82,7 +82,7 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   const agent = createScriptedAgent(spec => {
     if (spec.submission.name !== contextSelectorToolName) return typeof script === 'function' ? script(spec) : script;
     const parent = agent.sessions.find(session => session.spec.submission.name === workOrientationToolName);
-    if (!parent || !agent.forget(parent.ref)) throw new Error('Expected retained orientation point');
+    if (!parent || !agent.loseSession(JSON.parse(parent.ref))) throw new Error('Expected retained orientation point');
     return submit({ selected: [{ id: 'nfr-001', reason: 'Needed by this assignment', conditions: [], uncertainty: '' }] });
   });
   const scenario = scenariosCommit('revision-diff');

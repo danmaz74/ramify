@@ -1,192 +1,59 @@
 import { rootDescription } from '../../../../../../../src/tests/helpers/root-description.js';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type {
-  AgentEvent,
-  AgentPort,
-  AgentSession,
-  ContextPolicy,
-  GuardedCall,
-  SessionSpec,
-  SettledMutation,
-  SubmissionVerdict,
-  ToolAction,
-  ToolDefinition,
-} from '../../../../../src/interfaces/port.js';
-import { createPiAgentOn } from '../../pi-agent.js';
-import { scriptedProvider, scriptedRuntime, type ReplyStep, type ScriptedProvider } from './scripted-provider.js';
-
-/*
- * A real pi session over the scripted provider, for the tests of the port
- * additions. Nothing here reaches a network or the person's pi directory:
- * every session runs in a temporary agent directory with `PI_OFFLINE=1`.
- */
-
-/** A context policy with no budget and compaction permitted. */
-export const unbounded: ContextPolicy = { compaction: 'allowed', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 };
-
-export const submissionSchema = {
-  type: 'object',
-  properties: { summary: { type: 'string' }, modules: { type: 'array', items: { type: 'string' } } },
-  required: ['summary', 'modules'],
-  additionalProperties: false,
-};
-
-export const validMap = { summary: 'A change', modules: ['demo'] };
-
-export interface PiHarness {
-  readonly agent: AgentPort;
-  readonly session: AgentSession;
-  readonly spec: SessionSpec;
-  readonly events: AgentEvent[];
-  readonly judged: unknown[];
-  readonly guarded: Array<{ readonly callId: string; readonly tool: string; readonly input: unknown; readonly action: ToolAction }>;
-  readonly settledMutations: Array<{ readonly callId: string; readonly tool: string; readonly action: ToolAction; readonly failed: boolean }>;
-  readonly scripted: ScriptedProvider;
-  readonly workingDirectory: string;
-  readonly sessionDirectory: string;
-  /** Everything the model was sent on request `index`, flattened. */
-  requestText(index: number): string;
-  /** The tool names offered on request `index`. */
-  toolNames(index: number): readonly string[];
-}
-
-export interface PiOptions {
-  /** The role the session plays; every writer role installs the same guard. */
-  readonly role?: string | undefined;
-  readonly verdicts?: SubmissionVerdict[] | undefined;
-  readonly tools?: ToolDefinition[] | undefined;
-  readonly systemPrompt?: string | undefined;
-  readonly prompt?: string | undefined;
-  readonly session?: SessionSpec['session'] | undefined;
-  readonly context?: ContextPolicy | undefined;
-  readonly builtinTools?: SessionSpec['builtinTools'] | undefined;
-  /** The model as the adapter is given it; default `scripted/scripted-1`. */
-  readonly model?: string | undefined;
-  /** Whether the scripted model supports thinking. */
-  readonly reasoning?: boolean | undefined;
-  /** The model's context window, small enough to reach a threshold cheaply. */
-  readonly contextWindow?: number | undefined;
-  /** pi's own compaction thresholds. */
-  readonly compaction?: { readonly reserveTokens?: number | undefined; readonly keepRecentTokens?: number | undefined } | undefined;
-  readonly settleMs?: number | undefined;
-  /** pi's first delay before it retries a failed model call. */
-  readonly retryDelayMs?: number | undefined;
-  /** The scripted model's rates per million tokens. */
-  readonly cost?: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number } | undefined;
-  /** Tool names the guard denies, with the text the denial returns. */
-  readonly deny?: Record<string, string> | undefined;
-  readonly guard?: boolean | undefined;
-  /** A guard of the caller's own, which decides each call however it likes. */
-  readonly decide?: ((call: GuardedCall) => Promise<{ readonly allow: true } | { readonly allow: false; readonly text: string }>) | undefined;
-  /** The text `afterMutation` appends to a settled call's result. */
-  readonly hookCheck?: string | undefined;
-  /** Reuses an existing working and session directory, for a second session over the same files. */
-  readonly reuse?: { readonly workingDirectory: string; readonly sessionDirectory: string } | undefined;
-  /** Files to create in the working directory before the session runs. */
-  readonly files?: Record<string, string> | undefined;
-}
+import type { AgentEvent, ToolDefinition, SubmissionVerdict } from '../../../../../src/interfaces/port.js';
+import type { AgentSessionPoint, SessionExecutionBindings, SessionExecutionPolicy, SessionStore, SessionStoreRecord, SessionToolDeclaration } from '../../../../../src/interfaces/session-operations.js';
+import { createPiAgentOn, type PiRuntimeSource } from '../../pi-agent.js';
+import { piBuiltinDeclarations } from '../../session-operations.js';
+import { nativeCodexRuntime } from './scripted-provider.js';
 
 /** A disposable working directory with a `module.ramify` and whatever files a test asks for. */
-export async function workspace(cleanups: Array<() => Promise<void>>, files: Record<string, string> = {}): Promise<{ workingDirectory: string; sessionDirectory: string }> {
+export async function workspace(cleanups: Array<() => Promise<void>>, files: Record<string, string> = {}): Promise<{ workingDirectory: string }> {
   const workingDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-pi-cwd-'));
   cleanups.push(() => rm(workingDirectory, { recursive: true, force: true }));
   await writeFile(join(workingDirectory, 'module.ramify'), rootDescription('demo'));
   for (const [name, content] of Object.entries(files)) await writeFile(join(workingDirectory, name), content);
-  const sessionDirectory = join(workingDirectory, 'session');
-  await mkdir(sessionDirectory);
-  return { workingDirectory, sessionDirectory };
+  return { workingDirectory };
 }
 
-/** Starts one real pi session on the scripted provider. */
-export async function startPi(cleanups: Array<() => Promise<void>>, steps: readonly ReplyStep[], options: PiOptions = {}): Promise<PiHarness> {
-  const places = options.reuse ?? await workspace(cleanups, options.files ?? {});
-  if (options.reuse !== undefined && options.files !== undefined) {
-    for (const [name, content] of Object.entries(options.files)) await writeFile(join(places.workingDirectory, name), content);
-  }
 
-  const scripted = scriptedProvider(steps, {
-    ...(options.contextWindow === undefined ? {} : { contextWindow: options.contextWindow }),
-    ...(options.reasoning === undefined ? {} : { reasoning: options.reasoning }),
-    ...(options.cost === undefined ? {} : { cost: options.cost }),
-  });
-  const isolated = await scriptedRuntime(scripted);
-  cleanups.push(isolated.remove);
-  const agent = createPiAgentOn({
-    agentDirectory: isolated.agentDirectory,
-    model: options.model ?? 'scripted/scripted-1',
-    settleMs: options.settleMs ?? 5_000,
-    compaction: options.compaction,
-    retryDelayMs: options.retryDelayMs,
-    runtime: async () => isolated.runtime,
-  });
-
-  const events: AgentEvent[] = [];
-  const judged: unknown[] = [];
-  const guarded: PiHarness['guarded'] = [];
-  const settledMutations: PiHarness['settledMutations'] = [];
-  const verdicts = [...(options.verdicts ?? [])];
-  const deny = options.deny ?? {};
-  const spec: SessionSpec = {
-    role: options.role ?? 'engineer',
-    scope: { workingDirectory: places.workingDirectory },
-    systemPrompt: options.systemPrompt ?? 'You are the engineer. Exactly this prompt.',
-    prompt: options.prompt ?? 'Do the work.',
-    session: options.session ?? { mode: 'fresh' },
-    context: options.context ?? unbounded,
-    builtinTools: options.builtinTools ?? ['read', 'grep', 'ls'],
-    tools: options.tools ?? [],
-    submission: {
-      name: 'submit_implementation_map',
-      description: 'Submit the map.',
-      inputSchema: submissionSchema,
-      accept: async input => {
-        judged.push(input);
-        return verdicts.shift() ?? { accepted: true };
-      },
+export const nativeCall = (name: string, input: unknown, id = name) => ({ type: 'function_call', id: `fc_${id}`, call_id: `call_${id}`, name, arguments: JSON.stringify(input) });
+export const nativeText = (value: string) => ({ type: 'message', id: 'msg_fixture', role: 'assistant', phase: 'final_answer', content: [{ type: 'output_text', text: value, annotations: [] }], status: 'completed' });
+export const submission: SessionToolDeclaration = { name: 'submit_map', description: 'Submit current map.', inputSchema: { type: 'object', properties: { summary: { type: 'string' } }, required: ['summary'], additionalProperties: false }, mutating: false };
+export function memoryStore() {
+  const records = new Map<string, SessionStoreRecord>(); const payloads = new Map<string, Uint8Array>();
+  const store: SessionStore = {
+    async read(run, id) { return structuredClone(records.get(JSON.stringify([run, id])) ?? null); },
+    async putPayload(bytes) { const id = createHash('sha256').update(bytes).digest('hex'); payloads.set(id, new Uint8Array(bytes)); return id; },
+    async getPayload(id) { return payloads.get(id) ?? null; },
+    async commit(input) {
+      if (input.expected.some(item => (records.get(JSON.stringify([input.runId, item.id]))?.revision ?? null) !== item.revision)) return { kind: 'conflict', reason: 'CAS' };
+      for (const record of input.records) records.set(JSON.stringify([input.runId, record.id]), structuredClone(record));
+      return { kind: 'committed' };
     },
-    sessionDirectory: places.sessionDirectory,
-    ...(options.guard === true || options.decide !== undefined || Object.keys(deny).length > 0
-      ? {
-          guard: async (call: GuardedCall) => {
-            guarded.push({ callId: call.callId, tool: call.tool, input: call.input, action: call.action });
-            if (options.decide !== undefined) return options.decide(call);
-            const text = deny[call.tool];
-            return text === undefined ? { allow: true as const } : { allow: false as const, text };
-          },
-        }
-      : {}),
-    ...(options.hookCheck === undefined
-      ? {}
-      : {
-          afterMutation: async (call: SettledMutation) => {
-            settledMutations.push({ callId: call.callId, tool: call.tool, action: call.action, failed: call.failed });
-            return { text: options.hookCheck as string };
-          },
-        }),
-    onEvent: event => events.push(event),
-  };
-
-  const session = agent.startSession(spec);
-  cleanups.push(async () => { await Promise.race([session.stop(), delay(2_000)]); });
-  return {
-    agent, session, spec, events, judged, guarded, settledMutations, scripted,
-    workingDirectory: places.workingDirectory,
-    sessionDirectory: places.sessionDirectory,
-    requestText: index => JSON.stringify(scripted.requests[index]?.messages ?? []),
-    toolNames: index => (scripted.requests[index]?.tools ?? []).map(tool => tool.name),
-  };
+  }; return { store, records, payloads };
 }
-
-export function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+/** Installed supported serializer with entirely scripted HTTP replies and a public neutral store. */
+export async function preservingPi(cleanups: Array<() => Promise<void>>, outputs: Parameters<typeof nativeCodexRuntime>[0], options: {
+  files?: Record<string, string>; tools?: readonly ToolDefinition[]; builtins?: readonly ('read'|'grep'|'find'|'ls'|'edit'|'write')[];
+  verdicts?: SubmissionVerdict[]; model?: string; policy?: SessionExecutionPolicy; instructions?: string;
+} = {}) {
+  const places = await workspace(cleanups, options.files); const native = await nativeCodexRuntime(outputs); cleanups.push(native.remove);
+  const memory = memoryStore(); const source: PiRuntimeSource = { runtime: async () => native.runtime, agentDirectory: native.agentDirectory, model: options.model ?? 'openai-codex/gpt-5.6-sol' };
+  const agent = createPiAgentOn(source); const operations = agent.bindSessionStore!(memory.store);
+  const policy: SessionExecutionPolicy = options.policy ?? { context: { compaction: 'forbidden', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 }, authority: { write: true }, validator: { revision: 1 }, destination: { record: 'map' } };
+  const declarations: readonly SessionToolDeclaration[] = [...piBuiltinDeclarations(options.builtins ?? [], places.workingDirectory), ...(options.tools ?? []).map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, mutating: tool.mutating === true })), submission];
+  const initial = await operations.create({ runId: 'pi-test', operationId: 'create', initialInstructions: options.instructions ?? 'Exact role instructions.', declarations, activate: declarations.map(item => item.name), policy });
+  const task = { role: 'engineer', message: 'Current task.', submissionTool: submission.name, environment: { workingDirectory: places.workingDirectory, candidate: null, snapshot: null, limits: {} }, policyIdentity: 'p1', validatorIdentity: 'v1', destinationIdentity: 'd1' };
+  const events: AgentEvent[] = []; const judged: unknown[] = []; const verdicts = [...(options.verdicts ?? [])];
+  const bindings: SessionExecutionBindings = { task, policy, tools: options.tools ?? [], submission: { name: submission.name, async accept(input) { judged.push(input); return verdicts.shift() ?? { accepted: true }; } }, currentAuthority: async () => true, onEvent: event => events.push(event), publish: async () => {} };
+  const input = (point: AgentSessionPoint = initial.point!, operationId = 'task', bound = bindings) => ({ runId: 'pi-test', operationId, sessionId: point.sessionId, expectedPoint: point, task: bound.task, policy: bound.policy, additions: [], toolChange: { add: [], activate: [], inactivate: [] }, bindings: bound });
+  return { ...places, ...memory, native, source, agent, operations, initial, policy, declarations, bindings, task, events, judged, input };
 }
-
+export function delay(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)); }
 export async function until(condition: () => boolean, timeoutMs = 5_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  while (!condition()) {
-    if (Date.now() > deadline) throw new Error('Timed out waiting for a condition');
-    await delay(10);
-  }
+  while (!condition()) { if (Date.now() > deadline) throw new Error('Timed out waiting for a condition'); await delay(10); }
 }

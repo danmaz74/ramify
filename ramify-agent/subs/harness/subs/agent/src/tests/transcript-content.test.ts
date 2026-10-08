@@ -1,3 +1,4 @@
+import { invokeProbe, probeOperations } from './helpers/spec.js';
 import { describe, expect, test } from 'vitest';
 import { assistantText, noMessageDetail } from '../interfaces/port.js';
 import type { AgentEvent, MessageDetail, MessageEvent } from '../interfaces/port.js';
@@ -26,21 +27,21 @@ describe('the fake reports every message', () => {
       { kind: 'submit', input: { done: true } },
     ]);
     const probe = probeSpec();
-    await expect(agent.startSession(probe.spec).outcome).resolves.toEqual({ kind: 'submitted', input: { done: true } });
+    await expect((await invokeProbe(agent, probe.spec)).outcome).resolves.toEqual({ kind: 'submitted', input: { done: true } });
 
     expect(probe.events[0]).toEqual({ type: 'message', role: 'user', blocks: [{ type: 'text', text: 'do the work' }] });
     const all = messages(probe.events);
     const calls = all.flatMap(event => (event.role === 'assistant' ? event.blocks.filter(block => block.type === 'tool-call') : []));
     expect(calls).toEqual([
-      { type: 'tool-call', callId: 'call-1', tool: 'read', input: { path: 'module.ramify' }, action: { kind: 'read', path: 'module.ramify', range: null } },
-      { type: 'tool-call', callId: 'call-2', tool: 'echo', input: { word: 'hi' }, action: { kind: 'harness' } },
-      { type: 'tool-call', callId: 'call-3', tool: 'submit', input: { done: true }, action: { kind: 'harness' } },
+      { type: 'tool-call', callId: 'probe-1:call-1', tool: 'read', input: { path: 'module.ramify' }, action: { kind: 'read', path: 'module.ramify', range: null } },
+      { type: 'tool-call', callId: 'probe-1:call-2', tool: 'echo', input: { word: 'hi' }, action: { kind: 'harness' } },
+      { type: 'tool-call', callId: 'probe-1:call-3', tool: 'submit', input: { done: true }, action: { kind: 'harness' } },
     ]);
     const results = all.flatMap(event => (event.role === 'tool-result' ? [event] : []));
     expect(results.map(event => [event.callId, event.tool, event.isError, event.blocks])).toEqual([
-      ['call-1', 'read', false, []],
-      ['call-2', 'echo', false, [{ type: 'text', text: '{"word":"hi"}' }]],
-      ['call-3', 'submit', false, [{ type: 'text', text: 'The submission was accepted.' }]],
+      ['probe-1:call-1', 'read', false, []],
+      ['probe-1:call-2', 'echo', false, [{ type: 'text', text: '{"word":"hi"}' }]],
+      ['probe-1:call-3', 'submit', false, [{ type: 'text', text: 'The submission was accepted.' }]],
     ]);
     // A call's assistant message precedes its start, and its result follows its end.
     for (const { callId } of results) {
@@ -71,7 +72,7 @@ describe('the fake reports every message', () => {
       { kind: 'end' },
     ]);
     const probe = probeSpec();
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     const assistant = messages(probe.events).flatMap(event => (event.role === 'assistant' ? [event] : []));
 
     expect(assistant[0]).toEqual({
@@ -97,7 +98,7 @@ describe('the fake reports every message', () => {
       { kind: 'end' },
     ]);
     const probe = probeSpec();
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(probe.events.slice(1)).toEqual([
       { type: 'message', role: 'assistant', blocks: [], text: '', usage: null, detail: { ...noMessageDetail, stopReason: 'error', error: '529 overloaded' } },
       { type: 'retry', phase: 'started', attempt: 1, maxAttempts: 3, delayMs: 2_000, errorText: '529 overloaded' },
@@ -111,7 +112,7 @@ describe('the fake reports every message', () => {
   test('compaction sizes a script leaves out are null', async () => {
     const agent = createScriptedAgent([{ kind: 'compaction', reason: 'overflow' }, { kind: 'end' }]);
     const probe = probeSpec();
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(probe.events.filter(event => event.type === 'compaction')).toEqual([
       { type: 'compaction', phase: 'started', reason: 'overflow' },
       { type: 'compaction', phase: 'ended', reason: 'overflow', tokensBefore: null, tokensAfter: null, aborted: false, errorText: null },
@@ -139,7 +140,7 @@ describe('the fake reports every message', () => {
     expect(agent.support.thinking).toEqual({ available: false, reason: 'This executor reports no thinking.' });
     expect(agent.support.retries).toEqual({ available: false, reason: 'This executor does not say when it retries.' });
     const probe = probeSpec();
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     const assistant = messages(probe.events).flatMap(event => (event.role === 'assistant' ? [event] : []));
     expect(assistant[0]!.blocks).toEqual([{ type: 'text', text: 'Done.' }]);
     expect(assistant[1]!.detail.error).toBe('529 overloaded');

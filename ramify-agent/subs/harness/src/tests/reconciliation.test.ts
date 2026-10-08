@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -14,9 +15,9 @@ import { scriptedCandidates, testReviewPolicy, type ScriptedCommit } from './hel
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { assign, completionProposed, outline, submit, write } from './helpers/iterations.js';
 import { concern as boundConcern, decision, dispose, report } from './helpers/check-findings.js';
-import { mockGit } from './helpers/mock-git.js';
+import { gateGit } from './helpers/gate-git.js';
 import {
-  candidates, eventsOf, finalReviewTree, gate, limit, notes, notesDirectory, plan, revisionGates, reviewRun, reviewTarget, store, tool, unchanged,
+  interceptOperations, candidates, eventsOf, finalReviewTree, gate, limit, notes, notesDirectory, plan, revisionGates, reviewRun, reviewTarget, store, tool, unchanged,
 } from './helpers/reviews.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, staleCrashLock, testPolicy, until } from './helpers/runs.js';
 
@@ -136,7 +137,7 @@ async function answerAtCurrentVersion(
   }
 }
 
-const reconcilerSessions = (agent: ScriptedAgent) => agent.sessions.filter(session => session.spec.prompt.startsWith('# Reconciliation'));
+const reconcilerSessions = (agent: ScriptedAgent) => agent.sessions.filter(session => session.spec.submission.name === 'submit_reconciliation');
 
 describe('CF08: nothing to assess', () => {
   test('clean reviews take the work item to its gate with no reconciliation and no assessment call', async () => {
@@ -204,7 +205,7 @@ describe('CF02, CF03 and CF12: one routine assessment', () => {
     // The attention set is in attention order: by risk, then credibility, then the most recent report.
     expect(basis.checkFindings.map(entry => entry.checkFinding)).toEqual(['cf-0004', 'cf-0001', 'cf-0003', 'cf-0002']);
     const [fork] = reconcilerSessions(agent!);
-    expect(fork!.spec.session).toEqual({ mode: 'fork', from: completion.data.architectRef!.ref });
+    expect(fork!.spec.session).toEqual({ mode: 'fork', from: JSON.stringify(JSON.parse(completion.data.architectRef!.ref).point) });
     expect(fork!.start).toEqual({ mode: 'fork' });
     expect(fork!.spec.submission.name).toBe('submit_reconciliation');
     expect(fork!.spec.prompt).toContain('This is the first round: a correction may be planned for any signal.');
@@ -297,7 +298,7 @@ describe('CF11 and CF15: a correction round, and the floor of the next', () => {
 
     // The architect's own session was continued to assign the correction,
     // with the brief in its history, and the assignment resolves the intent.
-    const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && !session.spec.prompt.startsWith('# Reconciliation'));
+    const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && session.spec.submission.name !== 'submit_reconciliation');
     const correctionTurn = parentTurns[5]!;
     expect(correctionTurn.spec.session.mode).toBe('continue');
     expect(correctionTurn.inherited.some(text => text.includes('Reconciliation wi-001.rc01 (round 1)'))).toBe(true);
@@ -325,7 +326,7 @@ describe('CF11 and CF15: a correction round, and the floor of the next', () => {
     expect(basis).toMatchObject({ round: 2, floor: 'non-low', source: { commit: 'revision-04', tree: correctedTree } });
     expect(basis.checkFindings.map(entry => entry.checkFinding)).toEqual(['cf-0001', 'cf-0003']);
     const [, refork] = reconcilerSessions(agent!);
-    expect(refork!.spec.session).toEqual({ mode: 'fork', from: eventsOf(events, 'outline-revised').filter(event => event.data.architectRef !== undefined)[1]!.data.architectRef!.ref });
+    expect(refork!.spec.session).toEqual({ mode: 'fork', from: JSON.stringify(JSON.parse(eventsOf(events, 'outline-revised').filter(event => event.data.architectRef !== undefined)[1]!.data.architectRef!.ref).point) });
     expect(refork!.spec.prompt).toContain('A correction may be planned only for a signal of at least medium risk');
     expect(refork!.verdicts[0]).toMatchObject({ accepted: false });
     expect(JSON.stringify(refork!.verdicts[0])).toContain('correction-floor: cf-0003 is of low risk');
@@ -573,20 +574,21 @@ describe('CF10: a missing fork point and a failed brief append', () => {
     const run = await reviewRun(root, cleanups, {
       ...correctionScenario,
       agentReady: agent => {
-        const start = agent.startSession.bind(agent);
-        // The architect's session is lost before the first reconciliation forks it.
-        agent.startSession = spec => {
-          if (spec.prompt.startsWith('# Reconciliation wi-001.rc01') && spec.session.mode === 'fork') agent.forget(spec.session.from);
-          return start(spec);
-        };
+        let lost = false;
+        interceptOperations(agent, operations => ({ ...operations, async inspect(runId, sessionId, point) {
+          if (!lost && point && existsSync(runPath(root, plan, runId, reconciliationLayout.basis('wi-001.rc01')))) {
+            lost = true; agent.loseSession(point);
+          }
+          return operations.inspect(runId, sessionId, point);
+        } }));
       },
     });
     const { service, runId, events, agent } = run;
     expect(onlyRun(service, plan).state).toBe('completed');
 
     const [first, second] = reconcilerSessions(agent!);
-    expect(first!.spec.session.mode).toBe('fork');
-    expect(first!.start).toMatchObject({ mode: 'fresh', degradedReason: expect.stringContaining('not known') });
+    expect(first!.spec.session.mode).toBe('fresh');
+    expect(first!.start).toEqual({ mode: 'fresh' });
     expect(first!.spec.prompt).toContain('## CheckFindings needing attention (1)');
     const record = await committed<ReconciliationAssessment>(root, runId, reconciliationLayout.assessment('wi-001.rc01'));
     expect(record).toMatchObject({ requestedStart: 'fork', actualStart: 'fresh' });
@@ -598,7 +600,7 @@ describe('CF10: a missing fork point and a failed brief append', () => {
     expect(appended[0]!.data).toMatchObject({ reconciliation: 'wi-001.rc01', outcome: 'session-lost', ref: null });
     expect(eventsOf(events, 'session-finished').some(event => event.data.session === appended[0]!.data.session && event.data.reason === 'lost')).toBe(true);
     // The next architect turn starts fresh, and its input carries the brief from the log.
-    const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && !session.spec.prompt.startsWith('# Reconciliation'));
+    const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && session.spec.submission.name !== 'submit_reconciliation');
     const correctionTurn = parentTurns[5]!;
     expect(correctionTurn.spec.session).toEqual({ mode: 'fresh' });
     expect(correctionTurn.spec.prompt).toContain('could not be appended to your session (session-lost');
@@ -616,11 +618,10 @@ describe('CF10: the brief append outcomes that land nothing', () => {
     const run = await reviewRun(root, cleanups, {
       ...correctionScenario,
       agentReady: agent => {
-        const append = agent.appendContext.bind(agent);
-        agent.appendContext = async (ref, key, text) => {
-          if (key === 'brief:wi-001.rc01') throw new Error('the executor refused the append');
-          return append(ref, key, text);
-        };
+        interceptOperations(agent, operations => ({ ...operations, async appendContext(input) {
+          if (input.additions.some(item => item.key === 'brief:wi-001.rc01')) throw new Error('the executor refused the append');
+          return operations.appendContext(input);
+        } }));
       },
     });
     const { service, runId, events, agent } = run;
@@ -633,7 +634,7 @@ describe('CF10: the brief append outcomes that land nothing', () => {
     // Unlike a lost session, a failed append keeps it: the correction turn
     // continues it, and its input quotes the brief from the log.
     expect(eventsOf(events, 'session-finished').some(event => event.data.session === appended[0]!.data.session && event.data.reason === 'lost')).toBe(false);
-    const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && !session.spec.prompt.startsWith('# Reconciliation'));
+    const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && session.spec.submission.name !== 'submit_reconciliation');
     const correctionTurn = parentTurns[5]!;
     expect(correctionTurn.spec.session.mode).toBe('continue');
     expect(correctionTurn.inherited.some(text => text.includes('Reconciliation wi-001.rc01'))).toBe(false);
@@ -657,12 +658,13 @@ describe('CF10: the brief append outcomes that land nothing', () => {
         'rq-0003': review(changed[3]),
       },
       agentReady: agent => {
-        const start = agent.startSession.bind(agent);
-        // The architect's session is lost before the first reconciliation forks it.
-        agent.startSession = spec => {
-          if (spec.prompt.startsWith('# Reconciliation wi-001.rc01') && spec.session.mode === 'fork') agent.forget(spec.session.from);
-          return start(spec);
-        };
+        let lost = false;
+        interceptOperations(agent, operations => ({ ...operations, async inspect(runId, sessionId, point) {
+          if (!lost && point && existsSync(runPath(root, plan, runId, reconciliationLayout.basis('wi-001.rc01')))) {
+            lost = true; agent.loseSession(point);
+          }
+          return operations.inspect(runId, sessionId, point);
+        } }));
       },
       reconcilers: {
         'wi-001.rc01': reconcile(submission([
@@ -703,15 +705,16 @@ describe('CF10: the brief append outcomes that land nothing', () => {
 });
 
 /** A service opened over the crashed project, with the agent that held the architect's session. */
-async function restart(root: string, agent: ScriptedAgent) {
+async function restart(root: string, agent: ScriptedAgent, continuing = true) {
+  const git = gateGit(root, { head: continuing ? 'revision-03' : 'revision-04', commits: continuing ? correctionGates.slice(3, 5) : [], previews: continuing ? Array.from({ length: 5 }, () => ({ repositoryRoot: root, head: 'revision-04', tree: correctedTree })) : [] });
   const restarted = await openRuns(root, {
     agent,
-    git: mockGit({ changedPaths: async () => [], currentHead: async () => 'revision-03' }),
-    candidates: scriptedCandidates(root, candidates()),
+    git: git.git,
+    candidates: scriptedCandidates(root, correctedCandidates()),
     policy: projectRoot => testPolicy(projectRoot, { reviews: testReviewPolicy() }),
   });
   cleanups.push(() => restarted.service.close());
-  return restarted;
+  return { ...restarted, git };
 }
 
 /** A run that crashes around the first reconciliation's brief append, restarted and restarted again. */
@@ -719,19 +722,19 @@ async function crashAroundAppend(when: 'before' | 'after'): Promise<void> {
   const root = await reviewTarget(cleanups);
   const crashed = gate();
   let scripted!: ScriptedAgent;
-  let append!: ScriptedAgent['appendContext'];
+  let crashAppend = true;
+  let capturedOperations: import('../../subs/agent/src/interfaces/session-operations.js').SessionOperations | undefined;
   const run = await reviewRun(root, cleanups, {
     ...correctionScenario,
     detached: true,
     agentReady: agent => {
       scripted = agent;
-      append = agent.appendContext.bind(agent);
-      agent.appendContext = async (ref, key, text) => {
-        if (key !== 'brief:wi-001.rc01') return append(ref, key, text);
-        if (when === 'after') await append(ref, key, text);
+      interceptOperations(agent, operations => { capturedOperations = operations; return { ...operations, async appendContext(input) {
+        if (!crashAppend || !input.additions.some(item => item.key === 'brief:wi-001.rc01')) return operations.appendContext(input);
+        if (when === 'after') await operations.appendContext(input);
         crashed.open();
         return new Promise(() => undefined);
-      };
+      } }; });
     },
   });
   await crashed.opened;
@@ -740,25 +743,28 @@ async function crashAroundAppend(when: 'before' | 'after'): Promise<void> {
   expect(before.at(-1)).toMatchObject({ type: 'reconciliation-assessed', data: { reconciliation: 'wi-001.rc01', next: 'correct' } });
   await staleCrashLock(root);
 
-  scripted.appendContext = append;
+  crashAppend = false;
   const restarted = await restart(root, scripted);
-  expect(restarted.recovery.effects).toEqual([`${plan}/${run.runId}: the parent append of reconciliation wi-001.rc01`]);
+  expect(restarted.recovery.effects).toEqual([`${plan}/${run.runId}: the parent append of reconciliation wi-001.rc01`, `${plan}/${run.runId}: restored ordinary owning workflow from its original task correlations`]);
+  await restarted.service.settled(plan, run.runId);
   const after = await runEventsOnDisk(root, plan, run.runId);
   const recovered = after.slice(before.length);
   expect(recovered[0]).toMatchObject({ type: 'reconciliation-brief-appended', data: { reconciliation: 'wi-001.rc01', outcome: when === 'before' ? 'appended' : 'already-present' } });
-  expect(recovered.at(-1)).toMatchObject({ type: 'job-interrupted' });
+  expect(onlyRun(restarted.service, plan).state).toBe('completed');
   // No second assessment, and the brief is in the architect's session once.
-  expect(eventsOf(after, 'reconciliation-assessed')).toHaveLength(1);
+  expect(eventsOf(after, 'reconciliation-assessed').filter(event => event.data.reconciliation === 'wi-001.rc01')).toHaveLength(1);
   const parent = eventsOf(after, 'outline-revised').find(event => event.data.architectRef !== undefined)!.data.architectRef!;
-  expect(await append(parent.ref, 'brief:wi-001.rc01', 'again')).toMatchObject({ outcome: 'already-present' });
+  const parentPoint = JSON.parse(parent.ref) as { point: { sessionId: string } };
+  expect((await capturedOperations!.inspect(run.runId, parentPoint.point.sessionId))!.additions.filter(item => item.key === 'brief:wi-001.rc01')).toHaveLength(1);
   // The repair decision kept its intent, recoverable after the crash.
   const detail = restarted.service.checkFindings(plan, run.runId, { kind: 'detail', checkFinding: 'cf-0001' });
-  expect(detail).toMatchObject({ ok: true, view: { summary: { standing: 'open', reason: 'repair-planned', repair: { kind: 'intent', ref: 'wi-001.rc01' } } } });
+  expect(detail).toMatchObject({ ok: true, view: { summary: { standing: 'closed', reason: 'fixed-by-assessment' } } });
 
   // A second restart finds nothing to do.
+  restarted.git.assertComplete();
   await restarted.service.close();
   cleanups.pop();
-  const again = await restart(root, scripted);
+  const again = await restart(root, scripted, false);
   expect(again.recovery.effects).toEqual([]);
   expect(await runEventsOnDisk(root, plan, run.runId)).toEqual(after);
 }

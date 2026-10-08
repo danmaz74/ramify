@@ -138,17 +138,17 @@ export function reviewScript(scenario: Pick<ReviewRun, 'reviewers' | 'engineer' 
   const reconcilerStarts = new Map<string, number>();
   const reviewerStarts = new Map<string, number>();
   return (spec: SessionSpec): readonly ScriptStep[] => {
-    const reconciliation = /^# Reconciliation (\S+)/u.exec(spec.prompt)?.[1];
-    if (spec.role === 'local-architect' && reconciliation !== undefined) {
+    const reconciliation = [...spec.prompt.matchAll(/^# Reconciliation (\S+)/gmu)].at(-1)?.[1];
+    if (spec.submission.name === 'submit_reconciliation' && reconciliation !== undefined) {
       const starts = (reconcilerStarts.get(reconciliation) ?? 0) + 1;
       reconcilerStarts.set(reconciliation, starts);
       return scenario.reconcilers?.[`${reconciliation}#${starts}`] ?? scenario.reconcilers?.[reconciliation] ?? [{ kind: 'end', message: `no reconciliation scripted for ${reconciliation}` }];
     }
     if (spec.role !== 'reviewer') return roles(spec);
     // A design orientation is scripted as `orientation`, by the order it started in.
-    const request = spec.prompt.startsWith('Design orientation.')
+    const request = spec.submission.name === 'submit_orientation'
       ? 'orientation'
-      : /(?:Code|Scope|Design) review (rq-\d{4})/u.exec(spec.prompt)?.[1] ?? 'unknown';
+      : [...spec.prompt.matchAll(/(?:Code|Scope|Design) review (rq-\d{4})/gu)].at(-1)?.[1] ?? 'unknown';
     const attempts = reviewerStarts.get(request) ?? 0;
     reviewerStarts.set(request, attempts + 1);
     return scenario.reviewers[`${request}#${attempts + 1}`] ?? scenario.reviewers[request] ?? [{ kind: 'end', message: `no review scripted for ${request}` }];
@@ -208,4 +208,11 @@ export const eventsOf = <T extends RunEvent['type']>(events: readonly RunEvent[]
 
 export async function attemptRecord(root: string, runId: string, attempt: string): Promise<ReviewAttempt> {
   return JSON.parse(await readFile(runPath(root, plan, runId, reviewLayout.attempt(attempt)), 'utf8')) as ReviewAttempt;
+}
+
+import type { SessionOperations } from '../../../subs/agent/src/interfaces/session-operations.js';
+/** Intercepts only the injected public operation boundary, never a provider session reader. */
+export function interceptOperations(agent: ScriptedAgent, wrap: (operations: SessionOperations) => SessionOperations): void {
+  const bind = agent.bindSessionStore.bind(agent);
+  agent.bindSessionStore = store => wrap(bind(store));
 }

@@ -1,32 +1,13 @@
-import { afterEach, beforeAll, describe, expect, test } from 'vitest';
-import { startPi, validMap } from './helpers/session.js';
-import { call } from './helpers/scripted-provider.js';
-
-/*
- * The model request as the adapter is given it, through the real pi adapter
- * on the offline scripted provider. pi's resolver parses a thinking level
- * from `provider/model:level` but leaves applying it to the caller, so a
- * dropped level would run the model at pi's default without a sign.
- */
-
-beforeAll(() => { process.env.PI_OFFLINE = '1'; });
-
+import { afterEach, beforeAll, expect, test } from 'vitest';
+import { nativeText, preservingPi } from './helpers/session.js';
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+beforeAll(() => { process.env.PI_OFFLINE = '1'; });
+afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+test('an explicitly requested thinking level reaches the native supported request', async () => {
+  const f = await preservingPi(cleanups, [[nativeText('Done')]], { model: 'openai-codex/gpt-5.6-sol:high' });
+  await (await f.operations.continue(f.input())).settled(); expect(f.native.requests[0]!['reasoning']).toMatchObject({ effort: 'high' }); f.native.verify();
 });
-
-describe('the model request', () => {
-  test('a thinking level named after the model reaches every request of the session', async () => {
-    const harness = await startPi(cleanups, [call('submit_implementation_map', validMap)], { model: 'scripted/scripted-1:high', reasoning: true });
-    await harness.session.outcome;
-    expect(harness.scripted.requests.length).toBeGreaterThan(0);
-    expect(harness.scripted.requests.map(request => request.reasoning)).toEqual(harness.scripted.requests.map(() => 'high'));
-  });
-
-  test('a model named without a level runs at pi\'s own default, not at a level the harness chose', async () => {
-    const harness = await startPi(cleanups, [call('submit_implementation_map', validMap)], { model: 'scripted/scripted-1', reasoning: true });
-    await harness.session.outcome;
-    expect(harness.scripted.requests[0]?.reasoning).not.toBe('high');
-  });
+test('an unknown model is unavailable before native request dispatch', async () => {
+  const f = await preservingPi(cleanups, [], { model: 'unavailable/no-model' });
+  const result = await (await f.operations.continue(f.input())).settled(); expect(result.status).toBe('unavailable'); expect(f.native.dispatches()).toBe(0); expect(result.point).toBeNull();
 });

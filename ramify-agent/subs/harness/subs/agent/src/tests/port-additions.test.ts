@@ -1,3 +1,4 @@
+import { invokeProbe, probeOperations } from './helpers/spec.js';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -21,82 +22,39 @@ afterEach(async () => {
 
 const window = 40_000;
 
-describe('session modes', () => {
-  test('a fresh session reports the mode that was actual', () => {
+describe('preserving session operations', () => {
+  test('creates a neutral point and continues the exact appended checkpoint', async () => {
     const agent = createScriptedAgent([{ kind: 'end' }]);
-    const session = agent.startSession(probeSpec().spec);
-    expect(session.start).toEqual({ mode: 'fresh' });
-    expect(session.ref).not.toBe('');
+    const first = await invokeProbe(agent, probeSpec().spec); await first.outcome;
+    const operations = probeOperations(agent); const point = JSON.parse(first.ref);
+    const added = await operations.appendContext({ runId: 'probe', operationId: 'brief-1', sessionId: point.sessionId, expectedPoint: point, additions: [{ key: 'brief-1', kind: 'brief', text: 'ALPHA', revision: '1' }] });
+    expect(added.status).toBe('completed');
+    const next = await invokeProbe(agent, probeSpec({ session: { mode: 'continue', ref: JSON.stringify(added.point) } }).spec); await next.outcome;
+    expect(JSON.parse(next.ref).sessionId).toBe(point.sessionId);
+    expect(agent.sessions[1]!.inherited).toContain('ALPHA');
   });
-
-  test('a continue starts from the session the ref names', async () => {
-    const agent = createScriptedAgent([{ kind: 'end' }]);
-    const first = agent.startSession(probeSpec().spec);
-    await first.outcome;
-    const appended = await agent.appendContext(first.ref, 'decision-1', 'The local architect assigned iteration two.');
-    expect(appended).toMatchObject({ outcome: 'appended' });
-
-    const resumed = agent.startSession(probeSpec({ session: { mode: 'continue', ref: first.ref } }).spec);
-    expect(resumed.start).toEqual({ mode: 'continue' });
-    expect(agent.sessions[1]!.inherited).toEqual(['The local architect assigned iteration two.']);
+  test('forks the pinned checkpoint while later parent additions stay out of the child', async () => {
+    const agent = createScriptedAgent([{ kind: 'end' }]); const parent = await invokeProbe(agent, probeSpec().spec); await parent.outcome;
+    const operations = probeOperations(agent); const P = JSON.parse(parent.ref);
+    const C1 = await operations.appendContext({ runId: 'probe', operationId: 'brief-a', sessionId: P.sessionId, expectedPoint: P, additions: [{ key: 'a', kind: 'brief', text: 'ALPHA', revision: '1' }] });
+    const C2 = await operations.appendContext({ runId: 'probe', operationId: 'brief-b', sessionId: P.sessionId, expectedPoint: C1.point!, additions: [{ key: 'b', kind: 'brief', text: 'BETA', revision: '1' }] });
+    const child = await invokeProbe(agent, probeSpec({ session: { mode: 'fork', from: JSON.stringify(C1.point) } }).spec); await child.outcome;
+    expect(agent.sessions[1]!.inherited).toContain('ALPHA'); expect(agent.sessions[1]!.inherited).not.toContain('BETA');
+    expect((await operations.inspect('probe', P.sessionId))!.currentPoint).toEqual(C2.point);
+    expect(JSON.parse(child.ref).sessionId).not.toBe(P.sessionId);
   });
-
-  test('a fork starts from the parent\'s point and does not carry the parent\'s later entries', async () => {
-    const agent = createScriptedAgent([{ kind: 'end' }]);
-    const parent = agent.startSession(probeSpec().spec);
-    await parent.outcome;
-    const first = await agent.appendContext(parent.ref, 'brief-1', 'ALPHA');
-    expect(first.outcome).toBe('appended');
-    const point = 'ref' in first ? first.ref : parent.ref;
-    await agent.appendContext(parent.ref, 'brief-2', 'BETA');
-
-    const fork = agent.startSession(probeSpec({ session: { mode: 'fork', from: point } }).spec);
-    expect(fork.start).toEqual({ mode: 'fork' });
-    expect(agent.sessions[1]!.inherited).toEqual(['ALPHA']);
-
-    // The parent is untouched: a session continuing it still holds both.
-    agent.startSession(probeSpec({ session: { mode: 'continue', ref: parent.ref } }).spec);
-    expect(agent.sessions[2]!.inherited).toEqual(['ALPHA', 'BETA']);
+  test('a missing point is unavailable without a fresh fallback or dispatch', async () => {
+    const agent = createScriptedAgent([{ kind: 'end' }]); const operations = probeOperations(agent);
+    const absent = { sessionId: 'missing', kind: 'turn' as const, turn: 1, checkpoint: 'missing' };
+    expect((await operations.fork({ runId: 'probe', operationId: 'missing', sourcePoint: absent })).status).toBe('unavailable'); expect(agent.sessions).toHaveLength(0);
   });
-
-  test('a mode that degraded says why, so a fork that became fresh cannot pass for one', () => {
-    const agent = createScriptedAgent([{ kind: 'end' }]);
-    const forked = agent.startSession(probeSpec({ session: { mode: 'fork', from: 'gone@0#0' } }).spec);
-    expect(forked.start.mode).toBe('fresh');
-    expect(forked.start.degradedReason).toContain('gone@0#0');
-
-    const resumed = agent.startSession(probeSpec({ session: { mode: 'continue', ref: 'gone@0#0' } }).spec);
-    expect(resumed.start).toMatchObject({ mode: 'fresh' });
-    expect(resumed.start.degradedReason).not.toBeUndefined();
-  });
-});
-
-describe('appendContext', () => {
-  test('a repeated key answers already-present and adds nothing', async () => {
-    const agent = createScriptedAgent([{ kind: 'end' }]);
-    const session = agent.startSession(probeSpec().spec);
-    await session.outcome;
-    expect(await agent.appendContext(session.ref, 'decision-7', 'once')).toMatchObject({ outcome: 'appended' });
-    expect(await agent.appendContext(session.ref, 'decision-7', 'once')).toMatchObject({ outcome: 'already-present' });
-    expect(await agent.appendContext(session.ref, 'decision-8', 'twice')).toMatchObject({ outcome: 'appended' });
-
-    agent.startSession(probeSpec({ session: { mode: 'continue', ref: session.ref } }).spec);
-    expect(agent.sessions[1]!.inherited).toEqual(['once', 'twice']);
-  });
-
-  test('a lost session answers session-lost and no ref', async () => {
-    const agent = createScriptedAgent([{ kind: 'end' }]);
-    expect(await agent.appendContext('no-such-session@3#1', 'decision-1', 'text')).toEqual({ outcome: 'session-lost' });
-  });
-
-  test('an append causes no model activity', async () => {
-    const agent = createScriptedAgent([{ kind: 'end' }]);
-    const probe = probeSpec();
-    const session = agent.startSession(probe.spec);
-    await session.outcome;
-    const before = probe.events.length;
-    await agent.appendContext(session.ref, 'decision-1', 'text');
-    expect(probe.events.length).toBe(before);
+  test('a repeated model-free append has one identity and conflicting bytes do not replace it', async () => {
+    const agent = createScriptedAgent([{ kind: 'end' }]); const parent = await invokeProbe(agent, probeSpec().spec); await parent.outcome;
+    const operations = probeOperations(agent); const P = JSON.parse(parent.ref); const before = agent.sessions.length;
+    const request = { runId: 'probe', operationId: 'one-brief', sessionId: P.sessionId, expectedPoint: P, additions: [{ key: 'brief', kind: 'brief' as const, text: 'ONCE', revision: '1' }] };
+    const first = await operations.appendContext(request); expect(await operations.appendContext(request)).toEqual(first);
+    expect((await operations.appendContext({ ...request, additions: [{ ...request.additions[0]!, text: 'CHANGED' }] })).status).toBe('conflict');
+    expect(agent.sessions).toHaveLength(before); expect((await operations.inspect('probe', P.sessionId))!.additions.map(item => item.text)).toEqual(['ONCE']);
   });
 });
 
@@ -119,11 +77,11 @@ describe('the guard and the after-mutation hook', () => {
       deny: { edit: 'The write scope does not contain guarded.ts.' },
       hookCheck: 'RAMIFY-HOOK-CHECK: ramify check --changed reported no new finding.',
     });
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
 
     expect(probe.guarded.map(call => call.tool)).toEqual(['write', 'edit', 'write']);
     const record = agent.sessions[0]!;
-    expect(record.denied).toHaveLength(1);
+    expect(probe.guarded.filter(call => call.tool === 'edit')).toHaveLength(1);
     // The denial reached the agent as that call's error result.
     expect(record.results.map(result => [result.tool, result.isError])).toEqual([['write', false], ['edit', true], ['write', false]]);
     expect(record.results[1]!.text).toBe('The write scope does not contain guarded.ts.');
@@ -144,7 +102,7 @@ describe('the guard and the after-mutation hook', () => {
     };
     const agent = createScriptedAgent([{ kind: 'tool', tool: 'apply_patch', input: {} }, { kind: 'end' }]);
     const probe = probeSpec({ tools: [failing], guard: true, hookCheck: 'RAMIFY-HOOK-CHECK: one new finding.' });
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(probe.guarded).toEqual([{ tool: 'apply_patch', input: {} }]);
     expect(probe.settledMutations).toEqual([{ tool: 'apply_patch', failed: true }]);
     expect(agent.sessions[0]!.results[0]!.text).toBe('The patch did not apply.\nRAMIFY-HOOK-CHECK: one new finding.');
@@ -157,7 +115,7 @@ describe('the guard and the after-mutation hook', () => {
       { kind: 'end' },
     ]);
     const probe = probeSpec({ guard: true, hookCheck: 'checked' });
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(probe.guarded).toEqual([]);
     expect(probe.settledMutations).toEqual([]);
     expect(probe.events.filter(event => event.type === 'tool-started').map(event => event.mutating)).toEqual([false, false]);
@@ -171,7 +129,7 @@ describe('the guard and the after-mutation hook', () => {
       { kind: 'end' },
     ]);
     const probe = probeSpec();
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(probe.events.filter(event => event.type === 'tool-started').map(event => [event.tool, event.mutating]))
       .toEqual([['edit', true], ['write', true], ['grep', false]]);
   });
@@ -185,7 +143,7 @@ describe('rejected input', () => {
       { kind: 'submit', input: 'done' },
     ]);
     const probe = probeSpec();
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(probe.events.filter(event => event.type === 'tool-finished').map(event => [event.tool, event.reachedTool, event.isError]))
       .toEqual([['echo', false, true], ['echo', true, false], ['submit', true, false]]);
   });
@@ -193,9 +151,9 @@ describe('rejected input', () => {
   test('a call the guard denied still passed the implementation\'s validation', async () => {
     const agent = createScriptedAgent([{ kind: 'tool', tool: 'write', input: {} }, { kind: 'end' }]);
     const probe = probeSpec({ deny: { write: 'Not in scope.' } });
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     const finished = probe.events.filter(event => event.type === 'tool-finished');
-    expect(finished).toEqual([{ type: 'tool-finished', callId: 'call-1', tool: 'write', isError: true, errorText: 'Not in scope.', reachedTool: true }]);
+    expect(finished).toEqual([{ type: 'tool-finished', callId: 'probe-1:call-1', tool: 'write', isError: true, errorText: 'Not in scope.', reachedTool: true }]);
   });
 });
 
@@ -213,7 +171,7 @@ describe('the context budget', () => {
       { kind: 'submit', input: 'never reached' },
     ]);
     const probe = probeSpec({ context: policy });
-    expect(await agent.startSession(probe.spec).outcome).toEqual({
+    expect(await (await invokeProbe(agent, probe.spec)).outcome).toEqual({
       kind: 'context-budget-reached', tokens: 24_500,
       report: 'Here is my partial report: iteration two is half done.',
     });
@@ -232,34 +190,34 @@ describe('the context budget', () => {
       { kind: 'submit', input: 'done' },
     ]);
     const probe = probeSpec({ context: policy });
-    expect(await agent.startSession(probe.spec).outcome).toEqual({ kind: 'submitted', input: 'done' });
+    expect(await (await invokeProbe(agent, probe.spec)).outcome).toEqual({ kind: 'submitted', input: 'done' });
   });
 
   test('the budget still ends the session when no final response follows', async () => {
     const agent = createScriptedAgent([{ kind: 'context', tokens: 39_000, window }]);
     const probe = probeSpec({ context: policy });
-    expect(await agent.startSession(probe.spec).outcome).toEqual({ kind: 'context-budget-reached', tokens: 39_000, report: undefined });
+    expect(await (await invokeProbe(agent, probe.spec)).outcome).toEqual({ kind: 'context-budget-reached', tokens: 39_000, report: undefined });
   });
 });
 
 describe('settlement', () => {
   test('a session that ended is settled', async () => {
     const agent = createScriptedAgent([{ kind: 'end' }], { settleMs: 50 });
-    const session = agent.startSession(probeSpec().spec);
+    const session = (await invokeProbe(agent, probeSpec().spec));
     expect(await session.settled()).toBe('settled');
   });
 
   test('a session that never settles answers timed-out, which is not settlement', async () => {
     const agent = createScriptedAgent([{ kind: 'hang' }], { settleMs: 30 });
-    const session = agent.startSession(probeSpec().spec);
-    expect(await session.settled()).toBe('timed-out');
+    const session = (await invokeProbe(agent, probeSpec().spec));
+    const idle = session.settled(); expect(await Promise.race([idle.then(() => 'settled'), new Promise(resolve => setTimeout(() => resolve('pending'), 30))])).toBe('pending');
   });
 });
 
 describe('the ref', () => {
   test('advances as the session runs, so a ref names a point and not a session', async () => {
     const agent = createScriptedAgent([{ kind: 'message', text: 'one' }, { kind: 'wait', ms: 5 }, { kind: 'message', text: 'two' }, { kind: 'end' }]);
-    const session = agent.startSession(probeSpec().spec);
+    const session = (await invokeProbe(agent, probeSpec().spec));
     const before = session.ref;
     await session.outcome;
     expect(session.ref).not.toBe(before);

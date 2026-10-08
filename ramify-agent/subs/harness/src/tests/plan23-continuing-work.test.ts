@@ -55,7 +55,7 @@ function loaded(role: Role): LoadedPackage {
 function input(role: Role, kind: TaskKind, operationId: string, ref?: string): HarnessOperationInput {
   const name = toolOf[kind]!;
   const spec: SessionSpec = { role, scope: { workingDirectory: '/project/src' }, systemPrompt: 'LEGACY COMPOSITE HEAD MUST NOT BE DELIVERED', prompt: 'LEGACY MESSAGE MUST NOT BE DELIVERED',
-    session: ref ? { mode: 'continue', ref } : { mode: 'fresh' }, context, builtinTools: [], tools: [], sessionDirectory: '/ignored-executor-cache',
+    session: ref ? { mode: 'continue', ref } : { mode: 'fresh' }, context, builtinTools: [], tools: [],
     submission: { name, description: 'Legacy submission schema copy must not be delivered', inputSchema: { type: 'object' }, accept: async () => ({ accepted: true }) }, onEvent: () => undefined };
   return { runId: 'run-A', operationId, session: 'ses-A', loaded: loaded(role), spec,
     brief: { kind, objective: `${kind} current work`, goal: 'G1: expose the status', requirements: ['R1: show the status label'], sections: [{ key: 'support:owner', text: 'Read supplied owner evidence V1.' }],
@@ -164,15 +164,15 @@ async function turn(adapter: HarnessSessionOperations, request: HarnessOperation
     expect(packet!.manifest.entries.some(entry => entry.key.includes('support:obligations') && entry.delivery === 'inherited')).toBe(true);
     expect(packet!.manifest.entries.some(entry => entry.key.includes('support:obligations') && entry.delivery === 'appended')).toBe(false);
   });
-  test('unavailable high-level driver and unknown point never call the legacy provider or create another session', async () => {
-    let oldCalls = 0;
+  test('unavailable high-level driver and unknown point never dispatch or create another session', async () => {
+    let factoryCalls = 0;
     const agent = createScriptedAgent([]);
-    const legacy: AgentPort = { name: agent.name, support: agent.support, startSession(spec) { oldCalls++; return agent.startSession(spec); }, appendContext: (...args) => agent.appendContext(...args) };
+    const unsupported: AgentPort = { name: agent.name, support: agent.support, get sessionOperations() { factoryCalls++; return null; } };
     const root = await mkdtemp(join(tmpdir(), 'ramify-plan23-unavailable-')); roots.push(root);
-    await expect(HarnessSessionOperations.open(root, legacy)).rejects.toThrow(genericSessionDriverUnavailableError);
+    await expect(HarnessSessionOperations.open(root, unsupported)).rejects.toThrow(genericSessionDriverUnavailableError);
     let dispatches = 0; const modern = await open(() => { dispatches++; return [{ kind: 'submit', input: {} }]; });
     await expect(modern.adapter.start(input('engineer', 'repair', 'unknown-parent', 'pi-file:old-entry'))).rejects.toThrow('explicit workflow recovery');
-    expect([oldCalls, dispatches]).toEqual([0, 0]);
+    expect([factoryCalls, dispatches]).toEqual([0, 0]);
   });
   test('a saved harness intent before Create and before Continue completes the same idempotent preparation', async () => {
     let dispatches = 0;

@@ -1,5 +1,5 @@
 import { createSessionOperations } from './session-operations.js';
-import type { SessionDriverInvocation, SessionExecutionBindings, SessionOperationDriver, SessionOperations, SessionStore, SessionToolDeclaration } from './interfaces/session-operations.js';
+import type { AgentSessionPoint, SessionDriverInvocation, SessionExecutionBindings, SessionOperationDriver, SessionOperations, SessionStore, SessionToolDeclaration } from './interfaces/session-operations.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { assistantText, contextBudgetReached, noMessageDetail } from './interfaces/port.js';
@@ -127,12 +127,9 @@ export interface ScriptedAgent extends AgentPort {
   readonly sessionOperations: SessionOperations | null;
   bindSessionStore(sessionStore: SessionStore): SessionOperations;
   readonly sessions: readonly ScriptedSessionRecord[];
-  /**
-   * Forgets a session, as an implementation that can no longer read one does.
-   * A `continue` from a ref of a forgotten session degrades to `fresh` with
-   * its reason, and an `appendContext` to it answers `session-lost`.
-   */
-  forget(ref: SessionRef): boolean;
+  /** Explicit scripted loss of a structured session; never a replacement fresh strategy. */
+  loseSession(point: AgentSessionPoint): boolean;
+
 }
 
 export interface ScriptedAgentOptions {
@@ -188,43 +185,33 @@ const scriptedSupport: ExecutorSupport = {
  */
 export function createScriptedAgent(script: Script, options: ScriptedAgentOptions = {}): ScriptedAgent {
   const sessions: ScriptedSessionRecord[] = [];
+  const lost = new Set<string>();
+  return {
+    name: 'scripted',
+    support: { ...scriptedSupport, ...options.support },
+    sessions,
+    loseSession(point) { if (!point || typeof point.sessionId !== 'string') throw new Error('A structured session point is required'); const fresh = !lost.has(point.sessionId); lost.add(point.sessionId); return fresh; },
+    bindSessionStore: store => createScriptedOperations(store, script, options, sessions, lost),
+    sessionOperations: options.sessionStore ? createScriptedOperations(options.sessionStore, script, options, sessions, lost) : null,
+  };
+}
+
+/** One private script actor. All history and restoration belong to SessionOperations. */
+function createScriptActor(script: Script, options: ScriptedAgentOptions) {
+  const sessions: ScriptedSessionRecord[] = [];
   const settleMs = options.settleMs ?? 30_000;
   const support: ExecutorSupport = { ...scriptedSupport, ...options.support };
   /** The port's built-in each of the fake's own tool names stands for. */
   const builtinOf = new Map(portTools.map(tool => [options.toolNames?.[tool] ?? tool, tool]));
-  /** Appended context per scripted session, which a continue inherits and a fork inherits up to its point. */
-  const histories = new Map<string, Array<{ readonly key: string; readonly text: string }>>();
-  let sessionCount = 0;
-
-  const refOf = (id: string, steps: number): SessionRef => `${id}@${steps}#${histories.get(id)?.length ?? 0}`;
-
   return {
-    name: 'scripted',
-    bindSessionStore: sessionStore => createScriptedOperations(sessionStore, script, options, sessions),
-    sessionOperations: options.sessionStore ? createScriptedOperations(options.sessionStore, script, options, sessions) : null,
-    support,
     sessions,
-
-    forget(ref) {
-      const id = sessionOf(ref);
-      return id === undefined ? false : histories.delete(id);
-    },
-
-    async appendContext(ref, key, text) {
-      const id = sessionOf(ref);
-      const history = id === undefined ? undefined : histories.get(id);
-      if (id === undefined || history === undefined) return { outcome: 'session-lost' };
-      if (history.some(entry => entry.key === key)) return { outcome: 'already-present', ref: refOf(id, pointOf(ref)) };
-      history.push({ key, text });
-      return { outcome: 'appended', ref: refOf(id, pointOf(ref)) };
-    },
-
-    startSession(spec: SessionSpec): AgentSession {
-      const { id, start, inherited } = beginSession(spec, histories, () => `scripted-${++sessionCount}`, support);
+    execute(spec: SessionSpec): AgentSession {
+      const start: ActualStart = { mode: 'fresh' };
+      const inherited: readonly string[] = [];
       let stepsRun = 0;
       const record: ScriptedSessionRecord = {
         spec, verdicts: [], start, inherited, results: [], denied: [],
-        suppressedCompactions: 0, refusedAfterBudget: 0, stopCalls: 0, ref: refOf(id, 0),
+        suppressedCompactions: 0, refusedAfterBudget: 0, stopCalls: 0, ref: '',
       };
       sessions.push(record);
       const controller = new AbortController();
@@ -241,7 +228,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
         for (const step of steps) {
           if (controller.signal.aborted && !deaf) return { kind: 'stopped' };
           stepsRun += 1;
-          record.ref = refOf(id, stepsRun);
+
           if (budgetTokens !== undefined && step.kind !== 'message') {
             // The tools are gone, so a call cannot happen; only the final response can.
             if (step.kind === 'tool' || step.kind === 'submit') record.refusedAfterBudget += 1;
@@ -499,66 +486,6 @@ function finish(spec: SessionSpec, record: ScriptedSessionRecord, result: Script
   });
 }
 
-/**
- * Resolves the session a spec starts from. A `continue` or `fork` whose ref
- * names a session the fake has never seen degrades to `fresh` and says so.
- */
-function beginSession(
-  spec: SessionSpec,
-  histories: Map<string, Array<{ readonly key: string; readonly text: string }>>,
-  fresh: () => string,
-  support: ExecutorSupport,
-): { readonly id: string; readonly start: ActualStart; readonly inherited: readonly string[] } {
-  const start = spec.session;
-  // A start the fake declares it lacks degrades with the reason it declared.
-  const declared = start.mode === 'fresh' ? undefined : support[start.mode];
-  if (declared !== undefined && !declared.available) return degrade(histories, fresh, declared.reason);
-  if (start.mode === 'continue') {
-    const id = sessionOf(start.ref);
-    const history = id === undefined ? undefined : histories.get(id);
-    if (id !== undefined && history !== undefined) {
-      return { id, start: { mode: 'continue' }, inherited: history.map(entry => entry.text) };
-    }
-    return degrade(histories, fresh, `The session named by ${start.ref} is not known to the scripted agent.`);
-  }
-  if (start.mode === 'fork') {
-    const id = sessionOf(start.from);
-    const history = id === undefined ? undefined : histories.get(id);
-    if (id !== undefined && history !== undefined) {
-      const forked = fresh();
-      const taken = history.slice(0, pointOf(start.from, history.length));
-      histories.set(forked, [...taken]);
-      return { id: forked, start: { mode: 'fork' }, inherited: taken.map(entry => entry.text) };
-    }
-    return degrade(histories, fresh, `The session named by ${start.from} is not known to the scripted agent.`);
-  }
-  const id = fresh();
-  histories.set(id, []);
-  return { id, start: { mode: 'fresh' }, inherited: [] };
-}
-
-function degrade(
-  histories: Map<string, Array<{ readonly key: string; readonly text: string }>>,
-  fresh: () => string,
-  reason: string,
-): { readonly id: string; readonly start: ActualStart; readonly inherited: readonly string[] } {
-  const id = fresh();
-  histories.set(id, []);
-  return { id, start: { mode: 'fresh', degradedReason: reason }, inherited: [] };
-}
-
-/** The scripted ref is `<session>@<steps>#<entries>`. */
-function sessionOf(ref: SessionRef): string | undefined {
-  const id = ref.split('@')[0];
-  return id === undefined || id === '' ? undefined : id;
-}
-
-function pointOf(ref: SessionRef, fallback = 0): number {
-  const after = ref.split('#')[1];
-  const parsed = after === undefined ? Number.NaN : Number.parseInt(after, 10);
-  return Number.isNaN(parsed) ? fallback : parsed;
-}
-
 /** Settles when `pending` does, or on abort, whichever is first; a rejection counts as settling. */
 function settledOrAborted(pending: Promise<unknown>, signal: AbortSignal): Promise<void> {
   return new Promise(resolve => {
@@ -669,7 +596,7 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
       }
       const inherited = [...inheritedMessages, ...input.session.additions.map(addition => addition.text)];
       // Only script perception receives its already visible context. Actual records and emitted packets remain current-only.
-      const actor = createScriptedAgent(typeof script === 'function' ? spec => script({ ...diagnostic(spec), prompt: [...inherited, spec.prompt].join('\n\n') }) : script, { ...options, sessionStore: undefined });
+      const actor = createScriptActor(typeof script === 'function' ? spec => script({ ...diagnostic(spec), prompt: [...inherited, spec.prompt].join('\n\n') }) : script, { ...options, sessionStore: undefined });
       let eventIndex = 0;
       let events: Promise<unknown> = Promise.resolve();
       let eventError: unknown;
@@ -682,7 +609,7 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
         role: input.task.role, scope: { workingDirectory: input.task.environment.workingDirectory },
         systemPrompt: input.session.initialInstructions, prompt: input.task.message,
         session: { mode: 'fresh' }, context: input.session.policy.context,
-        builtinTools: [], sessionDirectory: '',
+        builtinTools: [],
         tools: declarations.filter(item => item.name !== submission.name).map(declaration => ({
           ...declaration,
           action: value => runtime.describeTool(declaration.name, value).action,
@@ -700,11 +627,12 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
           }).catch(error => { eventError ??= error; });
         },
       };
-      const session = actor.startSession(spec);
+      const session = actor.execute(spec);
       for (const record of actor.sessions) {
         Object.defineProperty(record, 'spec', { value: diagnostic(record.spec) });
         Object.defineProperty(record, 'start', { value: { mode: diagnosticMode } });
         Object.defineProperty(record, 'inherited', { value: inherited });
+        record.ref = diagnosticRef;
         observations.push(record);
       }
       const stop = () => { void session.stop(); };
@@ -716,7 +644,8 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
 }
 
 /** Provider built-ins are bound here, never by a harness-side transcript decoder. */
-function createScriptedOperations(sessionStore: SessionStore, script: Script, options: ScriptedAgentOptions, observations: ScriptedSessionRecord[]): SessionOperations {
+function createScriptedOperations(ownedStore: SessionStore, script: Script, options: ScriptedAgentOptions, observations: ScriptedSessionRecord[], lost: ReadonlySet<string>): SessionOperations {
+  const sessionStore: SessionStore = { async read(runId, id) { return id.startsWith('session:') && lost.has(id.slice(8)) ? null : ownedStore.read(runId, id); }, putPayload: bytes => ownedStore.putPayload(bytes), getPayload: id => ownedStore.getPayload(id), commit: input => ownedStore.commit(input) };
   const operations = createSessionOperations({ sessionStore, driver: options.operationScript ? createScriptedSessionDriver(options.operationScript) : createScriptDeclarationDriver(script, options, observations) });
   function enrich(bindings: SessionExecutionBindings, declarations: readonly SessionToolDeclaration[]): SessionExecutionBindings {
     const tools = [...bindings.tools];

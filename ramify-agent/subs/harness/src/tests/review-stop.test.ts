@@ -267,7 +267,7 @@ describe('a run started with the review stop', () => {
     await service.settled(plan, receipt.jobId);
   }, 120_000);
 
-  test('closing the service while a run waits at the stop leaves it to be interrupted, as any other phase', async () => {
+  test('closing and reopening at the review stop restores the recorded wait without a model dispatch', async () => {
     const root = await target();
     const first = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
     const receipt = await first.service.execute(startRun(plan, 'scripted', undefined, true));
@@ -281,13 +281,15 @@ describe('a run started with the review stop', () => {
 
     const second = await openRuns(root, { script: [] });
     cleanups.push(() => second.service.close());
-    expect(second.recovery.interrupted).toEqual([`${plan}/${receipt.jobId}`]);
-    expect(onlyRun(second.service, plan)).toMatchObject({ state: 'interrupted', phase: 'ended', review: 'not-reviewed' });
+    expect(second.recovery.interrupted).toEqual([]);
+    expect(second.recovery.effects).toEqual([`${plan}/${receipt.jobId}: restored ordinary owning workflow from its original task correlations`]);
+    expect(onlyRun(second.service, plan)).toMatchObject({ state: 'running', phase: 'awaiting-review', review: 'not-reviewed' });
+    expect(second.agent!.sessions).toHaveLength(0);
     expect(first.git.branch()).toBeNull();
     expect(second.git.operations()['createRunBranch']).toBeUndefined();
   }, 120_000);
 
-  test('a crash at awaiting-review is recovered as interrupted, calls no agent, and refuses a later approval', async () => {
+  test('a crash at awaiting-review restores the recorded wait, calls no agent, and accepts the later approval', async () => {
     const root = await target();
     const crashed = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
     const receipt = await crashed.service.execute(startRun(plan, 'scripted', undefined, true));
@@ -295,21 +297,22 @@ describe('a run started with the review stop', () => {
     // The crashed service is abandoned, never closed, and its lock is a dead process's.
     await staleCrashLock(root);
 
-    const restarted = await openRuns(root, { script: [] });
+    const restarted = await openRuns(root, { script: [], unchangedCheckpoints: [finalVerification] });
     cleanups.push(() => restarted.service.close());
-    expect(restarted.recovery.interrupted).toEqual([`${plan}/${receipt.jobId}`]);
+    expect(restarted.recovery.interrupted).toEqual([]);
+    expect(restarted.recovery.effects).toEqual([`${plan}/${receipt.jobId}: restored ordinary owning workflow from its original task correlations`]);
     expect(restarted.recovery.invocations).toEqual([]);
     expect(await types(root, receipt.jobId)).toEqual([
       'job-started', 'document-manifest-committed', ...analysed, 'analysis-accepted', 'review-requested',
-      'session-finished', 'job-interrupted',
     ]);
     expect(restarted.agent!.sessions).toHaveLength(0);
-    expect(onlyRun(restarted.service, plan)).toMatchObject({ state: 'interrupted', review: 'not-reviewed' });
-
-    await expect(restarted.service.execute(approveRun(plan, receipt.jobId, version(restarted.service, receipt.jobId))))
-      .rejects.toMatchObject({ code: 'conflict', message: expect.stringContaining('interrupted') });
+    expect(onlyRun(restarted.service, plan)).toMatchObject({ state: 'running', phase: 'awaiting-review', review: 'not-reviewed' });
     expect(crashed.git.branch()).toBeNull();
     expect(restarted.git.operations()['createRunBranch']).toBeUndefined();
+    const approved = await restarted.service.execute(approveRun(plan, receipt.jobId, version(restarted.service, receipt.jobId)));
+    expect(approved.jobId).toBe(receipt.jobId);
+    await restarted.service.settled(plan, receipt.jobId);
+    expect(onlyRun(restarted.service, plan).state).toBe('completed');
   }, 120_000);
 });
 
@@ -445,12 +448,10 @@ describe('the run budget', () => {
     const timed: AgentPort = {
       name: scripted.name,
       support: scripted.support,
-      appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
-      startSession: spec => {
-        const session = scripted.startSession(spec);
+      bindSessionStore(store) { const operations = scripted.bindSessionStore(store); return { ...operations, async continue(input) {
         current = new Date(current.getTime() + perSession);
-        return session;
-      },
+        return operations.continue(input);
+      } }; },
     };
     const opened = await openRuns(root, {
       agent: timed,

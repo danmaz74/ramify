@@ -146,10 +146,9 @@ export type Availability =
  *
  * - Usage, context size and compaction are port events. One the executor
  *   cannot observe is recorded as a coverage gap, never read as room.
- * - `continue`, `fork` and `forkAtPoint` are session starts; a start the
- *   executor lacks degrades to `fresh` with the declared reason, as
- *   `ActualStart` reports. `forkAtPoint` is a fork from any ref, not only
- *   from a session's latest one.
+ * - `continue`, `fork` and `forkAtPoint` describe preserving operations.
+ *   Unsupported operations remain unavailable. Named source-backed recovery
+ *   belongs to the owning workflow; these observations never choose it.
  * - `appendContext` stores text without a model call.
  * - `exactSystemPrompt` sends the spec's prompt with nothing of the
  *   executor's own added.
@@ -247,8 +246,7 @@ export interface SessionSpec {
   readonly builtinTools: ReadonlyArray<BuiltinTool | WriteTool>;
   readonly tools: readonly ToolDefinition[];
   readonly submission: SubmissionTool;
-  /** A directory the implementation may use for its own session record. */
-  readonly sessionDirectory: string;
+
   /**
    * Called before a mutating call executes: a mutating built-in, or a harness
    * tool that declares itself mutating. A denial becomes that call's error
@@ -503,7 +501,7 @@ export interface AgentSession {
 
 /** An agent implementation: pi, or the scripted fake. */
 export interface AgentPort {
-  /** Additive lifecycle while old internal callers migrate through iteration 9. */
+  /** Durable preserving session operations. */
   readonly sessionOperations?: SessionOperations | null | undefined;
   /** Bind one harness-owned store lifetime without exposing provider transcript handling. */
   bindSessionStore?(sessionStore: SessionStore): SessionOperations;
@@ -511,15 +509,7 @@ export interface AgentPort {
   readonly name: string;
   /** What this implementation supports, and the reason for anything it does not. */
   readonly support: ExecutorSupport;
-  /** Starts a session. Failures to start are reported through `outcome`, not thrown. */
-  startSession(spec: SessionSpec): AgentSession;
-  /**
-   * Stores text in a session without a model call, so that a session started
-   * from the returned ref carries it. `key` makes a repeat a no-op, which is
-   * what an intent performed again after a crash needs. A ref whose session
-   * can no longer be read answers `session-lost`.
-   */
-  appendContext(ref: SessionRef, key: string, text: string): Promise<AppendOutcome>;
+
 }
 
 /** What an `appendContext` did. */

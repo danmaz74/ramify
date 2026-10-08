@@ -95,6 +95,14 @@ export class HarnessSessionOperations {
     await writeFileExclusive(path, bytes);
     if (await readFile(path, 'utf8') !== bytes) throw new Error('Conflicting harness session correlation');
   }
+  /** Verify a durable generic source without opening provider files or moving its point. */
+  async hasPoint(runId: string, ref: string): Promise<boolean> {
+    const source = readSessionPointReference(ref);
+    if (!source || source.runId !== runId) return false;
+    const snapshot = await this.operations.inspect(runId, source.point.sessionId, source.point);
+    return snapshot !== null;
+  }
+
   private async context(runId: string, point: AgentSessionPoint): Promise<Context> {
     const found = await this.read<Context>(this.path('points', [runId, point]));
     if (!found || JSON.stringify(found.point) !== JSON.stringify(point)) throw new Error('The named session point has no recorded briefing ancestry');
@@ -205,18 +213,28 @@ export class HarnessSessionOperations {
         finally { clearTimeout(timer); }
       }, settled };
   }
-  async append(ref: string, key: string, text: string): Promise<AppendOutcome> {
+  async append(ref: string, key: string, text: string, briefingSectionKey?: string): Promise<AppendOutcome> {
     const parsed = readSessionPointReference(ref);
     if (!parsed) return { outcome: 'session-lost' };
     const context = await this.context(parsed.runId, parsed.point);
     const operationId = `append:${parsed.point.sessionId}:${key}`;
+    const snapshot = await this.operations.inspect(parsed.runId, parsed.point.sessionId);
+    const wasPresent = snapshot?.additions.some(addition => addition.key === key) === true;
     const receipt = await this.operations.appendContext({ runId: parsed.runId, operationId, sessionId: parsed.point.sessionId, expectedPoint: parsed.point,
       additions: [{ key, kind: 'brief', text, revision: null }] });
     if (receipt.status !== 'completed' || !receipt.point) return { outcome: 'session-lost' };
     const already = await this.read<Context>(this.path('points', [parsed.runId, receipt.point]));
-    await this.retain(this.path('points', [parsed.runId, receipt.point]), { ...context, point: receipt.point,
+    let history = context.history; let revision = context.revision;
+    if (briefingSectionKey !== undefined) {
+      const previous = history.find(item => item.revision === revision);
+      if (!previous) throw new Error('Appended briefing section has no captured revision');
+      const sections = [...previous.sections.filter(section => section.key !== briefingSectionKey), { key: briefingSectionKey, text }];
+      revision = exactInputHash(JSON.stringify(sections));
+      history = [...history, { revision, sections }];
+    }
+    await this.retain(this.path('points', [parsed.runId, receipt.point]), { ...context, history, revision, point: receipt.point,
       inherited: [...context.inherited, { key: `append:${key}`, kind: 'brief', text, source: null, revision: null }] });
-    return { outcome: already === null ? 'appended' : 'already-present', ref: sessionPointReference(parsed.runId, receipt.point) };
+    return { outcome: already === null && !wasPresent ? 'appended' : 'already-present', ref: sessionPointReference(parsed.runId, receipt.point) };
   }
 }
 

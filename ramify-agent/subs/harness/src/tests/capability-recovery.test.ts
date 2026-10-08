@@ -41,7 +41,7 @@ async function lostBWriterCase(restartBeforeSettlement: boolean): Promise<void> 
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -58,7 +58,7 @@ async function lostBWriterCase(restartBeforeSettlement: boolean): Promise<void> 
     }
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
         kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B source appears in A' }).assignment }) : [{ kind: 'wait', ms: 60_000 }];
     }
@@ -115,7 +115,7 @@ test('CA18 CA26 CA29: an ended B writer keeps dirty source and closes partial th
 test('CA18 CA26 CA29: restart after an ended B writer preserves its ordinary partial result without a second writer',
   () => lostBWriterCase(true), 45_000);
 
-test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect without dispatching the B entry', async () => {
+test('CA05 CA19 CA22 CA32: service restart continues the durable active architect without dispatching the B entry', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   const boundaryAnswers = recoveryBoundaries(fixture.root, 'a+b', true);
@@ -132,7 +132,7 @@ test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect wit
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -147,7 +147,7 @@ test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect wit
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
       prompts.push(spec.prompt);
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
       if (architectTurns === 1) return submit({ ...basis, kind: 'partial', progress: 'A source inspected',
         unfinished: ['Assign B'] });
@@ -180,7 +180,11 @@ test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect wit
   expect(events.filter(event => event.type === 'capability-delegated')).toHaveLength(1);
   expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
   expect(events.filter(event => event.type === 'work-item-started' && event.data.workItem === 'wi-002')).toHaveLength(0);
-  expect(starts.filter(entry => entry === 'capability-architect:submit_capability_action:fresh').length).toBeGreaterThanOrEqual(2);
+  expect(starts.filter(entry => entry === 'capability-architect:submit_capability_action:fresh')).toHaveLength(1);
+  expect(starts).toContain('capability-architect:submit_capability_action:continue');
+  const architectStarts = events.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect');
+  expect(architectStarts[1]?.type === 'invocation-started' ? architectStarts[1].data.session : null)
+    .toBe(architectStarts[0]?.type === 'invocation-started' ? architectStarts[0].data.session : null);
   expect(prompts[1]).toContain('# Selected plan package ');
   expect(prompts[1]).toContain('Current plan:');
   for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -191,14 +195,13 @@ test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect wit
   await second.service.settled('need', receipt.jobId);
 }, 60_000);
 
-test('a restart after a capability architect budget return reconstructs from committed task state', async () => {
+test('restart preserves raw capability context exhaustion as unfinished failure without another dispatch', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   const boundaryAnswers = recoveryBoundaries(fixture.root);
   answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
-  let frozen = false;
   let architectTurns = 0;
   const starts: string[] = [];
   const script: Script = spec => {
@@ -206,7 +209,7 @@ test('a restart after a capability architect budget return reconstructs from com
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -217,7 +220,7 @@ test('a restart after a capability architect budget return reconstructs from com
     } });
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       if (architectTurns === 1) return [
         { kind: 'context', tokens: 200_000, window: null },
         { kind: 'message', text: 'The capability task is unfinished at my context budget.' },
@@ -227,39 +230,18 @@ test('a restart after a capability architect budget return reconstructs from com
     }
     return [];
   };
-  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
-    afterWrite: async (write: string, runId: string) => {
-      if (write !== 'capability-coordinator-resumed' || frozen) return;
-      const events = await runEventsOnDisk(fixture.root, 'need', runId);
-      const latest = events.at(-1);
-      if (latest?.type === 'capability-coordinator-resumed' && events.some(event =>
-        event.type === 'invocation-ended' && event.data.ended === 'context-budget-reached')) {
-        frozen = true;
-        await freeze();
-      }
-    } };
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs() };
   const first = await openCapabilityRuns(fixture.root, options);
   const receipt = await first.service.execute(startRun('need'));
-  await until(() => frozen, 30_000);
-  await staleCrashLock(fixture.root);
-  const second = await openCapabilityRuns(fixture.root, options);
-  cleanups.push(() => second.service.close());
-  await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event =>
-    event.type === 'capability-assigned' || event.type === 'job-failed'), 30_000);
-  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(events.some(event => event.type === 'job-failed')).toBe(false);
-  expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
-  expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
-  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual([
-    'capability-architect:submit_capability_action:fresh',
-    'capability-architect:submit_capability_action:fresh',
-  ]);
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const current = second.service.events('need', receipt.jobId)!;
-    try { await second.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence)); break; }
-    catch (error) { if (!String(error).includes('at version') || attempt === 19) throw error; }
-  }
-  await second.service.settled('need', receipt.jobId);
+  await first.service.settled('need', receipt.jobId);
+  const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(before.find(event => event.type === 'job-failed')?.data).toMatchObject({ reason: 'limit-exceeded', message: expect.stringContaining('unfinished task remains') });
+  expect(before.filter(event => event.type === 'capability-assigned' || event.type === 'capability-handed-back')).toEqual([]);
+  await first.service.close();
+  const second = await openCapabilityRuns(fixture.root, options); cleanups.push(() => second.service.close());
+  expect(second.recovery.effects).toEqual([]);
+  expect(await runEventsOnDisk(fixture.root, 'need', receipt.jobId)).toEqual(before);
+  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual(['capability-architect:submit_capability_action:fresh']);
 }, 60_000);
 
 test('CA19: accepted qualification before delegation replays one decision after restart', async () => {
@@ -274,7 +256,7 @@ test('CA19: accepted qualification before delegation replays one decision after 
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -307,7 +289,8 @@ test('CA19: accepted qualification before delegation replays one decision after 
   await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event =>
     event.type === 'capability-delegated' || event.type === 'job-failed'), 30_000);
   const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
+  const failedOutcomes = await Promise.all(after.flatMap(event => event.type === 'invocation-ended' && event.data.ended === 'failed' ? [readFile(runPath(fixture.root, 'need', receipt.jobId, `invocations/${event.data.invocation}/outcome.json`), 'utf8')] : []));
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: after.slice(-12), failedOutcomes })).toHaveLength(0);
   expect(after.filter(event => event.type === 'capability-delegated')).toHaveLength(1);
   expect(after.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect' &&
     event.data.work.request === 'need-001')).toHaveLength(1);
@@ -333,7 +316,7 @@ test('CA19: accepted assign action before its effect replays without a second co
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -347,7 +330,7 @@ test('CA19: accepted assign action before its effect replays without a second co
     }
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
         kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B result' }).assignment }) : [{ kind: 'wait', ms: 60_000 }];
     }
@@ -374,7 +357,8 @@ test('CA19: accepted assign action before its effect replays without a second co
   await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event =>
     event.type === 'capability-assignment-settled' || event.type === 'job-failed'), 30_000);
   const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
+  const failedOutcomes = await Promise.all(after.flatMap(event => event.type === 'invocation-ended' && event.data.ended === 'failed' ? [readFile(runPath(fixture.root, 'need', receipt.jobId, `invocations/${event.data.invocation}/outcome.json`), 'utf8')] : []));
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: after.slice(-12), failedOutcomes })).toHaveLength(0);
   const resumed = after.filter(event => event.type === 'capability-coordinator-resumed' && event.data.task === 'cap-001');
   expect(resumed.length).toBeGreaterThanOrEqual(1);
   expect(new Set(resumed.map(event => event.type === 'capability-coordinator-resumed' ? event.data.invocation : '')).size).toBe(1);
@@ -402,7 +386,7 @@ test(`PB3-C04 PB3-C05: restart after ${boundary} keeps the accepted action's rep
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -417,7 +401,7 @@ test(`PB3-C04 PB3-C05: restart after ${boundary} keeps the accepted action's rep
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
       architectPrompts.push(spec.prompt);
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       // The accepted assignment carries the architect's own done report.
       return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
         kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B result' }).assignment,
@@ -449,7 +433,8 @@ test(`PB3-C04 PB3-C05: restart after ${boundary} keeps the accepted action's rep
   cleanups.push(() => second.service.close());
   await until(() => architectTurns >= 2 || (second.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'), 30_000);
   const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
+  const failedOutcomes = await Promise.all(after.flatMap(event => event.type === 'invocation-ended' && event.data.ended === 'failed' ? [readFile(runPath(fixture.root, 'need', receipt.jobId, `invocations/${event.data.invocation}/outcome.json`), 'utf8')] : []));
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: after.slice(-12), failedOutcomes })).toHaveLength(0);
   // The report is recorded once, by the accepted invocation, before the
   // action's effect; the action is replayed, not asked for again.
   const reports = after.filter(event => event.type === 'obligation-reported');
@@ -460,6 +445,24 @@ test(`PB3-C04 PB3-C05: restart after ${boundary} keeps the accepted action's rep
   const coordinators = after.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect' &&
     event.data.work.capabilityTask === 'cap-001' && event.sequence < assigned[0]!.sequence);
   expect(coordinators).toHaveLength(1);
+  const original = coordinators[0]!;
+  if (original.type !== 'invocation-started') throw new Error('Missing original coordinator');
+  const originalOutcome = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+    `invocations/${original.data.invocation}/outcome.json`), 'utf8'));
+  const originalPoint = JSON.parse(originalOutcome.session.ref).point;
+  // Replay forks assignment authority at the original accepted action, while
+  // the next coordinator advances from the separately appended recovery brief.
+  expect(assigned[0]!.data.architectRef!.ref).toBe(originalOutcome.session.ref);
+  const nextActor = second.agent!.sessions.find(session => session.spec.role === 'capability-architect')!;
+  expect(nextActor.start.mode).toBe('continue');
+  expect(nextActor.spec.session.mode).toBe('continue');
+  if (nextActor.spec.session.mode !== 'continue') throw new Error('Expected resumed coordinator');
+  const resumedPoint = JSON.parse(nextActor.spec.session.ref);
+  expect(resumedPoint).toMatchObject({ sessionId: originalPoint.sessionId, turn: originalPoint.turn });
+  expect(resumedPoint.checkpoint).not.toBe(originalPoint.checkpoint);
+  const recoveryBrief = `Recover capability cap-001 from the committed plan and task state`;
+  expect(nextActor.inherited.filter(bytes => bytes === recoveryBrief)).toHaveLength(1);
+  expect(nextActor.spec.prompt).not.toContain(recoveryBrief);
   expect(reports[0]!.data).toMatchObject({ by: coordinators[0]!.type === 'invocation-started' ? coordinators[0]!.data.invocation : '' });
   // No writer was acquired between the crash and the replayed effect, and
   // the assignment has one writer.
@@ -490,7 +493,7 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -507,7 +510,7 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
     }
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
         kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B source appears in A' }).assignment }) : [{ kind: 'wait', ms: 60_000 }];
     }
@@ -533,7 +536,8 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
   await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event =>
     event.type === 'capability-assignment-settled' || event.type === 'job-failed'), 30_000);
   const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
+  const failedOutcomes = await Promise.all(after.flatMap(event => event.type === 'invocation-ended' && event.data.ended === 'failed' ? [readFile(runPath(fixture.root, 'need', receipt.jobId, `invocations/${event.data.invocation}/outcome.json`), 'utf8')] : []));
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: after.slice(-12), failedOutcomes })).toHaveLength(0);
   expect(after.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
   const settlements = after.filter(event => event.type === 'capability-assignment-settled');
   expect(settlements).toHaveLength(1);
@@ -578,7 +582,7 @@ test('CA19: accepted B completion before assignment settlement replays without a
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -592,7 +596,7 @@ test('CA19: accepted B completion before assignment settlement replays without a
     }
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
         kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B result' }).assignment }) : [{ kind: 'wait', ms: 60_000 }];
     }
@@ -614,7 +618,8 @@ test('CA19: accepted B completion before assignment settlement replays without a
   await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event =>
     event.type === 'capability-assignment-settled' || event.type === 'job-failed'), 30_000);
   const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
+  const failedOutcomes = await Promise.all(after.flatMap(event => event.type === 'invocation-ended' && event.data.ended === 'failed' ? [readFile(runPath(fixture.root, 'need', receipt.jobId, `invocations/${event.data.invocation}/outcome.json`), 'utf8')] : []));
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: after.slice(-12), failedOutcomes })).toHaveLength(0);
   expect(after.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
   expect(after.filter(event => event.type === 'capability-assignment-settled')).toHaveLength(1);
   expect(after.filter(event => event.type === 'invocation-started' && event.data.role === 'engineer' && event.data.work.iteration === 'cap-001.i01'), JSON.stringify(after.slice(-25))).toHaveLength(1);
@@ -642,7 +647,7 @@ test('CA20 CA32: restart with a B writer lacking confirmed release stops the sta
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -655,7 +660,7 @@ test('CA20 CA32: restart with a B writer lacking confirmed release stops the sta
       } }) : submit({ kind: 'completion-proposed', summary: 'B result', findings: [] });
     }
     if (spec.role === 'capability-architect') {
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
         kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B result' }).assignment });
     }
@@ -705,7 +710,7 @@ test('CA19 CA30: service restart adopts a source snapshot before its request led
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
@@ -737,7 +742,8 @@ test('CA19 CA30: service restart adopts a source snapshot before its request led
   await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event =>
     event.type === 'capability-delegated' || event.type === 'job-failed'), 30_000);
   const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
+  const failedOutcomes = await Promise.all(after.flatMap(event => event.type === 'invocation-ended' && event.data.ended === 'failed' ? [readFile(runPath(fixture.root, 'need', receipt.jobId, `invocations/${event.data.invocation}/outcome.json`), 'utf8')] : []));
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: after.slice(-12), failedOutcomes })).toHaveLength(0);
   expect(after.filter(event => event.type === 'capability-requested')).toHaveLength(1);
   expect(after.filter(event => event.type === 'capability-delegated')).toHaveLength(1);
   expect(after.filter(event => event.type === 'work-item-started' && event.data.workItem === 'wi-002')).toHaveLength(0);
@@ -766,7 +772,7 @@ for (const boundary of ['capability-exchange-opened', 'capability-exchange-answe
       if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a)]));
       if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
       if (spec.submission.name === 'submit_capability_qualification') {
-        const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
           placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
       }
@@ -780,7 +786,7 @@ for (const boundary of ['capability-exchange-opened', 'capability-exchange-answe
       } });
       if (spec.role === 'capability-architect') {
         architectTurns += 1;
-        const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
           kind: 'consult-consumer', question: 'How will A render the source?', sections: ['calling code'], references: [] })
           : [{ kind: 'wait', ms: 60_000 }];

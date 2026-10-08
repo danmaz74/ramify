@@ -1,3 +1,4 @@
+import { invokeProbe, probeOperations } from './helpers/spec.js';
 import { describe, expect, test } from 'vitest';
 import { contextBudgetReached } from '../interfaces/port.js';
 import type { AgentPort, ExecutorSupport } from '../interfaces/port.js';
@@ -23,7 +24,7 @@ describe('observations are port events', () => {
       { kind: 'submit', input: { done: true } },
     ]);
     const probe = probeSpec();
-    expect(await agent.startSession(probe.spec).outcome).toEqual({ kind: 'submitted', input: { done: true } });
+    expect(await (await invokeProbe(agent, probe.spec)).outcome).toEqual({ kind: 'submitted', input: { done: true } });
 
     const usage = probe.events.flatMap(event => (event.type === 'message' && event.role === 'assistant' ? [event.usage] : []));
     // The submission's assistant message reports no usage, which is absent, not zero.
@@ -70,25 +71,13 @@ describe('observations are port events', () => {
     for (const [, reason] of missing) expect(reason).not.toBe('');
   });
 
-  test('a session start the executor lacks degrades to fresh with the reason it declared', async () => {
-    const agent = createScriptedAgent([{ kind: 'end' }], {
-      support: {
-        continue: { available: false, reason: 'This executor cannot resume a session.' },
-        fork: { available: false, reason: 'This executor cannot branch a session.' },
-      },
-    });
-    const first = agent.startSession(probeSpec().spec);
-    await first.outcome;
-    expect(first.start).toEqual({ mode: 'fresh' });
-
-    const continued = agent.startSession(probeSpec({ session: { mode: 'continue', ref: first.ref } }).spec);
-    await continued.outcome;
-    expect(continued.start).toEqual({ mode: 'fresh', degradedReason: 'This executor cannot resume a session.' });
-
-    const forked = agent.startSession(probeSpec({ session: { mode: 'fork', from: first.ref } }).spec);
-    await forked.outcome;
-    expect(forked.start).toEqual({ mode: 'fresh', degradedReason: 'This executor cannot branch a session.' });
-    expect(agent.support.forkAtPoint.available).toBe(true);
+  test('old availability observations do not silently choose a fresh preservation strategy', async () => {
+    const agent = createScriptedAgent([{ kind: 'end' }], { support: { continue: { available: false, reason: 'Old executor cannot resume.' } } });
+    const first = await invokeProbe(agent, probeSpec().spec); await first.outcome;
+    const next = await invokeProbe(agent, probeSpec({ session: { mode: 'continue', ref: first.ref } }).spec); await next.outcome;
+    expect(JSON.parse(next.ref).sessionId).toBe(JSON.parse(first.ref).sessionId);
+    expect(agent.support.continue.available).toBe(false);
+    expect(agent.sessions[1]!.start.mode).toBe('continue');
   });
 
   test('an unknown context size is never room: the budget cannot fire on it', async () => {
@@ -106,7 +95,7 @@ describe('observations are port events', () => {
       { kind: 'submit', input: 'done' },
     ]);
     const probe = probeSpec({ context: policy });
-    expect(await agent.startSession(probe.spec).outcome).toEqual({ kind: 'submitted', input: 'done' });
+    expect(await (await invokeProbe(agent, probe.spec)).outcome).toEqual({ kind: 'submitted', input: 'done' });
   });
 
   test('a forbidden role compacts not at all, and the suppression is counted', async () => {
@@ -116,7 +105,7 @@ describe('observations are port events', () => {
       { kind: 'end', message: 'done' },
     ]);
     const probe = probeSpec({ context: { compaction: 'forbidden', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 } });
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(probe.events.filter(event => event.type === 'compaction')).toEqual([]);
     expect(agent.sessions[0]!.suppressedCompactions).toBe(1);
     // The context is still observed: the policy governs compaction, not observation.
@@ -126,7 +115,7 @@ describe('observations are port events', () => {
   test('the policy is never prompt text', async () => {
     const agent = createScriptedAgent([{ kind: 'end' }]);
     const probe = probeSpec({ context: { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 16_000 } });
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     const sent = `${probe.spec.systemPrompt}\n${probe.spec.prompt}`;
     for (const term of ['compact', 'budget', 'token', 'context window', 'reserve']) {
       expect(sent.toLowerCase()).not.toContain(term);

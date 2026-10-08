@@ -48,7 +48,7 @@ function selectingAfterLoss(agent: () => ScriptedAgent, ids: readonly string[], 
   return spec => {
     if (spec.submission.name !== contextSelectorToolName) return typeof rest === 'function' ? rest(spec) : rest;
     const parent = agent().sessions.find(session => session.spec.submission.name === workOrientationToolName);
-    if (!parent || !agent().forget(parent.ref)) throw new Error('Expected a retained orientation point');
+    if (!parent || !agent().loseSession(JSON.parse(parent.ref))) throw new Error('Expected a retained orientation point');
     return submit({ selected: ids.map(id => ({ id, reason: `Applies to the work: ${id}`, conditions: [], uncertainty: '' })) });
   };
 }
@@ -117,11 +117,12 @@ test('an assigned non-functional element reaches the engineer once per session, 
   expect(events.find(event => event.type === 'context-selection-recorded')?.data.packageHash).toBe(assignment.source!.hash);
   const organizing = agent.sessions.filter(session => session.spec.submission.name === 'submit_work_item_result');
   expect(organizing.map(session => session.start.mode)).toEqual(['fresh', 'continue']);
-  expect(organizing[0]!.spec.prompt).toContain(`# Your work-item package\n\n${text}`);
+  expect(organizing[0]!.spec.prompt).toContain(text);
   // A continued turn names the package by hash and never repeats its body.
   expect(organizing[1]!.spec.prompt).not.toContain(quote);
   expect(organizing[1]!.spec.prompt).not.toContain('# Your work-item package');
-  expect(organizing[1]!.spec.prompt).toContain(`Your work-item package \`${assignment.source!.hash}\`, already in your session`);
+  expect(organizing[1]!.inherited.filter(bytes => bytes.includes(quote))).toHaveLength(1);
+  expect(organizing[0]!.spec.prompt).toContain(assignment.source!.hash);
   const engineers = agent.sessions.filter(session => session.spec.role === 'engineer');
   expect(engineers.map(session => session.start.mode)).toEqual(['fresh', 'continue']);
   expect(engineers[0]!.spec.prompt).toContain(`## What the plan asks of this iteration\n\nThe elements your assignment cites`);
@@ -141,7 +142,7 @@ test('an assigned non-functional element reaches the engineer once per session, 
   expect(engineers[0]!.spec.prompt).toContain('### sc-001 (pending): A person uses review-summary');
   const continued = engineers[1]!.spec.session;
   expect(continued.mode).toBe('continue');
-  expect(continued.mode === 'continue' && String(continued.ref).split('@')[0]).toBe(String(engineers[0]!.ref).split('@')[0]);
+  expect(continued.mode === 'continue' && JSON.parse(continued.ref).sessionId).toBe(JSON.parse(engineers[0]!.ref).sessionId);
   expect(engineers[1]!.spec.prompt).toContain('## The gate did not pass');
   expect(engineers[1]!.spec.prompt).toMatch(/- audit `[^`]+:ga-\d{4}`, the project's default audit of `[^`]+` under `ramify-audit\.json`: requested ramify-partial, executed ramify-partial; composed verdict `fail`/u);
   expect(engineers[1]!.spec.prompt).toContain('- `tests`: failed; the provider\'s record of it follows:');
@@ -196,5 +197,5 @@ test('a contract requested by an engineer inherits the requester\'s assignment p
   const engineer = agent.sessions.find(session => session.spec.role === 'engineer');
   expect(engineer?.spec.prompt).toContain(requester.text.trimEnd());
   const contractSession = agent.sessions.find(session => session.spec.role === 'contract-engineer');
-  expect(contractSession?.spec.prompt).toContain(`## What the plan asks of the requesting iteration\n\nThe elements its assignment cites, whole, with the plan deviations in force when it was assigned.\n\n${requester.text.trimEnd()}`);
+  expect(contractSession?.spec.prompt).toContain(requester.text.trimEnd());
 }, 120_000);

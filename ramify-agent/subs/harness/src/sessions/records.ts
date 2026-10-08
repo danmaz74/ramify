@@ -29,7 +29,6 @@ export const sessionLayout = {
   submission: 'submission.json',
   outcome: 'outcome.json',
   /** The executor's own session record, such as pi's, which only it reads. */
-  executorSession: 'session',
   /** The harness's transcript of the session: raw output, never a record. */
   transcript: 'transcript.jsonl',
   /** The content store the transcript names bodies in, `blobs/<sha256>`. */

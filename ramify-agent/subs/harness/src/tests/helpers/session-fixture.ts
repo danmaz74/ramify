@@ -90,7 +90,7 @@ async function lineageRun(root: string): Promise<FinishedSessionRuns['lineage']>
             if (session.outcome === undefined) continue;
             if (session.spec.role === 'engineer' || (session === firstArchitect && !forgotten.has(session))) {
               forgotten.add(session);
-              scripted.forget(session.ref);
+              scripted.loseSession(JSON.parse(session.ref));
             }
           }
         }, 5);

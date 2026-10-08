@@ -244,6 +244,7 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
   const stop = () => session.agent.abort(); runtime.signal.addEventListener('abort', stop, { once: true });
   try {
     await runtime.assertLive();
+    if (!input.recovering) runtime.onEvent({ type: 'message', role: 'user', blocks: [{ type: 'text', text: input.task.message }] });
     const last = messages.at(-1);
     if (input.recovering && last?.role === 'assistant') {
       // Complete known tool effects without asking the model to repeat a tool call.

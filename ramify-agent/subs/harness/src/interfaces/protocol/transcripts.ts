@@ -111,7 +111,7 @@ export const transcriptContinuesSchema = z.object({
 /** A forked start: the source point, why, the context generation where it forked the architect context, and the briefs held at the point. */
 export const transcriptForkSchema = z.object({
   from: transcriptPointSchema,
-  reason: z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection']),
+  reason: z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection', 'capability-consultation']),
   generation: z.int().positive().optional(),
   briefs: z.array(text),
 }).strict();

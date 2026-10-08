@@ -93,7 +93,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
     requestedBy: requestRelationSchema.optional(),
   }).strict()),
   /**
-   * Appended before `startSession`, so a stop arriving between this event and
+   * Appended before the preserving operation, so a stop arriving between this event and
    * the session's start applies to a known invocation. It commits the
    * `Invocation` and the `MeasurementSnapshot` its scope was measured at.
    * `start` says whether it is the first invocation of the session just

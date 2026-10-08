@@ -1,5 +1,6 @@
+import { invokeProbe, probeOperations } from './helpers/spec.js';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -36,7 +37,7 @@ describe('the scripted fake\'s actions', () => {
       { kind: 'end' },
     ]);
     const probe = probeSpec({ builtinTools: ['read', 'grep', 'ls'] });
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(probe.events.flatMap(event => (event.type === 'tool-started' ? [event.action] : []))).toEqual([
       { kind: 'read', path: 'a.ts', range: null },
       { kind: 'read', path: 'a.ts', range: { start: 5, count: 10 } },
@@ -63,7 +64,7 @@ describe('the scripted fake\'s actions', () => {
       { kind: 'submit', input: 'done' },
     ]);
     const probe = probeSpec({ tools: [run, echo] });
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(probe.events.flatMap(event => (event.type === 'tool-started' ? [[event.tool, event.action]] : []))).toEqual([
       ['run', { kind: 'command', command: 'npm test' }],
       ['echo', { kind: 'harness' }],
@@ -87,12 +88,15 @@ describe('the scripted fake\'s actions', () => {
       { kind: 'tool', tool: 'read', input: { path: 'a.ts' } },
       { kind: 'end' },
     ], { toolNames: { read: 'Read', write: 'CreateFile' } });
-    const probe = probeSpec({ workingDirectory, builtinTools: ['read', 'write'] });
-    await agent.startSession({
+    const probe = probeSpec({ workingDirectory, builtinTools: [], tools: [
+      { name: 'Read', description: 'Read renamed tool', inputSchema: {}, action: () => ({ kind: 'read', path: 'a.ts', range: null }), execute: async () => ({ text: 'read' }) },
+      { name: 'CreateFile', description: 'Write renamed tool', inputSchema: {}, mutating: true, action: () => ({ kind: 'write', paths: ['made.ts'] }), execute: async () => { await writeFile(join(workingDirectory, 'made.ts'), 'export const made = 1;\n'); return { text: 'written' }; } },
+    ] });
+    await (await invokeProbe(agent, {
       ...probe.spec,
       guard: async call => { guarded.push(call); return { allow: true }; },
       afterMutation: async call => { settled.push(call); return null; },
-    }).outcome;
+    })).outcome;
 
     const started = probe.events.filter(event => event.type === 'tool-started');
     expect(started.map(event => [event.tool, event.mutating])).toEqual([['Read', false], ['CreateFile', true], ['read', false]]);
@@ -115,7 +119,7 @@ describe('the scripted fake\'s actions', () => {
       { kind: 'end' },
     ], { toolNames: { write: 'CreateFile' } });
     const probe = probeSpec({ workingDirectory, builtinTools: ['read'] });
-    await agent.startSession(probe.spec).outcome;
+    await (await invokeProbe(agent, probe.spec)).outcome;
     expect(agent.sessions[0]!.results).toEqual([{ callId: 'call-1', tool: 'CreateFile', text: 'Tool CreateFile not found', isError: true }]);
     expect(existsSync(join(workingDirectory, 'made.ts'))).toBe(false);
   });

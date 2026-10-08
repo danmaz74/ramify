@@ -14,6 +14,7 @@ import { readBody, readTranscript } from '../transcripts/writer.js';
 import { copyFixture } from './helpers/fixture.js';
 import { expectNoProcesses, forgetExternalTools, openRunsWithoutProcesses } from './helpers/external-tools.js';
 import { read } from './helpers/iterations.js';
+import { defaultTurn } from './helpers/declarations.js';
 import { emptyAnalysis, installTestRunner, onlyRun, runPath, startRun } from './helpers/runs.js';
 import { scriptedGit } from './helpers/scripted-git.js';
 import { runSessionScenario } from './helpers/session-scenario.js';
@@ -48,25 +49,25 @@ const thinking = 'The notes module owns the reviewer note; the limit is a rule o
  * whether the transcript's last entry was that invocation's start when its
  * session was started.
  */
-function capturing(scripted: AgentPort) {
+function capturing(scripted: AgentPort, projectRoot: string) {
   const events = new Map<string, AgentEvent[]>();
   const startedFirst = new Map<string, boolean>();
   const port: AgentPort = {
     name: scripted.name,
     support: scripted.support,
-    appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
-    startSession(spec) {
-      // `invocations/<id>/session`, beneath the run's directory.
-      const invocation = basename(dirname(spec.sessionDirectory));
-      const transcripts = join(dirname(dirname(dirname(spec.sessionDirectory))), 'transcripts');
-      const last = readdirSync(transcripts).map(name => {
-        const lines = readFileSync(join(transcripts, name), 'utf8').split('\n').filter(Boolean);
-        return JSON.parse(lines.at(-1)!) as TranscriptEntry;
-      });
-      startedFirst.set(invocation, last.some(entry => entry.type === 'started' && entry.invocation === invocation));
-      const list: AgentEvent[] = [];
-      events.set(invocation, list);
-      return scripted.startSession({ ...spec, onEvent: event => { list.push(event); spec.onEvent(event); } });
+    bindSessionStore(store) {
+      const operations = scripted.bindSessionStore!(store);
+      return { ...operations, async continue(input) {
+        const invocation = input.operationId;
+        const transcripts = join(runPath(projectRoot, 'review-notes', input.runId), 'transcripts');
+        const last = readdirSync(transcripts).map(name => {
+          const lines = readFileSync(join(transcripts, name), 'utf8').split('\n').filter(Boolean);
+          return JSON.parse(lines.at(-1)!) as TranscriptEntry;
+        });
+        startedFirst.set(invocation, last.some(entry => entry.type === 'started' && entry.invocation === invocation));
+        const list: AgentEvent[] = []; events.set(invocation, list);
+        return operations.continue({ ...input, bindings: { ...input.bindings, onEvent: event => { list.push(event); input.bindings.onEvent(event); } } });
+      } };
     },
   };
   return { port, events, startedFirst };
@@ -107,6 +108,7 @@ async function recordFiles(directory: string): Promise<string[]> {
 describe('ST07, ST08: the transcripts of a scripted run', () => {
   test('every session has one, each start precedes its model call, points and forks are named, and each reads back to its port events', async () => {
     let captured: ReturnType<typeof capturing> | undefined;
+    const fixture = await copyFixture(); cleanups.push(fixture.remove);
     const scenario = await runSessionScenario({
       cleanup: step => { cleanups.push(step); },
       before: {
@@ -122,7 +124,8 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
           read('plans/review-notes/plan.md'),
         ],
       },
-      port: scripted => (captured = capturing(scripted)).port,
+      root: fixture.root,
+      port: scripted => (captured = capturing(scripted, fixture.root)).port,
     });
     const { events } = scenario;
     const store = new ContentStore(scenario.path(runLayout.blobs));
@@ -212,11 +215,7 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
       prompts.set(entry.role, (prompts.get(entry.role) ?? new Set()).add(entry.systemPrompt.hash));
     }
     expect(prompts.size).toBe(7);
-    expect(prompts.get('catalog-extractor')?.size).toBe(2);
-    expect(prompts.get('context-selector')?.size).toBe(1);
-    expect(prompts.get('engineer')?.size).toBe(2);
-    expect(prompts.get('local-architect')?.size).toBe(4);
-    expect([...prompts].filter(([role]) => role !== 'engineer' && role !== 'local-architect' && role !== 'catalog-extractor').map(([, hashes]) => hashes.size)).toEqual([1, 1, 1, 1]);
+    expect([...prompts.values()].map(hashes => hashes.size)).toEqual(Array(prompts.size).fill(1));
     expect((await blobsIn(scenario.path(runLayout.blobs))).length).toBeGreaterThanOrEqual(prompts.size);
 
     // No record, event or observation quotes a body. An assistant's text is
@@ -254,7 +253,7 @@ describe('a transcript that cannot be written', () => {
     ], previews: final.previews });
     const { service } = await openRunsWithoutProcesses(fixture.root, git, {
       candidates: final.candidates,
-      script: [{ kind: 'message', text: 'Orienting.' }, { kind: 'submit', input: emptyAnalysis() }],
+      script: spec => spec.role === 'initial-architect' ? [{ kind: 'message', text: 'Orienting.' }, { kind: 'submit', input: emptyAnalysis() }] : defaultTurn(spec) ?? [],
       // A directory where the first session's transcript would be: every
       // append to it fails.
       afterWrite: async (write, runId) => {

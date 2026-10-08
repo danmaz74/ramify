@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { z } from 'zod';
 import { citationSchema, modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
-import { moduleProposalSchema, recordRefSchema } from '../run/records.js';
+import { globalForkSourceSchema, moduleProposalSchema, recordRefSchema } from '../run/records.js';
 import { slugSchema } from '../analysis/records.js';
 
 /*
@@ -76,6 +76,8 @@ export const placementRequestSchema = z.object({
   hypotheses: z.array(z.object({ ref: recordRefSchema, stance: hypothesisStanceSchema, evidence: text }).strict()),
   /** The requester's own local decisions this request rests on. */
   localDecisions: z.array(text),
+  /** Required by current producers; absent input cannot select a moving parent. */
+  globalSource: globalForkSourceSchema.optional(),
 }).strict();
 export type PlacementRequest = z.infer<typeof placementRequestSchema>;
 

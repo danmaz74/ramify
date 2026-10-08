@@ -93,16 +93,12 @@ describe('a run whose invocation is not confirmed settled', () => {
     return {
       name: scripted.name,
       support: scripted.support,
-      appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
-      startSession(spec: SessionSpec): AgentSession {
-        const started = scripted.startSession(spec);
-        return {
-          get outcome() { return started.outcome; },
-          get start() { return started.start; },
-          get ref() { return started.ref; },
-          settled: async () => 'timed-out',
-          stop: () => started.stop(),
-        };
+      bindSessionStore(store) {
+        const operations = scripted.bindSessionStore(store);
+        return { ...operations, async continue(input) {
+          const handle = await operations.continue(input);
+          return { ...handle, settled: async () => new Promise(() => undefined) };
+        } };
       },
     };
   }

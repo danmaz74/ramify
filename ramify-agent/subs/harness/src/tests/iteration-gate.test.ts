@@ -295,6 +295,7 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
       head: base, previews: candidate.previews,
       commits: [scenarios, unchanged, modified('revision-01', `${notesDirectory}/src/notes.ts`), unchanged, unchanged],
     });
+    let loseOriginal: (() => void) | undefined; let didLoseOriginal = false;
     const opened = await openRuns(root, {
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
@@ -310,6 +311,7 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
       checkScript: ({ check, context }) => {
         if (context.checkpoint !== 'iteration') return {};
         firstIteration ??= context.attemptId;
+        if (context.attemptId === firstIteration && check.kind === 'tests' && !didLoseOriginal) { didLoseOriginal = true; loseOriginal!(); }
         return context.attemptId === firstIteration && check.kind === 'tests'
           ? { outcome: { kind: 'completed', exitCode: 1 }, stderr: 'not ok\n' }
           : {};
@@ -320,13 +322,12 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
     // repair, exactly as an implementation that can no longer read it would.
     const agent = opened.agent!;
     const receipt = await opened.service.execute(startRun('review-notes'));
-    const forget = setInterval(() => {
-      for (const session of agent.sessions) {
-        if (session.spec.role === 'engineer' && session.outcome !== undefined) agent.forget(session.ref);
-      }
-    }, 10);
+    loseOriginal = () => {
+      const original = agent.sessions.find(session => session.spec.role === 'engineer')!;
+      expect(agent.loseSession(JSON.parse(original.ref))).toBe(true);
+    };
     await opened.service.settled('review-notes', receipt.jobId);
-    clearInterval(forget);
+    expect(didLoseOriginal).toBe(true);
     const runId = receipt.jobId;
 
     expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');

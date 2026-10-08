@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
 import { elementIdSchema, type PackageDeviation } from '../../subs/plan-evidence/src/interfaces/catalog.js';
+import { globalForkSourceSchema } from '../run/records.js';
 
 /*
  * Plan deviations. A local architect that finds its request cannot be met
@@ -78,6 +79,8 @@ export const unresolvedRequestSchema = z.object({
   invocation: text,
   conflict: text,
   evidence: z.array(text),
+  /** The oriented global point at request time, including accepted brief identities. */
+  globalSource: globalForkSourceSchema.optional(),
 }).strict();
 export type UnresolvedRequest = z.infer<typeof unresolvedRequestSchema>;
 

@@ -227,7 +227,7 @@ import { briefed, entryScenariosOf, type EngineerScenarios } from '../work/scena
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import { declaredModuleDirectories } from './project-config.js';
 import { assertScratchSafe, ensureScratchRule, releasableScratchModules, removeScratchDirectories, scratchSafetyRule, ScratchIgnoreConflictError } from '../work/scratch.js';
-import {
+import { globalForkSourceSchema,
   gateAttemptId, gateAttemptSchema, invocationId, invocationOutcomeSchema, invocationSchema, lineEventSummarySchema,
   measurementSnapshotSchema, readinessAttemptSchema, recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
   type GateOperation, type Invocation, type InvocationOutcome, type LineEventSummary, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
@@ -403,7 +403,7 @@ interface InvocationRequest<T> {
   readonly systemPrompt: string;
   readonly prompt: string;
   /** Exact owning task inputs; headings in the old display brief carry no ancestry authority. */
-  readonly task?: { readonly kind?: TaskKind; readonly goal: string; readonly requirements: readonly string[]; readonly omit?: readonly string[]; readonly candidate?: string; readonly snapshot?: string; readonly consultationSubmissionSchema?: string; readonly views?: TaskEnvironment['views'] };
+  readonly task?: { readonly kind?: TaskKind; readonly goal: string; readonly requirements: readonly string[]; readonly omit?: readonly string[]; readonly literalSections?: HarnessTaskBrief['sections']; readonly candidate?: string; readonly snapshot?: string; readonly consultationSubmissionSchema?: string; readonly views?: TaskEnvironment['views'] };
   readonly start: SessionStart;
   readonly toolName: string;
   readonly description: string;
@@ -1091,6 +1091,8 @@ export class RunService {
         agent: run.record.agent,
         model: this.options.model ?? null,
         context: run.record.policy.context.reviewer,
+        scope: { projectRoot: this.projectRoot, workItem: closed.workItem, authority: 'read-only-candidate' },
+        execution: { history: 'complete', compaction: 'forbidden', snapshot: 'current-request-candidate' },
       });
       return { guidance, forkPoint: { kind: 'orientation', key } };
     } catch (error) {
@@ -1213,7 +1215,9 @@ export class RunService {
     } catch (error) {
       return await unavailable(`The ${kind} review's captured inputs could not be read as recorded: ${message(error)}`) === 'committed';
     }
-    const start = await this.reviewStart(run, agent, loaded, request, guidance);
+    let start: Awaited<ReturnType<RunService['reviewStart']>>;
+    try { start = await this.reviewStart(run, agent, loaded, request, guidance); }
+    catch (error) { return await unavailable(`The recorded review source is unavailable: ${message(error)}`) === 'committed'; }
     // An orientation made first may have met a stop or the deadline, and
     // its work item's deadline may have settled the request meanwhile.
     if (this.closed || this.ignoring(run) || run.reviews?.accepting !== true) return false;
@@ -1385,9 +1389,9 @@ export class RunService {
    * Where one attempt's reviewer starts. Code review starts fresh. Scope
    * review forks the local architect at the point that produced its
    * assignment, and design review forks the orientation of its guidance,
-   * made first where none exists yet. A fork point that is missing or
-   * unusable starts fresh, recorded as a start the caller could not honor;
-   * the message is the complete input either way.
+   * made first where none exists yet. Only the existing scope recovery may
+   * reconstruct a complete recorded assignment packet. Unavailable design
+   * history and unsupported forks remain explicit failures.
    */
   private async reviewStart(run: Run, agent: AgentPort, loaded: LoadedPackage, request: ReviewRequest, guidance: readonly CapturedInput[]): Promise<{
     readonly start: SessionStart;
@@ -1397,24 +1401,33 @@ export class RunService {
     const fresh = (reason: string) => ({ start: { mode: 'fresh' } as const, degraded: { requested: 'fork' as const, reason } });
     const point = request.forkPoint;
     if (point.kind === 'none') return { start: { mode: 'fresh' } };
-    if (point.kind === 'unavailable') return fresh(point.reason);
+    if (point.kind === 'unavailable') {
+      if (request.key.kind === 'scope') return fresh(point.reason);
+      throw new EvidenceUnavailableError(point.reason);
+    }
     let from: { readonly session: SessionId; readonly invocation: string; readonly ref: string; readonly reason: 'scope-review' | 'design-orientation' };
     if (point.kind === 'session') {
       const assigned = run.log.all('iteration-assigned').find(event => event.data.iteration === request.key.iteration);
       const taskAssigned = run.log.all('capability-assigned').find(event => event.data.assignment === request.key.iteration);
       const invocation = assigned?.data.invocation ?? taskAssigned?.data.invocation;
-      if (invocation === undefined) return fresh(`No assignment of ${request.key.iteration} is recorded`);
+      if (invocation === undefined) throw new EvidenceUnavailableError(`No assignment of ${request.key.iteration} is recorded`);
       from = { session: point.session as SessionId, invocation, ref: point.ref, reason: 'scope-review' };
     } else {
       const orientation = await this.orientation(run, agent, loaded, request, guidance);
       if (orientation.outcome !== 'oriented' || orientation.session === null || orientation.invocation === null || orientation.ref === null) {
-        return fresh(`The design orientation ${point.key.slice(0, 12)} did not orient: ${orientation.reason ?? 'no reason was recorded'}`);
+        throw new EvidenceUnavailableError(`The design orientation ${point.key.slice(0, 12)} did not orient: ${orientation.reason ?? 'no reason was recorded'}`);
       }
       from = { session: orientation.session as SessionId, invocation: orientation.invocation, ref: orientation.ref, reason: 'design-orientation' };
     }
     const source = this.sessionsOf(run)?.get(from.session);
     if (source === undefined || !source.invocations.includes(from.invocation) || source.awaiting === from.invocation) {
-      return fresh(`${from.session} has not reached the end of ${from.invocation}`);
+      throw new EvidenceUnavailableError(`${from.session} has not reached the end of ${from.invocation}`);
+    }
+    const outcome = committedRecords(run.log.ledger.replay()).outcomes.get(from.invocation);
+    if (outcome?.session?.ref !== from.ref) throw new EvidenceUnavailableError('The captured review source differs from its accepted invocation point');
+    if (!await (await this.operations(agent)).hasPoint(run.record.jobId, from.ref)) {
+      if (from.reason === 'scope-review') return fresh('The captured assignment point is unavailable; reconstructing the complete scope review packet');
+      throw new EvidenceUnavailableError('The recorded design orientation is unavailable');
     }
     const ended = run.log.all('invocation-ended').find(event => event.data.invocation === from.invocation)?.sequence ?? 0;
     const briefs = run.log.all('brief-appended')
@@ -1430,8 +1443,8 @@ export class RunService {
    * The design orientation of a request's guidance selection: the one the
    * log records for its key, or one made now, once, by a reviewer session
    * that reads the guidance and is kept. A failed orientation is recorded
-   * too, so the run does not pay for it twice; its design reviews start
-   * fresh with the reason.
+   * too, so the run does not pay for it twice; its dependent design reviews
+   * remain unavailable with that recorded reason.
    */
   private async orientation(run: Run, agent: AgentPort, loaded: LoadedPackage, request: ReviewRequest, guidance: readonly CapturedInput[]): Promise<ReviewOrientation> {
     const key = request.forkPoint.kind === 'orientation' ? request.forkPoint.key : '';
@@ -1945,11 +1958,11 @@ export class RunService {
    * its completion request, or fresh with the complete packet and the reason
    * where that point is missing or unusable.
    */
-  private reconciliationStart(run: Run, basis: ReconciliationBasis, completion: { readonly session: SessionId; readonly invocation: string } | undefined): {
+  private async reconciliationStart(run: Run, agent: AgentPort, basis: ReconciliationBasis, completion: { readonly session: SessionId; readonly invocation: string } | undefined): Promise<{
     readonly start: SessionStart;
     readonly fork?: ForkRelation | undefined;
     readonly degraded?: { readonly requested: 'fork'; readonly reason: string } | undefined;
-  } {
+  }> {
     const fresh = (reason: string) => ({ start: { mode: 'fresh' } as const, degraded: { requested: 'fork' as const, reason } });
     const point = basis.forkPoint;
     if (point.kind !== 'session') return fresh(point.kind === 'unavailable' ? point.reason : 'No point of the local architect was captured');
@@ -1957,8 +1970,11 @@ export class RunService {
     const from = { session: point.session as SessionId, invocation: completion.invocation };
     const source = this.sessionsOf(run)?.get(from.session);
     if (source === undefined || !source.invocations.includes(from.invocation) || source.awaiting === from.invocation) {
-      return fresh(`${from.session} has not reached the end of ${from.invocation}`);
+      throw new EvidenceUnavailableError(`${from.session} has not reached the end of ${from.invocation}`);
     }
+    const outcome = committedRecords(run.log.ledger.replay()).outcomes.get(from.invocation);
+    if (outcome?.session?.ref !== point.ref) throw new EvidenceUnavailableError('The recorded completion point does not match its accepted invocation');
+    if (!await (await this.operations(agent)).hasPoint(run.record.jobId, point.ref)) return fresh('The recorded completion session point is unavailable; reconstructing the complete reconciliation packet');
     const ended = run.log.all('invocation-ended').find(event => event.data.invocation === from.invocation)?.sequence ?? 0;
     const briefs = run.log.all('brief-appended')
       .filter(event => event.data.session === from.session && event.sequence < ended)
@@ -2039,7 +2055,7 @@ export class RunService {
     const ordinaryCompletion = owner.completion === undefined ? this.latestCompletion(run, owner.id) : undefined;
     const completion = owner.completion ?? (ordinaryCompletion?.data.architectRef == null ? undefined
       : { session: ordinaryCompletion.data.architectRef.session, invocation: ordinaryCompletion.data.invocation });
-    const start = this.reconciliationStart(run, basis, completion);
+    const start = await this.reconciliationStart(run, agent, basis, completion);
     const state = checkFindingStateOf(run.log.ledger);
     const held = new Map(this.ownerCheckFindings(state, owner.id, 'all').map(summary => [summary.id, summary.revision]));
     const evidence = await readAcceptedEvidence(run.directory, run.record, run.log.events);
@@ -2704,7 +2720,7 @@ export class RunService {
               return { session: null, ref: null, outcome: 'no-session', reason: 'No retained parent point' };
             }
             try {
-              const answer = await (await this.operations(agent)).append(orientation.data.point, key, recorded.packageText);
+              const answer = await (await this.operations(agent)).append(orientation.data.point, key, recorded.packageText, 'support:work-item-package');
               return answer.outcome === 'session-lost'
                 ? { session: event.data.session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' }
                 : { session: event.data.session, ref: answer.ref, outcome: answer.outcome, reason: null };
@@ -3665,7 +3681,7 @@ export class RunService {
       .filter(event => event.data.assessment === assessment.id && event.data.round === assessment.round)
       .map(event => run.path(runLayout.submission(event.data.invocation)));
     const result = await this.runInvocation<CoordinatorAction>(run, agent, {
-      role: 'nonfunctional-coordinator', work: {},
+      role: 'nonfunctional-coordinator', task: { goal: `Assess the requirements of candidate ${candidate.tree}`, requirements: [this.planPackage(run, catalog)] }, work: {},
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
       loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot, coordinatorActionToolName),
       prompt: [coordinatorActionPrompt(candidate, unresolved, investigatedNfrs,
@@ -3696,7 +3712,7 @@ export class RunService {
     const loaded = packages.get('nonfunctional-coordinator');
     if (loaded === undefined) throw new Error('Non-functional coordinator package is unavailable');
     const result = await this.runInvocation<CoordinatorInvestigation>(run, agent, {
-      role: 'nonfunctional-coordinator', work: {},
+      role: 'nonfunctional-coordinator', task: { goal: action.question, requirements: [this.planPackage(run, await this.frozenCatalog(run), action.nfrs)] }, work: {},
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
       loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot, coordinatorInvestigationToolName),
       prompt: [`Investigate element IDs ${action.nfrs.join(', ')} for assessment ${assessment.id} of tree ${assessment.candidate.tree}.`,
@@ -3767,7 +3783,7 @@ export class RunService {
     const baseline = await this.baselineSnapshot(run);
     const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
     const result = await this.runInvocation<NonfunctionalRepairSubmission>(run, agent, {
-      role: 'nonfunctional-repair-engineer', work: { nonfunctionalRepair: assignment.id },
+      role: 'nonfunctional-repair-engineer', task: { goal: assignment.task, requirements: [this.planPackage(run, catalog, assignment.nfrs)] }, work: { nonfunctionalRepair: assignment.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-repair-engineer').length + 1,
       loaded, systemPrompt: renderNonfunctionalRepairPrompt(loaded, this.projectRoot),
       prompt: repairPrompt(assignment.task, (await this.readPreparedCandidate(run, assignment.candidate)).candidate,
@@ -3907,7 +3923,7 @@ export class RunService {
         return null;
       }
       const result = await this.runInvocation<CoordinatorAssessmentSubmission>(run, agent, {
-        role: 'nonfunctional-coordinator', work: {},
+        role: 'nonfunctional-coordinator', task: { goal: `Assess the complete NFR catalog for ${prepared.candidate.tree}`, requirements: [this.planPackage(run, catalog.catalog)] }, work: {},
         attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
         loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot),
         prompt: coordinatorAssessmentPrompt(this.planPackage(run, catalog.catalog), prepared.candidate, round, phase),
@@ -3954,7 +3970,7 @@ export class RunService {
   /**
    * One invocation, from the event that licenses it to the outcome that
    * closes it. Every role goes through here: the record is committed before
-   * `startSession`, the judge is the one answer to an invalid submission,
+   * the preserving operation, the judge is the one answer to an invalid submission,
    * the session's settlement is the harness's own observation, and the
    * closing event is the last write of the invocation.
    */
@@ -4083,7 +4099,6 @@ export class RunService {
       startedAt: this.now().toISOString(),
     } satisfies Invocation);
 
-    await mkdir(run.path(runLayout.session(id)), { recursive: true });
     const observations = await ObservationLog.open(run.path(runLayout.observations(id)));
 
     // Registered before any event, so a stop that arrives between the
@@ -4229,7 +4244,7 @@ export class RunService {
           return verdict;
         },
       },
-      sessionDirectory: run.path(runLayout.session(id)),
+
       onEvent: event => {
         bounds.touch();
         void recorder.record(event)
@@ -4246,9 +4261,14 @@ export class RunService {
         destination: { run: run.record.jobId, invocation: id, submission: runLayout.submission(id) },
         accepted: () => { if (value === undefined || submissionHash === null) throw new Error('Accepted destination was not retained'); return { value, schema: request.submissionSchema, submissionHash }; }, currentAuthority: async () => !this.ignoring(run) && request.fenced?.() !== true,
         prepared: async packet => {
-          const recorded = await readTranscript(run.path(runLayout.transcript(session)));
+          const recorded = await readTranscript(run.path(runLayout.transcript(session))).catch(error => {
+            if (request.restore === true) throw error;
+            // A new invocation keeps display transcript failures as coverage gaps.
+            // Its operation/store input remains authoritative.
+            return { entries: [], unreadable: [] };
+          });
           const starts = recorded.entries.filter(entry => entry.type === 'started' && entry.invocation === id);
-          if (recorded.unreadable.length > 0 || starts.length > 1) throw new Error('Original invocation transcript start is unavailable or ambiguous');
+          if ((request.restore === true && recorded.unreadable.length > 0) || starts.length > 1) throw new Error('Original invocation transcript start is unavailable or ambiguous');
           const prior = starts[0];
           if (prior?.type === 'started') {
             if (prior.role !== request.role || JSON.stringify(prior.work) !== JSON.stringify(request.work) ||
@@ -4278,7 +4298,9 @@ export class RunService {
     if (live !== undefined) live.session = agentSession;
     // A start the executor could not honor is known only now, after the
     // invocation's start is committed; its end records it.
-    const degraded: DegradeRelation | undefined = request.start.mode !== 'fresh' && agentSession.start.mode !== request.start.mode
+    const degraded: DegradeRelation | undefined = request.degraded !== undefined && request.degraded.requested !== 'fresh'
+      ? { requested: request.degraded.requested === 'continued' ? 'continue' : request.degraded.requested, actual: agentSession.start.mode, reason: request.degraded.reason }
+      : request.start.mode !== 'fresh' && agentSession.start.mode !== request.start.mode
       ? { requested: request.start.mode, actual: agentSession.start.mode, reason: agentSession.start.degradedReason ?? null }
       : undefined;
 
@@ -4390,7 +4412,7 @@ export class RunService {
     const item = records.workItems.find(item => item.id === request.work.workItem);
     const goal = request.task?.goal ?? item?.goal ?? `Read the captured plan for ${run.record.planId} and perform the current ${kind} task.`;
     const requirements = request.task?.requirements ?? [new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)))];
-    const sections = taskSupportSections(request.prompt, [goal, ...requirements, ...(request.task?.omit ?? [])]);
+    const sections = [...taskSupportSections(request.prompt, [goal, ...requirements, ...(request.task?.omit ?? [])]), ...(request.task?.literalSections ?? [])];
     return { kind, objective: `Perform ${kind} for ${JSON.stringify(request.work)}; use the current evidence and designated submission.`, goal, requirements, sections,
       ...(request.task?.consultationSubmissionSchema === undefined ? {} : { consultationSubmissionSchema: request.task.consultationSubmissionSchema }),
       environment: { projectRoot: this.projectRoot, workingDirectory: spec.scope.workingDirectory,
@@ -4984,7 +5006,7 @@ export class RunService {
           await this.afterWrite('context-package-append-requested', run.record.jobId);
           if (session === undefined || ref === undefined) return { session: null, ref: null, outcome: 'no-session', reason: 'No retained parent point' };
           try {
-            const answer = await (await this.operations(agent)).append(ref, key, recorded.packageText);
+            const answer = await (await this.operations(agent)).append(ref, key, recorded.packageText, 'support:work-item-package');
             return answer.outcome === 'session-lost'
               ? { session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' }
               : { session, ref: answer.ref, outcome: answer.outcome, reason: null };
@@ -5582,7 +5604,8 @@ export class RunService {
       const result = await this.runInvocation<LocalArchitectSubmission>(run, agent, {
         role: 'local-architect',
         originalInvocation: originalLocalInvocation,
-        task: { goal: item.goal, requirements: contextPackage === undefined ? [plan] : [contextPackage.text], omit: contextPackage === undefined ? [] : [contextPackage.text],
+        task: { goal: item.goal, requirements: contextPackage === undefined ? [plan] : [`Use the accepted work-item package ${contextPackage.citation.hash}, with selected elements ${contextPackage.citation.elements.join(', ') || '(none)'}. Its complete context is supplied once and remains in this session.`], omit: contextPackage === undefined ? [] : [contextPackage.text],
+          literalSections: contextPackage !== undefined ? [{ key: 'support:work-item-package', text: contextPackage.text }] : [],
           views: (views.evidence?.views ?? []).map(view => ({ path: view.path, revision: view.revision, modules: [item.module], coverage: view.coverage === null ? [] : [`${view.coverage} coverage limits`] })) },
         work: { workItem: item.id },
         attempt,
@@ -5719,7 +5742,7 @@ export class RunService {
         // package, which the next prompt carries once.
         if (resolution.kind === 'decided' && contextPackage !== undefined && this.addsOwner(run, item, resolution.decision)) {
           const reselected = await this.reselectWorkContext(run, agent, packages, item, contextPackage,
-            { invocation: result.id, point: sessionRef ?? null, session }, resolution.decision);
+            { invocation: result.id, point: result.ref ?? null, session: result.session }, resolution.decision);
           if (reselected === null) return null;
           contextPackage = reselected;
           packageUndelivered = true;
@@ -6066,6 +6089,7 @@ export class RunService {
         return [{ ref: refOf(hypothesis.id, hypothesis.revision, hypothesis), stance: tested.stance, evidence: tested.evidence }];
       }),
       localDecisions: [...body.localDecisions],
+      globalSource: globalForkSourceSchema.parse(this.globalContextOf(run)),
     } satisfies PlacementRequest) : placementRequestSchema.parse(this.committedBody(run, architectureLayout.request(id)));
 
     if (existingId !== undefined) {
@@ -6116,7 +6140,12 @@ export class RunService {
       if (this.ignoring(run)) return null;
 
       const current = committedRecords(run.log.ledger.replay());
-      const context = this.globalContextOf(run);
+      const context = request.globalSource;
+      if (context === undefined || (context.ref === null && (context.generation === 1 || context.previous === null ||
+        !run.log.all('global-context-rebuilt').some(event => event.data.generation === context.generation)))) {
+        await this.fail(run, 'recovery-exhausted', `Placement ${id} has no recorded oriented request-time parent or named rebuild`);
+        return null;
+      }
       const decisions = [...current.decisions.values()];
       const replay = existingId === undefined ? undefined : await this.replayAcceptedBoundaryFork(run, id, view);
       if (replay === null) return null;
@@ -6315,6 +6344,7 @@ export class RunService {
       invocation: answer.invocation,
       conflict: answer.conflict,
       evidence: [...answer.evidence],
+      globalSource: globalForkSourceSchema.parse(this.globalContextOf(run)),
     } satisfies UnresolvedRequest) : unresolvedRequestSchema.parse(this.committedBody(run, deviationLayout.request(id)));
     if (existingId !== undefined) {
       const accepted = run.log.all('decision-accepted').find(event => event.data.request === id);
@@ -6388,7 +6418,12 @@ export class RunService {
       if (this.ignoring(run)) return null;
 
       const current = committedRecords(run.log.ledger.replay());
-      const context = this.globalContextOf(run);
+      const context = request.globalSource;
+      if (context === undefined || (context.ref === null && (context.generation === 1 || context.previous === null ||
+        !run.log.all('global-context-rebuilt').some(event => event.data.generation === context.generation)))) {
+        await this.fail(run, 'recovery-exhausted', `Unresolved request ${id} has no recorded oriented request-time parent or named rebuild`);
+        return null;
+      }
       const decisions = [...current.decisions.values()];
       const tracked = trackedScenarios(run.log.ledger.replay());
       const replay = existingId === undefined ? undefined : await this.replayAcceptedBoundaryFork(run, id, view);
@@ -7581,14 +7616,9 @@ export class RunService {
     let progress = resume?.progress ?? '';
     let pendingAction = resume?.replay;
     let reconstructedFrom = resume?.reconstructedFrom;
-    const lastAnswer = [...records.capabilityExchanges.values()].flatMap(entries => entries)
-      .filter(entry => entry.task === task.id && entry.answer !== null).at(-1)?.answer;
-    const answerOutcome = lastAnswer === undefined || lastAnswer === null ? undefined :
-      records.outcomes.get(lastAnswer.invocation);
-    const answerStart = lastAnswer === undefined || lastAnswer === null ? undefined :
-      run.log.all('invocation-started').find(event => event.data.invocation === lastAnswer.invocation);
-    let consumerPoint = answerOutcome?.session?.ref ?? request.continuation.point;
-    let consumerSession: SessionId | undefined = answerStart?.data.session ?? request.continuation.session;
+    // Consultation children never replace the original suspended consumer source.
+    let consumerPoint = request.continuation.point;
+    let consumerSession: SessionId | undefined = request.continuation.session;
     for (let attempt = resume?.attempt ?? 1; attempt <= task.limits.maxInvocations; attempt += 1) {
     // The task's architect may register a case of its current plan revision.
     const capabilityActor = (): ObligationActor => ({ kind: 'capability-task', id: task.id, useCases: new Set(plan.useCases.map(useCase => useCase.id)) });
@@ -7654,7 +7684,8 @@ export class RunService {
     ];
     let unreported: string[] = [];
     const action = pendingAction ?? await this.runInvocation<CapabilityAction>(run, agent, {
-      role: 'capability-architect', task: { kind: 'capability', goal: request.original.need, requirements: [JSON.stringify(request.original)] }, work: { capabilityTask: task.id, request: request.id }, attempt,
+      role: 'capability-architect', task: { kind: 'capability', goal: request.original.need, requirements: [JSON.stringify(request.original)],
+        omit: [`# Selected plan package ${selectedHash}\n\n${selected}`], literalSections: [{ key: 'support:selected-plan-package', text: `# Selected plan package ${selectedHash}\n\n${selected}` }] }, work: { capabilityTask: task.id, request: request.id }, attempt,
       loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
       prompt: [
         `# Capability task ${task.id}`, `Use task ${task.id}, planRevision ${plan.revision} and invocation ${coordinatorBasis} as your action basis.`,
@@ -7746,7 +7777,10 @@ export class RunService {
       await this.afterWrite('capability-coordinator-resumed', run.record.jobId);
       if (this.ignoring(run)) return null;
     }
-    let nextCoordinator = { point: replayed && resume?.session === undefined ? undefined : action.ref || undefined,
+    // Recovery's model-free append advanced this same recorded coordinator.
+    // Replay the effect from the original action point, then continue from the
+    // explicitly retained appended recovery point rather than the stale action.
+    let nextCoordinator = { point: replayed ? resume?.point : action.ref || undefined,
       session: replayed && resume?.session === undefined ? undefined : action.kept ? action.session : undefined,
       invocation: action.id };
     if (chosen.kind === 'consult-consumer') {
@@ -7853,12 +7887,18 @@ export class RunService {
         await run.mutex.run(() => commitCapabilityTransition(run.log, {
           type: 'capability-exchange-answered', data: { task: task.id, exchange: id, invocation: prior.data.invocation },
         }, [{ path: capabilityLayout.exchange(task.id, id, 2), id, revision: 2, body: answered }]));
-        return { exchange: answered, point: outcome.session?.ref ?? '', session: prior.data.session };
+        return { exchange: answered, point: consumer.point ?? '', session: consumer.session ?? request.continuation.session as SessionId };
       }
     }
-    const continuation = consumer.point === null || consumer.session === undefined ? { outcome: 'session-lost' as const }
-      : await (await this.operations(agent)).append(consumer.point, `consult:${id}`, `Read-only consultation ${id}: ${action.question}`);
-    const reconstructed = continuation.outcome === 'session-lost';
+    // Every consultation branches from the ORIGINAL accepted capability
+    // request. Neither a prior answer nor the parent's later head is its
+    // source; exploration and new role/tool input remain only in the child.
+    const source = request.continuation;
+    if (source.point !== null && readSessionPointReference(source.point)?.runId !== run.record.jobId) {
+      await this.fail(run, 'recovery-exhausted', `Consultation ${id} has an invalid recorded original request point`);
+      return null;
+    }
+    const reconstructed = source.point === null || !await (await this.operations(agent)).hasPoint(run.record.jobId, source.point);
     const response = await this.runInvocation(run, agent, {
       role: 'engineer', task: { kind: 'consultation', goal: action.question, requirements: [JSON.stringify(plan)], consultationSubmissionSchema: JSON.stringify(z.toJSONSchema(responseSchema)) }, work: { capabilityTask: task.id, request: request.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'engineer' &&
@@ -7869,21 +7909,21 @@ export class RunService {
         ...(reconstructed ? [`Original request and suspended source: ${JSON.stringify(request)}`] : []),
         `References: ${action.references.join(', ')}`, 'Answer directly; source edits require a separate A-scoped assignment.'].join('\n\n'),
       workingDirectory: this.projectRoot,
-      start: reconstructed ? { mode: 'fresh' } : { mode: 'continue', ref: continuation.ref },
+      start: reconstructed ? { mode: 'fresh' } : { mode: 'fork', from: source.point! },
       ...(reconstructed ? {
         ...(consumer.session === undefined ? {} : { replaces: { session: consumer.session, reason: 'reconstructed' as const } }),
-        degraded: { requested: 'continued' as const, reason: 'The original engineer session could not be continued; current request, source and plan were supplied to a reconstructed session.' },
-      } : { session: consumer.session!, continuing: 'capability-coordination' as const }),
+        degraded: { requested: 'fork' as const, reason: 'The recorded original capability request point is unavailable; current request, suspended source and plan were supplied under the named consumer consultation recovery.' },
+      } : { fork: { from: { session: source.session as SessionId, invocation: request.invocation }, reason: 'capability-consultation' as const, briefs: [] } }),
       toolName: 'answer_capability_consultation', description: 'Answer the question from the preserved A-engineer session.',
       inputSchema: z.toJSONSchema(responseSchema) as JsonSchema,
       submissionSchema: 'ramify-agent.capability-consultation/1', validate: input => validateAgainst(responseSchema, input),
       scope: { write: null, measurement: null, size: null },
       equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools: [] }),
-      keep: () => kept,
+      keep: () => finished('not-kept'),
     });
     if (this.ignoring(run)) return null;
     if (response.ended !== 'submitted' || response.value === undefined || (response.actual === 'fresh' && !reconstructed)) {
-      await this.fail(run, 'invalid-submission', `Consultation ${id} did not continue the preserved engineer session and answer`);
+      await this.fail(run, 'invalid-submission', `Consultation ${id} did not fork the original capability request point and answer`);
       return null;
     }
     const answered: CapabilityExchange = { ...exchange, answer: { invocation: response.id,
@@ -7893,7 +7933,7 @@ export class RunService {
     }, [{ path: capabilityLayout.exchange(task.id, id, 2), id, revision: 2, body: answered }]));
     await this.afterWrite('capability-exchange-answered', run.record.jobId);
     if (this.ignoring(run)) return null;
-    return { exchange: answered, point: response.ref, session: response.session };
+    return { exchange: answered, point: consumer.point ?? '', session: consumer.session ?? source.session as SessionId };
   }
 
   /** A task completion request uses the ordinary project gate and the
@@ -8573,7 +8613,8 @@ export class RunService {
       const result = replay ?? await this.runInvocation<EngineerSubmission>(run, agent, {
         role: 'engineer',
         originalInvocation: run.restoring && latestStart && !run.log.all('invocation-ended').some(event => event.data.invocation === latestStart.data.invocation) ? latestStart.data.invocation : undefined,
-        task: { kind: start.mode === 'continue' ? 'repair' : 'engineering', goal: assignment.goal, requirements: assignmentPackage === undefined ? [assignment.completionEvidence] : [assignmentPackage], omit: assignmentPackage === undefined ? [] : [assignmentPackage],
+        task: { kind: start.mode === 'continue' ? 'repair' : 'engineering', goal: assignment.goal, requirements: [assignment.completionEvidence], omit: assignmentPackage === undefined ? [] : [assignmentPackage],
+          literalSections: assignmentPackage !== undefined ? [{ key: 'support:assignment-package', text: assignmentPackage }] : [],
           views: invocationViews.flatMap(entry => entry.views.map(view => ({ path: view.path, revision: view.revision, modules: [entry.module], coverage: view.coverage === null ? [] : [`${view.coverage} coverage limits`] }))) },
         workingDirectory,
         work: { workItem: item.id, iteration: assignment.id },
@@ -9211,7 +9252,8 @@ export class RunService {
       const result = await this.runInvocation<ContractSubmission>(run, agent, {
         role: 'contract-engineer',
         originalInvocation: originalContractInvocation,
-        task: { kind: 'contract', goal: assignment.goal, requirements: assignmentPackage === undefined ? [assignment.completionEvidence] : [assignmentPackage] },
+        task: { kind: 'contract', goal: assignment.goal, requirements: [assignment.completionEvidence], omit: assignmentPackage === undefined ? [] : [assignmentPackage],
+          literalSections: assignmentPackage === undefined ? [] : [{ key: 'support:assignment-package', text: assignmentPackage }] },
         work: { workItem: item.id, iteration: assignment.id },
         attempt,
         loaded,

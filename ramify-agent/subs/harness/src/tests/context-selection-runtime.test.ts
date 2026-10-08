@@ -12,6 +12,8 @@ import { readRecordedContextSelection } from '../context-selection/recorded.js';
 import { contextSelectorToolName } from '../context-selection/submissions.js';
 import { coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
 import type { RunEvent, RunEventOf } from '../run/log.js';
+import { HarnessSessionOperations } from '../run/session-operations.js';
+import { exactInputHash } from '../prompts/delivered-manifest.js';
 import { runLayout, runRecordSchema } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { declaringScenarios, defaultTurn, withDefaultTurns } from './helpers/declarations.js';
@@ -90,6 +92,16 @@ test('one oriented local context selects once, appends the work-item package onc
   // The package is in the session once, as its append, byte for byte; the brief names it by hash.
   expect(organizing[0]!.inherited.filter(text => text === recorded.packageText)).toHaveLength(1);
   expect(organizing[0]!.spec.prompt).not.toContain(recorded.packageText);
+  const operation = events.find(event => event.type === 'invocation-started' && event.data.role === 'local-architect' && event.data.start === 'continued');
+  if (!operation || operation.type !== 'invocation-started') throw new Error('Expected organizing continuation');
+  const adapter = await HarnessSessionOperations.open(join(fixture.root, 'plans', '.harness', 'session-operations'), agent);
+  try {
+    const packet = await adapter.packet(receipt.jobId, operation.data.invocation);
+    expect(packet!.message).toBe(organizing[0]!.spec.prompt);
+    expect(packet!.manifest.currentMessage!.hash).toBe(exactInputHash(packet!.message));
+    expect(packet!.manifest.entries.filter(entry => entry.hash === exactInputHash(recorded.packageText))).toEqual([expect.objectContaining({ delivery: 'inherited' })]);
+    expect(packet!.additions.some(entry => entry.text.includes(recorded.packageText))).toBe(false);
+  } finally { expect(await adapter.close()).toBe(true); }
   expect(organizing[0]!.spec.prompt).not.toContain('# Your work-item package');
   expect(organizing[0]!.spec.prompt).toContain(`Your work-item package \`${recorded.selection.package.hash}\`, already in your session`);
   expect(organizing[0]!.spec.prompt).toContain('- Requirement: fr-001\n- Acceptance: fr-002\n- Context: none');
@@ -189,7 +201,7 @@ test('lost parent session reconstructs the exact package in a fresh organizing p
   await installTestRunner(fixture.root);
   const agent = createScriptedAgent(selecting(() => {
     const parent = agent.sessions.find(session => session.spec.submission.name === 'submit_work_orientation');
-    if (!parent || !agent.forget(parent.ref)) throw new Error('Expected a retained orientation point');
+    if (!parent || !agent.loseSession(JSON.parse(parent.ref))) throw new Error('Expected a retained orientation point');
     return submit({ selected: [] });
   }, spec => {
     if (spec.role === 'initial-architect') return submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core')]));
@@ -210,7 +222,7 @@ test('lost parent session reconstructs the exact package in a fresh organizing p
   const organizing = agent.sessions.find(session => session.spec.submission.name === 'submit_work_item_result');
   expect(organizing?.start.mode).toBe('fresh');
   const recorded = await recordedPackage(fixture.root, receipt.jobId, events, selection);
-  expect(organizing?.spec.prompt).toContain(`\n\n# Your work-item package\n\n${recorded.packageText}`);
+  expect(organizing?.spec.prompt).toContain(recorded.packageText);
   expect(organizing?.spec.prompt.split(recorded.packageText)).toHaveLength(2);
   expect(events.find(event => event.type === 'context-package-prompt-bound')?.data.packageHash).toBe(selection.data.packageHash);
 }, 120_000);

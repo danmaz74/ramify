@@ -78,6 +78,8 @@ export function orientationKey(inputs: {
   readonly agent: string;
   readonly model: string | null;
   readonly context: unknown;
+  readonly scope?: unknown;
+  readonly execution?: unknown;
 }): string {
   return hashOf(canonicalJson({
     question: 'design',
@@ -86,5 +88,7 @@ export function orientationKey(inputs: {
     agent: inputs.agent,
     model: inputs.model,
     context: inputs.context ?? null,
+    scope: inputs.scope ?? null,
+    execution: inputs.execution ?? null,
   }));
 }

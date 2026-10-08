@@ -110,13 +110,12 @@ describe('the bounds on one invocation', () => {
 describe('an implementation that cannot start a session', () => {
   test('is an adapter fault: the invocation ends failed with that interruption, and the run fails agent-failed', async () => {
     // Also found by the composition suite: the harness's defense against a
-    // `startSession` that throws, which the port's rules forbid, had no test.
+    // the preserving operation that throws, which the port's rules forbid, had no test.
     const scripted = createScriptedAgent([{ kind: 'submit', input: analysis([]) }]);
     const broken: AgentPort = {
       name: scripted.name,
       support: scripted.support,
-      startSession: () => { throw new Error('the adapter could not build a session'); },
-      appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
+      bindSessionStore(store) { const operations = scripted.bindSessionStore(store); return { ...operations, continue: async () => { throw new Error('the adapter could not build a session'); } }; },
     };
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
@@ -161,14 +160,12 @@ describe('the bounds on the whole run', () => {
     const timed: AgentPort = {
       name: scripted.name,
       support: scripted.support,
-      appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
       // The analysis's three sessions (intake, initial architect, checker)
       // together pass the bound, at the boundary before the local architect's.
-      startSession: spec => {
-        const session = scripted.startSession(spec);
+      bindSessionStore(store) { const operations = scripted.bindSessionStore(store); return { ...operations, async continue(input) {
         current = new Date(current.getTime() + 67);
-        return session;
-      },
+        return operations.continue(input);
+      } }; },
     };
     const opened = await openRuns(fixture.root, {
       agent: timed,

@@ -324,7 +324,6 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
   const id = sessionId();
   const records = join(projectRoot, sessionsDirectory, id);
   const at = (path: string) => join(records, path);
-  await mkdir(at(sessionLayout.executorSession), { recursive: true });
 
   // The prompt is the goal; what the person did not give reads "not stated".
   const assignment: IterationAssignment = {
@@ -472,7 +471,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
         return verdict;
       },
     },
-    sessionDirectory: at(sessionLayout.executorSession),
+
     onEvent: event => {
       bounds.touch();
       if (event.type === 'tool-started' && event.tool !== engineerToolName) {

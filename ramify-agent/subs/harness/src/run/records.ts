@@ -586,6 +586,13 @@ export const sessionPointSchema = z.union([
 ]);
 export type SessionPoint = z.infer<typeof sessionPointSchema>;
 
+/** Captured when a global question is accepted, never recomputed on retry. */
+export const globalForkSourceSchema = z.object({
+  generation: z.int().positive(), session: sessionIdSchema.nullable(), ref: text.nullable(),
+  point: sessionPointSchema.nullable(), previous: sessionIdSchema.nullable(),
+  appended: z.array(text), pending: z.array(text),
+}).strict();
+
 /**
  * Why a suspended session is continued: its placement request was answered,
  * the iteration it assigned closed, its completion was refused while
@@ -606,7 +613,7 @@ export type ContinueReason = z.infer<typeof continueReasonSchema>;
  * point after its completion request; an unresolved request forks the
  * architect context, as a placement request does.
  */
-export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection']);
+export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection', 'capability-consultation']);
 
 /** Why a session takes another's place: a lost engineer is reconstructed from records, or the architect context is rebuilt. */
 export const replaceReasonSchema = z.enum(['reconstructed', 'context-rebuilt']);
@@ -959,7 +966,6 @@ export const runLayout = {
   observations: (id: InvocationId): string => join('invocations', id, 'observations.jsonl'),
   lineEvents: (id: InvocationId): string => join('invocations', id, 'lines.json'),
   /** The executor's own session record, such as pi's, which only it reads. */
-  session: (id: InvocationId): string => join('invocations', id, 'session'),
   /** The complete output of one `shell` call, which the tool answers only the tail of. */
   shellOutput: (id: InvocationId, call: number): string => join('invocations', id, 'shell', `${String(call).padStart(3, '0')}.log`),
   /** What one post-write hook check printed, which its observation names. */

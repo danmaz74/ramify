@@ -54,7 +54,7 @@ function script(starts: string[], capabilityPrompts: string[] = [], qualificatio
     }
     if (spec.submission.name === 'submit_capability_qualification') {
       qualificationTurns += 1;
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt);
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1);
       if (!ids) throw new Error('Qualification prompt lost its request or invocation');
       if (qualificationTurns === 1) return submit({ kind: qualification === 'placement' ? 'request-placement' : 'unresolved',
         request: ids[1], invocation: ids[2], problem: 'B ownership needs a global decision',
@@ -83,7 +83,7 @@ function script(starts: string[], capabilityPrompts: string[] = [], qualificatio
     if (spec.role === 'capability-architect') {
       capabilityPrompts.push(spec.prompt);
       capabilityTurns += 1;
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt);
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1);
       if (!ids) throw new Error('Capability prompt lost its task basis');
       const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
       if (capabilityTurns <= budgetReturns) return [
@@ -93,7 +93,8 @@ function script(starts: string[], capabilityPrompts: string[] = [], qualificatio
           changes: { proposedInterface: 'B returns fact text with its source' },
         } }] : []),
         { kind: 'context', tokens: 200_000, window: null },
-        { kind: 'message', text: 'The capability remains unfinished at my context budget.' },
+        // A raw limit supplies no explicit provider report.
+
       ];
       if (capabilityTurns === budgetReturns + 1) return submit({ kind: 'partial', ...basis,
         progress: 'Read A source and B entry context', unfinished: ['Coordinate B and A assignments'] });
@@ -134,8 +135,10 @@ test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and kee
   expect(capabilityPrompts[0]).toContain('# Selected plan package ');
   expect(capabilityPrompts[0]).toContain('B owns the source fact. A integrates its calling code.');
   expect(capabilityPrompts[1]).toContain('was delivered in full in the earlier turn; it is unchanged');
-  expect(capabilityPrompts[1]).not.toContain('# Selected plan package ');
-  expect(capabilityPrompts[1]).not.toContain('Original request:');
+  const currentArchitect = opened.agent!.sessions.filter(session => session.spec.role === 'capability-architect')[1]!;
+  expect(currentArchitect.spec.prompt).not.toContain('# Selected plan package ');
+  expect(currentArchitect.inherited.filter(text => text.includes('# Selected plan package '))).toHaveLength(1);
+  expect(currentArchitect.spec.prompt).not.toContain('Original request:');
   expect(capabilityStarts[1]?.type === 'invocation-started' ? capabilityStarts[1].data.session : null)
     .toBe(capabilityStarts[0]?.type === 'invocation-started' ? capabilityStarts[0].data.session : null);
   expect(starts.filter(start => start.startsWith('local-architect:submit_work_item_result'))).toHaveLength(1);
@@ -225,56 +228,28 @@ test('an unsafe scratch override refuses capability source capture until the sam
   await opened.service.settled('need', receipt.jobId);
 }, 60_000);
 
-test('a capability architect budget return reconstructs a fresh session with the current task and plan', async () => {
-  const fixture = await copyCapabilityFixture();
-  cleanups.push(fixture.remove);
+test('a raw capability architect limit fails with its task unfinished and no synthetic report or replacement dispatch', async () => {
+  const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
   const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'delegation', 'a+b'); answers.push(boundaryAnswers);
-
-
   const starts: string[] = [];
-  const prompts: string[] = [];
   const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, {
-    ...boundaryAnswers.options, script: script(starts, prompts, 'placement', 1, true), inputs: treeInputs(),
-
+    ...boundaryAnswers.options, script: script(starts, [], 'placement', 1, true), inputs: treeInputs(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
-  await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>
-    event.type === 'capability-assigned' || event.type === 'job-failed'));
-  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(events.some(event => event.type === 'job-failed')).toBe(false);
-  const startsForTask = events.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect');
-  expect(startsForTask).toHaveLength(3);
-  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual([
-    'capability-architect:submit_capability_action:fresh',
-    'capability-architect:submit_capability_action:fresh',
-    'capability-architect:submit_capability_action:continue',
-  ]);
-  expect(prompts[1]).toContain('Original request:');
-  expect(prompts[1]).toContain('# Selected plan package ');
-  expect(prompts[1]).toContain('Current plan:');
-  expect(prompts[1]).toContain('context budget');
-  expect(prompts[1]).toContain('planRevision 2');
-  expect(prompts[1]).toContain('B returns fact text with its source');
-  const first = startsForTask[0];
-  const second = startsForTask[1];
-  if (first?.type !== 'invocation-started' || second?.type !== 'invocation-started') throw new Error('Missing capability architect invocations');
-  expect(second.data.session).not.toBe(first.data.session);
-  const budget = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
-    `invocations/${first.data.invocation}/outcome.json`), 'utf8')) as { ended: string; budget?: { reportDelivered: boolean } };
-  expect(budget).toMatchObject({ ended: 'context-budget-reached', budget: { reportDelivered: true } });
-  expect(events.some(event => event.type === 'capability-handed-back')).toBe(false);
-  let stopped = false;
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const version = opened.service.getRun('need', receipt.jobId)!.version;
-    try { await opened.service.execute(stopRun('need', receipt.jobId, version)); stopped = true; break; }
-    catch (error) { if (!String(error).includes('at version')) throw error; }
-  }
-  expect(stopped).toBe(true);
   await opened.service.settled('need', receipt.jobId);
+  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(events.find(event => event.type === 'job-failed')?.data).toMatchObject({ reason: 'limit-exceeded', message: expect.stringContaining('unfinished task remains') });
+  const taskStarts = events.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect');
+  expect(taskStarts).toHaveLength(1);
+  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual(['capability-architect:submit_capability_action:fresh']);
+  const first = taskStarts[0]!; if (first.type !== 'invocation-started') throw new Error('Missing architect');
+  const outcome = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.outcome(first.data.invocation)), 'utf8'));
+  expect(outcome).toMatchObject({ ended: 'context-budget-reached', submission: null, budget: { reportDelivered: false } });
+  expect(events.filter(event => event.type === 'capability-assigned' || event.type === 'capability-handed-back' || event.type === 'work-item-completed')).toEqual([]);
 }, 30_000);
 
-test('exhausted capability architect budget returns leave the task unfinished without handback', async () => {
+test('a captured budget-return allowance does not authorize fresh fallback after a raw capability limit', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'delegation', 'a+b'); answers.push(boundaryAnswers);
@@ -296,11 +271,11 @@ test('exhausted capability architect budget returns leave the task unfinished wi
   expect(capturedBound).toBe(6);
   const terminal = events.find(event => event.type === 'job-failed');
   expect(terminal?.type === 'job-failed' ? terminal.data.reason : null).toBe('limit-exceeded');
-  expect(events.filter(event => event.type === 'invocation-ended' && event.data.ended === 'context-budget-reached')).toHaveLength(capturedBound);
+  expect(events.filter(event => event.type === 'invocation-ended' && event.data.ended === 'context-budget-reached')).toHaveLength(1);
   expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(0);
   expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
   expect(events.filter(event => event.type === 'work-item-completed')).toHaveLength(0);
-  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual(Array(capturedBound).fill('capability-architect:submit_capability_action:fresh'));
+  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual(['capability-architect:submit_capability_action:fresh']);
 }, 30_000);
 
 for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port-inputs'] as const) {
@@ -316,7 +291,7 @@ for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port
       if (spec.role !== 'capability-architect') return typeof ordinary === 'function' ? ordinary(spec) : ordinary;
       architectTurns += 1;
       if (architectTurns > 1) return [{ kind: 'wait', ms: 60_000 }];
-      const [, task, revision, invocation] = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const [, task, revision, invocation] = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       const basis = { task, planRevision: Number(revision), invocation };
       const incomplete = { ...basis, kind: 'assign', owner: b };
       if (mode === 'preview-then-correct') return [
@@ -467,7 +442,7 @@ test('CA02: local architect finds an existing API and the same engineer verifies
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       return submit({ kind: 'satisfy-with-existing', request: ids[1], invocation: ids[2],
         api: { owner: b, path: 'subs/b/src/fact.ts', symbol: 'readFact' },
         guidance: 'Call readFact and retain its old text behavior', evidence: ['subs/b/src/fact.ts exports readFact'] });

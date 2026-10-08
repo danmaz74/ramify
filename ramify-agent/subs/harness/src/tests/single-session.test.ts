@@ -381,8 +381,6 @@ describe('the session\'s records', () => {
     const agent: AgentPort = {
       name: scripted.name,
       support: scripted.support,
-      appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
-      startSession: spec => scripted.startSession(spec),
       bindSessionStore(store) {
         const operations = scripted.bindSessionStore(store);
         return { ...operations, async continue(input) {

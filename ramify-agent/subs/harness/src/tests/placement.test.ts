@@ -25,7 +25,7 @@ import {
  * long-lived architect context.
  *
  * Each request refreshes the architect view, records its identity, and forks
- * the parent's latest point. The fork investigates and decides; the parent
+ * the recorded request-time parent point. The fork investigates and decides; the parent
  * is never invoked for the choice. The brief of an accepted decision is
  * appended to the parent without a model call, and the next fork inherits
  * it.
@@ -200,6 +200,11 @@ describe('G2, G3: two sequential placement forks, and the brief between them', (
     // The brief carries the decision's own references, and the fork's text
     // unchanged.
     expect(forks[1]!.inherited.join('\n')).toContain('Decision gd-001 (request pr-001)');
+    const sources = await Promise.all(['pr-001', 'pr-002'].map(id => readJson<PlacementRequest>(runPath(project, 'revision-diff', runId, architectureLayout.request(id)))));
+    expect(sources.map(request => request.globalSource!.appended)).toEqual([[], ['gd-001']]);
+    expect(sources.map(request => request.globalSource!.pending)).toEqual([[], []]);
+    // The second decision was accepted later, so it belongs to neither captured inherited prefix.
+    expect(forks.every(fork => !fork.inherited.join('\n').includes('Decision gd-002 (request pr-002)'))).toBe(true);
 
     // G2: the second decision reuses the registered entry rather than
     // naming a new slug.
@@ -412,23 +417,22 @@ describe('a start the executor could not honor', () => {
       'global-fork': [submit(firstDecision('field-diff belongs to the catalog core.'))],
     })));
     // The executor forgets the architect context and the local architect's
-    // session as soon as each first invocation ends, so the fork and the
-    // continuation it asks for both start fresh.
+    // session as soon as each first invocation ends, so the requested preserving fork must remain unavailable.
     let forgotInitial = false;
     let forgotLocal = false;
     const opened = await openRuns(project, {
       agent,
       inputs: treeInputs(),
-      unchangedCheckpoints: unchangedPlacementCheckpoints,
+      unchangedCheckpoints: [scenariosCommit('revision-diff')],
       afterWrite: async write => {
         if (write !== 'invocation-ended') return;
         const last = agent.sessions.at(-1);
         if (last?.spec.role === 'initial-architect' && !forgotInitial) {
           forgotInitial = true;
-          expect(agent.forget(last.ref)).toBe(true);
+          expect(agent.loseSession(JSON.parse(last.ref))).toBe(true);
         } else if (last?.spec.submission.name === 'submit_work_item_result' && !forgotLocal) {
           forgotLocal = true;
-          expect(agent.forget(last.ref)).toBe(true);
+          expect(agent.loseSession(JSON.parse(last.ref))).toBe(true);
         }
       },
     });
@@ -437,20 +441,12 @@ describe('a start the executor could not honor', () => {
     await opened.service.settled('revision-diff', receipt.jobId);
 
     const events = await runEventsOnDisk(project, 'revision-diff', receipt.jobId);
-    const degraded = events.flatMap(event => (event.type === 'invocation-ended' && event.data.degraded !== undefined ? [[event.data.invocation, event.data.degraded]] : []));
-    expect(degraded.map(([, relation]) => relation)).toEqual([
-      { requested: 'fork', actual: 'fresh', reason: expect.stringContaining('is not known to the scripted agent') },
-      { requested: 'continue', actual: 'fresh', reason: expect.stringContaining('is not known to the scripted agent') },
-    ]);
-    // The relations requested stay as they were asked for: the fork still
-    // names its source point, and the continuation its session's last one.
-    const sessions = reduceSessions(events);
-    const placementFork = [...sessions.values()].find(entry => entry.fork?.reason === 'placement-request');
-    expect(placementFork?.fork).toMatchObject({ from: { session: 'ses-0002', invocation: 'inv-0002' } });
-    const continued = events.find(event => event.type === 'invocation-started' && event.data.continues?.reason === 'placement-answered')!;
-    expect(continued.data).toMatchObject({ start: 'continued', continues: { reason: 'placement-answered' } });
-    // Only a start that degraded says so.
-    expect(events.filter(event => event.type === 'invocation-ended').length).toBeGreaterThan(degraded.length);
+    expect(events.filter(event => event.type === 'job-failed')).toHaveLength(1);
+    expect(events.filter(event => event.type === 'invocation-ended' && event.data.degraded?.actual === 'fresh')).toEqual([]);
+    expect(agent.sessions.filter(session => session.spec.role === 'global-fork')).toHaveLength(0);
+    const request = await readJson<PlacementRequest>(runPath(project, 'revision-diff', receipt.jobId, architectureLayout.request('pr-001')));
+    expect(request.globalSource?.ref).not.toBeNull();
+    expect(events.filter(event => event.type === 'session-opened' && event.data.role === 'initial-architect')).toHaveLength(1);
   }, 120_000);
 });
 
@@ -479,7 +475,7 @@ describe('a parent context that can no longer be read', () => {
         // brief is not appended yet.
         if (write === 'decision-accepted' && !lost) {
           lost = true;
-          expect(agent.forget(agent.sessions.find(session => session.spec.role === 'initial-architect')!.ref)).toBe(true);
+          expect(agent.loseSession(JSON.parse(agent.sessions.find(session => session.spec.role === 'initial-architect')!.ref))).toBe(true);
         }
       },
     });
@@ -513,6 +509,13 @@ describe('a parent context that can no longer be read', () => {
     expect(forks[1]!.inherited).toEqual([]);
     expect(forks[1]!.spec.prompt).toContain('The architect context, rebuilt from the run\'s records');
     expect(forks[1]!.spec.prompt).toContain(brief);
+    const source = (await readJson<PlacementRequest>(runPath(project, 'revision-diff', runId, architectureLayout.request('pr-002')))).globalSource!;
+    expect(source).toMatchObject({ generation: 2, ref: null, appended: [], pending: [] });
+    // gd-001 was accepted before its failed append. It is delivered as current reconstructed support, never claimed inherited.
+    const startedFresh = events.find(event => event.type === 'session-opened' && event.data.role === 'global-fork' && event.data.replaces !== undefined);
+    expect(startedFresh?.type).toBe('session-opened');
+    if (!startedFresh || startedFresh.type !== 'session-opened') throw new Error('Expected named reconstruction');
+    expect(startedFresh.data.fork).toBeUndefined();
     expect(forks[1]!.spec.prompt).toContain('`field-diff` → `collection-review/workspace/catalog/core`');
 
     // The invocation of that fork records what was requested and what was
@@ -682,9 +685,10 @@ describe('a decision that replaces an earlier one', () => {
     // The consequence reached the work item it names, at its own turn.
     const architects = agent.sessions.filter(session => session.spec.role === 'local-architect');
     const affected = architects.at(-1)!;
-    expect(affected.spec.prompt).toContain('# Work item wi-002');
-    expect(affected.spec.prompt).toContain('gd-002');
-    expect(affected.spec.prompt).toContain(consequence);
-    expect(affected.spec.prompt).toContain('It replaces `gd-001`.');
+    expect(affected.spec.prompt).toContain('Perform assignment for {"workItem":"wi-002"}');
+    const received = [...affected.inherited, affected.spec.prompt].join('\n');
+    expect(received).toContain('gd-002');
+    expect(received).toContain(consequence);
+    expect(received).toContain('It replaces `gd-001`.');
   }, 120_000);
 });
