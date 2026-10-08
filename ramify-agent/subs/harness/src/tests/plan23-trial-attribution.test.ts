@@ -27,6 +27,12 @@ describe('Plan23 exact setup line identities', () => {
   it('excludes only surviving shifted setup identity in a mixed commit and same file', () => {
     expect(result()).toEqual(expected([5])); // Agent line6 remains, despite same commit/path.
   });
+  it('keeps verified setup addition when another writer has no irrelevant source-position proof', () => {
+    expect(result({ candidates: [{ commit: 'S', path: '.gitignore', kind: 'added' }, { commit: 'F', path: '.gitignore', kind: 'added' }], facts: [{ ...fact, finalAdded: [fact.finalAdded![0]!, { line: 6, hash: other, originCommit: 'F', originPath: '', originLine: 0, boundary: true }] }] })).toEqual({ base: 'B', final: 'F', entries: [{ commit: 'S', path: '.gitignore', added: [5], deleted: [] }, { commit: 'F', path: '.gitignore', added: [], deleted: [] }] });
+  });
+  it('keeps verified setup deletion when another remover has no irrelevant setup-before mapping', () => {
+    const data = deletion(); expect(verifySetupLineIdentities({ ...data, candidates: [{ commit: 'S', path: '.gitignore', kind: 'deleted' }, { commit: 'F', path: '.gitignore', kind: 'deleted' }], facts: [{ ...data.facts[0]!, baseDeleted: [data.facts[0]!.baseDeleted![0]!, { line: 3, hash: other, lastSeenCommit: 'S', sourceBeforePath: '', sourceBeforeLine: null, removingCommit: 'F' }] }] })).toEqual({ base: 'B', final: 'F', entries: [{ commit: 'S', path: '.gitignore', added: [], deleted: [2] }, { commit: 'F', path: '.gitignore', added: [], deleted: [] }] });
+  });
   it('does not subtract setup counts when reverted setup leaves same-commit agent lines', () => {
     expect(result({ facts: [{ ...fact, finalAdded: [{ line: 2, hash: other, originCommit: 'S', originPath: '.gitignore', originLine: 3, boundary: false }] }] })).toEqual(expected([]));
   });

@@ -104,10 +104,10 @@ export function verifySetupLineIdentities(input: SetupLineIdentityInput): Harnes
         const verified: number[] = []; let invalid = false;
         for (const row of rows) {
           if (path(fact.afterPath) && present(row.originCommit) && !partitions.has(key(row.originCommit, fact.afterPath, kind))) throw new Error('Setup attribution direct-diff partition missing');
-          if (!position(row.line) || typeof row.hash !== 'string' || !position(row.originLine) || !hash(row.hash) || !path(row.originPath) || index(row.originCommit) < 0 || typeof row.boundary !== 'boolean' ||
+          if (!position(row.line) || typeof row.hash !== 'string' || !hash(row.hash) || index(row.originCommit) < 0 ||
               !partitions.has(key(row.originCommit, fact.afterPath!, kind))) { invalid = true; break; }
           if (row.originCommit !== record.commit) continue;
-          if (row.boundary || row.originPath !== record.path) { invalid = true; break; }
+          if (!position(row.originLine) || !path(row.originPath) || row.boundary !== false || row.originPath !== record.path) { invalid = true; break; }
           const expected = byLine.get(row.originLine);
           if (expected === undefined) continue; // Other same-commit lines retain writer attribution.
           if (expected !== row.hash) { invalid = true; break; }
@@ -122,10 +122,10 @@ export function verifySetupLineIdentities(input: SetupLineIdentityInput): Harnes
           const last = index(row.lastSeenCommit);
           const remover = last < 0 ? undefined : chain![last + 1];
           if (path(fact.beforePath) && remover !== undefined && !partitions.has(key(remover, fact.beforePath, kind))) throw new Error('Setup attribution direct-diff partition missing');
-          if (!position(row.line) || typeof row.hash !== 'string' || !hash(row.hash) || !path(row.sourceBeforePath) || !position(row.sourceBeforeLine!) || remover === undefined || row.removingCommit !== remover ||
+          if (!position(row.line) || typeof row.hash !== 'string' || !hash(row.hash) || remover === undefined || row.removingCommit !== remover ||
               !partitions.has(key(remover, fact.beforePath!, kind))) { invalid = true; break; }
           if (remover !== record.commit) continue;
-          if (row.sourceBeforePath !== record.path) { invalid = true; break; }
+          if (!path(row.sourceBeforePath) || !position(row.sourceBeforeLine!) || row.sourceBeforePath !== record.path) { invalid = true; break; }
           const expected = byLine.get(row.sourceBeforeLine!);
           if (expected === undefined) continue;
           if (expected !== row.hash) { invalid = true; break; }
