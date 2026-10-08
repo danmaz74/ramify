@@ -198,6 +198,10 @@ export const recoveryTable = {
     machines: ['SM4'], scenario: 'iteration', appended: interrupted,
     stated: 'Re-materializes the outline revision; no second revision',
   },
+  'obligation-reported': {
+    machines: ['SM4'], scenario: 'iteration', appended: interrupted,
+    stated: 'The accepted report stands once, with its invocation and submission; nothing is reported again and the request it rode on reaches no outline or gate',
+  },
   'iteration-assigned': {
     machines: ['SM5'], scenario: 'iteration', appended: interrupted,
     stated: 'Rewrites the assignment from the log; nothing is assigned twice',

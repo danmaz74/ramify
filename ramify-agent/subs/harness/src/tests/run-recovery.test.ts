@@ -212,6 +212,7 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'work-item-started': return types.includes('work-item-started');
     case 'hypotheses-delivered': return types.includes('hypotheses-delivered');
     case 'outline-revised': return types.includes('outline-revised');
+    case 'obligation-reported': return types.includes('obligation-reported');
     case 'iteration-assigned': return types.includes('iteration-assigned');
     case 'writer-acquired': return types.includes('writer-acquired');
     case 'writer-process-registered': return types.includes('writer-process-registered');
@@ -727,6 +728,28 @@ describe('the recovery table', () => {
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     expect(events.filter(event => event.type === 'outline-revised')).toHaveLength(1);
     expect(existsSync(runPath(root, 'review-notes', runId, workLayout.outline('wi-001', 2)))).toBe(false);
+  }, 180_000);
+
+  test('PB3-C04 PB3-C05: a crash after obligation-reported keeps the report once, with its invocation and submission, and gates nothing', async () => {
+    const root = await target([materialize], [], materialized);
+    const { runId } = await crashAfter(root, 'obligation-reported', false, oneWorkItem());
+    const before = await runEventsOnDisk(root, 'review-notes', runId);
+    const architect = before.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect').at(-1)!;
+    const accepted = before.find(event => event.type === 'invocation-ended' && event.data.invocation === (architect.data as { invocation: string }).invocation)!;
+
+    const { service } = await reopen(root);
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    // The accepted completion request's report stands once, as it was made:
+    // recovery reports nothing again and starts no writer, outline or gate.
+    expect(events.filter(event => event.type === 'obligation-reported').map(event => event.data)).toEqual([{
+      id: 'sc-001', judgment: 'done', basedOnRevision: 0, revision: 1,
+      by: (architect.data as { invocation: string }).invocation, submission: (accepted.data as { submission: string }).submission,
+    }]);
+    expect(events.filter(event => event.type === 'invocation-ended')).toHaveLength(before.filter(event => event.type === 'invocation-ended').length);
+    expect(events.some(event => event.type === 'outline-revised' || event.type === 'gate-committing' || event.type === 'writer-acquired')).toBe(false);
+    expect(events.at(-1)!.type).toBe('job-interrupted');
+    // The declaration survives the restart: the reopened run's scenario is done.
+    expect(onlyRun(service, 'review-notes').counts.scenarios).toEqual({ pending: 0, bound: 0, done: 1 });
   }, 180_000);
 
   test('a crash after work-item-completed leaves the item completed and starts it no second time', async () => {

@@ -496,6 +496,94 @@ test('CA19: accepted assign action before its effect replays without a second co
   await second.service.close();
 }, 60_000);
 
+for (const boundary of ['invocation-ended', 'obligation-reported'] as const) {
+test(`PB3-C04 PB3-C05: restart after ${boundary} keeps the accepted action's report once, with no second coordinator or writer, and the next turn retrieves it`, async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  await initRepository(fixture.root);
+  await installMiniRunner(fixture.root);
+  const a = 'capability-coordination/a';
+  const b = 'capability-coordination/b';
+  let engineerTurns = 0;
+  let architectTurns = 0;
+  let frozen = false;
+  const architectPrompts: string[] = [];
+  const script: Script = spec => {
+    if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
+    if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
+    if (spec.submission.name === 'submit_capability_qualification') {
+      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
+        placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
+    }
+    if (spec.role === 'engineer') {
+      engineerTurns += 1;
+      return engineerTurns === 1 ? submit({ kind: 'capability-needed', summary: 'A needs source', request: {
+        need: 'B fact for A', usage: [{ path: 'subs/a/src/caller.ts', use: 'Display source', prospective: false }],
+        constraints: [], knownInterface: { kind: 'none-known' },
+        examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
+      } }) : submit({ kind: 'completion-proposed', summary: 'B submitted its result', findings: [] });
+    }
+    if (spec.role === 'capability-architect') {
+      architectTurns += 1;
+      architectPrompts.push(spec.prompt);
+      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      // The accepted assignment carries the architect's own done report.
+      return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
+        kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B result' }).assignment,
+        reports: [{ id: 'cap-001', judgment: 'done', basedOnRevision: 0 }] }) : [{ kind: 'wait', ms: 60_000 }];
+    }
+    return [];
+  };
+  const options = { git: gitService, script, inputs: treeInputs(),
+    afterWrite: async (write: string, runId: string) => {
+      if (write !== boundary || frozen) return;
+      const events = await runEventsOnDisk(fixture.root, 'need', runId);
+      const last = events.at(-1);
+      const architect = new Set(events.flatMap(event => event.type === 'invocation-started' && event.data.role === 'capability-architect'
+        ? [event.data.invocation] : []));
+      if ((last?.type === 'invocation-ended' && architect.has(last.data.invocation) && last.data.ended === 'submitted')
+        || (last?.type === 'obligation-reported' && last.data.id === 'cap-001')) {
+        frozen = true;
+        await freeze();
+      }
+    } };
+  const first = await openCapabilityRuns(fixture.root, options);
+  const receipt = await first.service.execute(startRun('need'));
+  await until(() => frozen, 30_000);
+  await staleCrashLock(fixture.root);
+  const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(before.filter(event => event.type === 'obligation-reported')).toHaveLength(boundary === 'obligation-reported' ? 1 : 0);
+  expect(before.filter(event => event.type === 'capability-assigned')).toHaveLength(0);
+  const second = await openCapabilityRuns(fixture.root, options);
+  cleanups.push(() => second.service.close());
+  await until(() => architectTurns >= 2 || (second.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'), 30_000);
+  const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
+  // The report is recorded once, by the accepted invocation, before the
+  // action's effect; the action is replayed, not asked for again.
+  const reports = after.filter(event => event.type === 'obligation-reported');
+  expect(reports.map(event => event.data)).toEqual([expect.objectContaining({ id: 'cap-001', judgment: 'done', revision: 1 })]);
+  const assigned = after.filter(event => event.type === 'capability-assigned');
+  expect(assigned).toHaveLength(1);
+  expect(reports[0]!.sequence).toBeLessThan(assigned[0]!.sequence);
+  const coordinators = after.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect' &&
+    event.data.work.capabilityTask === 'cap-001' && event.sequence < assigned[0]!.sequence);
+  expect(coordinators).toHaveLength(1);
+  expect(reports[0]!.data).toMatchObject({ by: coordinators[0]!.type === 'invocation-started' ? coordinators[0]!.data.invocation : '' });
+  // No writer was acquired between the crash and the replayed effect, and
+  // the assignment has one writer.
+  expect(after.filter(event => event.type === 'writer-acquired' && event.sequence > before.length && event.sequence < assigned[0]!.sequence)).toHaveLength(0);
+  expect(after.filter(event => event.type === 'writer-acquired' && event.sequence > assigned[0]!.sequence)).toHaveLength(1);
+  expect(after.filter(event => event.type === 'capability-assignment-settled')).toHaveLength(1);
+  // The architect's next turn retrieves its own report.
+  expect(architectPrompts).toHaveLength(2);
+  expect(architectPrompts[1]).toContain('# Registered obligations');
+  expect(architectPrompts[1]).toMatch(/- cap-001 \(delegated outcome\): done, revision 1; not bound; last report done by inv-\d+/u);
+  await second.service.close();
+}, 60_000);
+}
+
 for (const boundary of ['capability-assigned', 'invocation-ended'] as const) {
 test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial once`, async () => {
   const fixture = await copyCapabilityFixture();

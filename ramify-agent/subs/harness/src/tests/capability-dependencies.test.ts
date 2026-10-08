@@ -13,10 +13,11 @@ import { committedRecords, refOf } from '../work/committed.js';
 import { capabilityDependencyCycle, replayCapabilityState } from '../capability/state.js';
 import { capabilityLayout } from '../capability/records.js';
 import { RunLog } from '../run/log.js';
+import { runLayout } from '../run/records.js';
 import { copyCapabilityFixture, fixturePlan, fixtureRequest, fixtureTask, openCapabilityRuns } from './helpers/capability.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { freeze, initRepository, runEventsOnDisk, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
+import { freeze, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { decision, forkDecision, forkPartial } from './helpers/placement.js';
 
 const directories: string[] = [];
@@ -434,7 +435,6 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
     let childTurns = 0;
     let parentTurns = 0;
     let returnedPrompt = '';
-    let refusedPrompt = '';
     let childClosureScratch: { parent: string; childRemoved: boolean } | null = null;
     let frozenHandback = false;
     let service: Awaited<ReturnType<typeof openCapabilityRuns>>['service'] | undefined;
@@ -485,15 +485,15 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
         childTurns += 1;
         if (childTurns === 1) return submit({ ...basis, kind: 'assign', assignment: assign(c, { goal: 'Normalize source', approach: 'Implement and test C behavior', completionEvidence: 'C test passes' }).assignment });
         if (childTurns === 2) return submit({ ...basis, kind: 'assign', assignment: assign(b, { goal: 'Use normalized source in B', approach: 'Call real C from B', completionEvidence: 'B test passes' }).assignment });
-        // A handback request without the done report on cap-002 is refused
-        // naming it, before any gate; the next turn reports it.
-        if (childTurns === 3) return submit({ ...basis, kind: 'request-handback', summary: 'C normalization is used by B',
-          interfaces: [{ path: 'subs/c/src/source.ts', symbols: ['normalizeSource'], use: 'Call from B' }], limitations: [] });
-        if (childTurns !== 4) throw new Error('Unexpected child coordinator turn');
-        refusedPrompt = spec.prompt;
-        // The child's handback is its own done report on cap-002; the
-        // example is the request's context, remarked on in the summary.
-        return [{ kind: 'tool', tool: 'update_capability_plan', input: { task: basis.task,
+        if (childTurns !== 3) throw new Error('Unexpected child coordinator turn');
+        // A handback request without the done report on cap-002 is a
+        // rejected submission naming it, before any gate; the same turn
+        // reports it. The child's handback is its own done report on
+        // cap-002; the example is the request's context, remarked on in
+        // the summary.
+        return [...submit({ ...basis, kind: 'request-handback', summary: 'C normalization is used by B',
+          interfaces: [{ path: 'subs/c/src/source.ts', symbols: ['normalizeSource'], use: 'Call from B' }], limitations: [] }),
+        { kind: 'tool', tool: 'update_capability_plan', input: { task: basis.task,
           basedOn: basis.planRevision, invocation: basis.invocation, reason: 'The real B caller states the original case',
           changes: { useCases: [{ id: 'need-002.ex01', expectedBehavior: 'B uses normalized C source', derivedFrom: ['need-002.ex01'] }] } } },
           { kind: 'submit', input: { ...basis, planRevision: basis.planRevision + 1, kind: 'request-handback',
@@ -556,14 +556,21 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
     expect(childClosureScratch).toEqual({ parent: 'parent scratch\n', childRemoved: true });
     await expect(readFile(join(fixture.root, 'subs/b/src/tmp/parent.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
     expect(events.filter(event => event.type === 'capability-handed-back' && event.data.task === 'cap-002')).toHaveLength(1);
-    // PB3-D08: the request without a report was refused naming cap-002, and
-    // no completion gate ran between it and the turn that reported it.
-    expect(refusedPrompt).toContain('Handback refused for cap-002: cap-002 is pending and not reported done');
-    const childStarts = events.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect' &&
-      event.data.work.capabilityTask === 'cap-002').map(event => event.sequence);
-    expect(childStarts.length).toBeGreaterThanOrEqual(4);
-    expect(events.filter(event => event.type === 'gate-committing' && event.data.checkpoint === 'work-item' &&
-      event.sequence > childStarts[2]! && event.sequence < childStarts[3]!)).toHaveLength(0);
+    // PB3-C01 PB3-D08: the request without a report was a rejected
+    // submission naming cap-002, and the same turn reported it; no gate
+    // ran while that turn lasted.
+    const childStarts = events.flatMap(event => event.type === 'invocation-started' && event.data.role === 'capability-architect' &&
+      event.data.work.capabilityTask === 'cap-002' ? [event] : []);
+    expect(childStarts).toHaveLength(3);
+    const handing = childStarts[2]!.data.invocation;
+    const rejections = (await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.observations(handing)), 'utf8'))
+      .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { errors?: Array<{ path: string; message: string }> } })
+      .filter(line => line.type === 'rejection');
+    expect(rejections.map(line => line.data.errors)).toEqual([[{ path: 'reports',
+      message: expect.stringContaining('This handback request leaves cap-002 without a done report.') }]]);
+    const ended = events.find(event => event.type === 'invocation-ended' && event.data.invocation === handing)!;
+    expect(events.filter(event => event.type === 'gate-committing' &&
+      event.sequence > childStarts[2]!.sequence && event.sequence < ended.sequence)).toHaveLength(0);
     // PB3-D10: the child's done report returned cap-002 and nothing else.
     // The parent task's outcome stays its own architect's to report, while
     // its original B assignment continues.

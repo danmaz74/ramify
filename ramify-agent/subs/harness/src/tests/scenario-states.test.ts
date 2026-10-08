@@ -162,6 +162,11 @@ function architectPrompts(agent: { readonly sessions: ReadonlyArray<{ readonly s
   return (agent?.sessions ?? []).filter(session => session.spec.submission.name === 'submit_work_item_result').map(session => session.spec.prompt);
 }
 
+/** The verdicts of each local architect session of a run, in order. */
+function architectVerdicts(agent: { readonly sessions: ReadonlyArray<{ readonly spec: { readonly submission: { readonly name: string } }; readonly verdicts: readonly unknown[] }> } | undefined): unknown[][] {
+  return (agent?.sessions ?? []).filter(session => session.spec.submission.name === 'submit_work_item_result').map(session => [...session.verdicts]);
+}
+
 /** The structured errors of a rejected submission's verdict. */
 function rejection(verdict: unknown): Array<{ path: string; message: string; expected?: string }> {
   return (JSON.parse((verdict as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string; message: string; expected?: string }> }).errors;
@@ -190,6 +195,15 @@ function failingScenario(check: PlannedCheck, id: string): DirectCheckStep {
 const read = (root: string, path: string) => readFileSync(join(root, path), 'utf8');
 
 const done = (id: string, basedOnRevision: number) => ({ id, judgment: 'done' as const, basedOnRevision });
+/** A completion request that forgets its reports. */
+const forgotten = { ...requestCompletion(), reports: [] };
+/** The rejection a completion request missing the IDs' done reports receives. */
+const owing = (ids: string) => ({
+  path: 'reports',
+  message: `This completion request leaves ${ids} without a done report. Report each one done in \`reports\` where, in your judgment, `
+    + 'it is correctly implemented and passing; where work remains, assign it, or submit `unresolved` with what blocks it',
+  expected: `a done report for each of ${ids}`,
+});
 const revised = (id: string, basedOnRevision: number) => ({ id, judgment: 'bound' as const, basedOnRevision });
 
 describe('PB3-D12, PB3-D06: binding, the done report and the pending tag', () => {
@@ -314,7 +328,7 @@ describe('PB3-D12, PB3-D06: binding, the done report and the pending tag', () =>
 });
 
 describe('PB3-D03: the audit result is evidence beside the state, never the state', () => {
-  test('an iteration whose gate passes leaves the scenario bound: completion is refused until the architect reports it done, and the binding\'s fakes are shown to it', async () => {
+  test('an iteration whose gate passes leaves the scenario bound: a completion request is rejected until the architect reports it done, and the binding\'s fakes are shown to it', async () => {
     const root = await fixtureWith('notes');
     const feature = featureOf(notesDirectory, 'review-note');
     const steps = stepsOf(notesDirectory, 'review-note');
@@ -322,8 +336,7 @@ describe('PB3-D03: the audit result is evidence beside the state, never the stat
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [
         submit(assign(notes, { obligations: ['sc-001'] }, outline())),
-        submit({ ...requestCompletion(), reports: [] }),
-        submit({ ...requestCompletion(), reports: [done('sc-001', 0)] }),
+        [...submit(forgotten), ...submit({ ...requestCompletion(), reports: [done('sc-001', 0)] })],
       ],
       engineer: [submit(completionProposed('Bound against the fake limit.', { bindings: [{ id: 'sc-001', fakes: ['FakeNoteLimit'] }] }), write(steps.slice(`${notesDirectory}/src/`.length), stepFile))],
     }, [
@@ -341,12 +354,15 @@ describe('PB3-D03: the audit result is evidence beside the state, never the stat
     // The pass reported nothing: the only report is the architect's last.
     expect(scenarioLines(log)).toEqual(['bound sc-001 (FakeNoteLimit)', 'reported sc-001 done']);
     expect(at(log, 'obligation-reported')).toBeGreaterThan(at(log, 'gate-passed', data => data.gate === iterationGate.id));
-    const [, refused, finishing] = architectPrompts(agent);
-    expect(refused).toContain('- sc-001 (scenario): bound, revision 0; bound by inv-');
-    expect(refused).toContain('relying on fakes FakeNoteLimit; no report yet');
-    expect(finishing).toContain('## Completion was refused');
-    expect(finishing).toContain('- sc-001 is bound and not reported done: report it done in `reports` where its binding holds, or assign the work that finishes it');
-    // The refused request ran no gate and wrote no outline: the assignment's
+    const [, completing] = architectPrompts(agent);
+    expect(architectPrompts(agent)).toHaveLength(2);
+    expect(completing).toContain('- sc-001 (scenario): bound, revision 0; bound by inv-');
+    expect(completing).toContain('relying on fakes FakeNoteLimit; no report yet');
+    // The rejection and the report that answers it are one turn.
+    const verdicts = architectVerdicts(agent)[1]!;
+    expect(rejection(verdicts[0])).toEqual([owing('sc-001')]);
+    expect(verdicts[1]).toEqual({ accepted: true });
+    // The rejected request ran no gate and wrote no outline: the assignment's
     // and the accepted request's are the only two.
     expect(log.filter(event => event.type === 'outline-revised')).toHaveLength(2);
     expect(log.filter(event => event.type === 'gate-attempted' && (event.data as { checkpoint: string }).checkpoint === 'work-item')).toHaveLength(1);
@@ -416,16 +432,23 @@ describe('PB3-D03: the audit result is evidence beside the state, never the stat
       'local-architect': [
         submit(assign(notes, { obligations: ['sc-001'] }, outline())),
         submit({ ...assign(notes, { goal: 'Replace the fake limit with the real one.', obligations: ['sc-001'] }), reports: [done('sc-001', 0)] }),
-        submit({ ...requestCompletion(), reports: [revised('sc-001', 1)] }),
+        // A completion request cannot carry the revision: it would leave
+        // sc-001 without a done report. The revision travels with the work.
+        [
+          ...submit({ ...requestCompletion(), reports: [revised('sc-001', 1)] }),
+          ...submit({ ...assign(notes, { goal: 'Cover the limit at its edge.', obligations: ['sc-001'] }), reports: [revised('sc-001', 1)] }),
+        ],
         submit({ ...requestCompletion(), reports: [done('sc-001', 2)] }),
       ],
       engineer: [
         submit(completionProposed('Bound against the fake limit.', { bindings: [{ id: 'sc-001', fakes: ['FakeNoteLimit'] }] }), write(steps.slice(`${notesDirectory}/src/`.length), stepFile)),
         submit(completionProposed('The notes use the real limit.', { bindings: [{ id: 'sc-001' }] }), write('notes.ts', `${consumerStub}// real limit\n`)),
+        submit(completionProposed('The limit holds at its edge.', { bindings: [{ id: 'sc-001' }] }), write('notes.ts', `${consumerStub}// real limit, at its edge\n`)),
       ],
     }, [
       accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
       accepted('wi-001.i02', 'revision-02', modified(source)),
+      accepted('wi-001.i03', 'revision-03', modified(source)),
       unchanged('wi-001'),
       unchanged(finalSubject),
     ]);
@@ -434,13 +457,19 @@ describe('PB3-D03: the audit result is evidence beside the state, never the stat
     expect(onlyRun(service, plan).state).toBe('completed');
     const log = await events(root, runId);
     expect(scenarioLines(log)).toEqual([
-      'bound sc-001 (FakeNoteLimit)', 'reported sc-001 done', 'bound sc-001 (no fakes)', 'reported sc-001 bound', 'reported sc-001 done',
+      'bound sc-001 (FakeNoteLimit)', 'reported sc-001 done', 'bound sc-001 (no fakes)', 'reported sc-001 bound', 'bound sc-001 (no fakes)', 'reported sc-001 done',
     ]);
     const [, , rebound, revisedBack] = architectPrompts(agent);
     const engineers = invocationsOf(log, 'engineer');
-    expect(rebound).toContain(`- sc-001 (scenario): done, revision 1; bound by ${engineers.at(-1)} with no fakes; last report done by`);
-    expect(revisedBack).toContain('- sc-001 (scenario): bound, revision 2;');
-    expect(revisedBack).toContain('- sc-001 is bound and not reported done');
+    expect(rebound).toContain(`- sc-001 (scenario): done, revision 1; bound by ${engineers[1]} with no fakes; last report done by`);
+    // PB3-C06: the accepted source moved since the report, shown as its own
+    // fact beside the unchanged declaration; the harness infers nothing from it.
+    expect(rebound).toContain('# Accepted source since your reports');
+    expect(rebound).toContain('The accepted source is now revision-02.');
+    expect(rebound).toContain('- sc-001: last reported done against accepted source revision-01');
+    expect(rebound.indexOf('# Accepted source since your reports')).toBeGreaterThan(rebound.indexOf('- sc-001 (scenario): done'));
+    expect(rejection(architectVerdicts(agent)[2]![0])).toEqual([owing('sc-001')]);
+    expect(revisedBack).toContain(`- sc-001 (scenario): bound, revision 2; bound by ${engineers[2]} with no fakes; last report bound by`);
     // A revision never brings the pending tag back.
     expect(read(root, feature)).toContain('  @ramify-sc-001\n');
     expect(read(root, feature)).not.toContain('@ramify-sc-001 @ramify-pending');
@@ -531,41 +560,67 @@ describe('PB3-D11: a completion proposal binds every assigned obligation', () =>
 });
 
 describe('§9: work-item completion', () => {
-  test('a request is refused while a scenario of its entry is pending, with the reason in the next turn; one that reports it done completes', async () => {
+  test('PB3-C01 a request is rejected while a scenario of its entry is pending, naming it; the same turn reports it done and completes', async () => {
     const root = await fixtureWith('notes');
     const { service, runId, agent } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
-      'local-architect': [
-        submit({ ...requestCompletion(), reports: [] }),
-        submit({ ...requestCompletion(), reports: [done('sc-001', 0)] }),
-      ],
+      'local-architect': [[...submit(forgotten), ...submit({ ...requestCompletion(), reports: [done('sc-001', 0)] })]],
     }, [unchanged('wi-001'), unchanged(finalSubject)]);
 
     expect(onlyRun(service, plan).state).toBe('completed');
-    const prompts = architectPrompts(agent);
-    expect(prompts).toHaveLength(2);
-    expect(prompts[1]).toContain('## Completion was refused');
-    expect(prompts[1]).toContain('- sc-001 is pending and not reported done: report it done in `reports` where it holds, or assign an iteration that binds it');
+    expect(architectPrompts(agent)).toHaveLength(1);
+    const [verdicts] = architectVerdicts(agent);
+    expect(rejection(verdicts![0])).toEqual([owing('sc-001')]);
+    expect(verdicts![1]).toEqual({ accepted: true });
     const log = await events(root, runId);
-    // The refused request ran no gate and wrote no outline.
+    // The rejected request ran no gate and wrote no outline.
     expect(log.filter(event => event.type === 'outline-revised')).toHaveLength(1);
     expect(log.filter(event => event.type === 'gate-attempted' && (event.data as { checkpoint: string }).checkpoint === 'work-item')).toHaveLength(1);
     expect(scenarioLines(log)).toEqual(['reported sc-001 done']);
   }, 120_000);
 
-  test('refused beyond the bound, the run fails with the scenarios as evidence', async () => {
+  test('PB3-C02 a rejected request whose scenario is unfinished assigns the work in the same turn; the engineer binds it and the next turn reports it done', async () => {
     const root = await fixtureWith('notes');
-    const { service } = await run(root, {
+    const feature = featureOf(notesDirectory, 'review-note');
+    const steps = stepsOf(notesDirectory, 'review-note');
+    const { service, runId, agent, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
-      'local-architect': [submit({ ...requestCompletion(), reports: [] })],
+      'local-architect': [
+        [...submit(forgotten), ...submit(assign(notes, { obligations: ['sc-001'] }, outline()))],
+        submit({ ...requestCompletion(), reports: [done('sc-001', 0)] }),
+      ],
+      engineer: [submit(completionProposed('Bound with no fakes.', { bindings: [{ id: 'sc-001' }] }), write(steps.slice(`${notesDirectory}/src/`.length), stepFile))],
+    }, [
+      accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
+      unchanged('wi-001'),
+      unchanged(finalSubject),
+    ]);
+
+    expect(onlyRun(service, plan).failure).toBeNull();
+    const [first, second] = architectVerdicts(agent);
+    expect(rejection(first![0])).toEqual([owing('sc-001')]);
+    expect(first![1]).toEqual({ accepted: true });
+    expect(second).toEqual([{ accepted: true }]);
+    const log = await events(root, runId);
+    // No report was manufactured: the binding came from the work, the done from the next turn.
+    expect(scenarioLines(log)).toEqual(['bound sc-001 (no fakes)', 'reported sc-001 done']);
+    git.assertAnswered();
+  }, 120_000);
+
+  test('PB3-C03 rejected to the per-turn bound, the run fails as rejected submissions naming the scenario, with no gate and its state kept', async () => {
+    const root = await fixtureWith('notes');
+    const { service, runId, agent } = await run(root, {
+      'initial-architect': [submit(analysis([entry('review-note', notes)]))],
+      'local-architect': [[...submit(forgotten), ...submit(forgotten), ...submit(forgotten)]],
     }, []);
     const snapshot = onlyRun(service, plan);
     expect(snapshot.state).toBe('failed');
-    expect(snapshot.failure).toMatchObject({
-      reason: 'acceptance-incomplete',
-      evidence: ['scenarios/sc-001.json'],
-    });
-    expect(snapshot.failure!.message).toContain('wi-001 asked for completion 4 times with scenarios of its entry not reported done: sc-001 is pending and not reported done');
+    expect(snapshot.failure).toMatchObject({ reason: 'invalid-submission' });
+    expect(snapshot.failure!.message).toContain('its last rejected completion request left sc-001 without a done report');
+    expect(architectVerdicts(agent)[0]!.map(verdict => rejection(verdict))).toEqual([[owing('sc-001')], [owing('sc-001')], [owing('sc-001')]]);
+    const log = await events(root, runId);
+    expect(log.some(event => event.type === 'gate-attempted' || event.type === 'obligation-reported')).toBe(false);
+    expect(snapshot.counts.scenarios).toEqual({ pending: 1, bound: 0, done: 0 });
   }, 120_000);
 
   test('a done scenario that fails a later gate fails that gate, and stays done', async () => {

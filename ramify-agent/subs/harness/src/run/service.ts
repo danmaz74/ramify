@@ -49,7 +49,7 @@ import { capabilityRunPolicyVersion, captureCapabilityLimits } from '../capabili
 import { createCapabilityWorkflow } from '../capability/workflow.js';
 import { commitCapabilityTransition } from '../capability/ledger.js';
 import { qualificationActionSchema, capabilityActionSchema, capabilityPlanUpdateSchema, buildCapabilityPlanRevision,
-  validateCapabilityAction, validateCapabilityPlanUpdate, type QualificationAction, type CapabilityAction } from '../capability/submission.js';
+  unreportedByHandback, validateCapabilityAction, validateCapabilityPlanUpdate, type QualificationAction, type CapabilityAction } from '../capability/submission.js';
 import { capabilityCompletionBlockers, capabilityHandbackReadiness, replayCapabilityState } from '../capability/state.js';
 import type { CapabilityWorkflow } from '../capability/workflow.js';
 import { reportCommand, type BoundReport } from '../check-findings/report.js';
@@ -195,13 +195,15 @@ import {
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
 import {
-  bindingEventsToRecord, obligationBriefingLines, obligationEventsToRecord, obligationsOf, obligationsOwnedBy, unreportedObligations, unreportedText,
+  bindingEventsToRecord, obligationBriefingLines, obligationEventsToRecord, obligationsOf, obligationsOwnedBy, reportSourceLines,
   type ObligationActor, type ObligationBinding, type ObligationProjection, type ObligationRegistration, type ObligationReport,
 } from '../work/obligations.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
 import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
-import { capabilityLocalArchitectJsonSchema, localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
+import {
+  capabilityLocalArchitectJsonSchema, localArchitectJsonSchema, localArchitectToolName, unreportedByCompletion, validateLocalArchitect, type LocalArchitectSubmission,
+} from '../work/submission.js';
 import { gateDiagnostics, scenarioCheckLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
@@ -299,6 +301,7 @@ export type RunWrite =
   | 'brief-appended'
   | 'decision-delivered'
   | 'outline-revised'
+  | 'obligation-reported'
   | 'iteration-assigned'
   | 'writer-acquired'
   | 'writer-process-registered'
@@ -5369,7 +5372,7 @@ export class RunService {
         return null;
       }
       if (packageInPrompt) prompt = `${prompt}\n\n# Your work-item package\n\n${contextPackage!.text}`;
-      const owned = obligationBriefingLines(obligationsOwnedBy(this.obligationProjection(run), { kind: 'work-item', id: item.id }));
+      const owned = this.obligationBriefing(run, { kind: 'work-item', id: item.id });
       if (owned.length > 0) prompt = `${prompt}\n\n${owned.join('\n')}`;
       if (attempt === 1 && this.workflow !== null) {
         const intervening = [...current.capabilityHandbacks.values()].flatMap(handback => {
@@ -5396,6 +5399,11 @@ export class RunService {
       returned = undefined;
       undelivered.length = 0;
 
+      // A completion request that leaves an obligation of this architect
+      // without a done report is rejected in this same turn, under the
+      // per-turn bound, before any outline, commit or gate.
+      const localObligations = () => ({ actor: { kind: 'work-item' as const, id: item.id }, projection: this.obligationProjection(run) });
+      let unreported: string[] = [];
       const result = await this.runInvocation<LocalArchitectSubmission>(run, agent, {
         role: 'local-architect',
         work: { workItem: item.id },
@@ -5425,27 +5433,33 @@ export class RunService {
             invocation, session: destination,
           } });
         } }),
-        validate: input => this.workflow !== null && typeof input === 'object' && input !== null && (
-          (input as { kind?: unknown }).kind === 'yield-for-providers' ||
-          (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.kind === 'contract' ||
-          (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.revisesContract !== undefined
-        ) ? { ok: false, errors: [{ path: 'kind', message: 'The contract and provider-yield workflow is historical; use capability requests and scoped assignments' }] }
-          : validateLocalArchitect(input, {
-          index,
-          registry,
-          outline: outlines.at(-1) ?? null,
-          hypotheses: new Map(current.hypotheses.map(hypothesis => [hypothesis.id, hypothesis])),
-          decisions: current.decisions,
-          workItems: new Set(current.workItems.map(entry => entry.id)),
-          openRequirements: new Set(open.map(requirement => requirement.id)),
-          contracts: this.contractsConsumedBy(run, current, item.id),
-          guardedPaths: guarded,
-          harnessOnly,
-          ...(integration === undefined ? {} : { integration: integration.scope }),
-          bounds: engineerBoundsOf(run.record.policy.limits),
-          ...(contextPackage === undefined ? {} : { package: new Set(contextPackage.citation.elements) }),
-          obligations: { actor: { kind: 'work-item', id: item.id }, projection: this.obligationProjection(run) },
-        }),
+        validate: input => {
+          const verdict = this.workflow !== null && typeof input === 'object' && input !== null && (
+            (input as { kind?: unknown }).kind === 'yield-for-providers' ||
+            (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.kind === 'contract' ||
+            (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.revisesContract !== undefined
+          ) ? { ok: false as const, errors: [{ path: 'kind', message: 'The contract and provider-yield workflow is historical; use capability requests and scoped assignments' }] }
+            : validateLocalArchitect(input, {
+              index,
+              registry,
+              outline: outlines.at(-1) ?? null,
+              hypotheses: new Map(current.hypotheses.map(hypothesis => [hypothesis.id, hypothesis])),
+              decisions: current.decisions,
+              workItems: new Set(current.workItems.map(entry => entry.id)),
+              openRequirements: new Set(open.map(requirement => requirement.id)),
+              contracts: this.contractsConsumedBy(run, current, item.id),
+              guardedPaths: guarded,
+              harnessOnly,
+              ...(integration === undefined ? {} : { integration: integration.scope }),
+              bounds: engineerBoundsOf(run.record.policy.limits),
+              ...(contextPackage === undefined ? {} : { package: new Set(contextPackage.citation.elements) }),
+              obligations: localObligations(),
+            });
+          // What the last rejected request left unreported, which an
+          // exhausted turn's failure names.
+          if (!verdict.ok) unreported = unreportedByCompletion(input, localObligations());
+          return verdict;
+        },
         scope: {
           write: null,
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
@@ -5457,10 +5471,15 @@ export class RunService {
 
       if (this.ignoring(run)) return null;
       if (result.ended !== 'submitted' || result.value === undefined) {
+        // An exhausted rejection bound is a rejected-submissions result: it
+        // names what the last rejected completion request left unreported,
+        // and says nothing about the code.
+        const owed = result.ended === 'invalid-submission' && unreported.length > 0
+          ? `; its last rejected completion request left ${unreported.join(', ')} without a done report` : '';
         await this.fail(
           run,
           result.ended === 'invalid-submission' ? 'invalid-submission' : result.ended === 'failed' ? 'agent-failed' : 'internal',
-          `The local architect of ${item.id} ended without a result (${result.ended})`,
+          `The local architect of ${item.id} ended without a result (${result.ended})${owed}`,
           [runLayout.outcome(result.id)],
         );
         return null;
@@ -5592,16 +5611,12 @@ export class RunService {
       // Completion is refused while a requirement of this work item is open,
       // and while the obligation it exists for is not conformed: a
       // fake-backed pass never completes a capability, and the gate's verdict
-      // on the tests says nothing about which provider ran. It is refused
-      // too while a scenario of its entry is not reported done; the
-      // request's own reports were recorded above, so a request that reports
-      // the last scenario done is not refused for it. (Iteration 8 replaces
-      // this refusal with the general rejected submission.)
+      // on the tests says nothing about which provider ran. Missing done
+      // reports never reach here: validation rejected such a request.
       const owing = this.obligationOwedBy(run, item, current);
       const owed = owing !== null && !conformed.has(conformanceKey(owing.id, owing.revision)) ? owing : null;
-      const unbound = this.unfinishedScenarios(run, item);
       const capabilityBlockers = this.workflow === null ? [] : this.capabilityBlockers(run, item.id);
-      if ((this.workflow === null && (open.length > 0 || owed !== null)) || capabilityBlockers.length > 0 || unbound.length > 0) {
+      if ((this.workflow === null && (open.length > 0 || owed !== null)) || capabilityBlockers.length > 0) {
         refusals += 1;
         blocked = [
           ...(this.workflow === null ? open : []).map(requirement => {
@@ -5610,10 +5625,9 @@ export class RunService {
           }),
           ...(this.workflow !== null || owed === null ? [] : [`${owed.id} is owed: the agreed conformance suite has not passed against the real provider yet`]),
           ...capabilityBlockers,
-          ...unbound.map(scenario => unreportedText({ id: scenario.id, status: scenario.state })),
         ];
         if (refusals > bound) {
-          await this.refuseCompletion(run, item, refusals, blocked, { open: this.workflow === null ? open : [], owed: this.workflow === null && owed !== null, scenarios: unbound });
+          await this.refuseCompletion(run, item, refusals, blocked, { open: this.workflow === null ? open : [], owed: this.workflow === null && owed !== null });
           return null;
         }
         continuing = 'completion-refused';
@@ -7361,6 +7375,7 @@ export class RunService {
         } },
       createGitInspectionTool(this.projectRoot),
     ];
+    let unreported: string[] = [];
     const action = pendingAction ?? await this.runInvocation<CapabilityAction>(run, agent, {
       role: 'capability-architect', work: { capabilityTask: task.id, request: request.id }, attempt,
       loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
@@ -7376,8 +7391,8 @@ export class RunService {
           ...(progress === '' ? [] : [`Progress from the last turn: ${progress}`]),
         ] : [`Selected plan package ${selectedHash} was delivered in full in the earlier turn; it is unchanged.`,
           `Current plan: ${JSON.stringify(plan)}`, `Progress from the last turn: ${progress}`]),
-        ...[obligationBriefingLines(obligationsOwnedBy(this.obligationProjection(run), { kind: 'capability-task', id: task.id })).join('\n')].filter(section => section !== ''),
-        `Inspect current source and Git directly. The latest task assignment results are ${[...records.results.values()].filter(result => result.coordination?.kind === 'capability-task' && result.coordination.id === task.id).map(result => `${result.iteration}: ${result.outcome}, gate ${result.gate ?? '(none)'}, commit ${result.commit ?? '(none)'}, findings ${result.findings.join('; ')}`).join(' | ') || '(none)'}. Gate reports are under ${runLayout.gateOutput('ga-0001').replace(/ga-0001.*/, '')}; inspect the named gate and review artifacts when needed. Request handback when, in your judgment, the real provider and requesting consumer meet the original need: report ${task.id} and every obligation you registered done in the same or an earlier action. The original examples are the request's context; say what you concluded about one in your summary.`,
+        ...[this.obligationBriefing(run, { kind: 'capability-task', id: task.id }).join('\n')].filter(section => section !== ''),
+        `Inspect current source and Git directly. The latest task assignment results are ${[...records.results.values()].filter(result => result.coordination?.kind === 'capability-task' && result.coordination.id === task.id).map(result => `${result.iteration}: ${result.outcome}, gate ${result.gate ?? '(none)'}, commit ${result.commit ?? '(none)'}, findings ${result.findings.join('; ')}`).join(' | ') || '(none)'}. Gate reports are under ${runLayout.gateOutput('ga-0001').replace(/ga-0001.*/, '')}; inspect the named gate and review artifacts when needed. Request handback when, in your judgment, the real provider and requesting consumer meet the original need: report ${task.id} and every obligation you registered done in the same or an earlier action; a request that leaves one unreported is rejected naming it. The original examples are the request's context; say what you concluded about one in your summary.`,
       ].join('\n\n'),
       start: coordinatorPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: coordinatorPoint },
       ...(coordinatorPoint === undefined || coordinatorSession === undefined
@@ -7391,6 +7406,9 @@ export class RunService {
       submissionSchema: 'ramify-agent.capability-action/1',
       validate: input => {
         const checked = validateActionInput(input);
+        // What the last rejected handback request left unreported, which an
+        // exhausted turn's failure names.
+        if (!checked.valid) unreported = unreportedByHandback(input, currentBasis()?.obligations);
         return checked.valid ? { ok: true, value: checked.value }
           : { ok: false, errors: checked.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message,
             expected: issue.kind === 'state' ? 'current task authority' : 'the action schema' })) };
@@ -7424,7 +7442,11 @@ export class RunService {
       continue;
     }
     if (action.ended !== 'submitted') {
-      await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} did not submit an action`);
+      // An exhausted rejection bound names what the last rejected handback
+      // request left unreported; it is no verdict on the code.
+      const owed = action.ended === 'invalid-submission' && unreported.length > 0
+        ? `; its last rejected handback request left ${unreported.join(', ')} without a done report` : '';
+      await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} did not submit an action${owed}`);
       return null;
     }
     if (action.value === undefined) {
@@ -7614,9 +7636,10 @@ export class RunService {
   /** A task completion request uses the ordinary project gate and the
    * reviews already requested for its accepted iterations. Its result returns
    * to this architect; failed iteration gates already returned to engineers.
-   * The handback is the architect's done reports on the task's obligations:
-   * the harness checks that every one is reported, and the non-test workflow
-   * boundaries, never a cited file, an executed test or a per-example state. */
+   * The handback is the architect's done reports on the task's obligations,
+   * which validation required of the accepted request; the harness checks
+   * the non-test workflow boundaries, never a cited file, an executed test
+   * or a per-example state. */
   private async verifyCapabilityHandback(
     run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, item: WorkItem, task: CapabilityTask,
     request: CapabilityRequest, plan: CapabilityPlan,
@@ -7631,12 +7654,9 @@ export class RunService {
     if (state === undefined || state.status !== 'coordinating' || state.planRevision !== plan.revision || state.activeChild !== null) {
       return { handedBack: false, guidance: 'The task, plan or child dependency is not ready for completion' };
     }
-    // Every obligation this architect is responsible for needs its done
-    // report before any gate runs; the request's own reports were recorded
-    // on acceptance. (Iteration 8 replaces this refusal with the general
-    // rejected submission.)
-    const unreported = unreportedObligations(this.obligationProjection(run), { kind: 'capability-task', id: task.id });
-    if (unreported.length > 0) return { handedBack: false, guidance: unreported.map(unreportedText).join('; ') };
+    // Every obligation this architect is responsible for was reported done
+    // by the time the request was accepted: validation rejects one that
+    // leaves an ID unreported, in the same turn and before any gate.
     const records = committedRecords(run.log.ledger.replay());
     const assignments = [...records.assignments.values()].filter(entry =>
       entry.coordination?.kind === 'capability-task' && entry.coordination.id === task.id)
@@ -11202,6 +11222,22 @@ export class RunService {
   }
 
   /**
+   * What an architect's briefing says about the obligations it reports on:
+   * each with its status, binding and last report, and then, separately,
+   * the accepted source each report was made against where that source has
+   * moved on since. The second part is provenance the architect may inspect;
+   * the harness revises, resets or questions no report because of it.
+   */
+  private obligationBriefing(run: Run, actor: Pick<ObligationActor, 'kind' | 'id'>): string[] {
+    const owned = obligationsOwnedBy(this.obligationProjection(run), actor);
+    const lines = obligationBriefingLines(owned);
+    if (lines.length === 0) return lines;
+    const entries = run.log.ledger.replay();
+    const source = reportSourceLines(owned, sequence => acceptedCommit(entries.slice(0, sequence), run.base), acceptedCommit(entries, run.base));
+    return source.length === 0 ? lines : [...lines, '', ...source];
+  }
+
+  /**
    * Records an accepted architect submission's registrations and reports,
    * each as its own event naming the invocation and the submission's hash.
    * What the same accepted submission already recorded is not recorded
@@ -11220,6 +11256,10 @@ export class RunService {
       // scenario done commits that scenario's work item with it.
       const due = input.type === 'obligation-reported' && input.data.judgment === 'done' ? this.integrationItemsDue(run, input.data.id) : [];
       if (await this.write(run, input, due) === 'ended') return false;
+      // A crash between two reports of one submission leaves the rest to
+      // the replay, which records each once.
+      if (input.type === 'obligation-reported') await this.afterWrite('obligation-reported', run.record.jobId);
+      if (this.ignoring(run)) return false;
     }
     return !this.ignoring(run);
   }
@@ -11371,14 +11411,15 @@ export class RunService {
   /**
    * The last refusal of a completion request the bound allows: the run fails
    * with the requirements as evidence where one is open or owed, and with
-   * the scenarios otherwise.
+   * the unresolved capability work otherwise. A missing done report is no
+   * refusal here: validation rejects that request in its own turn.
    */
   private async refuseCompletion(
     run: Run,
     item: WorkItem,
     refusals: number,
     blocked: readonly string[],
-    owing: { readonly open: readonly ConsumerRequirement[]; readonly owed: boolean; readonly scenarios: ReadonlyArray<{ readonly id: string }> },
+    owing: { readonly open: readonly ConsumerRequirement[]; readonly owed: boolean },
   ): Promise<void> {
     if (owing.open.length > 0 || owing.owed) {
       await this.fail(run, 'unresolvable-requirement',
@@ -11386,9 +11427,7 @@ export class RunService {
         owing.open.map(requirement => contractsLayout.requirement(requirement.id, requirement.revision)));
       return;
     }
-    await this.fail(run, 'acceptance-incomplete',
-      `${item.id} asked for completion ${refusals} times with ${integrationScenarioOf(item) === null ? 'scenarios of its entry' : 'its integration scenario'} not reported done: ${blocked.join('; ')}`,
-      owing.scenarios.map(scenario => runLayout.scenario(scenario.id)));
+    await this.fail(run, 'acceptance-incomplete', `${item.id} asked for completion ${refusals} times with capability work unresolved: ${blocked.join('; ')}`);
   }
 
   /**

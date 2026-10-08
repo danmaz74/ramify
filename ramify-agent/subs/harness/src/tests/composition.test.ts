@@ -330,7 +330,7 @@ describe('the recovery tables of the ten state machines', () => {
     const rows = allRows();
     // `recoveryTable` is typed against the run service's own boundary union,
     // so a boundary without a row does not compile; this states the count.
-    expect(new Set(rows.map(row => row.write)).size).toBe(43);
+    expect(new Set(rows.map(row => row.write)).size).toBe(44);
     const machines = new Set(rows.flatMap(row => row.machines));
     expect([...machines].sort()).toEqual((Object.keys(machineNames) as Machine[]).sort());
 
@@ -769,7 +769,6 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[work-item-started].data.origin', values: ['verification'], file: 'subs/harness/src/tests/contract-revision-scripted.test.ts', test: 'two consumers complete revision 1, a third revises it, and the follow-ups finish the run' },
   { union: 'run log[work-item-started].data.origin', values: ['integration'], file: 'subs/harness/src/tests/integration-scenarios.test.ts', test: 'PB3-D07 created by the last sub-scenario\'s done report and not before, at the common ancestor, queued, briefed, bound at the ancestor, reported done by its architect, and completed' },
   { union: 'query work-items.workItems[].origin', values: ['integration'], file: 'subs/harness/src/tests/integration-scenarios.test.ts', test: 'PB3-D07 created by the last sub-scenario\'s done report and not before, at the common ancestor, queued, briefed, bound at the ancestor, reported done by its architect, and completed' },
-  { union: 'run log[job-failed].data.reason', values: ['acceptance-incomplete'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'refused beyond the bound, the run fails with the scenarios as evidence' },
   { union: 'command.type', values: ['approve-analysis'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'start-run with reviewStop and approve-analysis are accepted as stop-job is, and a malformed approval is refused' },
   { union: 'query runs.runs[].phase', values: ['awaiting-review'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'start-run with reviewStop and approve-analysis are accepted as stop-job is, and a malformed approval is refused' },
   // The composed runs bind no scenario; the query projects the state from
@@ -867,6 +866,10 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'run log[capability-assignment-settled].data.outcome', values: ['failed', 'interrupted'],
     reason: 'Current driven capability runs recover interrupted writers into a later settlement or stop the stack; no test commits these terminal settlement outcomes yet.',
+  },
+  {
+    union: 'run log[job-failed].data.reason', values: ['acceptance-incomplete'],
+    reason: 'A completion request missing a done report is a rejected submission (invalid-submission when exhausted), so no driven run reaches the final gate with a scenario not done; the rule itself is tested on incompleteScenarios, and exhausted capability-blocker refusals have no driven fixture yet.',
   },
   {
     union: 'submission engineer[capability-needed].request.examples[].designation', values: ['executable'],

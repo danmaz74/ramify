@@ -411,7 +411,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
   if (delegation?.blocked !== undefined && delegation.blocked.length > 0) {
     lines.push('## Completion was refused', '');
     for (const reason of delegation.blocked) lines.push(`- ${reason}`);
-    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider; a scenario of this work item counts once you report it `done` in `reports`, which you may do with the request itself where, in your judgment, it is correctly implemented and passing; assign an iteration that binds the others.', '');
+    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider; a capability request closes with an accepted current handback of its task, or an accepted consumer verification where it used an existing interface.', '');
   }
 
   if (briefing.unresolvedRequest !== undefined) {

@@ -3,7 +3,9 @@ import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { capabilityPlanContentSchema, capabilityPlanSchema, type CapabilityPlan } from './records.js';
 import { assignmentBodySchema } from '../work/assignment.js';
-import { obligationSubmissionErrors, obligationSubmissionFields, type ObligationContext } from '../work/obligations.js';
+import {
+  incompleteRequestError, obligationSubmissionErrors, obligationSubmissionFields, outstandingReports, type ObligationContext,
+} from '../work/obligations.js';
 
 /** Agent judgments are explicit values. Validation checks form and current
  * authority; it never infers whether prose, code or an expected result is true.
@@ -25,7 +27,9 @@ export const capabilityActionSchema = z.discriminatedUnion('kind', [
   action('unresolved', { problem: text, evidence: z.array(text).min(1) }),
   /** The architect's done reports on the task's obligations, in `reports`,
    * are the handback; anything it says about an original example is free
-   * text in `summary` or a report's `where`. No cited file or test is checked. */
+   * text in `summary` or a report's `where`. No cited file or test is checked.
+   * A request that leaves one of them without a `done` report is rejected,
+   * naming the IDs, like any other invalid action. */
   action('request-handback', {
     summary: text,
     interfaces: z.array(z.object({ path: text, symbols: z.array(text).min(1), use: text }).strict()).min(1),
@@ -103,7 +107,25 @@ export function validateCapabilityAction(input: unknown, current: CapabilityActi
       }
     }
   }
+  const outstanding = issues.some(issue => issue.path[0] === 'registrations' || issue.path[0] === 'reports') ? [] : unreportedBy(value, current.obligations);
+  if (outstanding.length > 0) issues.push({ kind: 'state', path: ['reports'], message: incompleteRequestError(outstanding, 'handback').message });
   return issues.length === 0 ? { valid: true, value, issues: [] } : { valid: false, issues };
+}
+
+/**
+ * The registered IDs a handback request would leave without a `done`
+ * report, once its own reports apply; none for any other action, for one
+ * whose reports are themselves invalid, or without obligation context. The
+ * rejection and the exhausted turn's failure both name these.
+ */
+export function unreportedByHandback(input: unknown, obligations: ObligationContext | undefined): string[] {
+  const parsed = capabilityActionSchema.safeParse(input);
+  if (!parsed.success || obligations === undefined || obligationSubmissionErrors(parsed.data, obligations).length > 0) return [];
+  return unreportedBy(parsed.data, obligations);
+}
+
+function unreportedBy(value: CapabilityAction, obligations: ObligationContext | undefined): string[] {
+  return value.kind === 'request-handback' && obligations !== undefined ? outstandingReports(value, obligations) : [];
 }
 
 /** Plan tools use the same captured basis rule without comparing prose. */

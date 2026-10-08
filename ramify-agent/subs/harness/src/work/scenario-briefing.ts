@@ -86,7 +86,7 @@ export function architectScenarioSection(scenarios: readonly BriefedScenario[]):
     'accepted proposal binds each, naming the fakes the binding relies on, and the scenario is `bound` and loses its',
     'pending tag at the next commit, so the gates\' configured checks run it. A passing gate is evidence, never your',
     'report: when, in your judgment, a scenario is correctly implemented and passing, report it `done` in `reports`,',
-    'whatever fakes its binding names. Completion is refused while any of them is not `done`.',
+    'whatever fakes its binding names. A completion request that leaves one not `done` is rejected, naming it.',
     '',
   );
   return lines;

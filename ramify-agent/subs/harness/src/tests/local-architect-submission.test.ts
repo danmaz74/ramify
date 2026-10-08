@@ -10,11 +10,12 @@ import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
 import type { RegistryEntry } from '../analysis/records.js';
 import { workLayout } from '../work/records.js';
-import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect } from '../work/submission.js';
+import { localArchitectJsonSchema, localArchitectToolName, unreportedByCompletion, validateLocalArchitect } from '../work/submission.js';
 import { assign, outline } from './helpers/iterations.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion, unresolved } from './helpers/analysis.js';
+import { forkNothingPossible } from './helpers/placement.js';
 import { installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { localContext, registered as registeredEvent, reported, submissionHash } from './helpers/obligations.js';
 import { obligationsOf } from '../work/obligations.js';
@@ -368,11 +369,14 @@ describe('extra locations: module contents, paths outside modules and guarded fi
   });
 });
 
+const errorsOf = (result: ReturnType<typeof validateLocalArchitect>) => (result.ok ? [] : result.errors);
+
 describe('PB3-D01 PB3-D02 PB3-D04: registrations and reports', () => {
-  const completing = (extra: Record<string, unknown>) => ({ ...requestCompletion(), ...extra });
-  const errorsOf = (result: ReturnType<typeof validateLocalArchitect>) => (result.ok ? [] : result.errors);
+  // The rules hold for every action that carries them; an `unresolved`
+  // request owes no report, so only these rules are judged here.
+  const reporting = (extra: Record<string, unknown>) => ({ ...unresolved(), ...extra });
   const judged = (extra: Record<string, unknown>, context = localContext()) =>
-    errorsOf(validateLocalArchitect(completing(extra), { ...evidence, obligations: context }));
+    errorsOf(validateLocalArchitect(reporting(extra), { ...evidence, obligations: context }));
 
   test('outcome-only tracking needs no registration, and a separate required test is registered only by explicit choice', () => {
     // The default: the scenarios the analysis accepted and the delegated outcome are already obligations.
@@ -418,7 +422,7 @@ describe('PB3-D01 PB3-D02 PB3-D04: registrations and reports', () => {
     expect(judged({ reports: [{ id: 'sc-001', judgment: 'done', basedOnRevision: 1, where: 'subs/a/src/send.ts — sendOnce' }] }, localContext([done]))).toEqual([]);
     expect(judged({ reports: [{ id: 'sc-001', judgment: 'bound', basedOnRevision: 1 }] }, localContext([done]))).toEqual([]);
     // Without the run's obligations nothing can be reported.
-    expect(errorsOf(validateLocalArchitect(completing({ reports: [{ id: 'sc-001', judgment: 'done', basedOnRevision: 0 }] }), evidence))
+    expect(errorsOf(validateLocalArchitect(reporting({ reports: [{ id: 'sc-001', judgment: 'done', basedOnRevision: 0 }] }), evidence))
       .map(error => error.path)).toEqual(['reports']);
   });
 
@@ -436,16 +440,62 @@ describe('PB3-D01 PB3-D02 PB3-D04: registrations and reports', () => {
     const context = { ...evidence, obligations: localContext() };
     expect(validateLocalArchitect({ ...assign('shop/orders', {}, outline()), ...report }, context).ok).toBe(true);
     expect(validateLocalArchitect({ ...unresolved(), ...report }, context).ok).toBe(true);
+    expect(validateLocalArchitect({ ...requestCompletion(), ...report }, context).ok).toBe(true);
     // An invalid report refuses the whole submission, with the action's own errors beside it.
     const both = errorsOf(validateLocalArchitect({ ...assign('shop/orders'), reports: [{ id: 'sc-404', judgment: 'done', basedOnRevision: 0 }] }, context));
     expect(both.map(error => error.path)).toEqual(['outline', 'reports.0.id']);
   });
 });
 
+describe('PB3-C01: a completion request owes a done report for each registered obligation of its architect', () => {
+  const owing = (ids: string) => ({
+    path: 'reports',
+    message: `This completion request leaves ${ids} without a done report. Report each one done in \`reports\` where, in your judgment, `
+      + 'it is correctly implemented and passing; where work remains, assign it, or submit `unresolved` with what blocks it',
+    expected: `a done report for each of ${ids}`,
+  });
+  const done = (id: string, basedOnRevision = 0) => ({ id, judgment: 'done', basedOnRevision });
+
+  test('a request missing one is rejected naming it; its own report resolves it, with or without where', () => {
+    const context = { ...evidence, obligations: localContext() };
+    expect(errorsOf(validateLocalArchitect({ ...requestCompletion(), reports: [] }, context))).toEqual([owing('sc-001')]);
+    expect(unreportedByCompletion({ ...requestCompletion(), reports: [] }, context.obligations)).toEqual(['sc-001']);
+    expect(validateLocalArchitect({ ...requestCompletion(), reports: [done('sc-001')] }, context).ok).toBe(true);
+    expect(validateLocalArchitect({ ...requestCompletion(), reports: [{ ...done('sc-001'), where: 'subs/never/src/absent.ts' }] }, context).ok).toBe(true);
+    // Only this architect's own: wi-002's scenario, the integration scenario and the capability outcome are owed by others.
+    expect(unreportedByCompletion({ ...requestCompletion(), reports: [] }, localContext([], 'wi-002'))).toEqual(['sc-002']);
+  });
+
+  test('a test it registers is owed in the same request, a done obligation is not, and a revision to bound owes it again', () => {
+    const context = { ...evidence, obligations: localContext() };
+    const registering = { ...requestCompletion(), registrations: [{ kind: 'test', description: 'Writing a note twice keeps one note' }] };
+    expect(errorsOf(validateLocalArchitect({ ...registering, reports: [done('sc-001')] }, context))).toEqual([owing('test-001')]);
+    expect(validateLocalArchitect({ ...registering, reports: [done('sc-001'), done('test-001')] }, context).ok).toBe(true);
+    const reportedDone = reported({ id: 'sc-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0003', submission: submissionHash('a') });
+    const after = { ...evidence, obligations: localContext([reportedDone]) };
+    expect(validateLocalArchitect({ ...requestCompletion(), reports: [] }, after).ok).toBe(true);
+    expect(errorsOf(validateLocalArchitect({ ...requestCompletion(), reports: [{ id: 'sc-001', judgment: 'bound', basedOnRevision: 1 }] }, after)))
+      .toEqual([owing('sc-001')]);
+  });
+
+  test('unfinished work and blockers owe no report, and an invalid report is judged first', () => {
+    const context = { ...evidence, obligations: localContext() };
+    expect(validateLocalArchitect(assign('shop/orders', { obligations: ['sc-001'] }, outline()), context).ok).toBe(true);
+    expect(validateLocalArchitect(unresolved(), context).ok).toBe(true);
+    const stale = validateLocalArchitect({ ...requestCompletion(), reports: [done('sc-001', 4)] }, context);
+    expect(errorsOf(stale).map(error => error.path)).toEqual(['reports.0.basedOnRevision']);
+    expect(unreportedByCompletion({ ...requestCompletion(), reports: [done('sc-001', 4)] }, context.obligations)).toEqual([]);
+    // The request's own rules and the missing report are answered together.
+    const staged = requestCompletion({ decomposition: { kind: 'staged', rationale: 'It is big.' }, stages: [] });
+    expect(errorsOf(validateLocalArchitect({ ...staged, reports: [] }, context)).map(error => error.path)).toEqual(['outline.stages', 'reports']);
+  });
+});
+
 describe('a rejected submission in a run', () => {
   const reviews = 'collection-review/workspace/reviews';
 
-  async function run(inputs: readonly unknown[], unchangedCheckpoints: ReadonlyArray<string | GitCheckpoint> = []) {
+  async function run(inputs: readonly unknown[], unchangedCheckpoints: ReadonlyArray<string | GitCheckpoint> = [],
+    roles: Readonly<Record<string, readonly unknown[]>> = {}) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
@@ -454,7 +504,7 @@ describe('a rejected submission in a run', () => {
       unchangedCheckpoints,
       script: (spec: SessionSpec) => (spec.role === 'catalog-extractor' ? [] : spec.role === 'initial-architect'
         ? [{ kind: 'submit' as const, input: submitted }]
-        : inputs.map(input => ({ kind: 'submit' as const, input }))),
+        : (roles[spec.role] ?? inputs).map(input => ({ kind: 'submit' as const, input }))),
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
@@ -577,6 +627,79 @@ describe('a rejected submission in a run', () => {
     expect(outcome).toMatchObject({ ended: 'invalid-submission', rejectedSubmissions: 3, submission: null });
     expect(events.some(event => event.type === 'outline-revised')).toBe(false);
     expect(events.some(event => event.type === 'gate-attempted')).toBe(false);
+  }, 300_000);
+
+  /** The structured errors and the remaining attempts of a rejected verdict. */
+  const answerOf = (verdict: unknown) => JSON.parse((verdict as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as {
+    errors: Array<{ path: string; message: string; expected?: string }>; remainingAttempts: number;
+  };
+  const forgotten = { ...requestCompletion(), reports: [] };
+
+  test('PB3-C01: a completion request missing a report is rejected naming the ID before any outline or gate; the same turn reports it and completes', async () => {
+    const { root, runId, service, agent } = await run([forgotten, { ...requestCompletion(), reports: [{ id: 'sc-001', judgment: 'done', basedOnRevision: 0 }] }],
+      [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"']);
+
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    const local = agent!.sessions.filter(session => session.spec.submission.name === localArchitectToolName);
+    // One turn: the rejection and the accepted request are verdicts of the same session.
+    expect(local).toHaveLength(1);
+    const answer = answerOf(local[0]!.verdicts[0]);
+    expect(answer.errors).toEqual([{ path: 'reports', message: expect.stringContaining('This completion request leaves sc-001 without a done report.'),
+      expected: 'a done report for each of sc-001' }]);
+    expect(answer.remainingAttempts).toBe(2);
+    expect(local[0]!.verdicts[1]).toEqual({ accepted: true });
+
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    // The rejected request recorded nothing and reached no outline, commit or gate.
+    expect(events.filter(event => event.type === 'outline-revised')).toHaveLength(1);
+    expect(events.filter(event => event.type === 'gate-committing' && (event.data as { checkpoint: string }).checkpoint === 'work-item')).toHaveLength(1);
+    expect(events.findIndex(event => event.type === 'obligation-reported')).toBeLessThan(events.findIndex(event => event.type === 'outline-revised'));
+    expect(events.filter(event => event.type === 'obligation-reported').map(event => event.data)).toEqual([
+      expect.objectContaining({ id: 'sc-001', judgment: 'done', revision: 1 }),
+    ]);
+    const invocation = (events.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect').at(-1)!.data as { invocation: string }).invocation;
+    const rejections = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations(invocation)), 'utf8')).split('\n').filter(Boolean)
+      .map(line => JSON.parse(line) as { type: string; data: { errors?: Array<{ path: string; message: string }> } })
+      .filter(line => line.type === 'rejection');
+    expect(rejections.map(line => line.data.errors)).toEqual([[{ path: 'reports', message: expect.stringContaining('leaves sc-001 without a done report') }]]);
+  }, 300_000);
+
+  test('PB3-C03: repeated incomplete requests spend the per-turn bound; the run ends as rejected submissions naming the IDs, with no gate and no report', async () => {
+    const { root, runId, service, agent } = await run([forgotten, forgotten, forgotten, forgotten], [scenariosCommit('review-notes')]);
+
+    const snapshot = onlyRun(service, 'review-notes');
+    expect(snapshot.state).toBe('failed');
+    expect(snapshot.failure).toMatchObject({ reason: 'invalid-submission' });
+    expect(snapshot.failure!.message).toBe('The local architect of wi-001 ended without a result (invalid-submission); '
+      + 'its last rejected completion request left sc-001 without a done report');
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
+    expect(local.verdicts).toHaveLength(3);
+    expect(local.verdicts.at(-1)).toMatchObject({ accepted: false, final: true });
+    expect(answerOf(local.verdicts.at(-1)).errors[0]!.message).toContain('leaves sc-001 without a done report');
+
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    const invocation = (events.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect').at(-1)!.data as { invocation: string }).invocation;
+    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome(invocation)), 'utf8')) as InvocationOutcome;
+    expect(outcome).toMatchObject({ ended: 'invalid-submission', rejectedSubmissions: 3, submission: null });
+    // No verdict on the code: nothing gated, reported, reset or counted beyond the rejections.
+    expect(events.some(event => ['outline-revised', 'gate-committing', 'gate-attempted', 'obligation-reported'].includes(event.type))).toBe(false);
+    expect(snapshot.counts.scenarios).toEqual({ pending: 1, bound: 0, done: 0 });
+  }, 300_000);
+
+  test('PB3-C02: an architect that cannot finish states the blocker in the same turn rather than manufacture a report', async () => {
+    const { root, runId, service, agent } = await run([forgotten, unresolved('The note store the goal needs does not exist yet.', ['README.md'])],
+      [scenariosCommit('review-notes')], { 'global-fork': [forkNothingPossible()] });
+
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
+    expect(local.verdicts).toHaveLength(2);
+    expect(local.verdicts[1]).toEqual({ accepted: true });
+    const snapshot = onlyRun(service, 'review-notes');
+    expect(snapshot.failure).toMatchObject({ reason: 'unresolvable-requirement' });
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    expect(events.some(event => event.type === 'unresolved-requested')).toBe(true);
+    // The blocker reported nothing: the scenario stays pending, and nothing was gated.
+    expect(events.some(event => event.type === 'obligation-reported' || event.type === 'gate-committing')).toBe(false);
+    expect(snapshot.counts.scenarios).toEqual({ pending: 1, bound: 0, done: 0 });
   }, 300_000);
 
   test('a first assignment without an outline is rejected before scheduling and can be corrected in the same session', async () => {

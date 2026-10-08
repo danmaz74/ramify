@@ -605,22 +605,68 @@ export function obligationsOwnedBy(projection: ObligationProjection, actor: Pick
 }
 
 /**
- * The obligations this actor is responsible for that its reports have not
- * made `done`: what a completion or handback request still owes. The
- * request's own reports count once recorded, so the projection passed in is
- * read after they are applied. Only the registered IDs are consulted: an
+ * The registered IDs this actor is responsible for that a completion or
+ * handback request would still leave without a `done` report, in
+ * registration order: the run's own and those the same submission
+ * registers, once its reports apply. A report of `done` resolves one; a
+ * revision to `bound` leaves it outstanding. Only registered IDs count: an
  * original example, a plan case nobody registered or an ordinary test owes
- * nothing, and no file, test result or audit outcome is read.
+ * nothing, `where` is never read, and no file, test result or audit outcome
+ * is consulted. The submission's reports are taken as validation accepted
+ * them; with invalid reports the caller judges those first.
  */
-export function unreportedObligations(projection: ObligationProjection, actor: Pick<ObligationActor, 'kind' | 'id'>): Obligation[] {
-  return obligationsOwnedBy(projection, actor).filter(obligation => obligation.status !== 'done');
+export function outstandingReports(
+  submission: { readonly registrations: readonly ObligationRegistration[]; readonly reports: readonly ObligationReport[] },
+  context: ObligationContext,
+): string[] {
+  const { actor, projection } = context;
+  const judged = new Map(submission.reports.map(report => [report.id, report.judgment] as const));
+  const owned = [
+    ...obligationsOwnedBy(projection, actor).map(obligation => ({ id: obligation.id, status: obligation.status })),
+    ...plannedRegistrations(submission.registrations, actor, projection.tests).map(entry => ({ id: entry.id, status: 'pending' as const })),
+  ];
+  return owned.filter(entry => (judged.get(entry.id) ?? entry.status) !== 'done').map(entry => entry.id);
 }
 
-/** Why a request cannot finish while this obligation is not reported done, by its state. */
-export function unreportedText(obligation: Pick<Obligation, 'id' | 'status'>): string {
-  return obligation.status === 'pending'
-    ? `${obligation.id} is pending and not reported done: report it done in \`reports\` where it holds, or assign an iteration that binds it`
-    : `${obligation.id} is bound and not reported done: report it done in \`reports\` where its binding holds, or assign the work that finishes it`;
+/**
+ * The one rejection of a completion or handback request that leaves
+ * registered IDs without a `done` report. It is an ordinary rejected
+ * submission: it names the IDs, counts toward the per-turn bound, and the
+ * same turn continues, where the architect reports what it forgot, assigns
+ * the unfinished work or states what blocks it.
+ */
+export function incompleteRequestError(outstanding: readonly string[], request: 'completion' | 'handback'): SubmissionError {
+  return {
+    path: 'reports',
+    message: `This ${request} request leaves ${outstanding.join(', ')} without a done report. Report each one done in \`reports\` `
+      + 'where, in your judgment, it is correctly implemented and passing; where work remains, assign it, or submit `unresolved` with what blocks it',
+    expected: `a done report for each of ${outstanding.join(', ')}`,
+  };
+}
+
+/**
+ * What the briefing says about source since each report: the accepted
+ * source a report was made against, where the accepted source has moved on
+ * since, so the architect can inspect the change. It is provenance for the
+ * architect's own reassessment, never a reason the harness changes or
+ * questions a report: nothing here marks a report stale or affected.
+ */
+export function reportSourceLines(owned: readonly Obligation[], sourceAt: (sequence: number) => string, current: string): string[] {
+  const moved = owned.flatMap(obligation => {
+    if (obligation.report === null) return [];
+    const at = sourceAt(obligation.report.sequence);
+    return at === current ? [] : [`- ${obligation.id}: last reported ${obligation.report.judgment} against accepted source ${at}`];
+  });
+  if (moved.length === 0) return [];
+  return [
+    '# Accepted source since your reports',
+    '',
+    `The accepted source is now ${current}. These reports were made against earlier accepted source; `
+      + '`inspect_git` with `diff` from that revision to the current one shows what changed. '
+      + 'The reports stand as you made them: whether one needs revising is your judgment.',
+    '',
+    ...moved,
+  ];
 }
 
 /**

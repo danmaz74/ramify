@@ -13,7 +13,9 @@ import { assignmentBodySchema, assignmentErrors, type AssignmentBody } from './a
 import type { IntegrationScope } from './integration.js';
 import { decompositionSchema } from './records.js';
 import type { EngineerBounds } from '../run/policy.js';
-import { obligationSubmissionErrors, obligationSubmissionFields, type ObligationContext } from './obligations.js';
+import {
+  incompleteRequestError, obligationSubmissionErrors, obligationSubmissionFields, outstandingReports, type ObligationContext,
+} from './obligations.js';
 
 /*
  * What a local architect submits at a coordination point. This iteration
@@ -27,7 +29,9 @@ import { obligationSubmissionErrors, obligationSubmissionFields, type Obligation
  * `request-completion` commits a `WorkItemOutline` and runs the `work-item`
  * gate. Requesting completion with no iteration is a legitimate outcome: the
  * goal is already satisfied by existing behavior, which is verified reuse,
- * and the outline records why.
+ * and the outline records why. A request that leaves an obligation this
+ * architect is responsible for without a `done` report is rejected, naming
+ * the IDs, like any other invalid submission.
  *
  * `request-placement` asks the global architect where a capability belongs,
  * when the choice is not the local architect's to make. It records the
@@ -191,8 +195,27 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
   if (!shape.ok) return shape;
   const checked = validateKind(shape.value, evidence);
   const reporting = shape.value.kind === 'yield-for-providers' ? [] : obligationErrors(shape.value, evidence);
-  if (reporting.length === 0) return checked;
-  return { ok: false, errors: [...(checked.ok ? [] : checked.errors), ...reporting] };
+  const outstanding = reporting.length === 0 ? unreportedBy(shape.value, evidence.obligations) : [];
+  const incomplete = outstanding.length === 0 ? [] : [incompleteRequestError(outstanding, 'completion')];
+  if (reporting.length === 0 && incomplete.length === 0) return checked;
+  return { ok: false, errors: [...(checked.ok ? [] : checked.errors), ...reporting, ...incomplete] };
+}
+
+/**
+ * The registered IDs a completion request would leave without a `done`
+ * report, once its own reports apply; none for any other input, for one
+ * whose reports are themselves invalid, or where the turn has no obligation
+ * context. The rejection and the exhausted turn's failure both name these.
+ */
+export function unreportedByCompletion(input: unknown, obligations: ObligationContext | undefined): string[] {
+  const shape = localArchitectSubmissionSchema.safeParse(input);
+  if (!shape.success || shape.data.kind === 'yield-for-providers') return [];
+  if (obligations === undefined || obligationSubmissionErrors(shape.data, obligations).length > 0) return [];
+  return unreportedBy(shape.data, obligations);
+}
+
+function unreportedBy(value: LocalArchitectSubmission, obligations: ObligationContext | undefined): string[] {
+  return value.kind === 'request-completion' && obligations !== undefined ? outstandingReports(value, obligations) : [];
 }
 
 /**

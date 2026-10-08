@@ -156,17 +156,20 @@ describe('the local architect\'s briefing', () => {
     // How binding and reporting work, and the refusal: a pass is evidence, never the report.
     expect(text).toContain('`assignment.obligations`');
     expect(text).toContain('A passing gate is evidence, never your\nreport');
-    expect(text).toContain('report it `done` in `reports`,\nwhatever fakes its binding names. Completion is refused while any of them is not `done`.');
+    expect(text).toContain('report it `done` in `reports`,\nwhatever fakes its binding names. A completion request that leaves one not `done` is rejected, naming it.');
     expect(text).not.toContain('`request-completion.scenarios`');
   });
 
-  test('a provider work item\'s briefing says nothing about scenarios, and the completion refusal names the done report', () => {
+  test('a provider work item\'s briefing says nothing about scenarios, and the completion refusal names what still blocks it', () => {
     expect(entryScenariosOf(records, states([]), null)).toEqual([]);
     const text = workItemMessage(architectBriefing(workItem({ obligation: { id: 'ob-001', revision: 1 } as never }), {
-      delegation: { open: [], released: [], blocked: ['sc-001 is pending and not reported done'] },
+      delegation: { open: [], released: [], blocked: ['cap-001 has no accepted current handback'] },
     }));
     expect(text).not.toContain('## The scenarios of this work item');
-    expect(text).toContain('a scenario of this work item counts once you report it `done` in `reports`, which you may do with the request itself where, in your judgment, it is correctly implemented and passing; assign an iteration that binds the others.');
+    expect(text).toContain('## Completion was refused\n\n- cap-001 has no accepted current handback');
+    expect(text).toContain('a capability request closes with an accepted current handback of its task, or an accepted consumer verification where it used an existing interface.');
+    // A missing done report is never a refusal here: it is a rejected submission in its own turn.
+    expect(text).not.toContain('report it `done`');
   });
 
   test('the last accepted iteration carries each scenario its gate passed, with the definition that bound each step', () => {

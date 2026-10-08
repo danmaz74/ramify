@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildCapabilityPlanRevision, validateCapabilityAction, validateCapabilityPlanUpdate, type CapabilityActionBasis } from '../capability/submission.js';
+import {
+  buildCapabilityPlanRevision, unreportedByHandback, validateCapabilityAction, validateCapabilityPlanUpdate, type CapabilityActionBasis,
+} from '../capability/submission.js';
 import { copyCapabilityFixture, fixturePlan, openCapabilityRuns } from './helpers/capability.js';
 import { capabilityPlanSchema } from '../capability/records.js';
 import type { Script } from '../../subs/agent/src/scripted.js';
@@ -9,7 +11,7 @@ import { assign, edit, installMiniRunner, outline, submit, treeInputs } from './
 import { initRepository, runEventsOnDisk, startRun, until } from './helpers/runs.js';
 import { capabilityContext, line, registered, reported, submissionHash } from './helpers/obligations.js';
 import { validateEngineer } from '../work/engineer.js';
-import { obligationEventsToRecord, unreportedObligations, unreportedText } from '../work/obligations.js';
+import { obligationEventsToRecord, outstandingReports } from '../work/obligations.js';
 import type { RunEvent } from '../run/log.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -154,13 +156,15 @@ describe('PB3-D01 PB3-D02 PB3-D04: capability registrations and reports', () => 
   });
 
   it('PB3-D08 PB3-D09 a handback owes a done report for each registered obligation of its task, outcome-only or separately tracked, and none for an example', () => {
-    const owed = (events: Parameters<typeof capabilityContext>[0]) =>
-      unreportedObligations(capabilityContext(events).projection, { kind: 'capability-task', id: 'cap-001' }).map(unreportedText);
+    const owed = (events: Parameters<typeof capabilityContext>[0], reports: ReadonlyArray<{ id: string; judgment: 'done' | 'bound'; basedOnRevision: number }> = []) =>
+      outstandingReports({ registrations: [], reports }, capabilityContext(events));
     // Outcome-only tracking: the delegated outcome is the one report owed.
-    expect(owed([])).toEqual(['cap-001 is pending and not reported done: report it done in `reports` where it holds, or assign an iteration that binds it']);
+    expect(owed([])).toEqual(['cap-001']);
     const doneOutcome = reported({ id: 'cap-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0003', submission: submissionHash('a') });
     expect(owed([doneOutcome])).toEqual([]);
-    // Separate tracking: a registered case and test are owed beside it; the consumer's sc-001 is not the task's to report.
+    // Separate tracking: a registered case and test are owed beside it, bound
+    // or not; the consumer's sc-001 is not the task's to report, and the
+    // plan's other examples and cases, registered by nobody, owe nothing.
     const separate = [
       registered({ id: 'cap-001.case.need-001.ex01', kind: 'scenario', responsible: { kind: 'capability-task', id: 'cap-001' },
         by: 'inv-0003', submission: submissionHash('b'), case: 'need-001.ex01' }),
@@ -169,11 +173,35 @@ describe('PB3-D01 PB3-D02 PB3-D04: capability registrations and reports', () => 
       doneOutcome,
       line('obligation-bound', { id: 'test-001', fakes: ['FactSourceFake'], by: 'inv-0005', submission: submissionHash('c') }),
     ];
-    expect(owed(separate).map(text => text.split(':')[0])).toEqual(['cap-001.case.need-001.ex01 is pending and not reported done', 'test-001 is bound and not reported done']);
-    expect(owed([...separate,
-      reported({ id: 'cap-001.case.need-001.ex01', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0006', submission: submissionHash('d') }),
-      reported({ id: 'test-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0006', submission: submissionHash('d') }),
-    ])).toEqual([]);
+    expect(owed(separate)).toEqual(['cap-001.case.need-001.ex01', 'test-001']);
+    // The request's own reports count: a done report resolves one, a revision to bound leaves cap-001 owed again.
+    expect(owed(separate, [{ id: 'cap-001.case.need-001.ex01', judgment: 'done', basedOnRevision: 0 }, { id: 'test-001', judgment: 'done', basedOnRevision: 0 }])).toEqual([]);
+    expect(owed(separate, [{ id: 'cap-001', judgment: 'bound', basedOnRevision: 1 }])).toEqual(['cap-001', 'cap-001.case.need-001.ex01', 'test-001']);
+    // A case or test registered by the request itself is owed by that same request.
+    expect(outstandingReports({ registrations: [{ kind: 'test', description: 'B keeps its source' }], reports: [{ id: 'cap-001', judgment: 'done', basedOnRevision: 0 }] },
+      capabilityContext())).toEqual(['test-001']);
+  });
+
+  it('PB3-C01 a handback request missing a report is a rejected submission naming the IDs; the same request with the report, and no where, is accepted', () => {
+    const handback = { task: 'cap-001', planRevision: 2, invocation: 'inv-0003', kind: 'request-handback', summary: 'B returns its source',
+      interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact'], use: 'Call from A' }], limitations: [] };
+    const current = { ...basis, obligations: capabilityContext() };
+    const missing = validateCapabilityAction(handback, current);
+    expect(missing).toEqual({ valid: false, issues: [{ kind: 'state', path: ['reports'], message: 'This handback request leaves cap-001 without a done report. '
+      + 'Report each one done in `reports` where, in your judgment, it is correctly implemented and passing; where work remains, assign it, or submit `unresolved` with what blocks it' }] });
+    expect(unreportedByHandback(handback, current.obligations)).toEqual(['cap-001']);
+    // The forgotten report in the same request resolves it; `where` is optional and never read.
+    const reportedHandback = { ...handback, reports: [{ id: 'cap-001', judgment: 'done', basedOnRevision: 0 }] };
+    expect(validateCapabilityAction(reportedHandback, current).valid).toBe(true);
+    expect(unreportedByHandback(reportedHandback, current.obligations)).toEqual([]);
+    // Unfinished work continues through ordinary coordination: no other action owes a report.
+    expect(validateCapabilityAction({ task: 'cap-001', planRevision: 2, invocation: 'inv-0003', kind: 'partial', progress: 'B is half done',
+      unfinished: ['the B source'] }, current).valid).toBe(true);
+    expect(validateCapabilityAction({ task: 'cap-001', planRevision: 2, invocation: 'inv-0003', kind: 'unresolved', problem: 'B cannot know the source',
+      evidence: ['subs/b/src/fact.ts'] }, current).valid).toBe(true);
+    // An invalid report is judged as such; the missing-report rejection is not added on top of it.
+    const stale = validateCapabilityAction({ ...handback, reports: [{ id: 'cap-001', judgment: 'done', basedOnRevision: 3 }] }, current);
+    expect(stale.valid ? [] : stale.issues.map(issue => issue.path.join('.'))).toEqual(['reports.0.basedOnRevision']);
   });
 });
 

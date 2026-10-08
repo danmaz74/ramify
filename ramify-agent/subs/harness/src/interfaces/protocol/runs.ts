@@ -131,8 +131,8 @@ export const runFailureReasonSchema = z.enum([
   'repair-exhausted',
   /**
    * A tracked scenario had no `done` report from its responsible architect
-   * before the final gate, or a work item asked for completion with a
-   * scenario of its own not reported done more often than the bound allows.
+   * before the final gate, or a work item asked for completion with
+   * capability work unresolved more often than the bound allows.
    */
   'acceptance-incomplete',
   /** Infrastructure recoveries were spent without a running check. */

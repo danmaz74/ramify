@@ -7,8 +7,8 @@ import { checkToolName, intakeToolName, principleToolName } from '../../analysis
  * Scripted local architects that report their work item's scenarios done.
  *
  * Every entry of a scripted analysis has scenarios, and a completion
- * request is refused while one of its entry's scenarios is not reported
- * done (architecture §9). A test whose subject is not the scenarios writes
+ * request that leaves one of its entry's scenarios not reported done is a
+ * rejected submission (architecture §9). A test whose subject is not the scenarios writes
  * its completion requests without reports, so this wrapper reports for it:
  * a local architect's `request-completion` that names no `reports` reports
  * every scenario obligation its prompt lists as not yet done, as an

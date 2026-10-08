@@ -1187,6 +1187,8 @@ export function identityOf(event: RunEvent): string | null {
     case 'iteration-assigned': case 'iteration-closed': return `${event.type}:${String(data.iteration)}`;
     case 'contract-requested': return `${event.type}:${String(data.iteration)}`;
     case 'outline-revised': return `${event.type}:${String(data.workItem)}@${String(data.revision)}`;
+    case 'obligation-registered': return `${event.type}:${String(data.id)}`;
+    case 'obligation-reported': return `${event.type}:${String(data.id)}@${String(data.revision)}`;
     case 'gate-committing': case 'gate-attempted': return `${event.type}:${String(data.gate)}`;
     case 'placement-requested': return `${event.type}:${String(data.request)}`;
     case 'decision-accepted': case 'brief-appended': return `${event.type}:${String(data.decision)}`;
