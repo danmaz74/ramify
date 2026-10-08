@@ -17,7 +17,6 @@ import type { LedgerFileSystem } from '../../subs/ledger/src/fs.js';
 import { replayCheckFindingEvents } from '../../subs/check-findings/src/replay.js';
 import type { CheckFindingEvent } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import { checkFindingCauseSchema, checkFindingEventsField } from '../check-findings/records.js';
-import { gateCheckFindingOutcomeSchema } from '../checks/scenario-findings.js';
 import {
   reviewAttemptFinishedFields, reviewAttemptStartedDataSchema, reviewOrientationRecordedDataSchema, reviewRequestRecordedDataSchema,
 } from '../reviews/records.js';
@@ -49,6 +48,25 @@ const eventBase = {
   at: z.iso.datetime(),
 };
 const event = <T extends string, D extends z.ZodType>(type: T, data: D) => z.object({ ...eventBase, type: z.literal(type), data }).strict();
+
+/**
+ * The CheckFinding part an earlier run's gate recorded from its harness
+ * scenario check: why the part was refused, and each scenario left out. No
+ * gate writes it now; its notes are kept as recorded.
+ */
+const historicalScenarioFindingsSchema = z.object({
+  refused: z.object({
+    reason: z.enum(['source-unavailable', 'transition-refused']),
+    message: z.string(),
+  }).strict().nullable(),
+  notes: z.array(z.object({
+    scenario: scenarioIdSchema,
+    checkFinding: z.string().nullable(),
+    step: z.enum(['promotion', 'witness']),
+    code: z.string(),
+    classification: z.string().optional(),
+  }).strict()),
+}).strict();
 
 const text = z.string().min(1);
 
@@ -569,8 +587,14 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('gate-command-started', z.object({
     gate: text,
     checkpoint: text,
-    kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
-    /** A setup command's declared name, such as `build`. */
+    /**
+     * `configured` is one check of the committed audit definition, which the
+     * provider starts. `tests`, `conformance` and `scenarios` are the
+     * harness-planned commands of earlier runs, read from their logs and no
+     * longer written.
+     */
+    kind: z.enum(['setup', 'ramify-check', 'type-check', 'configured', 'tests', 'conformance', 'scenarios']),
+    /** A setup command's declared name, such as `build`, or a configured check's ID. */
     name: text.optional(),
     position: z.int().positive(),
     total: z.int().positive(),
@@ -578,14 +602,16 @@ export const runEventSchema = z.discriminatedUnion('type', [
   /** A provider test/check is queued for the machine lock; readiness projects native check progress here. */
   event('gate-command-waiting', z.object({
     gate: text, checkpoint: text,
-    kind: z.enum(['tests', 'scenarios', 'conformance']),
+    /** `configured` now; the others are read from earlier runs' logs. */
+    kind: z.enum(['configured', 'tests', 'scenarios', 'conformance']),
     position: z.int().positive(), total: z.int().positive(), line: text,
   }).strict()),
   /**
-   * A gate finished and commits its one complete `GateAttempt`. A committing
-   * gate of a work item also carries what its scenario check means for the
-   * work item's CheckFindings: a repeated failure promoted, a witness that
-   * fixes one, and what was left out. The verdict never depends on them.
+   * A gate finished and commits its one complete `GateAttempt`. Earlier runs'
+   * committing gates also carried what their harness scenario check meant
+   * for the work item's CheckFindings, which stays readable here; a gate
+   * that asks the configured audit carries none, because its per-scenario
+   * results are display only.
    */
   event('gate-attempted', z.object({
     gate: text,
@@ -594,7 +620,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
     next: text,
     committing: z.boolean().optional(),
     checkFindings: checkFindingEventsField.optional(),
-    scenarioFindings: gateCheckFindingOutcomeSchema.optional(),
+    scenarioFindings: historicalScenarioFindingsSchema.optional(),
   }).strict()),
   /**
    * CheckFinding events committed by a path with no run event of its own:

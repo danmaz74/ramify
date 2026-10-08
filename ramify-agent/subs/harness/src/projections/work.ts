@@ -10,7 +10,7 @@ import { deliverPackage } from '../context-selection/delivery.js';
 import { packageDeviation, planDeviationSchema } from '../deviations/records.js';
 import type { PackageDeviation } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { ProjectionError, type RunView } from './inputs.js';
-import { scenarioCheckViewOf } from './scenarios.js';
+import { gateScenarioViewsOf } from './scenarios.js';
 
 /*
  * Work items, their iterations and their gates, as a client reads them.
@@ -262,6 +262,9 @@ export function gateOf(view: RunView, id: string): GateView {
     audited: gate.audited,
     evidence: gate.evidence === null ? null : { ...gate.evidence },
     ...(gate.provider === undefined ? {} : { provider: gate.provider }),
+    ...(gate.audit === undefined ? {} : { audit: { ...gate.audit, definition: { ...gate.audit.definition },
+      reuse: gate.audit.reuse === null ? null : { ...gate.audit.reuse, ignoredChangedPaths: [...gate.audit.reuse.ignoredChangedPaths] } } }),
+    scenarios: gateScenarioViewsOf(gate),
     verdict: gate.verdict,
     cause: gate.cause,
     next: gate.next,
@@ -290,15 +293,6 @@ export function gateOf(view: RunView, id: string): GateView {
       outcome: command.outcome,
       notVerified: command.notVerified ?? null,
       runnerError: command.runnerError,
-      selection: command.selection === undefined
-        ? null
-        : {
-            policy: command.selection.policy,
-            exactOwners: [...command.selection.exactOwners],
-            subtrees: [...command.selection.subtrees],
-            extraSuites: [...command.selection.extraSuites],
-            resolved: [...command.selection.resolved],
-          },
       output: {
         path: command.output.path,
         bytes: command.output.bytes,
@@ -307,7 +301,6 @@ export function gateOf(view: RunView, id: string): GateView {
       },
       stopped: command.stopped ?? null,
       outputIncomplete: command.outputIncomplete === true,
-      scenarios: command.scenarios === undefined ? null : scenarioCheckViewOf(command.scenarios),
     })),
   };
 }

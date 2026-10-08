@@ -90,6 +90,7 @@ function verdictText(node: GateNode): string {
 type ExecutionGateCommand = NonNullable<ExecutionMapSnapshot['current']['gateCommand']>;
 const commandWords: Record<ExecutionGateCommand['kind'], string> = {
   setup: 'Setup', tests: 'Tests', 'type-check': 'Type check', 'ramify-check': 'Ramify check', conformance: 'Conformance', scenarios: 'Scenarios',
+  configured: 'Configured check',
 };
 
 /** A command's words: a setup command the project named `build` is the build. */
@@ -224,7 +225,7 @@ function Detail({ node, map, client, planId, runId, onOpenGate, onOpenSession }:
     {node.kind === 'scenario' && <><p>Latest real result: {realResultText(node.latestRealResult)}; lifecycle: {node.state}.</p>
       {scenario.state.status === 'ready' && scenario.state.data && (scenario.state.data.detail.state === 'available'
         ? <><pre>{scenario.state.data.detail.source.join('\n')}</pre><h4>Result history</h4>
-          {scenario.state.data.detail.gates.length ? <ol>{scenario.state.data.detail.gates.map((g, i) => <li key={`${g.gate}:${i}`}>{g.gate}: {g.status}{g.dryRun ? ' (dry run)' : ''}; gate {g.verdict}; {g.checkpoint}</li>)}</ol>
+          {scenario.state.data.detail.gates.length ? <ol>{scenario.state.data.detail.gates.map((g, i) => <li key={`${g.gate}:${i}`}>{g.gate}: {g.status} in {g.check}; gate {g.verdict}; {g.checkpoint}</li>)}</ol>
             : <p>No recorded gate result.</p>}</> : <p>Full scenario unavailable: {scenario.state.data.detail.reason}</p>)}
       {scenario.state.status === 'failed' && <p role="alert">Could not read scenario: {scenario.state.error.message}</p>}</>}
     {node.kind === 'gate' && <><p>Verdict {node.verdict ?? 'running'}{node.audit !== 'not-applicable' ? `; audit ${node.audit}` : ''}{node.repairRound > 0 ? `; repair round ${node.repairRound}` : ''}; cause {node.cause ?? 'none'}.</p>

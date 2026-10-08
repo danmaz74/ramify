@@ -5,6 +5,7 @@ import type {
 import { gateCheckpointSchema } from '../interfaces/protocol/runs.js';
 import type { ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import type { GateAttempt } from '../checks/records.js';
+import { scenarioResultsOf } from '../checks/scenario-results.js';
 import { capabilityProgressOf } from './progress.js';
 import { gatesByScenario, scenariosOf } from './scenarios.js';
 import { runSessionViews } from './sessions.js';
@@ -73,9 +74,8 @@ function scenarioSources(view: RunView): Map<string, ExecutionSourceRef> {
 function scenarioResults(view: RunView): Map<string, ExecutionScenarioResult> {
   const latest = new Map<string, ExecutionScenarioResult>();
   // Gate attempts retain their first-commit order even if the body is later revised.
-  for (const { body: gate } of view.gates.values()) for (const command of gate.commands) {
-    if (command.kind !== 'scenarios' || command.scenarios === undefined || command.scenarios.dryRun) continue;
-    for (const result of command.scenarios.scenarios) latest.set(result.id, result.status);
+  for (const { body: gate } of view.gates.values()) {
+    for (const result of scenarioResultsOf(gate)) latest.set(result.id, result.status);
   }
   return latest;
 }

@@ -63,31 +63,6 @@ export async function dispatchHarnessCommand(input: {
   return { run, provider: result, passed: result.passed, runnerError };
 }
 
-/** Dirty, focused execution without a suite lock or published evidence. */
-export async function runFocusedCheck(command: CheckCommand, signal: AbortSignal): Promise<{
-  readonly outcome: 'passed' | 'failed' | 'not-verified';
-  readonly notVerified: string | null;
-  readonly exitCode: number | null;
-  readonly elapsedMs: number;
-  readonly diagnostics: string;
-}> {
-  const executed = await dispatchHarnessCommand({ command, signal });
-  const result = executed.provider as import('ramify-audit').CheckExecutionResult;
-  const run = executed.run;
-  const notVerified = executed.runnerError?.kind ?? (run.outcome.kind !== 'completed' ? run.outcome.kind : null);
-  const outcome = result.passed ? 'passed' : notVerified === null ? 'failed' : 'not-verified';
-  const detail = result.commands?.command ?? result;
-  const diagnostics = [
-    result.summary,
-    ...(detail.counts === undefined ? ['Counts: unknown'] : [`Counts: ${JSON.stringify(detail.counts)}`]),
-    ...[...(detail.failedTests ?? []), ...(detail.failedScenarios ?? [])].map(failure => JSON.stringify(failure)),
-    ...(detail.runnerError === undefined ? [] : [`Runner error: ${JSON.stringify(detail.runnerError)}`]),
-    ...(detail.output === '' ? [] : [detail.output]),
-  ].join('\n');
-  return { outcome, notVerified, exitCode: run.outcome.kind === 'completed' ? run.outcome.exitCode : null,
-    elapsedMs: run.elapsedMs, diagnostics };
-}
-
 async function isVitest(command: CheckCommand): Promise<boolean> {
   const executable = command.argv[0] ?? '';
   if ((executable === 'vitest' || executable.endsWith('/vitest')) && command.argv[1] === 'run') return true;

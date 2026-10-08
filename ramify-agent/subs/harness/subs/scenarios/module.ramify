@@ -2,10 +2,10 @@ ramify 1
 module scenarios
 
 // Acceptance scenarios as pure functions: plan extraction, the form rules of
-// the initial analysis, records and their numbering, the state reducer,
-// feature rendering, the per-module Cucumber profile and the reducer of a
-// run's message stream. The Gherkin parser and the message types stay
-// behind this boundary. Every named type a signature mentions is exposed
+// the initial analysis, records and their numbering, the state reducer and
+// feature rendering. The project's own Cucumber configuration runs them as
+// checks of its committed audit definition. The Gherkin parser stays behind
+// this boundary. Every named type a signature mentions is exposed
 // beside the symbol, so the parent can name what it receives.
 expose-src extractPlanScenarios, extractDocumentScenarios, PlanScenario, planScenarioSchema from "extraction.ts" to parent
 expose-src PlanScenarioLimitation, planScenarioLimitationSchema from "extraction.ts" to parent
@@ -27,12 +27,3 @@ expose-src reduceScenarioStates, countScenarioStates, carriesPendingTag from "st
 
 expose-src renderFeatureFiles, FeatureRenderingRun, RenderedFeatureFile from "rendering.ts" to parent
 expose-src pendingTag, identityTagOf, scenarioIdOfTag from "rendering.ts" to parent
-
-expose-src buildScenarioProfile, ScenarioProfile, ScenarioProfileOptions, ScenarioRunConfig from "profiles.ts" to parent
-expose-src ScenarioMode, scenarioModeSchema, ScenarioSelection, scenarioSelectionSchema from "profiles.ts" to parent
-expose-src scenarioTagExpression, scenarioRunName from "profiles.ts" to parent
-
-expose-src TrackedScenario, ScenarioRunSummary, scenarioRunSummarySchema from "messages.ts" to parent
-expose-src ScenarioRunResult, scenarioRunResultSchema, ScenarioRunStatus, scenarioRunStatusSchema from "messages.ts" to parent
-expose-src untrackedScenarioCountsSchema from "messages.ts" to parent
-

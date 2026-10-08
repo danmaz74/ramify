@@ -305,10 +305,11 @@ what you established:
 implemented and passing, including those existing step definitions already
 bind. See Scenarios and your reports above.
 
-The harness then runs the work item's gate: the project's tests, its type
-check, a complete Ramify check and, in quick mode, every module's scenarios
-that carry no pending tag. Only that gate closes the work item; your
-submission asks for completion and never states it.
+The harness then runs the work item's gate: the project's committed audit of
+the candidate, whose configured checks run its tests, its type check, a
+complete Ramify check and every scenario that carries no pending tag. Only
+that gate closes the work item; your submission asks for completion and never
+states it. A gate's audit result never reports a scenario done.
 
 Before that gate, the reviews of your iterations settle. When they leave
 CheckFindings that need attention, a fork of your session taken at your

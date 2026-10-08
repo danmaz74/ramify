@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { findingsOf, sentenceOf, type HookFinding } from '../hooks/post-write.js';
-import type { GateAttempt, GateCommandRecord, ScenarioCheckSummary } from './records.js';
+import type { GateAttempt, GateCommandRecord } from './records.js';
+import { scenarioResultsOf, untrackedScenarioCounts, type ScenarioResult } from './scenario-results.js';
 
 /*
  * What a failing gate says to the agent that receives it.
@@ -10,11 +11,13 @@ import type { GateAttempt, GateCommandRecord, ScenarioCheckSummary } from './rec
  * asks its reader to guess: an architect that read `outside-assignment` and
  * nothing else narrowed a file list and the same failure came back.
  *
- * So a briefing names each command that did not pass and carries what it
- * reported. A Ramify check reports a structured document, each finding with
- * its own location, and those findings are worded by the one function that
- * words a finding anywhere. A command that reports no structure is quoted:
- * the end of its own output, bounded, never parsed.
+ * So a briefing names what the gate's audit asked and answered, and each
+ * configured check that did not pass with what the provider recorded of it:
+ * its counts, its failed tests and scenarios, its runner error and the end of
+ * its output, bounded. A scenario the audit ran is named by its identity tag,
+ * from the raw runner output. A standalone diagnosis names each command;
+ * a Ramify check's findings are worded by the one function that words a
+ * finding anywhere, and any other command is quoted, never parsed.
  */
 
 /** How many lines of one command's own output a briefing carries. */
@@ -66,15 +69,12 @@ export async function ramifyFindingsOf(command: GateCommandRecord): Promise<Hook
 }
 
 /**
- * What a failing gate tells its reader: one line per command, the findings
- * or the output of each one that did not pass, and, for the local
- * architect, what a module violation leaves it to decide. The lines are
- * placed as they are; nothing that reads them prefixes them again.
- *
- * A scenario check is read from its summary rather than quoted: each
- * scenario that did not pass with its file and line, its failing step, the
- * message and the steps no definition matched, and each one that passed
- * with its binding. `names` gives each tracked scenario's name.
+ * What a failing gate tells its reader: its audit request and answer, each
+ * configured check that did not pass with the provider's record of it, each
+ * tracked scenario that did not pass, each in-place command, failed rule and
+ * unauthorized guarded change. The lines are placed as they are; nothing
+ * that reads them prefixes them again. `names` gives each tracked
+ * scenario's name.
  */
 export async function gateDiagnostics(
   gate: GateAttempt,
@@ -84,6 +84,7 @@ export async function gateDiagnostics(
   waiting: ReadonlyMap<number, string> = new Map(),
 ): Promise<GateDiagnostics> {
   const summary: string[] = [];
+  if (gate.audit !== undefined) summary.push(...auditLines(gate, names, waiting));
   // The commands a setup command that did not pass kept from running are
   // named once, after it: they report nothing about the source.
   const skipped = gate.commands.filter(command => command.notVerified === 'setup-failed');
@@ -106,22 +107,11 @@ export async function gateDiagnostics(
       }
       continue;
     }
-    if (command.kind === 'scenarios' && command.scenarios !== undefined) {
-      const passed = command.outcome === 'passed';
-      const lines = scenarioCheckLines(command.scenarios, names, { indent: '  ', only: passed ? 'passed' : 'all' });
-      if (lines.length > 0) {
-        summary.push(passed
-          ? `- \`${command.kind}\`: ${outcome}${exit}; each scenario it passed, and the step definitions that bound it:`
-          : `- \`${command.kind}\`: ${outcome}${exit}; ${describeScenarioCheck(command.scenarios)}:`);
-        summary.push(...lines);
-        continue;
-      }
-    }
     if (command.outcome === 'passed') {
       summary.push(`- \`${command.kind}\`: ${outcome}${exit}`);
       continue;
     }
-    const provider = providerFailureLines(gate, index);
+    const provider = commandProviderLines(gate, index);
     if (provider.length > 0) {
       summary.push(`- \`${command.kind}\`: ${outcome}${exit}; complete provider diagnostics follow; full command output: \`${command.output.path}\`:`);
       summary.push(...provider.map(line => `  ${line}`));
@@ -156,20 +146,106 @@ export async function gateDiagnostics(
   return { id: gate.id, cause: gate.cause, summary };
 }
 
-/** Read only failure facts from the retained provider payload; successful output stays on demand. */
-function providerFailureLines(gate: GateAttempt, index: number): string[] {
+/**
+ * A committing gate's audit: what was requested and what answered it, then
+ * each configured check of the returned record, the failures in full and the
+ * passes in one line, the universe's checks the record did not select, and
+ * every tracked scenario that did not pass.
+ */
+function auditLines(gate: GateAttempt, names: ReadonlyMap<string, string>, waiting: ReadonlyMap<number, string>): string[] {
+  const audit = gate.audit!;
+  const lines: string[] = [];
+  const asked = `${audit.mode === 'full' ? 'a full audit' : 'the project\'s default audit'} of \`${audit.requestedSourceCommit}\` under \`${audit.definition.path}\``;
+  if (audit.status !== 'completed') {
+    lines.push(`- audit \`${audit.requestId}\`, ${asked}: ${audit.status === 'refused' ? 'refused' : audit.status}, ${audit.detail}`);
+  } else {
+    const executed = `requested ${audit.requestedMode ?? 'unknown'}, executed ${audit.executedMode ?? 'unknown'}${audit.fallbackReason === null ? '' : ` (${audit.fallbackReason})`}`;
+    lines.push(`- audit \`${audit.requestId}\`, ${asked}: ${executed}; composed verdict \`${audit.verdict ?? 'none'}\`${audit.verdict === 'pass' ? '' : `, ${audit.detail}`}`);
+  }
+  if (audit.reuse !== null) {
+    const ignored = audit.reuse.ignoredChangedPaths.length === 0 ? 'no changed path' : audit.reuse.ignoredChangedPaths.map(path => `\`${path}\``).join(', ');
+    lines.push(`  - it reused the record of \`${audit.reuse.auditedCommit}\`, which applies to this commit: its policy ignores ${ignored}`);
+  }
+  for (const line of waiting.values()) lines.push(`- a configured check waited for the machine test lock: ${line}`);
   const checks = gate.provider?.checks;
-  if (checks === null || typeof checks !== 'object' || Array.isArray(checks)) return [];
-  const command = gate.commands[index];
-  if (command === undefined) return [];
-  const id = command.providerCheckId;
-  if (id === undefined) return [];
-  const value = (checks as Record<string, unknown>)[id];
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return [];
-  const check = value as Record<string, unknown>;
+  const published = isRecord(checks) ? checks : {};
+  for (const [id, value] of Object.entries(published)) {
+    if (!isRecord(value)) continue;
+    const status = typeof value['status'] === 'string' ? value['status'] : value['passed'] === true ? 'passed' : 'failed';
+    if (status === 'passed') {
+      lines.push(`- \`${id}\`: passed${countsOf(value)}`);
+      continue;
+    }
+    lines.push(`- \`${id}\`: ${status}; the provider's record of it follows:`);
+    lines.push(...checkFailureLines(id, value).map(line => `  ${line}`));
+    const tail = textTail(typeof value['output'] === 'string' ? value['output'] : '');
+    if (tail.length > 0) {
+      lines.push('  - the end of what it printed:');
+      for (const line of tail) lines.push(`        ${line}`);
+    }
+  }
+  const universe = universeOf(gate.provider?.result);
+  const unselected = universe.filter(id => !(id in published));
+  if (audit.status === 'completed' && unselected.length > 0) {
+    lines.push(`- not run by this record, as the provider selected: ${unselected.map(id => `\`${id}\``).join(', ')}`);
+  }
+  lines.push(...scenarioLines(scenarioResultsOf(gate), names, untrackedScenarioCounts(gate)));
+  return lines;
+}
+
+/**
+ * Each tracked scenario of the audit's raw runner output: where any did not
+ * pass, every result, so that an engineer sees which scenarios of a
+ * composition still pass beside the one that fails; then the project's own
+ * failures by count.
+ */
+function scenarioLines(results: readonly ScenarioResult[], names: ReadonlyMap<string, string>, untracked: { readonly failed: number }): string[] {
+  const lines: string[] = [];
+  const title = (id: string) => (names.has(id) ? `\`${id}\` "${names.get(id)}"` : `\`${id}\``);
+  const anyFailed = results.some(result => result.status !== 'passed');
+  for (const result of results) {
+    if (result.status === 'passed') {
+      if (anyFailed) lines.push(`- scenario ${title(result.id)} passed in \`${result.check}\`, at \`${result.file}:${result.line}\`.`);
+      continue;
+    }
+    lines.push(`- scenario ${title(result.id)} ${result.status} in \`${result.check}\`, at \`${result.file}:${result.line}\`:`);
+    if (result.failure !== null) {
+      lines.push(`  - The failing step: \`${result.failure.step}\`.`);
+      const message = boundedMessage(result.failure.message);
+      if (message.length === 1) lines.push(`  - Its message: ${message[0]}`);
+      else if (message.length > 1) {
+        lines.push('  - Its message:');
+        for (const line of message) lines.push(`        ${line}`);
+      }
+    }
+    if (result.undefined.length > 0) lines.push(`  - No step definition matches ${result.undefined.map(text => `"${text}"`).join(', ')}.`);
+  }
+  if (untracked.failed > 0) lines.push(`- ${untracked.failed} of the project's own scenarios failed.`);
+  return lines;
+}
+
+/**
+ * The tracked scenarios a passed gate's audit ran, each with the step
+ * definitions that bound it: what an engineer is told its binding achieved.
+ */
+export function passedScenarioLines(gate: Pick<GateAttempt, 'provider'>, names: ReadonlyMap<string, string> = new Map()): string[] {
+  const title = (id: string) => (names.has(id) ? `\`${id}\` "${names.get(id)}"` : `\`${id}\``);
+  return scenarioResultsOf(gate).filter(result => result.status === 'passed').flatMap(result => [
+    `- ${title(result.id)} passed in \`${result.check}\`, at \`${result.file}:${result.line}\`${result.binding.length === 0 ? ', with no step bound.' : ', bound by:'}`,
+    ...result.binding.map(binding => `  - \`${binding.step}\` → \`${binding.definition}\``),
+  ]);
+}
+
+function countsOf(check: Record<string, unknown>): string {
+  return check['counts'] === undefined ? '' : `; counts: ${JSON.stringify(check['counts'])}`;
+}
+
+/** The provider's failure facts of one check and each of its commands; successful output stays on demand. */
+function checkFailureLines(id: string, check: Record<string, unknown>): string[] {
   const lines: string[] = [];
   const render = (label: string, result: Record<string, unknown>): void => {
     lines.push(`- ${label || id} status: ${typeof result['status'] === 'string' ? result['status'] : 'unknown'}; counts: ${result['counts'] === undefined ? 'unknown' : JSON.stringify(result['counts'])}`);
+    if (typeof result['summary'] === 'string' && result['summary'] !== '') lines.push(`- ${label}summary: ${result['summary']}`);
     for (const field of ['failedTests', 'failedScenarios', 'failedSuites', 'warnedSuites'] as const) {
       const entries = result[field];
       if (!Array.isArray(entries)) {
@@ -183,20 +259,42 @@ function providerFailureLines(gate: GateAttempt, index: number): string[] {
       if (entry !== undefined && entry !== null) lines.push(`- ${label}${field}: ${JSON.stringify(entry)}`);
     }
     const cucumber = result['cucumberMessages'];
-    if (cucumber !== null && typeof cucumber === 'object' && !Array.isArray(cucumber)) {
-      const { raw: _raw, ...reference } = cucumber as Record<string, unknown>;
+    if (isRecord(cucumber)) {
+      const { raw: _raw, run: _run, ...reference } = cucumber;
       lines.push(`- ${label}cucumberMessages: ${JSON.stringify(reference)}`);
     }
     const commands = result['commands'];
-    if (commands !== null && typeof commands === 'object' && !Array.isArray(commands)) {
+    if (isRecord(commands)) {
       for (const [name, entry] of Object.entries(commands)) {
-        if (entry !== null && typeof entry === 'object' && !Array.isArray(entry)) render(`${label}${name}.`, entry as Record<string, unknown>);
+        if (isRecord(entry)) render(`${label}${name}.`, entry);
       }
     }
   };
   render('', check);
-  if (lines.length === 0) lines.push(`- The provider supplied no structured failure details for ${id}; inspect its exact check payload and full output.`);
   return lines;
+}
+
+/** An in-place command's provider diagnostic, read from the retained payload by its check ID. */
+function commandProviderLines(gate: GateAttempt, index: number): string[] {
+  const checks = gate.provider?.checks;
+  const command = gate.commands[index];
+  if (!isRecord(checks) || command?.providerCheckId === undefined) return [];
+  const value = checks[command.providerCheckId];
+  if (!isRecord(value)) return [];
+  const lines = checkFailureLines(command.providerCheckId, value);
+  if (lines.length === 0) lines.push(`- The provider supplied no structured failure details for ${command.providerCheckId}; inspect its exact check payload and full output.`);
+  return lines;
+}
+
+/** The check universe the returned record declared. */
+function universeOf(result: unknown): string[] {
+  if (!isRecord(result) || !isRecord(result['summary']) || !isRecord(result['summary']['coverage'])) return [];
+  const universe = result['summary']['coverage']['universe'];
+  return isRecord(universe) && Array.isArray(universe['checkIds']) ? universe['checkIds'].filter((id): id is string => typeof id === 'string') : [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -239,73 +337,6 @@ export const briefedMessageLines = 12;
 /** The bound on those lines together, in characters. */
 export const briefedMessageCharacters = 1_500;
 
-/** A failure line of the check about one tracked scenario, which the lines per scenario say in full. */
-const perScenarioFailure = /^sc-\d{3,} (?:passed|failed|undefined|pending|ambiguous|skipped):/;
-
-/** The mode and the selection of one scenario check, in a phrase. */
-export function describeScenarioCheck(summary: ScenarioCheckSummary): string {
-  const selection = summary.selection.kind === 'identity'
-    ? `selected by identity: ${summary.selection.scenarios.join(', ')}`
-    : summary.selection.kind === 'all-untagged' ? 'every scenario without the pending tag' : 'every scenario';
-  return `${summary.mode} mode${summary.dryRun ? ', a dry run' : ''}, ${selection}`;
-}
-
-/**
- * What one scenario check says, a line per point, each ready to place:
- * every tracked scenario that did not pass, with its name, its file and
- * line, the failing step, the message and each step no definition matched;
- * every one that passed, with the definition that bound each step as
- * `uri:line`; the project's own scenarios where any did not pass; and every
- * other reason the check failed. `only: 'passed'` keeps the passed ones.
- */
-export function scenarioCheckLines(
-  summary: ScenarioCheckSummary,
-  names: ReadonlyMap<string, string> = new Map(),
-  options: { readonly indent?: string; readonly only?: 'all' | 'passed' } = {},
-): string[] {
-  const indent = options.indent ?? '';
-  const only = options.only ?? 'all';
-  const passes = (status: string) => status === 'passed' || (summary.dryRun && status === 'skipped');
-  const lines: string[] = [];
-  const title = (id: string) => (names.has(id) ? `\`${id}\` "${names.get(id)}"` : `\`${id}\``);
-  for (const result of summary.scenarios) {
-    if (passes(result.status)) continue;
-    if (only === 'passed') continue;
-    lines.push(`- ${title(result.id)} ${result.status}, at \`${result.file}:${result.line}\`:`);
-    if (result.failure !== undefined) {
-      lines.push(`  - The failing step: \`${result.failure.step}\`.`);
-      const message = boundedMessage(result.failure.message);
-      if (message.length === 1) lines.push(`  - Its message: ${message[0]}`);
-      else if (message.length > 1) {
-        lines.push('  - Its message:');
-        for (const line of message) lines.push(`        ${line}`);
-      }
-    }
-    if (result.undefined.length > 0) {
-      lines.push(`  - No step definition matches ${result.undefined.map(text => `"${text}"`).join(', ')}.`);
-    }
-  }
-  for (const result of summary.scenarios) {
-    if (!passes(result.status)) continue;
-    if (result.binding.length === 0) {
-      lines.push(`- ${title(result.id)} ${result.status}, at \`${result.file}:${result.line}\`, with no step bound.`);
-      continue;
-    }
-    lines.push(`- ${title(result.id)} ${result.status}, at \`${result.file}:${result.line}\`, bound by:`);
-    for (const binding of result.binding) lines.push(`  - \`${binding.step}\` → \`${binding.definition}\``);
-  }
-  if (only === 'all') {
-    const { passed, skipped, failed } = summary.untracked;
-    if (failed > 0 || (!summary.dryRun && skipped > 0)) {
-      lines.push(`- The project's own scenarios: ${passed} passed, ${skipped} skipped, ${failed} failed.`);
-    }
-    for (const failure of summary.failures) {
-      if (!perScenarioFailure.test(failure)) lines.push(`- ${failure}`);
-    }
-  }
-  return lines.map(line => `${indent}${line}`);
-}
-
 /** The first lines of a failure message, bounded in lines and in characters. */
 function boundedMessage(message: string): string[] {
   const lines = message.split('\n').map(line => line.trimEnd()).filter(line => line.trim() !== '');
@@ -323,7 +354,12 @@ function boundedMessage(message: string): string[] {
 
 /** The last lines of what one command printed, bounded in lines and in characters. */
 function outputTail(command: GateCommandRecord): string[] {
-  const lines = command.output.tail.split('\n').map(line => line.trimEnd()).filter(line => line.trim() !== '');
+  return textTail(command.output.tail);
+}
+
+/** The last lines of a text, bounded in lines and in characters. */
+function textTail(text: string): string[] {
+  const lines = text.split('\n').map(line => line.trimEnd()).filter(line => line.trim() !== '');
   const last = lines.slice(-briefedOutputLines);
   const kept: string[] = [];
   let characters = 0;

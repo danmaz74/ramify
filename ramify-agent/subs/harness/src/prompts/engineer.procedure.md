@@ -15,8 +15,9 @@ Do this, in order:
    Use `tmp/` for throwaway files while this iteration is open; its contents
    are removed when the iteration closes, so put lasting evidence in the
    assigned result locations.
-4. Run `run_scope_tests` until the selection passes, and the scenarios you
-   bind with it. It is a diagnosis, not a verdict.
+4. Run the tests you wrote or changed by naming their files from `shell`, such
+   as `npx vitest run <path/to/file.test.ts>`, until they pass. It is a
+   diagnosis, not a verdict: the gate's audit runs the project's checks.
 5. Submit, binding every obligation the assignment names.
 
 ## Scenarios
@@ -32,7 +33,8 @@ definitions that bind them; you never write or change a feature file.
 - Never edit a feature file. A write to one is refused.
 - A scenario you bind loses its pending tag at the next commit, and the
   configured checks run it from then on: an undefined, pending or ambiguous
-  step fails it. `run_scope_tests` shows you how it runs before you submit.
+  step fails it. The gate's audit runs it through the project's configured
+  scenario check; a pending scenario is not run.
 - When a step file needs another owner's step definitions, import a named
   symbol of that owner's step file, never the file alone with a symbol-free
   `import '…'`: a symbol-free import loads the file without Ramify verifying

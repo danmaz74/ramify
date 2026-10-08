@@ -2,21 +2,5 @@
   "schema": "ramify-agent.project/1",
   "typeCheck": {
     "output": "tsc"
-  },
-  "acceptance": {
-    "support": [],
-    "modes": {
-      "quick": {
-        "command": [
-          "cucumber-js"
-        ]
-      },
-      "full": {
-        "command": [
-          "cucumber-js"
-        ],
-        "readiness": "dry-run"
-      }
-    }
   }
 }

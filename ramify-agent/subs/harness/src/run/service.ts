@@ -9,14 +9,9 @@ import { projectConfigurationFile } from '../../subs/evidence/src/project-config
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { Checkpoint, GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
 import { acceptedCommit } from '../checks/accepted.js';
-import { type CheckExecutionPort, type GateCommandStarted } from '../checks/execution.js';
+import type { GateCommandStarted } from '../checks/execution.js';
 import type { ConfiguredAuditPort } from '../../subs/audit/src/check-execution.js';
-import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
-import { resolveTestSelection } from '../checks/selection.js';
-import {
-  planScenarioFindings, scenarioGatesToRead, scenarioObservations,
-  type GateCheckFindingOutcome, type ScenarioFindingNote, type ScenarioGateInputs, type ScenarioObservation,
-} from '../checks/scenario-findings.js';
+import { executeConfiguredGate, type ConfiguredGateAudit, type PreparedGate } from '../checks/gate.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { decideWrite } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
@@ -204,18 +199,17 @@ import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type Dele
 import {
   capabilityLocalArchitectJsonSchema, localArchitectJsonSchema, localArchitectToolName, unreportedByCompletion, validateLocalArchitect, type LocalArchitectSubmission,
 } from '../work/submission.js';
-import { gateDiagnostics, scenarioCheckLines, type GateAudience } from '../checks/diagnostics.js';
+import { gateDiagnostics, passedScenarioLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
 import type { RenderedFeatureFile } from '../../subs/scenarios/src/rendering.js';
-import { planScenarioCheck, type ScenarioCheckInputs } from '../checks/checkpoint.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import type { Transaction } from '../../subs/ledger/src/ledger.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder, type CallInFlight } from './port-events.js';
-import { contextPolicyOf, defaultRunPolicy, engineerBoundsOf, withProjectTimeouts, type EngineerBounds, type NestedPackage } from './policy.js';
-import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
+import { contextPolicyOf, defaultRunPolicy, engineerBoundsOf, withProjectTimeouts, type EngineerBounds } from './policy.js';
+import { captureProjectConfig, moduleTestAreas, type TestArea } from './project-config.js';
 import {
   commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
   incompleteScenarios, rewordedTrailerValue, rewordingMessage, scenarioNameOf, trackedScenarios,
@@ -347,12 +341,13 @@ export interface RunServiceOptions {
   readonly git?: GitService | undefined;
   /** Where a review reads its frozen candidate from: Git's objects by default; tests script it like Git. */
   readonly candidates?: CandidateSource | undefined;
-  /** How committing checkpoint commands run. */
-  readonly checkExecution: CheckExecutionPort;
-  /** Provider-owned committed configuration and configured full execution. */
-  readonly configuredAudit?: ConfiguredAuditPort | undefined;
+  /**
+   * The provider's committed audit: its configuration, read at a commit, and
+   * the configured audit every committing gate and readiness request.
+   */
+  readonly configuredAudit: ConfiguredAuditPort;
   /** The policy the run captures. Without one it is the hardcoded default over this project. */
-  readonly policy?: ((projectRoot: string, nested: readonly NestedPackage[]) => RunPolicy) | undefined;
+  readonly policy?: ((projectRoot: string) => RunPolicy) | undefined;
   /** The module the baseline is frozen over; the architect view's root by default. */
   readonly rootModule?: string | undefined;
   /** How long a stop waits for the session before the run is marked stopped anyway. */
@@ -2971,7 +2966,7 @@ export class RunService {
   private async start(command: Extract<RunCommand, { type: 'start-run' }>, contentHash: string): Promise<Receipt> {
     const { planId, agent: requested, reviewStop } = command.payload;
     if (this.options.policy !== undefined) {
-      const policy = this.options.policy(this.projectRoot, []);
+      const policy = this.options.policy(this.projectRoot);
       if (policy.version !== capabilityRunPolicyVersion) throw new CommandRejection('conflict', `Run policy ${policy.version} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
     }
     this.commands.requireVersion(command, 0, 'A start creates a run, whose version is 0');
@@ -3033,9 +3028,8 @@ export class RunService {
     const projectConfig = await captureProjectConfig(this.projectRoot);
     const sourceCommit = await this.git.currentHead(this.projectRoot);
     const auditConfiguration = sourceCommit === '' ? { invalid: 'No committed HEAD is available for audit configuration' }
-      : await this.options.configuredAudit?.read(this.projectRoot, sourceCommit)
-      .then(config => ({ config }), error => ({ invalid: `Committed audit configuration at ${sourceCommit}: ${message(error)}` }))
-      ?? { invalid: 'The configured audit provider is unavailable' };
+      : await this.options.configuredAudit.read(this.projectRoot, sourceCommit)
+        .then(config => ({ config }), error => ({ invalid: `Committed audit configuration at ${sourceCommit}: ${message(error)}` }));
     const record = runRecordSchema.parse({
       schema: jobSchemaVersion,
       jobId: runId,
@@ -3091,7 +3085,7 @@ export class RunService {
       if (error instanceof EvidenceUnavailableError) throw new CommandRejection('unavailable', error.message);
       throw error;
     }
-    const policy = (this.options.policy ?? ((root: string) => defaultRunPolicy({ projectRoot: root })))(this.projectRoot, []);
+    const policy = (this.options.policy ?? ((root: string) => defaultRunPolicy({ projectRoot: root })))(this.projectRoot);
     if (policy.version !== capabilityRunPolicyVersion) {
       throw new CommandRejection('conflict', `Run policy ${policy.version} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
     }
@@ -3712,8 +3706,7 @@ export class RunService {
     const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot,
       [...await this.deniedFiles(run), ...assignment.guarded.map(file => file.path)]), this.options.ramify);
     const commandTimeoutMs = engineerBoundsOf(run.record.policy.limits).defaults.commandTimeoutMs;
-    const tools = this.implementationTools(run, { workingDirectory, scopeRevision: 1, guarded,
-      tests: { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites: [] }, commandTimeoutMs });
+    const tools = this.implementationTools(run, { workingDirectory, scopeRevision: 1, guarded, commandTimeoutMs });
     const result = await this.runInvocation<NonfunctionalRepairSubmission>(run, agent, {
       role: 'nonfunctional-repair-engineer', work: { nonfunctionalRepair: assignment.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-repair-engineer').length + 1,
@@ -6954,6 +6947,17 @@ export class RunService {
   }
 
   /**
+   * The test areas of the modules whose tests an assignment owns, for its
+   * briefing: each exact owner's, and every module's beneath a subtree. It
+   * selects nothing for a gate, whose audit selects its own checks.
+   */
+  private async ownedTestAreas(run: Run, tests: TestSelectionPolicy): Promise<TestArea[]> {
+    const areas = await moduleTestAreas(this.projectRoot, run.index);
+    return areas.filter(area => tests.exactOwners.includes(area.module)
+      || tests.subtrees.some(subtree => area.module === subtree || area.module.startsWith(`${subtree}/`)));
+  }
+
+  /**
    * The equipment of one implementation session, over this run: its paths
    * hold the shell output and the hook logs, and its policy supplies the
    * commands and the bounds.
@@ -6962,8 +6966,6 @@ export class RunService {
     readonly workingDirectory?: string;
     readonly scopeRevision: number;
     readonly guarded: GuardedScope;
-    readonly tests: TestSelectionPolicy;
-    readonly scenarios?: EngineerEquipmentInputs['scenarios'];
     readonly commandTimeoutMs: number;
   }): EngineerEquipment {
     return engineerEquipment({
@@ -6983,7 +6985,7 @@ export class RunService {
       ...options,
       outputPath: (kind, invocation, number) => run.path(kind === 'shell'
         ? runLayout.shellOutput(invocation, number)
-        : kind === 'hook' ? runLayout.hookOutput(invocation, number) : runLayout.scopeScenarios(invocation, number)),
+        : runLayout.hookOutput(invocation, number)),
     });
   }
 
@@ -8286,15 +8288,10 @@ export class RunService {
         await this.fail(run, 'inputs-changed', `The assignment package of ${assignment.id} cannot be delivered: ${message(error)}`);
         return null;
       }
-      // The engineer's own test run is a diagnosis over the modules it was
-      // given. Where the gate is the whole project, the tool still resolves
-      // this iteration's own modules, with the suites its evidence requires.
       const tools = this.implementationTools(run, {
         workingDirectory,
         scopeRevision: assignment.scope.revision,
         guarded,
-        tests: assignment.gate.tests,
-        scenarios: this.scopeScenarioCheck(run, item, assignment.gate.tests, assignment),
         commandTimeoutMs: bounds.commandTimeoutMs,
       });
 
@@ -8311,6 +8308,7 @@ export class RunService {
           workingDirectory,
           base: this.accepted(run),
           views: await this.iterationViews(run, assignment),
+          testAreas: await this.ownedTestAreas(run, assignment.gate.tests),
           ...(failedGate === undefined ? {} : { failedGate }),
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
           ...(briefedScenarios === undefined ? {} : { scenarios: briefedScenarios }),
@@ -8912,7 +8910,6 @@ export class RunService {
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
         guarded,
-        tests: assignment.gate.tests,
         commandTimeoutMs: bounds.commandTimeoutMs,
       });
       const index = await this.refreshIndex(run);
@@ -9075,10 +9072,10 @@ export class RunService {
   }
 
   /**
-   * The contract gate: the consumer's own tests and the conformance suite the
-   * agreement names, resolved anew from the tree, the project's type check, a
-   * complete Ramify check, and the fake-naming rule the harness verifies
-   * itself over the files this iteration wrote.
+   * The contract gate: the project's committed audit of the candidate,
+   * whose configured checks run the consumer's tests and the agreement's
+   * conformance suite among the project's own, and the fake-naming rule the
+   * harness verifies itself over the files this iteration wrote.
    */
   private async contractGate(
     run: Run,
@@ -9090,17 +9087,7 @@ export class RunService {
   ): Promise<GateAttempt | null> {
     run.writer.requireSettled(`The ${assignment.id} gate cannot run`);
     const gateId = gateAttemptId(this.gateCount(run) + 1);
-    // The conformance suite is the agreement's own evidence, so the gate
-    // requires it beside the consumer's tests. The suite did not exist when
-    // the assignment was made; it exists now, and a selection that cannot
-    // reach it is not verified.
-    const policy: TestSelectionPolicy = {
-      ...assignment.gate.tests,
-      extraSuites: [...new Set([...assignment.gate.tests.extraSuites, ...submission.artifacts.conformance.map(entry => entry.path)])].sort(),
-    };
     const index = await this.refreshIndex(run);
-    const tests = await resolveTestSelection({ projectRoot: this.projectRoot, index, policy });
-    await this.recordRunnerGaps(run, invocation);
 
     const writeScope = writeScopePaths(this.projectRoot, assignment);
     // The agreement's own fakes are this gate's to answer; another
@@ -9128,7 +9115,6 @@ export class RunService {
       repairRound,
       infrastructureAttempt: 0,
       subject: { workItem: item.id, iteration: assignment.id },
-      tests,
       guarded: this.guardedAtGate(run, assignment.guarded),
       writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
@@ -9584,10 +9570,10 @@ export class RunService {
   }
 
   /**
-   * The iteration's gate: the tests its scope owns, resolved anew from the
-   * current tree, the project's type check and a complete Ramify check. Once
-   * verified, the attempt's tree is committed before either passing or
-   * failing audit evidence is produced.
+   * The iteration's gate: the project's committed audit of the candidate the
+   * gate commits, in the project's default mode, and the harness's own rules
+   * over the tree. The provider selects the configured checks; the harness
+   * names no test.
    */
   private async iterationGate(
     run: Run,
@@ -9600,11 +9586,7 @@ export class RunService {
   ): Promise<GateAttempt | null> {
     run.writer.requireSettled(`The ${assignment.id} gate cannot run`);
     const gateId = gateAttemptId(this.gateCount(run) + 1);
-    // A breaking iteration is judged at an all-project boundary.
-    const allProject = assignment.gate.tests.policy === 'all-project';
     const index = await this.refreshIndex(run);
-    const tests = allProject ? undefined : await this.resolveTests(run, assignment, index);
-    await this.recordRunnerGaps(run, invocation);
 
     // While an agreement's fake is registered, a write of this iteration
     // that makes it more or less importable than its real export fails the
@@ -9624,7 +9606,6 @@ export class RunService {
       repairRound,
       infrastructureAttempt,
       subject: { workItem: item.id, iteration: assignment.id },
-      ...(tests === undefined ? {} : { tests }),
       guarded: this.guardedAtGate(run, assignment.guarded),
       writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
@@ -9637,40 +9618,6 @@ export class RunService {
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return null;
     return attempt;
-  }
-
-  /**
-   * Resolves the assignment's captured policy against the tree as it stands
-   * now, on `refreshed` where the caller has just refreshed the view.
-   */
-  private async resolveTests(run: Run, assignment: IterationAssignment, refreshed?: ArchitectIndex | null) {
-    const index = refreshed === undefined ? await this.refreshIndex(run) : refreshed;
-    return resolveTestSelection({ projectRoot: this.projectRoot, index, policy: assignment.gate.tests });
-  }
-
-  /**
-   * Suites of the project the MVP's one supported runner does not select.
-   * They are a coverage gap on every attempt, never an absence of tests, and
-   * they are read from the project's own manifest. A Cucumber script is none
-   * once the captured configuration names the acceptance modes, which run
-   * the project's scenarios in the harness's own profile.
-   */
-  private async recordRunnerGaps(run: Run, invocation: string): Promise<void> {
-    const manifest = await readJson(join(this.projectRoot, 'package.json')) as { scripts?: Record<string, unknown> } | null;
-    const declared = manifest?.scripts ?? {};
-    const acceptance = 'config' in run.record.projectConfig;
-    const scripts = Object.keys(declared)
-      .filter(name => name.startsWith('test:'))
-      .filter(name => !(acceptance && typeof declared[name] === 'string' && /\bcucumber-js\b/u.test(declared[name])))
-      .sort();
-    if (scripts.length === 0) return;
-    const observations = await ObservationLog.open(run.path(runLayout.observations(invocation)));
-    for (const script of scripts) {
-      await observations.record({
-        type: 'coverage-gap',
-        data: { kind: 'unsupported-runner', detail: `the project's "${script}" script is outside the one runner this MVP selects` },
-      });
-    }
   }
 
   /**
@@ -10178,13 +10125,6 @@ export class RunService {
       }
     }
     const gateId = gateAttemptId(this.gateCount(run) + 1);
-    const taskScenarios = taskOwner === undefined ? undefined : await this.scenarioInputs(run);
-    const relevant = taskOwner === undefined ? undefined : new Set(
-      [...committedRecords(run.log.ledger.replay()).assignments.values()]
-        .filter(assignment => assignment.coordination?.kind === 'capability-task' && assignment.coordination.id === taskOwner)
-        .flatMap(assignment => assignment.obligations ?? []));
-    const scenarioOwners = relevant === undefined || taskScenarios === undefined ? [] :
-      [...new Set(taskScenarios.scenarios.filter(scenario => relevant.has(scenario.id)).map(scenario => scenario.owner))];
     const attempt = await this.committingCheckpoint(run, {
       id: gateId,
       runId: run.record.jobId,
@@ -10196,10 +10136,6 @@ export class RunService {
       proposedBy: invocation,
       repairRound,
       subject: { workItem: taskOwner ?? item.id },
-      ...(taskScenarios === undefined || relevant === undefined ? {} : {
-        scenarios: { ...taskScenarios, scenarios: taskScenarios.scenarios.filter(scenario => relevant.has(scenario.id)) },
-        scenarioScope: { exactOwners: scenarioOwners, include: [...relevant] },
-      }),
       ...(lastAssignment === undefined ? {} : { writeScope: writeScopePaths(this.projectRoot, lastAssignment) }),
     }, summary);
     const subject = attempt;
@@ -10316,11 +10252,7 @@ export class RunService {
       // baseline passed; a branch git refuses fails readiness there.
       const head = await this.git.currentHead(this.projectRoot);
       await this.write(run, { type: 'gate-started', data: { gate: gateId, checkpoint: 'readiness' } });
-      const configuredAudit = this.options.configuredAudit ?? {
-        async read(): Promise<never> { throw new Error('The configured audit provider is unavailable'); },
-        async runFull(): Promise<never> { throw new Error('The configured audit provider is unavailable'); },
-      };
-      let result = await runReadiness(configuredAudit, {
+      let result = await runReadiness(this.options.configuredAudit, {
         runId: run.record.jobId,
         attempt: attemptNumber,
         projectRoot: this.projectRoot,
@@ -10552,18 +10484,11 @@ export class RunService {
     goal?: string,
     binding?: { candidateId: string; assessment: Assessment },
   ): Promise<GateAttempt> {
-    const scenarios = request.scenarios ?? await this.scenarioInputs(run);
-    const captured = run.record.projectConfig;
-    const typeCheckOutput = 'config' in captured ? captured.config.typeCheck?.output : undefined;
-    const setup = 'config' in captured ? captured.config.setup : undefined;
     const scratch = await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
     const { rules: scopeRules, ownership } = await this.candidateAuthority(run, request);
     const prepared = await prepareCheckpoint({
       ...request,
       rules: [...(request.rules ?? []), scratch, ...scopeRules],
-      ...(scenarios === undefined ? {} : { scenarios }),
-      ...(typeCheckOutput === undefined ? {} : { typeCheckOutput }),
-      ...(setup === undefined ? {} : { setup }),
     });
     if ('schema' in prepared) {
       await this.write(run, {
@@ -10761,7 +10686,7 @@ export class RunService {
       ...(earlierAttempts(run, identity.id, identity.subject ?? {}).length === 0 ? {} : { earlier: earlierAttempts(run, identity.id, identity.subject ?? {}) }),
     });
     const operation = gateOperation(prepared, message);
-    const effect = run.log.ledger.effect<{ readonly attempt: GateAttempt; readonly findings: ScenarioGateFindings }>({
+    const effect = run.log.ledger.effect<{ readonly attempt: GateAttempt }>({
       key: `gate-commit:${identity.id}`,
       serialize: work => run.mutex.run(work),
       intent: () => ({
@@ -10791,7 +10716,7 @@ export class RunService {
         });
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;
-        const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit,
+        const attempt = await executeConfiguredGate(this.configuredGateAudit(run), prepared, sourceCommit, commit,
           this.commandStarted(run, identity.id, prepared.checkpoint), this.commandWaiting(run, identity.id, prepared.checkpoint));
         if (attempt.audited !== null && attempt.audited !== sourceCommit) {
           throw new Error(`Gate ${attempt.id} audited ${attempt.audited}, expected ${sourceCommit}`);
@@ -10802,16 +10727,14 @@ export class RunService {
         if (attempt.verdict === 'passed' && (attempt.audited !== sourceCommit || attempt.evidence === null)) {
           throw new Error(`Gate ${attempt.id} passed without published evidence for ${sourceCommit}`);
         }
-        // What the scenario check means for the work item's CheckFindings
-        // is read here, outside the mutex; the completion decides it.
-        return { attempt, findings: await this.scenarioGateFindings(run, attempt) };
+        return { attempt };
       },
-      complete: ({ attempt, findings }) => {
+      complete: ({ attempt }) => {
         const { auditOverall, ...durableAttempt } = attempt;
         if (auditOverall != null && (attempt.audited === null || attempt.evidence === null)) {
           throw new Error(`Gate ${attempt.id} has an audit outcome without its published commit`);
         }
-        return this.gateAttempted(run, attempt, findings, [
+        return this.gateAttempted(run, attempt, [
           { path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: durableAttempt },
           ...(auditOverall == null ? [] : [{ path: runLayout.gateAuditOutcome(attempt.id), id: attempt.id, revision: 1,
             body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: attempt.id, overall: auditOverall, audited: attempt.audited } }]),
@@ -10827,116 +10750,41 @@ export class RunService {
   }
 
   /**
-   * What a committing gate's scenario check means for its work item's
-   * CheckFindings, read before its completion takes the mutex (Plan 12
-   * iteration 6): the tracked scenarios it observed, every earlier attempt
-   * of the work item, and the audited tree of each attempt a promotion or a
-   * witness needs. Null when there is nothing to promote or witness, which
-   * reads no tree; unavailable when a tree cannot be read, which the
-   * completion records and the attempt survives.
+   * The committed configured audit a committing gate asks for: the
+   * provider's definition as the run captured it, at the gate's candidate
+   * commit, under the request identity of the run and the attempt. A run
+   * whose captured definition is invalid has none to carry, and its gate is
+   * not verified.
    */
-  private async scenarioGateFindings(run: Run, attempt: GateAttempt): Promise<ScenarioGateFindings> {
-    const workItem = attempt.subject.workItem;
-    if (workItem === undefined || attempt.audited === null) return null;
-    try {
-      const tracked = trackedScenarios(run.log.ledger.replay()).records.map(record => ({ id: record.id, owner: record.owner, file: record.file }));
-      const observations = scenarioObservations(attempt, tracked);
-      if (observations.length === 0) return null;
-      const earlier = run.log.all('gate-attempted').flatMap(event => {
-        const body = event.data.gate === attempt.id ? undefined : gateBodyOf(run, event.data.gate);
-        return body === undefined || body.subject.workItem !== workItem ? [] : [{ body, observations: scenarioObservations(body, tracked) }];
+  private configuredGateAudit(run: Run): ConfiguredGateAudit {
+    return async request => {
+      const captured = run.record.auditConfiguration;
+      if (captured === undefined || 'invalid' in captured) {
+        throw new Error(`The run carries no committed audit definition: ${captured === undefined ? 'none was captured' : captured.invalid}`);
+      }
+      return this.options.configuredAudit.run({
+        projectRoot: request.projectRoot,
+        sourceCommit: request.sourceCommit,
+        configuration: captured.config,
+        mode: request.mode,
+        runId: request.runId,
+        attemptId: request.attemptId,
+        signal: request.signal,
+        ...(request.started === undefined ? {} : { started: request.started }),
+        ...(request.waiting === undefined ? {} : { waiting: request.waiting }),
+        ...(request.lockAcquired === undefined ? {} : { lockAcquired: request.lockAcquired }),
       });
-      const needed = scenarioGatesToRead(checkFindingStateOf(run.log.ledger), workItem, attempt.verdict, observations,
-        earlier.map(entry => ({ gate: entry.body.id, observations: entry.observations })));
-      if (needed === null) return null;
-      const trees = new Map<string, string>();
-      const treeOf = async (commit: string): Promise<string> => {
-        const known = trees.get(commit);
-        if (known !== undefined) return known;
-        const tree = await this.candidates.commitTree(this.projectRoot, commit);
-        trees.set(commit, tree);
-        return tree;
-      };
-      const observed = async (body: GateAttempt, entries: readonly ScenarioObservation[], read: boolean) => ({
-        gate: body.id,
-        tree: read && body.audited !== null ? await treeOf(body.audited) : null,
-        observations: entries,
-        record: runLayout.gate(body.id),
-        output: runLayout.gateOutput(body.id),
-      });
-      const current = await observed(attempt, observations, true);
-      return {
-        workItem,
-        verdict: attempt.verdict,
-        changedFiles: attempt.guardedChanges.map(change => change.path),
-        current: { ...current, tree: current.tree! },
-        earlier: await Promise.all(earlier.map(entry => observed(entry.body, entry.observations, needed.includes(entry.body.id)))),
-        tracked,
-      };
-    } catch (error) {
-      return { unavailable: `The audited tree a scenario CheckFinding of gate ${attempt.id} needs could not be read: ${message(error)}` };
-    }
+    };
   }
 
   /**
-   * The `gate-attempted` line of a committing gate: its attempt and records,
-   * and the CheckFinding part its scenario check decides under the mutex.
-   * The attempt and its verdict are committed whatever that part does; a
-   * part refused as a whole is recorded on the event with its reason, and a
-   * scenario left out as a note.
+   * The `gate-attempted` line of a committing gate: its attempt and records.
+   * Its per-scenario results are display only and decide no CheckFinding.
    */
-  private gateAttempted(run: Run, attempt: GateAttempt, findings: ScenarioGateFindings, records: CommitRecord[]): Transaction<RunEvent> {
-    const data = { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next };
-    const plain = (outcome?: GateCheckFindingOutcome): Transaction<RunEvent> => ({
-      event: run.log.next({ type: 'gate-attempted', data: { ...data, ...(outcome === undefined ? {} : { scenarioFindings: outcome }) } }),
-      records,
-    });
-    if (findings === null) return plain();
-    if ('unavailable' in findings) {
-      this.warn(`Run ${run.record.jobId}: ${findings.unavailable}; the gate is committed without its CheckFinding part`);
-      return plain({ refused: { reason: 'source-unavailable', message: findings.unavailable }, notes: [] });
-    }
-    let notes: ScenarioFindingNote[] = [];
-    const decided = decideCheckFindingTransaction(run.log, ({ state }) => {
-      const plan = planScenarioFindings(state, findings);
-      notes = [...plan.notes];
-      return {
-        commands: plan.commands,
-        compose: outcome => ({
-          event: {
-            type: 'gate-attempted',
-            data: {
-              ...data,
-              ...(outcome.events.length === 0 ? {} : { checkFindings: [...outcome.events] }),
-              ...(notes.length === 0 ? {} : { scenarioFindings: { refused: null, notes } }),
-            },
-          },
-          records,
-        }),
-      };
-    });
-    if (decided.kind === 'transaction') return decided.transaction;
-    if (decided.kind === 'replayed') return plain(notes.length === 0 ? undefined : { refused: null, notes });
-    const refusal = `${decided.refusal.reason}: ${decided.refusal.message}`;
-    this.warn(`Run ${run.record.jobId}: the CheckFinding part of gate ${attempt.id} was refused (${refusal}); the gate is committed without it`);
-    return plain({ refused: { reason: 'transition-refused', message: refusal }, notes });
-  }
-
-  /**
-   * What a checkpoint's scenario check is planned from: the captured scenario
-   * harness, the modules of the current view that have feature files, and
-   * every tracked scenario with its owner, file and state as the ledger and
-   * the log hold them. A run past readiness has a valid configuration; one
-   * without it plans no scenario check.
-   */
-  private async scenarioInputs(run: Run): Promise<ScenarioCheckInputs | undefined> {
-    const captured = run.record.projectConfig;
-    if ('invalid' in captured) return undefined;
-    const { records, states } = trackedScenarios(run.log.ledger.replay());
+  private gateAttempted(run: Run, attempt: GateAttempt, records: CommitRecord[]): Transaction<RunEvent> {
     return {
-      harness: captured.config.acceptance,
-      modules: await scenarioModules(this.projectRoot, run.index),
-      scenarios: records.map(record => ({ id: record.id, owner: record.owner, file: record.file, state: states.get(record.id) ?? 'pending' })),
+      event: run.log.next({ type: 'gate-attempted', data: { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next } }),
+      records,
     };
   }
 
@@ -10958,7 +10806,7 @@ export class RunService {
 
   private commandWaiting(run: Run, gate: string, checkpoint: Checkpoint): NonNullable<import('../checks/gate.js').GateRequest['waiting']> {
     return async (command, line) => {
-      if (command.kind !== 'tests' && command.kind !== 'scenarios' && !(checkpoint === 'readiness' && command.kind === 'conformance')) return;
+      if (command.kind !== 'configured') return;
       try {
         await this.write(run, { type: 'gate-command-waiting', data: {
           gate, checkpoint, kind: command.kind, position: command.position, total: command.total, line,
@@ -11165,16 +11013,13 @@ export class RunService {
   }
 
   /**
-   * What an assignment guards of the scenarios: the support files the
-   * captured configuration names, and every tracked feature file with the
-   * hash of the rendering the harness last wrote, once the files are
-   * materialized.
+   * What an assignment guards of the scenarios: every tracked feature file
+   * with the hash of the rendering the harness last wrote, once the files
+   * are materialized.
    */
   private async guardedScenarioFiles(run: Run): Promise<GuardedScenarioFiles> {
-    const captured = run.record.projectConfig;
-    const support = 'invalid' in captured ? [] : await supportFiles(this.projectRoot, captured.config.acceptance.support);
     const expected = run.log.find('scenarios-materialized') === undefined ? [] : expectedFeatureHashes(this.writtenFeatures(run));
-    return { support, expected };
+    return { expected };
   }
 
   /** Every tracked feature file as the harness last rendered it into the tree. */
@@ -11333,39 +11178,6 @@ export class RunService {
   }
 
   /**
-   * The scenario check an engineer's `run_scope_tests` runs beside its
-   * tests: quick mode, the scope's bound and done scenarios selected by
-   * identity as an iteration gate selects them, and the pending ones too: a
-   * work item's pending scenarios, or the pending ones a capability task's
-   * assignment names, so the engineer sees the scenarios it binds pass before
-   * it binds them. Planned anew on each call; nothing where the run tracks no
-   * scenario or has no scenario harness.
-   */
-  private scopeScenarioCheck(run: Run, item: WorkItem, scope: TestSelectionPolicy,
-    assignment: IterationAssignment): EngineerEquipmentInputs['scenarios'] {
-    const { records } = trackedScenarios(run.log.ledger.replay());
-    if (records.length === 0) return undefined;
-    return {
-      names: new Map(records.map(record => [record.id, record.name])),
-      plan: async () => {
-        const inputs = await this.scenarioInputs(run);
-        if (inputs === undefined) return undefined;
-        const { states } = trackedScenarios(run.log.ledger.replay());
-        const assigned = (assignment.obligations ?? []).filter(id => states.get(id) === 'pending');
-        const pending = assignment.coordination?.kind === 'capability-task' ? assigned : [...new Set([
-          ...this.unfinishedScenarios(run, item).filter(scenario => scenario.state === 'pending').map(scenario => scenario.id),
-          ...assigned,
-        ])];
-        return planScenarioCheck('iteration', inputs, {
-          projectRoot: this.projectRoot,
-          scope: { exactOwners: scope.exactOwners, subtrees: scope.subtrees },
-          include: pending,
-        });
-      },
-    };
-  }
-
-  /**
    * What an engineer is told of its work item's scenarios: its entry's, or
    * an integration work item's one scenario with its sub-scenarios' step
    * files. Undefined for a provider, follow-up or capability-task
@@ -11444,17 +11256,17 @@ export class RunService {
   }
 
   /**
-   * The scenarios an accepted iteration's gate passed, each with the step
-   * definitions that bound it, for the local architect: binding is
-   * recorded, not policed, and this is where the architect sees it.
+   * The tracked scenarios an accepted iteration's gate audit passed, read
+   * from its raw runner output, each with the step definitions that bound
+   * it, for the local architect: binding is recorded, not policed, and this
+   * is where the architect sees it. Display only.
    */
   private async passedScenarioLines(run: Run, result: IterationResult): Promise<string[]> {
     if (result.outcome !== 'accepted' || result.gate === null) return [];
     const gate = await this.readGate(run, result.gate);
-    const summary = gate?.commands.find(command => command.kind === 'scenarios')?.scenarios;
-    if (summary === undefined) return [];
+    if (gate === null) return [];
     const { records } = trackedScenarios(run.log.ledger.replay());
-    return scenarioCheckLines(summary, new Map(records.map(record => [record.id, record.name])), { only: 'passed' });
+    return passedScenarioLines(gate, new Map(records.map(record => [record.id, record.name])));
   }
 
   private async readGate(run: Run, id: string): Promise<GateAttempt | null> {
@@ -11643,9 +11455,6 @@ function earlierAttempts(run: Run, attemptId: string, attemptSubject: GateAttemp
     });
 }
 
-/** What a committing gate's completion decides its CheckFinding part from; see `scenarioGateFindings`. */
-type ScenarioGateFindings = ScenarioGateInputs | { readonly unavailable: string } | null;
-
 /** One gate attempt as the log committed it, without reading the file again. */
 function gateBodyOf(run: Run, id: string): GateAttempt | undefined {
   for (const entry of run.log.ledger.replay()) {
@@ -11660,11 +11469,12 @@ function gateBodyOf(run: Run, id: string): GateAttempt | undefined {
 function gateOperation(prepared: PreparedGate, message: string): GateOperation {
   const request = prepared.request;
   if (request.runId === undefined) throw new Error('A committing gate requires its durable run ID');
-  if (prepared.decisive.length > 0 || request.checks.some(check => check.discovery !== undefined || check.kind === 'conformance')) {
-    throw new Error(`Gate ${request.id} was not completely verified before its operation was recorded`);
+  if (request.audit === undefined || request.checks.length > 0) {
+    throw new Error(`Gate ${request.id} is not a configured audit request; a committing gate plans no command of its own`);
   }
+  if (prepared.decisive.length > 0) throw new Error(`Gate ${request.id} was not completely verified before its operation was recorded`);
   return {
-    schema: 'ramify-agent.gate-operation/1',
+    schema: 'ramify-agent.gate-operation/2',
     checkpoint: prepared.checkpoint as GateOperation['checkpoint'],
     request: {
       id: request.id,
@@ -11672,17 +11482,7 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
       projectRoot: request.projectRoot,
       directory: request.directory,
       head: request.head,
-      checks: request.checks.map(({ discovery: _discovery, ...check }) => ({
-        ...check,
-        kind: check.kind as 'setup' | 'ramify-check' | 'type-check' | 'tests' | 'scenarios',
-      })),
-      ...(request.auditAllTests === undefined ? {} : { auditAllTests: request.auditAllTests }),
-      selection: {
-        policy: request.selection?.policy ?? 'all-project',
-        exactOwners: [...(request.selection?.exactOwners ?? [])],
-        subtrees: [...(request.selection?.subtrees ?? [])],
-      },
-      dependencyDirectories: [...(request.dependencyDirectories ?? [])],
+      audit: { mode: request.audit.mode, timeoutMs: request.audit.timeoutMs },
       subject: request.subject ?? {},
       proposedBy: request.proposedBy ?? null,
       repairRound: request.repairRound ?? 0,
@@ -11692,7 +11492,6 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
         repairRounds: request.limits?.repairRounds ?? 1,
         infrastructureRetries: request.limits?.infrastructureRetries ?? 1,
       },
-      ...(request.scenarios === undefined ? {} : { scenarios: request.scenarios }),
     },
     guardedChanges: [...prepared.guardedChanges],
     rules: prepared.rules.map(({ limits, ...rule }) => ({
@@ -11712,8 +11511,7 @@ function preparedGate(operation: GateOperation): PreparedGate {
     checkpoint: operation.checkpoint,
     request: {
       ...operation.request,
-      checks: operation.request.checks,
-      dependencyDirectories: operation.request.dependencyDirectories,
+      checks: [],
       writeScope: operation.request.writeScope,
     },
     guardedChanges: [...operation.guardedChanges],

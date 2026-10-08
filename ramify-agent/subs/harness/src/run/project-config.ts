@@ -1,12 +1,11 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { delimiter, isAbsolute, join, matchesGlob, relative, sep } from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { readProjectConfiguration } from '../../subs/evidence/src/project-configuration.js';
 import { isTestingModule, type ArchitectIndex } from '../../subs/evidence/src/views.js';
-import type { ScenarioModule } from '../../subs/scenarios/src/records.js';
 import { parseModuleHeader } from './module-header.js';
 import {
   capturedProjectConfigSchema, projectConfigSchema,
-  type AcceptanceMode, type CapturedProjectConfig, type ProjectConfig,
+  type CapturedProjectConfig, type ProjectConfig,
 } from './records.js';
 
 /*
@@ -15,8 +14,7 @@ import {
  * beside the run policy. A missing or invalid file is captured with its
  * reason and never refuses a start; readiness reports it.
  *
- * What readiness asks of a valid file is here too: that its support code
- * lies in a module's test area, and that each mode's commands resolve.
+ * The modules' test areas are here too, which a briefing names as text.
  */
 
 /** Reads, validates and captures the project's configuration. */
@@ -48,7 +46,7 @@ export function parseProjectConfig(text: string): { readonly config: ProjectConf
   return { invalid: `does not validate against ramify-agent.project/1: ${issues.join('; ')}` };
 }
 
-// The test areas support code must lie in.
+// The modules' test areas.
 
 /** A module's test area: its `src/tests/`, or a testing module's `src/`, project-relative. */
 export interface TestArea {
@@ -66,39 +64,6 @@ export async function moduleTestAreas(projectRoot: string, index: ArchitectIndex
   return modules
     .map(module => ({ module: index === null ? module.name : module.module, area: areaOf(module.dir, module.testing) }))
     .sort((a, b) => (a.area < b.area ? -1 : a.area > b.area ? 1 : 0));
-}
-
-/**
- * Every module whose feature directory holds a `.feature` file: its
- * `src/tests/features/`, or a testing module's `src/features/`. The view
- * names the modules where the run has one; without it the declarations on
- * disk do, with declared-name paths joined from the root's. Ordered by
- * directory, which is the order the scenario check's runs go in.
- */
-export async function scenarioModules(projectRoot: string, index: ArchitectIndex | null): Promise<ScenarioModule[]> {
-  const modules = await declaredModules(projectRoot, index);
-  const found: ScenarioModule[] = [];
-  for (const module of modules) {
-    if (await holdsFeatureFile(join(projectRoot, areaOf(module.dir, module.testing), 'features'), 0)) {
-      found.push({ module: module.module, dir: module.dir, testing: module.testing });
-    }
-  }
-  return found.sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
-}
-
-async function holdsFeatureFile(directory: string, depth: number): Promise<boolean> {
-  if (depth > moduleDepth) return false;
-  let entries;
-  try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch {
-    return false;
-  }
-  if (entries.some(entry => entry.isFile() && entry.name.endsWith('.feature'))) return true;
-  for (const entry of entries) {
-    if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules' && await holdsFeatureFile(join(directory, entry.name), depth + 1)) return true;
-  }
-  return false;
 }
 
 /** One declared module: its declared-name path, its header's own name, its directory and whether it is testing. */
@@ -159,126 +124,4 @@ async function moduleHeader(path: string): Promise<{ name: string; tags: string[
     return null;
   }
   return parseModuleHeader(text);
-}
-
-/** What one `support` entry matched: the files inside a test area and those outside every one. */
-export interface SupportMatch {
-  readonly entry: string;
-  readonly inside: readonly string[];
-  readonly outside: readonly string[];
-}
-
-/**
- * Each `support` entry against the project's files. An entry is a path or a
- * glob relative to the project root; a file matches when the entry names it
- * or its glob matches it.
- */
-export async function matchSupport(projectRoot: string, support: readonly string[], areas: readonly TestArea[]): Promise<SupportMatch[]> {
-  const files = await projectFiles(projectRoot);
-  const within = (file: string) => areas.some(area => file.startsWith(`${area.area}/`));
-  return support.map(entry => {
-    const pattern = entry.replace(/^\.\//u, '');
-    const matched = isAbsolute(pattern) ? [] : files.filter(file => file === pattern || matchesGlob(file, pattern));
-    return { entry, inside: matched.filter(within), outside: matched.filter(file => !within(file)) };
-  });
-}
-
-/**
- * Every file the `support` entries name, project-relative and ordered: what
- * a run guards of the scenario harness beside its configuration.
- */
-export async function supportFiles(projectRoot: string, support: readonly string[]): Promise<string[]> {
-  if (support.length === 0) return [];
-  const matched = await matchSupport(projectRoot, support, []);
-  return [...new Set(matched.flatMap(entry => [...entry.inside, ...entry.outside]))].sort();
-}
-
-/** Every file beneath the root, project-relative, skipping `node_modules` and dot-directories. */
-async function projectFiles(projectRoot: string): Promise<string[]> {
-  const found: string[] = [];
-  await walk(projectRoot, 0);
-  return found.sort();
-
-  async function walk(directory: string, depth: number): Promise<void> {
-    if (depth > moduleDepth * 2) return;
-    let entries;
-    try {
-      entries = await readdir(directory, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) await walk(path, depth + 1);
-      else if (entry.isFile()) found.push(relative(projectRoot, path).split(sep).join('/'));
-    }
-  }
-}
-
-// The acceptance modes' commands.
-
-/** One command of a mode that does not resolve, with the reason. */
-export interface UnresolvedCommand {
-  readonly mode: 'quick' | 'full';
-  readonly role: 'command' | 'setup' | 'teardown';
-  readonly argv: readonly string[];
-  readonly reason: string;
-}
-
-/**
- * Every command of both modes that does not resolve. `npm run <script>`
- * resolves when `package.json` declares the script; any other argv resolves
- * when its executable is a file, by path from the project root or by name in
- * `node_modules/.bin` or on the `PATH`.
- */
-export async function unresolvedCommands(projectRoot: string, config: ProjectConfig): Promise<UnresolvedCommand[]> {
-  const scripts = await packageScripts(projectRoot);
-  const unresolved: UnresolvedCommand[] = [];
-  const modes: Array<['quick' | 'full', AcceptanceMode]> = [['quick', config.acceptance.modes.quick], ['full', config.acceptance.modes.full]];
-  for (const [mode, declared] of modes) {
-    for (const role of ['command', 'setup', 'teardown'] as const) {
-      const argv = declared[role];
-      if (argv === undefined) continue;
-      const reason = await unresolvedReason(projectRoot, argv, scripts);
-      if (reason !== null) unresolved.push({ mode, role, argv, reason });
-    }
-  }
-  return unresolved;
-}
-
-async function unresolvedReason(projectRoot: string, argv: readonly string[], scripts: Record<string, unknown> | null): Promise<string | null> {
-  const [executable, subcommand, script] = argv;
-  if (executable === 'npm' && (subcommand === 'run' || subcommand === 'run-script')) {
-    if (script === undefined) return '`npm run` names no script';
-    if (scripts === null) return 'package.json cannot be read';
-    const body = scripts[script];
-    return typeof body === 'string' && body !== '' ? null : `package.json declares no \`${script}\` script`;
-  }
-  if (executable === undefined) return 'the argv is empty';
-  if (executable.includes('/')) {
-    return await isFile(isAbsolute(executable) ? executable : join(projectRoot, executable)) ? null : `${executable} is not a file`;
-  }
-  const directories = [join(projectRoot, 'node_modules', '.bin'), ...(process.env['PATH'] ?? '').split(delimiter).filter(Boolean)];
-  for (const directory of directories) {
-    if (await isFile(join(directory, executable))) return null;
-  }
-  return `\`${executable}\` is neither in node_modules/.bin nor on the PATH`;
-}
-
-async function packageScripts(projectRoot: string): Promise<Record<string, unknown> | null> {
-  try {
-    const parsed = JSON.parse(await readFile(join(projectRoot, 'package.json'), 'utf8')) as { scripts?: Record<string, unknown> };
-    return parsed.scripts ?? {};
-  } catch {
-    return null;
-  }
-}
-
-async function isFile(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isFile();
-  } catch {
-    return false;
-  }
 }

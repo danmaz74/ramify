@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import type {
-  AnalysisScenario, RunReview, RunSnapshot, ScenarioCheckView, ScenarioGateResult, ScenarioOriginView, ScenarioView, ScenarioWarningView,
+  AnalysisScenario, RunReview, RunSnapshot, GateScenarioResultView, ScenarioGateResult, ScenarioOriginView, ScenarioView, ScenarioWarningView,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, newCommandId, type ProtocolClient } from './client.js';
 
@@ -179,7 +179,7 @@ export function ScenarioReview({ entries, scenarios, warnings, total }: {
 
 function gateLine(gate: ScenarioGateResult): string {
   const subject = gate.subject.iteration ?? gate.subject.workItem;
-  return `${gate.checkpoint}${subject ? ` ${subject}` : ''}, ${gate.mode}${gate.dryRun ? ' dry run' : ''}: ${gate.status}`;
+  return `${gate.checkpoint}${subject ? ` ${subject}` : ''}, ${gate.check}${gate.command === null ? '' : `.${gate.command}`}: ${gate.status}`;
 }
 
 /** Every tracked scenario with its state, what it belongs to, where it lives and the gates that ran it. */
@@ -227,28 +227,21 @@ export function ScenarioTable({ scenarios, total }: { readonly scenarios: readon
   );
 }
 
-/** A `scenarios` command's summary in a gate attempt. */
-export function ScenarioCheckSummaryView({ summary }: { readonly summary: ScenarioCheckView }) {
-  const selection = summary.selection.kind === 'identity' ? `by identity: ${summary.selection.scenarios.join(', ')}` : summary.selection.kind;
+/** The tracked scenarios a gate's audit ran, read from its raw runner output; display only. */
+export function GateScenarioResults({ scenarios }: { readonly scenarios: readonly GateScenarioResultView[] }) {
+  if (scenarios.length === 0) return null;
   return (
-    <div className="scenario-check" aria-label="Scenario check">
-      <p className="muted">
-        Mode {summary.mode}{summary.dryRun ? ' (dry run)' : ''}, selection {selection}, {summary.excluded} excluded.
-        Runs: {summary.runs.map(run => `${run.module} exit ${run.exit ?? 'none'}`).join(', ') || 'none'}.
-        The project's own: {summary.untracked.passed} passed, {summary.untracked.skipped} skipped, {summary.untracked.failed} failed.
-      </p>
-      {summary.scenarios.length > 0 && (
-        <ul aria-label="Scenario results">
-          {summary.scenarios.map(result => (
-            <li key={result.id} className={`scenario-status-${result.status}`}>
-              <code>{result.id}</code> {result.status} in {result.run}, <code>{result.file}:{result.line}</code>
-              {result.failure && <div className="failure">{result.failure.step}: {result.failure.message}</div>}
-              {result.undefined.length > 0 && <div className="failure">Undefined: {result.undefined.join('; ')}</div>}
-            </li>
-          ))}
-        </ul>
-      )}
-      {summary.failures.length > 0 && <ul className="failure" aria-label="Why the scenario check did not pass">{summary.failures.map(line => <li key={line}>{line}</li>)}</ul>}
+    <div className="scenario-check" aria-label="Scenario results">
+      <p className="muted">The tracked scenarios this gate's audit ran, by its configured Cucumber checks.</p>
+      <ul aria-label="Scenario results">
+        {scenarios.map(result => (
+          <li key={`${result.check}:${result.command ?? ''}:${result.id}`} className={`scenario-status-${result.status}`}>
+            <code>{result.id}</code> {result.status} in <code>{result.command === null ? result.check : `${result.check}.${result.command}`}</code>, <code>{result.file}:{result.line}</code>
+            {result.failure && <div className="failure">{result.failure.step}: {result.failure.message}</div>}
+            {result.undefined.length > 0 && <div className="failure">Undefined: {result.undefined.join('; ')}</div>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

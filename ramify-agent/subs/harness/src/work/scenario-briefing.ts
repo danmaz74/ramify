@@ -131,7 +131,7 @@ export function engineerScenarioSection(scenarios: EngineerScenarios | undefined
     '',
     `- Write step definitions in \`src/tests/steps/\` of a module within your write scope (a testing module's \`src/steps/\`). A run of these scenarios loads their owner's step files, ${directories.map(directory => `\`${directory}/\``).join(', ')}, and what those import.`,
     '- Never edit a feature file. The harness writes them, and a write to one is refused.',
-    '- Bind each assigned scenario in `bindings` of your completion proposal once its step definitions bind its steps, naming the fakes they rely on. `run_scope_tests` shows you how they run in quick mode; the next gate runs every bound scenario strictly, without its pending tag.',
+    '- Bind each assigned scenario in `bindings` of your completion proposal once its step definitions bind its steps, naming the fakes they rely on. Binding removes its pending tag, so the next gate\'s audit runs it through the project\'s configured scenario check; a pending scenario is not run.',
     ...namedImportLines(),
     '',
   );
@@ -175,7 +175,7 @@ function integrationEngineerSection(integration: IntegrationBriefing, state: Sce
     '  module receives them.',
     '- Never edit a feature file. The harness writes them, and a write to one is refused.',
     `- Bind \`${scenario.id}\` in \`bindings\` of your completion proposal once your step file binds it, naming the fakes`,
-    '  it relies on. `run_scope_tests` shows you how it runs in quick mode; the gate runs it strictly.',
+    '  it relies on. Binding removes its pending tag, so the gate\'s audit runs it through the project\'s configured scenario check.',
     ...namedImportLines(),
     '',
   );

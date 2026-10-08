@@ -7,7 +7,6 @@ import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { findModule, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { writeFileAtomic } from '../../subs/ledger/src/atomic.js';
-import { resolveTestSelection } from '../checks/selection.js';
 import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execution.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import { placementDecisions } from '../guard/write-guard.js';
@@ -388,7 +387,6 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     index: () => index,
     guarded,
     scopeRevision: scope.revision,
-    tests,
     outputPath: (kind, _invocation, number) => at(kind === 'shell' ? sessionLayout.shellOutput(number) : sessionLayout.hookOutput(number)),
   });
 
@@ -553,16 +551,16 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     actual: { mode: agentSession.start.mode, degradedReason: agentSession.start.degradedReason ?? null },
   });
 
-  // The gate: the iteration checkpoint over the tree the session left,
-  // with the module's own tests resolved anew and the guarded files as
-  // they stood at the start. It never commits.
+  // The gate: an in-place diagnosis of the tree the session left, its
+  // setup, type check and Ramify check, with the guarded files as they
+  // stood at the start. It never commits and runs no test or scenario: the
+  // project's tests run only through its committed audit.
   let gate: SessionGateResult | null = null;
   if (options.gate === true) {
     if (!settled.confirmed) {
       gate = { ran: false, reason: 'the session did not settle, so a check of the tree it may still be writing would prove nothing' };
     } else {
       progress({ type: 'gate-started' });
-      const selection = await resolveTestSelection({ projectRoot, index: await refresh(), policy: tests });
       // The project's declared setup, such as its build, runs first, as at
       // every gate of a run.
       const config = await captureProjectConfig(projectRoot);
@@ -576,7 +574,6 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
         policy,
         proposedBy: id,
         subject: {},
-        tests: selection,
         guarded: guardedFiles,
         authorizations: [],
         rules: [safety, { rule: 'write-scope', outcome: snapshot.failure !== null || snapshot.outsideScope.length > 0 ? 'failed' : 'passed', violations: snapshot.outsideScope.map(path => ({ rule: 'write-scope', path, detail: 'Candidate change is outside current and captured write authority' })), ...(snapshot.failure === null ? {} : { limits: [snapshot.failure] }) }],

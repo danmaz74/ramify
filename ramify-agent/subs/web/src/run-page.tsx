@@ -15,7 +15,7 @@ import { Markdown } from './markdown.js';
 import { chapterHref, routeHref } from './routes.js';
 import { counted, figure, metricValue, RunState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
-import { ApproveForm, canApprove, reviewText, ReviewPanel, ScenarioCheckSummaryView, ScenarioReview, ScenarioTable } from './run-scenarios.js';
+import { ApproveForm, canApprove, reviewText, ReviewPanel, GateScenarioResults, ScenarioReview, ScenarioTable } from './run-scenarios.js';
 import type { DiagramSessions } from './session-marks.js';
 import { SessionTimeline } from './session-timeline.js';
 
@@ -651,6 +651,8 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
                   : <><span>run ref <code>{data.evidence.runRef}</code></span>; <span>report commit <code>{data.evidence.reportCommit}</code></span>; <span>tree ref <code>{data.evidence.treeRef}</code></span></>}</dd>
               </div>
             </dl>
+            {data.audit !== undefined && <AuditRequestFacts audit={data.audit} />}
+            <GateScenarioResults scenarios={data.scenarios} />
             {data.provider === undefined
               ? <p className="muted">Complete provider diagnostics are unavailable for this historical attempt.</p>
               : <details><summary>Complete provider report and diagnostics</summary>
@@ -667,10 +669,8 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
                   : <>{command.outcome}{command.notVerified ? ` (${command.notVerified})` : ''}, exit {command.exitCode ?? 'none'}, {command.elapsedMs} ms</>}</p>
                 <p className="muted"><code>{command.argv.join(' ')}</code></p>
                 {command.providerCheckId && <p className="muted">Provider check <code>{command.providerCheckId}</code>.</p>}
-                {command.selection && <p className="muted">Selection ({command.selection.policy}): {counted(command.selection.resolved.length, 'file')}{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
                 <p className="muted">Output: {command.output.bytes} bytes in <code>{command.output.path}</code>; the last {Math.min(command.output.bytes, 8192)} are shown.</p>
                 {(command.stopped !== null || command.outputIncomplete) && <p className="muted">{stoppedText(command.stopped, command.outputIncomplete)}</p>}
-                {command.scenarios && <ScenarioCheckSummaryView summary={command.scenarios} />}
                 <pre className="tail" aria-label={`Output tail of ${command.kind}`}>{command.output.tail}</pre>
               </div>
             ))}
@@ -678,6 +678,20 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
         )}
       </Loading>
     </section>
+  );
+}
+
+/** What a committing gate asked of the committed audit and what answered it, both source commits included. */
+function AuditRequestFacts({ audit }: { readonly audit: NonNullable<GateView['audit']> }) {
+  return (
+    <dl className="facts" aria-label="Configured audit">
+      <div><dt>Audit request</dt><dd><code>{audit.requestId}</code>, {audit.mode === 'full' ? 'full' : 'project default'} under <code>{audit.definition.path}</code>: {audit.status}</dd></div>
+      <div><dt>Requested source</dt><dd><code>{audit.requestedSourceCommit}</code></dd></div>
+      <div><dt>Audited source</dt><dd>{audit.auditedSourceCommit === null ? 'none' : <code>{audit.auditedSourceCommit}</code>}</dd></div>
+      <div><dt>Mode</dt><dd>requested {audit.requestedMode ?? 'unknown'}, executed {audit.executedMode ?? 'unknown'}{audit.fallbackReason === null ? '' : ` (${audit.fallbackReason})`}</dd></div>
+      {audit.reuse !== null && <div><dt>Reused record</dt><dd>of <code>{audit.reuse.auditedCommit}</code>; ignored changes: {audit.reuse.ignoredChangedPaths.length === 0 ? 'none' : audit.reuse.ignoredChangedPaths.join(', ')}</dd></div>}
+      <div><dt>Composed verdict</dt><dd>{audit.verdict ?? 'none'}{audit.verdict === 'pass' ? '' : `: ${audit.detail}`}</dd></div>
+    </dl>
   );
 }
 

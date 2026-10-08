@@ -101,7 +101,7 @@ export const executionCountCoverageSchema = z.discriminatedUnion('state', [
 ]);
 export type ExecutionCountCoverage = z.infer<typeof executionCountCoverageSchema>;
 
-/** A scenario's latest non-dry-run result, shown beside its reported state; only a pass of a done scenario counts as passed. */
+/** A scenario's latest result in a gate's audit, shown beside its reported state; only a pass of a done scenario counts as passed. */
 export const executionScenarioResultSchema = z.enum([
   'no-real-run', ...scenarioStatusSchema.options, 'unavailable',
 ]);
@@ -225,8 +225,9 @@ export type ExecutionLink = z.infer<typeof executionLinkSchema>;
  * event: its kind and its place among the gate's commands, counted from one.
  */
 export const executionGateCommandSchema = z.object({
-  kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
-  /** A setup command's declared name, such as `build`. */
+  /** `configured` is a check of the committed audit; `tests`, `conformance` and `scenarios` are read from earlier runs' logs. */
+  kind: z.enum(['setup', 'ramify-check', 'type-check', 'configured', 'tests', 'conformance', 'scenarios']),
+  /** A setup command's declared name, such as `build`, or a configured check's ID. */
   name: text.optional(),
   position: z.int().positive(),
   total: z.int().positive(),

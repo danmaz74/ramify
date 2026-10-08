@@ -125,9 +125,9 @@ expose-sub invocationEvaluationSchema, InvocationEvaluation from harness to desc
 expose-sub metricsResponseSchema, MetricsResponse from harness to descendants
 expose-sub scenarioKindSchema, ScenarioKind, scenarioOriginViewSchema, ScenarioOriginView from harness to descendants
 expose-sub trackedScenarioStateSchema, TrackedScenarioState, scenarioStatusSchema, ScenarioStatus from harness to descendants
-expose-sub scenarioCheckModeSchema, ScenarioCheckMode, scenarioWarningKindSchema, ScenarioWarningKind from harness to descendants
+expose-sub scenarioWarningKindSchema, ScenarioWarningKind from harness to descendants
 expose-sub scenarioWarningViewSchema, ScenarioWarningView, analysisScenarioSchema, AnalysisScenario from harness to descendants
-expose-sub scenarioCheckViewSchema, ScenarioCheckView, scenarioGateResultSchema, ScenarioGateResult from harness to descendants
+expose-sub gateScenarioResultViewSchema, GateScenarioResultView, scenarioGateResultSchema, ScenarioGateResult from harness to descendants
 expose-sub scenarioViewSchema, ScenarioView, scenarioListResponseSchema, ScenarioListResponse from harness to descendants
 
 // protocol/transcripts.ts

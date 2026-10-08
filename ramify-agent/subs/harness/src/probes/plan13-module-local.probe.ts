@@ -118,11 +118,9 @@ async function oneSession(
   const guarded = guardedScopeOf(captured, denied);
   const equipment = engineerEquipment({
     projectRoot: project, workingDirectory: cwd, ramify,
-    commands: { typeCheck: command, allTests: command, scopedTests: command, ramifyCheck: command,
-      nestedPackages: [], hookTimeoutMs: 5_000 },
+    commands: { typeCheck: command, ramifyCheck: command, hookTimeoutMs: 5_000 },
     bounds: { rejectedToolInputsPerTurn: 3 }, refresh: async () => view, index: () => view,
     guarded, scopeRevision: guarded.revision,
-    tests: { policy: kind === 'repair' ? 'all-project' : 'owned-by-scope', exactOwners: [], subtrees: [], extraSuites: [] },
     outputPath: (type, invocation, number) => join(directory, `${type}-${invocation}-${number}.log`),
   });
   const equipped = equipment.equip({ invocation: kind, observations,

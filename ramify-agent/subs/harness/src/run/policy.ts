@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
 import { checkCommand, type CheckCommand } from '../checks/records.js';
 import type { Role } from '../interfaces/protocol/runs.js';
@@ -142,24 +141,12 @@ export function contextPolicyOf(policy: RunPolicy, role: Role): NonNullable<RunP
  */
 export const defaultTranscriptPolicy: RunPolicy['transcript'] = { inlineBodyBytes: 8 * 1024 };
 
-/** The timeouts of the main plan's command table. */
+/** The timeouts of the harness's own commands. */
 export const commandTimeouts = {
   typeCheck: 300_000,
-  allTests: 900_000,
-  scopedTests: 600_000,
   ramifyCheck: 600_000,
   hook: 5_000,
-  nestedInstall: 900_000,
 } as const;
-
-/** One independent nested package of the target project. */
-export interface NestedPackage {
-  /** Project-relative, with forward slashes. */
-  readonly directory: string;
-  readonly manifest: string;
-  readonly installed: boolean;
-  readonly testScript: string | null;
-}
 
 /** The MVP's one test runner, reached through the project's own npm scripts. */
 function npmCommand(cwd: string, args: readonly string[], timeoutMs: number): CheckCommand {
@@ -168,8 +155,6 @@ function npmCommand(cwd: string, args: readonly string[], timeoutMs: number): Ch
 
 export interface RunPolicyOptions {
   readonly projectRoot: string;
-  /** Historical policy fixtures only. New runs derive preparation from committed audit configuration. */
-  readonly nested?: readonly NestedPackage[];
   /** The `ramify` executable, for a test that supplies its own. */
   readonly ramify?: string | undefined;
   /** An endpoint directory for the harness's own Ramify daemon, where it has one. */
@@ -197,18 +182,6 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
     reviews: defaultReviewPolicy,
     commands: {
       typeCheck: npmCommand(projectRoot, ['run', 'type-check'], commandTimeouts.typeCheck),
-      allTests: npmCommand(projectRoot, ['test'], commandTimeouts.allTests),
-      /**
-       * The scoped test run's template. The resolved files follow its argv
-       * and nothing else of it changes. It is the MVP's one runner, reached
-       * as the project installed it, because a selection of files is not
-       * something an npm script takes.
-       */
-      scopedTests: checkCommand({
-        argv: [join(projectRoot, 'node_modules', '.bin', 'vitest'), 'run'],
-        cwd: projectRoot,
-        timeoutMs: commandTimeouts.scopedTests,
-      }),
       /**
        * The complete check. The harness reads its verdict and findings, never
        * the snapshot of every evaluated import, so the report leaves it out.
@@ -232,21 +205,15 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
         timeoutMs: commandTimeouts.hook,
       }),
       hookTimeoutMs: commandTimeouts.hook,
-      nestedPackages: (options.nested ?? []).map(nested => ({
-        directory: nested.directory,
-        install: npmCommand(join(projectRoot, nested.directory), ['ci'], commandTimeouts.nestedInstall),
-        tests: nested.testScript === null ? null : npmCommand(join(projectRoot, nested.directory), ['test'], commandTimeouts.allTests),
-      })),
     },
   });
 }
 
 /**
- * The policy with the gate command timeouts a project's configuration
- * declares in place of the harness's own: `typeCheck`, `tests` (the
- * project's tests and each nested package's), `scopedTests` and
- * `ramifyCheck`. A missing or invalid configuration changes nothing; its
- * reason is readiness's to report.
+ * The policy with the diagnosis command timeouts a project's configuration
+ * declares in place of the harness's own: `typeCheck` and `ramifyCheck`. A
+ * missing or invalid configuration changes nothing; its reason is
+ * readiness's to report.
  */
 export function withProjectTimeouts(policy: RunPolicy, captured: CapturedProjectConfig): RunPolicy {
   const timeouts = 'config' in captured ? captured.config.timeouts : undefined;
@@ -259,13 +226,7 @@ export function withProjectTimeouts(policy: RunPolicy, captured: CapturedProject
     commands: {
       ...commands,
       typeCheck: timed(commands.typeCheck, timeouts.typeCheck),
-      allTests: timed(commands.allTests, timeouts.tests),
-      scopedTests: timed(commands.scopedTests, timeouts.scopedTests),
       ramifyCheck: timed(commands.ramifyCheck, timeouts.ramifyCheck),
-      nestedPackages: commands.nestedPackages.map(nested => ({
-        ...nested,
-        tests: nested.tests === null ? null : timed(nested.tests, timeouts.tests),
-      })),
     },
   });
 }

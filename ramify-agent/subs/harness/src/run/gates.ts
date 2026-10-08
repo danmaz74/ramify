@@ -1,12 +1,7 @@
-import { stat } from 'node:fs/promises';
-import { join } from 'node:path';
-import {
-  allProjectChecks, checkpointPolicies, planScenarioCheck, scopedChecks, setupChecks,
-  type ResolvedTests, type ScenarioCheckInputs, type SetupDeclaration,
-} from '../checks/checkpoint.js';
+import { checkpointPolicies, diagnosisChecks, type SetupDeclaration } from '../checks/checkpoint.js';
 import type { CheckExecutionPort } from '../checks/execution.js';
 import { executePreparedGate, prepareGate } from '../checks/gate.js';
-import type { PreparedGate } from '../checks/gate.js';
+import type { GateRequest, PreparedGate } from '../checks/gate.js';
 import type { Checkpoint, GateAttempt, GateRuleRecord, RecordReference, TypeCheckOutput } from '../checks/records.js';
 import { gitService, type GitService } from '../../subs/evidence/src/git.js';
 import type { RunPolicy } from './records.js';
@@ -14,9 +9,10 @@ import type { RunPolicy } from './records.js';
 /*
  * A checkpoint of a run: verify, commit, then audit.
  *
- * Committing run checkpoints settle the writer and verify every plan before
- * an effect is recorded. That effect makes or finds its commit and audits the
- * exact revision. Standalone sessions keep their in-place execution.
+ * Committing run checkpoints settle the writer and verify the harness's own
+ * rules before an effect is recorded. That effect makes or finds its commit
+ * and asks the project's committed audit about the exact revision.
+ * Standalone sessions keep their in-place diagnosis.
  *
  * The commit is an external effect of the ledger, keyed by the gate attempt.
  * A repeat after a crash finds the commit by its `Ramify-Run` and
@@ -43,116 +39,64 @@ export interface CheckpointRequest {
   readonly infrastructureAttempt?: number | undefined;
   /** What the attempt is for: a work item, an iteration, or neither. */
   readonly subject?: GateAttempt['subject'] | undefined;
-  /** For an `owned-by-scope` checkpoint: the selection resolved anew from the current tree. */
-  readonly tests?: ResolvedTests | undefined;
   /** The guarded files as the assignment captured them. */
   readonly guarded?: readonly { readonly path: string; readonly hash: string | null }[] | undefined;
-  /**
-   * The project-relative write scope of the assignment this checkpoint
-   * follows. A failed Ramify check's findings are attributed against it.
-   */
+  /** The project-relative write scope of the assignment this checkpoint follows. */
   readonly writeScope?: readonly string[] | undefined;
   readonly authorizations?: readonly { readonly path: string; readonly by: RecordReference }[] | undefined;
   /** Rules the harness verified over the tree itself, such as a contract gate's fake naming. */
   readonly rules?: readonly GateRuleRecord[] | undefined;
   /**
-   * The project's scenario harness, the modules with feature files and the
-   * tracked scenarios, from which the checkpoint's scenario check is
-   * planned. A gate without them, such as a standalone session's, has none.
-   */
-  readonly scenarios?: ScenarioCheckInputs | undefined;
-  /** A bounded task's scenario identities at this common checkpoint. */
-  readonly scenarioScope?: { readonly exactOwners: readonly string[]; readonly include: readonly string[] } | undefined;
-  /**
-   * The format the project declared for what its type check prints, from
-   * its captured `ramify-agent.json`, retained with the command's diagnostic
-   * evidence. Failure keeps the ordinary gate repair route.
+   * For a standalone diagnosis: the format the project declared for what its
+   * type check prints, retained with the command's diagnostic evidence.
    */
   readonly typeCheckOutput?: TypeCheckOutput | undefined;
   /**
-   * The project's setup commands from its captured `ramify-agent.json`,
-   * which run first, in order: the in-place runner runs them at the project
-   * root, and the audit forwards them to ramify-audit's preparation of the
-   * worktree.
+   * For a standalone diagnosis: the project's setup commands from its
+   * captured `ramify-agent.json`, which run first, in order, at the project
+   * root. A committing gate's audit prepares its worktree from the committed
+   * audit definition instead.
    */
   readonly setup?: readonly SetupDeclaration[] | undefined;
   readonly signal?: AbortSignal | undefined;
 }
 
 /**
- * Runs one checkpoint in place and answers its attempt. Durable run
- * checkpoints split preparation from execution around their commit effect.
+ * Runs a standalone session's diagnosis in place and answers its attempt:
+ * the project's setup, its type check and a complete Ramify check. It
+ * commits nothing and publishes nothing.
  */
 export async function runCheckpoint(execution: CheckExecutionPort, request: CheckpointRequest): Promise<GateAttempt> {
-  const prepared = await prepareCheckpoint(request);
+  const prepared = await prepareGate(request.checkpoint, {
+    ...gateRequest(request),
+    checks: diagnosisChecks(request.policy.commands, request.setup ?? [], request.projectRoot, request.typeCheckOutput),
+  });
   if ('schema' in prepared) return prepared;
   return executePreparedGate(execution, prepared, request.head, null);
 }
 
-/** Verify a committing checkpoint before its commit effect is allowed to begin. */
-export async function prepareCheckpoint(request: CheckpointRequest): Promise<PreparedGate | GateAttempt> {
-  return prepareGate(request.checkpoint, gateRequest(request, await linkedDependencies(request)));
-}
-
 /**
- * The nested packages whose installed dependencies an isolated runner links:
- * every one whose tests a gate runs, which readiness required installed, and
- * any other the project has installed. One without its tests and without
- * `node_modules` is left out, as readiness left it uninstalled.
+ * Verify a committing checkpoint before its commit effect is allowed to
+ * begin. It plans no command: its audit asks the committed definition in the
+ * checkpoint's mode, bounded by the run's absolute limit, lock waits excepted.
  */
-async function linkedDependencies(request: CheckpointRequest): Promise<string[]> {
-  const linked: string[] = [];
-  for (const nested of request.policy.commands.nestedPackages) {
-    if (nested.tests !== null || await isDirectory(join(request.projectRoot, nested.directory, 'node_modules'))) linked.push(nested.directory);
-  }
-  return linked;
-}
-
-async function isDirectory(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-function gateRequest(request: CheckpointRequest, dependencyDirectories: readonly string[]) {
+export async function prepareCheckpoint(request: CheckpointRequest): Promise<PreparedGate | GateAttempt> {
   const policy = checkpointPolicies[request.checkpoint];
-  if (policy.selection !== 'all-project' && request.tests === undefined) {
-    throw new Error(`The ${request.checkpoint} checkpoint requires an ${policy.selection} selection, and none was resolved`);
-  }
-  const scenarios = request.scenarios === undefined ? undefined : planScenarioCheck(request.checkpoint, request.scenarios, {
-    projectRoot: request.projectRoot,
-    ...(request.tests === undefined ? {} : { scope: request.tests.selection }),
-    ...(request.scenarioScope === undefined ? {} : {
-      selection: 'identity' as const,
-      scope: { exactOwners: request.scenarioScope.exactOwners, subtrees: [] },
-      include: request.scenarioScope.include,
-    }),
+  if (!policy.committing) throw new Error(`The ${request.checkpoint} checkpoint does not commit`);
+  return prepareGate(request.checkpoint, {
+    ...gateRequest(request),
+    checks: [],
+    audit: { mode: policy.audit, timeoutMs: request.policy.limits.runAbsoluteMs },
   });
-  const scenarioCheck = scenarios !== undefined && 'check' in scenarios ? scenarios.check : undefined;
-  const planned = request.tests === undefined
-    ? allProjectChecks(request.policy.commands, policy, scenarioCheck)
-    : scopedChecks(request.policy.commands, request.tests, scenarioCheck);
-  const output = request.typeCheckOutput;
-  const checks = [
-    ...setupChecks(request.setup ?? [], request.projectRoot),
-    ...(output === undefined ? planned : planned.map(check => (check.kind === 'type-check' ? { ...check, output } : check))),
-  ];
+}
+
+function gateRequest(request: CheckpointRequest): Omit<GateRequest, 'checks'> {
   return {
     id: request.id,
     ...(request.runId === undefined ? {} : { runId: request.runId }),
     projectRoot: request.projectRoot,
     directory: request.directory,
     head: request.head,
-    checks,
-    auditAllTests: request.policy.commands.allTests,
-    selection: {
-      policy: policy.selection,
-      exactOwners: policy.selection === 'owned-by-scope' ? [...(request.tests?.selection.exactOwners ?? [])] : [],
-      subtrees: policy.selection === 'owned-by-scope' ? [...(request.tests?.selection.subtrees ?? [])] : [],
-    },
-    dependencyDirectories: [...dependencyDirectories],
     ...(request.subject === undefined ? {} : { subject: request.subject }),
     ...(request.proposedBy === undefined ? {} : { proposedBy: request.proposedBy }),
     ...(request.repairRound === undefined ? {} : { repairRound: request.repairRound }),
@@ -161,7 +105,6 @@ function gateRequest(request: CheckpointRequest, dependencyDirectories: readonly
     ...(request.writeScope === undefined ? {} : { writeScope: request.writeScope }),
     ...(request.authorizations === undefined ? {} : { authorizations: request.authorizations }),
     ...(request.rules === undefined ? {} : { rules: request.rules }),
-    ...(scenarios !== undefined && 'none' in scenarios ? { scenarios: scenarios.none } : {}),
     limits: {
       repairRounds: request.checkpoint === 'work-item'
         ? request.policy.limits.repairRoundsPerWorkItemGate

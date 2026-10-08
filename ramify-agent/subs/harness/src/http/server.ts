@@ -10,7 +10,7 @@ import {
   checkToolName, intakeToolName, principleToolName, type CheckSubmission, type IntakeSubmission, type PrincipleSubmission,
 } from '../analysis/extraction.js';
 import { architectRunInputs } from '../run/inputs.js';
-import { createAuditCheckExecution, createConfiguredAudit } from '../../subs/audit/src/check-execution.js';
+import { createConfiguredAudit } from '../../subs/audit/src/check-execution.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { RunService, type RunRecoveryReport, type RunServiceOptions } from '../run/service.js';
 import { acquireProjectLock } from '../store/lock.js';
@@ -186,7 +186,6 @@ export async function startServerWith(options: ServerSettings): Promise<RunningS
       projectRoot,
       lock,
       ramify,
-      checkExecution: options.runs?.checkExecution ?? createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) }),
       configuredAudit: options.runs?.configuredAudit ?? createConfiguredAudit({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) }),
       ...(agent === undefined ? {} : { agent }),
       ...(model === undefined ? {} : { model }),

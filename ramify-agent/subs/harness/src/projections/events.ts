@@ -26,6 +26,7 @@ const commandLabels: Record<RunEventOf<'gate-command-started'>['data']['kind'], 
   'ramify-check': 'the Ramify check',
   conformance: 'the conformance check',
   scenarios: 'the scenario check',
+  configured: 'the configured check',
 };
 
 /** One event, as a client reads it. Every internal event type has a projection here. */

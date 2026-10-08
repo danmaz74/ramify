@@ -1,7 +1,7 @@
 import { mkdir, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { GateCommandStarted } from '../checks/execution.js';
-import { configuredFullRecovery, type CommittedAuditConfiguration, type ConfiguredAuditPort, type ConfiguredFullAuditResult } from '../../subs/audit/src/check-execution.js';
+import { configuredFullRecovery, sameAuditPolicy, type CommittedAuditConfiguration, type ConfiguredAuditPort, type ConfiguredFullAuditResult } from '../../subs/audit/src/check-execution.js';
 import { installOperation, setupChecks } from '../checks/checkpoint.js';
 import { checkCommand, checkCommandEnvironment } from '../checks/records.js';
 import type { GateAttempt } from '../checks/records.js';
@@ -12,7 +12,7 @@ import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { PausableDeadline } from './pausable-deadline.js';
 import type { RunFailureReason } from '../interfaces/protocol/runs.js';
-import { declaredModuleDirectories, matchSupport, moduleTestAreas, unresolvedCommands } from './project-config.js';
+import { declaredModuleDirectories } from './project-config.js';
 import { removeScratchDirectories, trackedScratchPaths } from '../work/scratch.js';
 import {
   readinessAttemptSchema, infrastructureRecoverySchema,
@@ -22,8 +22,8 @@ import {
 /*
  * Execution readiness. Before any work is assigned, the harness verifies the
  * project it will work in: that it is there, that it is a clean git
- * repository, that the compiler and project configuration and scenario
- * harness are available, and that Ramify answers. It then prepares the
+ * repository, that the compiler and project configuration are available,
+ * and that Ramify answers. It then prepares the
  * committed audit workspace declarations in the run working tree and asks
  * the installed provider for one configured full audit of HEAD.
  *
@@ -84,8 +84,7 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
   steps.push(await scratchCleanupStep(projectRoot, request.git ?? gitService, steps[0]!.outcome));
   steps.push(await gitCleanStep(projectRoot, request.signal, request.git ?? gitService));
   steps.push(await compilerConfigStep(projectRoot));
-  steps.push(await projectConfigStep(projectRoot, request.projectConfig, request.index ?? null));
-  steps.push(await acceptanceRunnerStep(projectRoot, request.projectConfig));
+  steps.push(projectConfigStep(request.projectConfig));
   steps.push(await ramifyDaemonStep(request));
   if (request.signal?.aborted) return cancelledReadiness(request, steps);
 
@@ -97,7 +96,7 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
   } else {
     try {
       current = await execution.read(projectRoot, request.head, request.signal);
-      const compatible = JSON.stringify({ ...captured.config, sourceCommit: current.sourceCommit }) === JSON.stringify(current);
+      const compatible = sameAuditPolicy(current, captured.config);
       if (compatible) config = current;
       steps.push(compatible
         ? { step: 'audit-config', outcome: 'passed', detail: `${current.path} blob ${current.blob} at ${request.head}; captured at ${captured.config.sourceCommit}` }
@@ -142,7 +141,7 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
   let releaseWait: (() => void) | undefined;
   let audit: ConfiguredFullAuditResult;
   try {
-    audit = await execution.runFull({ projectRoot, sourceCommit: request.head, configuration: config!,
+    audit = await execution.run({ projectRoot, sourceCommit: request.head, configuration: config!, mode: 'full',
       runId: request.runId, attemptId: request.gateId,
       signal: request.signal === undefined ? bound.signal : AbortSignal.any([request.signal, bound.signal]),
       started: request.started,
@@ -150,9 +149,11 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
       lockAcquired: () => { releaseWait?.(); releaseWait = undefined; },
     });
   } catch (error) {
-    audit = { status: 'failed', requestedSourceCommit: request.head, auditedSourceCommit: null,
-      reused: false, verdict: null, reportCommit: null, runRef: null, treeRef: null,
-      detail: error instanceof Error ? error.message : String(error), provider: { error: String(error) } };
+    audit = { status: 'failed', requestId: `${request.runId}:${request.gateId}`, mode: 'full',
+      requestedSourceCommit: request.head, auditedSourceCommit: null, reused: false, reuse: null,
+      requestedMode: null, executedMode: null, fallbackReason: null,
+      verdict: null, reportCommit: null, runRef: null, treeRef: null, definition: { path: config!.path, blob: config!.blob },
+      detail: error instanceof Error ? error.message : String(error), provider: { error: String(error) }, checks: {} };
   } finally { releaseWait?.(); bound.dispose(); }
   const gate = configuredGate(request, audit);
   steps.push({ step: 'configured-full-audit', outcome: audit.status === 'completed' ? audit.verdict === 'pass' ? 'passed' : 'failed' : 'not-verified',
@@ -175,7 +176,7 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
 function cancelledReadiness(request: ReadinessRequest, steps: StepResult[], nested: ReadinessAttempt['nested'] = [],
   gate: GateAttempt | null = null, audit?: ConfiguredFullAuditResult): ReadinessResult {
   const order: ReadinessStep[] = ['project-root', 'scratch-cleanup', 'git-clean', 'compiler-config', 'project-config',
-    'acceptance-runner', 'ramify-daemon', 'audit-config', 'declared-packages', 'declared-preparation', 'configured-full-audit', 'run-branch'];
+    'ramify-daemon', 'audit-config', 'declared-packages', 'declared-preparation', 'configured-full-audit', 'run-branch'];
   for (const step of order) {
     if (!steps.some(entry => entry.step === step)) steps.push({ step, outcome: 'not-verified', detail: 'not reached: readiness was cancelled' });
   }
@@ -243,12 +244,17 @@ function configuredGate(request: ReadinessRequest, audit: ConfiguredFullAuditRes
   return {
     schema: 'ramify-agent.gate-attempt/3', id: request.gateId, checkpoint: 'readiness',
     subject: {}, proposedBy: null, repairRound: 0, infrastructureAttempt: 0,
-    head: request.head, commit: null, audited: audit.auditedSourceCommit,
-    evidence: audit.reportCommit !== null && audit.runRef !== null && audit.treeRef !== null
+    head: request.head, commit: null, audited: audit.status === 'completed' ? audit.requestedSourceCommit : null,
+    evidence: audit.status === 'completed' && audit.reportCommit !== null && audit.runRef !== null && audit.treeRef !== null
       ? { reportCommit: audit.reportCommit, runRef: audit.runRef, treeRef: audit.treeRef } : null,
-    provider: { result: audit.provider, checks: audit.status === 'completed' &&
-      typeof audit.provider === 'object' && audit.provider !== null && 'summary' in audit.provider
-      ? (audit.provider.summary as { checks?: unknown }).checks ?? {} : {} },
+    provider: { result: audit.provider, checks: audit.checks },
+    audit: {
+      requestId: audit.requestId, mode: audit.mode, status: audit.status, definition: { ...audit.definition },
+      requestedSourceCommit: audit.requestedSourceCommit, auditedSourceCommit: audit.auditedSourceCommit,
+      requestedMode: audit.requestedMode, executedMode: audit.executedMode, fallbackReason: audit.fallbackReason,
+      reuse: audit.reuse === null ? null : { ...audit.reuse, ignoredChangedPaths: [...audit.reuse.ignoredChangedPaths] },
+      verdict: audit.status === 'completed' ? audit.verdict : null, detail: audit.detail,
+    },
     guardedChanges: [], commands: [], verdict,
     cause: verdict === 'passed' ? null : audit.status === 'completed' ? 'check-failed' : 'infrastructure',
     next: verdict === 'passed' ? 'accept' : 'exhausted',
@@ -340,12 +346,11 @@ export function failingStep(attempt: ReadinessAttempt): ReadinessAttempt['steps'
 
 /**
  * The reason a run fails with when readiness ends at this step. The
- * project's configuration and its scenario harness name their own; every
- * other step is `readiness-failed`.
+ * project's configuration names its own; every other step is
+ * `readiness-failed`.
  */
 export function readinessFailureReason(step: string | undefined): RunFailureReason {
   if (step === 'project-config') return 'project-config-invalid';
-  if (step === 'acceptance-runner') return 'acceptance-harness-missing';
   return 'readiness-failed';
 }
 
@@ -404,56 +409,14 @@ async function compilerConfigStep(projectRoot: string): Promise<StepResult> {
 }
 
 /**
- * `ramify-agent.json` validated at `start-run`, and every `support` entry
- * matching at least one file, each inside a module's test area. A failure is
- * not a code-repair assignment: the project's configuration is the person's.
+ * `ramify-agent.json` validated at `start-run`. A failure is not a
+ * code-repair assignment: the project's configuration is the person's. The
+ * project's tests and scenarios are checks of its committed audit
+ * definition, which `audit-config` reads.
  */
-async function projectConfigStep(projectRoot: string, captured: CapturedProjectConfig, index: ArchitectIndex | null): Promise<StepResult> {
+function projectConfigStep(captured: CapturedProjectConfig): StepResult {
   if ('invalid' in captured) return { step: 'project-config', outcome: 'failed', detail: captured.invalid };
-  const support = captured.config.acceptance.support;
-  const areas = await moduleTestAreas(projectRoot, index);
-  const matches = await matchSupport(projectRoot, support, areas);
-  const problems = matches.flatMap(match => [
-    ...(match.inside.length === 0 && match.outside.length === 0 ? [`\`${match.entry}\` matches no file`] : []),
-    ...(match.outside.length > 0 ? [`\`${match.entry}\` matches ${match.outside.slice(0, 3).join(', ')}${match.outside.length > 3 ? ', …' : ''} outside every module's test area`] : []),
-  ]);
-  if (problems.length > 0) {
-    return {
-      step: 'project-config',
-      outcome: 'failed',
-      detail: `${captured.path}: support code is testing source of the module whose test area holds it, its src/tests/ or a testing module's src/: ${problems.join('; ')}`,
-    };
-  }
-  const files = matches.flatMap(match => match.inside);
-  return {
-    step: 'project-config',
-    outcome: 'passed',
-    detail: `${captured.path} validates against ramify-agent.project/1; ${support.length === 0 ? 'it names no support code' : `its support code is ${files.join(', ')}`}; full mode's readiness is ${captured.config.acceptance.modes.full.readiness}`,
-  };
-}
-
-/**
- * The scenario harness the configuration names: `cucumber-js` installed, and
- * each mode's commands resolving. A missing runner is as unrecoverable here
- * as a missing `vitest` is for `test-runner`.
- */
-async function acceptanceRunnerStep(projectRoot: string, captured: CapturedProjectConfig): Promise<StepResult> {
-  if ('invalid' in captured) {
-    return { step: 'acceptance-runner', outcome: 'not-verified', detail: 'not reached: the project\'s configuration names no acceptance modes' };
-  }
-  const runner = join(projectRoot, 'node_modules', '.bin', 'cucumber-js');
-  const problems: string[] = [];
-  if (!(await isFile(runner))) problems.push('node_modules/.bin/cucumber-js is not installed');
-  for (const command of await unresolvedCommands(projectRoot, captured.config)) {
-    problems.push(`${command.mode} mode's ${command.role} \`${command.argv.join(' ')}\` does not resolve: ${command.reason}`);
-  }
-  if (problems.length > 0) return { step: 'acceptance-runner', outcome: 'failed', detail: problems.join('; ') };
-  const { quick, full } = captured.config.acceptance.modes;
-  return {
-    step: 'acceptance-runner',
-    outcome: 'passed',
-    detail: `node_modules/.bin/cucumber-js is installed; quick mode runs \`${quick.command.join(' ')}\`, full mode \`${full.command.join(' ')}\``,
-  };
+  return { step: 'project-config', outcome: 'passed', detail: `${captured.path} validates against ramify-agent.project/1` };
 }
 
 /** The run branch created and checked out, or found where an earlier attempt of the run created it. */

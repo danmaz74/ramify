@@ -2,10 +2,10 @@ ramify 1
 module audit
 
 // The audit library and its evidence model stay behind this boundary. The
-// parent receives only its own check-execution implementation and the durable
-// workspace-ownership callback contract. No ramify-audit type crosses.
-expose-src createAuditCheckExecution, AuditCheckExecutionOptions, AuditWorkspaceOwnershipRecorder, IntendedAuditWorkspace from "check-execution.ts" to parent
-expose-src createConfiguredAudit, ConfiguredAuditPort, CommittedAuditConfiguration, ConfiguredFullAuditResult, configuredFullRecovery, readCommittedAuditConfiguration, runConfiguredFullAudit from "check-execution.ts" to parent
+// parent receives the committed configured audit, its harness result and the
+// durable workspace-ownership callback contract. No ramify-audit type crosses.
+expose-src AuditCheckExecutionOptions, AuditWorkspaceOwnershipRecorder, IntendedAuditWorkspace from "check-execution.ts" to parent
+expose-src createConfiguredAudit, ConfiguredAuditPort, ConfiguredAuditInput, ConfiguredAuditMode, ConfiguredAuditReuse from "check-execution.ts" to parent
+expose-src CommittedAuditConfiguration, ConfiguredAuditResult, ConfiguredFullAuditResult, configuredFullRecovery, readCommittedAuditConfiguration, sameAuditPolicy from "check-execution.ts" to parent
 expose-src testLockedRunner, TestLockOwner, TestLockHooks, TestLockOverride from "test-lock.ts" to parent
-expose-src scenarioReport, ReportedScenarioCommand from "scenario-report.ts" to parent
-expose-src runFocusedCheck, dispatchHarnessCommand from "focused-check.ts" to parent
+expose-src dispatchHarnessCommand from "focused-check.ts" to parent

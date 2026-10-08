@@ -94,7 +94,8 @@ export type WriteScope = z.infer<typeof writeScopeSchema>;
 /** The configuration a run guards: the files that decide what the checks discover and run. */
 export const guardedConfigurationFiles = [
   'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.gitignore', 'tsconfig.json', 'vitest.config.ts', 'vitest.config.js', 'vitest.config.mts',
-  'vite.config.ts', 'vite.config.js', 'vite.config.mts', 'cucumber.js', 'ramify-agent.json',
+  'vite.config.ts', 'vite.config.js', 'vite.config.mts',
+  'cucumber.js', 'cucumber.cjs', 'cucumber.mjs', 'cucumber.json', 'cucumber.yaml', 'cucumber.yml', 'ramify-agent.json',
   'ramify-audit.json',
 ] as const;
 
@@ -420,8 +421,6 @@ export function testPolicyOf(
 
 /** What a run guards beyond the configuration and the contract artifacts. */
 export interface GuardedScenarioFiles {
-  /** The files `acceptance.support` names, project-relative, hashed as they stand. */
-  readonly support?: readonly string[] | undefined;
   /**
    * Every tracked feature file with the hash of its expected rendering. It
    * is guarded whether or not the tree holds it, and against the rendering
@@ -433,8 +432,8 @@ export interface GuardedScenarioFiles {
 /**
  * The guarded files of one assignment: the project's compiler and
  * test-runner configuration, its package manifests, its configuration for
- * the harness, the contract artifacts a registered agreement requires and
- * the scenario harness's support files, hashed as they stand, and every
+ * the harness and its committed audit definition, and the contract
+ * artifacts a registered agreement requires, hashed as they stand, and every
  * tracked feature file with the hash of its expected rendering. A gate
  * compares the tree with these, so a change no record authorized is the
  * attempt's cause, and a deletion is `after: null` rather than an absent
@@ -453,7 +452,7 @@ export async function captureGuardedFiles(
   const expected = scenarios.expected ?? [];
   const rendered = new Set(expected.map(file => file.path));
   const hashed = await guardedFilesHash(projectRoot, [...new Set([
-    ...guardedConfigurationFiles, ...declaredAuditConfiguration, ...requiredArtifacts, ...(scenarios.support ?? []),
+    ...guardedConfigurationFiles, ...declaredAuditConfiguration, ...requiredArtifacts,
   ])].filter(path => !rendered.has(path)));
   return [
     ...hashed.map(file => ({ path: file.path, hash: file.hash })),

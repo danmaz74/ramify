@@ -33,13 +33,11 @@ in your tool calls resolve against it.
 - `edit` and `write` change files, and only within this iteration's write
   scope. Every call is checked before it runs. A call outside the scope is
   refused, nothing is written, and the reason names the target and the scope.
-- `run_scope_tests` runs the tests this iteration is judged on: the
-  consumer's own tests and the conformance suite, resolved from the tree as
-  it stands on every call, so a test you have just written runs.
 - `shell` runs one command in the working directory, with a timeout you may
   set: at most {{commandTimeoutMs}} ms, and two minutes when you set none.
-  Whole-suite Vitest and Cucumber runs are refused; name test files for a
-  focused run or use `run_scope_tests`.
+  Whole-suite Vitest and Cucumber runs are refused: the gate's audit runs
+  them. Name the consumer's test files and the conformance suite for a
+  focused run.
   Nothing checks what a command writes before it runs: those changes are
   recorded afterwards and reported.
 - `{{submissionTool}}` ends your turn. The harness validates it; if it is

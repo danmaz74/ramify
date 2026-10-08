@@ -97,10 +97,10 @@ export const observationSchema = z.discriminatedUnion('type', [
   }).strict()),
   observation('excursion', z.object({ callId: z.string(), module: z.string(), firstEntry: z.boolean() }).strict()),
   /**
-   * One diagnostic run of the assignment's own tests, asked for by the
-   * engineer. The selection is resolved anew from the tree on every call, so
-   * this is where the files of that call are recorded; a gate attempt records
-   * its own.
+   * One diagnostic run of the assignment's own tests, asked for by an
+   * engineer through the former scoped test tool. No engineer is given that
+   * tool any more and nothing writes this observation; it stays readable in
+   * the logs of runs that recorded it.
    */
   observation('scope-tests', z.object({
     callId: z.string(),
