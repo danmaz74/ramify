@@ -532,7 +532,8 @@
         "public trial attribution CLI preserves shifted setup identities and retains later same-file agent lines",
         "public trial attribution CLI proves reverted setup empty without exempting remaining agent lines",
         "public trial attribution CLI refuses mixed unknown binary dirty and symlink setup exemptions",
-        "prepared trial tool uses actual assigned module src cwd and external report destination"
+        "prepared trial tool uses actual assigned module src cwd and external report destination",
+        "native Git authenticates renamed nested-project source positions and arbitrary setup-before deletions"
       ]
     },
     {
