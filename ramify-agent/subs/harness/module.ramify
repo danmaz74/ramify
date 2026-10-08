@@ -73,3 +73,8 @@ expose-sub readPiNativeRequestArtifact, PiNativeRequestArtifact from agent to pa
 
 // Plain setup-line identity output consumed by the root-owned pure verifier.
 expose-src HarnessLineIdentities from "kpi/delivered.ts" to parent
+
+// Production ledger reopening belongs to the descendant Pi native witness.
+// Only the store contract and its signature companions cross this boundary.
+expose-src openSessionStore, LedgerSessionStoreOptions, LedgerSessionStore from "run/session-store.ts" to descendants
+expose-sub SessionStore, SessionStoreRecord, SessionStoreCommit, SessionStoreExpected, TranscriptPayloadId from agent to descendants
