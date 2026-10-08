@@ -26,7 +26,7 @@ files, which blocks any push of `main`.
       definition, and every child goes through it, `shell` included.
 - [x] A test that a secret-looking variable set in the parent appears in no
       record and reaches no child. `recorded-environment.test.ts` and the
-      allowlist test in `run-command.test.ts`.
+      allowlist test in `run-command.boundary.test.ts`.
 - [x] The values are out of the recorded trial files: every recorded command
       there now names its variables only.
 - [ ] Rewrite commit `2d280f6` so the recorded values are gone from history.

@@ -1219,7 +1219,7 @@ captures, nor a gate attempt, nor the environment a gate command prints of
 itself, while the names a command received are recorded and a run written
 before the names is still read.
 
-`audit-check-execution.test.ts` asks the installed provider, through the
+`audit-check-execution.boundary.test.ts` asks the installed provider, through the
 harness's configured audit port, about real Git projects it writes
 (`helpers/configured-repository.ts`), each under a private test lock: real
 Vitest and Cucumber checks narrowed by ownership, with a failing scenario

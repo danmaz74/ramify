@@ -114,5 +114,5 @@ unless forced, and evidence recorded under another ignore list never reused.
 `src/tests/completed-audit.test.ts` covers which completed results answer a
 gate and which are refused, nested invocations included, and the captured
 audit policy.
-`src/tests/workspace-preparation.test.ts` reads committed definitions without
+`src/tests/workspace-preparation.boundary.test.ts` reads committed definitions without
 executing anything, and `src/tests/test-lock.test.ts` covers the test lock.
