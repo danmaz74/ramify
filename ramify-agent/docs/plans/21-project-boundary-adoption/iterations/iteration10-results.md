@@ -350,3 +350,98 @@ Iteration 11 (integration acceptance) may start after the coordinator:
 It builds on `run-policy/7`, the exact `ramify.ts` 0.4.1 / `ramify-audit`
 0.7.2 pair and the nested contract above. Its F5 browser runs can reuse
 `plan21-projections.ts`'s gate checks.
+
+## Addendum: nested readiness correction
+
+**Date:** 2026-10-08. The coordinator's review corrected the receipt's
+reading that readiness stays non-nested. Contract 5 makes the baseline check
+and the final gate the same request, and line 240 of the contracts gives the
+final gate `mode: 'full', nested: true`. The first deviation above is
+withdrawn.
+
+**Change** (`db7fd9070dd29d3808e659db3cf29c5e2373a4c9`, tree `c97e76ed2f649f41f7a4d9b14f78c08c4ef04547`, fix(harness)):
+
+- The readiness policy is now `{ committing: false, audit: 'full', nested:
+  true }`. Readiness prepares the run's working tree, then asks the installed
+  provider for the full nested audit of HEAD. The provider answers it with
+  applicable earlier records where it finds them.
+- The baseline gate records every project and the discovery outcome through
+  the gate's own `configuredAuditRecord`.
+- A nested project's failure is `failed`/`check-failed`. An indeterminate
+  answer is `not-verified`/`infrastructure` and qualifies no bounded rerun.
+  Both stop before the run branch exists.
+- Merge readiness still requires the final gate's full nested pass.
+- The baseline's answered audit now keeps its outcome
+  (`gate-audit-outcome/1`) beside its gate. This removes the pre-existing
+  readiness gap ("Audit result for gate ga-0001 is unavailable"): the
+  durable scripted run now has no coverage gap.
+  - `run.ts` states that, and its rerun passed 46 checks
+    ([results](../evidence/iteration10-browser/execution-map/browser-results.json)).
+  - The execution map still projects a readiness gate's audit as
+    `not-applicable`.
+
+**Tests:**
+
+- **F4** (`project-boundary-audit.integration.test.ts`,
+  [evidence](../evidence/iteration10-f4/iteration10-f4-readiness.json)):
+  - Readiness on the failing grandchild fails at `configured-full-audit`
+    over a passing root composition. It records the three projects and the
+    skipped `vendor/lib`, leaves `run-branch` not reached and the repository
+    on `main`.
+  - After the repair, readiness passes and creates
+    `ramify-agent-run/run-f4-ready`.
+  - The final gate's identical request over the same commit reuses all three
+    projects' records with no execution.
+- **Scripted** (`readiness.test.ts`):
+  - the request is `['full', true]`;
+  - a nested failure refuses readiness with no recovery plan and no branch;
+  - undecided discovery is not verified, with no branch;
+  - an applicable reused nested result passes with its reuse recorded;
+  - `RunService` records the baseline's audit outcome.
+- `run-policy.test.ts` states the shared request.
+
+**Verification:**
+
+- A focused set of 42 harness and audit files ran (`focused-correction`):
+  405 passed. Two failed:
+  - the `run-policy` expectation, fixed in `db7fd907`;
+  - `run-recovery.test.ts` "a crash after immutable analysis evidence is
+    staged…", with `ENOTEMPTY` in its cleanup under load. It passed 3 of 3
+    isolated runs and the whole file passed. It is recorded as a flake.
+- The rerun of `readiness`, `run-policy` and `run-recovery` passed 42/42.
+  `composition`, `execution-map` and `run-page` passed 74/74.
+- `npm run type-check` exited 0 for all four configurations.
+- `npm run check:self` passed with 0 errors, 0 warnings and 313
+  nonblocking analysis limits.
+
+**Audit** of clean `56ddcc84bee4c4e55fc017c25ef9a11ea51b3e5e` (tree
+`5befcb6ae0b6032368b6c2055b5fb7455eee907c`; it adds the evidence commit to
+`db7fd907` and Plan 22's documentation commit `758d7eef`):
+
+- **Request.** Same command. Requested ramify-partial (defaulted), executed
+  ramify-partial at chain depth 1 over report `b83c479c`. The CLI exited 0
+  with `overall: pass`.
+- **Coverage.** All six checks were selected over the same five modules.
+  211 of 211 expected files ran (`complete`).
+- **Counts.** Files: 210 passed, 0 failed and 1 skipped. Tests: 1,624
+  passed and 2 skipped. 0 outstanding failures.
+- **Run.** 364.7 s, empty stderr, complete ledger.
+- **Identifiers.** Request `48bef7d0-9171-44df-af49-56734faa3220`, run
+  `87611952-aab5-46dc-889b-e8dcf9dc5aa7`, report
+  `55af7fe608fa45deb32c66c050d1f4189570ea7a`
+  ([projection](../evidence/iteration10-audit/delivery-audit-correction.json)).
+
+The qualified iteration 10 source is now `56ddcc84`.
+
+**Other decisions recorded:**
+
+- `0a025f57` is kept.
+- Gate records that no longer load under `run-policy/7` are accepted:
+  intermediate runs are qualification only and are restarted.
+- Plan 22's static `case-inventory.json` still cites the checkpoint policy
+  test under its title before iteration 10. It is not enforced and was not
+  edited here.
+
+**Protected files.** All 16 still match the entry baseline in the worktree,
+the index and `56ddcc84`. This addendum commit is documentation only; the
+audit checked `56ddcc84`.

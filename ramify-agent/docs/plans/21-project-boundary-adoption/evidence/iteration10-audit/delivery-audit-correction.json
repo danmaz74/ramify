@@ -1,0 +1,147 @@
+{
+  "schema": "plan21.iteration10.delivery-audit/1",
+  "command": "ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent --cwd . --json",
+  "raw": {
+    "path": "/tmp/pb3-it10-audit-correction.json",
+    "sha256": "d64e7b44f73f94770abb868ad01da78024f482433bb0aef1c6c5ea8940b27ded"
+  },
+  "window": "05:44:23–05:50:28 UTC",
+  "status": "completed",
+  "requestId": "48bef7d0-9171-44df-af49-56734faa3220",
+  "runId": "87611952-aab5-46dc-889b-e8dcf9dc5aa7",
+  "producer": {
+    "name": "ramify-audit",
+    "version": "0.7.2"
+  },
+  "sourceCommit": "56ddcc84bee4c4e55fc017c25ef9a11ea51b3e5e",
+  "sourceTree": "5befcb6ae0b6032368b6c2055b5fb7455eee907c",
+  "auditedAt": "2026-10-08T05:50:28.326Z",
+  "durationSeconds": 364.666,
+  "mode": {
+    "requestedMode": "ramify-partial",
+    "resolution": "defaulted",
+    "executedMode": "ramify-partial"
+  },
+  "overall": "pass",
+  "composition": {
+    "scoped": true,
+    "chainDepth": 1,
+    "reportCommit": "55af7fe608fa45deb32c66c050d1f4189570ea7a",
+    "rootReportCommit": "b83c479c94cfcd581607e14a60eb9825de9af3a7",
+    "outstandingFailures": 0,
+    "verdict": "pass"
+  },
+  "refs": {
+    "reportCommit": "55af7fe608fa45deb32c66c050d1f4189570ea7a",
+    "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T05-50-28Z-56ddcc84b",
+    "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/5befcb6ae0b6032368b6c2055b5fb7455eee907c"
+  },
+  "retrievalCommands": [
+    "git notes --ref=audit-projects/ramify-agent-f25e9a298228 show 56ddcc84bee4c4e55fc017c25ef9a11ea51b3e5e",
+    "git show refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T05-50-28Z-56ddcc84b:reports/audit/summary.json"
+  ],
+  "expectedFiles": {
+    "contract": "runner-configured-files/1",
+    "source": "partial-answer",
+    "expected": 211,
+    "run": 211,
+    "missing": [],
+    "status": "complete",
+    "runnerConfigFiles": [
+      "vitest.config.ts"
+    ]
+  },
+  "selection": {
+    "kind": "scoped",
+    "selectedCheckIds": [
+      "agent-scenarios",
+      "agent-structure",
+      "agent-tests",
+      "agent-typecheck",
+      "agent-web-build",
+      "patch-integrity"
+    ],
+    "omittedCheckIds": [],
+    "selectedTestUnitIds": [
+      "agent-check-self",
+      "agent-cucumber",
+      "agent-typecheck",
+      "agent-vitest",
+      "agent-web-build",
+      "git-diff-check"
+    ],
+    "omittedTestUnitIds": []
+  },
+  "ledgerCompleteness": "complete",
+  "checks": {
+    "agent-scenarios": {
+      "status": "pass",
+      "durationSeconds": 0.945,
+      "counts": {
+        "agent-cucumber": {
+          "scenarios": {
+            "failed": 0,
+            "passed": 0,
+            "skipped": 0,
+            "total": 0
+          },
+          "steps": {
+            "failed": 0,
+            "passed": 0,
+            "skipped": 0,
+            "total": 0,
+            "undefined": 0
+          }
+        }
+      }
+    },
+    "agent-structure": {
+      "status": "pass",
+      "durationSeconds": 20.742,
+      "counts": {
+        "agent-check-self": null
+      }
+    },
+    "agent-tests": {
+      "status": "pass",
+      "durationSeconds": 237.681,
+      "counts": {
+        "agent-vitest": {
+          "files": {
+            "failed": 0,
+            "passed": 210,
+            "skipped": 1,
+            "total": 211
+          },
+          "tests": {
+            "failed": 0,
+            "passed": 1624,
+            "skipped": 2,
+            "total": 1626
+          }
+        }
+      }
+    },
+    "agent-typecheck": {
+      "status": "pass",
+      "durationSeconds": 5.692,
+      "counts": {
+        "agent-typecheck": null
+      }
+    },
+    "agent-web-build": {
+      "status": "pass",
+      "durationSeconds": 0.572,
+      "counts": {
+        "agent-web-build": null
+      }
+    },
+    "patch-integrity": {
+      "status": "pass",
+      "durationSeconds": 0.006,
+      "counts": {
+        "git-diff-check": null
+      }
+    }
+  }
+}
