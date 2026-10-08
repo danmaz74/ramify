@@ -257,7 +257,8 @@
       "subs/harness/fixtures/collection-review/README.md",
       "subs/harness/fixtures/collection-review/module.ramify",
       "subs/harness/fixtures/collection-review/.gitignore",
-      "docs/plans/23-session-reuse-and-run-efficiency/iterations/13-results.md"
+      "docs/plans/23-session-reuse-and-run-efficiency/iterations/13-results.md",
+      "src/trial-attribution.ts"
     ],
     "14": [
       "src/tests/test-boundaries.json",
