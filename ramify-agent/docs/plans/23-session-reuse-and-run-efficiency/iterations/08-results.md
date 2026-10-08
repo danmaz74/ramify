@@ -29,6 +29,7 @@ Changed paths beneath `ramify-agent/`:
 - `subs/harness/src/tests/single-session.test.ts`
 - `subs/harness/src/tests/helpers/session-scenario.ts`
 - `subs/harness/subs/agent/src/scripted.ts`
+- `subs/harness/subs/agent/src/tests/plan23-session-operations.test.ts` (joined-check amendment, coordinator reservation `ad302ea3`)
 - this receipt
 
 The scripted observation bridge was additionally reserved by coordinator
@@ -183,6 +184,39 @@ passed. The focused registered diagnostic had skipped nonselected cases and is
 not claimed as acceptance. Early Stop test teardown and standalone fixture
 assumptions also failed before final controls were corrected. No timeout or
 required assertion was weakened.
+
+## Joined-check amendment
+
+The coordinator's first joined focused run selected 7 files/110 tests:
+109 passed and one stale provider assertion failed at
+`plan23-session-operations.test.ts:230`. Evidence:
+`/tmp/ramify-plan23-integrated-continuations-focused.log`. The assertion expected
+current-only callback perception, whereas the accepted private bridge now
+correctly exposes inherited text to the callback. No runtime source or
+acceptance behavior was changed to accommodate it.
+
+The additionally reserved generic test now independently checks callback texts
+`['Orient A', 'Orient A\n\nAssignment A']`, captured current specs and emitted
+user blocks `['Orient A', 'Assignment A']`, original immutable task/policy
+bindings, actual role/cwd/designated tool, both accepted outcomes, terminal
+Retry identity and exactly two script/tool/acceptance calls. Its exact focused
+command passed **1 file/15 tests**, 336 ms:
+
+```sh
+npm run test:quick -- subs/harness/subs/agent/src/tests/plan23-session-operations.test.ts --maxWorkers=2
+```
+
+Evidence: `/tmp/ramify-plan23-08-generic-perception-amendment.log`. This test-only
+amendment did not alter the six other passing joined files; coordinator joined
+reverification/acceptance remains pending.
+
+One narrow prompt-construction handoff remains for iteration 10: the support
+removal loop protects fenced literals, but the subsequent heading grouping loop
+is not yet fence-aware. A literal `# comment` line in fenced code can therefore
+split support section identities. The literal preservation control here has no
+heading inside its fence and does not qualify that edge. The coordinator has
+assigned its correction to iteration 10; no undisclosed complete literal
+Markdown grouping claim is made here.
 
 ## Iteration 9 handoff
 
