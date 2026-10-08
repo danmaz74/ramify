@@ -191,7 +191,7 @@ function verdicts(spec: { readonly verdicts: readonly unknown[] }): string[] {
 }
 
 describe('F5/F6 ordinary workflow: failure, repair and full nested acceptance', () => {
-  test('a failed nested final audit keeps its declarations and report; a repaired run reports, reassesses across an interruption and passes', async () => {
+  test('a failed nested final audit keeps its declarations and report; a repaired run reports unfinished work, reassesses and passes', async () => {
     const root = await notesProject();
     const main = (await git(root, 'rev-parse', 'HEAD')).trim();
     const external = await providers(root);
