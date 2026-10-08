@@ -358,7 +358,7 @@ describe('the acceptance scenarios a client reads', () => {
       requestId: 'r:ga-0004', mode: 'project-default', status: 'completed', definition: { path: 'ramify-audit.json', blob: 'b'.repeat(40) },
       requestedSourceCommit: 'c'.repeat(40), auditedSourceCommit: 'a'.repeat(40), requestedMode: 'ramify-partial', executedMode: 'ramify-partial',
       fallbackReason: null, reuse: { auditedCommit: 'a'.repeat(40), ignoredChangedPaths: ['docs/a.md'], requestedMode: 'ramify-partial', resolution: 'defaulted' },
-      verdict: 'fail', detail: 'a check failed',
+      verdict: 'fail', detail: 'a check failed', nested: false, projects: null, discovery: null,
     };
     const result = { id: 'sc-003', check: 'scenarios', command: 'cucumber', status: 'undefined', file: 'f.feature', line: 3, failure: null, undefined: ['Then it is shown'] };
     const gate = {
@@ -369,6 +369,19 @@ describe('the acceptance scenarios a client reads', () => {
     expect(gateViewSchema.safeParse({ ...gate, scenarios: [{ ...result, binding: [] }] }).success).toBe(false);
     expect(gateViewSchema.safeParse({ ...gate, scenarios: [{ ...result, mode: 'quick' }] }).success).toBe(false);
     expect(gateViewSchema.safeParse({ ...gate, audit: { ...audit, mode: 'dirty' } }).success).toBe(false);
+    // A nested final audit carries each project's own verdict, execution and record, and what discovery skipped.
+    const project = {
+      projectRoot: 'engine', verdict: 'fail', execution: 'ran', status: 'completed', failures: ['engine-check: FAIL'], requestId: 'u-1',
+      auditedSourceCommit: 'c'.repeat(40), requestedMode: 'full', executedMode: 'full', fallbackReason: null, reuse: null,
+      evidence: { runRef: 'refs/audited/projects/engine/runs/r', reportCommit: 'd'.repeat(40), treeRef: 'refs/audited/projects/engine/by-tree/t' },
+      retrievalCommands: ['git show refs/audited/projects/engine/runs/r:reports/audit/summary.json'], durationSeconds: 0.5,
+      counts: { checks: { total: 1, passed: 0, failed: 1, skipped: 0 }, tests: null, scenarios: null }, detail: 'composed fail',
+    };
+    const discovery = { status: 'complete', skipped: [{ projectRoot: 'vendor/lib', enclosingProject: '.', reason: 'external', directory: 'vendor' }], unavailable: [] };
+    const nested = { ...gate, audit: { ...audit, mode: 'full', nested: true, projects: [project], discovery } };
+    expect(gateViewSchema.parse(nested)).toEqual(nested);
+    expect(gateViewSchema.safeParse({ ...nested, audit: { ...nested.audit, projects: [{ ...project, execution: 'skipped' }] } }).success).toBe(false);
+    expect(gateViewSchema.safeParse({ ...nested, audit: { ...nested.audit, discovery: { ...discovery, skipped: [{ ...discovery.skipped[0], reason: 'vendored' }] } } }).success).toBe(false);
     for (const kind of ['tests', 'scenarios', 'conformance']) {
       expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind, ...command }] }).success).toBe(false);
     }
