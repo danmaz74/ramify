@@ -134,8 +134,7 @@ describe('Plan 23 F6 durable observation integration', () => {
     if (typeof routed !== 'function') throw new Error('Expected callable scripted router');
     expect(routed({ role: 'local-architect', prompt: `${prior}\n\n${current}` } as SessionSpec)).toEqual([{ kind: 'end', message: 'current' }]);
   });
-  test('all role/task families admit actual packet manifests and original identities before scripted events, without exploration calls', async () => {
-    const pairs: [Role, TaskKind, string][] = [
+  const pairs: [Role, TaskKind, string][] = [
       ['initial-architect', 'initial-analysis', 'submit_initial_analysis'], ['catalog-extractor', 'intake', 'submit_intake'],
       ['catalog-extractor', 'principles', 'submit_principle_elements'], ['catalog-extractor', 'check', 'submit_catalog_check'],
       ['global-fork', 'placement', 'submit_placement_decision'], ['local-architect', 'orientation', 'submit_work_orientation'],
@@ -152,10 +151,14 @@ describe('Plan 23 F6 durable observation integration', () => {
       ['nonfunctional-coordinator', 'assessment', 'submit_nonfunctional_assessment'], ['nonfunctional-coordinator', 'action', 'submit_nonfunctional_action'],
       ['nonfunctional-coordinator', 'investigation', 'submit_nonfunctional_investigation'], ['nonfunctional-repair-engineer', 'repair', 'submit_nonfunctional_repair'],
     ];
+  test('the independent role/task table covers all twelve roles and thirty-one bindings', () => {
+    expect(pairs).toHaveLength(31); expect(new Set(pairs.map(pair => pair[0])).size).toBe(12);
+  });
+  test.each(pairs)('%s/%s admits actual manifests and original identity using %s without exploration calls', async (role, kind, tool) => {
+    const index = pairs.findIndex(pair => pair[0] === role && pair[1] === kind);
     const directory = await temporaryDirectory(); cleanups.push(directory.remove); const packages = (await loadPromptPackages()).packages; const ordinary = (await loadPromptPackages({ capabilityWorkflow: false })).packages;
     const agent = createScriptedAgent([{ kind: 'submit', input: {} }]); const sessions = await HarnessSessionOperations.open(join(directory.path, 'operations'), agent); cleanups.push(async () => { expect(await sessions.close()).toBe(true); });
-    let accepted = 0; const actualCalls: string[] = []; const observed = new Set<Role>();
-    for (const [index, [role, kind, tool]] of pairs.entries()) {
+    let accepted = 0; const actualCalls: string[] = [];
       let packet: TaskPacket | null = null; let original: AgentEvent['execution']; let events = 0;
       const spec: SessionSpec = { role, scope: { workingDirectory: directory.path }, systemPrompt: 'Unused old composite head', prompt: 'Unused old task', session: { mode: 'fresh' },
         context: { compaction: 'forbidden', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 }, builtinTools: [], tools: [],
@@ -164,7 +167,6 @@ describe('Plan 23 F6 durable observation integration', () => {
           const manifest = deliveredManifestViewSchema.parse(packet!.manifest); expect(manifest.currentMessage?.bytes).toBe(Buffer.byteLength(packet!.message));
           const actual = deliveredScopeInputs({ exactOwners: [], subtrees: [], apiViews: false, architectView: false, supportDocuments: [] }, packet!.manifest);
           expect(actual.supplementary.reduce((sum, source) => sum + source.bytes, 0) + (actual.scope.brief ?? 0)).toBeGreaterThan(0);
-          observed.add(role);
         } };
       const session = await sessions.start({ runId: 'role-matrix', operationId: `case-${index}`, session: `display-${index}`, loaded: packages.get(role) ?? ordinary.get(role)!, spec,
         brief: { kind, objective: 'Observe the current owning task.', goal: 'Exact goal.', requirements: ['Exact requirement.'], sections: [],
@@ -173,9 +175,8 @@ describe('Plan 23 F6 durable observation integration', () => {
         authority: { role }, validator: { name: tool, schema: 'fixed-structural-test-validator' }, destination: { record: `result-${index}` }, currentAuthority: async () => true,
         prepared: async value => { packet = value; }, identified: async value => { original = value; } });
       expect((await session.outcome).kind).toBe('submitted'); expect(await session.settled!()).toBe('settled'); expect(events).toBeGreaterThan(0);
-    }
-    expect(accepted).toBe(pairs.length); expect(agent.sessions).toHaveLength(pairs.length); expect(observed.size).toBe(12);
-    expect(actualCalls).toEqual(pairs.map(pair => pair[2]));
+    expect(accepted).toBe(1); expect(agent.sessions).toHaveLength(1);
+    expect(actualCalls).toEqual([tool]);
   });
   test('every dispatched role records its actual packet and explicit size coverage before its first event', async () => {
     const admitted = new Map<string, { role: string; manifestHash: string }>();
