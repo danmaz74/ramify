@@ -70,3 +70,6 @@ expose-test guardedChildProcess, spawnAttempts from "helpers/process-guard.ts" t
 // Native request evidence is projected by its Pi owner. Root qualification
 // reads validated plain artifacts; opaque continuation encoding stays in Pi.
 expose-sub readPiNativeRequestArtifact, PiNativeRequestArtifact from agent to parent
+
+// Plain setup-line identity output consumed by the root-owned pure verifier.
+expose-src HarnessLineIdentities from "kpi/delivered.ts" to parent
