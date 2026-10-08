@@ -560,10 +560,14 @@ event moves its state.
 
 ### 9. Work-item completion
 
-`request-completion` is refused, with the existing refusal path and bound,
-while any entry scenario of the item, or an integration item's scenario, is
-not reported `done`. Its own reports are applied first, so a completion
-request that reports the last scenario done is not refused for it. The
+A `request-completion` that leaves any entry scenario of the item, an
+integration item's scenario or a test its architect registered not reported
+`done` is a rejected submission naming the IDs, under the per-turn
+rejected-submission bound and before any outline or gate; the architect
+answers in the same turn with the reports, an assignment or a blocker, and
+an exhausted bound fails the run as `invalid-submission` naming the IDs
+still owed. Its own reports are applied first, so a completion request that
+reports the last scenario done is not rejected for it. The
 `work-item` gate then runs every module that has feature files, one quick run
 each with `not @ramify-pending`, strictly, and `work-item-completed` requires
 that gate's pass.

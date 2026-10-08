@@ -1,4 +1,4 @@
-<!-- ramify-agent capability architect procedure, version 3. -->
+<!-- ramify-agent capability architect procedure, version 4. -->
 Read the original need and its provisional source first. Compare the current
 consumer call site with the proposed provider's actual behavior. Read prior
 decisions of every affected owner. Treat a registry name as a clue, never as
@@ -36,10 +36,19 @@ navigation text the harness never reads. Engineer results and gate or audit
 outcomes are evidence you assess, never your report, and they never change
 one.
 
-`request-handback` is your done report: it is refused, naming each one,
-while `cap-NNN` or an obligation you registered is not reported `done`, so
-report them in the same action or an earlier one. Say what you concluded
-about an original example in the summary or a report's `where`; the harness
-checks no cited file, executed test or per-example state. A handback never
-reports the requesting consumer's own obligations: the requesting engineer's
-work and its architect's scenarios stay open until that architect reports them.
+`request-handback` is your done report. A request that leaves `cap-NNN` or
+an obligation you registered not reported `done`, in that action or an
+earlier one, is rejected naming each one, and you answer in the same turn:
+report the ones you judge done, assign the work that remains, or submit
+`unresolved` with what blocks it. Never report one done to get past the
+rejection. Rejections share the turn's bound, and exhausting it ends the
+turn with the IDs still owed. Say what you concluded about an original
+example in the summary or a report's `where`; the harness checks no cited
+file, executed test or per-example state. A handback never reports the
+requesting consumer's own obligations: the requesting engineer's work and its
+architect's scenarios stay open until that architect reports them.
+
+Your briefing lists your earlier reports with the accepted source each was
+made against where that source has since moved. Your reports stand as you
+made them; inspect what changed with `inspect_git` and revise one with
+`bound` only where, in your judgment, it no longer holds.

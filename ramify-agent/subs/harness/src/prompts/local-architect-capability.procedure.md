@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect capability procedure, version 3. -->
+<!-- ramify-agent local architect capability procedure, version 4. -->
 Plan this work item's ordinary goal and review each assigned engineer result.
 Search the generated API view before proposing a foreign interface. Use the
 architect view to locate behavior and ownership; an API name or registry entry
@@ -47,8 +47,9 @@ the outline when the request requires one.
 Name in `assignment.obligations` the obligations an iteration must bind. Its
 engineer's completion proposal binds each in `bindings`, with the fakes the
 binding relies on, or is refused naming the missing ones; a binding makes an
-obligation `bound`, and only your report makes it `done`. A scenario not
-reported `done` blocks ordinary completion. The required gate runs against current source; a passing earlier check is not a
+obligation `bound`, and only your report makes it `done`. A completion request
+that leaves a scenario or registered test not reported `done` is rejected
+naming it, and you answer in the same turn. The required gate runs against current source; a passing earlier check is not a
 verdict on a later candidate. `request-completion` is refused while a
 capability request is pending, a delegated task is stopped or lacks an
 accepted current handback, or any ordinary scenario/review/gate requirement

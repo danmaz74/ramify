@@ -10,8 +10,9 @@ iterations remain partial or failed even after later work succeeds.
 
 A handback is the capability architect's done report on the task's delegated
 outcome, `cap-NNN`, and on every case or test it registered: a
-`request-handback` is refused, naming each obligation not reported `done`,
-before any gate runs. The request's original examples and approved
+`request-handback` that leaves one not reported `done` is a rejected
+submission naming each one, under the per-turn bound and before any gate
+runs, and the architect answers in the same turn. The request's original examples and approved
 requirements stay immutable context through every plan revision; a plan case
 carries no coverage state, and the handback cites no evidence. The harness
 checks the non-test boundaries (no active assignment or child, the current
@@ -1139,9 +1140,15 @@ pi actually made and what the snapshot tools answered.
   with every result; no composition diagnosis is generated.
 - **The work-item and final gates.** All project tests, the type check, a
   complete Ramify check and the scenario check, on the current tree. A
-  completion request applies its own reports first and is refused, under
-  the refusal bound, while a scenario of its entry, or an integration item's
-  scenario, is not reported `done`. `work-item-completed` requires a passing
+  completion request applies its own reports first. One that leaves a
+  registered obligation of its architect not reported `done` (a scenario of
+  its entry, an integration item's scenario or a test it registered) is a
+  rejected submission naming the IDs, under the per-turn bound and before
+  any outline, commit or gate; the same turn continues, and an exhausted
+  bound fails the run as `invalid-submission` naming the IDs still owed, no
+  verdict on the code. A capability handback request is judged the same
+  way. Only open requirements and unresolved capability work still refuse a
+  valid request, under the refusal bound. `work-item-completed` requires a passing
   `work-item` attempt, and is the only thing that closes a work item. Before
   the final run the rule `acceptance-incomplete` requires every tracked
   scenario reported `done`, integration scenarios included; `job-completed`
@@ -1245,7 +1252,15 @@ The run's own tests are beside them.
   break each submission's schema and each rule beyond it, and show that
   nothing changes, that every error carries its path, that a corrected input
   is accepted, and that the bound ends the invocation as
-  `invalid-submission`.
+  `invalid-submission`. Its PB3-C cases reject a completion request that
+  leaves a registered obligation without a done report, naming the IDs,
+  before any outline or gate, and resolve it in the same turn by the report,
+  by an exhausted bound that names the IDs still owed, or by a blocker
+  stated as `unresolved`; `capability-submission.test.ts` does the same for a
+  handback request, and `capability-recovery.test.ts` restarts after the
+  accepted action's `invocation-ended` and its `obligation-reported` to show
+  the report kept once, with no second coordinator or writer, and retrieved
+  by the architect's next turn.
 - `materialization.test.ts` drives a run that commits its feature files once
   readiness has passed, with the commit's content, subject, trailers and
   call arguments through the scripted Git, and whose work-item gates
@@ -1259,12 +1274,14 @@ The run's own tests are beside them.
 - `scenario-states.test.ts` covers the three states: a binding with and
   without fakes that takes the pending tag off before the gate selecting the
   scenario, a done report directly from `pending`, a passing gate that
-  leaves a scenario `bound` and a refused completion request until the
-  report, a done report that survives a failing gate, a repair exit and a
-  source edit, the architect's revision back to `bound`, a rebinding of
+  leaves a scenario `bound` and a rejected completion request until the
+  report, in the same turn, a done report that survives a failing gate, a
+  repair exit and a source edit, the architect's revision back to `bound`
+  with the accepted source since its report shown beside it, a rebinding of
   `done`, an incomplete proposal rejected with the missing IDs and the
   complete one that follows, a partial report under the same assignment,
-  the refusal bound, and the final gate whose raw scenario results never
+  a rejected request answered by an assignment in the same turn, the
+  rejection bound, and the final gate whose raw scenario results never
   decide completion. Scripted local architects in every lifecycle test
   report their entry's scenarios, or their integration scenario, `done`
   with their completion requests (`helpers/declarations.ts`), and the

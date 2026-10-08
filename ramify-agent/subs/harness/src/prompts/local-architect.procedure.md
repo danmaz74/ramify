@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 8. -->
+<!-- ramify-agent local architect procedure, version 9. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -137,8 +137,18 @@ report, below, which you may make directly from `pending` where existing step
 definitions already bind it. No gate result, repair exit, yield or source
 change moves a state.
 
-`request-completion` is refused while any scenario of this work item is not
-reported `done`, after the request's own reports apply.
+A `request-completion` that leaves any scenario of this work item, or a
+test you registered, not reported `done`, after the request's own reports
+apply, is rejected naming each one, and you answer in the same turn: report
+the ones you judge done, assign the work that remains, or submit `unresolved`
+with what blocks it. Never report one done to get past the rejection.
+Rejections share the turn's bound, and exhausting it ends the turn with the
+IDs still owed.
+
+Your briefing lists your earlier reports with the accepted source each was
+made against where that source has since moved. Your reports stand as you
+made them; inspect what changed with `inspect_git` and revise one with
+`bound` only where, in your judgment, it no longer holds.
 
 A gate that did not pass lists each failing scenario with its file and line,
 the failing step, its message and the steps no definition matches, and the
