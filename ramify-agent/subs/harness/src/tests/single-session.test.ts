@@ -357,8 +357,11 @@ describe('the session\'s records', () => {
     const hooks = await readdir(join(records, 'hooks'));
     expect(hooks).toEqual(['001.json', '002.json', '003.json']);
     for (const hook of hooks) JSON.parse(await readFile(join(records, 'hooks', hook), 'utf8'));
-    // The executor's own session record, beside the harness's transcript.
-    expect((await stat(join(records, 'session'))).isDirectory()).toBe(true);
+    // Durable operations use the shared owned ledger; no per-invocation executor directory.
+    expect(await exists(join(records, 'session'))).toBe(false);
+    const store = join(root, sessionsDirectory, 'session-operations', 'store');
+    expect((await stat(store)).isDirectory()).toBe(true);
+    expect((await stat(join(store, 'session-ledger.jsonl'))).size).toBeGreaterThan(0);
     expect((await stat(join(records, 'transcript.jsonl'))).isFile()).toBe(true);
 
     expect(summary.changed.filter(path => path.includes('plans/.harness'))).toEqual([]);
