@@ -24,7 +24,8 @@ export function buildFocusedScenarioCommand(input: { readonly effective: Cucumbe
   const configText = `${JSON.stringify({ [profile]: focused }, null, 2)}\n`;
   const configurationIdentity = createHash('sha256').update(configText).digest('hex');
   const configPath = resolve(input.scratchDirectory, `cucumber-focused-${configurationIdentity.slice(0, 16)}.json`);
-  const argv = [input.cucumberExecutable, '--config', configPath, '--profile', profile];
+  // Installed Cucumber joins its cwd to --config, including absolute arguments.
+  const argv = [input.cucumberExecutable, '--config', relative(selection.cwd, configPath), '--profile', profile];
   const support = Object.fromEntries(['import', 'require', 'requireModule', 'loader', 'worldParameters'].map(key => [key, configuration[key]]));
   return { kind: 'available', cwd: selection.cwd, environment: selection.environment, argv,
     shellCommand: `cd ${quote(selection.cwd)} && ${argv.map(quote).join(' ')}`, configPath, configText, configurationIdentity,
