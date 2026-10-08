@@ -23,11 +23,14 @@ contracts instead of a frozen earlier base.
    27 s in the post-cleanup audit. Preserve the distinct actual F1 provider
    cases as explicit boundary evidence; ordinary path/symlink tests retain real
    filesystem behavior and script ownership responses.
-5. Capability recovery and nonfunctional recovery, then measurement and other
-   mixed consumers according to the remaining ordinary cost and boundary trace.
-6. Capability assignment, delegation and other ordinary external consumers,
+5. Measurement recipe/capture cases: the post-cleanup profile traces about
+   17 s of ordinary calculations and unavailable-response controls in this
+   mixed file, alongside distinct actual producer/publication witnesses.
+6. Capability recovery and nonfunctional recovery, then other mixed consumers
+   according to remaining ordinary cost and boundary trace.
+7. Capability assignment, delegation and other ordinary external consumers,
    one bounded family at a time, ordered by the current measured profile.
-7. Complete shared enforcement/runner partition and final full qualification.
+8. Complete shared enforcement/runner partition and final full qualification.
 
 These cuts refine the plan's iteration groups; they preserve all acceptance
 cases. Global case inventory, shared helper infrastructure and runner
@@ -67,6 +70,7 @@ Delivery cuts qualified so far:
 | 1: command cleanup and accurate crashed-executor fixture | `e1ebdb75`, follow-up `3d69f923` | [Focused correction and failed full baseline](optimizations/01-integrated-baseline.md) |
 | 2: guarded twelve-case acceptance matrix and retained actual witness | `b8b3e055` | [Integrated focused verification](optimizations/02-integrated-results.md) |
 | 3: guarded thirteen-case dependency matrix and retained nested actual witness | `bf1261cb` | [Integrated focused verification](optimizations/03-integrated-results.md) |
+| 4: guarded ten-case write matrix and six retained actual provider controls | `cf813618` | [Integrated focused verification](optimizations/04-integrated-results.md) |
 
 These cuts have integrated focused passes. The initial full baseline failed one
 crash fixture, subsequently corrected with focused evidence. Final full-audit
