@@ -50,6 +50,17 @@ conversion, then complete project-wide coverage/enforcement after those cuts.
 
 ## Verification and status
 
+Delivery cuts qualified so far:
+
+| Optimization | Target merge | Evidence |
+| --- | --- | --- |
+| 1: command cleanup and accurate crashed-executor fixture | `e1ebdb75`, follow-up `3d69f923` | [Focused correction and failed full baseline](optimizations/01-integrated-baseline.md) |
+| 2: guarded twelve-case acceptance matrix and retained actual witness | `b8b3e055` | [Integrated focused verification](optimizations/02-integrated-results.md) |
+
+Both cuts have integrated focused passes. The initial full baseline failed one
+crash fixture, subsequently corrected with focused evidence. Final full-audit
+qualification and project-wide automatic enforcement remain outstanding.
+
 Focused Vitest runs are permitted for the optimization's cases. Full-suite
 verification runs through the installed committed audit CLI, serialized after
 any active Plan 21 audit. A running/locked audit is not a pass. The coordinator
