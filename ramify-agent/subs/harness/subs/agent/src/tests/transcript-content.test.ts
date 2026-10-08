@@ -4,6 +4,7 @@ import { assistantText, noMessageDetail } from '../interfaces/port.js';
 import type { AgentEvent, MessageDetail, MessageEvent } from '../interfaces/port.js';
 import { createScriptedAgent } from '../scripted.js';
 import { probeSpec } from './helpers/spec.js';
+import type { AgentSessionPoint } from '../interfaces/session-operations.js';
 
 /*
  * ST06 on the scripted fake: it reports the required core of every session,
@@ -13,6 +14,10 @@ import { probeSpec } from './helpers/spec.js';
  */
 
 const messages = (events: readonly AgentEvent[]): MessageEvent[] => events.filter((event): event is MessageEvent => event.type === 'message');
+const envelope = (sourcePoint: AgentSessionPoint, index: number) => ({
+  execution: { runId: 'probe', operationId: 'probe-1', sessionId: sourcePoint.sessionId, turn: 1, sourcePoint },
+  observation: { sourceId: `probe-1:event:${index}` }, replayed: false,
+});
 
 const detail: MessageDetail = {
   model: 'scripted/thinker-2', thinkingLevel: 'high', stopReason: 'end', error: null, reasoningTokens: 40,
@@ -27,9 +32,13 @@ describe('the fake reports every message', () => {
       { kind: 'submit', input: { done: true } },
     ]);
     const probe = probeSpec();
-    await expect((await invokeProbe(agent, probe.spec)).outcome).resolves.toEqual({ kind: 'submitted', input: { done: true } });
+    const session = await invokeProbe(agent, probe.spec); const sourcePoint = JSON.parse(session.ref) as AgentSessionPoint;
+    expect(sourcePoint).toMatchObject({ kind: 'checkpoint', turn: 0 });
+    await expect(session.outcome).resolves.toEqual({ kind: 'submitted', input: { done: true } });
 
-    expect(probe.events[0]).toEqual({ type: 'message', role: 'user', blocks: [{ type: 'text', text: 'do the work' }] });
+    expect(probe.events[0]).toEqual({ type: 'message', role: 'user', blocks: [{ type: 'text', text: 'do the work' }], ...envelope(sourcePoint, 0) });
+    expect(probe.events.map(({ execution, observation, replayed }) => ({ execution, observation, replayed })))
+      .toEqual(Array.from({ length: 13 }, (_, index) => envelope(sourcePoint, index)));
     const all = messages(probe.events);
     const calls = all.flatMap(event => (event.role === 'assistant' ? event.blocks.filter(block => block.type === 'tool-call') : []));
     expect(calls).toEqual([
@@ -72,7 +81,8 @@ describe('the fake reports every message', () => {
       { kind: 'end' },
     ]);
     const probe = probeSpec();
-    await (await invokeProbe(agent, probe.spec)).outcome;
+    const session = await invokeProbe(agent, probe.spec); const sourcePoint = JSON.parse(session.ref) as AgentSessionPoint;
+    expect(sourcePoint).toMatchObject({ kind: 'checkpoint', turn: 0 }); await session.outcome;
     const assistant = messages(probe.events).flatMap(event => (event.role === 'assistant' ? [event] : []));
 
     expect(assistant[0]).toEqual({
@@ -85,6 +95,7 @@ describe('the fake reports every message', () => {
       text: 'Thought it through.',
       usage: { input: 900, output: 60, cacheRead: 0, cacheWrite: 150, total: 1_110 },
       detail,
+      ...envelope(sourcePoint, 1),
     });
     // Zero reasoning tokens is reported as zero; what is left out is null.
     expect(assistant[1]!.detail).toEqual({ ...noMessageDetail, model: 'scripted/plain-1', reasoningTokens: 0 });
@@ -98,7 +109,8 @@ describe('the fake reports every message', () => {
       { kind: 'end' },
     ]);
     const probe = probeSpec();
-    await (await invokeProbe(agent, probe.spec)).outcome;
+    const session = await invokeProbe(agent, probe.spec); const sourcePoint = JSON.parse(session.ref) as AgentSessionPoint;
+    expect(sourcePoint).toMatchObject({ kind: 'checkpoint', turn: 0 }); await session.outcome;
     expect(probe.events.slice(1)).toEqual([
       { type: 'message', role: 'assistant', blocks: [], text: '', usage: null, detail: { ...noMessageDetail, stopReason: 'error', error: '529 overloaded' } },
       { type: 'retry', phase: 'started', attempt: 1, maxAttempts: 3, delayMs: 2_000, errorText: '529 overloaded' },
@@ -106,16 +118,17 @@ describe('the fake reports every message', () => {
       { type: 'message', role: 'assistant', blocks: [], text: '', usage: null, detail: { ...noMessageDetail, stopReason: 'error', error: 'rate limited' } },
       { type: 'retry', phase: 'started', attempt: 2, maxAttempts: null, delayMs: null, errorText: 'rate limited' },
       { type: 'retry', phase: 'ended', attempt: 2, succeeded: false, errorText: 'rate limited' },
-    ]);
+    ].map((event, index) => ({ ...event, ...envelope(sourcePoint, index + 1) })));
   });
 
   test('compaction sizes a script leaves out are null', async () => {
     const agent = createScriptedAgent([{ kind: 'compaction', reason: 'overflow' }, { kind: 'end' }]);
     const probe = probeSpec();
-    await (await invokeProbe(agent, probe.spec)).outcome;
+    const session = await invokeProbe(agent, probe.spec); const sourcePoint = JSON.parse(session.ref) as AgentSessionPoint;
+    expect(sourcePoint).toMatchObject({ kind: 'checkpoint', turn: 0 }); await session.outcome;
     expect(probe.events.filter(event => event.type === 'compaction')).toEqual([
-      { type: 'compaction', phase: 'started', reason: 'overflow' },
-      { type: 'compaction', phase: 'ended', reason: 'overflow', tokensBefore: null, tokensAfter: null, aborted: false, errorText: null },
+      { type: 'compaction', phase: 'started', reason: 'overflow', ...envelope(sourcePoint, 1) },
+      { type: 'compaction', phase: 'ended', reason: 'overflow', tokensBefore: null, tokensAfter: null, aborted: false, errorText: null, ...envelope(sourcePoint, 2) },
     ]);
   });
 

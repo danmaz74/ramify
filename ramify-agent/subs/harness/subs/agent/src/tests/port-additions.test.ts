@@ -7,6 +7,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import type { ToolDefinition } from '../interfaces/port.js';
 import { createScriptedAgent } from '../scripted.js';
 import { probeSpec } from './helpers/spec.js';
+import type { AgentSessionPoint } from '../interfaces/session-operations.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -151,9 +152,13 @@ describe('rejected input', () => {
   test('a call the guard denied still passed the implementation\'s validation', async () => {
     const agent = createScriptedAgent([{ kind: 'tool', tool: 'write', input: {} }, { kind: 'end' }]);
     const probe = probeSpec({ deny: { write: 'Not in scope.' } });
-    await (await invokeProbe(agent, probe.spec)).outcome;
+    const session = await invokeProbe(agent, probe.spec); const sourcePoint = JSON.parse(session.ref) as AgentSessionPoint;
+    expect(sourcePoint).toMatchObject({ kind: 'checkpoint', turn: 0 }); await session.outcome;
     const finished = probe.events.filter(event => event.type === 'tool-finished');
-    expect(finished).toEqual([{ type: 'tool-finished', callId: 'probe-1:call-1', tool: 'write', isError: true, errorText: 'Not in scope.', reachedTool: true }]);
+    expect(finished).toEqual([{ type: 'tool-finished', callId: 'probe-1:call-1', tool: 'write', isError: true, errorText: 'Not in scope.', reachedTool: true,
+      execution: { runId: 'probe', operationId: 'probe-1', sessionId: sourcePoint.sessionId, turn: 1, sourcePoint },
+      observation: { sourceId: 'probe-1:event:3' }, replayed: false,
+    }]);
   });
 });
 

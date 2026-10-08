@@ -4,6 +4,7 @@ import { contextBudgetReached } from '../interfaces/port.js';
 import type { AgentPort, ExecutorSupport } from '../interfaces/port.js';
 import { createScriptedAgent } from '../scripted.js';
 import { probeSpec, unbounded } from './helpers/spec.js';
+import type { AgentSessionPoint } from '../interfaces/session-operations.js';
 
 /*
  * The guard this iteration owns: usage, context size and compaction are port
@@ -24,20 +25,26 @@ describe('observations are port events', () => {
       { kind: 'submit', input: { done: true } },
     ]);
     const probe = probeSpec();
-    expect(await (await invokeProbe(agent, probe.spec)).outcome).toEqual({ kind: 'submitted', input: { done: true } });
+    const session = await invokeProbe(agent, probe.spec); const sourcePoint = JSON.parse(session.ref) as AgentSessionPoint;
+    expect(sourcePoint).toMatchObject({ kind: 'checkpoint', turn: 0 });
+    expect(await session.outcome).toEqual({ kind: 'submitted', input: { done: true } });
+    const envelope = (index: number) => ({ execution: { runId: 'probe', operationId: 'probe-1', sessionId: sourcePoint.sessionId, turn: 1, sourcePoint }, observation: { sourceId: `probe-1:event:${index}` }, replayed: false });
+    expect(probe.events.map(({ execution, observation, replayed }) => ({ execution, observation, replayed })))
+      .toEqual(Array.from({ length: 10 }, (_, index) => envelope(index)));
 
     const usage = probe.events.flatMap(event => (event.type === 'message' && event.role === 'assistant' ? [event.usage] : []));
     // The submission's assistant message reports no usage, which is absent, not zero.
     expect(usage).toEqual([{ input: 1_000, output: 20, cacheRead: 200, cacheWrite: 300, total: 1_520 }, null]);
     expect(probe.events.filter(event => event.type === 'context-observed')).toEqual([
-      { type: 'context-observed', tokens: 1_520, window },
-      { type: 'context-observed', tokens: null, window },
+      { type: 'context-observed', tokens: 1_520, window, ...envelope(2) },
+      { type: 'context-observed', tokens: null, window, ...envelope(5) },
     ]);
     expect(probe.events.filter(event => event.type === 'compaction')).toEqual([
-      { type: 'compaction', phase: 'started', reason: 'threshold' },
+      { type: 'compaction', phase: 'started', reason: 'threshold', ...envelope(3) },
       {
         type: 'compaction', phase: 'ended', reason: 'threshold',
         tokensBefore: 1_520, tokensAfter: 400, aborted: false, errorText: null,
+        ...envelope(4),
       },
     ]);
   });

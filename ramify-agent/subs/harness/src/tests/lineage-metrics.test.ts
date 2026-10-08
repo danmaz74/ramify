@@ -285,7 +285,7 @@ describe('ST13: a measurement whose inputs are missing is unavailable with the r
     // Interrupted: no start was recorded and no usage was reported.
     ...open({ id: 'inv-0003', session: 'ses-0003', role: 'global-fork', usage: { unavailable: 'the harness stopped while the session was running' }, kept: false, interrupted: true }, fork(1)),
     ...open({ id: 'inv-0004', session: 'ses-0004', role: 'global-fork', usage: use(400, 22_000, 500, 1200), kept: false }, fork(1)),
-    // An engineer whose first segment has no observation log, continued for a repair.
+    // An engineer whose first segment has a readable empty observation log, continued for a repair.
     ...open({ id: 'inv-0005', session: 'ses-0005', role: 'engineer', usage: use(3000, 30_000, 1000, 4000), kept: true }),
     ...continued({ id: 'inv-0006', session: 'ses-0005', role: 'engineer', usage: { unavailable: 'the session reported no usage' }, kept: false,
       continues: { from: point('ses-0005', 'inv-0005'), reason: 'repair', briefs: [] } }),
@@ -295,6 +295,7 @@ describe('ST13: a measurement whose inputs are missing is unavailable with the r
     'inv-0002': [noContext],
     'inv-0003': [context(25_000)],
     'inv-0004': [context(30_000)],
+    'inv-0005': [],
     'inv-0006': [context(9000)],
   };
 
@@ -321,6 +322,18 @@ describe('ST13: a measurement whose inputs are missing is unavailable with the r
     expect(find(lineage.metrics, 'repair.output')).toMatchObject({
       state: 'unavailable', subtotal: null, evidence: ['inv-0006 (ses-0005): the session reported no usage'],
     });
+  });
+
+  test('a missing previous observation log remains unavailable with its actual read failure', async () => {
+    const { 'inv-0005': emptyLog, ...missingLogs } = logs;
+    expect(emptyLog).toEqual([]);
+    const { lineage } = await run(lines, missingLogs);
+    const path = join(directories.at(-1)!, runLayout.observations('inv-0005'));
+    expect(find(lineage.metrics, 'continuation-growth')).toMatchObject({
+      state: 'unavailable', value: null, subtotal: null, coverage: { covered: 0, total: 1 },
+      evidence: [`inv-0006 (ses-0005): its previous segment inv-0005: invocations/inv-0005/observations.jsonl cannot be read: ENOENT: no such file or directory, open '${path}'`],
+    });
+    expect(find(lineage.metrics, 'repair.start-context')).toMatchObject({ state: 'measured', value: 9000 });
   });
 
   test('a fork whose start is unknown makes the degraded-start rate and the forks served partial', async () => {

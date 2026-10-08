@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { openLedger } from '../../subs/ledger/src/ledger.js';
 import { readCommitted } from '../jobs/commit.js';
 import { runEventSchema, terminalRunEvents, type RunEvent } from '../run/log.js';
-import { observationSchema } from '../run/observations.js';
+import { ObservationLog, observationSchema, type ObservationInput } from '../run/observations.js';
 import {
   capabilityStateSchema, decisionViewSchema, hypothesisStandingSchema, metricSchema, metricStateSchema,
   failureCauseSchema, roleSchema, runEventRefKindSchema, runFailureReasonSchema, runNoticeSchema, runPhaseSchema, workItemStateSchema,
@@ -64,6 +64,7 @@ async function ledger() {
   });
   let sequence = 0;
   return {
+    directory: directory.path,
     async roundTrip<T>(path: string, body: unknown, schema: { schema: string; body: { parse(value: unknown): T } }): Promise<T> {
       sequence += 1;
       await log.append({
@@ -87,7 +88,7 @@ describe('the run log', () => {
   test('every event type is written and read back, and the terminal ones are named', () => {
     const types = runEventSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
+      'invocation-prepared', 'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
       'document-manifest-committed', 'work-orientation-recorded', 'context-selection-recorded', 'context-package-append-requested', 'context-package-appended', 'context-package-prompt-bound', 'candidate-prepared', 'nonfunctional-phase-started', 'nonfunctional-assessed', 'nonfunctional-investigated', 'nonfunctional-repair-assigned', 'nonfunctional-repair-committed', 'nonfunctional-round-closed', 'nonfunctional-deviation-recorded', 'candidate-bound-to-gate',
       'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
       'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned',
@@ -115,6 +116,16 @@ describe('the run log', () => {
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
+  });
+
+  test('the prepared invocation event round-trips its original identity through the ledger', async () => {
+    const store = await ledger();
+    const event = { sequence: 1, jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z', type: 'invocation-prepared' as const, data: { invocation: 'inv-0001' } };
+    expect(runEventSchema.parse(event)).toEqual(event);
+    await store.log.append({ event, records: [] });
+    const restored = await openLedger<RunEvent>({ logPath: `${store.directory}/events.jsonl`, recordsRoot: store.directory, eventSchema: runEventSchema });
+    expect(restored.replay().map(entry => entry.transaction.event)).toEqual([event]);
+    expect(runEventSchema.safeParse({ ...event, data: { invocation: 'inv-0001', changedTask: true } }).success).toBe(false);
   });
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
@@ -281,6 +292,7 @@ describe('the observation log', () => {
   test('every observation type is a valid line, and every coverage-gap kind is named', () => {
     const types = observationSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
+      'exploration', 'usage', 'model-duration', 'tool-start', 'tool-duration', 'milestone',
       'activity', 'rejection', 'guard', 'mutation', 'hook-check', 'excursion',
       'context', 'compaction', 'coverage-gap',
     ]);
@@ -292,6 +304,30 @@ describe('the observation log', () => {
       expect(observationSchema.safeParse({ n: 1, at: '2026-09-20T10:15:00.000Z', type: 'coverage-gap', data: { kind, detail: 'why' } }).success).toBe(true);
     }
     expect(observationSchema.safeParse({ n: 1, at: '2026-09-20T10:15:00.000Z', type: 'coverage-gap', data: { kind: 'other', detail: 'why' } }).success).toBe(false);
+  });
+
+  test('the exploration usage and timing variants round-trip their exact values and stable identities', async () => {
+    const directory = await temporaryDirectory(); cleanups.push(directory.remove);
+    const path = `${directory.path}/observations.jsonl`;
+    const at = new Date('2026-09-20T10:15:00.000Z');
+    const inputs: ObservationInput[] = [
+      { type: 'exploration', data: { id: 'run/op/inv/call/read', invocationId: 'inv-0001', operationId: 'op-0001', role: 'engineer', sessionId: 'ses-0001', turn: 1, callId: 'call-0001', kind: 'read', requestedScope: ['src/a.ts'], resolvedScope: ['src/a.ts'], files: ['src/a.ts'], returnedBytes: 0, startedAt: null, endedAt: null, elapsedMs: null, outcome: 'completed', broad: false, outsideScope: false, coverage: ['Duration unavailable'] } },
+      { type: 'usage', data: { usage: { input: 100, output: 20, cacheRead: 40, cacheWrite: 10, total: 170 }, charge: null, modelElapsedMs: null } },
+      { type: 'model-duration', data: { elapsedMs: 0 } },
+      { type: 'tool-start', data: { callId: 'call-0001', tool: 'read', kind: 'read', requestedScope: ['src/a.ts'], startedAt: null } },
+      { type: 'tool-duration', data: { callId: 'call-0001', startedAt: null, endedAt: null, elapsedMs: null, coverage: ['Duration unavailable'] } },
+      { type: 'milestone', data: { kind: 'first-designated-submission', at: null } },
+    ].map((input, index) => ({ ...input, sourceId: `fixed-observation-${index + 1}` })) as ObservationInput[];
+    const log = await ObservationLog.open(path);
+    for (const input of inputs) expect(await log.record(input, at)).toBe(true);
+    const expected = inputs.map((input, index) => ({ n: index + 1, at: at.toISOString(), ...input }));
+    expect(log.observations).toEqual(expected);
+    const restored = await ObservationLog.open(path);
+    expect(restored.observations).toEqual(expected);
+    for (const input of inputs) expect(await restored.record(input, at)).toBe(false);
+    expect(restored.observations).toEqual(expected); expect(restored.replays).toBe(6);
+    for (const line of expected) expect(observationSchema.safeParse({ ...line, data: { ...line.data, unexpected: true } }).success).toBe(false);
+    expect(observationSchema.safeParse({ ...expected[2], data: { elapsedMs: -1 } }).success).toBe(false);
   });
 
   test('every guard verdict, mutation observer and compaction trigger', () => {
@@ -1030,6 +1066,7 @@ function sampleData(type: RunEvent['type']): unknown {
   const r = { id: 'x', revision: 1, hash: 'a'.repeat(64) };
   const command = { commandId: 'c', contentHash: 'h', receipt: { commandId: 'c', jobId: 'j', sequence: 1, acceptedAt: '2026-09-20T10:15:00.000Z' } };
   const samples: Partial<Record<RunEvent['type'], unknown>> = {
+    'invocation-prepared': { invocation: 'inv-0001' },
     'session-opened': { session: 'ses-0001', role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, executor: 'scripted', model: null },
     'invocation-started': { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' },
     'invocation-ended': { invocation: 'inv-0001', ended: 'submitted', submission: null, session: 'ses-0001', kept: false, finished: 'work-closed' },
