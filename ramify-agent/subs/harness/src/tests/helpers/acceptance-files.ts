@@ -1,0 +1,25 @@
+/** Independently frozen candidate bytes for the acceptance scenario. No runtime Git/filesystem discovery. */
+export const acceptanceInitialFiles: Readonly<Record<string, string>> = {
+  "README.md": "# Capability coordination fixture\n\nP assembles consumer A, provider B and existing consumer D.\n",
+  "package-lock.json": "{\n  \"name\": \"capability-coordination-fixture\",\n  \"version\": \"0.0.0\",\n  \"lockfileVersion\": 3,\n  \"requires\": true,\n  \"packages\": {\n    \"\": {\n      \"name\": \"capability-coordination-fixture\",\n      \"version\": \"0.0.0\"\n    }\n  }\n}\n",
+  ".gitignore": "node_modules/\n**/.harness/\n",
+  "ramify-agent.json": "{\n  \"schema\": \"ramify-agent.project/1\",\n  \"typeCheck\": {\n    \"output\": \"tsc\"\n  }\n}\n",
+  "fixture.json": "{\n  \"schema\": \"ramify-agent.capability-fixture/1\",\n  \"roles\": {\n    \"P\": \"capability-coordination\",\n    \"A\": \"capability-coordination/a\",\n    \"B\": \"capability-coordination/b\",\n    \"D\": \"capability-coordination/d\"\n  },\n  \"plan\": \"plans/need/plan.md\",\n  \"deferredEntry\": \"B\",\n  \"provisionalSource\": [\n    \"subs/a/src/caller.ts\",\n    \"subs/a/src/extra.ts\",\n    \"subs/a/src/tests/caller.test.ts\"\n  ]\n}\n",
+  "module.ramify": "ramify 1\nroot module capability-coordination\nexpose-sub readFact from b to descendants\n",
+  "package.json": "{\n  \"name\": \"capability-coordination-fixture\",\n  \"version\": \"0.0.0\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"type-check\": \"tsc --noEmit\",\n    \"test\": \"vitest run\"\n  }\n}\n",
+  "tsconfig.json": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"ESNext\",\n    \"moduleResolution\": \"bundler\",\n    \"strict\": true,\n    \"noEmit\": true\n  },\n  \"include\": [\n    \"src\",\n    \"subs/**/src\"\n  ],\n  \"exclude\": [\"**/src/tmp/**/*\"]\n}\n",
+  "subs/a/README.md": "# A\n\nA renders the fact for a caller and owns its consumer integration.\n",
+  "subs/a/module.ramify": "ramify 1\nmodule a\n",
+  "subs/a/src/caller.ts": "export function renderA(value: string): string { return `Fact: ${value}`; }\n",
+  "subs/a/src/tests/caller.test.ts": "import { expect, test } from 'vitest';\nimport { renderA } from '../caller.js';\ntest('A renders a fact', () => expect(renderA('old')).toBe('Fact: old'));\n",
+  "subs/d/README.md": "# D\n\nD is a pre-existing consumer of B and constrains compatibility.\n",
+  "subs/d/module.ramify": "ramify 1\nmodule d\n",
+  "subs/d/src/consumer.ts": "import { readFact } from '../../b/src/fact.js';\nexport function legacyLabel(): string { return readFact().toUpperCase(); }\n",
+  "subs/d/src/tests/consumer.test.ts": "import { expect, test } from 'vitest';\nimport { legacyLabel } from '../consumer.js';\ntest('D keeps the old text contract', () => expect(legacyLabel()).toBe('OLD'));\n",
+  "subs/b/README.md": "# B\n\nB owns the fact and its existing representation.\n",
+  "subs/b/module.ramify": "ramify 1\nmodule b\nexpose-src readFact from \"fact.ts\" to parent\n",
+  "subs/b/src/fact.ts": "export function readFact(): string { return 'old'; }\n",
+  "subs/b/src/tests/fact.test.ts": "import { expect, test } from 'vitest';\nimport { readFact } from '../fact.js';\ntest('B retains its existing fact', () => expect(readFact()).toBe('old'));\n",
+  "src/assembly.ts": "import { renderA } from '../subs/a/src/caller.js';\nimport { readFact } from '../subs/b/src/fact.js';\nexport const render = () => renderA(readFact());\n",
+  "plans/need/plan.md": "# Expose a richer fact to A\n\nA must show a label for a fact from B, including a fresh value and a source. B owns the fact and D already consumes its old text. Preserve D behavior while A gains the richer result.\n\n## Requirements\n\n- A displays the new fact from B with its source.\n- D still receives its existing text result.\n- B owns the fact data and its interface.\n- P assembles the result after A and B agree.\n\n## Acceptance\n\n- A uses B real behavior, not a stand-in.\n- B provider and A consumer checks pass on the combined candidate.\n- D compatibility remains verified.\n"
+};

@@ -39,3 +39,5 @@ expose-src GitService, gitService, currentHead, runBranchName from "git.ts" to p
 expose-src trackedPaths, ignoreStatus, IgnoreRule, IgnoreStatus from "git.ts" to parent
 expose-src GitInspection, inspectGit from "git.ts" to parent
 expose-src CandidateTreePreview, previewCandidateTree from "candidate-tree.ts" to parent
+
+expose-src productionSourceGit, ProvisionalSourceGit from "provisional-git.ts" to parent

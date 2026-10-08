@@ -1,0 +1,782 @@
+{
+  "base": "e1ebdb755b123ffbcc92caa85c8866b8d136fc1b",
+  "node": "22.23.3",
+  "runner": "Vitest4.1.11",
+  "ordinaryProcessAttempts": 0,
+  "ordinaryBoundaryMeaning": "Zero attempts includes setup, flow, caught failures and teardown; checked after every ordinary case.",
+  "reports": {
+    "baseline-all": {
+      "sourceReport": "/tmp/plan22-acceptance-baseline-all.json",
+      "startTime": 1791434171429,
+      "passed": 12,
+      "failed": 0,
+      "pendingOrFiltered": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+          "elapsedMs": 109720.43603515625,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision",
+              "status": "passed",
+              "elapsedMs": 9831.725709,
+              "failureMessages": []
+            },
+            {
+              "title": "CA28: deferred B entry receives accepted handback and replans from current source",
+              "status": "passed",
+              "elapsedMs": 11929.740834,
+              "failureMessages": []
+            },
+            {
+              "title": "CA31: source drift after a passing combined gate cannot be handed back",
+              "status": "passed",
+              "elapsedMs": 8693.060952,
+              "failureMessages": []
+            },
+            {
+              "title": "CA17 CA19 CA28 CA30: restart after handback continues the original A assignment once",
+              "status": "passed",
+              "elapsedMs": 9104.349876,
+              "failureMessages": []
+            },
+            {
+              "title": "CA17 CA20 CA30: restart after verification reuses the accepted gate and review for one handback",
+              "status": "passed",
+              "elapsedMs": 9240.994176,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing gate reuses its audited candidate",
+              "status": "passed",
+              "elapsedMs": 8990.704604999999,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate intent recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 8941.280122999997,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate commit recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 8788.554313,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing review reuses the same gate and review",
+              "status": "passed",
+              "elapsedMs": 8746.908230000001,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: accepted reviewer submissions replay before their combined review record",
+              "status": "passed",
+              "elapsedMs": 9046.528658999989,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: a submitted reviewer concern replays into one exact pending attempt and CheckFinding",
+              "status": "passed",
+              "elapsedMs": 8454.251476999998,
+              "failureMessages": []
+            },
+            {
+              "title": "CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback",
+              "status": "passed",
+              "elapsedMs": 7951.435974000007,
+              "failureMessages": []
+            }
+          ]
+        }
+      ]
+    },
+    "first-matrix": {
+      "sourceReport": "/tmp/plan22-acceptance-after-first.json",
+      "startTime": 1791434449591,
+      "passed": 12,
+      "failed": 1,
+      "pendingOrFiltered": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.boundary.test.ts",
+          "elapsedMs": 7001.919921875,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: actual Git and local-command multi-owner migration, repair, handback and linked revision",
+              "status": "passed",
+              "elapsedMs": 7001.919995,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+          "elapsedMs": 129212.80590820312,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision",
+              "status": "passed",
+              "elapsedMs": 1246.6775049999999,
+              "failureMessages": []
+            },
+            {
+              "title": "CA28: deferred B entry receives accepted handback and replans from current source",
+              "status": "passed",
+              "elapsedMs": 918.0528449999997,
+              "failureMessages": []
+            },
+            {
+              "title": "CA31: source drift after a passing combined gate cannot be handed back",
+              "status": "passed",
+              "elapsedMs": 714.2612860000004,
+              "failureMessages": []
+            },
+            {
+              "title": "CA17 CA19 CA28 CA30: restart after handback continues the original A assignment once",
+              "status": "passed",
+              "elapsedMs": 833.9259099999999,
+              "failureMessages": []
+            },
+            {
+              "title": "CA17 CA20 CA30: restart after verification reuses the accepted gate and review for one handback",
+              "status": "passed",
+              "elapsedMs": 808.0525349999998,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing gate reuses its audited candidate",
+              "status": "passed",
+              "elapsedMs": 746.6502500000006,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate intent recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 772.0983500000002,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate commit recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 755.1908829999993,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing review reuses the same gate and review",
+              "status": "passed",
+              "elapsedMs": 752.6388420000003,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: accepted reviewer submissions replay before their combined review record",
+              "status": "failed",
+              "elapsedMs": 120095.509349,
+              "failureMessages": [
+                "Error: Error: Timed out waiting for a condition; architect 8; gates [{\"sequence\":109,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:40:59.302Z\",\"type\":\"gate-attempted\",\"data\":{\"gate\":\"ga-0002\",\"checkpoint\":\"iteration\",\"verdict\":\"passed\",\"next\":\"accept\"}},{\"sequence\":141,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:40:59.407Z\",\"type\":\"gate-attempted\",\"data\":{\"gate\":\"ga-0003\",\"checkpoint\":\"iteration\",\"verdict\":\"passed\",\"next\":\"accept\"}},{\"sequence\":163,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:40:59.478Z\",\"type\":\"gate-attempted\",\"data\":{\"gate\":\"ga-0004\",\"checkpoint\":\"work-item\",\"verdict\":\"passed\",\"next\":\"accept\"}},{\"sequence\":179,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.573Z\",\"type\":\"gate-attempted\",\"data\":{\"gate\":\"ga-0005\",\"checkpoint\":\"work-item\",\"verdict\":\"passed\",\"next\":\"accept\"}}]; tail [{\"sequence\":183,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.587Z\",\"type\":\"hypotheses-delivered\",\"data\":{\"workItem\":\"wi-002\",\"refs\":[]}},{\"sequence\":184,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.595Z\",\"type\":\"session-opened\",\"data\":{\"session\":\"ses-0022\",\"role\":\"local-architect\",\"work\":{\"workItem\":\"wi-002\"},\"executor\":\"scripted\",\"model\":null}},{\"sequence\":185,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.596Z\",\"type\":\"invocation-started\",\"data\":{\"invocation\":\"inv-0033\",\"role\":\"local-architect\",\"session\":\"ses-0022\",\"work\":{\"workItem\":\"wi-002\"},\"start\":\"opened\"}},{\"sequence\":186,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.601Z\",\"type\":\"invocation-ended\",\"data\":{\"invocation\":\"inv-0033\",\"ended\":\"submitted\",\"submission\":\"56a11a6577c0666510946954c4c7c2801301a8842914e065f43bb95023472433\",\"session\":\"ses-0022\",\"kept\":true}},{\"sequence\":187,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.604Z\",\"type\":\"work-orientation-recorded\",\"data\":{\"workItem\":\"wi-002\",\"invocation\":\"inv-0033\",\"packetHash\":\"f382c4982de5d71278868add0c17ac4a1558a3c3168a8c086f417684dccc490a\",\"packet\":\"work/wi-002/orientation/f382c4982de5d71278868add0c17ac4a1558a3c3168a8c086f417684dccc490a.txt\",\"point\":\"scripted-22@1#0\"}},{\"sequence\":188,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.605Z\",\"type\":\"session-opened\",\"data\":{\"session\":\"ses-0023\",\"role\":\"context-selector\",\"work\":{\"workItem\":\"wi-002\"},\"executor\":\"scripted\",\"model\":null,\"fork\":{\"from\":{\"session\":\"ses-0022\",\"invocation\":\"inv-0033\"},\"reason\":\"context-selection\",\"briefs\":[]}}},{\"sequence\":189,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.606Z\",\"type\":\"invocation-started\",\"data\":{\"invocation\":\"inv-0034\",\"role\":\"context-selector\",\"session\":\"ses-0023\",\"work\":{\"workItem\":\"wi-002\"},\"start\":\"opened\"}},{\"sequence\":190,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.610Z\",\"type\":\"invocation-ended\",\"data\":{\"invocation\":\"inv-0034\",\"ended\":\"submitted\",\"submission\":\"21b9d97da2cf4f050c1eddf5d1ba5d1227888d4831aa2f6f527d439118589963\",\"session\":\"ses-0023\",\"kept\":false,\"finished\":\"not-kept\"}},{\"sequence\":191,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.615Z\",\"type\":\"context-selection-recorded\",\"data\":{\"workItem\":\"wi-002\",\"selection\":\"work/wi-002/selection/36862fe2d41bfcdb040042976a0da7dacc3657237ab6873db4dcd844ae026757.json\",\"selectionHash\":\"36862fe2d41bfcdb040042976a0da7dacc3657237ab6873db4dcd844ae026757\",\"packageHash\":\"d43581e20903ce1840857e1274a6f2a9932b61500d7052ad9b1e7a2cfa5cd7c0\"}},{\"sequence\":192,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.618Z\",\"type\":\"context-package-append-requested\",\"data\":{\"workItem\":\"wi-002\",\"selection\":\"work/wi-002/selection/36862fe2d41bfcdb040042976a0da7dacc3657237ab6873db4dcd844ae026757.json\",\"session\":\"ses-0022\",\"appendKey\":\"6ec5f4a4fb35fa6ff6e31fb660aa60e40fc16f7775af95082a6f6814865b10ed\"}},{\"sequence\":193,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.618Z\",\"type\":\"context-package-appended\",\"data\":{\"workItem\":\"wi-002\",\"selection\":\"work/wi-002/selection/36862fe2d41bfcdb040042976a0da7dacc3657237ab6873db4dcd844ae026757.json\",\"session\":\"ses-0022\",\"appendKey\":\"6ec5f4a4fb35fa6ff6e31fb660aa60e40fc16f7775af95082a6f6814865b10ed\",\"ref\":\"scripted-22@0#1\",\"outcome\":\"appended\",\"reason\":null}},{\"sequence\":194,\"jobId\":\"20261008T044058Z-8dbb31\",\"at\":\"2026-10-08T04:41:59.622Z\",\"type\":\"invocation-started\",\"data\":{\"invocation\":\"inv-0035\",\"role\":\"local-architect\",\"session\":\"ses-0022\",\"work\":{\"workItem\":\"wi-002\"},\"start\":\"continued\",\"continues\":{\"from\":{\"session\":\"ses-0022\",\"invocation\":\"inv-0033\"},\"reason\":\"context-selected\",\"briefs\":[]}}}]\n    at /home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/helpers/acceptance-flow.ts:311:13\n    at Module.runAcceptedHandback (/home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/helpers/acceptance-flow.ts:309:5)\n    at file:///home/app/ramify-plan21-project-boundary-adoption/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+              ]
+            },
+            {
+              "title": "CA19: a submitted reviewer concern replays into one exact pending attempt and CheckFinding",
+              "status": "passed",
+              "elapsedMs": 779.8989120000042,
+              "failureMessages": []
+            },
+            {
+              "title": "CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback",
+              "status": "passed",
+              "elapsedMs": 789.8058960000053,
+              "failureMessages": []
+            }
+          ]
+        }
+      ]
+    },
+    "strict-counters-first": {
+      "sourceReport": "/tmp/plan22-acceptance-after-second.json",
+      "startTime": 1791434724592,
+      "passed": 11,
+      "failed": 2,
+      "pendingOrFiltered": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.boundary.test.ts",
+          "elapsedMs": 9430.550048828125,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: actual Git and local-command multi-owner migration, repair, handback and linked revision",
+              "status": "passed",
+              "elapsedMs": 9430.549927,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+          "elapsedMs": 14431.406494140625,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision",
+              "status": "passed",
+              "elapsedMs": 1246.308134,
+              "failureMessages": []
+            },
+            {
+              "title": "CA28: deferred B entry receives accepted handback and replans from current source",
+              "status": "failed",
+              "elapsedMs": 926.773404,
+              "failureMessages": [
+                "AssertionError: expected [ 'iteration:tests', \u2026(8) ] to deeply equal [ 'iteration:tests', \u2026(5) ]\n    at Object.assertComplete (/home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/helpers/acceptance-boundaries.ts:172:73)\n    at /home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/helpers/acceptance-flow.ts:54:66\n    at /home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/capability-acceptance.integration.test.ts:8:67"
+              ]
+            },
+            {
+              "title": "CA31: source drift after a passing combined gate cannot be handed back",
+              "status": "passed",
+              "elapsedMs": 722.4948370000002,
+              "failureMessages": []
+            },
+            {
+              "title": "CA17 CA19 CA28 CA30: restart after handback continues the original A assignment once",
+              "status": "failed",
+              "elapsedMs": 790.3730260000002,
+              "failureMessages": [
+                "AssertionError: expected [ 'work-item:tests', \u2026(2) ] to deeply equal [ 'work-item:tests', \u2026(5) ]\n    at Object.assertComplete (/home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/helpers/acceptance-boundaries.ts:176:73)\n    at /home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/helpers/acceptance-flow.ts:54:66\n    at /home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/capability-acceptance.integration.test.ts:8:67"
+              ]
+            },
+            {
+              "title": "CA17 CA20 CA30: restart after verification reuses the accepted gate and review for one handback",
+              "status": "passed",
+              "elapsedMs": 1084.1311180000002,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing gate reuses its audited candidate",
+              "status": "passed",
+              "elapsedMs": 1017.578426,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate intent recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 1960.7774550000004,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate commit recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 1985.539041,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing review reuses the same gate and review",
+              "status": "passed",
+              "elapsedMs": 1437.984407,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: accepted reviewer submissions replay before their combined review record",
+              "status": "passed",
+              "elapsedMs": 953.7589229999994,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: a submitted reviewer concern replays into one exact pending attempt and CheckFinding",
+              "status": "passed",
+              "elapsedMs": 1176.6440489999986,
+              "failureMessages": []
+            },
+            {
+              "title": "CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback",
+              "status": "passed",
+              "elapsedMs": 1128.4064639999997,
+              "failureMessages": []
+            }
+          ]
+        }
+      ]
+    },
+    "injection-negative-reproduction": {
+      "sourceReport": "/tmp/plan22-source-injection-before.json",
+      "startTime": 1791434932738,
+      "passed": 0,
+      "failed": 1,
+      "pendingOrFiltered": 11,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+          "elapsedMs": 373.66162109375,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision",
+              "status": "failed",
+              "elapsedMs": 373.66171399999985,
+              "failureMessages": [
+                "AssertionError: {\"tail\":[{\"sequence\":32,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.749Z\",\"type\":\"invocation-ended\",\"data\":{\"invocation\":\"inv-0006\",\"ended\":\"submitted\",\"submission\":\"44c3da5e64e0dcda1659e87ed292514da23a7dbde7622aebc270cddbfcb5db97\",\"session\":\"ses-0004\",\"kept\":true}},{\"sequence\":33,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.753Z\",\"type\":\"outline-revised\",\"data\":{\"workItem\":\"wi-001\",\"revision\":1,\"invocation\":\"inv-0006\"}},{\"sequence\":34,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.768Z\",\"type\":\"iteration-assigned\",\"data\":{\"workItem\":\"wi-001\",\"iteration\":\"wi-001.i01\",\"kind\":\"ordinary\",\"scopeRevision\":1,\"invocation\":\"inv-0006\",\"decisions\":[],\"architectRef\":{\"session\":\"ses-0004\",\"ref\":\"scripted-4@1#1\"}}},{\"sequence\":35,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.780Z\",\"type\":\"session-opened\",\"data\":{\"session\":\"ses-0006\",\"role\":\"engineer\",\"work\":{\"workItem\":\"wi-001\",\"iteration\":\"wi-001.i01\"},\"executor\":\"scripted\",\"model\":null}},{\"sequence\":36,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.781Z\",\"type\":\"invocation-started\",\"data\":{\"invocation\":\"inv-0007\",\"role\":\"engineer\",\"session\":\"ses-0006\",\"work\":{\"workItem\":\"wi-001\",\"iteration\":\"wi-001.i01\"},\"start\":\"opened\"}},{\"sequence\":37,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.785Z\",\"type\":\"writer-acquired\",\"data\":{\"invocation\":\"inv-0007\",\"scopeRevision\":1}},{\"sequence\":38,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.817Z\",\"type\":\"writer-released\",\"data\":{\"invocation\":\"inv-0007\",\"confirmed\":true,\"groupsKilled\":0}},{\"sequence\":39,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.823Z\",\"type\":\"invocation-ended\",\"data\":{\"invocation\":\"inv-0007\",\"ended\":\"submitted\",\"submission\":\"daef60f706cb1c6ac0493a8ac5633947b71878d99d461030caf023aa2489d9cf\",\"session\":\"ses-0006\",\"kept\":true}},{\"sequence\":40,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.830Z\",\"type\":\"session-finished\",\"data\":{\"session\":\"ses-0002\",\"reason\":\"run-ended\"}},{\"sequence\":41,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.830Z\",\"type\":\"session-finished\",\"data\":{\"session\":\"ses-0004\",\"reason\":\"run-ended\"}},{\"sequence\":42,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.831Z\",\"type\":\"session-finished\",\"data\":{\"session\":\"ses-0006\",\"reason\":\"run-ended\"}},{\"sequence\":43,\"jobId\":\"20261008T044854Z-7bc983\",\"at\":\"2026-10-08T04:48:54.831Z\",\"type\":\"job-failed\",\"data\":{\"reason\":\"internal\",\"message\":\"This test starts no process: `execFile` was called with `git diff --cached --name-only -z`\",\"evidence\":[]}}],\"architect\":0,\"reviewer\":0,\"lastCapabilityPrompt\":\"\",\"gate\":null}: expected [ { sequence: 43, \u2026(4) } ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/app/ramify-plan21-project-boundary-adoption/ramify-agent/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/app/ramify-plan21-project-boundary-adoption/ramify-agent/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///home/app/ramify-plan21-project-boundary-adoption/ramify-agent/node_modules/chai/index.js:1700:25)\n    at Module.runAcceptedHandback (/home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/helpers/acceptance-flow.ts:447:126)\n    at file:///home/app/ramify-plan21-project-boundary-adoption/ramify-agent/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20",
+                "AssertionError: ordinary setup/flow/teardown attempted child processes: expected [ { api: 'execFile', \u2026(1) } ] to deeply equal []\n    at /home/app/ramify-plan22-capability-acceptance/ramify-agent/subs/harness/src/tests/capability-acceptance.integration.test.ts:12:95"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "qualified": {
+      "sourceReport": "/tmp/plan22-acceptance-final.json",
+      "startTime": 1791434953561,
+      "passed": 37,
+      "failed": 0,
+      "pendingOrFiltered": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/acceptance-boundaries.test.ts",
+          "elapsedMs": 22.445556640625,
+          "cases": [
+            {
+              "title": "retains caught Git response errors",
+              "status": "passed",
+              "elapsedMs": 9.762387999999646,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught candidate response errors",
+              "status": "passed",
+              "elapsedMs": 1.4705069999999978,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught candidate diff response errors",
+              "status": "passed",
+              "elapsedMs": 5.697362000000339,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught provisional source response errors",
+              "status": "passed",
+              "elapsedMs": 1.57248699999991,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught audit configuration response errors",
+              "status": "passed",
+              "elapsedMs": 1.5103760000001785,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught Ramify response errors",
+              "status": "passed",
+              "elapsedMs": 1.4073849999999766,
+              "failureMessages": []
+            },
+            {
+              "title": "unused required acceptance responses fail completion",
+              "status": "passed",
+              "elapsedMs": 1.4455800000000636,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.boundary.test.ts",
+          "elapsedMs": 8862.47412109375,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: actual Git and local-command multi-owner migration, repair, handback and linked revision",
+              "status": "passed",
+              "elapsedMs": 8862.474119999999,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+          "elapsedMs": 12549.305419921875,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision",
+              "status": "passed",
+              "elapsedMs": 1762.9684429999998,
+              "failureMessages": []
+            },
+            {
+              "title": "CA28: deferred B entry receives accepted handback and replans from current source",
+              "status": "passed",
+              "elapsedMs": 1383.5255350000007,
+              "failureMessages": []
+            },
+            {
+              "title": "CA31: source drift after a passing combined gate cannot be handed back",
+              "status": "passed",
+              "elapsedMs": 977.7870089999997,
+              "failureMessages": []
+            },
+            {
+              "title": "CA17 CA19 CA28 CA30: restart after handback continues the original A assignment once",
+              "status": "passed",
+              "elapsedMs": 1107.9542439999996,
+              "failureMessages": []
+            },
+            {
+              "title": "CA17 CA20 CA30: restart after verification reuses the accepted gate and review for one handback",
+              "status": "passed",
+              "elapsedMs": 843.4299019999999,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing gate reuses its audited candidate",
+              "status": "passed",
+              "elapsedMs": 943.1224280000006,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate intent recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 801.5121989999989,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate commit recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 932.3371029999998,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing review reuses the same gate and review",
+              "status": "passed",
+              "elapsedMs": 782.0386420000013,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: accepted reviewer submissions replay before their combined review record",
+              "status": "passed",
+              "elapsedMs": 750.668885000001,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: a submitted reviewer concern replays into one exact pending attempt and CheckFinding",
+              "status": "passed",
+              "elapsedMs": 1203.8659200000002,
+              "failureMessages": []
+            },
+            {
+              "title": "CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback",
+              "status": "passed",
+              "elapsedMs": 1059.3055100000001,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/provisional-source.test.ts",
+          "elapsedMs": 61.02392578125,
+          "cases": [
+            {
+              "title": "CA19 CA30 injected capture/reconcile preserve distinct binary bytes and refuse changed index/tree",
+              "status": "passed",
+              "elapsedMs": 61.02387299999964,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/candidate-tree.test.ts",
+          "elapsedMs": 985.367431640625,
+          "cases": [
+            {
+              "title": "preview matches a whole-worktree commit and preserves staged user index bytes",
+              "status": "passed",
+              "elapsedMs": 348.73487,
+              "failureMessages": []
+            },
+            {
+              "title": "a late source mutation changes the preview tree",
+              "status": "passed",
+              "elapsedMs": 193.76405499999998,
+              "failureMessages": []
+            },
+            {
+              "title": "nested cwd previews the entire eventual repository tree",
+              "status": "passed",
+              "elapsedMs": 164.59993799999995,
+              "failureMessages": []
+            },
+            {
+              "title": "a repository nested inside another uses its own root and index",
+              "status": "passed",
+              "elapsedMs": 163.56107599999996,
+              "failureMessages": []
+            },
+            {
+              "title": "a failed add cleans its isolated index and leaves the user index unchanged",
+              "status": "passed",
+              "elapsedMs": 86.22695699999986,
+              "failureMessages": []
+            },
+            {
+              "title": "an aborted preview leaves no temporary index",
+              "status": "passed",
+              "elapsedMs": 27.3674410000001,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/git.test.ts",
+          "elapsedMs": 1158.83447265625,
+          "cases": [
+            {
+              "title": "the real Git adapter inspects committed, staged, unstaged, deleted and untracked source without changing files, index or refs",
+              "status": "passed",
+              "elapsedMs": 155.241875,
+              "failureMessages": []
+            },
+            {
+              "title": "the real Git adapter creates and resumes a run branch, commits with its own policy, and recovers exact commit identities",
+              "status": "passed",
+              "elapsedMs": 451.95864800000004,
+              "failureMessages": []
+            },
+            {
+              "title": "the real Git adapter resumes a run on a branch of the earlier prefix, and commits there",
+              "status": "passed",
+              "elapsedMs": 103.28500099999997,
+              "failureMessages": []
+            },
+            {
+              "title": "the real Git adapter refuses a run branch git cannot create, with git's own message",
+              "status": "passed",
+              "elapsedMs": 53.153054999999995,
+              "failureMessages": []
+            },
+            {
+              "title": "the real Git adapter reports staged, untracked and renamed paths through the adapter",
+              "status": "passed",
+              "elapsedMs": 63.99467299999992,
+              "failureMessages": []
+            },
+            {
+              "title": "the real Git adapter reads path and line changes relative to the accepted revision even after a failed attempt commits",
+              "status": "passed",
+              "elapsedMs": 189.40564700000004,
+              "failureMessages": []
+            },
+            {
+              "title": "the real Git adapter serves a committed candidate from Git objects, whatever the working tree holds afterwards",
+              "status": "passed",
+              "elapsedMs": 123.66520500000001,
+              "failureMessages": []
+            },
+            {
+              "title": "the real Git adapter reports an unavailable head and a typed status error outside a repository",
+              "status": "passed",
+              "elapsedMs": 16.834468000000015,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/provisional-git.boundary.test.ts",
+          "elapsedMs": 89.221435546875,
+          "cases": [
+            {
+              "title": "actual provisional Git reads binary committed/index bytes, exact staged paths and absent blobs",
+              "status": "passed",
+              "elapsedMs": 79.57825799999995,
+              "failureMessages": []
+            },
+            {
+              "title": "actual provisional Git propagates process/cwd errors rather than reporting absent blobs",
+              "status": "passed",
+              "elapsedMs": 9.221474999999941,
+              "failureMessages": []
+            }
+          ]
+        }
+      ]
+    },
+    "existing-real-source-regressions": {
+      "sourceReport": "/tmp/plan22-source-real-regression.json",
+      "startTime": 1791434732922,
+      "passed": 3,
+      "failed": 0,
+      "pendingOrFiltered": 27,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/capability-delegation.test.ts",
+          "elapsedMs": 215.21240234375,
+          "cases": [
+            {
+              "title": "CA30: provisional snapshot keeps staged, worktree, untracked and deleted bytes separately",
+              "status": "passed",
+              "elapsedMs": 215.21249799999987,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/capability-recovery.test.ts",
+          "elapsedMs": 779.63623046875,
+          "cases": [
+            {
+              "title": "CA19 CA30: a snapshot written before its request commit is adopted with the exact dirty index and tree",
+              "status": "passed",
+              "elapsedMs": 471.99344299999984,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: retry refuses a changed staged or untracked candidate and preserves its bytes",
+              "status": "passed",
+              "elapsedMs": 307.6363319999996,
+              "failureMessages": []
+            }
+          ]
+        }
+      ]
+    },
+    "cleanup-final": {
+      "sourceReport": "/tmp/plan22-acceptance-cleanup-final.json",
+      "startTime": 1791435109224,
+      "passed": 20,
+      "failed": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/acceptance-boundaries.test.ts",
+          "elapsedMs": 10.78857421875,
+          "cases": [
+            {
+              "title": "retains caught Git response errors",
+              "status": "passed",
+              "elapsedMs": 5.6282699999999295,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught candidate response errors",
+              "status": "passed",
+              "elapsedMs": 0.9331569999999374,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught candidate diff response errors",
+              "status": "passed",
+              "elapsedMs": 1.104624000000058,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught provisional source response errors",
+              "status": "passed",
+              "elapsedMs": 0.7867610000000695,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught audit configuration response errors",
+              "status": "passed",
+              "elapsedMs": 0.7175979999999527,
+              "failureMessages": []
+            },
+            {
+              "title": "retains caught Ramify response errors",
+              "status": "passed",
+              "elapsedMs": 0.7192139999999654,
+              "failureMessages": []
+            },
+            {
+              "title": "unused required acceptance responses fail completion",
+              "status": "passed",
+              "elapsedMs": 0.7885409999998956,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.boundary.test.ts",
+          "elapsedMs": 7052.313720703125,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: actual Git and local-command multi-owner migration, repair, handback and linked revision",
+              "status": "passed",
+              "elapsedMs": 7052.313824,
+              "failureMessages": []
+            }
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+          "elapsedMs": 9824.652099609375,
+          "cases": [
+            {
+              "title": "CA08 CA11\u2013CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision",
+              "status": "passed",
+              "elapsedMs": 1276.1145680000002,
+              "failureMessages": []
+            },
+            {
+              "title": "CA28: deferred B entry receives accepted handback and replans from current source",
+              "status": "passed",
+              "elapsedMs": 945.4404610000001,
+              "failureMessages": []
+            },
+            {
+              "title": "CA31: source drift after a passing combined gate cannot be handed back",
+              "status": "passed",
+              "elapsedMs": 735.5715749999999,
+              "failureMessages": []
+            },
+            {
+              "title": "CA17 CA19 CA28 CA30: restart after handback continues the original A assignment once",
+              "status": "passed",
+              "elapsedMs": 847.3422789999995,
+              "failureMessages": []
+            },
+            {
+              "title": "CA17 CA20 CA30: restart after verification reuses the accepted gate and review for one handback",
+              "status": "passed",
+              "elapsedMs": 804.5110760000007,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing gate reuses its audited candidate",
+              "status": "passed",
+              "elapsedMs": 789.1644120000001,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate intent recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 771.0150160000003,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: in-flight combined capability gate commit recovers one audited commit and handback",
+              "status": "passed",
+              "elapsedMs": 793.4598950000009,
+              "failureMessages": []
+            },
+            {
+              "title": "CA20 CA30: restart after the passing review reuses the same gate and review",
+              "status": "passed",
+              "elapsedMs": 710.1270359999999,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: accepted reviewer submissions replay before their combined review record",
+              "status": "passed",
+              "elapsedMs": 706.4713340000017,
+              "failureMessages": []
+            },
+            {
+              "title": "CA19: a submitted reviewer concern replays into one exact pending attempt and CheckFinding",
+              "status": "passed",
+              "elapsedMs": 691.2326700000012,
+              "failureMessages": []
+            },
+            {
+              "title": "CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback",
+              "status": "passed",
+              "elapsedMs": 753.6521620000003,
+              "failureMessages": []
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

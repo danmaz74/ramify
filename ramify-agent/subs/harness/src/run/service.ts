@@ -1,3 +1,4 @@
+import type { ProvisionalSourceGit } from '../../subs/evidence/src/provisional-git.js';
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
 import { lstat, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -341,6 +342,8 @@ export interface RunServiceOptions {
   readonly git?: GitService | undefined;
   /** Where a review reads its frozen candidate from: Git's objects by default; tests script it like Git. */
   readonly candidates?: CandidateSource | undefined;
+  /** External index/blob reads for provisional capability snapshots. */
+  readonly provisionalSourceGit?: ProvisionalSourceGit | undefined;
   /**
    * The provider's committed audit: its configuration, read at a commit, and
    * the configured audit every committing gate and readiness request.
@@ -2383,7 +2386,7 @@ export class RunService {
       const release = run.log.all('writer-released').filter(event => event.data.invocation === started.data.invocation);
       if (release.length !== 1 || release[0]!.data.confirmed !== true) throw new Error(`Suspended engineer ${started.data.invocation} has no confirmed writer release`);
       const requestId = capabilityRequestId(records.capabilityRequests.size + 1);
-      const source = await captureProvisionalSource({ projectRoot: this.projectRoot, runDirectory: run.directory,
+      const source = await captureProvisionalSource({ git: this.git, sourceGit: this.options.provisionalSourceGit, projectRoot: this.projectRoot, runDirectory: run.directory,
         request: requestId, acceptedBase: this.accepted(run), writerSettledBy: started.data.invocation,
         changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)) });
       const captured = assignment === undefined ? undefined : await readFile(run.path(runLayout.capturedPlan));
@@ -7081,7 +7084,7 @@ export class RunService {
     }
     run.writer.requireSettled('A capability request cannot suspend an unsettled writer');
     const requestId = existingRequest?.id ?? capabilityRequestId(committedRecords(run.log.ledger.replay()).capabilityRequests.size + 1);
-    const source = existingRequest?.source ?? await captureProvisionalSource({
+    const source = existingRequest?.source ?? await captureProvisionalSource({ git: this.git, sourceGit: this.options.provisionalSourceGit,
       projectRoot: this.projectRoot, runDirectory: run.directory, request: requestId,
       acceptedBase: this.accepted(run), writerSettledBy: suspended.invocation,
       changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)),
@@ -7827,7 +7830,7 @@ export class RunService {
     const assignmentOwner = 'module' in assignment.scope.base ? assignment.scope.base.module : parentTask.consumer;
     run.writer.requireSettled(`Nested request from ${assignment.id} cannot suspend an unsettled writer`);
     const requestId = existingRequest?.id ?? capabilityRequestId(committedRecords(run.log.ledger.replay()).capabilityRequests.size + 1);
-    const source = existingRequest?.source ?? await captureProvisionalSource({ projectRoot: this.projectRoot, runDirectory: run.directory,
+    const source = existingRequest?.source ?? await captureProvisionalSource({ git: this.git, sourceGit: this.options.provisionalSourceGit, projectRoot: this.projectRoot, runDirectory: run.directory,
       request: requestId, acceptedBase: this.accepted(run), writerSettledBy: suspended.id,
       changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)) });
     if (existingRequest === undefined) {
