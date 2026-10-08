@@ -82,7 +82,8 @@ describe('the API view of a local architect\'s continued turns', () => {
     const prompts = new Map<string, string[]>();
     const directories: string[] = [];
     const scripted = gateGit(fixture.root, { previews: finalCandidate(fixture.root, 'revision-01').previews, head: base, commits: [scenarios,
-      { commit: 'revision-01', changes: [{ status: 'A', path: `${notesDirectory}/src/store.ts` }] }, unchanged] });
+      // The iteration checkpoint commits the store; the work-item and final checkpoints find it unchanged.
+      { commit: 'revision-01', changes: [{ status: 'A', path: `${notesDirectory}/src/store.ts` }] }, unchanged, unchanged] });
     const opened = await openRuns(fixture.root, {
       script: recording(byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],

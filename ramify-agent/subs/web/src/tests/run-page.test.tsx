@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import {
   analysisResponseSchema, capabilityListResponseSchema, capabilityStateSchema, decisionListResponseSchema, gateViewSchema, metricsResponseSchema,
   moduleCapabilityComparisonResponseSchema, runSnapshotSchema, scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
-  type RunSnapshot, type WorkItemSummary,
+  type GateView, type RunSnapshot, type WorkItemSummary,
 } from '../../../harness/src/interfaces/protocol/runs.js';
 import { checkFindingListResponseSchema, checkFindingModuleCountsSchema } from '../../../harness/src/interfaces/protocol/check-findings.js';
 import { ClientError } from '../client.js';
@@ -19,6 +19,16 @@ const runId = '20260921T080000Z-c0ffee';
 const at = '2026-09-21T08:00:00.000Z';
 const baseCommit = 'a'.repeat(40);
 const failedCommit = 'b'.repeat(40);
+const passedRequest = 'e'.repeat(40);
+
+/** A committing gate's configured audit as the protocol shows it. */
+function auditView(requested: string, audited: string, verdict: 'pass' | 'fail', reuse: NonNullable<GateView['audit']>['reuse'] = null): NonNullable<GateView['audit']> {
+  return {
+    requestId: `run:${requested.slice(0, 7)}`, mode: 'project-default', status: 'completed',
+    definition: { path: 'ramify-audit.json', blob: 'f'.repeat(40) }, requestedSourceCommit: requested, auditedSourceCommit: audited,
+    requestedMode: 'ramify-partial', executedMode: 'ramify-partial', fallbackReason: null, reuse, verdict, detail: `composed ${verdict}`,
+  };
+}
 
 function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
   return runSnapshotSchema.parse({
@@ -173,40 +183,32 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
     gates: {
       'ga-0001': gateViewSchema.parse({
         id: 'ga-0001', checkpoint: 'readiness', subject: {}, repairRound: 0, infrastructureAttempt: 0, head: baseCommit,
-        commit: null, audited: null, evidence: null, verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
+        commit: null, audited: null, evidence: null, scenarios: [], verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
         commands: [{
           kind: 'setup', name: 'build', argv: ['npm', 'run', 'build'], cwd: '/p', startedAt: at, elapsedMs: 7, exitCode: 0, outcome: 'passed', notVerified: null,
-          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0001/01-setup.log', bytes: 6, truncated: false, tail: 'built\n' }, scenarios: null,
+          runnerError: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0001/01-setup.log', bytes: 6, truncated: false, tail: 'built\n' },
         }],
       }),
       'ga-0002': gateViewSchema.parse({
         id: 'ga-0002', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, repairRound: 0, infrastructureAttempt: 0,
         head: baseCommit, commit: failedCommit, audited: failedCommit,
         evidence: { runRef: 'refs/audited/runs/failed', reportCommit: 'c'.repeat(40), treeRef: 'refs/audited/trees/failed' },
-        verdict: 'failed', cause: 'in-scope', next: 'repair', guardedChanges: [], rules: [],
-        commands: [{
-          kind: 'tests', name: null, argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
-          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\none failed\n' }, scenarios: null,
-        }, {
-          kind: 'scenarios', name: null, argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
-          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0002/scenarios.log', bytes: 30, truncated: false, tail: 'sc-001 failed\n' },
-          scenarios: {
-            mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-001'] }, dryRun: false, excluded: 3, runs: [{ module: 'shop/notes', exit: 1 }],
-            scenarios: [{ id: 'sc-001', run: 'shop/notes', status: 'failed', file: 'subs/notes/src/tests/features/review-notes/review-note.feature', line: 4, failure: noteFailure, undefined: [] }],
-            untracked: { passed: 2, skipped: 0, failed: 0 },
-            failures: ['sc-001 failed at "Then the note is listed": expected one note, got none'],
-          },
+        audit: auditView(failedCommit, failedCommit, 'fail'),
+        scenarios: [{
+          id: 'sc-001', check: 'scenarios', command: 'cucumber', status: 'failed', file: 'subs/notes/src/tests/features/review-notes/review-note.feature', line: 4,
+          failure: noteFailure, undefined: [],
         }],
+        verdict: 'failed', cause: 'check-failed', next: 'repair', guardedChanges: [], rules: [], commands: [],
       }),
       'ga-0003': gateViewSchema.parse({
         id: 'ga-0003', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, repairRound: 1, infrastructureAttempt: 0,
         head: failedCommit, commit: null, audited: failedCommit,
         evidence: { runRef: 'refs/audited/runs/passed', reportCommit: 'd'.repeat(40), treeRef: 'refs/audited/trees/passed' },
-        verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
-        commands: [{
-          kind: 'tests', name: null, argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 0, outcome: 'passed', notVerified: null,
-          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0003/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' }, scenarios: null,
-        }],
+        // The repaired tree equals the failed attempt's commit: the provider
+        // answers with a record of it, both source commits kept.
+        audit: auditView(passedRequest, failedCommit, 'pass', { auditedCommit: failedCommit, ignoredChangedPaths: ['docs/notes.md'], requestedMode: 'ramify-partial', resolution: 'defaulted' }),
+        scenarios: [{ id: 'sc-001', check: 'scenarios', command: 'cucumber', status: 'passed', file: 'subs/notes/src/tests/features/review-notes/review-note.feature', line: 4, failure: null, undefined: [] }],
+        verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [], commands: [],
       }),
     },
     scenarios: scenarioListResponseSchema.parse({
@@ -214,8 +216,8 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         scenarioView('sc-001', 'review-note', 'done', {
           origin: { kind: 'plan', planScenario: 'ps-01', lines: [10, 14] }, name: 'A reviewer writes a note',
           gates: [
-            { gate: 'ga-0002', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, verdict: 'failed', mode: 'quick', dryRun: false, status: 'failed', failure: noteFailure, undefined: [] },
-            { gate: 'ga-0003', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, verdict: 'passed', mode: 'quick', dryRun: false, status: 'passed', failure: null, undefined: [] },
+            { gate: 'ga-0002', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, verdict: 'failed', check: 'scenarios', command: 'cucumber', status: 'failed', failure: noteFailure, undefined: [] },
+            { gate: 'ga-0003', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, verdict: 'passed', check: 'scenarios', command: 'cucumber', status: 'passed', failure: null, undefined: [] },
           ],
         }),
         scenarioView('sc-002', 'review-note', 'bound', { partOf: 'sc-004' }),
@@ -634,9 +636,14 @@ test('one iteration shows its failed and passed audits, attempt-local commit, ev
   expect(within(gate).getByText('Attempt commit').nextElementSibling?.textContent).toBe('none (this attempt made no commit)');
   expect(within(gate).getByText('Audited commit').nextElementSibling?.textContent).toBe(failedCommit);
   expect(within(gate).getByText('Audit evidence').nextElementSibling?.textContent).toContain('refs/audited/trees/passed');
-  const tail = within(gate).getByLabelText('Output tail of tests');
-  expect(tail.textContent).toBe('xxxx\nall passed\n');
-  expect(within(gate).getByText(/20000 bytes in/)).toBeTruthy();
+  // The audit's request and answer: the requested source and the reused
+  // record's audited source, with no command the harness ran.
+  const audit = within(gate).getByLabelText('Configured audit');
+  expect(within(audit).getByText('Requested source').nextElementSibling?.textContent).toBe(passedRequest);
+  expect(within(audit).getByText('Audited source').nextElementSibling?.textContent).toBe(failedCommit);
+  expect(within(audit).getByText('Reused record').nextElementSibling?.textContent).toBe(`of ${failedCommit}; ignored changes: docs/notes.md`);
+  expect(within(audit).getByText('Mode').nextElementSibling?.textContent).toBe('requested ramify-partial, executed ramify-partial');
+  expect(gate.querySelector('.command')).toBeNull();
 
   fireEvent.click(screen.getByRole('button', { name: 'ga-0001' }));
   gate = await screen.findByLabelText('Gate ga-0001');
@@ -717,8 +724,8 @@ test('the Scenarios area lists every tracked scenario with its state, origin, wo
   expect(cells('sc-004')[5]).toBe('not run yet');
   const gates = within(row('sc-001')).getByLabelText('Gates of sc-001');
   expect([...gates.querySelectorAll('li')].map(item => item.textContent)).toEqual([
-    'ga-0002 iteration wi-002.i01, quick: failedThen the note is listed: expected one note, got none',
-    'ga-0003 iteration wi-002.i01, quick: passed',
+    'ga-0002 iteration wi-002.i01, scenarios.cucumber: failedThen the note is listed: expected one note, got none',
+    'ga-0003 iteration wi-002.i01, scenarios.cucumber: passed',
   ]);
   expect(screen.getByLabelText('Scenario states').textContent).toBe('1 pending · 2 bound · 1 done');
 });
@@ -934,17 +941,16 @@ test('a refused approval says why; a reviewed, failed, stopped or unanalysed run
   }
 });
 
-test('a gate\'s scenario check shows each scenario\'s status and failure', async () => {
+test('a gate shows each tracked scenario its audit ran, with its status, check and failure; display only', async () => {
   render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Checks' }));
   fireEvent.click(await screen.findByRole('button', { name: 'ga-0002' }));
   const gate = await screen.findByLabelText('Gate ga-0002');
-  const check = within(gate).getByLabelText('Scenario check');
-  expect(check.textContent).toContain('Mode quick, selection by identity: sc-001, 3 excluded.');
-  expect(within(check).getByLabelText('Scenario results').textContent)
-    .toBe('sc-001 failed in shop/notes, subs/notes/src/tests/features/review-notes/review-note.feature:4Then the note is listed: expected one note, got none');
-  expect(within(check).getByLabelText('Why the scenario check did not pass').textContent).toBe('sc-001 failed at "Then the note is listed": expected one note, got none');
-  expect(within(gate).getAllByLabelText('Scenario check')).toHaveLength(1);
+  const results = within(gate).getByLabelText('Scenarios the audit ran');
+  expect(within(results).getByRole('list').textContent)
+    .toBe('sc-001 failed in scenarios.cucumber, subs/notes/src/tests/features/review-notes/review-note.feature:4Then the note is listed: expected one note, got none');
+  expect(within(gate).getByLabelText('Configured audit').textContent).toContain('Composed verdictfail: composed fail');
+  expect(within(gate).queryByLabelText('Scenario check')).toBeNull();
 });
 
 test('the lineage measurements show their values, coverage and reasons; an unavailable one reads unavailable, never zero', async () => {

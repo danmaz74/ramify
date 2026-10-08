@@ -19,23 +19,26 @@ const entries = entryAssignmentsSchema.parse({ schema: 'ramify-agent.entry-assig
   entries: [{ capability: 'full-description', description, owner: reviews, requirementRefs: [], acceptanceRefs: [], contextRefs: [], citations: [] }],
 });
 
-function gate(id: string, status: 'passed' | 'failed', dryRun: boolean, checkpoint: 'iteration' | 'readiness' | 'final' = 'iteration', scenarioId = 'sc-001') {
+/**
+ * A gate whose configured audit ran `scenarioId` through a Cucumber check, as
+ * the provider's raw check record lists it; `unrun` is a gate whose audit ran
+ * no scenario at all.
+ */
+function gate(id: string, status: 'passed' | 'failed', unrun: boolean, checkpoint: 'iteration' | 'readiness' | 'final' = 'iteration', scenarioId = 'sc-001') {
+  const ran = {
+    uri: scenario.file, line: 1, name: scenarioId, tags: [`@ramify-${scenarioId}`], outcome: status, messages: [],
+    steps: status === 'failed' ? [{ text: source[3], status: 'FAILED', definitionLocations: [], errorMessage: 'failed' }] : [],
+  };
   return gateAttemptSchema.parse({
     schema: 'ramify-agent.gate-attempt/3', id, checkpoint,
     subject: checkpoint === 'iteration' ? { workItem: 'wi-001', iteration: 'wi-001.i01' } : {},
     proposedBy: null, repairRound: 0, infrastructureAttempt: 0, head: 'before', commit: null,
     audited: checkpoint === 'readiness' ? null : 'audited-commit',
     evidence: checkpoint === 'readiness' ? null : { runRef: 'refs/audited/run', reportCommit: 'report', treeRef: 'refs/audited/tree' },
-    guardedChanges: [], rules: [], commands: checkpoint === 'readiness' ? [] : [{
-      kind: 'scenarios', command: { argv: ['cucumber'], cwd: '/project', env: [], envAdditions: {}, timeoutMs: 1000 },
-      startedAt: '2026-09-24T00:00:00.000Z', elapsedMs: 1, exitCode: status === 'passed' ? 0 : 1,
-      outcome: status, runnerError: null, output: { path: 'gate.log', bytes: 0, truncated: false, tail: '' },
-      scenarios: { mode: 'full', selection: { kind: 'identity', scenarios: [scenarioId] }, dryRun, excluded: 0,
-        setup: null, teardown: null, runs: [{ module: reviews, exit: status === 'passed' ? 0 : 1, profile: 'profile', messages: 'messages' }],
-        scenarios: [{ id: scenarioId, run: reviews, status, file: scenario.file, line: 1, binding: [],
-          ...(status === 'failed' ? { failure: { step: source[3], message: 'failed' } } : {}), undefined: [] }],
-        untracked: { passed: 0, skipped: 0, failed: 0 }, failures: status === 'passed' ? [] : ['failed'] },
-    }], verdict: status, cause: status === 'failed' ? 'in-scope' : null, next: status === 'failed' ? 'repair' : 'accept',
+    ...(checkpoint === 'readiness' || unrun ? {} : { provider: { result: {}, checks: {
+      scenarios: { status: status === 'passed' ? 'pass' : 'fail', commands: { cucumber: { cucumberMessages: { status: 'read', run: { scenarios: [ran] } } } } },
+    } } }),
+    guardedChanges: [], rules: [], commands: [], verdict: status, cause: status === 'failed' ? 'check-failed' : null, next: status === 'failed' ? 'repair' : 'accept',
   });
 }
 
@@ -109,7 +112,7 @@ describe('execution core from committed run records', () => {
       { type: 'session-finished', data: { session: 'ses-initial', reason: 'replaced' } },
       { type: 'session-opened', data: { session: 'ses-local', role: 'local-architect', work: { workItem: 'wi-001' }, executor: 'scripted', model: null,
         replaces: { session: 'ses-initial', reason: 'reconstructed' } } },
-      { type: 'gate-attempted', data: {}, records: [{ path: 'gates/ga-dry/attempt.json', body: gate('ga-dry', 'passed', true) }] },
+      { type: 'gate-attempted', data: {}, records: [{ path: 'gates/ga-unrun/attempt.json', body: gate('ga-unrun', 'passed', true) }] },
       { type: 'gate-attempted', data: {}, records: [{ path: 'gates/ga-real/attempt.json', body: gate('ga-real', 'passed', false) }] },
       { type: 'gate-attempted', data: {}, records: [{ path: 'gates/ga-later/attempt.json', body: gate('ga-later', 'failed', false) }] },
       { type: 'readiness-passed', data: {}, records: [{ path: 'gates/ga-ready/attempt.json', body: gate('ga-ready', 'passed', false, 'readiness') }] },
@@ -123,12 +126,12 @@ describe('execution core from committed run records', () => {
       ['session:ses-initial', 'finished'], ['session:ses-local', 'live'],
     ]);
     expect(index.nodes.filter(node => node.kind === 'gate').map(node => node.key)).toEqual([
-      'gate:ga-dry', 'gate:ga-real', 'gate:ga-later', 'gate:ga-ready',
+      'gate:ga-unrun', 'gate:ga-real', 'gate:ga-later', 'gate:ga-ready',
     ]);
     expect(index.nodes.find(node => node.key === 'scenario:sc-001')).toMatchObject({ state: 'done', latestRealResult: 'failed' });
     expect(index.nodes.find(node => node.key === 'capability:full-description')).toMatchObject({ scenarios: { failed: 1, passed: 0 } });
     expect(index.nodes.find(node => node.key === 'gate:ga-later')).toMatchObject({ verdict: 'failed', audit: 'unavailable', evidencePresent: true,
-      cause: 'in-scope', subject: { workItem: 'wi-001', iteration: 'wi-001.i01' } });
+      cause: 'check-failed', subject: { workItem: 'wi-001', iteration: 'wi-001.i01' } });
     expect(index.nodes.find(node => node.key === 'gate:ga-ready')).toMatchObject({ audit: 'not-applicable' });
     expect(index.gaps).toContain('Audit result for gate ga-later is unavailable: the gate retains publication refs but no overall outcome.');
     expect(index.links.some(link => link.kind === 'tracks-scenario' && link.to.key === 'scenario:sc-001')).toBe(true);
@@ -143,8 +146,8 @@ describe('execution core from committed run records', () => {
     expect(executionCoreOf(runView(run)).nodes).toEqual(index.nodes); // durable replay, no mutable cache
   });
 
-  it('does not let a dry-run pass color a scenario green', () => {
-    const view = runView(recordedRun([{ type: 'gate-attempted', data: {}, records: [{ path: 'gates/ga-dry/attempt.json', body: gate('ga-dry', 'passed', true) }] }]));
+  it('does not let a passing gate whose audit ran no scenario color it green', () => {
+    const view = runView(recordedRun([{ type: 'gate-attempted', data: {}, records: [{ path: 'gates/ga-unrun/attempt.json', body: gate('ga-unrun', 'passed', true) }] }]));
     expect(executionCoreOf(view).nodes.find(node => node.key === 'scenario:sc-001')).toMatchObject({ latestRealResult: 'no-real-run' });
   });
 

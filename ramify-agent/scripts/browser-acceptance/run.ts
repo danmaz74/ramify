@@ -99,8 +99,8 @@ try {
   await canvas.getByRole('button', { name: /Renders the status badge, scenario/ }).click();
   await page.getByText(/Given a valid status/).waitFor();
   check('full frozen scenario opens', true);
-  check('scenario detail distinguishes dry, failed and repaired real results',
-    await page.getByText(/ga-001: passed \(dry run\)/).count() === 1 &&
+  check('scenario detail lists each result with the configured check that ran it',
+    await page.getByText(/ga-001: passed in scenarios; gate passed/).count() === 1 &&
     await page.getByText(/ga-005: failed/).count() === 1 && await page.getByText(/ga-006: passed/).count() === 1);
   await page.getByLabel('All gates').getByRole('button', { name: /Status iteration gate, failed/ }).click();
   check('failed verdict with passing audit remain distinct',

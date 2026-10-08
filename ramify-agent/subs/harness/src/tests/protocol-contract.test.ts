@@ -284,7 +284,7 @@ describe('the acceptance scenarios a client reads', () => {
   const plan = { kind: 'plan', planScenario: 'ps-01', lines: [12, 16] };
   const gateResult = {
     gate: 'ga-0004', checkpoint: 'iteration', subject: { workItem: 'wi-003', iteration: 'wi-003.i01' }, verdict: 'failed',
-    mode: 'quick', dryRun: false, status: 'failed', failure: { step: 'Then it is shown', message: 'expected one' }, undefined: [],
+    check: 'scenarios', command: 'cucumber', status: 'failed', failure: { step: 'Then it is shown', message: 'expected one' }, undefined: [],
   };
   const scenario = {
     id: 'sc-003', kind: 'integration', name: 'A note is shown with its tag', state: 'bound', origin: plan,
@@ -349,35 +349,37 @@ describe('the acceptance scenarios a client reads', () => {
     expect(capabilityProgressSchema.safeParse(progress).success).toBe(false);
   });
 
-  test('a gate\'s scenario command carries its compact summary; the others carry none', () => {
+  test('a gate carries its configured audit and the tracked scenarios it ran; a command carries no scenario summary', () => {
     const command = {
-      name: null, argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: '2026-09-23T08:00:00.000Z', elapsedMs: 5, exitCode: 1, outcome: 'failed',
-      notVerified: null, runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0004/scenarios.log', bytes: 10, truncated: false, tail: 'failed' },
+      name: null, argv: ['npm', 'run', 'build'], cwd: '/p', startedAt: '2026-09-23T08:00:00.000Z', elapsedMs: 5, exitCode: 1, outcome: 'failed',
+      notVerified: null, runnerError: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0004/01-setup.log', bytes: 10, truncated: false, tail: 'failed' },
     };
-    const summary = {
-      mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-003'] }, dryRun: false, excluded: 2,
-      runs: [{ module: 'app/reviews', exit: 1 }],
-      scenarios: [{ id: 'sc-003', run: 'app/reviews', status: 'undefined', file: 'f.feature', line: 3, failure: { step: 'Then it is shown', message: 'undefined' }, undefined: ['Then it is shown'] }],
-      untracked: { passed: 0, skipped: 0, failed: 0 },
-      failures: ['sc-003 undefined'],
+    const audit = {
+      requestId: 'r:ga-0004', mode: 'project-default', status: 'completed', definition: { path: 'ramify-audit.json', blob: 'b'.repeat(40) },
+      requestedSourceCommit: 'c'.repeat(40), auditedSourceCommit: 'a'.repeat(40), requestedMode: 'ramify-partial', executedMode: 'ramify-partial',
+      fallbackReason: null, reuse: { auditedCommit: 'a'.repeat(40), ignoredChangedPaths: ['docs/a.md'], requestedMode: 'ramify-partial', resolution: 'defaulted' },
+      verdict: 'fail', detail: 'a check failed',
     };
+    const result = { id: 'sc-003', check: 'scenarios', command: 'cucumber', status: 'undefined', file: 'f.feature', line: 3, failure: null, undefined: ['Then it is shown'] };
     const gate = {
       id: 'ga-0004', checkpoint: 'iteration', subject: {}, repairRound: 0, infrastructureAttempt: 0, head: 'a', commit: null, audited: null,
-      evidence: null, verdict: 'failed', cause: 'in-scope', next: 'repair', guardedChanges: [], rules: [],
-      commands: [{ kind: 'scenarios', ...command, scenarios: summary }, { kind: 'tests', ...command, scenarios: null }],
+      evidence: null, audit, scenarios: [result], verdict: 'failed', cause: 'check-failed', next: 'repair', guardedChanges: [], rules: [], commands: [],
     };
     expect(gateViewSchema.parse(gate)).toEqual(gate);
-    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'tests', ...command }] }).success).toBe(false);
-    const withBinding = { ...summary, scenarios: [{ ...summary.scenarios[0], binding: [] }] };
-    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'scenarios', ...command, scenarios: withBinding }] }).success).toBe(false);
-    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'scenarios', ...command, scenarios: { ...summary, mode: 'slow' } }] }).success).toBe(false);
+    expect(gateViewSchema.safeParse({ ...gate, scenarios: [{ ...result, binding: [] }] }).success).toBe(false);
+    expect(gateViewSchema.safeParse({ ...gate, scenarios: [{ ...result, mode: 'quick' }] }).success).toBe(false);
+    expect(gateViewSchema.safeParse({ ...gate, audit: { ...audit, mode: 'dirty' } }).success).toBe(false);
+    for (const kind of ['tests', 'scenarios', 'conformance']) {
+      expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind, ...command }] }).success).toBe(false);
+    }
+    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'setup', ...command, scenarios: null }] }).success).toBe(false);
     // A setup command carries its declared name; a command a failed setup kept from running says so.
     const setup = { ...gate, commands: [
-      { kind: 'setup', ...command, name: 'build', argv: ['npm', 'run', 'build'], exitCode: 2, scenarios: null },
-      { kind: 'tests', ...command, exitCode: null, outcome: 'not-verified', notVerified: 'setup-failed', scenarios: null },
+      { kind: 'setup', ...command, name: 'build', exitCode: 2 },
+      { kind: 'type-check', ...command, exitCode: null, outcome: 'not-verified', notVerified: 'setup-failed' },
     ] };
     expect(gateViewSchema.parse(setup)).toEqual(setup);
-    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'setup', ...command, name: '', scenarios: null }] }).success).toBe(false);
+    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'setup', ...command, name: '' }] }).success).toBe(false);
   });
 
   test('a projected event may refer to a scenario', () => {

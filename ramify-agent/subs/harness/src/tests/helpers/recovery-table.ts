@@ -217,13 +217,13 @@ export const recoveryTable = {
   'gate-attempted': {
     machines: ['SM7', 'SM4'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
     effect: /the commit and audit of gate ga-\d+/, commits: { before: 1, after: 2 }, recovery: 'makes-the-commit',
-    at: { gate: 'ga-0004', revision: source(1) },
+    at: { gate: 'ga-0002', revision: source(1) },
     stated: 'The verified operation is durable and the commit is not made: recovery makes and audits one commit, then writes the complete attempt once',
   },
   'gate-committing': {
     machines: ['SM7', 'SM4'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
     effect: /the commit and audit of gate ga-\d+/, commits: { before: 2, after: 2 }, recovery: 'finds-the-commit',
-    at: { gate: 'ga-0004', revision: source(1) },
+    at: { gate: 'ga-0002', revision: source(1) },
     stated: 'The commit is made and the audit is not complete: recovery finds and re-audits that commit, then writes one complete attempt',
   },
   'gate-committed': {

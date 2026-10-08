@@ -231,7 +231,7 @@ export function ScenarioTable({ scenarios, total }: { readonly scenarios: readon
 export function GateScenarioResults({ scenarios }: { readonly scenarios: readonly GateScenarioResultView[] }) {
   if (scenarios.length === 0) return null;
   return (
-    <div className="scenario-check" aria-label="Scenario results">
+    <div className="scenario-check" aria-label="Scenarios the audit ran">
       <p className="muted">The tracked scenarios this gate's audit ran, by its configured Cucumber checks.</p>
       <ul aria-label="Scenario results">
         {scenarios.map(result => (

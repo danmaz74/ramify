@@ -70,11 +70,11 @@ function nextMap(nodes = map.nodes) {
 }
 const scenarioHistory = [
   { gate: 'ga-001', checkpoint: 'iteration' as const, subject: { workItem: 'wi-status' }, verdict: 'passed' as const,
-    mode: 'quick' as const, dryRun: true, status: 'passed' as const, failure: null, undefined: [] },
+    check: 'scenarios', command: 'cucumber', status: 'passed' as const, failure: null, undefined: [] },
   { gate: 'ga-005', checkpoint: 'iteration' as const, subject: { workItem: 'wi-status' }, verdict: 'failed' as const,
-    mode: 'quick' as const, dryRun: false, status: 'failed' as const, failure: null, undefined: [] },
+    check: 'scenarios', command: 'cucumber', status: 'failed' as const, failure: null, undefined: [] },
   { gate: 'ga-006', checkpoint: 'iteration' as const, subject: { workItem: 'wi-status' }, verdict: 'passed' as const,
-    mode: 'full' as const, dryRun: false, status: 'passed' as const, failure: null, undefined: [] },
+    check: 'scenarios', command: 'cucumber', status: 'passed' as const, failure: null, undefined: [] },
 ];
 const client = {
   getExecutionMap: async () => { if (unavailable) throw new Error('Scripted connection loss');
