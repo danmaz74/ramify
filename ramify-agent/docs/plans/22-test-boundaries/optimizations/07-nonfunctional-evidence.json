@@ -1,0 +1,293 @@
+{
+  "base": "5c62119f3332f126aa96fba27d71f4ceb26fceca",
+  "targetAtQualification": "5c62119f3332f126aa96fba27d71f4ceb26fceca",
+  "branch": "perf/plan22-nonfunctional",
+  "originalCases": 20,
+  "ordinaryCases": 20,
+  "newControls": 7,
+  "compositionCases": 11,
+  "additionalActualWitnesses": 1,
+  "caseMap": [
+    {
+      "originalFile": "nonfunctional-deviation-runtime.test.ts",
+      "title": "an NFR-only exhausted run completes pending review with an exact source-bound CheckFinding",
+      "destination": "nonfunctional-deviation-runtime.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-deviation-runtime.test.ts",
+      "title": "accepting an exhausted NFR cannot waive a failed final test gate",
+      "destination": "nonfunctional-deviation-runtime.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-deviation-runtime.test.ts",
+      "title": "a rejected NFR decision remains current after a ledger rebuild and requires follow-up",
+      "destination": "nonfunctional-deviation-runtime.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a phase run resumes after nonfunctional-phase-started without repeating committed evidence",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a phase run resumes after candidate-prepared without repeating committed evidence",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a phase run resumes after nonfunctional-assessed without repeating committed evidence",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a final gate resumes after gate-attempted without a duplicate audit attempt",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a final gate resumes after gate-committing without a duplicate audit attempt",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a final gate resumes after gate-committed without a duplicate audit attempt",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a repair phase nonfunctional-repair-assigned crash resumes exactly once",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a repair phase nonfunctional-repair-assigned crash refuses downtime drift",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a repair phase invocation-ended crash resumes exactly once",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a repair phase nonfunctional-repair-committed crash resumes exactly once",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a repair phase nonfunctional-assessed crash resumes exactly once",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "a repair phase writer-acquired crash fails closed",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "round three exhausts and a late source change still refuses the final gate",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-recovery.test.ts",
+      "title": "an exhausted crash with changed source leaves merge readiness unavailable",
+      "destination": "nonfunctional-recovery.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-repair.test.ts",
+      "title": "one authorized repair edits two modules from the chosen src, then reassesses every NFR",
+      "destination": "nonfunctional-repair.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    },
+    {
+      "originalFile": "nonfunctional-run.test.ts",
+      "title": "an empty fixed catalog records a candidate-bound empty assessment and audits its exact tree",
+      "destination": "nonfunctional-run.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed",
+      "additionalActualWitness": "nonfunctional-run.boundary.test.ts; original callback byte-identical",
+      "ordinaryBoundary": "scripted Candidates.commitTree answer replaces actual commitTree; lifecycle assertions retained"
+    },
+    {
+      "originalFile": "nonfunctional-run.test.ts",
+      "title": "a mutation during final verification refuses completion after auditing the assessed commit",
+      "destination": "nonfunctional-run.test.ts",
+      "treatment": "same title; strict external ports; original harness, ledger, filesystem and outcomes",
+      "status": "passed"
+    }
+  ],
+  "physicalOriginalExpectations": {
+    "nonfunctional-deviation-runtime.test.ts": 30,
+    "nonfunctional-recovery.test.ts": 29,
+    "nonfunctional-repair.test.ts": 42,
+    "nonfunctional-run.test.ts": 14
+  },
+  "expectationPreservation": "All 115 original physical expectations retained. One ordinary commitTree assertion uses the injected CandidateSource; its exact original assertion remains in the byte-identical actual callback.",
+  "timings": [
+    {
+      "file": "nonfunctional-deviation-runtime.test.ts",
+      "oldMs": 3808.622802734375,
+      "ordinaryMs": 2554.921875
+    },
+    {
+      "file": "nonfunctional-recovery.test.ts",
+      "oldMs": 13059.304443359375,
+      "ordinaryMs": 6853.529052734375
+    },
+    {
+      "file": "nonfunctional-repair.test.ts",
+      "oldMs": 1549.591796875,
+      "ordinaryMs": 1126.0166015625
+    },
+    {
+      "file": "nonfunctional-run.test.ts",
+      "oldMs": 1832.306884765625,
+      "ordinaryMs": 1180.008056640625
+    }
+  ],
+  "sourceHashes": {
+    "subs/harness/src/tests/nonfunctional-recovery.test.ts": "49ae5cfc4a9030e8c3ce26ecae99ca43d19988dbf6fc707b5bb56d8d81e8716c",
+    "subs/harness/src/tests/nonfunctional-run.test.ts": "51b7a53c1eaeb15189802b84939505dd5f7345ee5112f2f9ada6dae755699249",
+    "subs/harness/src/tests/nonfunctional-repair.test.ts": "397901d3b318ee27592a88b731ef0b866e40e87979686fb7149349f2fcd67a17",
+    "subs/harness/src/tests/nonfunctional-deviation-runtime.test.ts": "40c3a8c06a4d1569f5887039e936cd47f80e443d5fc02ff351cd0c62809855e1",
+    "subs/harness/src/tests/nonfunctional-boundaries.test.ts": "e15b3e3ad371b52e5874344e3f965b7e4de812e4593ccb65ef4b66b9db00b30c",
+    "subs/harness/src/tests/nonfunctional-run.boundary.test.ts": "c511208ed191c51ab73630dce7d6459c69482fd0edb75ec2246818e1416229f5",
+    "subs/harness/src/tests/helpers/nonfunctional-boundaries.ts": "1f96957c00a40cf15f03c1975ad01b5138135aed423afe8cc4f285c8f547e2a8"
+  },
+  "configurationHashes": {
+    "vitest.config.ts": "c0f54f605e468027bffb775b4847c487bb88fb59f1b06528dbacb09738f07e7e",
+    "package.json": "df8473368f6e34409bc6f7917ba183bda93db16cf2b75f8a561c42ab12c29551",
+    "package-lock.json": "9d0b5e4332475cfc10b20c6f8c3d2aff035703a25af88710bc2beeb361ea96d6",
+    "ramify-audit.json": "9bfaaa5d6b95d590cf044ecab60faec812b2e39fd5a7752be28e7190afa80baa",
+    "subs/harness/module.ramify": "1236f0bf27b5ec513879601bc1d7f983d6a155d13f3b6adf1d12808304908288"
+  },
+  "verification": {
+    "baseline": {
+      "path": "/tmp/plan22-nonfunctional-baseline.json",
+      "sha256": "e59c79750ea15497cab9633952b4afbc9de780df55c4e85ff955fb79bedc9ddd",
+      "passed": 20,
+      "failed": 0,
+      "pending": 0
+    },
+    "authoring1": {
+      "path": "/tmp/plan22-nonfunctional-authoring1.json",
+      "sha256": "3299b9ee782c4a2a3864f60bc635f283b88c62277e0622f09070f29fb169445c",
+      "passed": 19,
+      "failed": 1,
+      "pending": 0
+    },
+    "authoring2": {
+      "path": "/tmp/plan22-nonfunctional-authoring2.json",
+      "sha256": "503b07f91b950537892b5530b474ffc38489299ee0b45a9b3e24c445050b7780",
+      "passed": 18,
+      "failed": 2,
+      "pending": 0
+    },
+    "authoring3": {
+      "path": "/tmp/plan22-nonfunctional-authoring3.json",
+      "sha256": "dd0ce441b19471329d7f48bff66fc907d08ed99bec76a9609334729096a24312",
+      "passed": 21,
+      "failed": 0,
+      "pending": 0
+    },
+    "qualified1": {
+      "path": "/tmp/plan22-nonfunctional-qualified1.json",
+      "sha256": "ba2e73cfde2621ba275fafb502df259322fbd0f631faabce740401c7a8ce13e0",
+      "passed": 30,
+      "failed": 2,
+      "pending": 0
+    },
+    "qualified2": {
+      "path": "/tmp/plan22-nonfunctional-qualified2.json",
+      "sha256": "6f75875021d7ede9934df11e0030b371ae69eedfcc1aa3b824fa52050072ae43",
+      "passed": 32,
+      "failed": 0,
+      "pending": 0
+    },
+    "ordinary-final": {
+      "path": "/tmp/plan22-nonfunctional-ordinary-final.json",
+      "sha256": "ca5c66767197c2ab140d4be48c4fa2719dcaddd906dc8cdb6bee465adcbf74b2",
+      "passed": 17,
+      "failed": 21,
+      "pending": 0
+    },
+    "qualified-final": {
+      "path": "/tmp/plan22-nonfunctional-qualified-final.json",
+      "sha256": "0c6c8ff9d248be0be692f2c26aca746834ca5740138debccbcd1b58f6ba74b5b",
+      "passed": 39,
+      "failed": 0,
+      "pending": 0
+    },
+    "controls-qualified": {
+      "path": "/tmp/plan22-nonfunctional-controls-qualified.json",
+      "sha256": "52b81930eb5c456ee9bc5546405e4b03a4df5a48de9e4a02e3761502f13053c6",
+      "passed": 7,
+      "failed": 0,
+      "pending": 0
+    },
+    "ordinary-qualified2": {
+      "path": "/tmp/plan22-nonfunctional-ordinary-qualified2.json",
+      "sha256": "22c4405114603afb2a0029d30cbd0c88ef9c3ee92ad4b188d6b56455890e4243",
+      "passed": 38,
+      "failed": 0,
+      "pending": 0
+    },
+    "boundary-qualified": {
+      "path": "/tmp/plan22-nonfunctional-boundary-qualified.json",
+      "sha256": "b68883cdbfa5d3b6b7ee42f66ad5b405e7af1e1c807bdd3b3e09bc56f1e6364b",
+      "passed": 1,
+      "failed": 0,
+      "pending": 0,
+      "durationMs": 1143.69970703125
+    }
+  },
+  "ordinaryProcessAttempts": 0,
+  "ordinaryGitInvocations": 0,
+  "ordinaryColdRamifyInvocations": 0,
+  "actualProcessCounts": "Not instrumented; actual witness deliberately invokes Git and released configured audit.",
+  "limits": [
+    "Current local vi.mock guard covers existing Node process API call paths; automatic global guard and runner partition remain future cuts.",
+    "Source identities evolve with concurrent Plan21; timing is advisory under shared host load.",
+    "Coordinator owns released full nested pre-merge audit; not executed by implementation agent."
+  ],
+  "cancelledAuthoring": {
+    "commandResult": "own Vitest PID2318543 terminated after strict ownership schema rejected accidental tags; no passing qualification claimed",
+    "durableFailure": "/tmp/plan22-nonfunctional-topology-schema-failure.jsonl",
+    "sha256": "73617eaef4a383a36b72e26786941a20d457c35577fa5a45ba7209e7eede7f89"
+  }
+}

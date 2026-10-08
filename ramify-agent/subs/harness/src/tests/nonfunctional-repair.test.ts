@@ -1,24 +1,39 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
-import { gitService } from '../../subs/evidence/src/git.js';
 import { coordinatorAssessmentToolName, coordinatorActionToolName, coordinatorInvestigationToolName, nonfunctionalRepairToolName } from '../nonfunctional/submissions.js';
 import { intakeToolName, principleToolName } from '../analysis/extraction.js';
 import { copyFixture } from './helpers/fixture.js';
 import { withDefaultTurns } from './helpers/declarations.js';
 import { analysis } from './helpers/analysis.js';
-import { submit, treeInputs, write } from './helpers/iterations.js';
-import { initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { submit, write } from './helpers/iterations.js';
+import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
 
+import { nfrBoundaries } from './helpers/nonfunctional-boundaries.js';
+import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
+vi.mock('node:child_process', async importOriginal => {
+  const { guardedChildProcess } = await import('./helpers/process-guard.js');
+  return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
+});
+beforeEach(resetSpawnAttempts);
+const answers: ReturnType<typeof nfrBoundaries>[] = [];
+
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+afterEach(async () => {
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
+  for (const answer of answers.splice(0)) try { answer.assertComplete(); } catch (error) { errors.push(error); }
+  try { expect(spawnAttempts(), 'ordinary NFR setup/flow/teardown process attempts').toEqual([]); } catch (error) { errors.push(error); }
+  if (errors.length) throw new AggregateError(errors, 'NFR fixture teardown failed');
+});
 
 test('one authorized repair edits two modules from the chosen src, then reassesses every NFR', async () => {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
-  await installTestRunner(fixture.root);
+  const boundaryAnswers = nfrBoundaries(fixture.root, { repair: 'two-modules' });
+  answers.push(boundaryAnswers);
   const plan = join(fixture.root, 'plans/review-notes/plan.md');
   const obligation = 'The review must retain an audit record.';
   const otherObligation = 'The catalog must expose the audit record.';
@@ -27,7 +42,6 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   const original = await readFile(plan, 'utf8');
   await writeFile(plan, `${original}\n${obligation}\n${otherObligation}\n${advice}\n`);
   await writeFile(join(fixture.root, 'audit.principles.md'), `# Audit\n\n${fixed}\n`);
-  await initRepository(fixture.root);
   const firstModule = 'collection-review/workspace/reviews/core';
   const firstSrc = join(fixture.root, 'subs/workspace/subs/reviews/subs/core/src');
   const otherFile = join(fixture.root, 'subs/workspace/subs/catalog/src/nonfunctional-repair.ts');
@@ -62,14 +76,14 @@ test('one authorized repair edits two modules from the chosen src, then reassess
     if (spec.submission.name === coordinatorInvestigationToolName) return submit({ kind: 'investigation-result',
       summary: 'Intermediate trace is absent', findings: [{ nfr: 'nfr-001', inspectedScope: ['src/'],
         evidence: ['No trace writer found'], uncertainty: 'The trace was not observed' }] });
-    if (spec.submission.name === nonfunctionalRepairToolName) return submit({ kind: 'completed', summary: 'Added audit record source',
+    if (spec.submission.name === nonfunctionalRepairToolName) { boundaryAnswers.repair(); return submit({ kind: 'completed', summary: 'Added audit record source',
       evidence: ['Two source files written'], remaining: [] },
       write('nonfunctional-repair.ts', 'export const auditRecord = true;\n'),
       write(otherFile, 'export const catalogAuditRecord = true;\n'),
-      write(plan, 'forbidden plan change\n'));
+      write(plan, 'forbidden plan change\n')); }
     return [];
   }));
-  const { service } = await openRuns(fixture.root, { git: gitService, agent, inputs: treeInputs() });
+  const { service } = await openRuns(fixture.root, { ...boundaryAnswers.options, agent });
   cleanups.push(() => service.close());
   const receipt = await service.execute(startRun('review-notes'));
   await service.settled('review-notes', receipt.jobId);

@@ -1,18 +1,32 @@
 import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterAll, afterEach, expect, test } from 'vitest';
-import { gitService } from '../../subs/evidence/src/git.js';
+import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { coordinatorActionToolName, coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
 import { intakeToolName } from '../analysis/extraction.js';
 import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findings.js';
 import { RunQueries } from '../projections/queries.js';
 import { copyFixture } from './helpers/fixture.js';
-import { initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, startRun, testPolicy } from './helpers/runs.js';
+import { onlyRun, openRuns, runEventsOnDisk, startRun, testPolicy } from './helpers/runs.js';
+
+import { nfrBoundaries } from './helpers/nonfunctional-boundaries.js';
+import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
+vi.mock('node:child_process', async importOriginal => {
+  const { guardedChildProcess } = await import('./helpers/process-guard.js');
+  return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
+});
+beforeEach(resetSpawnAttempts);
+const answers: ReturnType<typeof nfrBoundaries>[] = [];
 
 const plan = 'review-notes';
 const quote = 'The service must answer within 50 milliseconds.';
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+afterEach(async () => {
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
+  for (const answer of answers.splice(0)) try { answer.assertComplete(); } catch (error) { errors.push(error); }
+  try { expect(spawnAttempts(), 'ordinary NFR setup/flow/teardown process attempts').toEqual([]); } catch (error) { errors.push(error); }
+  if (errors.length) throw new AggregateError(errors, 'NFR fixture teardown failed');
+});
 const browserCases: Record<string, unknown> = {};
 const trial: Record<string, unknown> = {};
 afterAll(async () => {
@@ -43,14 +57,11 @@ const analysis = { elements: [], entries: [], hypotheses: [], coverageLimits: []
 async function startExhaustedRun(options: { finalGateFails?: boolean } = {}) {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
-  await installTestRunner(fixture.root);
+  const boundaryAnswers = nfrBoundaries(fixture.root, { finalGateFails: options.finalGateFails });
+  answers.push(boundaryAnswers);
   await writeFile(join(fixture.root, 'plans', plan, 'plan.md'), `# Review notes\n\n${quote}\n`);
-  await initRepository(fixture.root);
-  const opened = await openRuns(fixture.root, { git: gitService,
+  const opened = await openRuns(fixture.root, { ...boundaryAnswers.options,
     policy: root => testPolicy(root),
-    ...(options.finalGateFails ? { checkScript: ({ check, context }) =>
-      context.checkpoint === 'final' && check.kind === 'tests'
-        ? { outcome: { kind: 'completed' as const, exitCode: 1 } } : {} } : {}),
     script: spec => {
       if (spec.submission.name === intakeToolName) return [{ kind: 'submit', input: intake }];
       if (spec.role === 'initial-architect') return [{ kind: 'submit', input: analysis }];
@@ -67,7 +78,7 @@ async function startExhaustedRun(options: { finalGateFails?: boolean } = {}) {
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun(plan));
   await opened.service.settled(plan, receipt.jobId);
-  return { fixture, opened, receipt, queries: new RunQueries(opened.service) };
+  return { fixture, opened, receipt, boundaryAnswers, queries: new RunQueries(opened.service) };
 }
 
 test('an NFR-only exhausted run completes pending review with an exact source-bound CheckFinding', async () => {
@@ -155,7 +166,7 @@ test('accepting an exhausted NFR cannot waive a failed final test gate', async (
 }, 30_000);
 
 test('a rejected NFR decision remains current after a ledger rebuild and requires follow-up', async () => {
-  const { fixture, opened, receipt, queries } = await startExhaustedRun();
+  const { fixture, opened, receipt, queries, boundaryAnswers } = await startExhaustedRun();
   const version = opened.service.getRun(plan, receipt.jobId)!.version;
   const findings = await queries.checkFindings(plan, receipt.jobId,
     { workItem: null, module: null, select: 'all', order: 'attention', after: null, limit: 20 }, version);
@@ -175,7 +186,7 @@ test('a rejected NFR decision remains current after a ledger rebuild and require
   expect(rejected.items[0]?.planDeviation).toMatchObject({ followUp: 'Rework the response path before merge' });
   expect(rejected.items[0]?.standing).toBe('open');
   await opened.service.close();
-  const reopened = await openRuns(fixture.root, { git: gitService });
+  const reopened = await openRuns(fixture.root, { ...boundaryAnswers.options });
   cleanups.push(() => reopened.service.close());
   const rebuilt = new RunQueries(reopened.service);
   const reconstructedVersion = reopened.service.getRun(plan, receipt.jobId)!.version;
