@@ -411,6 +411,19 @@
       "structure": "passed; partial analysis coverage; 317 analysis limits",
       "logs": "/tmp/ramify-plan23-integrated-git-line-facts-*.log",
       "boundaryLimit": "Original source positions and repository-relative filenames retained; arbitrary BASE-to-setup-before mapping still requires exact boundary history and authenticated blob facts; no path/commit/count exemptions."
+    },
+    "sharedSetupAttributionVerifier": {
+      "providerHead": "095498883252a7c8c6365fd055864ac927537362",
+      "reviewFixHead": "c049ba7402febc608b593e3841134adb97a5bb29",
+      "integratedHead": "a96a1521",
+      "outputExposure": "c1ae1a95",
+      "helperExposure": "9eb86313",
+      "ordinaryFiles": 3,
+      "ordinaryTests": 60,
+      "typeCheck": "passed all four configured scopes",
+      "structure": "passed; partial analysis coverage; 317 retained analysis limits",
+      "logs": "/tmp/ramify-plan23-integrated-attribution-helper-*.log",
+      "limit": "Partial pure provider only; full13 collectors/fixtures and nativeGit remain pending."
     }
   }
 }

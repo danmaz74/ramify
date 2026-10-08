@@ -137,3 +137,5 @@ Intermediate type-check logs (`type-initial.log`, `type-fifth.log`, `type-sixth.
 ## Coordinator integration acceptance
 
 Integrated source **909ae04a** and receipt **c23a8970** were independently reviewed. Exact write-set validation found 25 changed paths within 28 optional reservations. The joined ordinary command in `/tmp/ramify-plan23-integrated-run-corrections-focused.log` passed **14 files / 195 tests**, 52.46s, on 2026-10-08 at 21:35 UTC; it includes command/catalog/current packets, mutation/completion, NFR, continuing workflows, shell classification and the generic operation engine. All four configured type scopes passed (`-types.log`), and structural validation passed with zero errors/warnings and 317 retained analysis limits (`-structure.log`, 671 source files). Main checkout HEAD/index/seven protected file hashes remained unchanged. This accepts W08–W11 ordinary integration; Q01–Q03 remain pending.
+
+The exact root 14-file process-guard receipt window was separately checked: all native:false, allowed:[], refused:[]. Evidence: `/tmp/ramify-plan23-integrated-run-corrections-process-receipts.json`.
