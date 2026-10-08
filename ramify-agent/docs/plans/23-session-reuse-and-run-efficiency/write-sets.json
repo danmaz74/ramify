@@ -238,7 +238,8 @@
       "subs/harness/src/sessions/single.ts",
       "subs/harness/src/tests/single-session.test.ts",
       "subs/harness/src/tests/single-session-fixture.ts",
-      "subs/harness/src/tests/hook-checks.test.ts"
+      "subs/harness/src/tests/hook-checks.test.ts",
+      "subs/harness/src/tests/helpers/hook-run-boundaries.ts"
     ],
     "11": [
       "subs/harness/src/run/service.ts",
