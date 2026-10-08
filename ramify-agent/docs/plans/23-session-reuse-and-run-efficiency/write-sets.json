@@ -447,6 +447,10 @@
         "subs/harness/src/tests/integration-scenarios.test.ts",
         "subs/harness/src/tests/contract-revision-scripted.test.ts",
         "subs/harness/src/tests/helpers/unchanged-run.ts"
+      ],
+      "performanceWorker": [
+        "subs/harness/src/run/session-store.ts",
+        "subs/harness/src/tests/plan23-session-store-cache.test.ts"
       ]
     }
   }
