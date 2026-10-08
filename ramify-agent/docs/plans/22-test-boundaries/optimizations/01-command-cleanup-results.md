@@ -1,7 +1,8 @@
 # Optimization 1: avoid cleanup waits for completed commands
 
 **Date:** 2026-10-08. **Delivery:** implementation and focused verification ready;
-full configured audit and post-cleanup suite baseline remain coordinator work.
+the coordinator's initial full audit failed one crash fixture, corrected in the
+qualification follow-up below. Full-audit rerun remains coordinator work.
 
 ## Inputs and correction
 
@@ -114,7 +115,68 @@ PY
 
 TB03/TB04 have focused wrapper and real-process evidence. No ordinary-test
 conversion, runner partition, provider contract or concurrency policy changed.
-The full configured audit and comparable four-worker suite baseline have not
-run in this optimization worktree; the coordinator owns them after merging.
+The initial implementation did not run a full configured audit locally; the
+coordinator subsequently ran the audit described below. A passing comparable
+four-worker suite baseline remains outstanding.
 These checks establish observed execution behavior, not responsible-architect
 semantic completion of Plan 21 or Plan 22.
+
+## Qualification follow-up: the CA20 crash fixture
+
+The coordinator's full audit of commit
+`42c1552737734de4ecb296855d76d3b923454e80` completed with a failing composition
+verdict. `/tmp/ramify-plan22-cleanup-baseline-audit.json` retained the failure:
+CA20, "a registered real process group survives a service crash and is settled
+before any successor work", raised `LedgerCorruptError` on ledger event 58,
+because another live writer had appended 243 bytes. This result remains a
+failed audit, not a passing baseline.
+
+The focused reproduction with the optimized wrapper also failed deterministically
+in 954 ms of test execution. The unchanged test passed with the original wrapper
+in 14.53 s. For that diagnostic, the original wrapper was read from base
+`2683945c`; the qualified wrapper was restored in a `finally` block. The preserved
+outputs are `/tmp/plan22-ca20-optimized.txt` and
+`/tmp/plan22-ca20-original.txt`.
+
+CA20 simulated a crash by freezing the durable registration callback while
+keeping the original service and real executor alive in the test process.
+The recovery service killed the registered group. This independently completed
+the old executor's callback, allowing the allegedly crashed service to resume
+and append concurrently with recovery. Unconditional waits on unrelated Git
+commands had masked the race. No production ledger or executor behavior was
+changed to accommodate this invalid crash simulation.
+
+The correction uses the existing injected `commandExecution` port. It runs the
+actual `runCommand` implementation and retains actual durable registration,
+kernel identity, OS liveness, group kill and recovery assertions. Once the
+crash flag is set, the test withholds the old executor's completion reply so
+that the abandoned service cannot receive callbacks after its simulated crash.
+An added assertion verifies that the original service's event sequence remains
+exactly at the recorded crash boundary after recovery. Cleanup is registered
+when the real group is observed, before the crash callback can freeze, so the
+group is killed even if subsequent fixture assertions fail.
+
+This remains an in-process service-crash simulation with a real OS process-group
+witness; it does not claim that the service itself was killed in a separate
+process, or label real command results as synthetic adapter evidence. The
+missing command completion reply models the stopped service's inability to
+receive a callback. Existing writer-unsettled and no-successor-work assertions
+are unchanged.
+
+Focused checks after the fixture correction, from `ramify-agent/`:
+
+```sh
+node_modules/.bin/vitest run subs/harness/subs/evidence/src/tests/run-command.test.ts subs/harness/src/tests/capability-recovery.test.ts -t 'command cleanup wrapper|runCommand|childEnvironment|environmentNames|a registered real process group'
+npm run type-check
+```
+
+Both focused files passed: 20 selected tests, with 17 other recovery cases
+filtered by the explicit title selection, duration 3.26 s and summed test time
+2.70 s. All 19 executor cases and the corrected CA20 recovery case executed.
+All four declared compiler scopes passed. Full output is retained in
+`/tmp/plan22-cleanup-recovery-regressions.txt` and
+`/tmp/plan22-cleanup-recovery-typecheck.txt`. `npm run check:self` also passed
+after the new test import: zero errors/warnings, 310 analysis limits, partial
+coverage, with output in `/tmp/plan22-cleanup-recovery-checkself.txt`.
+`git diff --check` passed. A full audit was not rerun by the
+optimization subagent; the coordinator owns that serialized qualification.

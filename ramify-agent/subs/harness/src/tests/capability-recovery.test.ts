@@ -2,6 +2,7 @@ import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { gitService } from '../../subs/evidence/src/git.js';
+import { runCommand } from '../../subs/evidence/src/run-command.js';
 import type { Script } from '../../subs/agent/src/scripted.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { captureProvisionalSource } from '../capability/source.js';
@@ -52,6 +53,17 @@ test('CA20: a registered real process group survives a service crash and is sett
   };
   const first = await openCapabilityRuns(fixture.root, {
     git: gitService, script, inputs: treeInputs(),
+    commandExecution: async request => {
+      const result = await runCommand({ ...request, registerProcessGroup: async (pid, identity) => {
+        cleanups.push(async () => nodeProcessGroups.kill(pid));
+        await request.registerProcessGroup?.(pid, identity);
+      } });
+      // A crashed service cannot receive the executor's completion callback
+      // when recovery kills its real group. Freezing registration alone leaves
+      // this independent callback alive in the in-process crash fixture.
+      if (frozen) await freeze();
+      return result;
+    },
     afterWrite: async write => { if (write === 'writer-process-registered' && !frozen) { frozen = true; await freeze(); } },
   });
   const receipt = await first.service.execute(startRun('need'));
@@ -60,7 +72,6 @@ test('CA20: a registered real process group survives a service crash and is sett
   const registered = before.find(event => event.type === 'writer-process-registered');
   if (registered?.type !== 'writer-process-registered') throw new Error('Missing durable process registration');
   const pid = registered.data.pid;
-  cleanups.push(async () => nodeProcessGroups.kill(pid));
   expect(nodeProcessGroups.alive(pid)).toBe(true);
   expect(before.some(event => event.type === 'writer-released' && event.data.invocation === registered.data.invocation)).toBe(false);
 
@@ -74,6 +85,7 @@ test('CA20: a registered real process group survives a service crash and is sett
   expect(events.find(event => event.type === 'job-failed')?.data.reason).toBe('writer-unsettled');
   expect(events.filter(event => event.type === 'capability-handed-back' || event.type === 'gate-attempted')).toHaveLength(0);
   expect(events.filter(event => event.type === 'work-item-started' && event.data.workItem === 'wi-002')).toHaveLength(0);
+  expect(first.service.events('need', receipt.jobId)).toEqual(before);
 }, 45_000);
 
 test('CA19 CA30: a snapshot written before its request commit is adopted with the exact dirty index and tree', async () => {
