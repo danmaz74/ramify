@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { isAbsolute, join } from 'node:path';
 import { buildFocusedScenarioCommand } from '../work/focused-scenarios.js';
 import { classifyShellTestRun } from '../tools/shell-tests.js';
 import { loadCucumberConfiguration } from '../../subs/evidence/src/cucumber-configuration.js';
@@ -28,7 +29,7 @@ describe('H05/H06: declared focused pending scenario preparation', () => {
     expect(generated['ramify-focused']).toEqual({ ...configuration, paths: ['/project/features/A.feature', '/project/features/B.feature'], tags: '', name: [], shard: '', dryRun: false });
     expect(generated.default).toBeUndefined();
     expect(generated['ramify-focused'].paths).not.toContain('/project/features/U.feature');
-    expect(result.argv).toEqual(['/project/node_modules/.bin/cucumber-js', '--config', result.configPath, '--profile', 'ramify-focused']);
+    expect(result.argv).toEqual(['/project/node_modules/.bin/cucumber-js', '--config', `subs/status/src/tmp/cucumber-focused-${result.configurationIdentity.slice(0, 16)}.json`, '--profile', 'ramify-focused']);
     expect(result.environment).toEqual({ PATH: '/project/bin', WORLD: 'declared' });
     expect(source.kind === 'available' && source.configuration['paths']).toEqual(['features/**/*.feature']);
     expect(source.kind === 'available' && source.configuration['tags']).toBe('not @ramify-pending');
@@ -60,5 +61,28 @@ describe('H05/H06: declared focused pending scenario preparation', () => {
     expect(result.support['import']).toEqual(configuration.import);
     expect(result.shellCommand).toContain("'\"'\"'");
     expect(result.shellCommand.startsWith("cd '/project' &&")).toBe(true);
+  });
+  test.each([
+    { scratch: '/project/subs/status/src/tmp', prefix: 'subs/status/src/tmp/' },
+    { scratch: "/scratch/path with 'quote'", prefix: "../scratch/path with 'quote'/" },
+  ])('installed Cucumber cwd joining resolves the exact config in $scratch', async ({ scratch, prefix }) => {
+    const result = buildFocusedScenarioCommand({ effective: await effective(), featurePaths: ['features/A.feature', 'features/B.feature'],
+      scratchDirectory: scratch, cucumberExecutable: '/project/node_modules/.bin/cucumber-js' });
+    if (result.kind !== 'available') throw new Error(result.reason);
+    const configArgument = result.argv[2]!;
+    expect(configArgument).toBe(`${prefix}cucumber-focused-${result.configurationIdentity.slice(0, 16)}.json`);
+    expect(isAbsolute(configArgument)).toBe(false);
+    expect(join('/project', configArgument)).toBe(result.configPath);
+    // This is the installed reader's failure for the old absolute argument.
+    expect(join('/project', result.configPath)).not.toBe(result.configPath);
+    expect(isAbsolute(result.configPath)).toBe(true);
+    expect(result.selection.config).toBe(result.configPath);
+    expect(result.selection.paths).toEqual(['/project/features/A.feature', '/project/features/B.feature']);
+    expect(result.support).toEqual({ import: configuration.import, require: configuration.require, requireModule: configuration.requireModule,
+      loader: configuration.loader, worldParameters: configuration.worldParameters });
+    const facts = { workingDirectory: '/project/subs/status/src', testScripts: {}, focusedCucumber: [result.selection] };
+    expect(classifyShellTestRun(result.shellCommand, facts).kind).toBe('focused');
+    expect(classifyShellTestRun(result.shellCommand, { ...facts, focusedCucumber: [{ ...result.selection, config: '/wrong/config.json' }] }).kind).toBe('unverified');
+    if (scratch.includes("'")) expect(result.shellCommand).toContain("'\"'\"'");
   });
 });
