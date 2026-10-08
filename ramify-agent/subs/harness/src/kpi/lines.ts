@@ -56,6 +56,8 @@ export interface LineEventRequest {
   readonly after: LineSnapshot;
   /** The refreshed architect view, for the owner of each path. */
   readonly index: ArchitectIndex | null;
+  /** Explicit collection limit when multiple writers overlap between these snapshots. */
+  readonly overlappingWriters?: readonly string[];
 }
 
 /**
@@ -65,6 +67,7 @@ export interface LineEventRequest {
  */
 export function lineEvents(request: LineEventRequest): LineEventSummary {
   const gaps: string[] = [];
+  if ((request.overlappingWriters?.length ?? 0) > 1) gaps.push(`overlapping-writers: ${request.overlappingWriters!.join(', ')}; per-invocation contributions cannot be separated`);
   if (!request.before.available) gaps.push(`changed-paths-unknown: the snapshot before the session failed (${request.before.reason})`);
   if (!request.after.available) gaps.push(`changed-paths-unknown: the snapshot after the session failed (${request.after.reason})`);
   if (request.index === null) gaps.push('the architect view was unavailable, so no path could be attributed to an owner');

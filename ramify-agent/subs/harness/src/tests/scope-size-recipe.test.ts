@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { architectViewDirectory } from '../../subs/evidence/src/views.js';
-import { baselineScope, scopeSize, writeScopeMeasurement, type DeclaredScope } from '../kpi/capture.js';
+import { baselineScope, deliveredScopeInputs, projectOnlySize, readScopeMeasurement, scopeSize, writeScopeMeasurement, type DeclaredScope } from '../kpi/capture.js';
 import type { MeasurementSnapshot, ScopeComponent } from '../run/records.js';
+import { buildDeliveredManifest, type DeliveredInput } from '../prompts/delivered-manifest.js';
 import type { WriteScope } from '../work/scope.js';
 
 /*
@@ -147,5 +148,75 @@ describe('scope-size/2 never merges numbers of two revisions', () => {
     const size = scopeSize(snapshot({ viewRevision: 'rev/1:g:2' }), scope({ exactOwners: ['p/a'] }));
     expect(component(size.components, 'architect-view')).toMatchObject({ state: 'measured', bytes: 0 });
     expect(component(size.components, 'owned-source')).toMatchObject({ state: 'unavailable', bytes: null });
+  });
+});
+
+
+describe('Plan23 F6 delivered scope and partial byte arithmetic', () => {
+  test('independent 100/20/30/50 baseline and 40/10/15/20/5 writer have 120/200 and 50/90 bytes', () => {
+    const taken = snapshot({ supplementary: [{ path: '.ramify-architect', bytes: 30 }, { path: 'baseline-support.md', bytes: 50 }, { path: 'role.md', bytes: 20 }] });
+    taken.measure = { revision: 'rev/1:g:1', hash: 'a'.repeat(64), document: { schema: 'ramify.measure/2', revision: 'rev/1:g:1', views: 'measured',
+      modules: [{ id: 'p', parent: null, exact: bucket(60, 0, 0, 10), subtree: bucket(100, 0, 0, 20) },
+        { id: 'p/a', parent: 'p', exact: bucket(40, 0, 0, 10), subtree: bucket(40, 0, 0, 10) }], files: [] } };
+    const baseline = scopeSize(taken, baselineScope('p', ['baseline-support.md', 'baseline-support.md', '.ramify-architect/README.md']));
+    const writerSnapshot = { ...taken, supplementary: [{ path: '.ramify-architect', bytes: 15 }, { path: 'role.md', bytes: 20 }] };
+    const writer = scopeSize(writerSnapshot, scope({ exactOwners: ['p/a'], apiViews: true, architectView: true, supportDocuments: ['role.md', 'role.md', '.ramify-architect/module.json'], brief: 5 }));
+    expect(projectOnlySize(baseline).bytes).toBe(120);
+    expect(baseline.bytes).toBe(200);
+    expect(projectOnlySize(writer).bytes).toBe(50);
+    expect(writer.bytes).toBe(90);
+  });
+
+  test('actually delivered sources deduplicate inherited support/brief while unused package files are absent', () => {
+    const role: DeliveredInput = { key: 'role', kind: 'role-instructions', text: 'expanded instructions', source: 'role.md', revision: 'v1',
+      sources: [{ path: 'role.md', hash: 'r', bytes: 20 }, { path: 'skill.md', hash: 's', bytes: 10 }] };
+    const brief: DeliveredInput = { key: 'brief', kind: 'brief', text: 'brief', source: 'brief.md', revision: 'b1' };
+    const manifest = buildDeliveredManifest({ inheritedPoint: 'point1', inherited: [role, brief], appended: [role, brief,
+      { key: 'environment', kind: 'environment', text: 'current environment', source: null, revision: null }] });
+    const delivered = deliveredScopeInputs(scope({}), manifest);
+    expect(delivered.scope.supportDocuments).toEqual(['role.md', 'skill.md']);
+    expect(delivered.scope.brief).toBe(5);
+    expect(delivered.supplementary).toEqual([{ path: 'role.md', bytes: 20 }, { path: 'skill.md', bytes: 10 }]);
+    expect(delivered.scope.supportDocuments).not.toContain('unused-skill.md');
+    expect(delivered.scope.supportDocuments).not.toContain('brief.md');
+    const commonFile: DeliveredInput = { key: 'same-source', kind: 'skill', text: 'brief', source: 'brief.md', revision: 'b1' };
+    const once = deliveredScopeInputs(scope({}), buildDeliveredManifest({ inheritedPoint: null, inherited: [], appended: [brief, commonFile] }));
+    expect(once.scope.brief).toBe(0);
+    expect(once.supplementary).toEqual([{ path: 'brief.md', bytes: 5 }]);
+    const declaration: DeliveredInput = { key: 'tool', kind: 'tool-declaration', text: 'schema', source: null, revision: null };
+    const declared = deliveredScopeInputs(scope({}), buildDeliveredManifest({ inheritedPoint: 'point1', inherited: [declaration], appended: [declaration] }));
+    expect(declared.supplementary).toEqual([{ path: expect.stringMatching(/^delivered-inputs\/tool-declaration\//), bytes: 6 }]);
+    expect(() => deliveredScopeInputs(scope({}), buildDeliveredManifest({ inheritedPoint: 'point1', inherited: [role],
+      appended: [{ ...role, sources: [{ path: 'role.md', hash: 'different-revision', bytes: 21 }] }] }))).toThrow('Conflicting delivered support revisions');
+  });
+
+  test('partial support and new bootstrap preserve known disjoint buckets, while mixed state/policy bytes are rejected', () => {
+    const partial = scopeSize(snapshot(), scope({ exactOwners: ['p/a', 'p/new'], apiViews: true, supportDocuments: ['skills/SKILL.md', 'missing.md'], brief: 5 }));
+    // Known owned source510 + API10 + support200 + brief5, despite unknown bootstrap and missing support.
+    expect(partial).toMatchObject({ bytes: null, subtotal: 725, coverage: 'partial' });
+    expect(projectOnlySize(partial)).toMatchObject({ bytes: null, subtotal: 520 });
+    expect(scopeSize(snapshot({ viewRevision: 'rev/2' }), scope({ exactOwners: ['p/a'], apiViews: true, supportDocuments: ['skills/SKILL.md'] }))).toMatchObject({ bytes: null, subtotal: 200 });
+    expect(scopeSize({ ...snapshot(), policy: 'scope-size/1' }, scope({ exactOwners: ['p/a'], supportDocuments: ['skills/SKILL.md'] }))).toMatchObject({ bytes: null, subtotal: 0 });
+  });
+
+  test('outside inventory per-file identities remove held/extra/read overlaps: held10 + new7 adds only7', () => {
+    const taken = snapshot();
+    taken.measure = { revision: 'rev/1:g:1', hash: 'a'.repeat(64), document: { schema: 'ramify.measure/2', revision: 'rev/1:g:1', views: 'measured',
+      modules: [{ id: 'p', parent: null, exact: bucket(10, 0, 0, 0), subtree: bucket(10, 0, 0, 0) }],
+      files: [{ path: 'src/held.ts', owner: 'p', area: 'ordinary', bytes: 10 }] } };
+    const files = [{ path: 'src/held.ts', bytes: 10 }, { path: 'src/new.txt', bytes: 7 }];
+    const measured = scopeSize(taken, scope({ exactOwners: ['p'], locations: [{ path: 'src', bytes: 17, files }, { path: 'src/new.txt', bytes: 7, files: files.slice(1) }] }));
+    expect(measured.bytes).toBe(17);
+    expect(scopeSize(taken, scope({ locations: [{ path: 'outside/new.txt', bytes: 7 }, { path: 'outside', bytes: 17 }, { path: 'outside', bytes: 17 }] })).bytes).toBe(17);
+    const write = { base: { module: 'p', included: [] }, extra: [], read: ['p/a', 'p/a'], bootstrap: [], rationale: '', revision: 1,
+      resolved: { included: [], roots: [], files: [], excluded: [], view: { status: 'placeholder' }, ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: '0', inputId: 'i', configuration: 'tsconfig.json', root: '/project', modules: [], exclusions: [] } } } as WriteScope;
+    expect(readScopeMeasurement(write).exactOwners).toEqual(['p/a']);
+    expect(writeScopeMeasurement(write).exactOwners).toEqual(['p']);
+  });
+
+  test('support in an unselected owner still counts, whereas a selected inventoried file counts once', () => {
+    const name = 'subs/b/src/b.ts';
+    expect(scopeSize(snapshot(), scope({ exactOwners: ['p/a'], supportDocuments: [name] })).bytes).toBe(510 + 350);
+    expect(scopeSize(snapshot(), scope({ exactOwners: ['p/b'], supportDocuments: [name] })).bytes).toBe(710);
   });
 });
