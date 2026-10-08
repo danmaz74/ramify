@@ -77,6 +77,7 @@ Delivery cuts qualified so far:
 | 5: guarded measurement capture/decoder cases and two retained actual producer witnesses | `77eac8be` | [Passing pre-merge released audit](optimizations/05-premerge-audit.md), [integrated verification](optimizations/05-integrated-results.md) |
 | 6: guarded fifteen-case capability recovery matrix and three unchanged actual witnesses | `42038395` | [Passing pre-merge released audit](optimizations/06-premerge-audit.md), [integrated verification](optimizations/06-integrated-results.md) |
 | 7: guarded twenty-case nonfunctional lifecycle family and one retained actual audit/tree witness | `09350e8c` | [Passing pre-merge released audit](optimizations/07-premerge-audit.md), [integrated verification](optimizations/07-integrated-results.md) |
+| 8: guarded capability assignment/delegation/consultation/submission cases, unchanged actual CA30 witness and complete-log recovery correction | `25ea4b8b` | [Passing pre-merge released audit](optimizations/08-premerge-audit.md), [integrated verification](optimizations/08-integrated-results.md) |
 
 These cuts have integrated focused passes. The initial full baseline failed one
 crash fixture, subsequently corrected with focused evidence. A later released
