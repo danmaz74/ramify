@@ -192,18 +192,18 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
         return (await repository.git('rev-parse', 'HEAD')).trim();
       };
       await repository.write('project/src/a.ts', 'one\ntwo\nthree\n');
-      await repository.write('project/src/moved.ts', 'kept\nlines\n');
+      await repository.write('project/src/moved \"é\".ts', 'kept\nlines\n');
       await repository.write('outside.txt', 'not the project\n');
       const base = await commit('base');
       // The first writer adds two lines, and a line the second rewrites.
-      await repository.write('project/src/a.ts', 'one\ntwo\nthree\nfour\nfive\n');
+      await repository.write('project/src/a.ts', 'one\ninserted\ntwo\nthree\nfour\nfive\n');
       await repository.write('project/logo.bin', '\u0000\u0001binary');
       const first = await commit('first');
       // The second rewrites `five`, deletes base line `two`, moves a file and
       // edits it, and changes a file outside the project.
-      await repository.write('project/src/a.ts', 'one\nthree\nfour\nFIVE\n');
-      await rm(join(repository.root, 'project/src/moved.ts'));
-      await repository.write('project/src/renamed.ts', 'kept\nlines\nadded\n');
+      await repository.write('project/src/a.ts', 'one\ninserted\nthree\nfour\nFIVE\n');
+      await rm(join(repository.root, 'project/src/moved \"é\".ts'));
+      await repository.write('project/src/renamed \"é\".ts', 'kept\nlines\nadded\n');
       await repository.write('outside.txt', 'changed\n');
       const second = await commit('second');
 
@@ -212,21 +212,25 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       const files = await gitChangeHistory.changedFiles(project, base, second);
       expect(files).toEqual([
         { before: null, after: 'logo.bin', binary: true, added: [], deleted: [] },
-        { before: 'src/a.ts', after: 'src/a.ts', binary: false, added: [[3, 2]], deleted: [[2, 1]] },
-        { before: 'src/moved.ts', after: 'src/renamed.ts', binary: false, added: [[3, 1]], deleted: [] },
+        { before: 'src/a.ts', after: 'src/a.ts', binary: false, added: [[2, 1], [4, 2]], deleted: [[2, 1]] },
+        { before: 'src/moved \"é\".ts', after: 'src/renamed \"é\".ts', binary: false, added: [[3, 1]], deleted: [] },
       ]);
       // `four` from the first writer and `FIVE` from the second, in the final tree.
-      expect(await gitChangeHistory.lineOrigins(project, base, second, 'src/a.ts', [[3, 2]])).toEqual([
-        { line: 3, commit: first, boundary: false },
-        { line: 4, commit: second, boundary: false },
+      expect(await gitChangeHistory.lineOrigins(project, base, second, 'src/a.ts', [[4, 2]])).toEqual([
+        { line: 4, commit: first, boundary: false, sourceLine: 5, sourcePath: 'project/src/a.ts', projectPrefix: 'project/' },
+        { line: 5, commit: second, boundary: false, sourceLine: 5, sourcePath: 'project/src/a.ts', projectPrefix: 'project/' },
       ]);
-      expect(await gitChangeHistory.lineOrigins(project, base, second, 'src/renamed.ts', [[1, 3]])).toEqual([
-        { line: 1, commit: base, boundary: true },
-        { line: 2, commit: base, boundary: true },
-        { line: 3, commit: second, boundary: false },
+      expect(await gitChangeHistory.lineOrigins(project, base, second, 'src/renamed \"é\".ts', [[1, 3]])).toEqual([
+        { line: 1, commit: base, boundary: true, sourceLine: 1, sourcePath: 'project/src/moved \"é\".ts', projectPrefix: 'project/' },
+        { line: 2, commit: base, boundary: true, sourceLine: 2, sourcePath: 'project/src/moved \"é\".ts', projectPrefix: 'project/' },
+        { line: 3, commit: second, boundary: false, sourceLine: 3, sourcePath: 'project/src/renamed \"é\".ts', projectPrefix: 'project/' },
       ]);
-      // Base line `two` was last held by the first commit, so the second removed it.
-      expect(await gitChangeHistory.lineLastSeen(project, base, second, 'src/a.ts', [[2, 1]])).toEqual([{ line: 2, commit: first, boundary: false }]);
+      // Base line 2 (`two`) was last held at position 3 in the first commit; the second removed it.
+      expect(await gitChangeHistory.lineLastSeen(project, base, second, 'src/a.ts', [[2, 1]])).toEqual([{ line: 2, commit: first, boundary: false, sourceLine: 3, sourcePath: 'project/src/a.ts', projectPrefix: 'project/' }]);
+      // At repository cwd the source path is still repository-relative, with an explicitly empty prefix.
+      expect(await gitChangeHistory.lineOrigins(repository.root, base, second, 'project/src/a.ts', [[4, 1]])).toEqual([
+        { line: 4, commit: first, boundary: false, sourceLine: 5, sourcePath: 'project/src/a.ts', projectPrefix: '' },
+      ]);
       await expect(gitChangeHistory.changedFiles(project, base, 'no-such-revision')).rejects.toThrow();
     });
   });

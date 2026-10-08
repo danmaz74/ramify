@@ -660,6 +660,12 @@ export interface LineCommit {
   readonly commit: string;
   /** Whether the line is the earlier commit's own, older than the range. */
   readonly boundary: boolean;
+  /** Git porcelain original/source position at `commit`, not the requested line position. Missing in older scripted answers. */
+  readonly sourceLine?: number;
+  /** Decoded Git porcelain filename relative to the repository root, possibly outside the supplied project. */
+  readonly sourcePath?: string;
+  /** Verified project cwd prefix relative to its repository root, with trailing slash; empty at that root. */
+  readonly projectPrefix?: string;
 }
 
 /** The read-only history boundary of delivered-change attribution. Consumer tests script it. */
@@ -729,21 +735,89 @@ export async function changedFiles(root: string, from: string, to: string, signa
   return files;
 }
 
-/** `git blame --line-porcelain` over the given ranges: the commit of each line, and whether it is a boundary line. */
+/** Decode Git's C-quoted pathname bytes, retaining unavailable proof on malformed output. */
+function blameFilename(value: string): string | undefined {
+  let path = value;
+  if (value.startsWith('"')) {
+    if (!value.endsWith('"') || value.length < 2) return undefined;
+    const bytes: number[] = [];
+    const escaped: Readonly<Record<string, number>> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '\\': 92, '"': 34 };
+    const body = value.slice(1, -1);
+    for (let index = 0; index < body.length; index += 1) {
+      const character = body[index]!;
+      if (character === '"') return undefined;
+      if (character !== '\\') {
+        const code = body.codePointAt(index)!;
+        bytes.push(...Buffer.from(String.fromCodePoint(code), 'utf8'));
+        if (code > 0xffff) index += 1;
+        continue;
+      }
+      const escape = body[++index];
+      if (escape === undefined) return undefined;
+      if (/[0-7]/u.test(escape)) {
+        const octal = body.slice(index, index + 3);
+        if (!/^[0-7]{3}$/u.test(octal)) return undefined;
+        const byte = Number.parseInt(octal, 8);
+        if (byte > 255) return undefined;
+        bytes.push(byte);
+        index += 2;
+      } else {
+        const byte = escaped[escape];
+        if (byte === undefined) return undefined;
+        bytes.push(byte);
+      }
+    }
+    try { path = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bytes)); }
+    catch { return undefined; }
+  }
+  // Git paths are repository-relative. A malformed/undecodable path is not an ownership fact.
+  if (path === '' || path.startsWith('/') || path.includes('\0') || path.split('/').some(part => part === '' || part === '.' || part === '..')) return undefined;
+  return path;
+}
+
+/**
+ * Parse exact line porcelain without launching a process. Source paths stay repository-relative;
+ * the optional prefix must come from a separately verified `git rev-parse --show-prefix`.
+ * Missing/malformed source metadata stays absent rather than guessed from the requested path.
+ * In reverse blame, sourceLine/sourcePath name the position/path at the last-seen commit.
+ */
+export function parseBlamePorcelain(text: string, projectPrefix?: string): LineCommit[] {
+  const answers: LineCommit[] = [];
+  let current: { line: number; commit: string; boundary: boolean; sourceLine: number; sourcePath?: string; projectPrefix?: string } | null = null;
+  let filenameSeen = false;
+  for (const line of text.split('\n')) {
+    const header = /^([0-9a-f]{40}|[0-9a-f]{64}) ([1-9]\d*) ([1-9]\d*)(?: ([1-9]\d*))?$/u.exec(line);
+    if (header !== null) {
+      const sourceLine = Number(header[2]);
+      const requestedLine = Number(header[3]);
+      current = Number.isSafeInteger(sourceLine) && Number.isSafeInteger(requestedLine)
+        ? { commit: header[1]!, line: requestedLine, sourceLine, boundary: false, ...(projectPrefix === undefined ? {} : { projectPrefix }) }
+        : null;
+      filenameSeen = false;
+      continue;
+    }
+    if (/^[0-9a-f]{40,64} /u.test(line)) { current = null; continue; }
+    if (current === null) continue;
+    if (line === 'boundary') current.boundary = true;
+    else if (line.startsWith('filename ')) {
+      const path = blameFilename(line.slice('filename '.length));
+      if (!filenameSeen && path !== undefined) current.sourcePath = path;
+      else delete current.sourcePath;
+      filenameSeen = true;
+    } else if (line.startsWith('\t')) { answers.push(current); current = null; }
+  }
+  return answers;
+}
+
+/** `git blame --line-porcelain` over given ranges, retaining exact source positions and filenames. */
 async function blameRanges(root: string, range: readonly string[], path: string, lines: readonly LineRange[], signal?: AbortSignal): Promise<LineCommit[]> {
   const ranges = lines.filter(([, count]) => count > 0);
   if (ranges.length === 0) return [];
+  const prefix = (await gitOk(root, ['rev-parse', '--show-prefix'], signal)).stdout;
+  // Remove only the command's terminating newline: spaces/newlines can belong to directory names.
+  const projectPrefix = prefix.endsWith('\n') ? prefix.slice(0, -1) : prefix;
   const run = await gitOk(root, ['--literal-pathspecs', 'blame', '--line-porcelain', ...ranges.flatMap(([start, count]) => ['-L', `${start},+${count}`]), ...range, '--', path], signal);
-  const answers: LineCommit[] = [];
-  let current: { line: number; commit: string; boundary: boolean } | null = null;
-  for (const line of run.stdout.split('\n')) {
-    const header = /^([0-9a-f]{40}|[0-9a-f]{64}) \d+ (\d+)/u.exec(line);
-    if (header !== null) { current = { commit: header[1]!, line: Number.parseInt(header[2]!, 10), boundary: false }; continue; }
-    if (current === null) continue;
-    if (line === 'boundary') current.boundary = true;
-    else if (line.startsWith('\t')) { answers.push(current); current = null; }
-  }
-  return answers;
+  return parseBlamePorcelain(run.stdout, projectPrefix);
 }
 
 export async function lineOrigins(root: string, from: string, to: string, path: string, lines: readonly LineRange[], signal?: AbortSignal): Promise<LineCommit[]> {
