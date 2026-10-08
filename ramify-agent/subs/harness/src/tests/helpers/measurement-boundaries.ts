@@ -77,7 +77,7 @@ export function measurementBoundaries(root: string, unavailable = false) {
   }, { scenarios: false });
   const audit = retain({ ...auditAnswers,
     async read(project: string, commit: string) { expect(project).toBe(root); expect(commit).toBe(head); return auditAnswers.read(project, commit); },
-    async run(input: Parameters<typeof auditAnswers.run>[0]) { expect(input.projectRoot).toBe(root); return auditAnswers.run(input); },
+    async run(input: Parameters<typeof auditAnswers.run>[0]) { expect(input.projectRoot).toBe(root); expect(input.mode).toBe('full'); expect(input.nested).toBe(true); return auditAnswers.run(input); },
   });
   class MeasurementRamify extends RamifyCli {
     constructor() { super({ executable: '/measurement-fixture-starts-no-process' }); }

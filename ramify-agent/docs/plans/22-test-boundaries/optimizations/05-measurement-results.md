@@ -77,11 +77,23 @@ not timeout increases or weakened outcomes. Intermediate failed source hashes
 were not captured and are not represented as known.
 
 The first actual execution report `/tmp/plan22-measurement-boundary.json` had two
-passing assertion records but a failed file/exit 1 with an empty JSON file message.
-That result remains failed; it cannot qualify the witnesses. The diagnostic final
-run with default plus JSON reporters, after literal registration correction,
-passed the complete file. No unexplained first-run failure is labelled a pass or
-claimed to be diagnosed as flakiness.
+passing assertions but a failed file/exit 1. This is now traced to an empty suite:
+the initial `measurementRows([1, 7])` registered all three `describe` blocks while
+filtering their contained rows. The unavailable-producer suite therefore had no
+test. The literal-registration refactor removed that empty suite.
+
+The original failing helper snapshot/hash was not persisted; the initial source
+creation tool input records that selector mechanism. An isolated reconstruction
+in `/tmp/plan22-measurement-empty-suite-control/selected-rows.test.ts` reproduces
+it without any provider or Git: Vitest exits 1, prints `No test found in suite a
+component the producer cannot supply`, and produces exactly the original JSON
+shape (four suites, two passed/two failed; two passed tests; failed file with
+empty message). A paired literal-registration control exits 0 (three suites,
+all passed; two passed tests). Both controls install launcher refusals and verify
+zero process attempts. Their source hashes, reports and log paths are recorded
+in the evidence JSON. This isolates the registration defect; no producer retry,
+cleanup defect or flakiness assertion is needed. The initial failed report is
+retained and never counted as a pass.
 
 ## Reconciliation before qualification audit
 
@@ -99,3 +111,34 @@ ordinary/composition files passed all 29 cases with zero skipped in
 released full nested audit on this clean committed branch before merging it
 into the concurrently used Plan21 target. Integration and that audit are unrun
 by this subagent; this receipt does not declare plan completion.
+
+## Passed prior audit and adoption of the later readiness correction
+
+The coordinator's released full nested audit **passed** on exactly
+`e30a8bf0435d914c606d013918c96cec67507a2b`, before integration. Its durable report
+is `4837972db4c71ecf5ba40b7cd3a894796b197a6a`; run ref
+`refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T05-45-50Z-e30a8bf04`.
+Composition is unscoped, chain depth 0, with zero outstanding failures. Vitest
+passed 253 files and 1,982 tests; the one file/two existing optional trials remain
+skipped. Audit duration was 315.286 s; the complete test check was 276.484 s.
+The raw CLI report `/tmp/plan22-opt05-audit.json` was read and its source/verdict
+verified; compact exact audit data is retained in the evidence JSON.
+
+While that audit ran, the target advanced to committed
+`56ddcc84bee4c4e55fc017c25ef9a11ea51b3e5e`, including production correction
+`db7fd9070dd29d3808e659db3cf29c5e2373a4c9`. This makes readiness request the same
+full nested audit as the final gate and persist all baseline project/discovery
+outcomes. It was adopted into this optimization branch by merge
+`b60e92f8a2da1828713fdca8e78b512b4e516752`; no target unfinished changes were copied.
+The measurement script now explicitly requires both external audit requests to
+be full and nested, retaining any mismatch. All 29 ordinary measurement/decoder
+and composition cases passed with zero skipped after this adoption and stricter
+contract (`/tmp/plan22-measurement-readiness-qualified.json`). All four compiler
+scopes and the module check passed again (zero errors, zero warnings, 313 limits).
+
+The earlier audit qualifies only its exact old source. It does **not** qualify
+this newly reconciled runtime for integration. The coordinator must run another
+released full nested audit on the new clean committed candidate before merge;
+that full run will include both actual producer witnesses. Those witnesses were
+not separately repeated after adoption. No target merge or publication has
+occurred from this optimization branch.
