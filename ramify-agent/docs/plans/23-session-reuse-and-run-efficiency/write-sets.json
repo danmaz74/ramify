@@ -215,7 +215,9 @@
       "docs/plans/23-session-reuse-and-run-efficiency/iterations/10-results.md",
       "subs/harness/src/analysis/submission.ts",
       "subs/harness/src/tools/shell.ts",
-      "subs/harness/src/nonfunctional/prompts.ts"
+      "subs/harness/src/nonfunctional/prompts.ts",
+      "subs/harness/src/sessions/single.ts",
+      "subs/harness/src/tests/single-session.test.ts"
     ],
     "11": [
       "subs/harness/src/run/service.ts",
@@ -237,7 +239,12 @@
       "subs/harness/subs/agent/src/interfaces/port.ts",
       "subs/harness/subs/agent/src/scripted.ts",
       "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
-      "docs/plans/23-session-reuse-and-run-efficiency/iterations/11-results.md"
+      "docs/plans/23-session-reuse-and-run-efficiency/iterations/11-results.md",
+      "subs/harness/subs/agent/subs/pi/src/session-operations.ts",
+      "subs/harness/subs/agent/subs/pi/src/tests/plan23-event-observations.test.ts",
+      "subs/harness/src/sessions/single.ts",
+      "subs/harness/src/sessions/records.ts",
+      "subs/harness/src/tests/single-session.test.ts"
     ],
     "12": [
       "subs/web/src/run-page.tsx",
