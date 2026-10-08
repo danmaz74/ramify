@@ -160,6 +160,7 @@
       "subs/harness/src/reviews/inputs.ts",
       "subs/harness/src/reviews/state.ts",
       "subs/harness/src/tests/plan23-fork-workflows.test.ts",
+      "subs/harness/src/tests/plan23-continuing-work.test.ts",
       "subs/harness/src/tests/nonfunctional-recovery.test.ts",
       "subs/harness/src/tests/session-reducer.test.ts",
       "subs/harness/subs/agent/src/interfaces/port.ts",
