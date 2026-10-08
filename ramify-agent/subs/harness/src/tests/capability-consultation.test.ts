@@ -1,21 +1,39 @@
+import { capabilityFlowBoundaries } from './helpers/capability-flow-boundaries.js';
+import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
-import { gitService } from '../../subs/evidence/src/git.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
-import { assign, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { initRepository, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
+import { assign, outline, submit, treeInputs, write } from './helpers/iterations.js';
+import { runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
+
+vi.mock('node:child_process', async importOriginal => {
+  const { guardedChildProcess } = await import('./helpers/process-guard.js');
+  return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
+});
+beforeEach(() => resetSpawnAttempts());
+const answers: ReturnType<typeof capabilityFlowBoundaries>[] = [];
+async function openGuardedCapabilityRuns(root: string, answers: ReturnType<typeof capabilityFlowBoundaries>, options: Parameters<typeof openCapabilityRuns>[1]) {
+  return openCapabilityRuns(root, { ...options, ...(options.script === undefined ? {} : { script: answers.script(options.script) }) });
+}
 
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+afterEach(async () => {
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
+  for (const answer of answers.splice(0)) try { answer.assertComplete(); } catch (error) { errors.push(error); }
+  try { expect(spawnAttempts(), 'ordinary capability setup/flow/teardown process attempts').toEqual([]); } catch (error) { errors.push(error); }
+  if (errors.length) throw new AggregateError(errors, 'Capability flow fixture teardown failed');
+});
 const a = 'capability-coordination/a';
 const b = 'capability-coordination/b';
 
 test('CA04 CA06 CA16: a pending question is durable and the retained A session answers without write equipment', async () => {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
-  await initRepository(fixture.root); await installMiniRunner(fixture.root);
+  const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'consultation', 'a'); answers.push(boundaryAnswers);
+
   let architectTurns = 0;
   const script: Script = spec => {
     if (spec.role === 'initial-architect') return submit(analysis([entry('richer-a-fact', a)]));
@@ -48,7 +66,7 @@ test('CA04 CA06 CA16: a pending question is durable and the retained A session a
     }
     return [];
   };
-  const opened = await openCapabilityRuns(fixture.root, { git: gitService, script, inputs: treeInputs(),
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script, inputs: treeInputs(),
     });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -58,6 +76,10 @@ test('CA04 CA06 CA16: a pending question is durable and the retained A session a
   expect(events.filter(event => event.type === 'job-failed')).toHaveLength(0);
   const first = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
     'capabilities/cap-001/exchanges/cap-001-ex01.1.json'), 'utf8')) as { answer: unknown; question: string };
+  await until(async () => {
+    try { await readFile(runPath(fixture.root, 'need', receipt.jobId, 'capabilities/cap-001/exchanges/cap-001-ex01.2.json')); return true; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
+  });
   const second = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
     'capabilities/cap-001/exchanges/cap-001-ex01.2.json'), 'utf8')) as { answer: { text: string } };
   expect(first.answer).toBeNull();
