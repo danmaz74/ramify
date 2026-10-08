@@ -1,6 +1,7 @@
 # Plan 22: enforced test boundaries and prompt command cleanup
 
-**Date:** 2026-10-08. **Status:** draft; planning only, implementation unstarted.
+**Date:** 2026-10-08. **Status:** implementation authorized; progressive
+optimization delivery in progress. See [execution](execution.md).
 
 ## Outcome
 
@@ -86,10 +87,14 @@ measured guarantees. Recheck each converted family's focused timing and remainin
 critical path after cleanup; use that evidence to order iteration 5's families.
 Keep all planned cases and final full-audit qualification regardless of ordering.
 
-Each iteration retains its focused failures, verification results and handoff.
-Implementation proceeds in order, one iteration at a time. Commit and delivery
-policy follows the later implementation authorization; this request creates
-planning artifacts only.
+Each optimization retains its focused failures, verification results and
+handoff. On 2026-10-08 the user authorized one sequential subagent per
+optimization: create a worktree from the current Plan 21 worktree, apply and
+test one optimization there, merge it back, then begin the next. The iteration
+groups define coverage; [execution](execution.md) defines the smaller delivery
+cuts and preservation rules. The cleanup fix is independent; minimum helpers
+needed by the slowest file travel with that file's optimization rather than
+blocking it behind project-wide infrastructure work.
 
 ## Required behavior and preservation
 

@@ -3,8 +3,10 @@
 [Plan](../main-plan.md), [contracts](../contracts.md),
 [acceptance](../acceptance.md), [manifest](manifest.json).
 
-All iterations are planned and run serially. No implementation or test pass
-is recorded by this index.
+The user authorized progressive implementation on 2026-10-08. Optimizations
+run serially in individual worktrees through [execution](../execution.md).
+The manifest reports grouped coverage progress; each optimization receipt
+records actual implementation/test evidence.
 
 | ID | Iteration |
 | --- | --- |
