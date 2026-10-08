@@ -7,7 +7,7 @@ import type { TranscriptBody, TranscriptEntry } from '../interfaces/protocol/tra
 import { runView } from '../projections/inputs.js';
 import { metricsOf } from '../projections/metrics.js';
 import { observationSchema } from '../run/observations.js';
-import { runLayout, type InvocationOutcome } from '../run/records.js';
+import { runLayout, invocationSchema, type InvocationOutcome } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
 import { ContentStore } from '../transcripts/store.js';
 import { readBody, readTranscript } from '../transcripts/writer.js';
@@ -163,8 +163,18 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
         const own = entries.filter(entry => entry.invocation === event.data.invocation);
         expect(own.map(entry => entry.type).at(0)).toBe('started');
         expect(own.map(entry => entry.type).slice(-2)).toEqual(['ended', 'point']);
+        const original = invocationSchema.parse(JSON.parse(await readFile(scenario.path(runLayout.invocation(event.data.invocation)), 'utf8')));
+        const admitted = original.sessionOperation!;
+        const portEvents = transcribed(captured!.events.get(event.data.invocation)!);
+        for (const observed of portEvents) {
+          expect(observed.execution).toEqual({ runId: scenario.runId, operationId: event.data.invocation,
+            sessionId: admitted.sessionId, turn: admitted.turn, sourcePoint: admitted.sourcePoint });
+          expect(observed.replayed).toBe(false);
+          expect(observed.observation?.sourceId).toMatch(new RegExp(`^${event.data.invocation}:event:[0-9]+$`, 'u'));
+        }
+        // Display transcripts preserve every original core field; durable correlation is recorded separately.
         expect(await portEventsOf(own, scenario.path(), store), event.data.invocation)
-          .toEqual(transcribed(captured!.events.get(event.data.invocation)!));
+          .toEqual(portEvents.map(({ execution: _execution, observation: _observation, replayed: _replayed, ...core }) => core));
       }
       if (event.type === 'invocation-ended') {
         // Its end, and the point that end is.

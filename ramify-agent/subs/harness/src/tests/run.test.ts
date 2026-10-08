@@ -62,12 +62,18 @@ describe('an implementation run with no entry capabilities', () => {
       'document-manifest-committed',
       'session-opened',
       'invocation-started',
+      'invocation-prepared', // The actual delivered packet is committed before model events.
+      'invocation-prepared', // The original generic operation/source point is then committed.
       'invocation-ended',
       'session-opened',
       'invocation-started',
+      'invocation-prepared', // The actual delivered packet is committed before model events.
+      'invocation-prepared', // The original generic operation/source point is then committed.
       'invocation-ended',
       'session-opened',
       'invocation-started',
+      'invocation-prepared', // The actual delivered packet is committed before model events.
+      'invocation-prepared', // The original generic operation/source point is then committed.
       'invocation-ended',
       'analysis-accepted',
       'gate-started',
@@ -185,8 +191,8 @@ describe('an implementation run with no entry capabilities', () => {
     expect(snapshot.failure?.message).toContain(refusal);
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended',
-      'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended',
+      'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended', 'analysis-accepted',
       'gate-started', 'readiness-failed', 'session-finished', 'job-failed',
     ]);
     expect(events.find(event => event.type === 'readiness-failed')?.data).toMatchObject({ step: 'run-branch', recovery: null, final: true });
@@ -217,8 +223,8 @@ describe('an implementation run with no entry capabilities', () => {
 
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended',
-      'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended',
+      'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended', 'analysis-accepted',
       'gate-started', 'readiness-passed', 'scratch-setting-up', 'scratch-setup-complete',
       'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
       'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-failed',
@@ -252,8 +258,15 @@ describe('an implementation run with no entry capabilities', () => {
 
     // The submission the session made afterwards was refused, and nothing
     // of it was written.
-    await until(() => architect()!.verdicts.length === 1);
-    expect(architect()!.verdicts[0]).toMatchObject({ accepted: false, final: true });
+    // Stop fences runtime admission before the submission callback, so no verdict is produced.
+    expect(architect()!.verdicts).toEqual([]);
+    const fencedOutcome = architect()!.outcome;
+    expect(fencedOutcome?.kind).toBe('failed');
+    if (fencedOutcome?.kind !== 'failed') throw new Error('Expected the late provider call to fail admission');
+    expect(fencedOutcome.error).toBeOneOf([
+      'Operation stopped', 'Operation runtime is closed', 'Current authority denied operation',
+    ]);
+    expect(architect()!.results).toEqual([]);
     expect(agent!.sessions.map(session => session.spec.role)).toEqual(['catalog-extractor', 'initial-architect']);
     await expect(readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.entries), 'utf8')).rejects.toThrow();
   }, 120_000);

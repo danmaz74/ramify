@@ -103,10 +103,13 @@ describe('the API view of a local architect\'s continued turns', () => {
     await opened.service.settled('review-notes', receipt.jobId);
     expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');
 
-    const [first, second] = prompts.get('local-architect') ?? [];
+    // Script callbacks see inherited history; recorded specs contain each current packet.
+    const first = prompts.get('local-architect')![0];
+    const second = opened.agent!.sessions.filter(session => session.spec.submission.name === localArchitectToolName)[1]!.spec.prompt;
     expect(first).toContain(`- API view: none was materialized, because the API view could not be materialized: ${failure}.`);
     expect(second).toBeDefined();
     expect(second).not.toContain(failure);
+    expect(prompts.get('local-architect')![1]).toContain(failure); // The historical failed view remains immutable.
     const moduleSource = join(fixture.root, notesDirectory, 'src');
     expect(directories).toEqual([moduleSource, moduleSource]);
     const architectMeta = JSON.parse(await readFile(join(fixture.root, '.ramify-architect', '_meta.json'), 'utf8')) as { revision: string };

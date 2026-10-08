@@ -715,10 +715,12 @@ describe('a rejected submission in a run', () => {
   test('the briefing states the default write scope: the owner directory and the only directories included may name', async () => {
     const { agent } = await run([requestCompletion()], [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"']);
     const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
-    expect(local.spec.prompt).toContain('## Default write scope');
-    expect(local.spec.prompt).toContain(`- \`${reviews}\`: the base gives its engineer \`${reviewsDirectory}/\` whole`);
-    expect(local.spec.prompt).toContain(`  - Immediate child modules: \`${reviewsDirectory}/subs/core\` (\`${reviews}/core\`), \`${reviewsDirectory}/subs/ui\` (\`${reviews}/ui\`), \`${reviewsDirectory}/subs/validation\` (\`${reviews}/validation\`).`);
-    expect(local.spec.prompt).toContain('  - Owned nested-project roots: none.');
+    const inheritedScope = local.inherited.join('\n\n');
+    expect(local.spec.prompt).not.toContain('## Default write scope');
+    expect(inheritedScope).toContain('## Default write scope');
+    expect(inheritedScope).toContain(`- \`${reviews}\`: the base gives its engineer \`${reviewsDirectory}/\` whole`);
+    expect(inheritedScope).toContain(`  - Immediate child modules: \`${reviewsDirectory}/subs/core\` (\`${reviews}/core\`), \`${reviewsDirectory}/subs/ui\` (\`${reviews}/ui\`), \`${reviewsDirectory}/subs/validation\` (\`${reviews}/validation\`).`);
+    expect(inheritedScope).toContain('  - Owned nested-project roots: none.');
   }, 300_000);
 
   test('an included directory inside the owner is rejected at submission with its path, and the same turn resubmits', async () => {

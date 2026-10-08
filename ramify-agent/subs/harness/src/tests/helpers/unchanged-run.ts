@@ -56,6 +56,8 @@ export async function openUnchangedRuns(root: string, options: UnchangedRunsOpti
   const audited = final < 0 ? null : checkpoints[final]!.commit ?? before;
   const candidates = audited === null ? undefined : scriptedCandidates(root, {
     [audited]: { tree: fixtureTree, files: {}, base: before, changes: [] },
+    // The preview explicitly states this same immutable tree, which current NFR delta reads address directly.
+    [fixtureTree]: { tree: fixtureTree, files: {}, base: before, changes: [] },
   });
   return { ...await openRuns(root, { git,
     ...(candidates === undefined ? {} : { candidates }), ...runs }), git };

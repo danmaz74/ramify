@@ -74,7 +74,7 @@ function phaseOf(service: RunService, runId: string) {
 }
 
 /** The initial analysis's turns: the catalog intake, the initial architect and the plan's checker, each its own session. */
-const analysed = ['session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended'];
+const analysed = ['session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-prepared', 'invocation-prepared', 'invocation-ended'];
 
 async function types(root: string, runId: string): Promise<string[]> {
   return (await runEventsOnDisk(root, plan, runId)).map(event => event.type);

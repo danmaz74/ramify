@@ -92,7 +92,7 @@ async function run(root: string, plan: Parameters<typeof byRole>[0], commits: re
   const after = commits.at(-1)?.commit ?? before;
   const tree = 'a'.repeat(40);
   const scripted = gateGit(root, { head: base, commits: [scenarios, ...commits],
-    previews: [before, before, before, after].map(head => ({ repositoryRoot: root, head, tree })) });
+    previews: (commits.length === 0 ? [] : [before, before, before, after]).map(head => ({ repositoryRoot: root, head, tree })) });
   const opened = await openRuns(root, {
     script: byRole(plan),
     inputs: treeInputs(),
@@ -265,54 +265,44 @@ describe('K3: exact-owner and included-subtree test areas in the engineer\'s bri
 });
 
 describe('X1a: an engineer reaches its context budget', () => {
-  test('it returns with its report, no compaction is recorded, and the sixth return exhausts the bound', async () => {
+  test('a hard context limit fails the unfinished iteration without compaction or a fresh replacement', async () => {
     const root = await target();
     const budgetTurn = [
       { kind: 'compaction' as const, reason: 'threshold' as const, tokensBefore: 130_000, tokensAfter: 40_000 },
       { kind: 'context' as const, tokens: 200_000, window: null },
       { kind: 'message' as const, text: 'I raised the limit and have not written its test.' },
     ];
-    // The iteration is never accepted, so no gate of its own is reached: the
-    // boundaries are the work item's and the run's.
-    const { service, runId, scripted } = await run(root, {
+    // No engineer accepts a return, so neither iteration nor later completion gates are admitted.
+    const { service, runId, scripted, agent } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
       engineer: Array(6).fill(budgetTurn),
-    }, [unchanged, unchanged]);
-
-    expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes').failure)).toBe('completed');
-    const result = await readResult(root, runId, 'wi-001', 1);
+    }, []);
+    expect(onlyRun(service, 'review-notes')).toMatchObject({ state: 'failed', failure: {
+      reason: 'limit-exceeded', message: 'Engineer inv-0007 reached its hard context limit without an accepted return; wi-001.i01 remains unfinished',
+      evidence: ['invocations/inv-0007/outcome.json'],
+    } });
     const job = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.record), 'utf8')) as
       { policy: { limits: { budgetReturnsPerIteration: number } } };
-    const capturedBound = job.policy.limits.budgetReturnsPerIteration;
-    expect(capturedBound).toBe(6);
-    expect(result.outcome).toBe('partial');
-    expect(result.invocations).toHaveLength(capturedBound);
-    expect(result.findings.some(finding => finding.includes(`return ${capturedBound} of ${capturedBound}`))).toBe(true);
-    expect(result.commit).toBeNull();
-
-    for (const [index, invocation] of result.invocations.entries()) {
-      const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome(invocation)), 'utf8')) as {
-        ended: string; budget?: { threshold: number; observed: number | null; reportDelivered: boolean };
-      };
-      expect(outcome.ended).toBe('context-budget-reached');
-      expect(outcome.budget).toEqual({ threshold: 140_000, observed: 200_000, reportDelivered: true });
-
-      // A fresh session does not reset the counter: each return after the
-      // first is its own fresh session, and the sixth still exhausts the
-      // captured bound.
-      const record = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.invocation(invocation)), 'utf8')) as {
-        session: { requested: string; actual: string }; attempt: number;
-      };
-      expect(record.session).toMatchObject({ requested: 'fresh', actual: 'fresh' });
-      expect(record.attempt).toBe(index + 1);
-
-      // Compaction is forbidden for the role, so none is recorded for it.
-      const observations = await readFile(runPath(root, 'review-notes', runId, runLayout.observations(invocation)), 'utf8');
-      expect(observations).not.toContain('"compaction"');
-      expect(observations).toContain('"context"');
-    }
-    // No external tool was started for any of this.
+    expect(job.policy.limits.budgetReturnsPerIteration).toBe(6);
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    expect(events.filter(event => event.type === 'iteration-closed' || event.type === 'work-item-completed' || event.type === 'gate-committing')).toEqual([]);
+    const engineers = agent!.sessions.filter(session => session.spec.role === 'engineer');
+    expect(engineers).toHaveLength(1);
+    expect(engineers[0]!.start).toEqual({ mode: 'fresh' });
+    expect(engineers[0]!.verdicts).toEqual([]);
+    expect(engineers[0]!.suppressedCompactions).toBe(1);
+    expect(engineers[0]!.outcome?.kind).toBe('context-budget-reached');
+    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0007')), 'utf8')) as { ended: string; budget: unknown };
+    expect(outcome.ended).toBe('context-budget-reached');
+    expect(outcome.budget).toEqual({ threshold: 140_000, observed: 200_000, reportDelivered: true });
+    const original = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.invocation('inv-0007')), 'utf8')) as { session: { requested: string; actual: string }; attempt: number };
+    expect(original.session).toMatchObject({ requested: 'fresh', actual: 'fresh' });
+    expect(original.attempt).toBe(1);
+    await expect(readFile(runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    const observations = await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0007')), 'utf8');
+    expect(observations).not.toContain('"compaction"');
+    expect(observations).toContain('"context"');
     expectNoProcesses();
     scripted.assertComplete();
   }, 120_000);

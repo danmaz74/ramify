@@ -142,7 +142,7 @@ describe('the integration work item', () => {
     // owners' step files as the tree held them, and the scope the engineer
     // must be given; no bridging Given is singled out.
     const sessions = agent!.sessions;
-    const briefing = sessions.find(session => session.spec.role === 'local-architect' && session.spec.prompt.startsWith('# Work item wi-003'))!.spec.prompt;
+    const briefing = sessions.find(session => session.spec.role === 'local-architect' && session.spec.submission.name === 'submit_work_orientation' && session.spec.scope.workingDirectory === join(root, reviewsDirectory, 'src'))!.spec.prompt;
     expect(briefing).toContain(`## The integration scenario sc-003: A written note is shown with its tag`);
     expect(briefing).toContain(['```gherkin', ...planScenario, '```'].join('\n'));
     expect(briefing).toContain(`The harness wrote it into \`${integrationFeature}\``);
@@ -156,12 +156,19 @@ describe('the integration work item', () => {
     // Its origin is the integration scenario, so it has no entry scenarios of its own.
     expect(briefing).not.toContain('## The scenarios of this work item');
     // An entry's local architect is given its entry's scenario, and the integration scenario it came from.
-    const entryBriefing = sessions.find(session => session.spec.role === 'local-architect' && session.spec.prompt.startsWith('# Work item wi-001'))!.spec.prompt;
+    const entryBriefing = sessions.find(session => session.spec.role === 'local-architect' && session.spec.submission.name === 'submit_work_orientation' && session.spec.scope.workingDirectory === join(root, notesDirectory, 'src'))!.spec.prompt;
     expect(entryBriefing).toContain('## The scenarios of this work item');
     expect(entryBriefing).toContain(`### sc-001 (pending): A note is written for tagging\n\n- Feature file: \`${noteFeature}\`.\n- A sub-scenario of the integration scenario \`sc-003\``);
     // Its engineer, each scenario not done and the rules; the
     // integration item's engineer, the scenario and the step files it imports.
-    const engineerOf = (iteration: string) => sessions.find(session => session.spec.role === 'engineer' && session.spec.prompt.startsWith(`# Iteration ${iteration}`))!.spec.prompt;
+    const engineerInvocations = log.filter(event => event.type === 'invocation-started' && event.data.role === 'engineer');
+    const engineers = sessions.filter(session => session.spec.role === 'engineer');
+    expect(engineers).toHaveLength(engineerInvocations.length);
+    const engineerOf = (iteration: string) => {
+      const position = engineerInvocations.findIndex(event => event.type === 'invocation-started' && event.data.work.iteration === iteration);
+      expect(position, iteration).toBeGreaterThanOrEqual(0);
+      return engineers[position]!.spec.prompt;
+    };
     expect(engineerOf('wi-001.i01')).toContain('### sc-001 (pending): A note is written for tagging');
     expect(engineerOf('wi-001.i01')).toContain('## Binding a scenario');
     const binder = engineerOf('wi-003.i01');
@@ -170,7 +177,7 @@ describe('the integration work item', () => {
     expect(binder).toContain(`- Write one step file in \`${reviewsDirectory}/src/tests/steps/\``);
     expect(binder).not.toContain('## Binding a scenario');
     // The narrower scope was refused through the judge, with the one expected.
-    const architect = sessions.find(session => session.spec.prompt.startsWith('# Work item wi-003')
+    const architect = sessions.find(session => session.spec.role === 'local-architect' && session.spec.scope.workingDirectory === join(root, reviewsDirectory, 'src')
       && session.spec.submission.name === 'submit_work_item_result')!;
     const refused = JSON.parse((architect.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string; message: string; expected: string }> };
     expect(refused.errors).toEqual([{

@@ -13,7 +13,7 @@ import type { RunService } from '../run/service.js';
 import { concern, decision, dispose, failure, report } from './helpers/check-findings.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { copyFixture } from './helpers/fixture.js';
-import { approveRun, emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, staleCrashLock, startRun, until } from './helpers/runs.js';
+import { approveRun, emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, staleCrashLock, startRun, stopRun, until } from './helpers/runs.js';
 import { assertUnchangedGit, openUnchangedRuns as openRuns } from './helpers/unchanged-run.js';
 
 vi.mock('node:child_process', async original =>
@@ -187,7 +187,12 @@ describe('a person\'s CheckFinding commands', () => {
     const restarted = await openRuns(root, { script: [] });
     cleanups.push(() => restarted.service.close());
     expect(await restarted.service.execute(answer)).toEqual(receipt);
-    // The recovered run is interrupted: it accepts no new command.
+    // Accepted ordinary recovery restores its original wait; Stop ends it before the late command.
+    expect(restarted.service.getRun(plan, runId)!.state).toBe('running');
+    await restarted.service.execute(stopRun(plan, runId, restarted.service.getRun(plan, runId)!.version));
+    await restarted.service.settled(plan, runId);
+    expect(restarted.service.getRun(plan, runId)!.state).toBe('stopped');
+    // An ended run accepts no new command.
     expect(await rejection(restarted.service.execute(command('waive-check-finding', runId, restarted.service.getRun(plan, runId)!.version, { checkFinding: 'cf-0002', expectedRevision: 3, reason: 'late' }))))
       .toMatchObject({ code: 'conflict', message: expect.stringContaining('has ended') });
   }, 120_000);
