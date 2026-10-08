@@ -18,9 +18,13 @@ contracts instead of a frozen earlier base.
    actual descendant/cancellation/timeout/registration behavior.
 2. Capability acceptance matrix: convert the twelve-case critical path with
    required strict helper support and retain named actual adapter witnesses.
-3. Capability dependencies: convert the next slowest file.
-4. Capability recovery.
-5. Nonfunctional recovery.
+3. Capability dependencies: convert the thirteen-case nested-flow matrix.
+4. Write-guard ordinary cases: their implicit ownership queries cost about
+   27 s in the post-cleanup audit. Preserve the distinct actual F1 provider
+   cases as explicit boundary evidence; ordinary path/symlink tests retain real
+   filesystem behavior and script ownership responses.
+5. Capability recovery and nonfunctional recovery, then measurement and other
+   mixed consumers according to the remaining ordinary cost and boundary trace.
 6. Capability assignment, delegation and other ordinary external consumers,
    one bounded family at a time, ordered by the current measured profile.
 7. Complete shared enforcement/runner partition and final full qualification.
@@ -32,6 +36,12 @@ cases and implement only the minimum strict helper support before each test
 conversion, then complete project-wide coverage/enforcement after those cuts.
 
 ## Before merge
+
+The post-cleanup audit also found 75–80 s files already documenting distinct
+actual Git/audit/CLI or generated-view witnesses. Their time does not justify
+replacing their actual claims with fake responses. Trace mixed files before
+classifying them; reduce unnecessary external work in ordinary cases and keep
+the minimum actual witnesses needed for the declared boundary claims.
 
 - Record base HEAD, exact affected files/cases, original expected outcomes and
   verification commands. Prepare dependencies matching that base's pinned
