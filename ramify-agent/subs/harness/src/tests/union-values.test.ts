@@ -90,9 +90,9 @@ describe('the run log', () => {
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
       'document-manifest-committed', 'work-orientation-recorded', 'context-selection-recorded', 'context-package-append-requested', 'context-package-appended', 'context-package-prompt-bound', 'candidate-prepared', 'nonfunctional-phase-started', 'nonfunctional-assessed', 'nonfunctional-investigated', 'nonfunctional-repair-assigned', 'nonfunctional-repair-committed', 'nonfunctional-round-closed', 'nonfunctional-deviation-recorded', 'candidate-bound-to-gate',
       'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
-      'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-interrupted',
-      'capability-assignment-settled', 'capability-candidate-accepted', 'capability-review-recorded',
-      'capability-verification-started', 'capability-verification-failed', 'capability-handed-back', 'capability-stopped',
+      'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned',
+      'capability-assignment-settled',
+      'capability-verification-started', 'capability-handed-back', 'capability-stopped',
       'review-requested', 'analysis-approved',
       'readiness-passed', 'readiness-failed', 'scratch-setting-up', 'scratch-setup-complete',
       'scenarios-materializing', 'scenarios-materialized',
@@ -281,12 +281,12 @@ describe('the observation log', () => {
   test('every observation type is a valid line, and every coverage-gap kind is named', () => {
     const types = observationSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
-      'activity', 'rejection', 'guard', 'mutation', 'hook-check', 'excursion', 'scope-tests',
+      'activity', 'rejection', 'guard', 'mutation', 'hook-check', 'excursion',
       'context', 'compaction', 'coverage-gap',
     ]);
     const kinds = [
       'unguarded-shell', 'changed-paths-unknown', 'usage-unavailable', 'context-unavailable',
-      'observation-truncated', 'unsupported-runner', 'transcript-incomplete', 'unsupported-check-result',
+      'observation-truncated', 'transcript-incomplete', 'unsupported-check-result',
     ];
     for (const kind of kinds) {
       expect(observationSchema.safeParse({ n: 1, at: '2026-09-20T10:15:00.000Z', type: 'coverage-gap', data: { kind, detail: 'why' } }).success).toBe(true);
@@ -881,7 +881,7 @@ describe('the protocol vocabulary', () => {
 
   test('every failure reason and every phase is named', () => {
     expect(runFailureReasonSchema.options).toEqual([
-      'analysis-invalid', 'readiness-failed', 'project-config-invalid', 'acceptance-harness-missing',
+      'analysis-invalid', 'readiness-failed', 'project-config-invalid',
       'agent-failed', 'invalid-submission', 'inputs-changed', 'dependency-cycle', 'unresolvable-requirement',
       'repair-exhausted', 'acceptance-incomplete', 'recovery-exhausted', 'writer-unsettled', 'limit-exceeded', 'internal',
     ]);
@@ -1057,15 +1057,8 @@ function sampleData(type: RunEvent['type']): unknown {
     'capability-exchange-opened': { task: 'cap-001', exchange: 'ex-001', invocation: 'inv-0005' },
     'capability-exchange-answered': { task: 'cap-001', exchange: 'ex-001', invocation: 'inv-0006' },
     'capability-assigned': { task: 'cap-001', assignment: 'cap-001.i01', sequence: 1, invocation: 'inv-0005' },
-    'capability-assignment-interrupted': { task: 'cap-001', assignment: 'cap-001.i01', invocation: 'inv-0007',
-      cause: 'budget reached', candidateTree: 'a'.repeat(40), attempt: 1 },
     'capability-assignment-settled': { task: 'cap-001', assignment: 'cap-001.i01', outcome: 'accepted' },
-    'capability-candidate-accepted': { task: 'cap-001', gate: 'ga-0005', tree: 'a'.repeat(40),
-      planRevision: 2, assignments: ['cap-001.i01'], review: 'cr-001' },
-    'capability-review-recorded': { task: 'cap-001', gate: 'ga-0005', tree: 'a'.repeat(40),
-      planRevision: 2, outcome: 'passed', review: 'cr-001' },
     'capability-verification-started': { task: 'cap-001', invocation: 'inv-0005' },
-    'capability-verification-failed': { task: 'cap-001', finding: 'The consumer test fails' },
     'capability-handed-back': { task: 'cap-001', handback: 'hb-001', invocation: 'inv-0005' },
     'capability-stopped': { task: 'cap-001', reason: 'Stopped by the operator' },
     'review-requested': {},
@@ -1113,7 +1106,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'gate-started': { gate: 'ga-0001', checkpoint: 'readiness' },
     'gate-committing': { gate: 'ga-0001', checkpoint: 'final' },
     'gate-command-started': { gate: 'ga-0001', checkpoint: 'final', kind: 'type-check', position: 2, total: 4 },
-    'gate-command-waiting': { gate: 'ga-0001', checkpoint: 'final', kind: 'tests', position: 3, total: 4, line: 'Waiting for another test run (fixture)' },
+    'gate-command-waiting': { gate: 'ga-0001', checkpoint: 'final', kind: 'configured', position: 3, total: 4, line: 'Waiting for another test run (fixture)' },
     'gate-attempted': { gate: 'ga-0001', checkpoint: 'final', verdict: 'passed', next: 'accept' },
     'check-findings-recorded': { cause: { kind: 'recovery', detail: 'd' }, checkFindings: [] },
     'review-request-recorded': { request: 'rq-0001', workItem: 'wi-001', iteration: 'wi-001.i01', kind: 'code', gate: 'ga-0002', candidate: 'c1' },

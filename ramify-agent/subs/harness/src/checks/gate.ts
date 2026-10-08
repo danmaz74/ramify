@@ -54,8 +54,6 @@ export interface GateRequest {
   readonly infrastructureAttempt?: number | undefined;
   /** The guarded files as the assignment captured them. */
   readonly guarded?: readonly { readonly path: string; readonly hash: string | null }[] | undefined;
-  /** The assignment's project-relative write scope, retained for historical request compatibility. */
-  readonly writeScope?: readonly string[] | undefined;
   /** A guarded path whose change a committed record authorized. */
   readonly authorizations?: readonly { readonly path: string; readonly by: RecordReference }[] | undefined;
   /**
@@ -481,7 +479,7 @@ function nextOf(
     const bound = request.limits?.infrastructureRetries;
     return bound !== undefined && (request.infrastructureAttempt ?? 0) + 1 >= bound ? 'exhausted' : 'retry-infrastructure';
   }
-  if (cause === 'check-failed' || cause === 'in-scope') {
+  if (cause === 'check-failed') {
     const bound = request.limits?.repairRounds;
     return bound !== undefined && (request.repairRound ?? 0) + 1 >= bound ? 'exhausted' : 'repair';
   }

@@ -210,7 +210,6 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
     const returned = workItemGates[0]!;
     expect(returned.verdict).toBe('failed');
     expect(returned.cause).toBe('check-failed');
-    expect(returned.attribution).toBeUndefined();
     expect(returned.next).toBe('repair');
     // The audit's own answer carries the failure; no command record is made for it.
     expect(returned.commands).toEqual([]);

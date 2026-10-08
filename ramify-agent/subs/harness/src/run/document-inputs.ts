@@ -12,7 +12,6 @@ const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).d
 export async function readCapturedDocuments(runDirectory: string, input: InputManifest): Promise<{
   readonly manifest: DocumentManifest; readonly bytes: ReadonlyMap<string, Uint8Array>;
 }> {
-  if (!input.documentManifest) throw new Error('This run has no captured document manifest');
   if (input.documentManifest.path !== runLayout.documentManifest) throw new Error('Unexpected captured document manifest path');
   const content = await readFile(join(runDirectory, input.documentManifest.path));
   if (hash(content) !== input.documentManifest.hash) throw new Error('The captured document manifest changed');
@@ -29,7 +28,6 @@ export async function readCapturedDocuments(runDirectory: string, input: InputMa
 
 /** Compare the fixed source corpus without treating intended implementation edits as drift. */
 export async function documentChanges(projectRoot: string, planId: string, runDirectory: string, input: InputManifest): Promise<string[]> {
-  if (!input.documentManifest) return [];
   let captured: Awaited<ReturnType<typeof readCapturedDocuments>>;
   try { captured = await readCapturedDocuments(runDirectory, input); }
   catch (error) { return [`Captured documents cannot be read as recorded: ${error instanceof Error ? error.message : String(error)}`]; }

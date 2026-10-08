@@ -14,9 +14,9 @@ import {
   type ConsumerRequirement, type ContractRecord, type ProviderObligation,
 } from '../contracts/records.js';
 import {
-  capabilityAssignmentSchema, capabilityExchangeSchema, capabilityHandbackSchema, capabilityPlanSchema,
+  capabilityExchangeSchema, capabilityHandbackSchema, capabilityPlanSchema,
   capabilityRequestSchema, capabilityTaskSchema,
-  type CapabilityAssignment, type CapabilityExchange, type CapabilityHandback, type CapabilityPlan,
+  type CapabilityExchange, type CapabilityHandback, type CapabilityPlan,
   type CapabilityRequest, type CapabilityTask,
 } from '../capability/records.js';
 
@@ -66,7 +66,6 @@ export interface CommittedRecords {
   readonly capabilityTasks: ReadonlyMap<string, CapabilityTask>;
   readonly capabilityPlans: ReadonlyMap<string, readonly CapabilityPlan[]>;
   readonly capabilityExchanges: ReadonlyMap<string, readonly CapabilityExchange[]>;
-  readonly capabilityAssignments: ReadonlyMap<string, CapabilityAssignment>;
   readonly capabilityHandbacks: ReadonlyMap<string, CapabilityHandback>;
 }
 
@@ -106,7 +105,6 @@ export function committedRecords(entries: readonly ReplayedLine[]): CommittedRec
   const capabilityTasks = new Map<string, CapabilityTask>();
   const capabilityPlans = new Map<string, CapabilityPlan[]>();
   const capabilityExchanges = new Map<string, CapabilityExchange[]>();
-  const capabilityAssignments = new Map<string, CapabilityAssignment>();
   const capabilityHandbacks = new Map<string, CapabilityHandback>();
 
   for (const entry of entries) {
@@ -217,12 +215,6 @@ export function committedRecords(entries: readonly ReplayedLine[]): CommittedRec
           capabilityExchanges.set(value.id, list);
           break;
         }
-        case 'ramify-agent.capability-assignment/1': {
-          const value = parse(capabilityAssignmentSchema, record.body, record.path);
-          if (capabilityAssignments.has(value.id)) throw new CommittedRecordError(record.path, ['An assignment is immutable']);
-          capabilityAssignments.set(value.id, value);
-          break;
-        }
         case 'ramify-agent.capability-handback/1': {
           const value = parse(capabilityHandbackSchema, record.body, record.path);
           if (capabilityHandbacks.has(value.task)) throw new CommittedRecordError(record.path, ['A handback is immutable']);
@@ -253,7 +245,6 @@ export function committedRecords(entries: readonly ReplayedLine[]): CommittedRec
     capabilityTasks,
     capabilityPlans,
     capabilityExchanges,
-    capabilityAssignments,
     capabilityHandbacks,
   };
 }

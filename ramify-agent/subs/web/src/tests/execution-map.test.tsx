@@ -312,7 +312,7 @@ test('a running readiness gate card says Running and for how long, Run-wide, wit
   try {
     const readiness = { key: 'gate:ga-0001', label: 'Readiness gate ga-0001', runVersion: 42, modules: [],
       sourceRefs: [{ kind: 'run-event' as const, id: 'ev-8', sequence: 8, revision: null }], kind: 'gate' as const, checkpoint: 'readiness' as const,
-      verdict: null, audit: 'not-applicable' as const, repairRound: 0, commit: null, auditedCommit: null, active: true,
+      verdict: null, audit: 'not-started' as const, repairRound: 0, commit: null, auditedCommit: null, active: true,
       subject: { workItem: null, iteration: null }, cause: null, evidencePresent: false };
     const canvas = await gateView([...map.nodes, readiness], [{ sequence: 8, at: '2026-09-24T21:43:40.000Z' }]);
     const card = within(canvas).getByRole('button', { name: /^Readiness gate ga-0001, gate/ });
@@ -358,7 +358,7 @@ test('a drag that starts on a card pans the canvas: its buttons refuse a node dr
 
 const readiness = { key: 'gate:ga-0001', label: 'Readiness gate ga-0001', runVersion: 42, modules: [],
   sourceRefs: [{ kind: 'run-event' as const, id: 'ev-8', sequence: 8, revision: null }], kind: 'gate' as const, checkpoint: 'readiness' as const,
-  verdict: null, audit: 'not-applicable' as const, repairRound: 0, commit: null, auditedCommit: null, active: true,
+  verdict: null, audit: 'not-started' as const, repairRound: 0, commit: null, auditedCommit: null, active: true,
   subject: { workItem: null, iteration: null }, cause: null, evidencePresent: false };
 
 test('the All gates list words each gate as its card does: verdict, module, repair round and audit only where they apply', async () => {
@@ -419,7 +419,7 @@ test('a running gate card and its detail name the command it is on', async () =>
 test('a queued gate card and detail show the machine test lock wait', async () => {
   const line = 'Waiting for another test run (fixture)';
   const running = { ...map, nodes: [...map.nodes, readiness], current: { awaitedSession: null, runningGate: readiness.key, source: readiness.sourceRefs[0]!,
-    gateCommand: { kind: 'tests' as const, position: 1, total: 4, waitingLine: line,
+    gateCommand: { kind: 'configured' as const, position: 1, total: 4, waitingLine: line,
       source: { kind: 'run-event' as const, id: 'ev-9', sequence: 9, revision: null } } } };
   const c = { ...client(), getExecutionMap: async () => running } as ProtocolClient;
   render(<ExecutionMapArea client={c} planId="nested-provider-map" runId="run-scripted-map" version={42} events={[]} onOpenGate={vi.fn()} />);

@@ -22,12 +22,10 @@ import { createMappedCheckExecution, type DirectCheckStep } from './helpers/dire
 /*
  * What a failing gate says, and who answers it.
  *
- * A cause is not a diagnosis: an architect that received `outside-assignment`
- * and nothing else read it as a write outside the assignment, narrowed the
- * file list, and the same failure came back. So an attempt carries what each
- * failing command reported, a Ramify check's findings are attributed to the
- * files the report itself names, and a module violation goes to the local
- * architect whatever scope it lies in.
+ * A cause is not a diagnosis: an agent that receives only a cause has to
+ * guess what failed. So an attempt carries what each failing command
+ * reported, a Ramify check's findings are worded from the files the report
+ * itself names, and no failure is assigned an owner by where it lies.
  */
 
 vi.mock('node:child_process', async original =>
@@ -79,7 +77,7 @@ function configuredAudit(overrides: Partial<GateAuditRecord> = {}): GateAuditRec
 }
 
 /** One attempt over a temporary directory, with the checks a test names. */
-async function attempt(checks: readonly PlannedCheck[], writeScope?: readonly string[]): Promise<GateAttempt> {
+async function attempt(checks: readonly PlannedCheck[]): Promise<GateAttempt> {
   const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-'));
   cleanups.push(() => rm(directory, { recursive: true, force: true }));
   return runGate(createMappedCheckExecution({ script: ({ checkIndex }) => {
@@ -93,7 +91,6 @@ async function attempt(checks: readonly PlannedCheck[], writeScope?: readonly st
     head: 'HEAD',
     checks,
     limits: { repairRounds: 2, infrastructureRetries: 1 },
-    ...(writeScope === undefined ? {} : { writeScope }),
   });
 }
 
@@ -244,12 +241,11 @@ describe('a Ramify check that failed at a gate', () => {
       { kind: 'type-check', command: prints('ok 1 - the limit\n', 0, directory) },
       { kind: 'type-check', command: prints('', 0, directory) },
       { kind: 'ramify-check', command: prints(checkReport([notVisible(source, 13)]), 1, directory) },
-    ], [scope]);
+    ]);
 
     expect(gate.verdict).toBe('failed');
-    // Every finding lies inside the write scope, so the failure is in scope.
+    // A failed check is a check failure, whatever scope its findings lie in.
     expect(gate.cause).toBe('check-failed');
-    expect(gate.attribution).toBeUndefined();
     expect(gate.next).toBe('repair');
 
     const briefed = await gateDiagnostics(gate, 'local-architect');
@@ -266,10 +262,9 @@ describe('a Ramify check that failed at a gate', () => {
     const gate = await attempt([
       { kind: 'type-check', command: prints('ok\n', 0, directory) },
       { kind: 'ramify-check', command: prints(checkReport([notVisible('subs/other/src/mcp.ts', 4)]), 1, directory) },
-    ], [scope]);
+    ]);
 
     expect(gate.cause).toBe('check-failed');
-    expect(gate.attribution).toBeUndefined();
     expect(gate.next).toBe('repair');
   }, 60_000);
 
@@ -281,10 +276,9 @@ describe('a Ramify check that failed at a gate', () => {
     const gate = await attempt([
       { kind: 'type-check', command: prints(`${lines}\n`, 1, directory) },
       { kind: 'ramify-check', command: prints(checkReport([]), 0, directory) },
-    ], [scope]);
+    ]);
 
     expect(gate.cause).toBe('check-failed');
-    expect(gate.attribution).toBeUndefined();
     expect(gate.next).toBe('repair');
 
     // The command has no structured findings, so the end of its own output
@@ -376,7 +370,6 @@ describe('a module violation at the iteration gate, over a run', () => {
       JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate(id)), 'utf8')) as GateAttempt));
     const failed = attempts.find(gate => gate.subject.iteration === 'wi-001.i01')!;
     expect([failed.cause, failed.next]).toEqual(['check-failed', 'repair']);
-    expect(failed.attribution).toBeUndefined();
 
     const result = JSON.parse(await readFile(
       runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;

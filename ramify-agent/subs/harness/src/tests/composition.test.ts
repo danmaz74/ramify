@@ -513,7 +513,6 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log.type', values: ['capability-plan-revised', 'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-settled'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
   { union: 'run log.type', values: ['capability-coordinator-resumed'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA18 CA26 CA29: an ended B writer keeps dirty source and closes partial through ordinary failure analysis' },
   { union: 'run log.type', values: ['capability-verification-started', 'capability-handed-back'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision' },
-  { union: 'run log.type', values: ['capability-verification-failed'], file: 'subs/harness/src/tests/capability-tasks-projection.test.ts', test: 'CA23 CA34: request, design, consultation and failed verification remain distinct from registry capability' },
   { union: 'run log.type', values: ['capability-stopped'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA20 CA32: restart with a B writer lacking confirmed release stops the stack and frontier' },
   { union: 'run log.type', values: ['writer-process-registered'], file: 'subs/harness/src/tests/capability-recovery.boundary.test.ts', test: 'CA20: a registered real process group survives a service crash and is settled before any successor work' },
   { union: 'run log[session-opened].data.role', values: ['capability-architect'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
@@ -526,7 +525,6 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[capability-qualified].data.outcome', values: ['unresolved'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'an unresolved qualification returns through the global architect and the same local architect' },
   { union: 'run log[capability-assignment-settled].data.outcome', values: ['accepted'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
   { union: 'run log[capability-assignment-settled].data.outcome', values: ['partial'], file: 'subs/harness/src/tests/capability-state.test.ts', test: 'refuses an active assignment but preserves partial history for the verifier' },
-  { union: 'run log[capability-review-recorded].data.outcome', values: ['passed', 'failed'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision' },
   { union: 'submission engineer.kind', values: ['capability-needed'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'submission engineer[capability-needed].request.knownInterface.kind', values: ['none-known'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'submission engineer[capability-needed].request.knownInterface.kind', values: ['insufficient'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision' },
@@ -872,12 +870,6 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.ownership.exclusions[].kind', values: ['repository', 'packages', 'generated'], reason: 'The current public rooted ownership topology does not emit these synthesized reserved path facts. Real installed F1 queries their excluded descendants; that is a path-answer witness, not a producer of captured topology table entries.' },
   { union: 'submission local-architect[assign].assignment.scope.extra[].kind', values: ['directory'], reason: 'Current architect assignment validation rejects directory extras. Whole assigned child/project trees use included entries, and registry bootstrap creates its internal directory authority. Negative-input validation remains covered; no accepted submission produces this value.' },
 
-  { union: 'query work-item.iterations[].gates[].cause', values: ['in-scope'], reason: 'Historical iterations may project the former in-scope cause; new ordinary gates record the neutral check-failed cause without owner attribution.' },
-  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['in-scope', 'outside-assignment'], reason: 'Historical gates retain this inferred attribution, but current gates no longer assign failure ownership from locations or scope probes.' },
-  { union: 'run log.type', values: ['capability-candidate-accepted', 'capability-review-recorded', 'capability-assignment-interrupted'],
-    reason: 'Historical capability-only transitions remain readable; current policy records ordinary iteration gates, review requests and invocation endings instead.' },
-  { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings', 'type-check-errors', 'ramify-findings-and-type-check-errors'],
-    reason: 'Historical inferred repair ownership remains readable; current gates retain provider diagnostics and agents decide the repair owner without this field.' },
   {
     union: 'run log[capability-assignment-settled].data.outcome', values: ['failed', 'interrupted'],
     reason: 'Current driven capability runs recover interrupted writers into a later settlement or stop the stack; no test commits these terminal settlement outcomes yet.',
@@ -892,7 +884,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   },
   {
     union: 'query analysis.analysis[accepted].planEvidence.status', values: ['unavailable'],
-    reason: 'Legacy coverage unavailability is exercised at the record helper boundary, but the current query suite does not construct an accepted legacy run for this projection branch.',
+    reason: 'Projected when the accepted catalog or incorporation file fails its integrity check against the committed event, or the captured documents cannot be read; the query suite does not corrupt a run\'s evidence files.',
   },
   {
     union: 'run log[context-package-appended].data.outcome', values: ['already-present', 'failed', 'no-session'],
@@ -979,10 +971,6 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'A run started on pi. No pi session ran in this environment: there is no pi login, so the real trial (T2) was not run and nothing produced it. It is produced only by a real `serve --agent pi` run.',
   },
   {
-    union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['check-failed', 'in-scope', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown', 'session-lost'],
-    reason: 'An InfrastructureRecovery is written only by readiness, whose recoveries have three causes. The gate\'s own infrastructure retry reruns the gate and writes no recovery record, and a reconstructed session is recorded on the invocation, so these causes, shared with GateAttempt.cause and the session vocabulary, have no writer.',
-  },
-  {
     union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['reconstruct-session', 'none'],
     reason: 'Readiness plans only reinstall-nested, restart-daemon and rerun-command; an unrecoverable failure records no recovery at all (iteration 4, deviation 9), and session reconstruction is recorded on the invocation, not as a recovery.',
   },
@@ -993,19 +981,6 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['provider-error'],
     reason: 'No code path writes it: a provider error reaches the harness as a failed session outcome, which is recorded as ended: failed with the error text and no interruption.',
-  },
-  {
-    union: 'record ramify-agent.gate-attempt/3.commands[].kind', values: ['conformance'],
-    reason: 'A conformance suite runs inside the project\'s own tests command, selected through extraSuites (iteration 9); no gate records a command of kind conformance.',
-  },
-  {
-    union: 'record ramify-agent.readiness-attempt/1.steps[].step',
-    values: ['test-runner', 'baseline-acceptance', 'acceptance-full', 'nested-packages', 'test-discovery', 'baseline-setup', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check'],
-    reason: 'These names remain in the version-one record vocabulary so committed historical readiness attempts can still be read. Configured native readiness now writes audit-config, declared-packages, declared-preparation and configured-full-audit instead; no new attempt writes these earlier steps.',
-  },
-  {
-    union: 'record ramify-agent.gate-attempt/3.cause', values: ['invalid-session'],
-    reason: 'A session the implementation can no longer read is detected before the gate and recorded on the invocation as a degraded session mode (iteration 6, deviation 8), so no gate attempt carries this cause.',
   },
   {
     union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['local-rule-failed'],
@@ -1056,36 +1031,8 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'The provider\'s other exclusion kinds: a definition beneath a declared output tree, `.git`, a package directory or Ramify\'s generated views. F4 declares only an external tree, which the nested final audit witnesses.',
   },
   {
-    union: 'run log[gate-command-started].data.kind', values: ['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios'],
-    reason: 'Harness-planned command kinds of earlier runs, read from their logs: committing gates and readiness now announce each configured check as configured, and setup commands as setup (iteration 9).',
-  },
-  {
-    union: 'run log[gate-command-waiting].data.kind', values: ['tests', 'scenarios', 'conformance'],
-    reason: 'Waits of harness-planned commands in earlier runs, read from their logs; only a configured check waits under the provider lock now (iteration 9).',
-  },
-  {
-    union: 'observation log.type', values: ['scope-tests'],
-    reason: 'The former scoped test tool\'s diagnostic run. No engineer is given that tool since iteration 9; engineers run named tests through the shell, and earlier runs\' observation logs stay readable.',
-  },
-  {
-    union: 'observation log[scope-tests].data.outcome', values: ['passed', 'failed', 'not-verified'],
-    reason: 'Written only by the former scoped test tool, which no engineer is given since iteration 9.',
-  },
-  {
-    union: 'observation log[coverage-gap].data.kind', values: ['unsupported-runner'],
-    reason: 'Recorded when the harness\'s own test discovery met a runner it could not read; the configured audit owns test selection since iteration 9, and the harness discovers no tests (iterations-integration.test.ts holds that none is recorded).',
-  },
-  {
-    union: 'run log[job-failed].data.reason', values: ['acceptance-harness-missing'],
-    reason: 'Readiness no longer runs a harness acceptance-runner step; scenarios run as a configured audit check (iteration 9). Earlier runs\' job-failed lines keep the value.',
-  },
-  {
-    union: 'run log[gate-attempted].data.scenarioFindings.refused.reason', values: ['source-unavailable', 'transition-refused'],
-    reason: 'Historical: a gate that asks the configured audit carries no CheckFinding part from its scenario results (iteration 9); earlier runs\' gate lines stay readable.',
-  },
-  {
-    union: 'run log[gate-attempted].data.scenarioFindings.notes[].step', values: ['promotion', 'witness'],
-    reason: 'Historical: a gate that asks the configured audit carries no CheckFinding part from its scenario results (iteration 9); earlier runs\' gate lines stay readable.',
+    union: 'run log[gate-command-started].data.kind', values: ['ramify-check', 'type-check'],
+    reason: 'Committing gates and readiness announce each configured check as configured, and setup commands as setup (iteration 9); only an in-place diagnosis plans a Ramify check or a type check, and no test drives one through a run.',
   },
   {
     union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['fix-by-check'],

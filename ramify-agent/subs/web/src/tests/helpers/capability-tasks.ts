@@ -37,7 +37,7 @@ export function capabilityTasksResponse(version: number, stage: 'waiting' | 'rep
           invocation: 'inv-0002', submission: 'c'.repeat(64), sequence: 9, at: '2026-10-07T12:00:00.000Z' } : null }],
       children: [], activeChild: null,
       verification: { status: handedBack ? 'passed' : stage === 'repair' ? 'failed' : 'pending',
-        gates: stage === 'waiting' ? [] : ['ga-001'], reviews: [], findings: stage === 'repair' ? ['D type migration failed'] : [] },
+        gates: stage === 'waiting' ? [] : ['ga-001'], findings: stage === 'repair' ? ['D type migration failed'] : [] },
       handback: handedBack ? { summary: 'B source is usable by A', returnedTree: 'b'.repeat(40),
         deltaFromSuspension: ['subs/b/src/source.ts'], interfaces: [{ path: 'subs/b/src/source.ts', symbols: ['readWithSource'], use: 'A reads source' }],
         limitations: [], checks: [{ id: 'ga-001', revision: 1 }], reviews: [] } : null,

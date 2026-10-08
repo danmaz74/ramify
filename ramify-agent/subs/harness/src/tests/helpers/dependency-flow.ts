@@ -481,7 +481,6 @@ export async function runDependencyGate(restartAfterHandback: boolean, realBound
     expect(passed.length).toBeGreaterThan(0);
     expect(events.filter(event => event.type === 'review-request-recorded' && event.data.workItem === 'cap-002').length,
       JSON.stringify(events.filter(event => event.type === 'review-request-recorded' || event.type === 'iteration-closed' || event.type === 'capability-handed-back'))).toBeGreaterThan(0);
-    expect(events.filter(event => event.type === 'capability-review-recorded')).toHaveLength(0);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const current = opened.service.events('need', receipt.jobId)!;
       try { await opened.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence)); break; }

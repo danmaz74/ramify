@@ -82,13 +82,13 @@ export const executionMapFixtureNodes: ExecutionNode[] = [
   { ...base('session:ses-engineer', 'Status engineer', 29, [moduleAt('project/ui', 'engineer', 29)]),
     kind: 'session', role: 'engineer', state: 'live', executor: 'scripted', workItem: 'work-item:wi-status', reach: { kind: 'work-item', workItem: 'wi-status', capability: 'status-badge', module: 'project/ui' }, invocations: ['inv-status'] },
   { ...base('gate:ga-005', 'Status iteration gate, failed', 27), kind: 'gate', checkpoint: 'iteration',
-    verdict: 'failed', audit: 'passed', repairRound: 0, commit: 'commit-failed', auditedCommit: 'commit-failed', active: false, subject: { workItem: 'wi-status', iteration: 'it-status-1' }, cause: 'in-scope', evidencePresent: true },
+    verdict: 'failed', audit: 'passed', repairRound: 0, commit: 'commit-failed', auditedCommit: 'commit-failed', active: false, subject: { workItem: 'wi-status', iteration: 'it-status-1' }, cause: 'check-failed', evidencePresent: true },
   { ...base('gate:ga-006', 'Status iteration gate, repaired', 34), kind: 'gate', checkpoint: 'iteration',
     verdict: 'passed', audit: 'incomplete', repairRound: 1, commit: 'commit-repair', auditedCommit: null, active: false, subject: { workItem: 'wi-status', iteration: 'it-status-2' }, cause: null, evidencePresent: false },
   { ...base('gate:ga-provider', 'Provider conformance gate', 24), kind: 'gate', checkpoint: 'contract',
     verdict: 'passed', audit: 'passed', repairRound: 0, commit: 'commit-provider', auditedCommit: 'commit-provider', active: false, subject: { workItem: 'wi-provider', iteration: 'it-provider-1' }, cause: null, evidencePresent: true },
   { ...base('gate:ga-readiness', 'Readiness gate', 15), kind: 'gate', checkpoint: 'readiness',
-    verdict: 'passed', audit: 'not-applicable', repairRound: 0, commit: null, auditedCommit: null, active: false, subject: { workItem: null, iteration: null }, cause: null, evidencePresent: false },
+    verdict: 'passed', audit: 'passed', repairRound: 0, commit: null, auditedCommit: 'commit-base', active: false, subject: { workItem: null, iteration: null }, cause: null, evidencePresent: true },
 ];
 executionMapFixtureNodes.sort((a, b) =>
   (a.sourceRefs[0]?.sequence ?? Number.MAX_SAFE_INTEGER) - (b.sourceRefs[0]?.sequence ?? Number.MAX_SAFE_INTEGER)

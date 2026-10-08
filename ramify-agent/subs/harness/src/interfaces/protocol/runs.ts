@@ -115,8 +115,6 @@ export const runFailureReasonSchema = z.enum([
   'readiness-failed',
   /** Readiness found no valid `ramify-agent.json`, or support code it names outside every test area. */
   'project-config-invalid',
-  /** Readiness found no `cucumber-js`, or an acceptance mode's command that does not resolve. */
-  'acceptance-harness-missing',
   /** An agent session crashed or could not start. */
   'agent-failed',
   /** Every allowed submission of one invocation was invalid. */
@@ -715,7 +713,7 @@ export type WorkItemListResponse = z.infer<typeof workItemListResponseSchema>;
 
 export const gateVerdictSchema = z.enum(['passed', 'failed', 'not-verified']);
 export const gateCheckpointSchema = z.enum(['readiness', 'iteration', 'contract', 'breaking-iteration', 'work-item', 'final']);
-export const gateCauseSchema = z.enum(['check-failed', 'in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']);
+export const gateCauseSchema = z.enum(['check-failed', 'infrastructure', 'timeout', 'guarded-change', 'unknown']);
 export const gateNextSchema = z.enum(['accept', 'repair', 'retry-infrastructure', 'return-to-local-architect', 'exhausted']);
 
 const gateSummary = z.object({
@@ -1154,9 +1152,9 @@ export const gateViewSchema = z.object({
   commit: text.nullable(),
   audited: text.nullable(),
   evidence: z.object({ runRef: text, reportCommit: text, treeRef: text }).strict().nullable(),
-  /** Complete producer evidence, including diagnostic details and artifact references. Absent on historical attempts. */
+  /** Complete producer evidence, including diagnostic details and artifact references. Absent on an attempt without provider results. */
   provider: z.object({ result: z.unknown(), checks: z.unknown() }).strict().optional(),
-  /** A committing gate's configured audit request and answer; absent for readiness's earlier records and an in-place diagnosis. */
+  /** A committing gate's configured audit request and answer; absent for an attempt that ended before its audit and an in-place diagnosis. */
   audit: gateAuditViewSchema.optional(),
   /** The tracked scenarios its audit's Cucumber checks ran; empty where none ran. */
   scenarios: z.array(gateScenarioResultViewSchema),

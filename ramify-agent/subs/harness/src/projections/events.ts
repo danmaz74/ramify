@@ -21,11 +21,8 @@ const obligationRef = (id: string): Ref[] => /^sc-\d{3,}$/.test(id) ? ref('scena
 /** Each kind of gate command, as a sentence names it. */
 const commandLabels: Record<RunEventOf<'gate-command-started'>['data']['kind'], string> = {
   setup: 'the setup command',
-  tests: 'the tests',
   'type-check': 'the type check',
   'ramify-check': 'the Ramify check',
-  conformance: 'the conformance check',
-  scenarios: 'the scenario check',
   configured: 'the configured check',
 };
 
@@ -251,13 +248,8 @@ function describe(event: RunEvent): [string, Ref[]] {
         `Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.line}, command ${event.data.position} of ${event.data.total}`,
         ref('gate', event.data.gate),
       ];
-    case 'gate-attempted': {
-      const carried = event.data.checkFindings?.length ?? 0;
-      const refused = event.data.scenarioFindings?.refused;
-      const findings = carried > 0 ? `, with ${counted(carried, 'CheckFinding event', 'CheckFinding events')}`
-        : refused ? `; its CheckFinding part was refused (${refused.reason})` : '';
-      return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}${findings}`, ref('gate', event.data.gate)];
-    }
+    case 'gate-attempted':
+      return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}`, ref('gate', event.data.gate)];
     case 'check-findings-recorded': {
       // CheckFindings have no reference kind on the wire yet; the page names the count and the cause.
       const cause = event.data.cause;
@@ -340,18 +332,10 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Capability task ${event.data.task} received exchange ${event.data.exchange}`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-assigned':
       return [`Capability task ${event.data.task} assigned ${event.data.assignment}`, [...ref('capability-task', event.data.task), ...ref('capability-assignment', event.data.assignment), ...ref('invocation', event.data.invocation)]];
-    case 'capability-assignment-interrupted':
-      return [`Capability assignment ${event.data.assignment} remains unfinished: ${event.data.cause}`, [...ref('capability-task', event.data.task), ...ref('capability-assignment', event.data.assignment), ...ref('invocation', event.data.invocation)]];
     case 'capability-assignment-settled':
       return [`Capability assignment ${event.data.assignment} settled: ${event.data.outcome}`, [...ref('capability-task', event.data.task), ...ref('capability-assignment', event.data.assignment)]];
-    case 'capability-review-recorded':
-      return [`Capability task ${event.data.task} review ${event.data.outcome} at ${event.data.tree}`, [...ref('capability-task', event.data.task), ...ref('gate', event.data.gate)]];
-    case 'capability-candidate-accepted':
-      return [`Capability task ${event.data.task} accepted candidate ${event.data.tree}`, [...ref('capability-task', event.data.task), ...ref('gate', event.data.gate)]];
     case 'capability-verification-started':
       return [`Capability task ${event.data.task} verification started`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
-    case 'capability-verification-failed':
-      return [`Capability task ${event.data.task} verification failed`, ref('capability-task', event.data.task)];
     case 'capability-handed-back':
       return [`Capability task ${event.data.task} handed back`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-stopped':
@@ -386,7 +370,7 @@ const counted = (count: number, one: string, many: string): string => `${count} 
 const workRefs = (work: RunEventOf<'session-opened'>['data']['work']): Ref[] => [
   ...ref('work-item', work.workItem), ...ref('iteration', work.iteration),
   ...ref(work.capabilityTask === undefined ? 'request' : 'capability-request', work.request),
-  ...ref('capability-task', work.capabilityTask), ...ref('capability-assignment', work.capabilityAssignment),
+  ...ref('capability-task', work.capabilityTask),
 ];
 
 /** The invocation a point names, where it names one. */

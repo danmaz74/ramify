@@ -16,8 +16,8 @@ export type AcceptedEvidence = { readonly status: 'available'; readonly catalog:
 /** The accepted event is the authority for two immutable, content-addressed files: the frozen catalog and the incorporation. */
 export async function readAcceptedEvidence(directory: string, record: RunRecord, events: readonly RunEvent[]): Promise<AcceptedEvidence> {
   const accepted = events.find(event => event.type === 'analysis-accepted');
-  if (!accepted || accepted.type !== 'analysis-accepted' || !accepted.data.evidence) {
-    return { status: 'unavailable', reason: 'This run has no accepted element catalog' };
+  if (!accepted || accepted.type !== 'analysis-accepted') {
+    return { status: 'unavailable', reason: 'This run has no accepted analysis' };
   }
   try {
     const { catalog: catalogRef, incorporation: incorporationRef } = accepted.data.evidence;
@@ -34,7 +34,7 @@ export async function readAcceptedEvidence(directory: string, record: RunRecord,
     }
     const catalog = elementCatalogSchema.parse(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(catalogBytes)));
     const incorporation = incorporationSchema.parse(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(incorporationBytes)));
-    if (catalog.manifestHash !== record.manifest.documentManifest?.hash) throw new Error('Catalog names another captured manifest');
+    if (catalog.manifestHash !== record.manifest.documentManifest.hash) throw new Error('Catalog names another captured manifest');
     return { status: 'available', catalog, catalogHash: catalogRef.hash, incorporation, ...captured };
   } catch (error) {
     return { status: 'unavailable', reason: error instanceof Error ? error.message : String(error) };

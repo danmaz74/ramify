@@ -20,6 +20,9 @@ import type { RunSession } from '../run/sessions.js';
 import { constructedRun, constructedRecord, registered, runId, hash } from './helpers/constructed.js';
 import { fixturePlan, fixtureRequest, fixtureTask } from './helpers/capability.js';
 import { recordHash } from '../work/committed.js';
+import { iterationAssignmentSchema, iterationResultSchema } from '../work/iterations.js';
+import { invocationSchema } from '../run/records.js';
+import type { GateAttempt } from '../checks/records.js';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const action of cleanup.splice(0)) await action(); });
@@ -45,10 +48,25 @@ function lines() {
         request: request.id, planRevision: 1, question: 'Which source must A show?', references: ['subs/a/src/caller.ts'],
         answer: { invocation: 'inv-0003', text: 'Show B source metadata', objections: [] } } },
     ] },
-    { type: 'capability-verification-started' as const, data: { task: task.id, invocation: 'inv-0002' } },
-    { type: 'capability-verification-failed' as const, data: { task: task.id, finding: 'A real test still fails' } },
+    { type: 'invocation-started' as const, data: { invocation: 'inv-0004', role: 'capability-architect', session: 'ses-0002',
+      work: { capabilityTask: task.id, request: request.id }, start: 'continued' }, records: [{ path: 'invocations/inv-0004/invocation.json',
+      body: invocationSchema.parse({ schema: 'ramify-agent.invocation/1', id: 'inv-0004', role: 'capability-architect',
+        work: { capabilityTask: task.id, request: request.id }, attempt: 2,
+        session: { requested: 'continued', actual: 'continued', ref: '' },
+        prompt: { package: 'capability-architect', hash, inputsHash: hash },
+        scope: { write: null, measurement: null, size: null }, writer: false,
+        base: 'abc', startedAt: '2026-09-21T08:00:00.000Z' }) }] },
+    { type: 'gate-attempted' as const, data: { gate: 'ga-0001', checkpoint: 'work-item', verdict: 'failed', next: 'repair' },
+      records: [{ path: 'gates/ga-0001/attempt.json', body: failedTaskGate }] },
   ];
 }
+
+/** The task's completion gate, proposed by its coordinator, failing a real test. */
+const failedTaskGate: GateAttempt = {
+  schema: 'ramify-agent.gate-attempt/3', id: 'ga-0001', checkpoint: 'work-item', subject: { workItem: 'cap-001' }, proposedBy: 'inv-0004',
+  repairRound: 0, infrastructureAttempt: 0, head: 'abc', commit: null, audited: null, evidence: null, guardedChanges: [],
+  commands: [], verdict: 'failed', cause: 'check-failed', next: 'repair',
+};
 
 test('CA23: capability event references identify requests, tasks and assignments', () => {
   const run = constructedRun([
@@ -73,7 +91,7 @@ test('CA23 CA34: request, design, consultation and failed verification remain di
       plan: { revision: 1, useCases: [{ id: 'need-001.ex01', expectedBehavior: 'A formats the fact', derivedFrom: ['need-001.ex01'] }] },
       obligations: [{ id: 'cap-001', kind: 'outcome', status: 'pending', report: null }],
       consultations: [{ answer: 'Show B source metadata' }],
-      verification: { status: 'failed', findings: ['A real test still fails'] }, handback: null,
+      verification: { status: 'failed', gates: ['ga-0001'], findings: ['ga-0001: failed; check-failed'] }, handback: null,
       deferredWorkItems: ['wi-002'] }] });
   expect(answer.tasks[0]?.id).not.toBe('format-b-fact');
   expect(answer.tasks[0]?.deferredWorkItems).toEqual(['wi-002']);
@@ -109,13 +127,18 @@ test('CA23: nested dependency and settled partial blocker stay visible in the ta
   const request = fixtureRequest();
   const task = fixtureTask(request);
   const plan = fixturePlan(request, task);
-  const assignment = { schema: 'ramify-agent.capability-assignment/1', id: 'cap-001.i01', task: task.id,
-    sequence: 1, owner: 'b', plan: { id: task.id, revision: 1, hash: recordHash(plan) },
-    purpose: 'Implement B source', approach: 'Extend B', requirementRefs: [], intendedEvidence: ['A real test'],
+  const planRef = { id: task.id, revision: 1, hash: recordHash(plan) };
+  const assignment = iterationAssignmentSchema.parse({ schema: 'ramify-agent.iteration-assignment/1', id: 'cap-001.i01', workItem: 'wi-001',
+    outline: planRef, coordination: { kind: 'capability-task', id: task.id, sequence: 1, plan: planRef, startingTree: 'a'.repeat(64), startingPaths: [] },
+    stage: 0, kind: 'ordinary', goal: 'Implement B source', approach: 'Extend B',
     scope: { revision: 0, base: { module: 'b', included: [] }, extra: [], read: [], bootstrap: [],
       rationale: 'B owns source', resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: [], files: [], view: { status: 'placeholder' } } },
-    gate: { tests: { policy: 'owned-by-scope', exactOwners: ['b'], subtrees: [], extraSuites: [] } },
-    startingTree: 'a'.repeat(64) };
+    externalCapabilities: [], completionEvidence: 'A real test', evidenceObligations: [],
+    gate: { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['b'], subtrees: [], extraSuites: [] } },
+    guarded: [], authorizations: [] });
+  const partialResult = iterationResultSchema.parse({ schema: 'ramify-agent.iteration-result/1', iteration: assignment.id,
+    coordination: assignment.coordination, outcome: 'partial', invocations: ['inv-0003'], gate: null, commit: null,
+    findings: ['unfinished: Root-owned stale assertion'], changedAssumptions: [], artifacts: [] });
   const childRequest = { ...request, id: 'need-002', parent: { kind: 'capability-task' as const, id: task.id },
     assignment: assignment.id, invocation: 'inv-0003', original: { ...request.original,
       examples: request.original.examples.map(example => ({ ...example, id: 'need-002.ex01' })) } };
@@ -124,7 +147,7 @@ test('CA23: nested dependency and settled partial blocker stay visible in the ta
   const childPlan = fixturePlan(childRequest, child);
   const run = constructedRun([...lines().slice(0, 2),
     { type: 'capability-assigned', data: { task: task.id, assignment: assignment.id, sequence: 1,
-      invocation: 'inv-0002' }, records: [{ path: 'assignments/cap-001.i01.json', body: assignment }] },
+      invocation: 'inv-0002' }, records: [{ path: 'work-items/cap-001/iterations/01/assignment.json', body: assignment }] },
     { type: 'capability-requested', data: { request: childRequest.id, parent: task.id,
       assignment: assignment.id, invocation: 'inv-0003' }, records: [{ path: 'requests/need-002.json', body: childRequest }] },
     { type: 'capability-delegated', data: { task: child.id, request: childRequest.id, parent: task.id,
@@ -139,12 +162,12 @@ test('CA23: nested dependency and settled partial blocker stay visible in the ta
   const partial = capabilityTasksResponseSchema.parse(capabilityTasksOf(runView(constructedRun([
     ...lines().slice(0, 2),
     { type: 'capability-assigned', data: { task: task.id, assignment: assignment.id, sequence: 1,
-      invocation: 'inv-0002' }, records: [{ path: 'assignments/cap-001.i01.json', body: assignment }] },
-    { type: 'capability-assignment-settled', data: { task: task.id, assignment: assignment.id,
-      outcome: 'partial', unfinished: ['Root-owned stale assertion'] } },
+      invocation: 'inv-0002' }, records: [{ path: 'work-items/cap-001/iterations/01/assignment.json', body: assignment }] },
+    { type: 'iteration-closed', data: {}, records: [{ path: 'work-items/cap-001/iterations/01/result.json', body: partialResult }] },
+    { type: 'capability-assignment-settled', data: { task: task.id, assignment: assignment.id, outcome: 'partial' } },
   ]))));
   expect(partial.tasks[0]?.assignments).toMatchObject([{
-    id: assignment.id, status: 'partial', failures: ['Root-owned stale assertion'],
+    id: assignment.id, owner: 'b', status: 'partial', failures: ['unfinished: Root-owned stale assertion'], result: { outcome: 'partial' },
   }]);
 });
 
@@ -175,7 +198,7 @@ test('CA23 CA34 PB3-D08: committed handback closes only the task, shows the arch
   expect(answer.requests).toMatchObject([{ task: 'cap-001', outcome: 'delegated' }]);
 });
 
-test('CA24: a historical registry/contract run answers an empty task view without changing its old records', () => {
+test('CA24: a registry/contract run without capability requests answers an empty task view and keeps its contract records', () => {
   const contract = { schema: 'ramify-agent.contract/2', id: 'ct-001', revision: 1,
     capability: { id: 'format-b-fact', revision: 1, hash }, decision: null,
     authority: { kind: 'provider', owner: 'collection-review/workspace/reviews', rationale: 'Provider owns the interface' },

@@ -129,35 +129,11 @@ export type NotVerified =
  */
 export type TypeCheckOutput = 'tsc';
 
-/** What an attribution's locations were read from: a Ramify report, the type check's errors, or both. */
-export type GateAttributionBasis = 'ramify-findings' | 'type-check-errors' | 'ramify-findings-and-type-check-errors';
-
-/**
- * What the cause was read from, beyond the runner error, the timeout and the
- * exit codes. A Ramify check prints a structured report that names each
- * finding's own file, and a type check whose output format the project
- * declared names each error's file, so a failure of either is attributed to
- * where its findings or errors lie: `inScope` and `outside` are those
- * locations against the write scope of the assignment the attempt followed.
- * No test output is parsed for this, nor the output of a command whose
- * format the project did not declare, and an attempt with neither records
- * no attribution.
- */
-export interface GateAttribution {
-  readonly basis: GateAttributionBasis;
-  readonly inScope: string[];
-  readonly outside: string[];
-}
-
 /**
  * Why a gate did not pass. `check-failed` records a command or rule failure
- * without assigning its location or repair owner. The current scripted
- * lifecycle engine also retains its location-attribution vocabulary until
- * Plan21 iteration 9 replaces that execution seam.
+ * without assigning its location or repair owner.
  */
-export type GateCause =
-  | 'check-failed' | 'in-scope' | 'infrastructure' | 'timeout' | 'invalid-session'
-  | 'outside-assignment' | 'guarded-change' | 'unknown';
+export type GateCause = 'check-failed' | 'infrastructure' | 'timeout' | 'guarded-change' | 'unknown';
 
 /** What the harness does with the attempt. */
 export type GateNext = 'accept' | 'repair' | 'retry-infrastructure' | 'return-to-local-architect' | 'exhausted';
@@ -339,8 +315,6 @@ export interface GateAttempt {
   readonly commands: GateCommandRecord[];
   readonly verdict: 'passed' | 'failed' | 'not-verified';
   readonly cause: GateCause | null;
-  /** What the cause was read from, where a report or declared output of its own named the files. */
-  readonly attribution?: GateAttribution;
   readonly next: GateNext;
 }
 

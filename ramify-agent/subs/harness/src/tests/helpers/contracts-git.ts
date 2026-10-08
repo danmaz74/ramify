@@ -224,14 +224,6 @@ export function scenariosCommitted(planId: string, commit = `scenarios-of-${plan
   return accepted(`Scenarios of ${planId}`, commit, added(...files));
 }
 
-/**
- * The harness's own commit of a withdrawal, "Withdraw sc-001" or "Withdraw
- * sc-001, sc-002", which restores the pending tag in each file it names.
- */
-export function withdrawn(scenarios: readonly string[], commit: string, files: readonly string[]): CommitResponse {
-  return accepted(`Withdraw ${scenarios.join(', ')}`, commit, modified(...files));
-}
-
 /** A commit attempt Git reports as an unchanged tree. */
 export function unchanged(subject: string): CommitResponse {
   return { subject, commit: null, changes: [] };

@@ -305,14 +305,12 @@ export type RunWrite =
   | 'nonfunctional-repair-assigned'
   | 'nonfunctional-repair-committed'
   | 'nonfunctional-assessed'
-  | 'capability-assignment-interrupted'
   | 'capability-coordinator-resumed'
   | 'capability-verification-started'
   | 'capability-source-captured'
   | 'capability-exchange-opened'
   | 'capability-exchange-answered'
   | 'capability-gate-recorded'
-  | 'capability-review-recorded'
   | 'capability-handed-back'
   | 'capability-assignment-settled'
   | 'capability-assigned'
@@ -2356,9 +2354,8 @@ export class RunService {
     const requested = new Set([...records.capabilityRequests.values()].map(request => request.invocation));
     for (const started of run.log.all('invocation-started')) {
       const iteration = started.data.work.iteration;
-      const capabilityAssignment = started.data.work.capabilityAssignment;
-      if (started.data.role !== 'engineer' || (iteration === undefined && capabilityAssignment === undefined) ||
-        requested.has(started.data.invocation) || (iteration !== undefined && records.results.has(iteration))) continue;
+      if (started.data.role !== 'engineer' || iteration === undefined ||
+        requested.has(started.data.invocation) || records.results.has(iteration)) continue;
       const ended = run.log.all('invocation-ended').find(event => event.data.invocation === started.data.invocation);
       const outcome = records.outcomes.get(started.data.invocation);
       if (ended?.data.ended !== 'submitted' || ended.data.submission === null || !ended.data.kept ||
@@ -2371,16 +2368,13 @@ export class RunService {
       const { schema: _schema, ...body } = raw;
       const parsed = engineerSubmissionSchema.safeParse(body);
       if (raw.schema !== 'ramify-agent.engineer-submission/1' || !parsed.success || parsed.data.kind !== 'capability-needed') continue;
-      const assignment = iteration === undefined ? undefined : records.assignments.get(iteration);
+      const assignment = records.assignments.get(iteration);
       const item = assignment === undefined ? undefined : records.workItems.find(entry => entry.id === assignment.workItem);
-      const nestedAssignment = capabilityAssignment === undefined ? undefined : records.capabilityAssignments.get(capabilityAssignment);
-      const taskId = assignment?.coordination?.kind === 'capability-task'
-        ? assignment.coordination.id : nestedAssignment?.task;
+      const taskId = assignment?.coordination?.kind === 'capability-task' ? assignment.coordination.id : undefined;
       const parentTask = taskId === undefined ? undefined : records.capabilityTasks.get(taskId);
       const parentPlan = parentTask === undefined ? undefined : records.capabilityPlans.get(parentTask.id)?.at(-1);
-      if ((iteration !== undefined && (assignment === undefined || item === undefined)) ||
-        (assignment?.coordination?.kind === 'capability-task' && (parentTask === undefined || parentPlan === undefined)) ||
-        (capabilityAssignment !== undefined && (nestedAssignment === undefined || parentTask === undefined || parentPlan === undefined))) {
+      if (assignment === undefined || item === undefined ||
+        (assignment.coordination?.kind === 'capability-task' && (parentTask === undefined || parentPlan === undefined))) {
         throw new Error(`Suspended engineer ${started.data.invocation} lacks its original assignment`);
       }
       const release = run.log.all('writer-released').filter(event => event.data.invocation === started.data.invocation);
@@ -2389,15 +2383,15 @@ export class RunService {
       const source = await captureProvisionalSource({ git: this.git, sourceGit: this.options.provisionalSourceGit, projectRoot: this.projectRoot, runDirectory: run.directory,
         request: requestId, acceptedBase: this.accepted(run), writerSettledBy: started.data.invocation,
         changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)) });
-      const captured = assignment === undefined ? undefined : await readFile(run.path(runLayout.capturedPlan));
+      const captured = await readFile(run.path(runLayout.capturedPlan));
       const request: CapabilityRequest = { schema: 'ramify-agent.capability-request/1', id: requestId,
-        parent: parentTask === undefined ? { kind: 'work-item', id: item!.id } : { kind: 'capability-task', id: parentTask.id },
-        assignment: assignment?.id ?? nestedAssignment!.id,
-        invocation: started.data.invocation, consumer: assignment?.coordination?.kind === 'capability-task'
+        parent: parentTask === undefined ? { kind: 'work-item', id: item.id } : { kind: 'capability-task', id: parentTask.id },
+        assignment: assignment.id,
+        invocation: started.data.invocation, consumer: assignment.coordination?.kind === 'capability-task'
           ? 'module' in assignment.scope.base ? assignment.scope.base.module : parentTask!.consumer
-          : item?.module ?? nestedAssignment!.owner,
+          : item.module,
         requirementPackage: parentTask === undefined
-          ? { id: runLayout.capturedPlan, revision: 1, hash: sha256(captured!) }
+          ? { id: runLayout.capturedPlan, revision: 1, hash: sha256(captured) }
           : refOf(parentTask.id, parentPlan!.revision, parentPlan!),
         continuation: { session: started.data.session, point: outcome.session.ref }, source,
         summary: parsed.data.summary, original: identifyCapabilityNeed(requestId, parsed.data.request) };
@@ -2438,14 +2432,12 @@ export class RunService {
         const record = runRecordSchema.parse(parsed);
         if (record.jobId !== jobId || record.planId !== planId) throw new Error('job.json names another run');
         const log = await RunLog.open(join(directory, runLayout.events), jobId);
-        if (record.manifest.documentManifest) {
-          const captured = await readCapturedDocuments(directory, record.manifest);
-          if (!log.find('job-started')) throw new Error('Document capture stopped before the run was published');
-          if (!log.find('document-manifest-committed')) await log.append({ type: 'document-manifest-committed', data: {
-            manifest: record.manifest.documentManifest.path, hash: record.manifest.documentManifest.hash,
-            documents: captured.manifest.documents.length,
-          } });
-        }
+        const captured = await readCapturedDocuments(directory, record.manifest);
+        if (!log.find('job-started')) throw new Error('Document capture stopped before the run was published');
+        if (!log.find('document-manifest-committed')) await log.append({ type: 'document-manifest-committed', data: {
+          manifest: record.manifest.documentManifest.path, hash: record.manifest.documentManifest.hash,
+          documents: captured.manifest.documents.length,
+        } });
         const base = await this.runBase(record, log);
         let loaded!: Run;
         loaded = new Run(record, directory, log, base, this.newWriter(record.policy, () => this.accepted(loaded)));
@@ -2593,7 +2585,7 @@ export class RunService {
     if (marker.data.maxRounds !== (run.record.policy.limits.nonfunctionalRoundsPerPlan ?? 3)) {
       return 'phase marker round bound differs from captured policy';
     }
-    const source = run.log.find('analysis-accepted')?.data.evidence?.catalog.hash;
+    const source = run.log.find('analysis-accepted')?.data.evidence.catalog.hash;
     if (source !== marker.data.catalogHash) return 'phase marker names another catalog';
     const nfrIds = assessedElements(accepted.catalog);
     const replay = replayNonfunctionalPhase(run.log.ledger.replay(), nfrIds, marker.data.maxRounds);
@@ -3380,7 +3372,7 @@ export class RunService {
       return null;
     }
     const accepted = run.log.find('analysis-accepted');
-    const catalogHash = accepted?.data.evidence?.catalog.hash;
+    const catalogHash = accepted?.data.evidence.catalog.hash;
     if (catalogHash === undefined) {
       await this.fail(run, 'analysis-invalid', 'The fixed non-functional catalog has no accepted hash');
       return null;
@@ -4268,10 +4260,6 @@ export class RunService {
       return false;
     }
     const manifestRef = run.record.manifest.documentManifest;
-    if (manifestRef === undefined) {
-      await this.fail(run, 'analysis-invalid', 'This run has no captured documents to extract a catalog from', []);
-      return false;
-    }
     const documents = await readCapturedDocuments(run.directory, run.record.manifest);
     const inputs: ExtractionInputs = { planId: run.record.planId, manifest: documents.manifest, bytes: documents.bytes, runDirectory: run.directory };
     let catalog = openElementCatalog(manifestRef.hash, documents.manifest);
@@ -4658,9 +4646,7 @@ export class RunService {
     const attempt = run.log.all('invocation-started').filter(event => event.data.role === 'capability-architect' &&
       event.data.work.capabilityTask === activeId && event.data.work.request === request.id).length + (replay === undefined ? 1 : 0);
     const progress = JSON.stringify({ status: active.status, planRevision: active.planRevision,
-      assignments: [...active.assignments], exchanges: [...records.capabilityExchanges.values()].filter(entries => entries[0]?.task === activeId),
-      reviews: run.log.all('capability-review-recorded').filter(event => event.data.task === activeId).map(event => event.data),
-      pending: run.log.all('capability-assignment-interrupted').filter(event => event.data.task === activeId).map(event => event.data) });
+      assignments: [...active.assignments], exchanges: [...records.capabilityExchanges.values()].filter(entries => entries[0]?.task === activeId) });
     const result = await this.runCapabilityCoordinator(run, agent, packages, baseline, item, task, request, plan,
       delegated.data.invocation, selected, providerItems, providerDecisions,
       { basis: active.coordinatorInvocation, point, session, progress, attempt,
@@ -4698,9 +4684,7 @@ export class RunService {
   private async orientAndSelectWorkContext(
     run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>,
     item: WorkItem, local: LoadedPackage, briefing: string, workingDirectory: string,
-  ): Promise<{ readonly kind: 'skip' | 'failed' } | { readonly kind: 'ready'; readonly package: WorkPackage; readonly session: SessionId | undefined; readonly ref: string | undefined }> {
-    const accepted = run.log.find('analysis-accepted');
-    if (!accepted?.data.evidence && !run.record.manifest.documentManifest) return { kind: 'skip' }; // old single-plan run
+  ): Promise<{ readonly kind: 'failed' } | { readonly kind: 'ready'; readonly package: WorkPackage; readonly session: SessionId | undefined; readonly ref: string | undefined }> {
     const sourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
     if (sourceChanges.length > 0) {
       await this.fail(run, 'inputs-changed', `The captured plan evidence changed before context selection: ${sourceChanges.join('; ')}`, [runLayout.documentManifest]);
@@ -5668,7 +5652,7 @@ export class RunService {
           continue turns;
         }
         if (undelivered.length > 0) returned = this.latestBasis(run, item.id)?.id;
-        gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary, lastAssignment);
+        gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary);
         gateRound += 1;
         if (gate === null) return null;
         if (gate.verdict !== 'passed') break;
@@ -7715,7 +7699,7 @@ export class RunService {
       return null;
     }
     const gate = await this.workItemGate(run, item, invocation, failedTaskGates.length,
-      `Capability ${task.id}: ${action.summary}`, latestAccepted, task.id, replayed);
+      `Capability ${task.id}: ${action.summary}`, task.id, replayed);
     if (gate === null) return null;
     if (gate.verdict !== 'passed' || gate.audited === null) {
       if (failedTaskGates.length + 1 > gateLimit) {
@@ -9119,7 +9103,6 @@ export class RunService {
       infrastructureAttempt: 0,
       subject: { workItem: item.id, iteration: assignment.id },
       guarded: this.guardedAtGate(run, assignment.guarded),
-      writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
       rules,
     }, submission.summary, modules, assignment.goal);
@@ -9610,7 +9593,6 @@ export class RunService {
       infrastructureAttempt,
       subject: { workItem: item.id, iteration: assignment.id },
       guarded: this.guardedAtGate(run, assignment.guarded),
-      writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
       ...(parity === null ? {} : { rules: [parity] }),
     }, summary, modules, assignment.goal);
@@ -10106,7 +10088,6 @@ export class RunService {
     invocation: string,
     repairRound: number,
     summary: string,
-    lastAssignment: IterationAssignment | undefined,
     taskOwner?: string,
     replayed = false,
   ): Promise<GateAttempt | null> {
@@ -10139,7 +10120,6 @@ export class RunService {
       proposedBy: invocation,
       repairRound,
       subject: { workItem: taskOwner ?? item.id },
-      ...(lastAssignment === undefined ? {} : { writeScope: writeScopePaths(this.projectRoot, lastAssignment) }),
     }, summary);
     const subject = attempt;
 
@@ -11047,9 +11027,7 @@ export class RunService {
   /** Every captured source document remains immutable for every writer of the run. */
   private async deniedFiles(run: Run): Promise<string[]> {
     const features = trackedScenarios(run.log.ledger.replay()).records.map(record => record.file);
-    const documents = run.record.manifest.documentManifest
-      ? (await readCapturedDocuments(run.directory, run.record.manifest)).manifest.documents.map(document => document.path)
-      : [];
+    const documents = (await readCapturedDocuments(run.directory, run.record.manifest)).manifest.documents.map(document => document.path);
     return deniedFiles(this.projectRoot, [...features, ...documents]);
   }
 
@@ -11492,7 +11470,6 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
       proposedBy: request.proposedBy ?? null,
       repairRound: request.repairRound ?? 0,
       infrastructureAttempt: request.infrastructureAttempt ?? 0,
-      writeScope: [...(request.writeScope ?? [])],
       limits: {
         repairRounds: request.limits?.repairRounds ?? 1,
         infrastructureRetries: request.limits?.infrastructureRetries ?? 1,
@@ -11517,7 +11494,6 @@ function preparedGate(operation: GateOperation): PreparedGate {
     request: {
       ...operation.request,
       checks: [],
-      writeScope: operation.request.writeScope,
     },
     guardedChanges: [...operation.guardedChanges],
     rules: [...operation.rules],

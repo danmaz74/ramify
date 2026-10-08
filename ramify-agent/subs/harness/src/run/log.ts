@@ -49,25 +49,6 @@ const eventBase = {
 };
 const event = <T extends string, D extends z.ZodType>(type: T, data: D) => z.object({ ...eventBase, type: z.literal(type), data }).strict();
 
-/**
- * The CheckFinding part an earlier run's gate recorded from its harness
- * scenario check: why the part was refused, and each scenario left out. No
- * gate writes it now; its notes are kept as recorded.
- */
-const historicalScenarioFindingsSchema = z.object({
-  refused: z.object({
-    reason: z.enum(['source-unavailable', 'transition-refused']),
-    message: z.string(),
-  }).strict().nullable(),
-  notes: z.array(z.object({
-    scenario: scenarioIdSchema,
-    checkFinding: z.string().nullable(),
-    step: z.enum(['promotion', 'witness']),
-    code: z.string(),
-    classification: z.string().optional(),
-  }).strict()),
-}).strict();
-
 const text = z.string().min(1);
 
 /** What an invocation ended with, as its outcome record says. */
@@ -157,18 +138,18 @@ export const runEventSchema = z.discriminatedUnion('type', [
     workItems: z.int().nonnegative(),
     scenarios: z.int().nonnegative(),
     warnings: z.array(scenarioWarningSchema),
-    /** The frozen catalog's elements by kind, when the same transaction also commits catalog and incorporation. */
+    /** The frozen catalog's elements by kind. */
     catalog: z.object({
       context: z.int().nonnegative(), functional: z.int().nonnegative(), nonFunctional: z.int().nonnegative(),
       fixed: z.int().nonnegative(), recommendation: z.int().nonnegative(),
-    }).strict().optional(),
+    }).strict(),
     /** The checkers' corrections, shown at the review stop beside the corrected catalog. */
-    findings: z.array(catalogFindingSchema).optional(),
+    findings: z.array(catalogFindingSchema),
     /** Hashes bind external immutable evidence files without putting their bodies in a ledger line. */
     evidence: z.object({
       catalog: z.object({ path: text, hash: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
       incorporation: z.object({ path: text, hash: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
-    }).strict().optional(),
+    }).strict(),
   }).strict()),
   /** The manifest is committed only after every immutable document byte file is durable. */
   event('document-manifest-committed', z.object({ manifest: text, hash: z.string().regex(/^[0-9a-f]{64}$/), documents: z.int().positive() }).strict()),
@@ -206,7 +187,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('nonfunctional-repair-committed', z.object({ round: z.int().positive(), invocation: text, assignment: text }).strict()),
   event('nonfunctional-round-closed', z.object({ round: z.int().positive(), record: text,
     outcome: z.enum(['satisfied', 'continue', 'exhausted', 'unavailable']),
-    /** Accepted coordinator close submission for unresolved choices; absent on earlier runs. */
+    /** Accepted coordinator close submission for unresolved choices; absent where the round closed without one. */
     actionInvocation: text.optional(),
   }).strict()),
   event('nonfunctional-deviation-recorded', z.object({ deviation: text, nfr: text, assessment: text, checkFinding: text,
@@ -225,17 +206,9 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('capability-exchange-answered', z.object({ task: text, exchange: text, invocation: text }).strict()),
   event('capability-assigned', z.object({ task: text, assignment: text, sequence: z.int().positive(), invocation: text,
     architectRef: architectRefSchema.nullable().optional(), corrects: text.optional() }).strict()),
-  event('capability-assignment-interrupted', z.object({ task: text, assignment: text, invocation: text,
-    cause: text, candidateTree: text, attempt: z.int().positive() }).strict()),
   event('capability-assignment-settled', z.object({ task: text, assignment: text, outcome: z.enum(['accepted', 'partial', 'failed', 'interrupted']),
-    mutated: z.array(text).optional(), outsideScope: z.array(text).optional(), endingTree: text.optional(),
-    unfinished: z.array(text).optional() }).strict()),
-  event('capability-candidate-accepted', z.object({ task: text, gate: text, tree: text,
-    planRevision: z.int().positive(), assignments: z.array(text).min(1), review: text }).strict()),
-  event('capability-review-recorded', z.object({ task: text, gate: text, tree: text,
-    planRevision: z.int().positive(), outcome: z.enum(['passed', 'failed']), review: text }).strict()),
+    mutated: z.array(text).optional(), outsideScope: z.array(text).optional(), endingTree: text.optional() }).strict()),
   event('capability-verification-started', z.object({ task: text, invocation: text, gate: text.optional() }).strict()),
-  event('capability-verification-failed', z.object({ task: text, finding: text }).strict()),
   event('capability-handed-back', z.object({ task: text, handback: text, invocation: text }).strict()),
   event('capability-stopped', z.object({ task: text, reason: text }).strict()),
   /**
@@ -266,8 +239,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
    */
   event('readiness-failed', z.object({
     attempt: z.int().positive(),
-    /** Present on new runs; older logs pair by the most recent start. */
-    gate: text.optional(),
+    gate: text,
     step: text,
     detail: z.string(),
     recovery: z.string().nullable(),
@@ -587,13 +559,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('gate-command-started', z.object({
     gate: text,
     checkpoint: text,
-    /**
-     * `configured` is one check of the committed audit definition, which the
-     * provider starts. `tests`, `conformance` and `scenarios` are the
-     * harness-planned commands of earlier runs, read from their logs and no
-     * longer written.
-     */
-    kind: z.enum(['setup', 'ramify-check', 'type-check', 'configured', 'tests', 'conformance', 'scenarios']),
+    /** `configured` is one check of the committed audit definition, which the provider starts. */
+    kind: z.enum(['setup', 'ramify-check', 'type-check', 'configured']),
     /** A setup command's declared name, such as `build`, or a configured check's ID. */
     name: text.optional(),
     position: z.int().positive(),
@@ -602,25 +569,19 @@ export const runEventSchema = z.discriminatedUnion('type', [
   /** A provider test/check is queued for the machine lock; readiness projects native check progress here. */
   event('gate-command-waiting', z.object({
     gate: text, checkpoint: text,
-    /** `configured` now; the others are read from earlier runs' logs. */
-    kind: z.enum(['configured', 'tests', 'scenarios', 'conformance']),
+    kind: z.enum(['configured']),
     position: z.int().positive(), total: z.int().positive(), line: text,
   }).strict()),
   /**
-   * A gate finished and commits its one complete `GateAttempt`. Earlier runs'
-   * committing gates also carried what their harness scenario check meant
-   * for the work item's CheckFindings, which stays readable here; a gate
-   * that asks the configured audit carries none, because its per-scenario
-   * results are display only.
+   * A gate finished and commits its one complete `GateAttempt`. It carries
+   * no CheckFinding events: the configured audit's per-scenario results are
+   * display only.
    */
   event('gate-attempted', z.object({
     gate: text,
     checkpoint: text,
     verdict: z.enum(['passed', 'failed', 'not-verified']),
     next: text,
-    committing: z.boolean().optional(),
-    checkFindings: checkFindingEventsField.optional(),
-    scenarioFindings: historicalScenarioFindingsSchema.optional(),
   }).strict()),
   /**
    * CheckFinding events committed by a path with no run event of its own:

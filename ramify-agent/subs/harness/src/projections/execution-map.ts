@@ -81,7 +81,6 @@ function scenarioResults(view: RunView): Map<string, ExecutionScenarioResult> {
 }
 
 function auditOf(view: RunView, gate: GateAttempt) {
-  if (gate.checkpoint === 'readiness') return 'not-applicable' as const;
   const outcome = view.gateAuditOutcomes.get(gate.id)?.body;
   if (outcome !== undefined && outcome.audited === gate.audited && gate.evidence !== null) {
     // A nested request's overall is its invocation verdict: indeterminate
@@ -246,11 +245,7 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
   for (const event of view.events) {
     if (event.type === 'gate-started' || event.type === 'gate-committing') activeStarts.set(event.data.gate, event);
     if (event.type === 'gate-attempted' || event.type === 'readiness-passed') activeStarts.delete(event.data.gate);
-    if (event.type === 'readiness-failed') {
-      if (event.data.gate !== undefined) { activeStarts.delete(event.data.gate); continue; }
-      const previous = [...activeStarts.values()].reverse().find(start => start.type === 'gate-started' && start.data.checkpoint === 'readiness');
-      if (previous?.type === 'gate-started') activeStarts.delete(previous.data.gate);
-    }
+    if (event.type === 'readiness-failed') activeStarts.delete(event.data.gate);
   }
   for (const event of activeStarts.values()) if (!settled.has(event.type === 'gate-started' || event.type === 'gate-committing' ? event.data.gate : '')) {
     if (event.type !== 'gate-started' && event.type !== 'gate-committing') continue;
@@ -258,7 +253,7 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
     const source = eventSource(view, event.sequence);
     add({ ...base(key('gate', event.data.gate), `${label(event.data.checkpoint)} gate ${event.data.gate}`, source),
       kind: 'gate', checkpoint: gateCheckpointSchema.parse(event.data.checkpoint),
-      verdict: null, audit: event.data.checkpoint === 'readiness' ? 'not-applicable' : 'not-started', repairRound: 0,
+      verdict: null, audit: 'not-started', repairRound: 0,
       commit: null, auditedCommit: null, active: true,
       subject: { workItem: null, iteration: null }, cause: null, evidencePresent: false });
   }

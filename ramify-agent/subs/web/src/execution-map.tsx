@@ -74,11 +74,11 @@ const verdictMarks = { passed: '✓', failed: '✗', 'not-verified': '?' } as co
 const auditWords = { 'not-started': 'Audit not started', passed: 'Audit passed', failed: 'Audit failed', indeterminate: 'Audit indeterminate',
   incomplete: 'Audit incomplete', unavailable: 'Audit unavailable' } as const;
 
-/** A gate's repair chain, repair round and audit, each only where it applies: a first round and a gate without an audit say nothing. */
+/** A gate's repair chain, repair round and audit, each only where it applies: a first round says nothing, and a running gate has no audit yet. */
 function gateFacts(node: GateNode, repairFrom: string | null): string {
   return [repairFrom ? `${repairFrom} → ${node.verdict ? verdictMarks[node.verdict] : '…'}` : null,
     node.repairRound > 0 ? `Repair round ${node.repairRound}` : null,
-    !node.active && node.audit !== 'not-applicable' ? auditWords[node.audit] : null].filter(Boolean).join(' · ');
+    !node.active ? auditWords[node.audit] : null].filter(Boolean).join(' · ');
 }
 
 /** A gate's verdict in words, or Running while it runs. */
@@ -89,8 +89,7 @@ function verdictText(node: GateNode): string {
 /** The command a running gate started last, as the map's current activity states it. */
 type ExecutionGateCommand = NonNullable<ExecutionMapSnapshot['current']['gateCommand']>;
 const commandWords: Record<ExecutionGateCommand['kind'], string> = {
-  setup: 'Setup', tests: 'Tests', 'type-check': 'Type check', 'ramify-check': 'Ramify check', conformance: 'Conformance', scenarios: 'Scenarios',
-  configured: 'Configured check',
+  setup: 'Setup', 'type-check': 'Type check', 'ramify-check': 'Ramify check', configured: 'Configured check',
 };
 
 /** A command's words: a setup command the project named `build` is the build. */
@@ -228,7 +227,7 @@ function Detail({ node, map, client, planId, runId, onOpenGate, onOpenSession }:
           {scenario.state.data.detail.gates.length ? <ol>{scenario.state.data.detail.gates.map((g, i) => <li key={`${g.gate}:${i}`}>{g.gate}: {g.status} in {g.check}; gate {g.verdict}; {g.checkpoint}</li>)}</ol>
             : <p>No recorded gate result.</p>}</> : <p>Full scenario unavailable: {scenario.state.data.detail.reason}</p>)}
       {scenario.state.status === 'failed' && <p role="alert">Could not read scenario: {scenario.state.error.message}</p>}</>}
-    {node.kind === 'gate' && <><p>Verdict {node.verdict ?? 'running'}{node.audit !== 'not-applicable' ? `; audit ${node.audit}` : ''}{node.repairRound > 0 ? `; repair round ${node.repairRound}` : ''}; cause {node.cause ?? 'none'}.</p>
+    {node.kind === 'gate' && <><p>Verdict {node.verdict ?? 'running'}; audit {node.audit}{node.repairRound > 0 ? `; repair round ${node.repairRound}` : ''}; cause {node.cause ?? 'none'}.</p>
       {node.active ? <p>The gate is running{map.current.runningGate === node.key && map.current.gateCommand ? `: ${map.current.gateCommand.waitingLine ?? gateStep(map.current.gateCommand)}` : ''}; its full check result will be available when this attempt settles.</p>
         : <button type="button" onClick={() => onOpenGate(node.key.slice('gate:'.length))}>Open full check and audit detail</button>}
       {gate.state.status === 'ready' && gate.state.data && <><p>Attempt commit {gate.state.data.commit ?? 'none'}; audited commit {gate.state.data.audited ?? 'none'}; audit evidence {gate.state.data.evidence?.runRef ?? 'not published'}.</p>
