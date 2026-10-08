@@ -142,3 +142,12 @@ released full nested audit on the new clean committed candidate before merge;
 that full run will include both actual producer witnesses. Those witnesses were
 not separately repeated after adoption. No target merge or publication has
 occurred from this optimization branch.
+
+Before final handoff the target advanced again to
+`42253094b10c00d5e3657d1e6b804efd9c05f24e`. Its two changes are only Plan21's
+readiness correction audit receipt and iteration10 result text. They were adopted
+by merge `bb62ca0c268278f220b90316dc1899c7b4358a4d`; runtime/configuration and the
+29-case/type/module verification above remain unchanged. The latest target
+committed head was rechecked before handoff. Complete prior-audit output remains
+retrievable from its durable report; this JSON stores compact statuses, timings
+and counts rather than copying command logs.
