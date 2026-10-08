@@ -202,3 +202,29 @@ provider tests. No foreign API was invented; all new imports remain same-owner.
 - `ramify-agent/subs/harness/src/prompts/tasks.ts`
 - `ramify-agent/subs/harness/src/tests/plan23-task-prompts.test.ts`
 - `ramify-agent/docs/plans/23-session-reuse-and-run-efficiency/iterations/02-results.md`
+
+## Specialized task bindings added before runtime integration
+
+Provider amendment `c74ecaa3177b12e993716a64eea41322f72d98db`, based on
+`243ad4c39e0dd57359167c1e9c5741cb94586a3e`, changes only `prompts/tasks.ts`
+and `tests/plan23-task-prompts.test.ts`. Inventory of actual runtime submission
+names found three missing pairs: local/capability architect qualification and
+engineer consultation. These now use explicit `capability-qualification` and
+`consultation` task kinds. Qualification binds `submit_capability_qualification`
+and the existing owner schema; consultation binds `answer_capability_consultation`
+and requires `consultationSubmissionSchema` serialized from its caller's actual
+validator. No schema fallback or parallel runtime schema was introduced.
+
+Consumers must select these explicit kinds; consultation passes
+`JSON.stringify(z.toJSONSchema(responseSchema))` from the runtime validator.
+Stable role bytes, once-only full schema in the declaration, current tool
+availability and immutable declaration conflict checks remain enforced. These
+are provider controls; invocation wiring still belongs to iterations 8/9.
+
+Integrated head `f16d47688331531e0dc53a7ee142107a055ed425`: two prompt/briefing
+files passed 62 tests; three existing capability submission, consultation and
+delegation files independently passed 24 tests. Type checks passed; structural
+check passed with zero errors/warnings and 314 analysis limits. Logs are
+`/tmp/ramify-plan23-integrated-specialized-packets-*.log`; worker handoff is
+`/tmp/ramify-plan23-specialized-receipt.md`. No native/live or full audit claim
+was made. All prior 36 role/task pairs and the three new pairs were exercised.

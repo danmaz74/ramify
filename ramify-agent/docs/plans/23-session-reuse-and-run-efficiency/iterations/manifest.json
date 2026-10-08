@@ -65,6 +65,15 @@
         "typeCheck": "passed",
         "structure": "passed; partial analysis coverage",
         "logs": "/tmp/ramify-plan23-integrated-prompts-*.log"
+      },
+      "specializedTaskAmendment": {
+        "providerHead": "c74ecaa3177b12e993716a64eea41322f72d98db",
+        "integratedHead": "f16d47688331531e0dc53a7ee142107a055ed425",
+        "ordinaryFiles": 5,
+        "ordinaryTests": 86,
+        "typeCheck": "passed",
+        "structure": "passed; partial analysis coverage; 314 analysis limits",
+        "logs": "/tmp/ramify-plan23-integrated-specialized-packets-*.log"
       }
     },
     {
