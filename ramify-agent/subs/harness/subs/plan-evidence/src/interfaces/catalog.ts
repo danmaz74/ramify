@@ -118,17 +118,20 @@ export type ElementAcceptance =
  * Accept one submission's elements: IDs continue each kind's numbering past
  * every issued or retired ID, in submission order, and the returned map
  * rewrites the submission's local keys to them. Each element is parsed
- * here, and every error carries the path of the submitted element.
+ * here, and errors name the submitted element's key. Optional reference lists
+ * are checked against submitted keys/active IDs before assigning any ID.
  */
-export function acceptElements(catalog: ElementCatalog, submission: readonly unknown[]): ElementAcceptance {
+export function acceptElements(catalog: ElementCatalog, submission: readonly unknown[], references: readonly ElementReferenceList[] = []): ElementAcceptance {
   const errors: string[] = [];
   const documents = new Map(catalog.documents.map(document => [document.id, document]));
   const keys = new Set<string>();
   const submitted: SubmittedElement[] = [];
   submission.forEach((candidate, index) => {
     const parsed = submittedElementSchema.safeParse(candidate);
+    const key = typeof candidate === 'object' && candidate !== null && 'key' in candidate && typeof candidate.key === 'string' ? candidate.key : null;
+    const named = key === null ? '' : ` (submitted key ${JSON.stringify(key)})`;
     if (!parsed.success) {
-      errors.push(...parsed.error.issues.map(issue => `${[index, ...issue.path].join('.')}: ${issue.message}`));
+      errors.push(...parsed.error.issues.map(issue => `${[index, ...issue.path].join('.')}: ${issue.message}${named}`));
       return;
     }
     const element = parsed.data;
@@ -136,8 +139,9 @@ export function acceptElements(catalog: ElementCatalog, submission: readonly unk
     if (keys.has(element.key)) errors.push(`${index}.key: duplicate submission-local key ${element.key}`);
     keys.add(element.key);
     const problem = documentProblem(element, documents);
-    if (problem) errors.push(`${index}.document: ${problem}`);
+    if (problem) errors.push(`${index}.document: ${problem}${named}`);
   });
+  errors.push(...validateElementReferences(references, catalog, submitted));
   if (errors.length > 0) return { ok: false, errors };
   const next = new Map(elementKinds.map(kind => [kind, highestNumber(catalog, kind) + 1]));
   const ids = new Map<string, string>();
@@ -161,13 +165,15 @@ export interface CatalogRevision {
   readonly retire: readonly string[];
   /** New elements, keyed like any submission, numbered past the retired IDs. */
   readonly add: readonly unknown[];
+  /** Re-citations checked against retained elements and new local keys before any new IDs. */
+  readonly references?: readonly ElementReferenceList[];
 }
 
 /**
  * Correct a catalog before it is frozen: rewrite readings in place, retire
  * the elements a split or merge replaces, and add elements. Errors carry the
  * revision's paths (`rewrite.<i>`, `retire.<i>`, `add.<i>`), and nothing
- * changes on an error.
+ * changes on an error. Reference errors retain their caller-supplied path.
  */
 export function reviseCatalog(catalog: ElementCatalog, revision: CatalogRevision): ElementAcceptance {
   const errors: string[] = [];
@@ -198,8 +204,8 @@ export function reviseCatalog(catalog: ElementCatalog, revision: CatalogRevision
     elements: catalog.elements.filter(element => !retired.has(element.id)).map(element => rewritten.get(element.id) ?? element),
     retired: [...catalog.retired, ...revision.retire],
   });
-  const added = acceptElements(corrected, revision.add);
-  return added.ok ? added : { ok: false, errors: added.errors.map(error => `add.${error}`) };
+  const added = acceptElements(corrected, revision.add, revision.references);
+  return added.ok ? added : { ok: false, errors: added.errors.map(error => /^\d+(?:\.|:)/.test(error) ? `add.${error}` : error) };
 }
 
 function highestNumber(catalog: ElementCatalog, kind: ElementKind): number {
@@ -207,6 +213,30 @@ function highestNumber(catalog: ElementCatalog, kind: ElementKind): number {
   return [...catalog.elements.map(element => element.id), ...catalog.retired]
     .filter(id => id.startsWith(prefix))
     .reduce((highest, id) => Math.max(highest, Number(id.slice(prefix.length))), 0);
+}
+
+/** A caller's citation field and its mechanically permitted element kinds. */
+export interface ElementReferenceList {
+  readonly path: string;
+  readonly citations: readonly string[];
+  readonly allowedKinds: readonly ElementKind[];
+}
+
+/** Validate local keys/active IDs in their submitted terms, before assigning any IDs. */
+export function validateElementReferences(
+  references: readonly ElementReferenceList[],
+  catalog: ElementCatalog,
+  submitted: readonly Pick<SubmittedElement, 'key' | 'kind'>[] = [],
+): string[] {
+  const kinds = new Map<string, ElementKind>(catalog.elements.map(element => [element.id, element.kind]));
+  for (const element of submitted) kinds.set(element.key, element.kind);
+  return references.flatMap(field => field.citations.flatMap((citation, index) => {
+    const kind = kinds.get(citation);
+    const at = `${field.path}.${index}`;
+    if (kind === undefined) return [`${at}: unknown element reference ${JSON.stringify(citation)}`];
+    if (!field.allowedKinds.includes(kind)) return [`${at}: reference ${JSON.stringify(citation)} is ${kind}; expected ${field.allowedKinds.join(' or ') || 'no element kinds'}`];
+    return [];
+  }));
 }
 
 /**
@@ -222,7 +252,7 @@ export function resolveCitations(
   const errors: string[] = [];
   const ids = citations.map((citation, index) => {
     const id = scope.keys?.get(citation) ?? (scope.elements.has(citation) ? citation : undefined);
-    if (id === undefined) errors.push(`${path}.${index}: unknown element ${citation}`);
+    if (id === undefined || !scope.elements.has(id)) errors.push(`${path}.${index}: unknown element ${citation}`);
     return id ?? citation;
   });
   return errors.length > 0 ? { ok: false, errors } : { ok: true, ids };

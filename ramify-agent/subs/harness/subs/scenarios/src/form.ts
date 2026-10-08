@@ -38,9 +38,12 @@ export const scenarioSubmissionSchema = z.object({
   partOf: planScenarioIdSchema.optional(),
   /** The acceptance elements this scenario verifies. */
   refs: z.array(scenarioElementRefSchema).optional(),
-  /** One `Scenario` or `Scenario Outline` block, without tags. */
-  gherkin: z.string().min(1),
-}).strict();
+  /** Architect scenarios supply text; plan scenarios may name their registry identity alone. */
+  gherkin: z.string().min(1).optional(),
+}).strict().superRefine((scenario, ctx) => {
+  if (scenario.origin.kind === 'architect' && scenario.gherkin === undefined)
+    ctx.addIssue({ code: 'custom', path: ['gherkin'], message: 'an architect scenario requires its Gherkin; a plan scenario may reference its identity' });
+});
 export type ScenarioSubmission = z.infer<typeof scenarioSubmissionSchema>;
 
 /** A plan scenario that combines several entries, and the entry scenarios it decomposes into. */
@@ -62,6 +65,20 @@ export type ScenarioFormSubmission = z.infer<typeof scenarioFormSubmissionSchema
 export interface ScenarioFormEntry {
   readonly capability: string;
   readonly acceptanceRefs: readonly ScenarioElementRef[];
+  readonly nonBehavioralAcceptance?: readonly NonBehavioralAcceptance[];
+}
+
+/** Classification is the agent's declaration; only references and registration are validated. */
+export const nonBehavioralAcceptanceSchema = z.object({
+  ref: scenarioElementRefSchema,
+  kind: z.literal('non-behavioral'),
+  test: z.string().min(1),
+}).strict();
+export type NonBehavioralAcceptance = z.infer<typeof nonBehavioralAcceptanceSchema>;
+
+export interface ScenarioFormEvidence {
+  /** Only actually registered test identities, excluding scenarios and arbitrary paths/names. */
+  readonly registeredTests: ReadonlySet<string>;
 }
 
 /** The exported symbols and file paths the architect view records, for the first warning. */
@@ -80,7 +97,7 @@ export const scenarioFormRules: Readonly<Record<ScenarioFormRule, string>> = {
   3: 'every plan scenario exactly once',
   4: 'every entry has a scenario',
   5: 'integration steps verbatim',
-  6: 'every acceptance element cited',
+  6: 'every acceptance element cited by a scenario or declared registered test',
 };
 
 export type ScenarioWarningKind =
@@ -150,6 +167,7 @@ export function validateScenarioForm(
   planScenarios: readonly PlanScenario[],
   entries: readonly ScenarioFormEntry[],
   viewNames: ScenarioViewNames = { symbols: [], files: [] },
+  evidence: ScenarioFormEvidence = { registeredTests: new Set() },
 ): ScenarioFormResult {
   const reject = (rule: ScenarioFormRule, path: string, detail: string): ScenarioFormResult => ({
     ok: false,
@@ -161,7 +179,13 @@ export function validateScenarioForm(
   // Rule 1: every value is one scenario with a step and no tag.
   const parsed: ParsedScenario[] = [];
   for (const [position, scenario] of submission.scenarios.entries()) {
-    const one = parseOneScenario(scenario.gherkin);
+    const origin = scenario.origin;
+    const registered = origin.kind === 'plan' ? planScenarios.find(item => item.id === origin.planScenario) : undefined;
+    if (scenario.gherkin === undefined && registered === undefined) {
+      if (scenario.origin.kind === 'plan') return reject(3, `scenarios.${position}.origin.planScenario`, `the scenario "${scenario.key}" names unknown plan scenario "${scenario.origin.planScenario}"`);
+      return reject(1, `scenarios.${position}.gherkin`, `the architect scenario "${scenario.key}" requires its Gherkin`);
+    }
+    const one = parseOneScenario(scenario.gherkin ?? registered!.source.join('\n'));
     if (!one.ok) return reject(1, `scenarios.${position}.gherkin`, `the scenario "${scenario.key}" ${one.problem}`);
     parsed.push(one.scenario);
   }
@@ -249,12 +273,23 @@ export function validateScenarioForm(
     }
   }
 
-  // Rule 6: every acceptance element of an entry is cited by one of its scenarios.
+  // Rule 6: scenario citation or the agent's non-behavioral registered-test declaration.
   for (const [position, entry] of entries.entries()) {
     const citing = new Set((byEntry.get(entry.capability) ?? []).flatMap((index) => submission.scenarios[index]!.refs ?? []));
+    const declared = new Set<string>();
+    for (const [index, candidate] of (entry.nonBehavioralAcceptance ?? []).entries()) {
+      const path = `entries.${position}.nonBehavioralAcceptance.${index}`;
+      const parsed = nonBehavioralAcceptanceSchema.safeParse(candidate);
+      if (!parsed.success) return reject(6, path, `the declaration of "${entry.capability}" is invalid: ${parsed.error.issues.map(issue => issue.message).join('; ')}`);
+      const declaration = parsed.data;
+      if (!entry.acceptanceRefs.includes(declaration.ref)) return reject(6, `${path}.ref`, `"${declaration.ref}" is no acceptance element of "${entry.capability}"`);
+      if (declared.has(declaration.ref)) return reject(6, `${path}.ref`, `"${declaration.ref}" is declared twice by "${entry.capability}"`);
+      if (!evidence.registeredTests.has(declaration.test)) return reject(6, `${path}.test`, `"${declaration.test}" is not a registered test for the declared non-behavioral acceptance "${declaration.ref}"`);
+      declared.add(declaration.ref);
+    }
     for (const [refIndex, ref] of entry.acceptanceRefs.entries()) {
-      if (!citing.has(ref)) {
-        return reject(6, `entries.${position}.acceptanceRefs.${refIndex}`, `the acceptance element ${ref} of "${entry.capability}" is cited by none of its scenarios; cite it in the refs of one of them`);
+      if (!citing.has(ref) && !declared.has(ref)) {
+        return reject(6, `entries.${position}.acceptanceRefs.${refIndex}`, `the acceptance element ${ref} of "${entry.capability}" is cited by none of its scenarios; cite it in the refs of one of them, or declare non-behavioral acceptance with a registered test`);
       }
     }
   }
