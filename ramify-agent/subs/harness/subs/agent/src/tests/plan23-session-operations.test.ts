@@ -53,7 +53,7 @@ describe('Plan 23 F1 high-level session operations', () => {
     const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
     await operations.create(create);
     const original = (await store.read('run-A', 'operation:create'))!;
-    for (const patch of [{ runId: 'other' }, { id: 'operation:other' }, { body: { ...original.body, snapshot: { ...(original.body['snapshot'] as object), currentPoint: { sessionId: original.body['sessionId'], turn: 0, kind: 'invented', checkpoint: '' } } } }]) {
+    for (const patch of [{ runId: 'other' }, { id: 'operation:other' }, { body: { ...original.body, kind: 'invented' } }, { body: { ...original.body, kind: 'continue', snapshot: { ...(original.body['snapshot'] as object), currentPoint: { sessionId: original.body['sessionId'], turn: Number.MAX_SAFE_INTEGER, kind: 'turn', checkpoint: 'original' } } } }, { body: { ...original.body, snapshot: { ...(original.body['snapshot'] as object), currentPoint: { sessionId: original.body['sessionId'], turn: 0, kind: 'invented', checkpoint: '' } } } }]) {
       const corrupt = { ...original, ...patch };
       const reader: SessionStore = { ...store, read: async () => corrupt };
       const reopened = createSessionOperations({ sessionStore: reader, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });

@@ -110,9 +110,12 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     return clone(result);
   }
   function executionIdentity(key: SessionOperationKey, body: OperationBody): SessionExecutionIdentity {
+    if (!['create', 'fork', 'append', 'tools', 'continue'].includes(body.kind)) throw new Error('Corrupt original operation kind');
     const source = body.snapshot?.currentPoint;
     if (body.snapshot?.runId !== key.runId || body.snapshot.sessionId !== body.sessionId || !body.sessionId || !source || source.sessionId !== body.sessionId || !Number.isSafeInteger(source.turn) || source.turn < 0 || !['turn', 'checkpoint'].includes(source.kind) || typeof source.checkpoint !== 'string' || !source.checkpoint) throw new Error('Corrupt original operation point');
-    return { ...clone(key), sessionId: body.sessionId, turn: source.turn + (body.kind === 'continue' ? 1 : 0), sourcePoint: clone(source) };
+    const turn = source.turn + (body.kind === 'continue' ? 1 : 0);
+    if (!Number.isSafeInteger(turn)) throw new Error('Corrupt original executing turn');
+    return { ...clone(key), sessionId: body.sessionId, turn, sourcePoint: clone(source) };
   }
   const api: SessionOperations = {
     async operationIdentity(runId, operationId) {
