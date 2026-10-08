@@ -52,7 +52,7 @@ async function capturedPolicy(root: string, runId: string): Promise<RunPolicy> {
   return (JSON.parse(await readFile(runPath(root, plan, runId, runLayout.record), 'utf8')) as { policy: RunPolicy }).policy;
 }
 
-const reconcilerSessions = (agent: ScriptedAgent) => agent.sessions.filter(session => session.spec.prompt.startsWith('# Reconciliation'));
+const reconcilerSessions = (agent: ScriptedAgent) => agent.sessions.filter(session => session.spec.submission.name === 'submit_reconciliation');
 
 describe('the composed run: a clean work item and a corrected one', () => {
   test('wi-001 reaches its gate with no reconciliation; wi-002\'s concurrent concerns are related, settled, corrected and fixed, and every gate keeps its verdict', async () => {
@@ -164,7 +164,6 @@ describe('the composed run: a clean work item and a corrected one', () => {
 /** A service opened over the project as a crash left it: nothing is driven, and what recovery asks of Git is answered. */
 async function restart(root: string) {
   const restarted = await openRuns(root, {
-    script: [],
     git: mockGit({ changedPaths: async () => [], currentHead: async () => 'revision-04' }),
     candidates: scriptedCandidates(root, compositionCommits()),
     policy: projectRoot => testPolicy(projectRoot, { reviews: testReviewPolicy({ kinds: ['code', 'scope', 'design'] }) }),
@@ -226,7 +225,13 @@ describe('CF06 and CF07: a crash at every review, reconciliation and CheckFindin
         const context = `cut ${cut} after ${prefix.at(-1)?.event.type ?? 'nothing'}`;
         // The prefix is untouched; recovery called no agent session.
         expect(after.slice(0, cut).map(line => line.text), context).toEqual(prefix.map(line => line.text));
-        expect(restarted.agent!.sessions, context).toEqual([]);
+        expect(restarted.agent, context).toBeUndefined();
+        const assessedIntent = prefix.find(line => line.event.type === 'reconciliation-assessed' && line.event.data.reconciliation === 'wi-002.rc01');
+        if (assessedIntent?.effect?.phase === 'intent' && !prefix.some(line => line.effect?.key === assessedIntent.effect!.key && line.effect.phase === 'completion')) {
+          // Without an execution port, retain the authentic pending append;
+          // no executor has established a lost session or completed delivery.
+          expect(after.filter(line => line.effect?.key === assessedIntent.effect!.key).map(line => line.effect!.phase), context).toEqual(['intent']);
+        }
         const appended = after.slice(cut).map(line => line.event);
         for (const event of appended) {
           expect(recoveryAppends.has(event.type), `${context}: recovery appended ${event.type}`).toBe(true);
@@ -269,12 +274,12 @@ describe('CF06 and CF07: a crash at every review, reconciliation and CheckFindin
           expect(restarted.service.checkFindings(plan, runId, { kind: 'detail', checkFinding: id }), `${context}: ${id}`)
             .toEqual(selectCheckFindings(replayed.state, { kind: 'detail', checkFinding: id }));
         }
-        // Every record the log commits is on disk, byte for byte.
-        for (const line of after) {
-          for (const record of line.records) {
-            written.add(record.path);
-            expect(await readFile(join(directory, record.path), 'utf8'), `${context}: ${record.path}`).toBe(recordText(record.body));
-          }
+        // Materialized records contain the latest committed version. The
+        // immutable prefix above retains every earlier intent/prepared version.
+        const currentRecords = new Map(after.flatMap(line => line.records).map(record => [record.path, record.body]));
+        for (const [path, body] of currentRecords) {
+          written.add(path);
+          expect(await readFile(join(directory, path), 'utf8'), `${context}: ${path}`).toBe(recordText(body));
         }
         expect(events.at(-1)!.type, context).toBe(cut === golden.length ? 'job-completed' : 'job-interrupted');
         recovered.set(cut, appended);
@@ -286,7 +291,7 @@ describe('CF06 and CF07: a crash at every review, reconciliation and CheckFindin
       const again = await restart(root);
       try {
         expect(await readFile(join(directory, 'events.jsonl'), 'utf8')).toBe(before);
-        expect(again.agent!.sessions).toEqual([]);
+        expect(again.agent).toBeUndefined();
       } finally {
         await again.service.close();
       }
@@ -302,7 +307,7 @@ describe('CF06 and CF07: a crash at every review, reconciliation and CheckFindin
     expect(reading.find(event => event.type === 'review-attempt-finished' && event.data.attempt === 'rq-0007.a01'))
       .toMatchObject({ data: { result: 'not-verified', reason: 'execution-failed', settles: true } });
     const assessed = recovered.get(after(event => event.type === 'reconciliation-assessed' && event.data.reconciliation === 'wi-002.rc01'))!;
-    expect(assessed[0]).toMatchObject({ type: 'reconciliation-brief-appended', data: { reconciliation: 'wi-002.rc01', outcome: 'session-lost' } });
+    expect(assessed.some(event => event.type === 'reconciliation-brief-appended' && event.data.reconciliation === 'wi-002.rc01')).toBe(false);
   }, 300_000);
 });
 
@@ -331,10 +336,12 @@ describe('CF07: a shutdown owns the live readers of the composed run, and a late
     const readers = agent!.sessions.filter(session => session.spec.role === 'reviewer' && /rq-000[78]/u.test(session.spec.prompt));
     expect(readers).toHaveLength(2);
     expect(readers.every(session => session.stopCalls > 0)).toBe(true);
-    // The late submission reached the tool after the shutdown and was refused there.
+    // The attempted late submission is fenced before entering its validator or persisting more provider events.
     const late = readers.find(session => session.spec.prompt.includes('rq-0007'))!;
     await until(() => late.outcome !== undefined, 10_000);
-    expect(late.verdicts.at(-1)).toMatchObject({ accepted: false, final: true });
+    expect(late.outcome).toEqual({ kind: 'failed', error: 'Operation runtime is closed' });
+    expect(late.verdicts).toEqual([]);
+    expect(late.results.some(result => result.tool === 'submit_review')).toBe(false);
     const closed = await runEventsOnDisk(root, plan, runId);
     // A closing service records no review result and no CheckFinding.
     expect(closed.slice(before.length).filter(event => event.type.startsWith('review-') || carriedCheckFindings(event).length > 0)).toEqual([]);
@@ -343,7 +350,7 @@ describe('CF07: a shutdown owns the live readers of the composed run, and a late
     await staleCrashLock(root);
     const restarted = await restart(root);
     try {
-      expect(restarted.agent!.sessions).toEqual([]);
+      expect(restarted.agent).toBeUndefined();
       const after = await runEventsOnDisk(root, plan, runId);
       const finished = eventsOf(after.slice(closed.length), 'review-attempt-finished').map(event => [event.data.attempt, event.data.result, event.data.reason]);
       expect(finished).toEqual(expect.arrayContaining([['rq-0007.a01', 'not-verified', 'execution-failed'], ['rq-0008.a01', 'not-verified', 'execution-failed']]));

@@ -1240,7 +1240,8 @@ export class RunService {
     /** Set when the request was settled before this attempt's start could be recorded. */
     let fenced = false;
     const result = await this.runInvocation<ReviewSubmission>(run, agent, {
-      role: 'reviewer', task: { kind, goal: `Review ${request.key.candidate}`, requirements: [JSON.stringify(request)], candidate: request.key.candidate, snapshot: snapshot.tree },
+      role: 'reviewer', task: { kind, goal: `Review ${request.key.candidate}`, requirements: [JSON.stringify(request)], candidate: request.key.candidate, snapshot: snapshot.tree,
+        ...(assignmentPackage === undefined ? {} : { omit: [assignmentPackage], literalSections: [{ key: 'support:assignment-package', text: assignmentPackage }] }) },
       work: { workItem: request.workItem, iteration: request.key.iteration },
       attempt: state.attempts.length + 1,
       loaded,
@@ -2584,7 +2585,7 @@ export class RunService {
             report.effects.push(`${run.key}: resumed the non-functional phase`);
           }
         } else if (this.options.agent?.bindSessionStore && !run.log.find('stop-requested') && run.log.all('invocation-started').some(event =>
-          (this.committedBody(run, runLayout.invocation(event.data.invocation)) as Invocation | null)?.sessionOperation?.runId === run.record.jobId)) {
+          this.invocationRecord(run, event.data.invocation).body.sessionOperation?.runId === run.record.jobId)) {
           const { packages } = await loadPromptPackages({ ...(this.options.skillDirectory === undefined ? {} : { skillDirectory: this.options.skillDirectory }), capabilityWorkflow: this.workflow !== null });
           if ([...packages].some(([role, loaded]) => run.record.prompts[role]?.hash !== loaded.hash)) throw new Error('Captured owning prompt packages changed before restoration');
           if (run.log.all('writer-released').some(event => event.data.confirmed !== true)) throw new Error('Original writer settlement was unconfirmed');

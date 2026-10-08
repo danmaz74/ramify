@@ -28,14 +28,14 @@ vi.mock('node:child_process', async original =>
  * design questions as three requests; scope review forks the local
  * architect at the point that produced the assignment; design review forks
  * one orientation per guidance selection, and a changed selection is a new
- * orientation; a fork the executor cannot take starts fresh with the same
- * complete message, and records that it did.
+ * orientation; an unavailable preserving fork remains unavailable without
+ * replacement fresh dispatch, and records its explicit outcome.
  *
  * The agent is the scripted fake, whose fork inherits a session's appended
  * context up to the ref it forks. Git's answers for the gates and the
  * candidates are scripted and no process is started. The real pi fork is
- * exercised by the pi module's own fork-isolation test and by the
- * development probe the final Plan23 native fork witness (iteration14).
+ * exercised by the Pi owner's fork-isolation controls and the registered
+ * Plan23 native transport witness (iteration14).
  */
 
 const cleanups: Array<() => Promise<void>> = [];
