@@ -1,173 +1,486 @@
-import { execFileSync } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
-import { existsSync } from 'node:fs';
-import { symlink } from 'node:fs/promises';
-import { setupChecks } from '../checks/checkpoint.js';
-import { inPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
 import { gateDiagnostics } from '../checks/diagnostics.js';
+import { inPlaceCheckExecution } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
-import { gateAuditOutcomeSchema } from '../run/records.js';
-import { checkCommand } from '../checks/records.js';
-import type { CheckCommand, GateAttempt, TestSelection } from '../checks/records.js';
+import { checkCommand, type GateAttempt } from '../checks/records.js';
+import { scenarioResultsOf } from '../checks/scenario-results.js';
 import type { PlannedCheck } from '../checks/verify.js';
+import { gateAuditOutcomeSchema } from '../run/records.js';
 import {
-  createAuditCheckExecution,
-  type AuditWorkspaceOwnershipRecorder,
-  type IntendedAuditWorkspace,
-} from '../../subs/audit/src/check-execution.js';
+  auditDefinition, commandCheck, configuredGate, configuredRepository, privateConfiguredAudit, recordingOwnership,
+  type ConfiguredRepository,
+} from './helpers/configured-repository.js';
 
-interface RepositoryFixture {
-  readonly repositoryRoot: string;
-  readonly projectRoot: string;
-  readonly commit: string;
-}
+/*
+ * A committing gate asks the project's committed audit about the commit it
+ * made, through the installed provider: the harness plans no test, no
+ * scenario run and no selection. These witnesses run real Vitest, Cucumber
+ * and `ramify affected` in the provider's worktrees, under a private test
+ * lock. Setting PLAN21_ITERATION9_EVIDENCE to a directory writes the gate
+ * attempts each witness produced there.
+ */
 
-const temporary = new Set<string>();
+const cleanups: Array<() => Promise<void>> = [];
+afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
 beforeAll(() => {
   process.env.GIT_CONFIG_GLOBAL = '/dev/null';
   process.env.GIT_CONFIG_SYSTEM = '/dev/null';
 });
 
-afterEach(async () => {
-  await Promise.all([...temporary].map(path => rm(path, { recursive: true, force: true })));
-  temporary.clear();
-});
-
-function git(root: string, args: readonly string[]): string {
-  return execFileSync('git', [...args], {
-    cwd: root,
-    encoding: 'utf8',
-    env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
-  }).trim();
+async function repository(files: Readonly<Record<string, string>>, prefix?: string): Promise<ConfiguredRepository & { readonly head: string }> {
+  const created = await configuredRepository(files, prefix);
+  cleanups.push(created.remove);
+  return created;
 }
 
-async function temporaryDirectory(prefix: string): Promise<string> {
+async function audit(ownership = recordingOwnership()) {
+  const created = await privateConfiguredAudit(ownership);
+  cleanups.push(created.remove);
+  return { ...created, ownership };
+}
+
+async function scratch(prefix: string): Promise<string> {
   const path = await mkdtemp(join(tmpdir(), prefix));
-  temporary.add(path);
+  cleanups.push(() => rm(path, { recursive: true, force: true }));
   return path;
 }
 
-async function repository(files: Readonly<Record<string, string>>, projectPrefix = ''): Promise<RepositoryFixture> {
-  const repositoryRoot = await temporaryDirectory('ramify-agent-audit-runner-');
-  git(repositoryRoot, ['init', '-b', 'main']);
-  for (const [path, content] of Object.entries(files)) {
-    const target = join(repositoryRoot, path);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, content);
+/** Writes one witness's attempts when an evidence directory is named. */
+async function evidence(name: string, value: unknown): Promise<void> {
+  const directory = process.env['PLAN21_ITERATION9_EVIDENCE'];
+  if (directory === undefined) return;
+  await writeFile(join(directory, `${name}.json`), `${JSON.stringify(value, null, 2)}\n`);
+}
+
+/** What one gate attempt shows a reviewer, without the provider's full result. */
+function digest(gate: GateAttempt) {
+  const result = gate.provider?.result as { summary?: { coverage?: { selectedModules?: Array<{ directory: string }>; carriedFailures?: unknown[] } } } | undefined;
+  return {
+    verdict: gate.verdict, cause: gate.cause, commands: gate.commands.length, audit: gate.audit, evidence: gate.evidence,
+    selectedModules: result?.summary?.coverage?.selectedModules?.map(module => module.directory) ?? null,
+    carriedFailures: result?.summary?.coverage?.carriedFailures?.length ?? 0,
+    checks: Object.fromEntries(Object.entries(checksOf(gate)).map(([id, check]) => [id, check.status])),
+    scenarios: scenarioResultsOf(gate).map(result => `${result.id} ${result.status}`),
+  };
+}
+
+interface RawCheck {
+  readonly status: string;
+  readonly output?: string;
+  readonly vitest?: { readonly files?: ReadonlyArray<{ readonly path: string; readonly state: string }> };
+  readonly commands?: Readonly<Record<string, { readonly vitest?: { readonly files?: ReadonlyArray<{ readonly path: string; readonly state: string }> } }>>;
+}
+
+function checksOf(gate: GateAttempt): Record<string, RawCheck> {
+  return (gate.provider?.checks ?? {}) as Record<string, RawCheck>;
+}
+
+/** Every test file a Vitest check's commands report, with its state. */
+function vitestFiles(gate: GateAttempt, check: string): string[] {
+  const raw = checksOf(gate)[check];
+  if (raw === undefined) return [];
+  const files = [...(raw.vitest?.files ?? []), ...Object.values(raw.commands ?? {}).flatMap(command => command.vitest?.files ?? [])];
+  return [...new Set(files.map(file => `${file.path} ${file.state}`))].sort();
+}
+
+/*
+ * F2: one Ramify root with a child and a grandchild, two Vitest
+ * configurations (one with its own root and an auxiliary test outside
+ * `src/tests`, one with custom file names and an excluded file), and a
+ * Cucumber check whose committed profile runs every scenario not tagged
+ * `@ramify-pending`.
+ */
+const steps = (module: string, value: number, text: string) => [
+  'import assert from \'node:assert/strict\';',
+  'import { Given, Then } from \'@cucumber/cucumber\';',
+  `import { ${module}Value } from '../../${module}.js';`,
+  '',
+  'let seen = 0;',
+  `Given('the ${text} value', () => { seen = ${module}Value; });`,
+  `Then('the ${text} value is ${value}', () => { assert.equal(seen, ${value}); });`,
+  '',
+].join('\n');
+
+const f2Definition = (ignorePaths: readonly string[]) => auditDefinition([
+  commandCheck('source-vitest', [{ name: 'source', cmd: 'npm', args: ['run', 'test:source'], parser: 'vitest' }]),
+  commandCheck('aux-vitest', [{ name: 'aux', cmd: 'npm', args: ['run', 'test:aux'], parser: 'vitest' }]),
+  commandCheck('scenarios', [{ name: 'cucumber', cmd: 'npm', args: ['run', 'test:scenarios'], parser: 'cucumber' }]),
+], { ignorePaths });
+
+const f2Files: Readonly<Record<string, string>> = {
+  'module.ramify': 'ramify 1\nroot module f2\n',
+  'package.json': `${JSON.stringify({
+    name: 'f2', version: '0.0.0', private: true, type: 'module',
+    scripts: {
+      'test:source': 'vitest run --config vitest.source.config.mjs',
+      'test:aux': 'vitest run --config vitest.aux.config.mjs',
+      'test:scenarios': 'NODE_OPTIONS=\'--import tsx\' cucumber-js',
+    },
+  }, null, 2)}\n`,
+  'tsconfig.json': '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","target":"ES2022","strict":true,"skipLibCheck":true},"include":["src","subs","checks"]}\n',
+  'vitest.source.config.mjs': 'export default { test: { include: [\'src/tests/**/*.check.ts\', \'subs/**/src/tests/**/*.check.ts\'], exclude: [\'**/node_modules/**\', \'**/excluded.check.ts\'] } };\n',
+  'vitest.aux.config.mjs': 'export default { root: \'./checks\', test: { include: [\'**/*.test.ts\'] } };\n',
+  'cucumber.json': `${JSON.stringify({ default: {
+    paths: ['src/tests/features/**/*.feature', 'subs/*/src/tests/features/**/*.feature', 'subs/*/subs/*/src/tests/features/**/*.feature'],
+    import: ['src/tests/steps/**/*.ts', 'subs/*/src/tests/steps/**/*.ts', 'subs/*/subs/*/src/tests/steps/**/*.ts'],
+    tags: 'not @ramify-pending',
+  } }, null, 2)}\n`,
+  'ramify-audit.json': f2Definition(['docs/**']),
+  'src/root.ts': 'export const rootValue = 1;\n',
+  'src/tests/root.check.ts': 'import { expect, test } from \'vitest\';\nimport { rootValue } from \'../root.js\';\ntest(\'root custom name\', () => { expect(rootValue).toBe(1); });\n',
+  'src/tests/excluded.check.ts': 'import { test } from \'vitest\';\ntest(\'excluded by the runner\', () => { throw new Error(\'never runs\'); });\n',
+  'checks/aux.test.ts': 'import { expect, test } from \'vitest\';\ntest(\'auxiliary root\', () => { expect(1).toBe(1); });\n',
+  'subs/a/module.ramify': 'ramify 1\nmodule a\n',
+  'subs/a/src/a.ts': 'export const aValue = 2;\n',
+  'subs/a/src/tests/child.check.ts': 'import { expect, test } from \'vitest\';\nimport { aValue } from \'../a.js\';\ntest(\'child custom name\', () => { expect(aValue).toBe(2); });\n',
+  'subs/a/src/tests/features/child.feature': [
+    'Feature: Child',
+    '',
+    '  @ramify-sc-001',
+    '  Scenario: the child value is bound',
+    '    Given the child value',
+    '    Then the child value is 2',
+    '',
+    '  @ramify-sc-002 @ramify-pending',
+    '  Scenario: a pending child scenario',
+    '    Given a step nobody has written',
+    '',
+  ].join('\n'),
+  'subs/a/src/tests/steps/child.steps.ts': steps('a', 2, 'child'),
+  // A sibling whose path begins with the child's: ownership is by module,
+  // never by path prefix.
+  'subs/ab/module.ramify': 'ramify 1\nmodule ab\n',
+  'subs/ab/src/ab.ts': 'export const abValue = 4;\n',
+  'subs/ab/src/tests/ab.check.ts': 'import { expect, test } from \'vitest\';\nimport { abValue } from \'../ab.js\';\ntest(\'collision sibling\', () => { expect(abValue).toBe(4); });\n',
+  'subs/a/subs/grand/module.ramify': 'ramify 1\nmodule grand\n',
+  'subs/a/subs/grand/src/grand.ts': 'export const grandValue = 3;\n',
+  'subs/a/subs/grand/src/tests/grand.check.ts': 'import { expect, test } from \'vitest\';\nimport { grandValue } from \'../grand.js\';\ntest(\'grand custom name\', () => { expect(grandValue).toBeGreaterThan(2); });\n',
+  'subs/a/subs/grand/src/tests/features/grand.feature': [
+    'Feature: Grand',
+    '',
+    '  @ramify-sc-003',
+    '  Scenario: the grand value is bound',
+    '    Given the grand value',
+    '    Then the grand value is 3',
+    '',
+  ].join('\n'),
+  'subs/a/subs/grand/src/tests/steps/grand.steps.ts': steps('grand', 3, 'grand'),
+};
+
+describe('configured committed execution over F2 (runner truth)', () => {
+  it('narrows real Vitest and Cucumber checks by ownership, keeps runner discovery and empty selection as producer facts, and carries failures through a zero-selection link', { timeout: 600_000 }, async () => {
+    const f2 = await repository(f2Files, 'ramify-agent-f2-');
+    const { audit: port } = await audit();
+    const gate = (sourceCommit: string, attemptId: string, captured = f2.head) =>
+      configuredGate(port, f2, { captured, sourceCommit, attemptId });
+
+    // The first gate after readiness: no baseline exists, so the provider
+    // executes the default request in full.
+    const baseline = await gate(f2.head, 'ga-0001');
+    expect(baseline.audit, JSON.stringify(baseline.provider?.result).slice(0, 2000)).toMatchObject({
+      status: 'completed', mode: 'project-default', requestedSourceCommit: f2.head, auditedSourceCommit: f2.head,
+      requestedMode: 'ramify-partial', executedMode: 'full', verdict: 'pass', reuse: null,
+    });
+    expect(baseline.audit?.fallbackReason).toMatch(/^no-baseline/u);
+    expect([baseline.verdict, baseline.cause, baseline.commands]).toEqual(['passed', null, []]);
+    // Custom names and the auxiliary root are the runner's discoveries; the
+    // runner-excluded file is never demanded.
+    expect(vitestFiles(baseline, 'source-vitest')).toEqual([
+      'src/tests/root.check.ts passed', 'subs/a/src/tests/child.check.ts passed', 'subs/a/subs/grand/src/tests/grand.check.ts passed',
+      'subs/ab/src/tests/ab.check.ts passed',
+    ]);
+    expect(vitestFiles(baseline, 'aux-vitest').join('\n')).toContain('aux.test.ts passed');
+    expect(vitestFiles(baseline, 'source-vitest').join('\n')).not.toContain('excluded');
+    // The bound scenarios run; the pending one is left out by the committed profile.
+    expect(scenarioResultsOf(baseline).map(result => `${result.id} ${result.status}`)).toEqual(['sc-001 passed', 'sc-003 passed']);
+    expect(scenarioResultsOf(baseline).find(result => result.id === 'sc-003')?.binding.map(entry => entry.definition))
+      .toEqual([expect.stringContaining('subs/a/subs/grand/src/tests/steps/grand.steps.ts'), expect.stringContaining('grand.steps.ts')]);
+
+    // A grandchild change with a new eligible test: the partial link runs
+    // the grandchild's tests and features only, the new test included.
+    const grandChange = await f2.commit('grandchild change and a new test', {
+      'subs/a/subs/grand/src/grand.ts': 'export const grandValue = 3; // revised\n',
+      'subs/a/subs/grand/src/tests/new-grand.check.ts': 'import { expect, test } from \'vitest\';\nimport { grandValue } from \'../grand.js\';\ntest(\'new grand test\', () => { expect(grandValue).toBe(3); });\n',
+    });
+    const partial = await gate(grandChange, 'ga-0002');
+    expect(partial.audit).toMatchObject({ status: 'completed', requestedSourceCommit: grandChange, executedMode: 'ramify-partial', fallbackReason: null, verdict: 'pass' });
+    expect(vitestFiles(partial, 'source-vitest')).toEqual([
+      'subs/a/subs/grand/src/tests/grand.check.ts passed', 'subs/a/subs/grand/src/tests/new-grand.check.ts passed',
+    ]);
+    expect(scenarioResultsOf(partial).map(result => `${result.id} ${result.status}`)).toEqual(['sc-003 passed']);
+    expect(partial.verdict).toBe('passed');
+
+    // An ambiguous step is the producer's failure of the scenario check.
+    const ambiguous = await f2.commit('ambiguous grandchild step', {
+      'subs/a/subs/grand/src/tests/steps/duplicate.steps.ts': 'import { Given } from \'@cucumber/cucumber\';\nGiven(\'the grand value\', () => undefined);\n',
+    });
+    const failing = await gate(ambiguous, 'ga-0003');
+    expect(failing.audit).toMatchObject({ status: 'completed', executedMode: 'ramify-partial', verdict: 'fail' });
+    expect([failing.verdict, failing.cause, failing.next]).toEqual(['failed', 'check-failed', 'repair']);
+    expect(scenarioResultsOf(failing).map(result => `${result.id} ${result.status}`)).toEqual(['sc-003 ambiguous']);
+    expect(checksOf(failing)['scenarios']?.status).toBe('fail');
+    const briefing = (await gateDiagnostics(failing, 'engineer')).summary.join('\n');
+    expect(briefing).toContain('sc-003');
+
+    // A module README selects no module: the link runs no narrowed test of
+    // its own, and the carried failure is rerun and composed.
+    const readme = await f2.commit('child documentation only', { 'subs/a/README.md': '# a\n\nThe child module.\n' });
+    const zero = await gate(readme, 'ga-0004');
+    const zeroSummary = (zero.provider?.result as { summary: { coverage: { selectedModules?: unknown[]; carriedFailures?: unknown[] } } }).summary;
+    expect(zero.audit).toMatchObject({ status: 'completed', executedMode: 'ramify-partial', verdict: 'fail', reuse: null });
+    expect(zeroSummary.coverage.selectedModules).toEqual([]);
+    expect(zeroSummary.coverage.carriedFailures?.length).toBeGreaterThan(0);
+    expect(vitestFiles(zero, 'source-vitest')).toEqual([]);
+    expect(scenarioResultsOf(zero).map(result => `${result.id} ${result.status}`)).toEqual(['sc-003 ambiguous']);
+    expect(zero.verdict).toBe('failed');
+
+    // The repair passes; a detected runner configuration change widens.
+    const repaired = await f2.commit('remove the duplicate step', { 'subs/a/subs/grand/src/tests/steps/duplicate.steps.ts': null });
+    const fixed = await gate(repaired, 'ga-0005');
+    expect(fixed.audit).toMatchObject({ status: 'completed', verdict: 'pass' });
+    // Root and grandchild change, and a test is deleted: the root's and the
+    // grandchild's tests run, the child between them does not, and the
+    // deleted test is simply gone from the runner's discoveries.
+    const rootAndGrand = await f2.commit('root and grandchild change, a test deleted', {
+      'src/root.ts': 'export const rootValue = 1; // revised\n',
+      'subs/a/subs/grand/src/grand.ts': 'export const grandValue = 3; // revised again\n',
+      'subs/a/subs/grand/src/tests/new-grand.check.ts': null,
+    });
+    const outer = await gate(rootAndGrand, 'ga-0006');
+    expect(outer.audit).toMatchObject({ status: 'completed', executedMode: 'ramify-partial', fallbackReason: null, verdict: 'pass' });
+    expect(vitestFiles(outer, 'source-vitest')).toEqual(['src/tests/root.check.ts passed', 'subs/a/subs/grand/src/tests/grand.check.ts passed']);
+    expect(scenarioResultsOf(outer).map(result => `${result.id} ${result.status}`)).toEqual(['sc-003 passed']);
+
+    // A change to the sibling whose path begins with `subs/a` selects only it.
+    const sibling = await f2.commit('collision sibling change', { 'subs/ab/src/ab.ts': 'export const abValue = 4; // revised\n' });
+    const collision = await gate(sibling, 'ga-0007');
+    expect(collision.audit).toMatchObject({ status: 'completed', executedMode: 'ramify-partial', fallbackReason: null, verdict: 'pass' });
+    expect(vitestFiles(collision, 'source-vitest')).toEqual(['subs/ab/src/tests/ab.check.ts passed']);
+    expect(scenarioResultsOf(collision)).toEqual([]);
+
+    // A detected runner configuration change widens to a full audit. Its
+    // runner now discovers nothing: the empty selection is the producer's
+    // failure, never a pass the harness supplies.
+    const runner = await f2.commit('runner configuration that discovers nothing', {
+      'vitest.aux.config.mjs': 'export default { root: \'./checks\', test: { include: [\'**/*.missing.ts\'] } };\n',
+    });
+    const widened = await gate(runner, 'ga-0008');
+    expect(widened.audit).toMatchObject({ status: 'completed', requestedMode: 'ramify-partial', executedMode: 'full', verdict: 'fail' });
+    expect(widened.audit?.fallbackReason).toMatch(/^runner-configuration/u);
+    expect(vitestFiles(widened, 'aux-vitest')).toEqual([]);
+    expect(checksOf(widened)['aux-vitest']?.status).toBe('fail');
+    expect([widened.verdict, widened.cause, widened.commands]).toEqual(['failed', 'check-failed', []]);
+    const restored = await f2.commit('runner configuration restored', { 'vitest.aux.config.mjs': f2Files['vitest.aux.config.mjs']! });
+    const healed = await gate(restored, 'ga-0009');
+    // Restoring the configuration restores the sibling commit's tree: the
+    // provider answers with that commit's evidence, keeping both source
+    // identities, and the harness records no execution of its own.
+    expect(healed.audit).toMatchObject({
+      status: 'completed', requestedSourceCommit: restored, auditedSourceCommit: sibling, verdict: 'pass',
+      reuse: { auditedCommit: sibling, ignoredChangedPaths: [] },
+    });
+    expect([healed.verdict, healed.commands, healed.evidence]).toEqual(['passed', [], collision.evidence]);
+
+    // A changed ignore policy is a new definition: the active run refuses it,
+    // and a run that captured it starts from a new full baseline.
+    const policy = await f2.commit('ignore notes too', { 'ramify-audit.json': f2Definition(['docs/**', 'notes/**']) });
+    const refused = await gate(policy, 'ga-0010');
+    expect(refused.audit).toMatchObject({ status: 'failed', auditedSourceCommit: null, verdict: null });
+    expect(refused.audit?.detail).toContain('Captured audit policy conflicts with ramify-audit.json');
+    expect([refused.verdict, refused.cause, refused.evidence]).toEqual(['not-verified', 'infrastructure', null]);
+    const rebased = await gate(policy, 'ga-0011', policy);
+    expect(rebased.audit).toMatchObject({ status: 'completed', requestedMode: 'ramify-partial', executedMode: 'full', verdict: 'pass' });
+    expect(rebased.audit?.fallbackReason).not.toBeNull();
+
+    await evidence('iteration9-f2-runner-truth', {
+      schema: 'plan21.iteration9.f2/1', providerVersion: 'ramify-audit@0.7.2', ramifyVersion: 'ramify.ts@0.4.1',
+      commits: { baseline: f2.head, grandChange, ambiguous, readme, repaired, rootAndGrand, sibling, runner, restored, policy },
+      gates: { baseline: digest(baseline), partial: digest(partial), failing: digest(failing), zero: digest(zero), fixed: digest(fixed), outer: digest(outer), collision: digest(collision), widened: digest(widened), healed: digest(healed), refused: digest(refused), rebased: digest(rebased) },
+    });
+  });
+});
+
+/*
+ * F4's root: a project without a root `module.ramify`, so every request
+ * executes in full, with an explicit ignored documentation tree.
+ */
+describe('applicable reuse over F4\'s root project', () => {
+  async function f4(counter: string) {
+    const program = `require('fs').appendFileSync(${JSON.stringify(counter)}, 'ran\\n')`;
+    const definition = (ignorePaths: readonly string[]) => auditDefinition([
+      commandCheck('root-command', [{ name: 'root', cmd: 'node', args: ['-e', program] }]),
+    ], { ignorePaths });
+    const repository_ = await repository({ 'package.json': '{"name":"f4-root","private":true}\n', 'src/index.js': 'export const value = 1;\n', 'ramify-audit.json': definition(['docs/**']) }, 'ramify-agent-f4-');
+    return { repository: repository_, definition };
   }
-  git(repositoryRoot, ['add', '--all']);
-  git(repositoryRoot, [
-    '-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost',
-    'commit', '--no-gpg-sign', '-m', 'fixture',
-  ]);
-  return {
-    repositoryRoot,
-    projectRoot: projectPrefix === '' ? repositoryRoot : join(repositoryRoot, projectPrefix),
-    commit: git(repositoryRoot, ['rev-parse', 'HEAD']),
-  };
-}
 
-function selection(resolved = ['src/tests/scoped.test.ts']): TestSelection {
-  return {
-    policy: 'owned-by-scope',
-    exactOwners: ['project/feature'],
-    subtrees: ['project/shared'],
-    extraSuites: [],
-    resolved,
-  };
-}
+  async function runs(counter: string): Promise<number> {
+    return existsSync(counter) ? (await readFile(counter, 'utf8')).split('\n').filter(Boolean).length : 0;
+  }
 
-function command(projectRoot: string, script: string, timeoutMs = 30_000) {
-  return checkCommand({ argv: ['node', '-e', script], cwd: projectRoot, timeoutMs });
-}
+  it('reuses applicable full evidence across an ignored-only change, keeping both source identities and executing nothing', { timeout: 300_000 }, async () => {
+    const counter = join(await scratch('ramify-agent-f4-counter-'), 'runs');
+    const { repository: root } = await f4(counter);
+    const { audit: port } = await audit();
+    const first = await configuredGate(port, root, { captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001' });
+    // The provider's default for a project that is not a Ramify project is full.
+    expect(first.audit).toMatchObject({ status: 'completed', mode: 'project-default', requestedMode: 'full', executedMode: 'full', verdict: 'pass', reuse: null });
+    expect(await runs(counter)).toBe(1);
 
-async function auditGate(
-  fixture: RepositoryFixture,
-  checks: readonly PlannedCheck[],
-  id: string,
-  options: {
-    readonly selectionPolicy?: 'owned-by-scope' | 'all-project';
-    readonly checkpoint?: GateAttempt['checkpoint'];
-    readonly dependencyDirectories?: readonly string[];
-    readonly rules?: GateAttempt['rules'];
-    readonly guarded?: readonly { readonly path: string; readonly hash: string }[];
-    readonly signal?: AbortSignal;
-    readonly workspaceOwnership?: AuditWorkspaceOwnershipRecorder;
-    readonly announced?: GateCommandStart[];
-    readonly auditAllTests?: CheckCommand;
-  } = {},
-): Promise<{ readonly attempt: GateAttempt; readonly workspaces: IntendedAuditWorkspace[]; readonly outputDirectory: string }> {
-  const outputDirectory = await temporaryDirectory('ramify-agent-audit-output-');
-  const workspaces: IntendedAuditWorkspace[] = [];
-  const execution = createAuditCheckExecution({
-    workspaceOwnership: options.workspaceOwnership ?? {
-      async recordIntendedWorkspace(workspace) {
-        workspaces.push(workspace);
-      },
-      async recoverAbandonedWorkspaces() {},
-      async recordWorkspaceCleaned() {},
-    },
+    const docs = await root.commit('documentation only', { 'docs/guide.md': '# Guide\n' });
+    const reused = await configuredGate(port, root, { captured: root.head, sourceCommit: docs, attemptId: 'ga-0002' });
+    expect(reused.audit).toMatchObject({
+      status: 'completed', requestedSourceCommit: docs, auditedSourceCommit: root.head, verdict: 'pass',
+      reuse: { auditedCommit: root.head, ignoredChangedPaths: ['docs/guide.md'] },
+    });
+    expect(reused.evidence).toEqual(first.evidence);
+    expect([reused.verdict, reused.audited, reused.commands]).toEqual(['passed', docs, []]);
+    expect(await runs(counter)).toBe(1);
+
+    // A source change is not ignored: a fresh full execution.
+    const source = await root.commit('source change', { 'src/index.js': 'export const value = 2;\n' });
+    const fresh = await configuredGate(port, root, { captured: root.head, sourceCommit: source, attemptId: 'ga-0003' });
+    expect(fresh.audit).toMatchObject({ status: 'completed', auditedSourceCommit: source, reuse: null, verdict: 'pass' });
+    expect(await runs(counter)).toBe(2);
+
+    await evidence('iteration9-f4-ignored-reuse', {
+      schema: 'plan21.iteration9.f4-reuse/1', commits: { baseline: root.head, docs, source },
+      gates: { first: digest(first), reused: digest(reused), fresh: digest(fresh) }, executions: await runs(counter),
+    });
   });
-  const policy = options.selectionPolicy ?? 'all-project';
-  const attempt = await runGate(execution, options.checkpoint ?? 'iteration', {
-    id,
-    runId: 'run-audit-equivalence',
-    projectRoot: fixture.projectRoot,
-    directory: outputDirectory,
-    head: fixture.commit,
-    checks,
-    ...(options.auditAllTests === undefined ? {} : { auditAllTests: options.auditAllTests }),
-    selection: {
-      policy,
-      exactOwners: policy === 'owned-by-scope' ? ['project/feature'] : [],
-      subtrees: policy === 'owned-by-scope' ? ['project/shared'] : [],
-    },
-    dependencyDirectories: options.dependencyDirectories ?? [],
-    ...(options.rules === undefined ? {} : { rules: options.rules }),
-    ...(options.guarded === undefined ? {} : { guarded: options.guarded }),
-    ...(options.signal === undefined ? {} : { signal: options.signal }),
-    ...(options.announced === undefined ? {} : { started: async (command: GateCommandStart) => { options.announced!.push(command); } }),
+
+  it('a changed ignore list refuses the active run and needs a new baseline, never reusing evidence recorded under the old list', { timeout: 300_000 }, async () => {
+    const counter = join(await scratch('ramify-agent-f4-policy-counter-'), 'runs');
+    const { repository: root, definition } = await f4(counter);
+    const { audit: port } = await audit();
+    const first = await configuredGate(port, root, { captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001' });
+    expect(first.audit?.verdict).toBe('pass');
+
+    const policy = await root.commit('ignore notes too', { 'ramify-audit.json': definition(['docs/**', 'notes/**']) });
+    const refused = await configuredGate(port, root, { captured: root.head, sourceCommit: policy, attemptId: 'ga-0002' });
+    expect([refused.verdict, refused.cause, refused.audit?.status]).toEqual(['not-verified', 'infrastructure', 'failed']);
+    expect(await runs(counter)).toBe(1);
+
+    const rebased = await configuredGate(port, root, { captured: policy, sourceCommit: policy, attemptId: 'ga-0003', runId: 'run-new-policy' });
+    expect(rebased.audit).toMatchObject({ status: 'completed', auditedSourceCommit: policy, reuse: null, verdict: 'pass' });
+    expect(await runs(counter)).toBe(2);
+    const notes = await root.commit('notes only', { 'notes/n.md': 'note\n' });
+    const reused = await configuredGate(port, root, { captured: policy, sourceCommit: notes, attemptId: 'ga-0004', runId: 'run-new-policy' });
+    expect(reused.audit).toMatchObject({ reuse: { auditedCommit: policy, ignoredChangedPaths: ['notes/n.md'] }, verdict: 'pass' });
+    expect(await runs(counter)).toBe(2);
+
+    await evidence('iteration9-f4-ignore-policy', {
+      schema: 'plan21.iteration9.f4-policy/1', commits: { baseline: root.head, policy, notes },
+      gates: { first: digest(first), refused: digest(refused), rebased: digest(rebased), reused: digest(reused) }, executions: await runs(counter),
+    });
   });
-  return { attempt, workspaces, outputDirectory };
-}
+});
 
-async function inPlaceGate(
-  fixture: RepositoryFixture,
-  checks: readonly PlannedCheck[],
-  id: string,
-): Promise<GateAttempt> {
-  const directory = await temporaryDirectory('ramify-agent-in-place-output-');
-  return runGate(inPlaceCheckExecution, 'iteration', {
-    id,
-    projectRoot: fixture.projectRoot,
-    directory,
-    head: fixture.commit,
-    checks,
+describe('configured gate outcomes', () => {
+  async function plain(checks: readonly unknown[], extra: Readonly<Record<string, string>> = {}, setupCommands?: readonly unknown[]) {
+    return repository({ 'package.json': '{"name":"plain","private":true}\n', ...extra, 'ramify-audit.json': auditDefinition(checks, setupCommands === undefined ? {} : { setupCommands }) });
+  }
+
+  it('a failing configured command fails the gate with its output and no invented command record', { timeout: 120_000 }, async () => {
+    const root = await plain([
+      commandCheck('passing', [{ name: 'passing', cmd: 'node', args: ['-e', 'console.log("typed")'] }]),
+      commandCheck('failing', [{ name: 'failing', cmd: 'node', args: ['-e', 'console.error("assertion failed in src/x.test.ts"); process.exit(3)'] }]),
+    ]);
+    const { audit: port } = await audit();
+    const started: Parameters<typeof configuredGate>[2]['started'] = [];
+    const attempt = await configuredGate(port, root, { captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001', started });
+    expect(attempt.audit).toMatchObject({ status: 'completed', verdict: 'fail', definition: { path: 'ramify-audit.json' } });
+    expect([attempt.verdict, attempt.cause, attempt.next, attempt.commands]).toEqual(['failed', 'check-failed', 'repair', []]);
+    expect(attempt.evidence?.reportCommit).toMatch(/^[0-9a-f]{40}$/u);
+    expect(checksOf(attempt)['failing']).toMatchObject({ status: 'fail' });
+    expect(started!.map(command => [command.kind, command.name])).toEqual([['configured', 'passing'], ['configured', 'failing']]);
+    const summary = (await gateDiagnostics(attempt, 'engineer')).summary.join('\n');
+    expect(summary).toContain('failing');
+    expect(summary).toContain('assertion failed in src/x.test.ts');
   });
-}
 
-function commandSemantics(attempt: GateAttempt) {
-  return attempt.commands.map(record => ({
-    kind: record.kind,
-    // The outer audit's private reporter endpoints are sanitized by the
-    // provider. Their presence in a parent process is not command semantics.
-    command: { ...record.command, env: record.command.env.filter(name =>
-      name !== 'RAMIFY_AUDIT_VITEST_ROOT' && name !== 'RAMIFY_AUDIT_VITEST_SUMMARY') },
-    selection: record.selection,
-    exitCode: record.exitCode,
-    outcome: record.outcome,
-    notVerified: record.notVerified,
-    runnerError: record.runnerError,
-    tail: record.output.tail,
-  }));
-}
+  it('a failing harness rule fails a passing audit, still without a command record', { timeout: 120_000 }, async () => {
+    const root = await plain([commandCheck('passing', [{ name: 'passing', cmd: 'node', args: ['-e', 'process.exit(0)'] }])]);
+    const { audit: port } = await audit();
+    const attempt = await configuredGate(port, root, {
+      captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001',
+      rules: [{ rule: 'fake-naming', outcome: 'failed', violations: [{ rule: 'fake-naming', path: 'src/fake.ts', detail: 'a fake is named like the real provider' }] }],
+    });
+    expect(attempt.audit?.verdict).toBe('pass');
+    expect([attempt.verdict, attempt.cause, attempt.commands]).toEqual(['failed', 'check-failed', []]);
+  });
 
-describe('audit-backed gate execution', () => {
+  it('a setup command that exits non-zero is the candidate\'s failure, and no check runs after it', { timeout: 120_000 }, async () => {
+    const marker = join(await scratch('ramify-agent-setup-marker-'), 'check-ran');
+    const root = await plain(
+      [commandCheck('after-setup', [{ name: 'after', cmd: 'node', args: ['-e', `require("fs").writeFileSync(${JSON.stringify(marker)}, "ran")`] }])],
+      {},
+      [{ name: 'build', cmd: 'node', args: ['-e', 'console.error("src/a.ts(1,1): error TS2304: Cannot find name x."); process.exit(2)'] }],
+    );
+    const { audit: port } = await audit();
+    const attempt = await configuredGate(port, root, { captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001' });
+    expect(attempt.audit?.status).toBe('failed');
+    expect(attempt.audit?.detail).toMatch(/^setup-command-failed/u);
+    expect([attempt.verdict, attempt.cause, attempt.next, attempt.evidence]).toEqual(['failed', 'check-failed', 'repair', null]);
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  it('a setup command that does not finish in time is infrastructure, not a failure of the source', { timeout: 120_000 }, async () => {
+    const root = await plain(
+      [commandCheck('after-setup', [{ name: 'after', cmd: 'node', args: ['-e', 'process.exit(0)'] }])],
+      {},
+      [{ name: 'slow', cmd: 'node', args: ['-e', 'setTimeout(() => {}, 60000)'], timeoutMs: 500 }],
+    );
+    const { audit: port } = await audit();
+    const attempt = await configuredGate(port, root, { captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001' });
+    expect(attempt.audit?.status).toBe('failed');
+    expect(attempt.audit?.detail).toMatch(/^setup-command-timed-out/u);
+    expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'timeout', 'retry-infrastructure']);
+  });
+
+  it('cancellation answers nothing for the commit and publishes no evidence', { timeout: 120_000 }, async () => {
+    const marker = join(await scratch('ramify-agent-cancel-marker-'), 'started');
+    const root = await plain([commandCheck('waiting', [{ name: 'wait', cmd: 'node', args: ['-e', `require("fs").writeFileSync(${JSON.stringify(marker)}, "x"); setInterval(() => {}, 1000)`] }])]);
+    const ownership = recordingOwnership();
+    const { audit: port } = await audit(ownership);
+    const controller = new AbortController();
+    const running = configuredGate(port, root, { captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001', signal: controller.signal });
+    const deadline = Date.now() + 60_000;
+    while (!existsSync(marker) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+    controller.abort();
+    const attempt = await running;
+    expect(attempt.audit?.status).toBe('cancelled');
+    expect([attempt.verdict, attempt.evidence, attempt.audited]).toEqual(['not-verified', null, null]);
+    expect(ownership.cleaned).toEqual(ownership.intended);
+    expect(await root.git('for-each-ref', 'refs/audited')).toBe('');
+  });
+
+  it('the gate\'s own bound ending a running audit is a timeout, not an infrastructure failure', { timeout: 120_000 }, async () => {
+    const root = await plain([commandCheck('waiting', [{ name: 'wait', cmd: 'node', args: ['-e', 'setInterval(() => {}, 1000)'] }])]);
+    const { audit: port } = await audit();
+    const attempt = await configuredGate(port, root, { captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001', timeoutMs: 3_000 });
+    expect([attempt.verdict, attempt.cause, attempt.next, attempt.evidence]).toEqual(['not-verified', 'timeout', 'retry-infrastructure', null]);
+  });
+
+  it('reopens the exact completed request without executing its checks again', { timeout: 120_000 }, async () => {
+    const counter = join(await scratch('ramify-agent-recovery-counter-'), 'runs');
+    const root = await plain([commandCheck('counted', [{ name: 'count', cmd: 'node', args: ['-e', `require("fs").appendFileSync(${JSON.stringify(counter)}, "ran\\n")`] }])]);
+    const { audit: port } = await audit();
+    const first = await configuredGate(port, root, { captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001' });
+    const again = await configuredGate(port, root, { captured: root.head, sourceCommit: root.head, attemptId: 'ga-0001' });
+    expect(again.audit?.requestId).toBe(first.audit?.requestId);
+    expect(again.evidence).toEqual(first.evidence);
+    expect((await readFile(counter, 'utf8')).split('\n').filter(Boolean)).toHaveLength(1);
+  });
+});
+
+describe('a standalone session\'s in-place diagnosis', () => {
   it('retains an indeterminate published audit outcome', () => {
     const record = gateAuditOutcomeSchema.parse({
       schema: 'ramify-agent.gate-audit-outcome/1', gate: 'ga-indeterminate', overall: 'indeterminate', audited: 'a'.repeat(40),
@@ -175,599 +488,16 @@ describe('audit-backed gate execution', () => {
     expect(record.overall).toBe('indeterminate');
   });
 
-  it('narrows a registered Vitest run to Ramify-selected source after a full root', { timeout: 60_000 }, async () => {
-    const fixture = await repository({
-      'module.ramify': 'ramify 1\nmodule "fixture"\nexpose-sub value from producer to descendants\n',
-      'package.json': '{"name":"fixture","private":true,"type":"module","scripts":{"test":"vitest run"}}',
-      'tsconfig.json': '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","target":"ES2022"},"include":["src/**/*.ts","subs/**/*.ts"]}',
-      'src/index.ts': 'export {};\n',
-      'subs/producer/module.ramify': 'ramify 1\nmodule producer\nexpose-src value from "value.ts" to parent\n',
-      'subs/producer/src/value.ts': 'export const value = 1;\n',
-      'subs/producer/src/tests/value.test.ts': 'import { expect, it } from "vitest"; import { value } from "../value.js"; it("value", () => expect(value).toBeGreaterThan(0));\n',
-      'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\n',
-      'subs/consumer/src/compute.ts': 'import { value } from "../../producer/src/value.js"; export const computed = value + 1;\n',
-      'subs/consumer/src/tests/compute.test.ts': 'import { expect, it } from "vitest"; import { computed } from "../compute.js"; it("computed", () => expect(computed).toBeGreaterThan(1));\n',
-    });
-    await symlink(join(process.cwd(), 'node_modules'), join(fixture.projectRoot, 'node_modules'));
-    const auditAllTests = checkCommand({ argv: ['npm', 'test'], cwd: fixture.projectRoot, timeoutMs: 30_000 });
-    const checks: PlannedCheck[] = [{
-      kind: 'tests', command: checkCommand({
-        argv: [join(fixture.projectRoot, 'node_modules/.bin/vitest'), 'run', 'subs/producer/src/tests/value.test.ts'],
-        cwd: fixture.projectRoot, timeoutMs: 30_000,
-      }),
-      selection: { policy: 'owned-by-scope', exactOwners: ['fixture/producer'], subtrees: [], extraSuites: [], resolved: ['subs/producer/src/tests/value.test.ts'] },
-      requiresTests: true,
-    }];
-    const full = (await auditGate(fixture, checks, 'ga-vitest-full', { checkpoint: 'final', auditAllTests })).attempt;
-    expect(full.auditOverall).toBe('pass');
-    const fullChecks = (full.provider as { checks: Record<string, { vitest?: { reason: string; files: Array<{ path: string; state: string }> } }> }).checks;
-    expect(fullChecks['check-01-tests']?.vitest).toMatchObject({ reason: 'passed' });
-    expect(fullChecks['check-01-tests']?.vitest?.files).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: 'subs/producer/src/tests/value.test.ts', state: 'passed' }),
-      expect.objectContaining({ path: 'subs/consumer/src/tests/compute.test.ts', state: 'passed' }),
-    ]));
-
-    await writeFile(join(fixture.projectRoot, 'subs/producer/src/value.ts'), 'export const value = 2;\n');
-    git(fixture.repositoryRoot, ['add', 'subs/producer/src/value.ts']);
-    git(fixture.repositoryRoot, ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--no-gpg-sign', '-m', 'change value']);
-    const changed = { ...fixture, commit: git(fixture.repositoryRoot, ['rev-parse', 'HEAD']) };
-    const partial = (await auditGate(changed, checks, 'ga-vitest-partial', { auditAllTests })).attempt;
-    expect(partial.auditOverall).toBe('pass');
-    const summary = JSON.parse(git(fixture.repositoryRoot, ['show', `${partial.evidence!.reportCommit}:reports/audit/summary.json`])) as {
-      mode: { requestedMode: string; executedMode: string };
-      coverage: { selectedModules?: Array<{ id: string }> };
-    };
-    expect(summary.mode, JSON.stringify(summary.mode)).toMatchObject({ requestedMode: 'ramify-partial', executedMode: 'ramify-partial' });
-    expect(summary.coverage.selectedModules?.map(module => module.id)).toContain('fixture/consumer');
-    expect(partial.commands[0]?.command.argv.at(-1)).toBe('subs/producer/src/tests/value.test.ts');
-
-    await mkdir(join(fixture.projectRoot, 'docs'), { recursive: true });
-    await writeFile(join(fixture.projectRoot, 'docs/first.md'), 'No source change\n');
-    git(fixture.repositoryRoot, ['add', 'docs/first.md']);
-    git(fixture.repositoryRoot, ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--no-gpg-sign', '-m', 'documentation without tests']);
-    const unselected = (await auditGate({ ...fixture, commit: git(fixture.repositoryRoot, ['rev-parse', 'HEAD']) }, checks, 'ga-vitest-unselected', { auditAllTests })).attempt;
-    expect(unselected.auditOverall).toBe('pass');
-    expect(unselected.commands[0]).toMatchObject({ outcome: 'not-verified', notVerified: 'audit-unselected', exitCode: null });
-    expect(unselected.verdict).toBe('passed');
-    expect(unselected.commands[0]?.output.bytes).toBe(0);
-
-    const failedFile = 'subs/consumer/src/tests/compute.test.ts';
-    await writeFile(join(fixture.projectRoot, failedFile),
-      'import { expect, it } from "vitest"; import { computed } from "../compute.js"; it("computed", () => expect(computed).toBeGreaterThan(100));\n');
-    git(fixture.repositoryRoot, ['add', failedFile]);
-    git(fixture.repositoryRoot, ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--no-gpg-sign', '-m', 'failing consumer test']);
-    const failing = (await auditGate({ ...fixture, commit: git(fixture.repositoryRoot, ['rev-parse', 'HEAD']) }, checks, 'ga-vitest-failing', { auditAllTests })).attempt;
-    expect(failing.auditOverall).toBe('fail');
-
-    await mkdir(join(fixture.projectRoot, 'docs'), { recursive: true });
-    await writeFile(join(fixture.projectRoot, 'docs/guide.md'), 'Documentation edit\n');
-    git(fixture.repositoryRoot, ['add', 'docs/guide.md']);
-    git(fixture.repositoryRoot, ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--no-gpg-sign', '-m', 'documentation after failed gate']);
-    const rerun = (await auditGate({ ...fixture, commit: git(fixture.repositoryRoot, ['rev-parse', 'HEAD']) }, checks, 'ga-vitest-rerun', { auditAllTests })).attempt;
-    expect(rerun.auditOverall).toBe('fail');
-    const rerunSummary = JSON.parse(git(fixture.repositoryRoot, ['show', `${rerun.evidence!.reportCommit}:reports/audit/summary.json`])) as {
-      mode: { executedMode: string };
-      coverage: { carriedFailures?: Array<{ path: string }> };
-    };
-    expect(rerunSummary.mode.executedMode).toBe('ramify-partial');
-    expect(rerunSummary.coverage.carriedFailures?.map(failure => failure.path)).toContain(failedFile);
-  });
-
-  it('defaults committing gates to partial mode and requests full mode for final', async () => {
-    const fixture = await repository({
-      'module.ramify': 'ramify 1\nmodule "fixture"\n',
-      'package.json': '{"name":"fixture","private":true}',
-      'src/index.ts': 'export const value = 1;\n',
-    });
-    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
-    const checks: PlannedCheck[] = [{ kind: 'type-check', command: command(fixture.projectRoot, 'console.log("checked")') }];
-    const iteration = (await auditGate(fixture, checks, 'ga-partial-default')).attempt;
-    const iterationSummary = JSON.parse(git(fixture.repositoryRoot, ['show', `${iteration.evidence!.reportCommit}:reports/audit/summary.json`])) as {
-      mode: { requestedMode: string; resolution: string };
-    };
-    expect(iterationSummary.mode).toMatchObject({ requestedMode: 'ramify-partial', resolution: 'defaulted' });
-    const final = (await auditGate(fixture, checks, 'ga-final-full', { checkpoint: 'final' })).attempt;
-    const finalSummary = JSON.parse(git(fixture.repositoryRoot, ['show', `${final.evidence!.reportCommit}:reports/audit/summary.json`])) as {
-      mode: { requestedMode: string; resolution: string; executedMode: string };
-    };
-    expect(finalSummary.mode).toMatchObject({ requestedMode: 'full', resolution: 'requested', executedMode: 'full' });
-  });
-
-  it.each(['fail', 'indeterminate'] as const)('blocks a run-local pass when composition is %s', async overall => {
-    const fixture = await repository({ 'source.txt': 'source\n' });
-    const checks: PlannedCheck[] = [{ kind: 'type-check', command: command(fixture.projectRoot, 'console.log("pass")') }];
-    const directory = await temporaryDirectory('ramify-agent-composed-verdict-');
-    const attempt = await runGate({
-      async run(planned, request) {
-        const local = await inPlaceCheckExecution.run(planned, request);
-        return { ...local, auditOverall: overall };
-      },
-    }, 'iteration', { id: `ga-composed-${overall}`, projectRoot: fixture.projectRoot, directory, head: fixture.commit, checks });
-    expect(attempt.commands[0]?.outcome).toBe('passed');
-    expect(attempt.auditOverall).toBe(overall);
-    expect(attempt.verdict).toBe(overall === 'fail' ? 'failed' : 'not-verified');
-    expect(attempt.next).not.toBe('accept');
-    expect(gateAuditOutcomeSchema.parse({ schema: 'ramify-agent.gate-audit-outcome/1', gate: attempt.id, overall, audited: fixture.commit }).overall).toBe(overall);
-  });
-
-  it('matches passing and failing in-place commands, verdict, cause and next over the same commit', async () => {
-    const fixture = await repository({ 'source.txt': 'source\n' });
-    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
-    const passing: PlannedCheck[] = [
-      { kind: 'tests', command: command(fixture.projectRoot, 'console.log("pass")') },
-      { kind: 'type-check', command: command(fixture.projectRoot, 'console.log("typed")') },
-    ];
-    const failing: PlannedCheck[] = [
-      { kind: 'tests', command: command(fixture.projectRoot, 'console.error("failed"); process.exit(3)') },
-      { kind: 'type-check', command: command(fixture.projectRoot, 'console.log("still ran")') },
-    ];
-
-    const passingInPlace = await inPlaceGate(fixture, passing, 'ga-pass-place');
-    const passingAudit = (await auditGate(fixture, passing, 'ga-pass-audit')).attempt;
-    const failingInPlace = await inPlaceGate(fixture, failing, 'ga-fail-place');
-    const failingAudit = (await auditGate(fixture, failing, 'ga-fail-audit')).attempt;
-
-    expect(passingAudit.auditOverall).toBe('pass');
-    expect(failingAudit.auditOverall).toBe('fail');
-    expect(failingAudit.evidence).not.toBeNull();
-    const retained = failingAudit.provider as { result: { refs: { reportCommit: string }; composition: { verdict: string } }; checks: Record<string, { output?: string }> };
-    expect(retained.result.refs.reportCommit).toBe(failingAudit.evidence?.reportCommit);
-    expect(retained.result.composition.verdict).toBe('fail');
-    expect(retained.checks['check-01-tests']?.output).toContain('failed');
-
-    expect(commandSemantics(passingAudit)).toEqual(commandSemantics(passingInPlace));
-    expect([passingAudit.verdict, passingAudit.cause, passingAudit.next])
-      .toEqual([passingInPlace.verdict, passingInPlace.cause, passingInPlace.next]);
-    expect(commandSemantics(failingAudit)).toEqual(commandSemantics(failingInPlace));
-    expect([failingAudit.verdict, failingAudit.cause, failingAudit.next])
-      .toEqual([failingInPlace.verdict, failingInPlace.cause, failingInPlace.next]);
-  });
-
-  it('keeps ramify exit 2 not verified and maps a failing stack trace back to project paths', async () => {
-    const fixture = await repository({
-      'scripts/fail.mjs': 'throw new Error("fixture stack")\n',
-    });
-    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
+  it('runs its type-check and Ramify check in the working tree and publishes nothing', async () => {
+    const root = await scratch('ramify-agent-in-place-');
+    const command = (script: string) => checkCommand({ argv: [process.execPath, '-e', script], cwd: root, timeoutMs: 30_000 });
     const checks: PlannedCheck[] = [
-      { kind: 'ramify-check', command: command(fixture.projectRoot, 'console.log("{\\"outcome\\":\\"not-checked\\"}"); process.exit(2)') },
-      { kind: 'tests', command: checkCommand({ argv: ['node', 'scripts/fail.mjs'], cwd: fixture.projectRoot, timeoutMs: 30_000 }) },
+      { kind: 'type-check', command: command('console.log("typed")') },
+      { kind: 'ramify-check', command: command('console.error("rule broken"); process.exit(1)') },
     ];
-
-    const inPlace = await inPlaceGate(fixture, checks, 'ga-not-verified-place');
-    const { attempt, workspaces } = await auditGate(fixture, checks, 'ga-not-verified-audit');
-
-    expect(attempt.commands[0]).toMatchObject({ exitCode: 2, outcome: 'not-verified', notVerified: 'runner-error' });
-    expect(attempt.verdict).toBe('not-verified');
-    expect(attempt.cause).toBe('infrastructure');
-    expect(attempt.next).toBe('retry-infrastructure');
-    expect(attempt.commands[1]?.output.tail).toContain(join(fixture.projectRoot, 'scripts/fail.mjs'));
-    expect(attempt.commands[1]?.output.tail).not.toContain(workspaces[0]?.worktreePath ?? 'missing-worktree');
-    expect(commandSemantics(attempt)).toEqual(commandSemantics(inPlace));
-  });
-
-  it('reopens the exact completed provider receipt without executing the check again', async () => {
-    const fixture = await repository({ 'source.txt': 'source\n' });
-    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
-    const directory = await temporaryDirectory('ramify-agent-audit-receipt-');
-    const workspaces: IntendedAuditWorkspace[] = [];
-    const execution = createAuditCheckExecution({ workspaceOwnership: {
-      async recordIntendedWorkspace(workspace) { workspaces.push(workspace); },
-      async recoverAbandonedWorkspaces() {},
-      async recordWorkspaceCleaned() {},
-    } });
-    const checks: PlannedCheck[] = [{ kind: 'tests', command: command(fixture.projectRoot, 'console.error("one failure"); process.exit(1)') }];
-    const request = {
-      id: 'ga-receipt', runId: 'run-audit-equivalence', projectRoot: fixture.projectRoot,
-      directory, head: fixture.commit, checks,
-      selection: { policy: 'all-project' as const, exactOwners: [], subtrees: [] },
-      dependencyDirectories: [],
-    };
-    const first = await runGate(execution, 'iteration', request);
-    const receipt = JSON.parse(await readFile(join(directory, 'provider-receipt.json'), 'utf8')) as { schema: string; completed: { evidence: { reportCommit: string } } };
-    expect(receipt.schema).toBe('ramify-agent.provider-receipt/1');
-    expect(receipt.completed.evidence.reportCommit).toBe(first.evidence?.reportCommit);
-    const second = await runGate(execution, 'iteration', request);
-    expect(second.evidence).toEqual(first.evidence);
-    expect(second.provider).toEqual(first.provider);
-    expect(workspaces).toHaveLength(1);
-    await rm(join(directory, 'provider-receipt.json'));
-    const beforeReceiptRecovery = await runGate(execution, 'iteration', request);
-    expect(beforeReceiptRecovery.evidence).toEqual(first.evidence);
-    expect((beforeReceiptRecovery.provider as { checks: unknown }).checks).toEqual((first.provider as { checks: unknown }).checks);
-    expect(workspaces).toHaveLength(1);
-  });
-
-  it('uses distinct per-position IDs for planned checks, preserves order, and names coverage', async () => {
-    const fixture = await repository({ 'source.txt': 'source\n' });
-    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
-    const checks: PlannedCheck[] = [
-      { kind: 'tests', command: command(fixture.projectRoot, 'console.log("project")'), attribution: 'project' },
-      { kind: 'type-check', command: command(fixture.projectRoot, 'console.log("types")'), attribution: 'project' },
-      {
-        kind: 'tests',
-        command: command(fixture.projectRoot, 'console.log("scope")'),
-        selection: selection(),
-        requiresTests: true,
-        attribution: 'in-scope',
-      },
-    ];
-
-    const announced: GateCommandStart[] = [];
-    const { attempt } = await auditGate(fixture, checks, 'ga-duplicates', {
-      checkpoint: 'breaking-iteration',
-      selectionPolicy: 'all-project',
-      announced,
-    });
-    // Each command is announced as the audit starts it, with its place.
-    expect(announced).toEqual([
-      { kind: 'tests', position: 1, total: 3 },
-      { kind: 'type-check', position: 2, total: 3 },
-      { kind: 'tests', position: 3, total: 3 },
-    ]);
-    const note = git(fixture.repositoryRoot, ['notes', '--ref=audit', 'show', fixture.commit]);
-    const runRef = note.match(/^Audited-Reports-Ref: (.+)$/mu)?.[1];
-    expect(runRef).toBeDefined();
-    const summary = JSON.parse(git(fixture.repositoryRoot, ['show', `${runRef}:reports/audit/summary.json`])) as {
-      checks: Record<string, unknown>;
-      coverage: { universe: { id: string; checkIds: string[] }; claim: { checkpoint: string; selectionPolicy: string; owners?: string[] } };
-    };
-
-    expect(attempt.commands.map(record => record.output.tail.trim())).toEqual(['project', 'types', 'scope']);
-    expect(Object.keys(summary.checks)).toEqual(['check-01-tests', 'check-02-type-check', 'check-03-tests', 'harness-rules']);
-    expect(summary.coverage.universe.checkIds).toEqual(['check-01-tests', 'check-02-type-check', 'check-03-tests', 'harness-rules']);
-    expect(summary.coverage.universe.id).toBe('ramify-agent:gates');
-    expect(summary.coverage.claim).toEqual({
-      checkpoint: 'breaking-iteration',
-      selectionPolicy: 'all-project',
-    });
-
-    await auditGate(fixture, checks, 'ga-owned-coverage', { selectionPolicy: 'owned-by-scope' });
-    const ownedNote = git(fixture.repositoryRoot, ['notes', '--ref=audit', 'show', fixture.commit]);
-    const ownedRunRef = ownedNote.match(/^Audited-Reports-Ref: (.+)$/mu)?.[1];
-    expect(ownedRunRef).toBeDefined();
-    const ownedSummary = JSON.parse(git(fixture.repositoryRoot, ['show', `${ownedRunRef}:reports/audit/summary.json`])) as {
-      coverage: { universe: { id: string }; claim: { checkpoint: string; selectionPolicy: string; owners: string[] } };
-    };
-    expect(ownedSummary.coverage.universe.id).toBe('ramify-agent:gates');
-    expect(ownedSummary.coverage.claim).toEqual({
-      checkpoint: 'iteration',
-      selectionPolicy: 'owned-by-scope',
-      owners: ['exact:project/feature', 'subtree:project/shared'],
-    });
-  });
-
-  it('rebases nested-project scripts, scoped tests and ramify --root, and links nested dependencies without building', async () => {
-    const prefix = 'apps/project';
-    const fixture = await repository({
-      'package.json': JSON.stringify({ scripts: { test: 'node -e "process.exit(91)"' } }),
-      [`${prefix}/package.json`]: JSON.stringify({ scripts: { test: 'node scripts/project-test.mjs', build: 'node -e "process.exit(88)"' }, type: 'module' }),
-      [`${prefix}/scripts/project-test.mjs`]: 'console.log(`project:${process.cwd()}`)\n',
-      [`${prefix}/src/tests/scoped.test.ts`]: 'export {}\n',
-      [`${prefix}/packages/tool/package.json`]: JSON.stringify({ scripts: { test: 'node test.cjs' } }),
-      [`${prefix}/packages/tool/test.cjs`]: 'console.log(`nested:${require("fixture-dep")}`)\n',
-    }, prefix);
-    const projectModules = join(fixture.projectRoot, 'node_modules');
-    const nestedModules = join(fixture.projectRoot, 'packages/tool/node_modules');
-    await mkdir(join(projectModules, '.bin'), { recursive: true });
-    await mkdir(join(nestedModules, 'fixture-dep'), { recursive: true });
-    await writeFile(join(nestedModules, 'fixture-dep/index.js'), 'module.exports = "dependency-ready"\n');
-    const scopedRunner = join(projectModules, '.bin/scoped-runner');
-    const ramify = join(projectModules, '.bin/ramify');
-    await writeFile(scopedRunner, '#!/bin/sh\nprintf "scoped:%s:%s\\n" "$PWD" "$2"\n[ "$2" = "src/tests/scoped.test.ts" ]\n');
-    await writeFile(ramify, '#!/bin/sh\nprintf "ramify:%s:%s\\n" "$PWD" "$*"\n[ "$4" = "$PWD" ]\n');
-    await chmod(scopedRunner, 0o755);
-    await chmod(ramify, 0o755);
-
-    const checks: PlannedCheck[] = [
-      { kind: 'tests', command: checkCommand({ argv: ['npm', 'test'], cwd: fixture.projectRoot, timeoutMs: 30_000 }), attribution: 'project' },
-      { kind: 'type-check', command: command(fixture.projectRoot, 'console.log(`type:${process.cwd()}`)'), attribution: 'project' },
-      { kind: 'ramify-check', command: checkCommand({ argv: [ramify, 'check', '--batch', '--root', fixture.projectRoot, '--format', 'json'], cwd: fixture.projectRoot, timeoutMs: 30_000 }), attribution: 'project' },
-      {
-        kind: 'tests',
-        command: checkCommand({ argv: [scopedRunner, 'run', 'src/tests/scoped.test.ts'], cwd: fixture.projectRoot, timeoutMs: 30_000 }),
-        selection: selection(),
-        requiresTests: true,
-        attribution: 'in-scope',
-      },
-      { kind: 'tests', command: checkCommand({ argv: ['npm', 'test'], cwd: join(fixture.projectRoot, 'packages/tool'), timeoutMs: 30_000 }), attribution: 'project' },
-    ];
-
-    const inPlace = await inPlaceGate(fixture, checks, 'ga-nested-place');
-    const { attempt, workspaces } = await auditGate(fixture, checks, 'ga-nested-audit', {
-      dependencyDirectories: ['packages/tool'],
-    });
-
-    expect(attempt.verdict).toBe('passed');
-    expect(commandSemantics(attempt)).toEqual(commandSemantics(inPlace));
-    expect(attempt.commands[0]?.output.tail).toContain(`project:${fixture.projectRoot}`);
-    expect(attempt.commands[2]?.output.tail).toContain(`--root ${fixture.projectRoot}`);
-    expect(attempt.commands[3]?.output.tail).toContain(`scoped:${fixture.projectRoot}:src/tests/scoped.test.ts`);
-    expect(attempt.commands[4]?.output.tail).toContain('nested:dependency-ready');
-    expect(workspaces).toHaveLength(1);
-    expect(workspaces[0]).toMatchObject({
-      repositoryRoot: fixture.repositoryRoot,
-      sourceCommit: fixture.commit,
-      runId: 'run-audit-equivalence',
-      attemptId: 'ga-nested-audit',
-      process: { id: process.pid },
-    });
-    expect(workspaces[0]?.worktreePath).toContain('ramify-audit-worktree-');
-    // The committed build script exits 88; a passing audit proves preparation did not run it.
-  });
-
-  it('publishes guarded changes and harness rules as one failing check without inventing a command record', async () => {
-    const fixture = await repository({ 'source.txt': 'source\n' });
-    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
-    const checks: PlannedCheck[] = [{ kind: 'tests', command: command(fixture.projectRoot, 'console.log("command passed")') }];
-    const { attempt } = await auditGate(fixture, checks, 'ga-rules', {
-      rules: [{ rule: 'fake-naming', outcome: 'failed', violations: [{ rule: 'fake-suffix', path: 'src/a.ts', detail: 'missing .fake' }] }],
-      guarded: [{ path: 'source.txt', hash: '0'.repeat(64) }],
-    });
-    const note = git(fixture.repositoryRoot, ['notes', '--ref=audit', 'show', fixture.commit]);
-    const runRef = note.match(/^Audited-Reports-Ref: (.+)$/mu)?.[1];
-    expect(runRef).toBeDefined();
-    const summary = JSON.parse(git(fixture.repositoryRoot, ['show', `${runRef}:reports/audit/summary.json`])) as {
-      checks: { 'harness-rules': { details: { guardedChanges: number; unauthorizedGuardedChanges: number; failedRules: string[] } } };
-    };
-
-    expect(attempt.commands).toHaveLength(1);
-    expect(attempt.commands[0]?.outcome).toBe('passed');
-    expect(attempt.verdict).toBe('failed');
-    expect(attempt.cause).toBe('guarded-change');
-    expect(note).toContain('harness-rules: FAIL');
-    expect(summary.checks['harness-rules'].details).toEqual({
-      guardedChanges: 1,
-      unauthorizedGuardedChanges: 1,
-      failedRules: ['fake-naming'],
-    });
-  });
-
-  it('maps audit cancellation to interrupted and audit failure to the library runner error', async () => {
-    const fixture = await repository({ 'source.txt': 'source\n' });
-    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
-    const checks: PlannedCheck[] = [{ kind: 'tests', command: command(fixture.projectRoot, 'console.log("unreached")') }];
-    const controller = new AbortController();
-    controller.abort('gate stopped');
-
-    const cancelled = (await auditGate(fixture, checks, 'ga-cancelled', { signal: controller.signal })).attempt;
-    const failed = (await auditGate(fixture, checks, 'ga-failed', {
-      workspaceOwnership: {
-        async recordIntendedWorkspace() {
-          throw new Error('durable ownership write refused');
-        },
-        async recoverAbandonedWorkspaces() {},
-        async recordWorkspaceCleaned() {},
-      },
-    })).attempt;
-
-    expect(cancelled.commands[0]).toMatchObject({
-      outcome: 'not-verified', notVerified: 'interrupted', runnerError: null,
-    });
-    expect(cancelled.cause).toBe('infrastructure');
-    expect(failed.commands[0]).toMatchObject({
-      outcome: 'not-verified',
-      notVerified: 'runner-error',
-      runnerError: { kind: 'audit-failed', message: expect.stringContaining('durable ownership write refused') },
-    });
-    expect(failed.cause).toBe('infrastructure');
-  });
-
-  it('remaps an audit-stage failure from the removed worktree to the original repository', async () => {
-    const fixture = await repository({
-      'source.txt': 'source\n',
-      // A tracked target makes dependency preparation fail after the
-      // isolated worktree exists, and the library error names that worktree.
-      'node_modules/tracked.txt': 'tracked target\n',
-    });
-    const checks: PlannedCheck[] = [{ kind: 'tests', command: command(fixture.projectRoot, 'console.log("unreached")') }];
-
-    const { attempt, workspaces } = await auditGate(fixture, checks, 'ga-preparation-failed');
-    const record = attempt.commands[0]!;
-    const output = await readFile(record.output.path, 'utf8');
-
-    expect(workspaces).toHaveLength(1);
-    // ramify-audit's own preparation refused the link, and says so with its
-    // own code and message.
-    expect(record).toMatchObject({
-      outcome: 'not-verified',
-      notVerified: 'runner-error',
-      runnerError: {
-        kind: 'dependency-link-failed',
-        message: `Audit dependency target already exists at ${join(fixture.repositoryRoot, 'node_modules')}`,
-      },
-    });
-    expect(attempt.cause).toBe('infrastructure');
-    expect(attempt.next).toBe('retry-infrastructure');
-    expect(record.runnerError?.message).not.toContain('ramify-audit-worktree-');
-    expect(record.output.tail).toContain(join(fixture.repositoryRoot, 'node_modules'));
-    expect(record.output.tail).not.toContain('ramify-audit-worktree-');
-    expect(output).toContain(join(fixture.repositoryRoot, 'node_modules'));
-    expect(output).not.toContain('ramify-audit-worktree-');
-  });
-});
-
-describe('the project\'s setup commands in the audited worktree', () => {
-  /** A project whose check reads the build output its declared setup writes; the repository ignores that output. */
-  async function builtProject() {
-    const fixture = await repository({
-      '.gitignore': 'dist/\nnode_modules/\n',
-      'package.json': JSON.stringify({ scripts: { build: 'node scripts/build.mjs' } }),
-      'scripts/build.mjs': [
-        'import { mkdirSync, writeFileSync } from "node:fs";',
-        'mkdirSync("dist", { recursive: true });',
-        'writeFileSync("dist/out.txt", `built for ${process.env.BUILD_LABEL}`);',
-        'console.log(`wrote ${process.cwd()}/dist/out.txt`);',
-      ].join('\n'),
-      'scripts/check.mjs': 'import { readFileSync } from "node:fs";\nconsole.log(readFileSync("dist/out.txt", "utf8"));\n',
-    });
-    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
-    return fixture;
-  }
-
-  it('builds in the worktree before any check, so a check reads the ignored output, and publishes what the build printed', async () => {
-    const fixture = await builtProject();
-    const checks: PlannedCheck[] = [
-      ...setupChecks([{ name: 'build', command: ['node', 'scripts/build.mjs'], env: { BUILD_LABEL: 'audited' }, timeoutMs: 60_000 }], fixture.projectRoot),
-      { kind: 'tests', command: checkCommand({ argv: ['node', 'scripts/check.mjs'], cwd: fixture.projectRoot, timeoutMs: 30_000 }), attribution: 'project' },
-    ];
-    const announced: GateCommandStart[] = [];
-
-    const { attempt, workspaces, outputDirectory } = await auditGate(fixture, checks, 'ga-setup-built', { announced });
-
-    expect(attempt.verdict).toBe('passed');
-    expect(attempt.evidence).not.toBeNull();
-    expect(announced).toEqual([
-      { kind: 'setup', name: 'build', position: 1, total: 2 },
-      { kind: 'tests', position: 2, total: 2 },
-    ]);
-    const [setup, tests] = attempt.commands;
-    expect(setup).toMatchObject({ kind: 'setup', name: 'build', outcome: 'passed', exitCode: 0, command: { argv: ['node', 'scripts/build.mjs'], cwd: fixture.projectRoot } });
-    expect(setup!.command.envAdditions).toEqual({ BUILD_LABEL: 'audited' });
-    // What the build printed names the project, not the removed worktree.
-    expect(setup!.output.path).toBe(join(outputDirectory, '01-setup.log'));
-    expect(setup!.output.tail).toContain(`wrote ${fixture.projectRoot}/dist/out.txt`);
-    expect(setup!.output.tail).not.toContain(workspaces[0]?.worktreePath ?? 'missing-worktree');
-    expect(git(fixture.repositoryRoot, ['show', `${attempt.evidence!.reportCommit}:reports/audit/workspace-preparation/setup-01.txt`])).toContain('status: passed');
-    expect(tests).toMatchObject({ kind: 'tests', outcome: 'passed' });
-    expect(tests!.output.tail).toContain('built for audited');
-    // The build ran in the worktree, never in the project.
-    expect(existsSync(join(fixture.projectRoot, 'dist'))).toBe(false);
-
-    const note = git(fixture.repositoryRoot, ['notes', '--ref=audit', 'show', fixture.commit]);
-    const runRef = note.match(/^Audited-Reports-Ref: (.+)$/mu)?.[1];
-    const summary = JSON.parse(git(fixture.repositoryRoot, ['show', `${runRef}:reports/audit/summary.json`])) as {
-      checks: Record<string, unknown>;
-      workspacePreparation: { preparationId: string; payload: { linkedPackageDirectories: string[]; setupCommands: Array<Record<string, unknown>> } };
-    };
-    expect(Object.keys(summary.checks)).toEqual(['check-02-tests', 'harness-rules']);
-    expect(summary.workspacePreparation.preparationId).toBe('nodejs');
-    expect(summary.workspacePreparation.payload.linkedPackageDirectories).toEqual(['']);
-    expect(summary.workspacePreparation.payload.setupCommands).toEqual([expect.objectContaining({
-      index: 1, name: 'build', command: ['node', 'scripts/build.mjs'], status: 'passed', exitCode: 0,
-      outputPath: 'reports/audit/workspace-preparation/setup-01.txt',
-    })]);
-    expect(git(fixture.repositoryRoot, ['show', `${runRef}:reports/audit/workspace-preparation/setup-01.txt`])).toContain('wrote ');
-  });
-
-  it('a setup command that exits non-zero fails the gate in scope with what it printed, and no check runs after it', async () => {
-    const fixture = await builtProject();
-    const marker = join(fixture.projectRoot, 'check-ran');
-    const checks: PlannedCheck[] = [
-      ...setupChecks([{ name: 'build', command: ['node', '-e', 'console.error("src/a.ts(1,1): error TS2304: Cannot find name x."); process.exit(2)'] }], fixture.projectRoot),
-      { kind: 'tests', command: command(fixture.projectRoot, `require("fs").writeFileSync(${JSON.stringify(marker)}, "ran")`), attribution: 'project' },
-      { kind: 'type-check', command: command(fixture.projectRoot, 'console.log("types")'), attribution: 'project' },
-    ];
-
-    const { attempt, outputDirectory } = await auditGate(fixture, checks, 'ga-setup-failed');
-    const inPlace = await inPlaceGate(fixture, checks, 'ga-setup-failed-place');
-
-    for (const gate of [attempt, inPlace]) {
-      expect(gate.commands.map(record => [record.kind, record.outcome, record.notVerified ?? null, record.exitCode])).toEqual([
-        ['setup', 'failed', null, 2],
-        ['tests', 'not-verified', 'setup-failed', null],
-        ['type-check', 'not-verified', 'setup-failed', null],
-      ]);
-      expect(gate.commands[0]!.output.tail).toContain('error TS2304: Cannot find name x.');
-      expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'check-failed', 'repair']);
-    }
-    expect(attempt.evidence).toBeNull();
-    expect(attempt.audited).toBeNull();
-    expect(attempt.commands[0]!.output.path).toBe(join(outputDirectory, '01-setup.log'));
-    expect(await readFile(attempt.commands[0]!.output.path, 'utf8')).toContain('error TS2304: Cannot find name x.');
-    expect(existsSync(marker)).toBe(false);
-  });
-
-  it('a setup command that does not finish in time is infrastructure, not a failure of the source', async () => {
-    const fixture = await builtProject();
-    const checks: PlannedCheck[] = [
-      ...setupChecks([{ command: ['node', '-e', 'setTimeout(() => {}, 60000)'], timeoutMs: 500 }], fixture.projectRoot),
-      { kind: 'tests', command: command(fixture.projectRoot, 'console.log("unreached")'), attribution: 'project' },
-    ];
-
-    const { attempt } = await auditGate(fixture, checks, 'ga-setup-timeout');
-
-    expect(attempt.commands.map(record => [record.kind, record.outcome, record.notVerified ?? null])).toEqual([
-      ['setup', 'not-verified', 'timeout'],
-      ['tests', 'not-verified', 'setup-failed'],
-    ]);
-    expect(attempt.commands[0]!.name).toBeUndefined();
-    expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'timeout', 'retry-infrastructure']);
-    // ramify-audit stopped the command's whole process tree, and the record and its briefing say how.
-    expect(attempt.commands[0]!.stopped).toMatch(/^its process tree was stopped after it timed out: \d+ process(es)? received SIGTERM/u);
-    const briefing = (await gateDiagnostics(attempt, 'engineer')).summary.join('\n');
-    expect(briefing).toContain(`not verified (timeout); ${attempt.commands[0]!.stopped!}`);
-  });
-
-  it('a setup command that installs through the linked node_modules is refused before it runs, and is infrastructure with what the project must change', async () => {
-    const fixture = await builtProject();
-    await writeFile(join(fixture.projectRoot, 'node_modules', 'kept.txt'), 'the project\'s own installation');
-    const checks: PlannedCheck[] = [
-      ...setupChecks([{ name: 'install', command: ['npm', 'ci'] }], fixture.projectRoot),
-      { kind: 'tests', command: command(fixture.projectRoot, 'console.log("unreached")'), attribution: 'project' },
-    ];
-
-    const { attempt } = await auditGate(fixture, checks, 'ga-setup-linked-install');
-
-    const [setup, tests] = attempt.commands;
-    expect(setup).toMatchObject({
-      kind: 'setup', name: 'install', outcome: 'not-verified', notVerified: 'runner-error', exitCode: null,
-      runnerError: { kind: 'setup-command-unsafe-with-linked-modules' },
-    });
-    expect(setup!.runnerError!.message).toContain('`npm ci` changes node_modules');
-    expect(setup!.runnerError!.message).toContain('so a setup command must not install them: remove it from `setup` in ramify-agent.json.');
-    // What the record shows as its output is why it was refused.
-    expect(setup!.output.tail).toBe(setup!.runnerError!.message);
-    expect(tests).toMatchObject({ outcome: 'not-verified', notVerified: 'setup-failed' });
-    expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'infrastructure', 'retry-infrastructure']);
-    expect(await readFile(join(fixture.projectRoot, 'node_modules', 'kept.txt'), 'utf8')).toBe('the project\'s own installation');
-  });
-
-  it('a setup command that cannot start is infrastructure, with the preparation\'s own error', async () => {
-    const fixture = await builtProject();
-    // The directory exists where the gate verified the plan, and not in the
-    // worktree of the commit, which holds only tracked files.
-    await mkdir(join(fixture.projectRoot, 'dist', 'local'), { recursive: true });
-    const checks: PlannedCheck[] = [
-      ...setupChecks([{ name: 'build', command: ['node', 'scripts/build.mjs'], cwd: 'dist/local' }], fixture.projectRoot),
-      { kind: 'tests', command: command(fixture.projectRoot, 'console.log("unreached")'), attribution: 'project' },
-    ];
-
-    const { attempt } = await auditGate(fixture, checks, 'ga-setup-spawn');
-
-    expect(attempt.commands[0]).toMatchObject({
-      kind: 'setup', outcome: 'not-verified', notVerified: 'runner-error',
-      runnerError: { kind: 'setup-command-spawn-failed', message: expect.stringContaining('its working directory does not exist') },
-    });
-    expect(attempt.commands[1]).toMatchObject({ outcome: 'not-verified', notVerified: 'setup-failed' });
-    expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'infrastructure', 'retry-infrastructure']);
-  });
-});
-
-describe('an audited worktree whose HEAD moves during the audit', () => {
-  it('fails every command as infrastructure, with where the audit found the move', async () => {
-    const fixture = await repository({ '.gitignore': 'node_modules/\n', 'package.json': '{}\n' });
-    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
-    const move = checkCommand({
-      argv: ['git', '-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--allow-empty', '--no-gpg-sign', '-q', '-m', 'moved'],
-      cwd: fixture.projectRoot,
-      timeoutMs: 30_000,
-    });
-    const checks: PlannedCheck[] = [
-      { kind: 'tests', command: move, attribution: 'project' },
-      { kind: 'type-check', command: command(fixture.projectRoot, 'console.log("types")'), attribution: 'project' },
-    ];
-
-    const { attempt } = await auditGate(fixture, checks, 'ga-revision-moved');
-
-    expect(attempt.commands.map(record => [record.kind, record.outcome, record.notVerified ?? null, record.runnerError?.kind ?? null])).toEqual([
-      ['tests', 'not-verified', 'runner-error', 'source-revision-moved'],
-      ['type-check', 'not-verified', 'runner-error', 'source-revision-moved'],
-    ]);
-    const message = attempt.commands[0]!.runnerError!.message;
-    expect(message).toMatch(new RegExp(`The audited HEAD moved from ${fixture.commit} to [0-9a-f]{40} \\(stage before-check, check check-02-type-check, workspace isolated-worktree\\); checks completed before it: check-01-tests\\.$`, 'u'));
-    expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'infrastructure', 'retry-infrastructure']);
-    expect(attempt.evidence).toBeNull();
-    // The project's own branch did not move.
-    expect(git(fixture.repositoryRoot, ['rev-parse', 'HEAD'])).toBe(fixture.commit);
+    const directory = await scratch('ramify-agent-in-place-output-');
+    const attempt = await runGate(inPlaceCheckExecution, 'iteration', { id: 'ga-0001', projectRoot: root, directory, head: 'a'.repeat(40) as GateAttempt['head'], checks });
+    expect(attempt.commands.map(record => [record.kind, record.outcome])).toEqual([['type-check', 'passed'], ['ramify-check', 'failed']]);
+    expect([attempt.verdict, attempt.audited, attempt.evidence, attempt.audit]).toEqual(['failed', null, null, undefined]);
   });
 });

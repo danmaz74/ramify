@@ -15,7 +15,7 @@ import { Markdown } from './markdown.js';
 import { chapterHref, routeHref } from './routes.js';
 import { counted, figure, metricValue, RunState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
-import { ApproveForm, canApprove, reviewText, ReviewPanel, ScenarioCheckSummaryView, ScenarioReview, ScenarioTable } from './run-scenarios.js';
+import { ApproveForm, canApprove, reviewText, ReviewPanel, GateScenarioResults, ObligationList, ScenarioReview, ScenarioTable } from './run-scenarios.js';
 import type { DiagramSessions } from './session-marks.js';
 import { SessionTimeline } from './session-timeline.js';
 
@@ -166,7 +166,7 @@ function Overview({ client, run, events, onApproved, onOpenGate }: {
           <div><dt>Open requirements</dt><dd>{run.counts.openRequirements}</dd></div>
           <div><dt>Invocations</dt><dd>{run.counts.invocations}</dd></div>
           <div><dt>Gate attempts</dt><dd>{run.counts.gateAttempts} (readiness attempts {run.counts.readinessAttempts})</dd></div>
-          <div><dt>Scenarios</dt><dd>{run.counts.scenarios.implemented} implemented, {run.counts.scenarios.declared} declared, {run.counts.scenarios.bound} bound, {run.counts.scenarios.pending} pending</dd></div>
+          <div><dt>Scenarios</dt><dd>{run.counts.scenarios.done} done, {run.counts.scenarios.bound} bound, {run.counts.scenarios.pending} pending</dd></div>
           <div><dt>Review</dt><dd>{reviewText(run.review)}</dd></div>
           <div><dt>Writer</dt><dd>{run.writer.held === null ? 'none held' : `held by ${run.writer.held}`}{run.writer.unsettled === null ? '' : `; ${run.writer.unsettled} was not confirmed settled`}</dd></div>
           <div><dt>Started</dt><dd>{run.startedAt}</dd></div>
@@ -464,7 +464,7 @@ function Decision({ decision }: { readonly decision: DecisionView }) {
       return (
         <li className="card decision">
           <p><span className="badge decided">scope</span> {decision.iteration} ({decision.iterationKind}): {decision.modules.map(module => <code key={module}>{module} </code>)}{decision.broad ? '(explicitly broad)' : ''}</p>
-          {decision.includedChildren.length > 0 && <p className="muted">Included children: {decision.includedChildren.join(', ')}</p>}
+          {decision.included.length > 0 && <p className="muted">Included trees: {decision.included.map(entry => `${entry.directory}: ${entry.reason}; ${entry.instructions}`).join('; ')}</p>}
           <p>{decision.rationale}</p>
           {decision.authorizations.length > 0 && <p className="muted">Authorized guarded changes: {decision.authorizations.map(a => `${a.path} (by ${a.by}: ${a.rationale})`).join('; ')}</p>}
         </li>
@@ -552,7 +552,7 @@ function WorkItemDetail({ client, planId, runId, version, workItem, onOpenGate }
                 {data.iterations.map(iteration => (
                   <li key={iteration.id} className="card">
                     <p><strong>{iteration.id}</strong> ({iteration.kind}, checkpoint {iteration.checkpoint}): {iteration.goal}</p>
-                    <p className="muted">Scope: {iteration.scope.modules.join(', ')}{iteration.scope.includedChildren.length ? ` with ${iteration.scope.includedChildren.join(', ')}` : ''}. {iteration.scope.rationale}</p>
+                    <p className="muted">Scope: {iteration.scope.modules.join(', ')}{iteration.scope.included.length ? ` with ${iteration.scope.included.map(entry => `${entry.directory}: ${entry.reason}; ${entry.instructions}`).join('; ')}` : ''}. {iteration.scope.rationale}</p>
                     <p>Result: {iteration.result ? `${iteration.result.outcome}${iteration.result.commit ? `, commit ${iteration.result.commit.slice(0, 12)}` : ''}` : 'open'}</p>
                     {iteration.result && iteration.result.findings.length > 0 && <ul>{iteration.result.findings.map(finding => <li key={finding}>{finding}</li>)}</ul>}
                     {iteration.result?.failure && <IterationFailure failure={iteration.result.failure} />}
@@ -599,9 +599,9 @@ function WorkItemDetail({ client, planId, runId, version, workItem, onOpenGate }
 function Scenarios({ client, planId, runId, version }: AreaProps) {
   const state = useRunQuery(`scenarios:${runId}`, version, () => client.getScenarios(planId, runId));
   return (
-    <div className="area" aria-label="Scenarios">
+    <div className="area area-broad" aria-label="Scenarios">
       <Loading state={state} what="the scenarios">
-        {data => <ScenarioTable scenarios={data.scenarios} total={data.total} />}
+        {data => <><ScenarioTable scenarios={data.scenarios} total={data.total} /><ObligationList obligations={data.obligations} /></>}
       </Loading>
     </div>
   );
@@ -651,8 +651,10 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
                   : <><span>run ref <code>{data.evidence.runRef}</code></span>; <span>report commit <code>{data.evidence.reportCommit}</code></span>; <span>tree ref <code>{data.evidence.treeRef}</code></span></>}</dd>
               </div>
             </dl>
+            {data.audit !== undefined && <AuditRequestFacts audit={data.audit} />}
+            <GateScenarioResults scenarios={data.scenarios} />
             {data.provider === undefined
-              ? <p className="muted">Complete provider diagnostics are unavailable for this historical attempt.</p>
+              ? <p className="muted">This attempt recorded no provider results, so complete provider diagnostics are unavailable.</p>
               : <details><summary>Complete provider report and diagnostics</summary>
                 <p>Producer results, counts, qualifications and artifact references are shown as recorded.</p>
                 <pre aria-label="Complete provider evidence">{JSON.stringify(data.provider, null, 2)}</pre>
@@ -667,10 +669,8 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
                   : <>{command.outcome}{command.notVerified ? ` (${command.notVerified})` : ''}, exit {command.exitCode ?? 'none'}, {command.elapsedMs} ms</>}</p>
                 <p className="muted"><code>{command.argv.join(' ')}</code></p>
                 {command.providerCheckId && <p className="muted">Provider check <code>{command.providerCheckId}</code>.</p>}
-                {command.selection && <p className="muted">Selection ({command.selection.policy}): {counted(command.selection.resolved.length, 'file')}{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
                 <p className="muted">Output: {command.output.bytes} bytes in <code>{command.output.path}</code>; the last {Math.min(command.output.bytes, 8192)} are shown.</p>
                 {(command.stopped !== null || command.outputIncomplete) && <p className="muted">{stoppedText(command.stopped, command.outputIncomplete)}</p>}
-                {command.scenarios && <ScenarioCheckSummaryView summary={command.scenarios} />}
                 <pre className="tail" aria-label={`Output tail of ${command.kind}`}>{command.output.tail}</pre>
               </div>
             ))}
@@ -678,6 +678,77 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
         )}
       </Loading>
     </section>
+  );
+}
+
+/** What a committing gate asked of the committed audit and what answered it, both source commits included. */
+function AuditRequestFacts({ audit }: { readonly audit: NonNullable<GateView['audit']> }) {
+  return (
+    <dl className="facts" aria-label="Configured audit">
+      <div><dt>Audit request</dt><dd><code>{audit.requestId}</code>, {audit.mode === 'full' ? 'full' : 'project default'} under <code>{audit.definition.path}</code>: {audit.status}</dd></div>
+      <div><dt>Requested source</dt><dd><code>{audit.requestedSourceCommit}</code></dd></div>
+      <div><dt>Audited source</dt><dd>{audit.auditedSourceCommit === null ? 'none' : <code>{audit.auditedSourceCommit}</code>}</dd></div>
+      <div><dt>Mode</dt><dd>requested {audit.requestedMode ?? 'unknown'}, executed {audit.executedMode ?? 'unknown'}{audit.fallbackReason === null ? '' : ` (${audit.fallbackReason})`}</dd></div>
+      {audit.reuse !== null && <div><dt>Reused record</dt><dd>of <code>{audit.reuse.auditedCommit}</code>; ignored changes: {audit.reuse.ignoredChangedPaths.length === 0 ? 'none' : audit.reuse.ignoredChangedPaths.join(', ')}</dd></div>}
+      <div><dt>{audit.nested ? 'Invocation verdict' : 'Composed verdict'}</dt><dd>{audit.verdict ?? 'none'}{audit.verdict === 'pass' ? '' : `: ${audit.detail}`}</dd></div>
+      {audit.nested && <NestedAuditFacts audit={audit} />}
+    </dl>
+  );
+}
+
+type AuditCountBucket = { readonly total: number; readonly passed: number; readonly failed: number; readonly skipped: number };
+
+function bucketText(label: string, bucket: AuditCountBucket): string {
+  return `${label} ${bucket.passed}/${bucket.total} passed${bucket.failed === 0 ? '' : `, ${bucket.failed} failed`}${bucket.skipped === 0 ? '' : `, ${bucket.skipped} skipped`}`;
+}
+
+/**
+ * A nested request's projects as the harness recorded them: each project's
+ * own verdict, whether this request ran, reused or did not run it, its
+ * failures, counts, duration and record, then what discovery skipped and
+ * could not decide. Nothing here is recomputed.
+ */
+function NestedAuditFacts({ audit }: { readonly audit: NonNullable<GateView['audit']> }) {
+  return (
+    <>
+      <div>
+        <dt>Projects</dt>
+        <dd>{audit.projects === null ? 'none recorded' : (
+          <ul className="audit-projects" aria-label="Audited projects">
+            {audit.projects.map(project => (
+              <li key={project.projectRoot} className={`audit-project audit-project-${project.verdict}`}>
+                <p><code>{project.projectRoot}</code>: <strong>{project.verdict}</strong>, {project.execution}
+                  {project.executedMode === null ? '' : `, executed ${project.executedMode}`}
+                  {project.status === 'completed' ? '' : ` (${project.status}: ${project.detail})`}</p>
+                {project.counts !== null && <p className="muted">{[
+                  bucketText('checks', project.counts.checks),
+                  ...(project.counts.tests === null ? [] : [bucketText('tests', project.counts.tests)]),
+                  ...(project.counts.scenarios === null ? [] : [bucketText('scenarios', project.counts.scenarios)]),
+                ].join('; ')}{project.durationSeconds === null ? '' : `; ${project.durationSeconds} s`}</p>}
+                {project.reuse !== null && <p className="muted">Reused the record of <code>{project.reuse.auditedCommit}</code>; ignored changes: {project.reuse.ignoredChangedPaths.length === 0 ? 'none' : project.reuse.ignoredChangedPaths.join(', ')}</p>}
+                {project.failures.length > 0 && <ul aria-label={`Failures of ${project.projectRoot}`}>{project.failures.map((failure, index) => <li key={index}>{failure}</li>)}</ul>}
+                <p className="muted">{project.evidence === null ? 'No published record'
+                  : <>Report commit <code>{project.evidence.reportCommit}</code>; run ref <code>{project.evidence.runRef}</code></>}</p>
+                {project.retrievalCommands.length > 0 && <details><summary>Retrieve its record</summary>
+                  <ul>{project.retrievalCommands.map(command => <li key={command}><code>{command}</code></li>)}</ul></details>}
+              </li>
+            ))}
+          </ul>
+        )}</dd>
+      </div>
+      <div>
+        <dt>Nested discovery</dt>
+        <dd>{audit.discovery === null ? 'none recorded' : <>
+          {audit.discovery.status}
+          {audit.discovery.skipped.length > 0 && <ul aria-label="Skipped projects">{audit.discovery.skipped.map(skip => (
+            <li key={skip.projectRoot}>Not audited: <code>{skip.projectRoot}</code>, beneath {skip.reason} <code>{skip.directory}</code> of <code>{skip.enclosingProject}</code></li>
+          ))}</ul>}
+          {audit.discovery.unavailable.length > 0 && <ul aria-label="Undecided nested definitions">{audit.discovery.unavailable.map(gap => (
+            <li key={gap.enclosingProject}>Beneath <code>{gap.enclosingProject}</code>: {gap.reason}{gap.definitions.length === 0 ? '' : ` (${gap.definitions.join(', ')})`}</li>
+          ))}</ul>}
+        </>}</dd>
+      </div>
+    </>
   );
 }
 

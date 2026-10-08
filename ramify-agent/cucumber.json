@@ -1,0 +1,15 @@
+{
+  "default": {
+    "paths": [
+      "src/tests/features/**/*.feature",
+      "subs/*/src/tests/features/**/*.feature",
+      "subs/*/subs/*/src/tests/features/**/*.feature"
+    ],
+    "import": [
+      "src/tests/steps/**/*.ts",
+      "subs/*/src/tests/steps/**/*.ts",
+      "subs/*/subs/*/src/tests/steps/**/*.ts"
+    ],
+    "tags": "not @ramify-pending"
+  }
+}

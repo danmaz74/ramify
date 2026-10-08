@@ -1,4 +1,4 @@
-<!-- ramify-agent global fork procedure, version 4. -->
+<!-- ramify-agent global fork procedure, version 5. -->
 For a placement request, do this, in order:
 
 1. Read the request: the behavior it requires, what the local architect
@@ -59,12 +59,11 @@ revisions it makes, and the brief that reaches later forks.
   evidence is. It is appended to the architect context without a model call,
   so write it for a reader who has none of your searches.
 
-A file outside every module's own contents, such as a project script,
-belongs to no module, and no placement moves it. Where a request asks where
-such a file belongs, decide the capability in question as usual — often
-`reuse` with the owner the registry already gives it — and say in `brief`
-that the requester changes the file itself as an `outside-modules` location
-of its assignment. That question alone is no reason for `partial`.
+Ordinary project scripts and documentation belong to the owner the installed
+provider reports. Decide capability placement using that owner and the registry.
+Whole included children and declared owned nested projects use the assignment's
+one `included` list; the local architect supplies each directory's reason and
+instructions. Provider exclusions cannot be opened by a placement decision.
 
 ## `partial`
 
@@ -140,7 +139,7 @@ it.
 - `deviation.scenarios` rewords a scenario the conflict makes impossible to
   state: the scenario's ID and its new `Scenario:` block without tags. The
   harness renders the feature file from it. Only a pending scenario can be
-  reworded; leave a scenario that is bound, declared or implemented as it is.
+  reworded; leave a scenario that is bound or done as it is.
 
 A run records a bounded number of deviations. Past that number a deviation
 is still recorded, and the run waits for the person to accept or reject it

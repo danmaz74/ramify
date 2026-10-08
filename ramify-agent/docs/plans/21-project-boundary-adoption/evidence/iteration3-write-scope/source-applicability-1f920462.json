@@ -1,0 +1,29 @@
+{
+  "ref": "HEAD",
+  "repoRoot": "/home/app/ramify-plan21-project-boundary-adoption",
+  "projectRoot": "ramify-agent",
+  "notesRef": "refs/notes/audit-projects/ramify-agent-f25e9a298228",
+  "currentBranch": "feat/plan21-project-boundary-adoption",
+  "headCommit": "1f920462d2495dd4a7c9786d15d5be2f81b4a2d7",
+  "lastAuditedCommit": "1f920462d2495dd4a7c9786d15d5be2f81b4a2d7",
+  "auditKind": "exact-tree",
+  "commitsSinceAudit": 0,
+  "impactingCommittedChangesSinceAudit": [],
+  "ignoredCommittedChangesSinceAudit": [],
+  "ignorePaths": [
+    "docs/**"
+  ],
+  "isCurrentBranch": false,
+  "impactingDirtyFiles": [],
+  "ignoredDirtyFiles": [],
+  "auditStillApplies": true,
+  "auditPassed": true,
+  "composition": {
+    "verdict": "pass",
+    "scoped": false,
+    "chainDepth": 0,
+    "reportCommit": "1cad33f30e760ed5561dff19c8698e028d00e4a3",
+    "outstandingFailures": 0
+  },
+  "reason": "The last audit still applies and all recorded checks passed."
+}

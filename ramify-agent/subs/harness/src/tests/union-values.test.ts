@@ -90,19 +90,18 @@ describe('the run log', () => {
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
       'document-manifest-committed', 'work-orientation-recorded', 'context-selection-recorded', 'context-package-append-requested', 'context-package-appended', 'context-package-prompt-bound', 'candidate-prepared', 'nonfunctional-phase-started', 'nonfunctional-assessed', 'nonfunctional-investigated', 'nonfunctional-repair-assigned', 'nonfunctional-repair-committed', 'nonfunctional-round-closed', 'nonfunctional-deviation-recorded', 'candidate-bound-to-gate',
       'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
-      'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-interrupted',
-      'capability-assignment-settled', 'capability-candidate-accepted', 'capability-review-recorded',
-      'capability-verification-started', 'capability-verification-failed', 'capability-handed-back', 'capability-stopped',
+      'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned',
+      'capability-assignment-settled',
+      'capability-verification-started', 'capability-handed-back', 'capability-stopped',
       'review-requested', 'analysis-approved',
-      'readiness-passed', 'readiness-failed',
+      'readiness-passed', 'readiness-failed', 'scratch-setting-up', 'scratch-setup-complete',
       'scenarios-materializing', 'scenarios-materialized',
-      'scenario-declared', 'scenario-due', 'scenario-implemented', 'scenario-bound-passed',
-      'scenarios-withdrawing', 'scenario-withdrawn',
+      'obligation-registered', 'obligation-bound', 'obligation-reported',
       'work-item-started', 'hypotheses-delivered',
       'placement-requested', 'view-refreshed', 'fork-returned-partial', 'decision-accepted',
       'brief-appended', 'global-context-rebuilt', 'decision-delivered',
       'outline-revised',
-      'iteration-assigned', 'iteration-closed',
+      'iteration-assigned', 'iteration-closed', 'scratch-preserved',
       'contract-requested', 'contract-registered',
       'work-item-yielded', 'work-item-resumed',
       'provider-conformed', 'requirement-verified',
@@ -282,12 +281,12 @@ describe('the observation log', () => {
   test('every observation type is a valid line, and every coverage-gap kind is named', () => {
     const types = observationSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
-      'activity', 'rejection', 'guard', 'mutation', 'hook-check', 'excursion', 'scope-tests',
+      'activity', 'rejection', 'guard', 'mutation', 'hook-check', 'excursion',
       'context', 'compaction', 'coverage-gap',
     ]);
     const kinds = [
       'unguarded-shell', 'changed-paths-unknown', 'usage-unavailable', 'context-unavailable',
-      'observation-truncated', 'unsupported-runner', 'transcript-incomplete',
+      'observation-truncated', 'transcript-incomplete', 'unsupported-check-result',
     ];
     for (const kind of kinds) {
       expect(observationSchema.safeParse({ n: 1, at: '2026-09-20T10:15:00.000Z', type: 'coverage-gap', data: { kind, detail: 'why' } }).success).toBe(true);
@@ -316,18 +315,33 @@ describe('the observation log', () => {
     }
   });
 
-  test('every hook-check mode and outcome, and the excursion an outside read is', () => {
+  test('every hook-check mode, outcome and path disposition, and the excursion an outside read is', () => {
     for (const mode of ['changed', 'complete']) {
       for (const outcome of ['passed', 'findings', 'not-checked']) {
         expect(observationSchema.safeParse({
           n: 1, at: '2026-09-20T10:15:00.000Z', type: 'hook-check',
-          data: { paths: ['a.ts'], mode, outcome, reason: null, newFindings: 0, log: null },
+          data: { paths: ['a.ts'], mode, outcome, reason: null, newFindings: 0, log: null, provider: null, dispositions: [] },
         }).success).toBe(true);
       }
     }
+    const dispositions = [
+      { path: 'a.ts', disposition: 'checked', reason: 'content', module: 'app', exclusion: null, sha256: 'a'.repeat(64) },
+      { path: 'gone.ts', disposition: 'checked', reason: 'deleted', module: 'app', exclusion: null, sha256: null },
+      { path: 'docs/a.md', disposition: 'not-analyzed', reason: 'owned-unwired', module: 'app', exclusion: { kind: 'owned-unwired', directory: 'docs', owner: 'app' }, sha256: null },
+      { path: 'b.ts', disposition: 'not-checked', reason: 'deadline-exceeded', module: 'app', exclusion: null, sha256: null },
+    ];
     expect(observationSchema.safeParse({
       n: 1, at: '2026-09-20T10:15:00.000Z', type: 'hook-check',
-      data: { paths: [], mode: 'partial', outcome: 'passed', reason: null, newFindings: 0, log: null },
+      data: { paths: ['a.ts'], mode: 'changed', outcome: 'not-checked', reason: 'deadline-exceeded', newFindings: 0, log: null, provider: { schema: 'ramify.check/3', revision: 'rev/1:x:1' }, dispositions },
+    }).success).toBe(true);
+    expect(observationSchema.safeParse({
+      n: 1, at: '2026-09-20T10:15:00.000Z', type: 'hook-check',
+      data: { paths: [], mode: 'partial', outcome: 'passed', reason: null, newFindings: 0, log: null, provider: null, dispositions: [] },
+    }).success).toBe(false);
+    // A path is never recorded as having passed: there is no such disposition.
+    expect(observationSchema.safeParse({
+      n: 1, at: '2026-09-20T10:15:00.000Z', type: 'hook-check',
+      data: { paths: ['a.ts'], mode: 'changed', outcome: 'passed', reason: null, newFindings: 0, log: null, provider: null, dispositions: [{ ...dispositions[0], disposition: 'passed' }] },
     }).success).toBe(false);
     expect(observationSchema.safeParse({
       n: 1, at: '2026-09-20T10:15:00.000Z', type: 'excursion',
@@ -343,7 +357,7 @@ describe('the observation log', () => {
     // A tool that runs no command carries none, and nothing else is added.
     expect(observationSchema.safeParse({
       n: 1, at: '2026-09-20T10:15:00.000Z', type: 'activity',
-      data: { activity: { kind: 'tool', callId: 'c1', tool: 'run_scope_tests' } },
+      data: { activity: { kind: 'tool', callId: 'c1', tool: 'read' } },
     }).success).toBe(true);
     expect(observationSchema.safeParse({
       n: 1, at: '2026-09-20T10:15:00.000Z', type: 'activity',
@@ -489,7 +503,7 @@ describe('the records this iteration establishes', () => {
   test('every iteration kind, extra purpose and result outcome is written and read back', async () => {
     const store = await ledger();
     expect(iterationKindSchema.options).toEqual(['ordinary', 'breaking', 'contract', 'verification', 'repair', 'integration']);
-    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'fake-injection', 'outside-modules']);
+    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'fake-injection']);
 
     const outlineRef = { id: 'wi-001', revision: 1, hash: 'd'.repeat(64) };
     for (const [index, kind] of iterationKindSchema.options.entries()) {
@@ -505,14 +519,12 @@ describe('the records this iteration establishes', () => {
           // takes. The broad arm has no producer until that iteration.
           base: kind === 'breaking'
             ? { modules: ['shop', 'shop/orders'], rationale: 'the guarantee changes in both' }
-            : { module: 'shop/orders', includedChildren: ['shop/orders/pricing'] },
-          extra: extraPurposeSchema.options.map(purpose => (purpose === 'outside-modules'
-            ? { path: 'scripts/report', purpose, kind: 'directory' as const, reason: 'the plan requires the report' }
-            : { path: `subs/orders/src/${purpose}.ts`, purpose })),
+            : { module: 'shop/orders', included: ['shop/orders/pricing'].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) },
+          extra: extraPurposeSchema.options.map(purpose => ({ path: `subs/orders/src/${purpose}.ts`, purpose })),
           read: ['shop'],
-          bootstrap: kind === 'ordinary' ? [{ capability: outlineRef, directory: 'subs/orders/subs/pricing' }] : [],
+          bootstrap: kind === 'ordinary' ? [{ capability: outlineRef, owner: 'shop/orders/pricing', parent: 'shop/orders', directory: 'subs/orders/subs/pricing' }] : [],
           rationale: 'r',
-          resolved: { roots: ['/p/subs/orders/src'], files: ['/p/subs/orders/module.ramify'], view: { status: 'placeholder' } },
+          resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: ['/p/subs/orders/src'], files: ['/p/subs/orders/module.ramify'], view: { status: 'placeholder' } },
         },
         source: { elements: ['fr-001', 'nfr-001'], deviations: ['pd-001'], hash: 'f'.repeat(64) },
         externalCapabilities: [{ capability: 'send-email', owner: 'shop', role: 'use' }],
@@ -520,7 +532,7 @@ describe('the records this iteration establishes', () => {
         evidenceObligations: [{ suite: ['subs/orders/src/tests/conformance.test.ts'], against: 'fake' }],
         gate: kind === 'breaking'
           ? { checkpoint: 'breaking-iteration', tests: { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites: [] } }
-          : { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['shop/orders'], subtrees: [], extraSuites: [], outsideModules: ['scripts/report'] } },
+          : { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['shop/orders'], subtrees: [], extraSuites: [] } },
         guarded: [{ path: 'package.json', hash: 'e'.repeat(64) }],
         // An authorization names a guarded path, the reason, and the record
         // that authorized it. Both states are representable: none, and one.
@@ -812,7 +824,7 @@ describe('the records this iteration establishes', () => {
       stage: 0,
       goal: 'g',
       approach: 'a',
-      scope: { base: { module: 'shop/orders', includedChildren: [] }, extra: [], read: [], rationale: 'r' },
+      scope: { base: { module: 'shop/orders', included: [] }, extra: [], read: [], rationale: 'r' },
       citedElements: [],
       externalCapabilities: [],
       completionEvidence: 'e',
@@ -869,7 +881,7 @@ describe('the protocol vocabulary', () => {
 
   test('every failure reason and every phase is named', () => {
     expect(runFailureReasonSchema.options).toEqual([
-      'analysis-invalid', 'readiness-failed', 'project-config-invalid', 'acceptance-harness-missing',
+      'analysis-invalid', 'readiness-failed', 'project-config-invalid',
       'agent-failed', 'invalid-submission', 'inputs-changed', 'dependency-cycle', 'unresolvable-requirement',
       'repair-exhausted', 'acceptance-incomplete', 'recovery-exhausted', 'writer-unsettled', 'limit-exceeded', 'internal',
     ]);
@@ -929,7 +941,7 @@ describe('the run protocol a client reads', () => {
       ['contract-registered', { contract: 'ct-001', revision: 1, mode: 'fake-backed', iteration: 'wi-001.i02', obligation: 'ob-ct-001', requirements: ['rq-001'], providerWorkItem: 'wi-002' }],
       ['invocation-started', { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' }],
       ['revision-needed', { obligation: r, iteration: 'wi-002.i01', consumerWorkItem: 'wi-001' }],
-      ['scenario-implemented', { scenario: 'sc-001', gate: 'ga-0003' }],
+      ['obligation-reported', { id: 'sc-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0003', submission: hash64 }],
       ['capability-requested', { request: 'need-001', parent: 'wi-001', assignment: 'wi-001.i01', invocation: 'inv-0003' }],
       ['capability-delegated', { task: 'cap-001', request: 'need-001', parent: 'wi-001', invocation: 'inv-0003', planRevision: 1 }],
       ['capability-assigned', { task: 'cap-001', assignment: 'cap-001.i01', sequence: 1, invocation: 'inv-0004' }],
@@ -977,7 +989,7 @@ describe('the run protocol a client reads', () => {
           goal: 'g', approach: 'a',
           scope: {
             revision: 1, base: { modules: ['shop', 'shop/web'], rationale: 'the guarantee changes in both' }, extra: [], read: [], bootstrap: [], rationale: 'r',
-            resolved: { roots: ['/p/src'], files: [], view: { status: 'placeholder' } },
+            resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: ['/p/src'], files: [], view: { status: 'placeholder' } },
           },
           externalCapabilities: [], completionEvidence: 'e', evidenceObligations: [],
           gate: { checkpoint: 'breaking-iteration', tests: { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites: [] } },
@@ -1045,29 +1057,21 @@ function sampleData(type: RunEvent['type']): unknown {
     'capability-exchange-opened': { task: 'cap-001', exchange: 'ex-001', invocation: 'inv-0005' },
     'capability-exchange-answered': { task: 'cap-001', exchange: 'ex-001', invocation: 'inv-0006' },
     'capability-assigned': { task: 'cap-001', assignment: 'cap-001.i01', sequence: 1, invocation: 'inv-0005' },
-    'capability-assignment-interrupted': { task: 'cap-001', assignment: 'cap-001.i01', invocation: 'inv-0007',
-      cause: 'budget reached', candidateTree: 'a'.repeat(40), attempt: 1 },
     'capability-assignment-settled': { task: 'cap-001', assignment: 'cap-001.i01', outcome: 'accepted' },
-    'capability-candidate-accepted': { task: 'cap-001', gate: 'ga-0005', tree: 'a'.repeat(40),
-      planRevision: 2, assignments: ['cap-001.i01'], review: 'cr-001' },
-    'capability-review-recorded': { task: 'cap-001', gate: 'ga-0005', tree: 'a'.repeat(40),
-      planRevision: 2, outcome: 'passed', review: 'cr-001' },
     'capability-verification-started': { task: 'cap-001', invocation: 'inv-0005' },
-    'capability-verification-failed': { task: 'cap-001', finding: 'The consumer test fails' },
     'capability-handed-back': { task: 'cap-001', handback: 'hb-001', invocation: 'inv-0005' },
     'capability-stopped': { task: 'cap-001', reason: 'Stopped by the operator' },
     'review-requested': {},
     'analysis-approved': { command, reviewer: 'r', note: null, duringRun: false },
     'readiness-passed': { attempt: 1, gate: 'ga-0001' },
     'readiness-failed': { attempt: 1, step: 'git-clean', detail: '', recovery: null, final: true },
+    'scratch-setting-up': { originalIgnoreBase64: null },
+    'scratch-setup-complete': { commit: null, appended: false },
     'scenarios-materializing': { files: ['src/tests/features/p/e.feature'] },
     'scenarios-materialized': { commit: 'c', files: ['src/tests/features/p/e.feature'] },
-    'scenario-declared': { scenario: 'sc-001', by: 'inv-0003', state: 'bound' },
-    'scenario-due': { scenario: 'sc-001', cause: 'requirements-verified' },
-    'scenario-implemented': { scenario: 'sc-001', gate: 'ga-0004' },
-    'scenario-bound-passed': { scenario: 'sc-001', gate: 'ga-0003' },
-    'scenarios-withdrawing': { withdrawal: 1, workItem: 'wi-001', scenarios: ['sc-001'], reason: 'yielded' },
-    'scenario-withdrawn': { scenario: 'sc-001', reason: 'yielded', commit: 'c' },
+    'obligation-registered': { id: 'test-001', kind: 'test', responsible: { kind: 'work-item', id: 'wi-001' }, by: 'inv-0003', submission: hash64, description: 'The duplicate send regression test' },
+    'obligation-bound': { id: 'sc-001', fakes: ['FakeMailer'], by: 'inv-0003', submission: hash64 },
+    'obligation-reported': { id: 'sc-001', judgment: 'done', basedOnRevision: 0, revision: 1, where: 'subs/a/src/a.ts — sendOnce', by: 'inv-0003', submission: hash64 },
     'work-item-started': { workItem: 'wi-001', module: 'm', origin: 'integration', scenario: 'sc-003' },
     'hypotheses-delivered': { workItem: 'wi-001', refs: [r] },
     'placement-requested': { request: 'pr-001', workItem: 'wi-001', requester: 'm', capability: 'c' },
@@ -1085,6 +1089,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'outline-revised': { workItem: 'wi-001', revision: 1, invocation: 'inv-0002' },
     'iteration-assigned': { workItem: 'wi-001', iteration: 'wi-001.i01', kind: 'ordinary', scopeRevision: 1, invocation: 'inv-0002', decisions: [] },
     'iteration-closed': { workItem: 'wi-001', iteration: 'wi-001.i01', outcome: 'partial', gate: null, commit: null, notices: [] },
+    'scratch-preserved': { iteration: 'wi-001.i01', paths: ['subs/notes/src/tmp/indexed.txt'] },
     'contract-requested': { workItem: 'wi-001', iteration: 'wi-001.i02', scopeRevision: 1, invocation: 'inv-0003', capability: 'c', consumer: 'm', provider: 'p', requestedBy: null, revises: null },
     'contract-registered': { contract: 'ct-001', revision: 1, mode: 'access-only', iteration: 'wi-001.i02', obligation: null, requirements: [], providerWorkItem: null },
     'work-item-yielded': { workItem: 'wi-001', requirements: ['rq-001'], invocation: 'inv-0003' },
@@ -1101,7 +1106,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'gate-started': { gate: 'ga-0001', checkpoint: 'readiness' },
     'gate-committing': { gate: 'ga-0001', checkpoint: 'final' },
     'gate-command-started': { gate: 'ga-0001', checkpoint: 'final', kind: 'type-check', position: 2, total: 4 },
-    'gate-command-waiting': { gate: 'ga-0001', checkpoint: 'final', kind: 'tests', position: 3, total: 4, line: 'Waiting for another test run (fixture)' },
+    'gate-command-waiting': { gate: 'ga-0001', checkpoint: 'final', kind: 'configured', position: 3, total: 4, line: 'Waiting for another test run (fixture)' },
     'gate-attempted': { gate: 'ga-0001', checkpoint: 'final', verdict: 'passed', next: 'accept' },
     'check-findings-recorded': { cause: { kind: 'recovery', detail: 'd' }, checkFindings: [] },
     'review-request-recorded': { request: 'rq-0001', workItem: 'wi-001', iteration: 'wi-001.i01', kind: 'code', gate: 'ga-0002', candidate: 'c1' },

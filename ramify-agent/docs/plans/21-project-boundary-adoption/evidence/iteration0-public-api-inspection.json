@@ -1,0 +1,121 @@
+{
+  "date": "2026-10-06",
+  "kind": "public-package-inspection-and-grouping-smoke",
+  "package": {
+    "name": "ramify-audit",
+    "version": "0.5.0",
+    "entry": "/home/app/tools/ramify-audit-0.5.0/node_modules/ramify-audit/dist/index.js",
+    "entrySha256": "a5ab86cd6858aa3b4bf38a932472b5841305066346827ab309c79ef102e15ed5",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "exports": {
+    "requestFromCommittedConfiguration": "undefined",
+    "requestFromProjectConfiguration": "undefined",
+    "discoverVitestCommand": "undefined",
+    "compareExpectedFiles": "undefined",
+    "vitestRunFiles": "undefined",
+    "vitestOwnershipGroups": "function",
+    "dispatchCheck": "function",
+    "createAuditService": "function",
+    "runCli": "function"
+  },
+  "grouping": {
+    "input": {
+      "ownership": {
+        "modules": [
+          {
+            "id": "app",
+            "parent": null,
+            "directory": "."
+          },
+          {
+            "id": "app/a",
+            "parent": "app",
+            "directory": "subs/a"
+          },
+          {
+            "id": "app/a/deep",
+            "parent": "app/a",
+            "directory": "subs/a/subs/deep"
+          },
+          {
+            "id": "app/b",
+            "parent": "app",
+            "directory": "subs/b"
+          }
+        ],
+        "exclusions": [
+          {
+            "kind": "owned-ignored",
+            "directory": "fixtures",
+            "owner": "app"
+          }
+        ]
+      },
+      "selected": [
+        "app",
+        "app/a/deep"
+      ],
+      "trackedFiles": [
+        "src/tests/root.custom.ts",
+        "subs/a/src/tests/child.custom.ts",
+        "subs/a/subs/deep/src/tests/deep.custom.ts",
+        "subs/b/src/tests/b.custom.ts",
+        "fixtures/example.ts"
+      ]
+    },
+    "groups": [
+      {
+        "head": "app",
+        "modules": [
+          "app"
+        ],
+        "filter": null,
+        "excludes": [
+          "**/.git/**",
+          "**/.ramify-architect.old-?*/**",
+          "**/.ramify-architect.tmp-?*/**",
+          "**/.ramify-architect/**",
+          "**/.ramify.old-?*/**",
+          "**/.ramify.tmp-?*/**",
+          "**/.ramify/**",
+          "**/bower_components/**",
+          "**/jspm_packages/**",
+          "**/node_modules/**",
+          "fixtures/**",
+          "subs/a/**",
+          "subs/b/**"
+        ]
+      },
+      {
+        "head": "app/a/deep",
+        "modules": [
+          "app/a/deep"
+        ],
+        "filter": "subs/a/subs/deep/",
+        "excludes": [
+          "**/.git/**",
+          "**/.ramify-architect.old-?*/**",
+          "**/.ramify-architect.tmp-?*/**",
+          "**/.ramify-architect/**",
+          "**/.ramify.old-?*/**",
+          "**/.ramify.tmp-?*/**",
+          "**/.ramify/**",
+          "**/bower_components/**",
+          "**/jspm_packages/**",
+          "**/node_modules/**"
+        ]
+      }
+    ]
+  },
+  "limits": [
+    "Synthetic topology; no real Ramify ownership or runner discovery",
+    "No test runner, audit, configuration read or acceptance case executed",
+    "Absent named exports plus inspected public signatures establish the current integration gap; not a proof about all possible future APIs"
+  ]
+}

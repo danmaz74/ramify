@@ -1,0 +1,9 @@
+./node_modules/.bin/vitest run --project web subs/web/src/tests/client.test.ts subs/web/src/tests/run-page.test.tsx
+
+ RUN  v4.1.11 /home/app/ramify-plan21-project-boundary-adoption/ramify-agent
+
+
+ Test Files  2 passed (2)
+      Tests  45 passed (45)
+   Start at  22:00:03
+   Duration  4.71s (transform 802ms, setup 41ms, import 1.32s, tests 2.78s, environment 1.59s)

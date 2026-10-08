@@ -1,0 +1,796 @@
+{
+  "runId": "20261008T065729Z-eab60c",
+  "final": {
+    "schema": "ramify-agent.gate-attempt/3",
+    "id": "ga-0006",
+    "checkpoint": "final",
+    "subject": {},
+    "proposedBy": null,
+    "repairRound": 0,
+    "infrastructureAttempt": 0,
+    "head": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+    "commit": null,
+    "audited": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+    "evidence": {
+      "reportCommit": "7635c14258d81ef7269c9c1b57bd5d2cc97a3dfc",
+      "runRef": "refs/audited/runs/2026-10-08T06-58-30Z-678c7b2f2",
+      "treeRef": "refs/audited/by-tree/cf4afe3c94b61d44b94acb71fc7726baeada3db5"
+    },
+    "provider": {
+      "result": {
+        "status": "completed",
+        "requestId": "20261008T065729Z-eab60c:ga-0006",
+        "runId": "cdd5d2cb-eff2-4020-b811-77833b494c89",
+        "summary": {
+          "auditedAt": "2026-10-08T06:58:30.321Z",
+          "checks": {
+            "tests": {
+              "commands": {
+                "vitest": {
+                  "durationSeconds": 0.638,
+                  "output": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/tmp/ramify-audit-worktree-wtLhaD/source\u001b[39m\n\n \u001b[32m✓\u001b[39m subs/b/src/tests/fact.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/d/src/tests/consumer.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/a/src/tests/caller.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m5 passed\u001b[39m\u001b[22m\u001b[90m (5)\u001b[39m\n\u001b[2m   Start at \u001b[22m 06:58:29\n\u001b[2m   Duration \u001b[22m 208ms\u001b[2m (transform 47ms, setup 0ms, import 89ms, tests 12ms, environment 0ms)\u001b[22m",
+                  "passed": true,
+                  "status": "pass",
+                  "summary": "\u001b[2m   Duration \u001b[22m 208ms\u001b[2m (transform 47ms, setup 0ms, import 89ms, tests 12ms, environment 0ms)\u001b[22m"
+                }
+              },
+              "durationSeconds": 0.639,
+              "output": "### vitest [PASS]\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/tmp/ramify-audit-worktree-wtLhaD/source\u001b[39m\n\n \u001b[32m✓\u001b[39m subs/b/src/tests/fact.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/d/src/tests/consumer.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/a/src/tests/caller.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m5 passed\u001b[39m\u001b[22m\u001b[90m (5)\u001b[39m\n\u001b[2m   Start at \u001b[22m 06:58:29\n\u001b[2m   Duration \u001b[22m 208ms\u001b[2m (transform 47ms, setup 0ms, import 89ms, tests 12ms, environment 0ms)\u001b[22m",
+              "passed": true,
+              "status": "pass",
+              "summary": "vitest: PASS"
+            },
+            "type-check": {
+              "commands": {
+                "tsc": {
+                  "durationSeconds": 0.434,
+                  "output": "Command completed with no output",
+                  "passed": true,
+                  "status": "pass",
+                  "summary": "Command completed with no output"
+                }
+              },
+              "durationSeconds": 0.434,
+              "output": "### tsc [PASS]\nCommand completed with no output",
+              "passed": true,
+              "status": "pass",
+              "summary": "tsc: PASS"
+            }
+          },
+          "coverage": {
+            "claim": {
+              "configuration": {
+                "blob": "87abc4a4ed8e598af360ee54ea5b3019ad0370b5",
+                "path": "ramify-audit.json",
+                "sourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a"
+              },
+              "scope": "repository"
+            },
+            "expectedFiles": {
+              "contract": "runner-configured-files/1",
+              "expected": 0,
+              "missing": [],
+              "run": 0,
+              "runnerConfigFiles": [],
+              "source": "not-needed",
+              "status": "complete"
+            },
+            "projectRoot": ".",
+            "selection": {
+              "kind": "full",
+              "omittedCheckIds": [],
+              "omittedTestUnitIds": [],
+              "selectedCheckIds": [
+                "tests",
+                "type-check"
+              ],
+              "selectedTestUnitIds": [
+                "tsc",
+                "vitest"
+              ]
+            },
+            "selector": {
+              "config": {},
+              "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "id": "full",
+              "version": "1"
+            },
+            "status": "declared",
+            "universe": {
+              "checkIds": [
+                "tests",
+                "type-check"
+              ],
+              "digest": "sha256:17fe146d5aa9d575cd9cdfb62859b5eeeb6a18249e2d373d26be092b4f025cad",
+              "id": "project:.",
+              "testUnitIds": [
+                "tsc",
+                "vitest"
+              ]
+            }
+          },
+          "definitions": {
+            "digest": "sha256:85a7dd3e7cc13dd9d842f8c59af744f92c51fb2f021dcd23ac778be95f02cc09",
+            "manifest": {
+              "checks": [
+                {
+                  "dependsOn": [],
+                  "executor": {
+                    "commands": [
+                      {
+                        "args": [
+                          "run",
+                          "subs"
+                        ],
+                        "cmd": "node_modules/.bin/vitest",
+                        "contracts": null,
+                        "env": {},
+                        "name": "vitest",
+                        "parser": "none",
+                        "timeoutMs": 120000
+                      }
+                    ],
+                    "continueOnFailure": true,
+                    "kind": "command",
+                    "mutex": false,
+                    "parallel": false
+                  },
+                  "id": "tests",
+                  "requiresPackageScripts": []
+                },
+                {
+                  "dependsOn": [],
+                  "executor": {
+                    "commands": [
+                      {
+                        "args": [
+                          "--noEmit",
+                          "-p",
+                          "tsconfig.json"
+                        ],
+                        "cmd": "node_modules/.bin/tsc",
+                        "contracts": null,
+                        "env": {},
+                        "name": "tsc",
+                        "parser": "none",
+                        "timeoutMs": 120000
+                      }
+                    ],
+                    "continueOnFailure": true,
+                    "kind": "command",
+                    "mutex": false,
+                    "parallel": false
+                  },
+                  "id": "type-check",
+                  "requiresPackageScripts": []
+                }
+              ],
+              "manifestVersion": 1,
+              "workingDirectory": ".",
+              "workspacePreparation": {
+                "optionsDigest": "sha256:568fad48d1ba58748d2eecb1bc90d7a15e489543325bd70f7071ac3f51601b5f",
+                "preparationId": "nodejs"
+              }
+            }
+          },
+          "durationSeconds": 1.212,
+          "evidenceSchemaVersion": 4,
+          "execution": {
+            "requestId": "20261008T065729Z-eab60c:ga-0004",
+            "runId": "c8612a1e-bd6a-4568-8494-904c6d6cdad5"
+          },
+          "mode": {
+            "executedMode": "full",
+            "fallbackReason": "baseline-incompatible: baseline 8413c30f01688c915ed9140dc9f11c1891b13614 (report 96327abf21446e8556d95207b4024a6fa0aedf4d) records no failure ledger, so it has no Vitest or Cucumber command",
+            "requestedMode": "ramify-partial",
+            "resolution": "defaulted"
+          },
+          "overall": "pass",
+          "producer": {
+            "name": "ramify-audit",
+            "version": "0.7.2"
+          },
+          "sourceBranch": "ramify-agent-run/20261008T065729Z-eab60c",
+          "sourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+          "sourceTree": "cf4afe3c94b61d44b94acb71fc7726baeada3db5",
+          "undetectedConfigFilesForcingFullAudit": [],
+          "workspacePreparation": {
+            "payload": {
+              "linkedPackageDirectories": [
+                ""
+              ],
+              "projectPrefix": "",
+              "setupCommands": []
+            },
+            "preparationId": "nodejs"
+          }
+        },
+        "refs": {
+          "reportCommit": "7635c14258d81ef7269c9c1b57bd5d2cc97a3dfc",
+          "runRef": "refs/audited/runs/2026-10-08T06-58-30Z-678c7b2f2",
+          "treeRef": "refs/audited/by-tree/cf4afe3c94b61d44b94acb71fc7726baeada3db5"
+        },
+        "retrievalCommands": [
+          "git notes --ref=audit show 678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+          "git show refs/audited/runs/2026-10-08T06-58-30Z-678c7b2f2:reports/audit/summary.json"
+        ],
+        "reused": {
+          "sourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+          "auditedCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+          "ignoredChangedPaths": [],
+          "requestedMode": "full",
+          "resolution": "requested"
+        },
+        "composition": {
+          "verdict": "pass",
+          "scoped": false,
+          "chainDepth": 0,
+          "reportCommit": "7635c14258d81ef7269c9c1b57bd5d2cc97a3dfc"
+        },
+        "projects": [
+          {
+            "projectRoot": ".",
+            "verdict": "pass",
+            "execution": "reused",
+            "failures": [],
+            "result": {
+              "status": "completed",
+              "requestId": "20261008T065729Z-eab60c:ga-0006",
+              "runId": "cdd5d2cb-eff2-4020-b811-77833b494c89",
+              "summary": {
+                "auditedAt": "2026-10-08T06:58:30.321Z",
+                "checks": {
+                  "tests": {
+                    "commands": {
+                      "vitest": {
+                        "durationSeconds": 0.638,
+                        "output": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/tmp/ramify-audit-worktree-wtLhaD/source\u001b[39m\n\n \u001b[32m✓\u001b[39m subs/b/src/tests/fact.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/d/src/tests/consumer.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/a/src/tests/caller.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m5 passed\u001b[39m\u001b[22m\u001b[90m (5)\u001b[39m\n\u001b[2m   Start at \u001b[22m 06:58:29\n\u001b[2m   Duration \u001b[22m 208ms\u001b[2m (transform 47ms, setup 0ms, import 89ms, tests 12ms, environment 0ms)\u001b[22m",
+                        "passed": true,
+                        "status": "pass",
+                        "summary": "\u001b[2m   Duration \u001b[22m 208ms\u001b[2m (transform 47ms, setup 0ms, import 89ms, tests 12ms, environment 0ms)\u001b[22m"
+                      }
+                    },
+                    "durationSeconds": 0.639,
+                    "output": "### vitest [PASS]\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/tmp/ramify-audit-worktree-wtLhaD/source\u001b[39m\n\n \u001b[32m✓\u001b[39m subs/b/src/tests/fact.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/d/src/tests/consumer.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/a/src/tests/caller.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m5 passed\u001b[39m\u001b[22m\u001b[90m (5)\u001b[39m\n\u001b[2m   Start at \u001b[22m 06:58:29\n\u001b[2m   Duration \u001b[22m 208ms\u001b[2m (transform 47ms, setup 0ms, import 89ms, tests 12ms, environment 0ms)\u001b[22m",
+                    "passed": true,
+                    "status": "pass",
+                    "summary": "vitest: PASS"
+                  },
+                  "type-check": {
+                    "commands": {
+                      "tsc": {
+                        "durationSeconds": 0.434,
+                        "output": "Command completed with no output",
+                        "passed": true,
+                        "status": "pass",
+                        "summary": "Command completed with no output"
+                      }
+                    },
+                    "durationSeconds": 0.434,
+                    "output": "### tsc [PASS]\nCommand completed with no output",
+                    "passed": true,
+                    "status": "pass",
+                    "summary": "tsc: PASS"
+                  }
+                },
+                "coverage": {
+                  "claim": {
+                    "configuration": {
+                      "blob": "87abc4a4ed8e598af360ee54ea5b3019ad0370b5",
+                      "path": "ramify-audit.json",
+                      "sourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a"
+                    },
+                    "scope": "repository"
+                  },
+                  "expectedFiles": {
+                    "contract": "runner-configured-files/1",
+                    "expected": 0,
+                    "missing": [],
+                    "run": 0,
+                    "runnerConfigFiles": [],
+                    "source": "not-needed",
+                    "status": "complete"
+                  },
+                  "projectRoot": ".",
+                  "selection": {
+                    "kind": "full",
+                    "omittedCheckIds": [],
+                    "omittedTestUnitIds": [],
+                    "selectedCheckIds": [
+                      "tests",
+                      "type-check"
+                    ],
+                    "selectedTestUnitIds": [
+                      "tsc",
+                      "vitest"
+                    ]
+                  },
+                  "selector": {
+                    "config": {},
+                    "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+                    "id": "full",
+                    "version": "1"
+                  },
+                  "status": "declared",
+                  "universe": {
+                    "checkIds": [
+                      "tests",
+                      "type-check"
+                    ],
+                    "digest": "sha256:17fe146d5aa9d575cd9cdfb62859b5eeeb6a18249e2d373d26be092b4f025cad",
+                    "id": "project:.",
+                    "testUnitIds": [
+                      "tsc",
+                      "vitest"
+                    ]
+                  }
+                },
+                "definitions": {
+                  "digest": "sha256:85a7dd3e7cc13dd9d842f8c59af744f92c51fb2f021dcd23ac778be95f02cc09",
+                  "manifest": {
+                    "checks": [
+                      {
+                        "dependsOn": [],
+                        "executor": {
+                          "commands": [
+                            {
+                              "args": [
+                                "run",
+                                "subs"
+                              ],
+                              "cmd": "node_modules/.bin/vitest",
+                              "contracts": null,
+                              "env": {},
+                              "name": "vitest",
+                              "parser": "none",
+                              "timeoutMs": 120000
+                            }
+                          ],
+                          "continueOnFailure": true,
+                          "kind": "command",
+                          "mutex": false,
+                          "parallel": false
+                        },
+                        "id": "tests",
+                        "requiresPackageScripts": []
+                      },
+                      {
+                        "dependsOn": [],
+                        "executor": {
+                          "commands": [
+                            {
+                              "args": [
+                                "--noEmit",
+                                "-p",
+                                "tsconfig.json"
+                              ],
+                              "cmd": "node_modules/.bin/tsc",
+                              "contracts": null,
+                              "env": {},
+                              "name": "tsc",
+                              "parser": "none",
+                              "timeoutMs": 120000
+                            }
+                          ],
+                          "continueOnFailure": true,
+                          "kind": "command",
+                          "mutex": false,
+                          "parallel": false
+                        },
+                        "id": "type-check",
+                        "requiresPackageScripts": []
+                      }
+                    ],
+                    "manifestVersion": 1,
+                    "workingDirectory": ".",
+                    "workspacePreparation": {
+                      "optionsDigest": "sha256:568fad48d1ba58748d2eecb1bc90d7a15e489543325bd70f7071ac3f51601b5f",
+                      "preparationId": "nodejs"
+                    }
+                  }
+                },
+                "durationSeconds": 1.212,
+                "evidenceSchemaVersion": 4,
+                "execution": {
+                  "requestId": "20261008T065729Z-eab60c:ga-0004",
+                  "runId": "c8612a1e-bd6a-4568-8494-904c6d6cdad5"
+                },
+                "mode": {
+                  "executedMode": "full",
+                  "fallbackReason": "baseline-incompatible: baseline 8413c30f01688c915ed9140dc9f11c1891b13614 (report 96327abf21446e8556d95207b4024a6fa0aedf4d) records no failure ledger, so it has no Vitest or Cucumber command",
+                  "requestedMode": "ramify-partial",
+                  "resolution": "defaulted"
+                },
+                "overall": "pass",
+                "producer": {
+                  "name": "ramify-audit",
+                  "version": "0.7.2"
+                },
+                "sourceBranch": "ramify-agent-run/20261008T065729Z-eab60c",
+                "sourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+                "sourceTree": "cf4afe3c94b61d44b94acb71fc7726baeada3db5",
+                "undetectedConfigFilesForcingFullAudit": [],
+                "workspacePreparation": {
+                  "payload": {
+                    "linkedPackageDirectories": [
+                      ""
+                    ],
+                    "projectPrefix": "",
+                    "setupCommands": []
+                  },
+                  "preparationId": "nodejs"
+                }
+              },
+              "refs": {
+                "reportCommit": "7635c14258d81ef7269c9c1b57bd5d2cc97a3dfc",
+                "runRef": "refs/audited/runs/2026-10-08T06-58-30Z-678c7b2f2",
+                "treeRef": "refs/audited/by-tree/cf4afe3c94b61d44b94acb71fc7726baeada3db5"
+              },
+              "retrievalCommands": [
+                "git notes --ref=audit show 678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+                "git show refs/audited/runs/2026-10-08T06-58-30Z-678c7b2f2:reports/audit/summary.json"
+              ],
+              "reused": {
+                "sourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+                "auditedCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+                "ignoredChangedPaths": [],
+                "requestedMode": "full",
+                "resolution": "requested"
+              },
+              "composition": {
+                "verdict": "pass",
+                "scoped": false,
+                "chainDepth": 0,
+                "reportCommit": "7635c14258d81ef7269c9c1b57bd5d2cc97a3dfc"
+              }
+            }
+          }
+        ],
+        "discovery": {
+          "status": "complete",
+          "skipped": [],
+          "unavailable": []
+        },
+        "invocationVerdict": "pass"
+      },
+      "checks": {
+        "tests": {
+          "commands": {
+            "vitest": {
+              "durationSeconds": 0.638,
+              "output": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/tmp/ramify-audit-worktree-wtLhaD/source\u001b[39m\n\n \u001b[32m✓\u001b[39m subs/b/src/tests/fact.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/d/src/tests/consumer.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/a/src/tests/caller.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m5 passed\u001b[39m\u001b[22m\u001b[90m (5)\u001b[39m\n\u001b[2m   Start at \u001b[22m 06:58:29\n\u001b[2m   Duration \u001b[22m 208ms\u001b[2m (transform 47ms, setup 0ms, import 89ms, tests 12ms, environment 0ms)\u001b[22m",
+              "passed": true,
+              "status": "pass",
+              "summary": "\u001b[2m   Duration \u001b[22m 208ms\u001b[2m (transform 47ms, setup 0ms, import 89ms, tests 12ms, environment 0ms)\u001b[22m"
+            }
+          },
+          "durationSeconds": 0.639,
+          "output": "### vitest [PASS]\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/tmp/ramify-audit-worktree-wtLhaD/source\u001b[39m\n\n \u001b[32m✓\u001b[39m subs/b/src/tests/fact.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/d/src/tests/consumer.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m subs/a/src/tests/caller.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m5 passed\u001b[39m\u001b[22m\u001b[90m (5)\u001b[39m\n\u001b[2m   Start at \u001b[22m 06:58:29\n\u001b[2m   Duration \u001b[22m 208ms\u001b[2m (transform 47ms, setup 0ms, import 89ms, tests 12ms, environment 0ms)\u001b[22m",
+          "passed": true,
+          "status": "pass",
+          "summary": "vitest: PASS"
+        },
+        "type-check": {
+          "commands": {
+            "tsc": {
+              "durationSeconds": 0.434,
+              "output": "Command completed with no output",
+              "passed": true,
+              "status": "pass",
+              "summary": "Command completed with no output"
+            }
+          },
+          "durationSeconds": 0.434,
+          "output": "### tsc [PASS]\nCommand completed with no output",
+          "passed": true,
+          "status": "pass",
+          "summary": "tsc: PASS"
+        }
+      }
+    },
+    "audit": {
+      "requestId": "20261008T065729Z-eab60c:ga-0006",
+      "mode": "full",
+      "nested": true,
+      "status": "completed",
+      "definition": {
+        "path": "ramify-audit.json",
+        "blob": "87abc4a4ed8e598af360ee54ea5b3019ad0370b5"
+      },
+      "requestedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+      "auditedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+      "requestedMode": "ramify-partial",
+      "executedMode": "full",
+      "fallbackReason": "baseline-incompatible: baseline 8413c30f01688c915ed9140dc9f11c1891b13614 (report 96327abf21446e8556d95207b4024a6fa0aedf4d) records no failure ledger, so it has no Vitest or Cucumber command",
+      "reuse": {
+        "auditedCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+        "ignoredChangedPaths": [],
+        "requestedMode": "full",
+        "resolution": "requested"
+      },
+      "verdict": "pass",
+      "detail": "invocation pass over 1 project",
+      "projects": [
+        {
+          "projectRoot": ".",
+          "verdict": "pass",
+          "execution": "reused",
+          "status": "completed",
+          "failures": [],
+          "requestId": "20261008T065729Z-eab60c:ga-0006",
+          "auditedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+          "requestedMode": "ramify-partial",
+          "executedMode": "full",
+          "fallbackReason": "baseline-incompatible: baseline 8413c30f01688c915ed9140dc9f11c1891b13614 (report 96327abf21446e8556d95207b4024a6fa0aedf4d) records no failure ledger, so it has no Vitest or Cucumber command",
+          "reuse": {
+            "auditedCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+            "ignoredChangedPaths": [],
+            "requestedMode": "full",
+            "resolution": "requested"
+          },
+          "evidence": {
+            "reportCommit": "7635c14258d81ef7269c9c1b57bd5d2cc97a3dfc",
+            "runRef": "refs/audited/runs/2026-10-08T06-58-30Z-678c7b2f2",
+            "treeRef": "refs/audited/by-tree/cf4afe3c94b61d44b94acb71fc7726baeada3db5"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit show 678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+            "git show refs/audited/runs/2026-10-08T06-58-30Z-678c7b2f2:reports/audit/summary.json"
+          ],
+          "durationSeconds": 1.212,
+          "counts": {
+            "checks": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "skipped": 0
+            },
+            "tests": null,
+            "scenarios": null
+          },
+          "detail": "composed pass"
+        }
+      ],
+      "discovery": {
+        "status": "complete",
+        "skipped": [],
+        "unavailable": []
+      }
+    },
+    "guardedChanges": [],
+    "rules": [
+      {
+        "rule": "scratch-safety",
+        "outcome": "passed",
+        "violations": []
+      },
+      {
+        "rule": "write-scope",
+        "outcome": "passed",
+        "violations": []
+      }
+    ],
+    "commands": [],
+    "verdict": "passed",
+    "cause": null,
+    "next": "accept"
+  },
+  "gates": [
+    {
+      "id": "ga-0002",
+      "checkpoint": "iteration",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065729Z-eab60c:ga-0002",
+        "mode": "project-default",
+        "nested": false,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "87abc4a4ed8e598af360ee54ea5b3019ad0370b5"
+        },
+        "requestedSourceCommit": "8413c30f01688c915ed9140dc9f11c1891b13614",
+        "auditedSourceCommit": "8413c30f01688c915ed9140dc9f11c1891b13614",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline c63fca718b3db74605848897aaaa8a916d3162c4 (report b5674c82fe03f3464131ce0ec16b6556f8483937) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass",
+        "projects": null,
+        "discovery": null
+      }
+    },
+    {
+      "id": "ga-0003",
+      "checkpoint": "work-item",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065729Z-eab60c:ga-0003",
+        "mode": "project-default",
+        "nested": false,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "87abc4a4ed8e598af360ee54ea5b3019ad0370b5"
+        },
+        "requestedSourceCommit": "8413c30f01688c915ed9140dc9f11c1891b13614",
+        "auditedSourceCommit": "8413c30f01688c915ed9140dc9f11c1891b13614",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline c63fca718b3db74605848897aaaa8a916d3162c4 (report b5674c82fe03f3464131ce0ec16b6556f8483937) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": {
+          "auditedCommit": "8413c30f01688c915ed9140dc9f11c1891b13614",
+          "ignoredChangedPaths": [],
+          "requestedMode": "ramify-partial",
+          "resolution": "defaulted"
+        },
+        "verdict": "pass",
+        "detail": "composed pass",
+        "projects": null,
+        "discovery": null
+      }
+    },
+    {
+      "id": "ga-0004",
+      "checkpoint": "iteration",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065729Z-eab60c:ga-0004",
+        "mode": "project-default",
+        "nested": false,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "87abc4a4ed8e598af360ee54ea5b3019ad0370b5"
+        },
+        "requestedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+        "auditedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline 8413c30f01688c915ed9140dc9f11c1891b13614 (report 96327abf21446e8556d95207b4024a6fa0aedf4d) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass",
+        "projects": null,
+        "discovery": null
+      }
+    },
+    {
+      "id": "ga-0005",
+      "checkpoint": "work-item",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065729Z-eab60c:ga-0005",
+        "mode": "project-default",
+        "nested": false,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "87abc4a4ed8e598af360ee54ea5b3019ad0370b5"
+        },
+        "requestedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+        "auditedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline 8413c30f01688c915ed9140dc9f11c1891b13614 (report 96327abf21446e8556d95207b4024a6fa0aedf4d) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": {
+          "auditedCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+          "ignoredChangedPaths": [],
+          "requestedMode": "ramify-partial",
+          "resolution": "defaulted"
+        },
+        "verdict": "pass",
+        "detail": "composed pass",
+        "projects": null,
+        "discovery": null
+      }
+    },
+    {
+      "id": "ga-0006",
+      "checkpoint": "final",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065729Z-eab60c:ga-0006",
+        "mode": "full",
+        "nested": true,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "87abc4a4ed8e598af360ee54ea5b3019ad0370b5"
+        },
+        "requestedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+        "auditedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline 8413c30f01688c915ed9140dc9f11c1891b13614 (report 96327abf21446e8556d95207b4024a6fa0aedf4d) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": {
+          "auditedCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+          "ignoredChangedPaths": [],
+          "requestedMode": "full",
+          "resolution": "requested"
+        },
+        "verdict": "pass",
+        "detail": "invocation pass over 1 project",
+        "projects": [
+          {
+            "projectRoot": ".",
+            "verdict": "pass",
+            "execution": "reused",
+            "status": "completed",
+            "failures": [],
+            "requestId": "20261008T065729Z-eab60c:ga-0006",
+            "auditedSourceCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+            "requestedMode": "ramify-partial",
+            "executedMode": "full",
+            "fallbackReason": "baseline-incompatible: baseline 8413c30f01688c915ed9140dc9f11c1891b13614 (report 96327abf21446e8556d95207b4024a6fa0aedf4d) records no failure ledger, so it has no Vitest or Cucumber command",
+            "reuse": {
+              "auditedCommit": "678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+              "ignoredChangedPaths": [],
+              "requestedMode": "full",
+              "resolution": "requested"
+            },
+            "evidence": {
+              "reportCommit": "7635c14258d81ef7269c9c1b57bd5d2cc97a3dfc",
+              "runRef": "refs/audited/runs/2026-10-08T06-58-30Z-678c7b2f2",
+              "treeRef": "refs/audited/by-tree/cf4afe3c94b61d44b94acb71fc7726baeada3db5"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit show 678c7b2f22ab083e3ffdfb03124ed43c0d96b36a",
+              "git show refs/audited/runs/2026-10-08T06-58-30Z-678c7b2f2:reports/audit/summary.json"
+            ],
+            "durationSeconds": 1.212,
+            "counts": {
+              "checks": {
+                "total": 2,
+                "passed": 2,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          }
+        ],
+        "discovery": {
+          "status": "complete",
+          "skipped": [],
+          "unavailable": []
+        }
+      }
+    }
+  ],
+  "obligations": [
+    "reported cap-001 done with where",
+    "bound sc-001 (no fakes)",
+    "reported sc-001 done with where"
+  ],
+  "recovery": {
+    "interrupted": [],
+    "rematerialized": [],
+    "effects": [
+      "need/20261008T065729Z-eab60c: resumed capability coordination from its committed stack"
+    ],
+    "invocations": [],
+    "skipped": [],
+    "reviews": []
+  },
+  "witnessed": {
+    "consumer-continued": {
+      "handback": true,
+      "scratchKept": true,
+      "suspendedEditKept": true
+    },
+    "consumer-after-interruption": {
+      "sc001": "pending"
+    },
+    "consumer-reassigned": {
+      "scratchGone": true,
+      "suspendedEditKept": true
+    },
+    "consumer-completion-briefing": {
+      "sc001": "bound"
+    }
+  }
+}

@@ -49,7 +49,7 @@ npm run type-check
 npm test
 npm run check:self
 npm run build:web
-cp -r fixtures/collection-review /tmp/collection-review
+cp -r subs/harness/fixtures/collection-review /tmp/collection-review
 npm run serve -- --project /tmp/collection-review [--port 4180]
 npm run session -- --project <root> --module <module-path> --prompt "<text>"
 npm run trial -- prepare [--into <directory>]
@@ -94,9 +94,13 @@ The module is named by its declared-name path, as the architect view names
 it, or by its project-relative directory; an unknown module is refused
 before any model call. The engineer gets what an implementation run gives
 its engineers: the engineer prompt, the module's API views, the write guard,
-the Ramify hook check after each edit, the shell, the scoped test tool and
-the validated submission. The prompt becomes the iteration's goal. The
-engineer may write the module's own contents and each `--write` path. The
+the Ramify hook check after each edit, the shell, which runs named test
+files and refuses a whole-suite run, and the validated submission. The prompt becomes the iteration's goal. The
+engineer may write the assigned owner's ordinary contents, with provider
+exclusions enforced at writes and candidate validation. A directory `--write`
+includes one whole immediate child or declared owned nested project, carrying
+the session task as its instructions. Guarded configuration needs recorded
+authorization, including when absent files are created. The
 session takes the project lock, so it never runs beside an implementation
 run or a server on the same project.
 
@@ -162,10 +166,10 @@ prepare another.
 
 ## Fixture
 
-`fixtures/collection-review/` is a copy of the toolkit's reference example
+`subs/harness/fixtures/collection-review/` is a copy of the toolkit's reference example
 with two plans under `plans/`. It is test data and an independent project:
-Plan 21 will declare its root as an `owned-nested-project` tree at the harness,
-so the enclosing project never analyzes its contents. Its own description,
+The harness declares its root as an `owned-nested-project` tree, so the
+enclosing project never analyzes its contents. Its own description,
 compiler configuration and instructions apply when it is selected as a project.
 
 ## License

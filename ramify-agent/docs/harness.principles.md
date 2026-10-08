@@ -76,10 +76,7 @@ The agent doing the work receives the relevant failures and their complete
 diagnostics, investigates them and makes the repairs. It asks its architect
 when it needs a scope or architectural decision. The harness does not infer
 repair responsibility from test locations, failure counts or comparison with
-a second test run. It records evidence, enforces execution and write
-boundaries, and requires the producer's applicable verification result before
-accepting work. Agent judgment cannot turn a failed or incomplete required
-check into a pass.
+a second test run. It records audit results and enforces execution and write boundaries. The local architect reads those results and the implementation and tests, assesses whether the requirement is satisfied, and reports its judgment to the harness, which trusts and records it.
 
 ### Bounded Context Is What Makes Agents Efficient
 
@@ -304,9 +301,10 @@ scenario's state.
 
 A scenario that passes against a fake is bound, not done; real integration
 and its current gate remain required.
-A plan is finished when every scenario passes in full mode at the final
-gate. A completed automated run may still await a person's decision on a
-non-functional plan deviation. Merge readiness requires that decision on the
+A plan is finished when every responsible architect has reported its
+registered scenarios implemented and passing, and the full audit of the
+configured suite passes at the final gate. A completed automated run may
+still await a person's decision on a non-functional plan deviation. Merge readiness requires that decision on the
 exact assessed candidate; it never changes the final gate's result.
 
 ### Trust Follows Provenance

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { coverageLimitsOf, loadArchitectIndex, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { ramifyVersion, type RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
-import type { InputManifest } from '../interfaces/protocol/evidence.js';
+import type { CapturedInputManifest, InputManifest } from '../interfaces/protocol/evidence.js';
 import { planPath } from '../plans/discover.js';
 import type { LoadedPackage } from '../prompts/packages.js';
 
@@ -69,7 +69,7 @@ export interface RunInputs {
    * `EvidenceUnavailableError` when the evidence it names cannot be
    * materialized.
    */
-  capture(projectRoot: string, capturedPlan: Uint8Array, packages: ReadonlyMap<string, LoadedPackage>): Promise<InputManifest>;
+  capture(projectRoot: string, capturedPlan: Uint8Array, packages: ReadonlyMap<string, LoadedPackage>): Promise<CapturedInputManifest>;
   /**
    * The architect view the analysis is validated against, or null where the
    * run has none. Without it the rules that need the view are not applied,

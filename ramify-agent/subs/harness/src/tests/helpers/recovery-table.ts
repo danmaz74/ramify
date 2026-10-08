@@ -10,7 +10,6 @@ import {
   runDirectory, scenarios, source, statedCommands, committedRecords, type CrashPoint, type LogLine, type ScenarioName,
 } from './composition.js';
 import { scenariosCommitName, type GitResponses } from './recovery-git.js';
-import { directReadinessExecution } from './external-tools.js';
 import { onlyRun, openRuns } from './runs.js';
 
 /*
@@ -102,21 +101,25 @@ export const nonfunctionalRecoveryBoundaries = {
   'nonfunctional-repair-assigned': 'nonfunctional-recovery.test.ts',
   'nonfunctional-repair-committed': 'nonfunctional-recovery.test.ts',
 } as const satisfies Partial<Record<RunWrite, string>>;
+export const scratchRecoveryBoundaries = {
+  'scratch-setting-up': 'scratch-setup.test.ts',
+  'scratch-rule-appended': 'scratch-setup.test.ts',
+  'scratch-committed': 'scratch-setup.test.ts',
+  'scratch-setup-complete': 'scratch-setup.test.ts',
+} as const satisfies Partial<Record<RunWrite, string>>;
 export const capabilityRecoveryBoundaries = {
-  'writer-process-registered': 'capability-recovery.test.ts',
+  'writer-process-registered': 'capability-recovery.boundary.test.ts',
   'capability-coordinator-resumed': 'capability-recovery.test.ts',
   'capability-source-captured': 'capability-recovery.test.ts',
   'capability-exchange-opened': 'capability-recovery.test.ts',
   'capability-exchange-answered': 'capability-recovery.test.ts',
   'capability-gate-recorded': 'capability-acceptance.integration.test.ts',
-  'capability-review-recorded': 'capability-acceptance.integration.test.ts',
   'capability-handed-back': 'capability-dependencies.test.ts',
   'capability-assignment-settled': 'capability-dependencies.test.ts',
   'capability-assigned': 'capability-recovery.test.ts',
-  'capability-assignment-interrupted': 'capability-recovery.test.ts',
   'capability-verification-started': 'capability-acceptance.integration.test.ts',
 } as const satisfies Partial<Record<RunWrite, string>>;
-type InterruptedRunWrite = Exclude<RunWrite, keyof typeof nonfunctionalRecoveryBoundaries | keyof typeof capabilityRecoveryBoundaries>;
+type InterruptedRunWrite = Exclude<RunWrite, keyof typeof nonfunctionalRecoveryBoundaries | keyof typeof capabilityRecoveryBoundaries | keyof typeof scratchRecoveryBoundaries>;
 
 /** One row per durable boundary with the interrupted-run recovery contract. */
 export const recoveryTable = {
@@ -193,6 +196,10 @@ export const recoveryTable = {
     machines: ['SM4'], scenario: 'iteration', appended: interrupted,
     stated: 'Re-materializes the outline revision; no second revision',
   },
+  'obligation-reported': {
+    machines: ['SM4'], scenario: 'iteration', appended: interrupted,
+    stated: 'The accepted report stands once, with its invocation and submission; nothing is reported again and the request it rode on reaches no outline or gate',
+  },
   'iteration-assigned': {
     machines: ['SM5'], scenario: 'iteration', appended: interrupted,
     stated: 'Rewrites the assignment from the log; nothing is assigned twice',
@@ -206,24 +213,25 @@ export const recoveryTable = {
     stated: 'Keeps what the writer left in the tree, closes the invocation, releases no second writer',
   },
   'gate-attempted': {
-    machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
+    machines: ['SM7', 'SM4'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
     effect: /the commit and audit of gate ga-\d+/, commits: { before: 1, after: 2 }, recovery: 'makes-the-commit',
     at: { gate: 'ga-0002', revision: source(1) },
     stated: 'The verified operation is durable and the commit is not made: recovery makes and audits one commit, then writes the complete attempt once',
   },
   'gate-committing': {
-    machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
+    machines: ['SM7', 'SM4'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
     effect: /the commit and audit of gate ga-\d+/, commits: { before: 2, after: 2 }, recovery: 'finds-the-commit',
     at: { gate: 'ga-0002', revision: source(1) },
     stated: 'The commit is made and the audit is not complete: recovery finds and re-audits that commit, then writes one complete attempt',
   },
   'gate-committed': {
+    when: events => { const event = events.at(-1); return event?.type === 'gate-attempted' && event.data.checkpoint === 'work-item'; },
     machines: ['SM7'], scenario: 'iteration', appended: interrupted, commits: { before: 2, after: 2 },
     stated: 'Leaves the complete attempt and its one commit alone and appends the interruption only',
   },
   'iteration-closed': {
     machines: ['SM5'], scenario: 'iteration', appended: interrupted,
-    stated: 'The accepted iteration stays accepted with its one commit; the work item is not closed by the interruption',
+    stated: 'The scoped iteration stays exhausted after child-removal discovery fails; the work item has not committed or closed at the interruption',
   },
   'session-finished': {
     machines: ['SM5'], scenario: 'iteration', appended: interrupted,
@@ -339,14 +347,12 @@ const lastLineOf: Readonly<Record<RunWrite, RunEvent['type']>> = {
   'gate-committing': 'gate-committing',
   'gate-committed': 'gate-attempted',
   'brief-appending': 'decision-accepted',
-  'capability-assignment-interrupted': 'capability-assignment-interrupted',
   'capability-coordinator-resumed': 'capability-coordinator-resumed',
   'capability-verification-started': 'capability-verification-started',
   'capability-source-captured': 'invocation-ended',
   'capability-exchange-opened': 'capability-exchange-opened',
   'capability-exchange-answered': 'capability-exchange-answered',
   'capability-gate-recorded': 'gate-attempted',
-  'capability-review-recorded': 'capability-review-recorded',
   'capability-assignment-settled': 'capability-assignment-settled',
   'writer-process-registered': 'writer-process-registered',
   'capability-assigned': 'capability-assigned',
@@ -375,6 +381,15 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     const committedBefore = committedGates(git);
     const askedBefore = { made: git.commits().length, found: git.recovered().length };
     const jobRecord = await readFile(join(runDirectory(root, runId), 'job.json'), 'utf8');
+    // A producer recovery needs explicit immutable Git-object answers from
+    // this boundary's stated committed paths and captured rendered bytes.
+    const producers: Record<string, import('./candidates.js').ScriptedCommit> = {};
+    if (row.name === 'scenarios-committed') {
+      const producer = scenario.git.commits.find(commit => commit.commit === materialized)!;
+      const files = Object.fromEntries(await Promise.all((producer.changes ?? []).map(async change => [change.path, await readFile(join(root, change.path), 'utf8')] as const)));
+      producers[materialized] = { tree: 'a'.repeat(40), base: producer.against, changes: producer.changes ?? [], files };
+    }
+    const recoveredCandidates = compositionCandidates(root, scenario, producers);
     await removeRecordFiles(root, runId, frozen);
     const sessionsBefore = agent.sessions.length;
 
@@ -389,7 +404,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     // The same Git answers the restart: the commit the interrupted run made
     // is the one this one finds by the attempt's identity trailers.
     const first = await openRuns(root, {
-      agent, git, candidates: compositionCandidates(root, scenario), readinessExecution: directReadinessExecution(),
+      agent, git, candidates: recoveredCandidates,
       // Recovery runs no command; one it ran would fail here rather than
       // starting a process.
       commandExecution: statedCommands(root, []),
@@ -489,7 +504,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     reopened.pop();
     const askedAgain = { made: git.commits().length, found: git.recovered().length };
     const second = await openRuns(root, {
-      agent, git, candidates: compositionCandidates(root, scenario), readinessExecution: directReadinessExecution(),
+      agent, git, candidates: recoveredCandidates,
       commandExecution: statedCommands(root, []),
       inputs: scenario.inputs(),
     });

@@ -22,6 +22,7 @@ import { build } from 'vite';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const agent = resolve(here, '../..');
+const fixtureRoot = resolve(agent, 'subs/web/src/tests/browser-acceptance');
 const artifacts = resolve(agent, 'docs/plans/13-plan-evidence-and-nonfunctional-work/evidence');
 const browserPath = process.env.CHROMIUM_PATH ?? '/usr/bin/chromium';
 const run = promisify(execFile);
@@ -59,8 +60,8 @@ try {
   }
   await mkdir(artifacts, { recursive: true });
   await writeFile(join(artifacts, 'plan13-readiness-fixture.json'), fixtureBytes);
-  await build({ configFile: false, root: here, base: '/', plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] },
-    build: { outDir: output, emptyOutDir: true, rollupOptions: { input: resolve(here, 'plan13-readiness.html') } }, logLevel: 'error' });
+  await build({ configFile: false, root: fixtureRoot, base: '/', plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] },
+    build: { outDir: output, emptyOutDir: true, rollupOptions: { input: resolve(fixtureRoot, 'plan13-readiness.html') } }, logLevel: 'error' });
   await writeFile(join(output, 'readiness-data.json'), JSON.stringify(fixture));
 
   const server = createServer(async (request, response) => {
@@ -88,7 +89,10 @@ try {
       rejected: 'Deviation rejected', 'gate-failed': 'Final gate failed', 'source-unavailable': 'Readiness unavailable' })) {
       await page.evaluate(value => window.plan13Readiness.setMode(value as 'pending'), mode);
       const panel = page.getByRole('heading', { name: 'Merge readiness' }).locator('..');
-      await panel.getByText(status, { exact: true }).waitFor();
+      try { await panel.getByText(status, { exact: true }).waitFor({ timeout: 5_000 }); }
+      catch (error) {
+        throw new Error(`Readiness ${mode} did not render ${status}; page: ${(await page.content()).slice(0, 3000)}; page errors: ${errors.join('; ')}`, { cause: error });
+      }
       check(`${mode} renders its authoritative verdict`, (await panel.innerText()).includes(status));
       if (mode === 'pending') {
         const deviation = page.getByRole('group', { name: /^Non-functional deviation / });

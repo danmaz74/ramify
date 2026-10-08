@@ -10,7 +10,7 @@ import {
 } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import type { RunEvent } from '../run/log.js';
 import { contractsLayout, type ConsumerRequirement, type ContractRecord, type ProviderObligation } from '../contracts/records.js';
 import { workLayout, type WorkItem } from '../work/records.js';
@@ -184,7 +184,7 @@ async function run(
     previews: [before, before, before, after].map(head => ({ repositoryRoot: root, head, tree })) });
   const opened = await openRuns(root, {
     script: byRole(plan), inputs: treeInputs(), git,
-    candidates: scriptedCandidates(root, { [after]: { tree, base: before, files: {}, changes: [] } }), readinessExecution: directReadinessExecution(), ...options,
+    candidates: scriptedCandidates(root, { [after]: { tree, base: before, files: {}, changes: [] } }),  ...options,
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
@@ -428,8 +428,7 @@ describe('a contract sub-session that fails registers nothing, and its caller go
         { kind: 'fail', error: 'the provider refused the request' },
       ]],
     }, [
-      accepted('wi-001.i03', 'revision-01', [...added(seam.interface), ...modified(seam.consumer)]),
-      unchanged('wi-001'),
+      accepted('wi-001', 'revision-01', [...added(seam.interface), ...modified(seam.consumer)]),
       unchanged('final verification of plan "review-notes"'),
     ]);
 
@@ -446,6 +445,13 @@ describe('a contract sub-session that fails registers nothing, and its caller go
     // Its local architect is briefed with the digest and the analysis, as for an engineer.
     expect(result.failure?.digest).toMatchObject({ invocation: result.invocations[0], role: 'contract-engineer', ended: 'failed' });
     expect(result.failure?.analysis.outcome).toBe('analyzed');
+    // Successor9 still discovers this ordinary iteration separately: it
+    // cannot commit the failed contract session's foreign dirty bytes. The
+    // later work-item gate uses both actual recorded assignment authorities.
+    const attempted = (await events(root, runId)).filter((event): event is Extract<RunEvent, { type: 'gate-attempted' }> => event.type === 'gate-attempted');
+    const attempts = await Promise.all(attempted.map(event => readJson<GateAttempt>(root, runId, runLayout.gate(event.data.gate))));
+    expect(attempts.find(gate => gate.subject.iteration === 'wi-001.i03')).toMatchObject({ commit: null, rules: expect.arrayContaining([expect.objectContaining({ rule: 'write-scope', outcome: 'failed' })]) });
+    expect(attempts.find(gate => gate.checkpoint === 'work-item')).toMatchObject({ commit: 'revision-01', rules: expect.arrayContaining([expect.objectContaining({ rule: 'write-scope', outcome: 'passed' })]) });
     expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01']);
     git.assertAnswered();
   }, 60_000);
@@ -483,8 +489,7 @@ describe('X1b: a contract sub-session that returns incomplete registers nothing'
       // Nothing was committed while the agreement was open, so the first
       // commit of the run carries the interface the unfinished session left
       // beside the work its caller carried itself.
-      accepted('wi-001.i03', 'revision-01', [...added(seam.interface), ...modified(seam.consumer)]),
-      unchanged('wi-001'),
+      accepted('wi-001', 'revision-01', [...added(seam.interface), ...modified(seam.consumer)]),
       unchanged('final verification of plan "review-notes"'),
     ]);
 
@@ -509,8 +514,15 @@ describe('X1b: a contract sub-session that returns incomplete registers nothing'
 
     // One commit, for the work its caller carried: a session that registered
     // nothing has no gate and no commit of its own.
+    // Successor9 still discovers this ordinary iteration separately: it
+    // cannot commit the failed contract session's foreign dirty bytes. The
+    // later work-item gate uses both actual recorded assignment authorities.
+    const attempted = (await events(root, runId)).filter((event): event is Extract<RunEvent, { type: 'gate-attempted' }> => event.type === 'gate-attempted');
+    const attempts = await Promise.all(attempted.map(event => readJson<GateAttempt>(root, runId, runLayout.gate(event.data.gate))));
+    expect(attempts.find(gate => gate.subject.iteration === 'wi-001.i03')).toMatchObject({ commit: null, rules: expect.arrayContaining([expect.objectContaining({ rule: 'write-scope', outcome: 'failed' })]) });
+    expect(attempts.find(gate => gate.checkpoint === 'work-item')).toMatchObject({ commit: 'revision-01', rules: expect.arrayContaining([expect.objectContaining({ rule: 'write-scope', outcome: 'passed' })]) });
     expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01']);
-    expect(git.subjects()).toHaveLength(4);
+    expect(git.subjects()).toEqual(['Scenarios of review-notes', 'wi-001', 'final verification of plan \"review-notes\"']);
     git.assertAnswered();
   }, 60_000);
 });

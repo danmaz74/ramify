@@ -1,0 +1,214 @@
+{
+  "plan": "../main-plan.md",
+  "status": "complete",
+  "execution": "serial",
+  "iterations": [
+    {
+      "id": "0",
+      "file": "00-provider-convergence.md",
+      "dependsOn": [],
+      "cases": [
+        "PB3-T06"
+      ],
+      "prerequisites": [
+        "provider-contract-review",
+        "responsibility-contract-review",
+        "protected-patch-authorization"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "1",
+      "file": "01-provider-adoption.md",
+      "dependsOn": [
+        "0"
+      ],
+      "cases": [
+        "PB3-A01",
+        "PB3-A02",
+        "PB3-A03",
+        "PB3-A04",
+        "PB3-R03"
+      ],
+      "prerequisites": [
+        "P2",
+        "P3"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "2",
+      "file": "02-preparation.md",
+      "dependsOn": [
+        "1"
+      ],
+      "cases": [
+        "PB3-P01",
+        "PB3-P02",
+        "PB3-P03",
+        "PB3-P04",
+        "PB3-P05"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "3",
+      "file": "03-write-scope.md",
+      "dependsOn": [
+        "2"
+      ],
+      "cases": [
+        "PB3-A02",
+        "PB3-S01",
+        "PB3-S02",
+        "PB3-S03",
+        "PB3-S04",
+        "PB3-S05",
+        "PB3-S06",
+        "PB3-S07",
+        "PB3-S08",
+        "PB3-S09",
+        "PB3-P04",
+        "PB3-R01"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "4",
+      "file": "04-hook-dispositions.md",
+      "dependsOn": [
+        "3"
+      ],
+      "cases": [
+        "PB3-H01",
+        "PB3-H02",
+        "PB3-H03",
+        "PB3-H04"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "5",
+      "file": "05-architect-declarations.md",
+      "dependsOn": [
+        "4"
+      ],
+      "cases": [
+        "PB3-D01",
+        "PB3-D02",
+        "PB3-D04",
+        "PB3-D05"
+      ],
+      "prerequisites": [
+        "reviewed-declaration-contract"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "6",
+      "file": "06-scenario-responsibilities.md",
+      "dependsOn": [
+        "5"
+      ],
+      "cases": [
+        "PB3-D03",
+        "PB3-D06",
+        "PB3-D07",
+        "PB3-D11",
+        "PB3-D12"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "7",
+      "file": "07-delegation-handback.md",
+      "dependsOn": [
+        "6"
+      ],
+      "cases": [
+        "PB3-D08",
+        "PB3-D09",
+        "PB3-D10"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "8",
+      "file": "08-clarification-recovery.md",
+      "dependsOn": [
+        "7"
+      ],
+      "cases": [
+        "PB3-C01",
+        "PB3-C02",
+        "PB3-C03",
+        "PB3-C04",
+        "PB3-C05",
+        "PB3-C06"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "9",
+      "file": "09-audit-delivery.md",
+      "dependsOn": [
+        "8"
+      ],
+      "cases": [
+        "PB3-P03",
+        "PB3-P04",
+        "PB3-T01",
+        "PB3-T02",
+        "PB3-T03",
+        "PB3-T04",
+        "PB3-T05",
+        "PB3-T06",
+        "PB3-T07",
+        "PB3-T08",
+        "PB3-E01",
+        "PB3-E02",
+        "PB3-E03",
+        "PB3-E04"
+      ],
+      "prerequisites": [
+        "P4"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "10",
+      "file": "10-nested-verification.md",
+      "dependsOn": [
+        "9"
+      ],
+      "cases": [
+        "PB3-E05",
+        "PB3-E06",
+        "PB3-E07",
+        "PB3-E08"
+      ],
+      "prerequisites": [
+        "P5"
+      ],
+      "status": "complete"
+    },
+    {
+      "id": "11",
+      "file": "11-integration-acceptance.md",
+      "dependsOn": [
+        "10"
+      ],
+      "cases": [
+        "PB3-S08",
+        "PB3-E07",
+        "PB3-D04",
+        "PB3-D05",
+        "PB3-R01",
+        "PB3-R02",
+        "PB3-R03",
+        "PB3-R04"
+      ],
+      "status": "complete"
+    }
+  ]
+}

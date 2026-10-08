@@ -6,7 +6,7 @@ import { realRamify } from './helpers/runs.js';
 /*
  * The fixture guard.
  *
- * `fixtures/collection-review` is the target project 49 test files copy, and
+ * `subs/harness/fixtures/collection-review` is the target project 49 test files copy, and
  * every one of them assumes it satisfies Ramify's own rules. Nothing asserted
  * that on its own: the tests that ran the real checker over it did so on the
  * way to another assertion, so the signature-companion rule could land and
@@ -33,16 +33,10 @@ interface CheckReport {
 }
 
 /**
- * The two warnings the fixture's own compiler configuration entails: it
- * includes `vite.config.ts` and `vitest.config.ts`, which lie outside every
- * module's `src/`. Ramify warns about compiler-selected source outside a
- * module without failing the check. They are named rather than counted, so
- * that any other warning fails this guard.
+ * Current Ramify treats the fixture's config files as auxiliary source under
+ * its marked project root. The complete check should have no warnings.
  */
-const configurationWarnings = [
-  'outside-module-source vite.config.ts',
-  'outside-module-source vitest.config.ts',
-];
+const configurationWarnings: string[] = [];
 
 describe('the collection-review fixture satisfies Ramify\'s rules', () => {
   test('a fresh copy checks with no error and no warning beyond its configuration files', async () => {

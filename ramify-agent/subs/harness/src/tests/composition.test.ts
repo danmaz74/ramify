@@ -1,15 +1,22 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { tmpdir } from 'node:os';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { runEventSchema } from '../run/log.js';
+import type { GateAttempt } from '../checks/records.js';
 import { observationSchema } from '../run/observations.js';
 import { runSchemas } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
 import { analysisSchemas } from '../analysis/records.js';
 import { workSchemas } from '../work/records.js';
 import { iterationSchemas } from '../work/iterations.js';
+import type { IterationAssignment } from '../work/iterations.js';
+import { resolveWriteScope } from '../work/scope.js';
+import { committedRecords } from '../work/committed.js';
+import { fixtureTask } from './helpers/capability.js';
 import { contractSchemas } from '../contracts/records.js';
 import { architectureSchemas } from '../architecture/records.js';
 import { reviewSchemas } from '../reviews/records.js';
@@ -18,7 +25,7 @@ import { deviationSchemas } from '../deviations/records.js';
 import { initialAnalysisSubmissionSchema } from '../analysis/submission.js';
 import { checkSubmissionSchema, intakeSubmissionSchema, principleSubmissionSchema } from '../analysis/extraction.js';
 import { localArchitectSubmissionSchema } from '../work/submission.js';
-import { engineerSubmissionSchema, scopeTestsInputSchema } from '../work/engineer.js';
+import { engineerSubmissionSchema } from '../work/engineer.js';
 import { forkSubmissionSchema } from '../architecture/submission.js';
 import { contractSubmissionSchema } from '../contracts/submission.js';
 import { failureAnalysisSubmissionSchema } from '../work/failure.js';
@@ -34,7 +41,6 @@ import { crashAt, fileHashes, logLines, plan, runDirectory, runToEnd, scenarios,
 import { allRows, machineNames, type Machine } from './helpers/recovery-table.js';
 import { observeValues, unionInventory } from './helpers/unions.js';
 import { openRuns, startRun, stopRun } from './helpers/runs.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { scenarioGit } from './helpers/recovery-git.js';
 import { copyFixture } from './helpers/fixture.js';
 
@@ -90,7 +96,7 @@ beforeAll(async () => {
   await writeFile(join(jobs, '20260921T000000Z-000002', 'job.json'), `${JSON.stringify({ schema: 'ramify-agent.job/9' })}\n`);
   const unserving = await openRuns(project.root, {
     git: scenarioGit(project.root, { head: 'source-00', commits: [] }),
-    readinessExecution: directReadinessExecution(),
+
     inputs: scenarios.iteration.inputs(),
   });
   answeredWhileRunning.push({ schema: runListResponseSchema, value: await new RunQueries(unserving.service).list(plan) });
@@ -102,7 +108,7 @@ beforeAll(async () => {
   const reopened = await openRuns(crashed.root, {
     agent: crashed.agent,
     git: crashed.git,
-    readinessExecution: directReadinessExecution(),
+
     inputs: scenarios.iteration.inputs(),
   });
   const queries = new RunQueries(reopened.service);
@@ -116,6 +122,174 @@ afterAll(async () => {
 });
 
 describe('the composed runs', () => {
+  test('removed included child keeps scope authority: the iteration gate audits and commits the removal, and the work-item gate finds it unchanged', async () => {
+    const run = finished.get('iteration')!;
+    const directory = runDirectory(run.root, run.runId);
+    const scoped = JSON.parse(await readFile(join(directory, 'gates/ga-0002/attempt.json'), 'utf8')) as GateAttempt;
+    expect(scoped.checkpoint).toBe('iteration');
+    expect(scoped.rules?.find(rule => rule.rule === 'write-scope')?.outcome).toBe('passed');
+    expect(scoped.verdict).toBe('passed');
+    expect(scoped.commands).toEqual([]);
+    expect(scoped.audit).toMatchObject({ requestedSourceCommit: 'source-01', auditedSourceCommit: 'source-01', verdict: 'pass' });
+    expect(scoped.commit).toBe('source-01');
+    const later = JSON.parse(await readFile(join(directory, 'gates/ga-0003/attempt.json'), 'utf8')) as GateAttempt;
+    expect(later.checkpoint).toBe('work-item');
+    expect(later.rules?.find(rule => rule.rule === 'write-scope')?.outcome).toBe('passed');
+    expect(later.commit).toBeNull();
+    expect(later.audit?.auditedSourceCommit).toBe('source-01');
+    expect(existsSync(join(run.root, 'subs/workspace/subs/reviews/subs/notes/subs/drafts/module.ramify'))).toBe(false);
+    expect(await readFile(join(run.root, 'subs/workspace/subs/reviews/subs/notes/shell-note.txt'), 'utf8')).toBe('left by the shell\n');
+  });
+
+  test('a rejected iteration cannot send its unauthorized dirty file through a later work-item or final committing checkpoint', async () => {
+    // Scripted lifecycle control of the actual committing checkpoint over
+    // assignments accepted by the real ledger. No Git or audit is executed.
+    const run = await runToEnd(scenarios.iteration);
+    try {
+      const active = run.service['runs'].get(`${plan}/${run.runId}`)!;
+      const ramify = run.service['options'].ramify;
+      const query = vi.spyOn(ramify, 'queryOwnership');
+      const git = run.service['git'];
+      const dirty = vi.spyOn(git, 'changedPaths').mockResolvedValue(['shell-note.txt']);
+      const commit = vi.spyOn(git, 'commitAccepted');
+      const before = commit.mock.calls.length;
+      await writeFile(join(run.root, 'shell-note.txt'), 'outside the originating notes assignments\n');
+      for (const checkpoint of ['iteration', 'work-item', 'final'] as const) {
+        query.mockClear();
+        const id = `ga-09${checkpoint === 'iteration' ? '00' : checkpoint === 'work-item' ? '01' : '02'}`;
+        const attempt = await run.service['committingCheckpoint'](active, {
+          id, runId: run.runId, checkpoint, projectRoot: run.root,
+          directory: active.path(`gates/${id}`), head: 'source-01', policy: active.record.policy,
+          subject: checkpoint === 'iteration' ? { workItem: 'wi-001', iteration: 'wi-001.i01' }
+            : checkpoint === 'work-item' ? { workItem: 'wi-001' } : {},
+        });
+        expect(attempt.rules?.find(rule => rule.rule === 'write-scope')).toMatchObject({ outcome: 'failed', violations: [{ path: 'shell-note.txt' }] });
+        expect(attempt.commit).toBeNull();
+        expect(query).toHaveBeenCalledTimes(1);
+        expect(commit.mock.calls).toHaveLength(before);
+      }
+      dirty.mockRestore(); query.mockRestore(); commit.mockRestore();
+    } finally { await run.dispose(); }
+  });
+
+  test('PB3: equal captured bytes, feature tampering and later render aliases cannot bypass the actual committing gate', async () => {
+    const capturedPackage = 'subs/workspace/subs/reviews/subs/notes/subs/drafts/package.json';
+    // The shell removes the drafts child's declaration and README but leaves
+    // its captured package: deleting that guarded file would be an
+    // unauthorized guarded change, which fails the iteration gate.
+    const shell = scenarios.iteration.commands![0]!;
+    const run = await runToEnd({ ...scenarios.iteration, target: async () => {
+      const fixture = await scenarios.iteration.target();
+      await writeFile(join(fixture.root, capturedPackage), '{"private":true}\n');
+      return fixture;
+    }, commands: [{ ...shell, async leaves(root) {
+      const drafts = 'subs/workspace/subs/reviews/subs/notes/subs/drafts';
+      await rm(join(root, drafts, 'module.ramify')); await rm(join(root, drafts, 'README.md'));
+      await writeFile(join(root, 'subs/workspace/subs/reviews/subs/notes/shell-note.txt'), 'left by the shell\n');
+    } }] });
+    const external = await mkdtemp(join(tmpdir(), 'pb3-captured-alias-'));
+    try {
+      const active = run.service['runs'].get(`${plan}/${run.runId}`)!;
+      const query = vi.spyOn(run.service['options'].ramify, 'queryOwnership');
+      const git = run.service['git'];
+      const dirty = vi.spyOn(git, 'changedPaths');
+      const commit = vi.spyOn(git, 'commitAccepted');
+      const before = commit.mock.calls.length;
+      const config = 'ramify-agent.json';
+      const bytes = await readFile(join(run.root, config));
+      await writeFile(join(external, 'same-config.json'), bytes);
+      await rm(join(run.root, config)); await symlink(join(external, 'same-config.json'), join(run.root, config));
+      const feature = run.service['writtenFeatures'](active)[0]!;
+      const declaration = join(run.root, 'subs/workspace/subs/reviews/subs/notes/module.ramify');
+      const originalDeclaration = await readFile(declaration, 'utf8');
+      const variants = [config, feature.path, feature.path, feature.path, capturedPackage];
+      for (const [index, path] of variants.entries()) {
+        if (index === 1) {
+          await rm(join(run.root, config)); await writeFile(join(run.root, config), bytes);
+          await writeFile(join(run.root, feature.path), 'tampered ledger feature bytes\n');
+        } else if (index === 2) {
+          await writeFile(join(external, 'external.feature'), 'external bytes must survive\n');
+          await rm(join(run.root, feature.path)); await symlink(join(external, 'external.feature'), join(run.root, feature.path));
+        } else if (index === 3) {
+          await rm(join(run.root, feature.path)); await writeFile(join(run.root, feature.path), feature.content);
+          await writeFile(declaration, `${originalDeclaration}\nexternal "${feature.path.slice('subs/workspace/subs/reviews/subs/notes/'.length)}"\n`);
+        } else if (index === 4) {
+          // Exact captured package bytes remain regular and unchanged, but a
+          // newly declared independent tree requires its own included entry.
+          await writeFile(declaration, `${originalDeclaration}\nowned-nested-project "subs/drafts"\n`);
+          const assignment = JSON.parse(await readFile(join(runDirectory(run.root, run.runId), 'work-items/wi-001/iterations/01/assignment.json'), 'utf8'));
+          expect(assignment.guarded).toContainEqual({ path: capturedPackage, hash: expect.any(String) });
+        }
+        dirty.mockResolvedValue([path]); query.mockClear();
+        const id = `ga-091${index}`;
+        const attempt = await run.service['committingCheckpoint'](active, {
+          id, runId: run.runId, checkpoint: 'work-item', projectRoot: run.root,
+          directory: active.path(`gates/${id}`), head: 'source-01', policy: active.record.policy, subject: { workItem: 'wi-001' },
+        });
+        expect(attempt.rules?.find(rule => rule.rule === 'write-scope')?.outcome).toBe('failed');
+        expect(attempt.commit).toBeNull(); expect(query).toHaveBeenCalledTimes(1);
+        expect(commit.mock.calls).toHaveLength(before);
+      }
+      expect(await readFile(join(external, 'external.feature'), 'utf8')).toBe('external bytes must survive\n');
+      dirty.mockRestore(); query.mockRestore(); commit.mockRestore();
+    } finally { await run.dispose(); await rm(external, { recursive: true, force: true }); }
+  });
+
+  test('PB3: scripted nested predecessors require every intermediate inherited hash to match', async () => {
+    const run = await runToEnd(scenarios.iteration);
+    try {
+      const active = run.service['runs'].get(`${plan}/${run.runId}`)!;
+      const ledger = active.log.ledger.replay();
+      const grandparent = committedRecords(ledger).assignments.get('wi-001.i01')!;
+      const rootOwner = grandparent.scope.resolved.ownership.modules.find(module => module.parent === null)!.id;
+      const scope = await resolveWriteScope({ projectRoot: run.root, ramify: run.service['options'].ramify, index: null,
+        view: grandparent.scope.resolved.view, revision: 1, base: { module: rootOwner, included: [] },
+        extra: [], read: [], bootstrap: [], rationale: 'Scripted unrelated owner for nested provenance control' });
+      const path = 'subs/workspace/subs/reviews/subs/notes/docs/inherited.txt';
+      await mkdir(join(run.root, 'subs/workspace/subs/reviews/subs/notes/docs'), { recursive: true });
+      const hash = (bytes: string) => createHash('sha256').update(bytes).digest('hex');
+      await writeFile(join(run.root, path), 'later bytes\n');
+      const currentHash = hash('later bytes\n');
+      const parentTask = { ...fixtureTask(), id: 'cap-091', parent: { kind: 'work-item' as const, id: grandparent.workItem }, originatingAssignment: grandparent.id };
+      const childTask = { ...fixtureTask(), id: 'cap-092', parent: { kind: 'capability-task' as const, id: parentTask.id }, originatingAssignment: 'cap-091.i01' };
+      const parent: IterationAssignment = { ...grandparent, id: 'cap-091.i01', scope, guarded: [], authorizations: [],
+        coordination: { kind: 'capability-task', id: parentTask.id, sequence: 1, plan: grandparent.outline,
+          startingTree: 'a'.repeat(40), startingPaths: [{ path, hash: hash('earlier bytes\n') }] } };
+      const child: IterationAssignment = { ...parent, id: 'cap-092.i01',
+        coordination: { ...parent.coordination as Extract<NonNullable<IterationAssignment['coordination']>, { kind: 'capability-task' }>,
+          id: childTask.id, startingPaths: [{ path, hash: currentHash }] } };
+      // This is an explicit scripted ledger projection over a real finished
+      // run. It exercises the existing evaluator, not a coordinator producer.
+      const last = ledger.at(-1)!;
+      const entries = [parentTask, parent, childTask, child].map((body, index) => {
+        const sequence = last.sequence + index + 1;
+        const isAssignment = body.schema === 'ramify-agent.iteration-assignment/1';
+        return { sequence, at: last.at, transaction: {
+          event: { sequence, at: last.at, jobId: run.runId,
+            ...(isAssignment ? { type: 'capability-assigned' as const, data: { task: index === 1 ? parentTask.id : childTask.id,
+              assignment: body.id, sequence: 1, invocation: 'scripted-provenance' } }
+              : { type: 'capability-delegated' as const, data: { task: body.id, request: 'need-001', parent: 'wi-001', invocation: 'scripted-provenance', planRevision: 1 as const } }) },
+          records: [{ path: `scripted/${body.id}.json`, id: body.id, revision: 1, body }],
+        } };
+      });
+      const replay = vi.spyOn(active.log.ledger, 'replay').mockReturnValue([...ledger, ...entries]);
+      const dirty = vi.spyOn(run.service['git'], 'changedPaths').mockResolvedValue([path]);
+      const query = vi.spyOn(run.service['options'].ramify, 'queryOwnership');
+      const request = { checkpoint: 'iteration' as const, subject: { workItem: grandparent.workItem, iteration: child.id } };
+      query.mockClear();
+      const denied = await run.service['candidateAuthority'](active, request);
+      expect(denied.rules.find(rule => rule.rule === 'write-scope')?.violations).toContainEqual(expect.objectContaining({ path }));
+      expect(query).toHaveBeenCalledTimes(1);
+      if (parent.coordination?.kind !== 'capability-task') throw new Error('Missing scripted parent coordination');
+      parent.coordination.startingPaths[0]!.hash = currentHash;
+      query.mockClear();
+      const permitted = await run.service['candidateAuthority'](active, request);
+      expect(permitted.rules.find(rule => rule.rule === 'write-scope')?.outcome).toBe('passed');
+      expect(query).toHaveBeenCalledTimes(1);
+      replay.mockRestore(); dirty.mockRestore(); query.mockRestore();
+    } finally { await run.dispose(); }
+  });
+
   test('each scenario runs to the end it is written for, and asks Git exactly what it states', () => {
     for (const [name, run] of finished) {
       const snapshot = run.service.getRun(plan, run.runId)!;
@@ -166,7 +340,7 @@ describe('the recovery tables of the ten state machines', () => {
     const rows = allRows();
     // `recoveryTable` is typed against the run service's own boundary union,
     // so a boundary without a row does not compile; this states the count.
-    expect(new Set(rows.map(row => row.write)).size).toBe(43);
+    expect(new Set(rows.map(row => row.write)).size).toBe(44);
     const machines = new Set(rows.flatMap(row => row.machines));
     expect([...machines].sort()).toEqual((Object.keys(machineNames) as Machine[]).sort());
 
@@ -238,7 +412,6 @@ function unionRoots(): Record<string, unknown> {
     'submission contract': contractSubmissionSchema,
     'submission failure-analysis': failureAnalysisSubmissionSchema,
     'tool shell': shellInputSchema,
-    'tool run_scope_tests': scopeTestsInputSchema,
     'command': runCommandSchema,
     'error': errorResponseSchema,
     'query runs': runListResponseSchema,
@@ -329,35 +502,49 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
  * becoming a second copy of the test that owns them.
  */
 const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly file: string; readonly test: string }> = [
+  { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.extra[].kind', values: ['file'], file: 'subs/harness/src/tests/write-guard.boundary.test.ts', test: 'PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions' },
+  { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.ownership.exclusions[].kind', values: ['owned-unwired', 'owned-nested-project', 'external', 'output'], file: 'subs/harness/src/tests/write-guard.boundary.test.ts', test: 'PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions' },
+  { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.included[].kind', values: ['owned-nested-project'], file: 'subs/harness/src/tests/write-guard.boundary.test.ts', test: 'PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions' },
+  { union: 'submission local-architect[assign].assignment.scope.extra[].kind', values: ['file'], file: 'subs/harness/src/tests/local-architect-submission.test.ts', test: 'removed outside-modules authority is refused, while narrow ordinary and bootstrap extras remain' },
+
   { union: 'record ramify-agent.iteration-assignment/1.coordination.kind', values: ['capability-task'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
   // Plan 16: the new-run capability path is driven in its own service tests.
   { union: 'run log.type', values: ['capability-requested', 'capability-qualified', 'capability-delegated'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'run log.type', values: ['capability-plan-revised', 'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-settled'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
   { union: 'run log.type', values: ['capability-coordinator-resumed'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA18 CA26 CA29: an ended B writer keeps dirty source and closes partial through ordinary failure analysis' },
-  { union: 'run log.type', values: ['capability-verification-started', 'capability-handed-back'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
-  { union: 'run log.type', values: ['capability-verification-failed'], file: 'subs/harness/src/tests/capability-tasks-projection.test.ts', test: 'CA23 CA34: request, design, consultation and failed verification remain distinct from registry capability' },
+  { union: 'run log.type', values: ['capability-verification-started', 'capability-handed-back'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision' },
   { union: 'run log.type', values: ['capability-stopped'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA20 CA32: restart with a B writer lacking confirmed release stops the stack and frontier' },
-  { union: 'run log.type', values: ['writer-process-registered'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA20: a registered real process group survives a service crash and is settled before any successor work' },
+  { union: 'run log.type', values: ['writer-process-registered'], file: 'subs/harness/src/tests/capability-recovery.boundary.test.ts', test: 'CA20: a registered real process group survives a service crash and is settled before any successor work' },
   { union: 'run log[session-opened].data.role', values: ['capability-architect'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'run log[session-opened].data.requestedBy.reason', values: ['capability-needed'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'run log[invocation-started].data.continues.reason', values: ['capability-qualification'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
-  { union: 'run log[invocation-started].data.continues.reason', values: ['capability-returned'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['capability-returned'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision' },
   { union: 'run log[invocation-started].data.continues.reason', values: ['capability-coordination'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA05 CA19 CA22 CA32: service restart reconstructs the active architect without dispatching the B entry' },
   { union: 'run log[capability-qualified].data.outcome', values: ['satisfied'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA02: local architect finds an existing API and the same engineer verifies it' },
   { union: 'run log[capability-qualified].data.outcome', values: ['request-placement'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'run log[capability-qualified].data.outcome', values: ['unresolved'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'an unresolved qualification returns through the global architect and the same local architect' },
   { union: 'run log[capability-assignment-settled].data.outcome', values: ['accepted'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
   { union: 'run log[capability-assignment-settled].data.outcome', values: ['partial'], file: 'subs/harness/src/tests/capability-state.test.ts', test: 'refuses an active assignment but preserves partial history for the verifier' },
-  { union: 'run log[capability-review-recorded].data.outcome', values: ['passed', 'failed'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
   { union: 'submission engineer.kind', values: ['capability-needed'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'submission engineer[capability-needed].request.knownInterface.kind', values: ['none-known'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
-  { union: 'submission engineer[capability-needed].request.knownInterface.kind', values: ['insufficient'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
+  { union: 'submission engineer[capability-needed].request.knownInterface.kind', values: ['insufficient'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision' },
   { union: 'submission engineer[capability-needed].request.examples[].designation', values: ['pseudocode'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'query events.events[].refs[].kind', values: ['capability-request', 'capability-task', 'capability-assignment'], file: 'subs/harness/src/tests/capability-tasks-projection.test.ts', test: 'CA23: capability event references identify requests, tasks and assignments' },
-  // A path outside every module, assigned as outside-modules and written through the guard.
-  { union: 'record ramify-agent.iteration-assignment/1.scope.extra[].purpose', values: ['outside-modules'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
-  { union: 'record ramify-agent.iteration-assignment/1.scope.extra[].kind', values: ['file'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
-  { union: 'submission local-architect[assign].assignment.scope.extra[].kind', values: ['file', 'directory'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
+  // Plan 21 iteration 5: registrations and reports in driven local and capability runs. Every architect submission
+  // shares one registrations/reports schema, so it is named after its first site, the local architect's assign.
+  { union: 'run log.type', values: ['obligation-registered', 'obligation-reported'], file: 'subs/harness/src/tests/local-architect-submission.test.ts', test: 'PB3-D01 PB3-D02 PB3-D04: an invalid report is refused before any effect; the accepted one records the test, the judgments and the where text as written' },
+  { union: 'run log[obligation-registered].data.kind', values: ['scenario', 'test'], file: 'subs/harness/src/tests/capability-submission.test.ts', test: 'PB3-D01 PB3-D02 PB3-D04: a capability architect registers a case and a test and reports during coordination; the run records exactly that' },
+  { union: 'run log[obligation-registered].data.responsible.kind', values: ['work-item'], file: 'subs/harness/src/tests/local-architect-submission.test.ts', test: 'PB3-D01 PB3-D02 PB3-D04: an invalid report is refused before any effect; the accepted one records the test, the judgments and the where text as written' },
+  { union: 'run log[obligation-registered].data.responsible.kind', values: ['capability-task'], file: 'subs/harness/src/tests/capability-submission.test.ts', test: 'PB3-D01 PB3-D02 PB3-D04: a capability architect registers a case and a test and reports during coordination; the run records exactly that' },
+  { union: 'run log[obligation-reported].data.judgment', values: ['done', 'bound'], file: 'subs/harness/src/tests/capability-submission.test.ts', test: 'PB3-D01 PB3-D02 PB3-D04: a capability architect registers a case and a test and reports during coordination; the run records exactly that' },
+  { union: 'submission local-architect[assign].registrations[].kind', values: ['test'], file: 'subs/harness/src/tests/local-architect-submission.test.ts', test: 'PB3-D01 PB3-D02 PB3-D04: an invalid report is refused before any effect; the accepted one records the test, the judgments and the where text as written' },
+  { union: 'submission local-architect[assign].registrations[].kind', values: ['scenario'], file: 'subs/harness/src/tests/capability-submission.test.ts', test: 'PB3-D01 PB3-D02 PB3-D04: a capability architect registers a case and a test and reports during coordination; the run records exactly that' },
+  { union: 'submission local-architect[assign].reports[].judgment', values: ['done'], file: 'subs/harness/src/tests/local-architect-submission.test.ts', test: 'PB3-D01 PB3-D02 PB3-D04: an invalid report is refused before any effect; the accepted one records the test, the judgments and the where text as written' },
+  { union: 'submission local-architect[assign].reports[].judgment', values: ['bound'], file: 'subs/harness/src/tests/capability-submission.test.ts', test: 'PB3-D01 PB3-D02 PB3-D04: a capability architect registers a case and a test and reports during coordination; the run records exactly that' },
+  { union: 'query scenarios.obligations[].kind', values: ['outcome', 'test'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'PB3-D04 the list carries each obligation with its responsible owner, its binding\'s fakes, its architect report and its where text, and the scenario states are its statuses' },
+  { union: 'query scenarios.obligations[].responsible.kind', values: ['capability-task', 'integration-scenario'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'PB3-D04 the list carries each obligation with its responsible owner, its binding\'s fakes, its architect report and its where text, and the scenario states are its statuses' },
+  { union: 'query scenarios.obligations[].status', values: ['bound', 'done'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'PB3-D04 the list carries each obligation with its responsible owner, its binding\'s fakes, its architect report and its where text, and the scenario states are its statuses' },
+  { union: 'query scenarios.obligations[].report.judgment', values: ['done', 'bound'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'PB3-D04 the list carries each obligation with its responsible owner, its binding\'s fakes, its architect report and its where text, and the scenario states are its statuses' },
   // Plan 12: CheckFindings committed through a driven run's own transition, and iteration reviews.
   { union: 'run log.type', values: ['check-findings-recorded'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['producer'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
@@ -404,22 +591,6 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[review-attempt-started].data.requestedStart', values: ['fresh'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
   { union: 'run log[review-attempt-finished].data.result', values: ['complete', 'partial'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
   { union: 'run log[review-attempt-finished].data.result', values: ['not-verified'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: 'malformed output is retried once, a hung reader times out and an unreadable candidate is unavailable' },
-  // Plan 12 iteration 6: the scenario producer's promotions, witnesses and what a gate's line leaves out.
-  { union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[].type', values: ['check-finding-reported'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
-  { union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['fix-by-check'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
-  { union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.coverage', values: ['complete'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
-  { union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.outcome', values: ['passed'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.refused.reason', values: ['source-unavailable'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'an audited tree that cannot be read refuses the part with its reason on the gate\'s line; the verdict and the run go on' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].step', values: ['witness'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].step', values: ['promotion'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a line holds at most 100 CheckFinding events; a scenario that does not fit is named and left for its next failure' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['failure-source'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['incomparable-inputs', 'insufficient-coverage', 'obligation-changed'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a narrower run, another mode, a pass on the failure\'s own tree and a changed obligation do not fix it' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['not-executed', 'not-passed'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a witness that did not run, ran in part or did not pass is refused by the child' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['awaiting-user-decision'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'an open CheckFinding awaiting a user\'s answer is not fixed by a gate' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|1', values: ['event-bound'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a line holds at most 100 CheckFinding events; a scenario that does not fit is named and left for its next failure' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|1', values: ['source-unavailable'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a failure whose audited tree was not read is named and left out, and the other scenarios go on' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].classification', values: ['inconclusive'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it' },
-  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].classification', values: ['intermittent'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'two passes on the failure\'s own tree are provisionally intermittent, and still fix nothing' },
   { union: 'run log[review-attempt-finished].data.reason', values: ['invalid-output', 'timed-out', 'unavailable'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: 'malformed output is retried once, a hung reader times out and an unreadable candidate is unavailable' },
   { union: 'run log[review-attempt-finished].data.reason', values: ['stopped'], file: 'subs/harness/src/tests/review-lifecycle.test.ts', test: 'two live readers are stopped with the writer, each attempt is settled before job-stopped, and a reader that ignores its stop ingests nothing' },
   { union: 'run log[review-attempt-finished].data.reason', values: ['deadline'], file: 'subs/harness/src/tests/review-lifecycle.test.ts', test: 'the settlement bound stops a reader that never answers, and the run completes with no reader left' },
@@ -481,7 +652,8 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['pass'], file: 'subs/harness/src/tests/execution-map-durable.test.ts', test: 'replays the independent published audit result after restart' },
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['fail'], file: 'subs/harness/src/tests/execution-map-projection.test.ts', test: 'reads old gates without an audit fact and a failed published audit independently of verdict' },
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['indeterminate'], file: 'subs/harness/src/tests/audit-check-execution.test.ts', test: 'retains an indeterminate published audit outcome' },
-  { union: 'run log.type', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
+  { union: 'run log.type', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService stops immediately when a declared installation repair is ineffective' },
+  { union: 'run log.type', values: ['scratch-preserved'], file: 'subs/harness/src/tests/accepted-commit.test.ts', test: 'a forced-staged scratch file fails the run gate and closure preserves only indexed scratch' },
   { union: 'run log.type', values: ['global-context-rebuilt'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
   { union: 'run log.type', values: ['job-interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after publishing the run and captured inputs leaves a run that loads and is interrupted' },
   { union: 'run log[invocation-ended].data[false].finished', values: ['interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after invocation-started closes that invocation without an agent call and without a second one' },
@@ -495,30 +667,29 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[invocation-ended].data[true].degraded.actual', values: ['fresh'], file: 'subs/harness/src/tests/placement.test.ts', test: 'is recorded at the invocation\'s end with what was requested, what was actual and the executor\'s reason' },
   { union: 'run log[brief-appended].data.outcome', values: ['already-present'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'G4: a crash after the append and before its completion answers already-present, and one brief exists' },
   { union: 'run log[iteration-closed].data.notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/module-creation-integration.test.ts', test: 'a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit' },
-  { union: 'run log[job-failed].data.reason', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
+  { union: 'run log[job-failed].data.reason', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService stops immediately when a declared installation repair is ineffective' },
   { union: 'run log[job-failed].data.reason', values: ['project-config-invalid'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a project without the file starts, and fails readiness with project-config-invalid and no recovery' },
-  { union: 'run log[job-failed].data.reason', values: ['acceptance-harness-missing'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a project without cucumber-js fails acceptance-runner with acceptance-harness-missing and no recovery' },
-  { union: 'record ramify-agent.job/3.projectConfig|0.config.acceptance.modes.full.readiness', values: ['run'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a configuration asking readiness to run full mode is captured with it' },
-  { union: 'observation log[coverage-gap].data.kind', values: ['unsupported-runner'], file: 'subs/harness/src/tests/iterations-integration.test.ts', test: 'a local architect assigns it, an engineer works it, the gate accepts it and the harness commits' },
   { union: 'run log[job-failed].data.reason', values: ['repair-exhausted'], file: 'subs/harness/src/tests/work-items.test.ts', test: 'returns to the same local architect, which revises its outline, and exhausts deterministically' },
-  { union: 'run log[job-failed].data.reason', values: ['recovery-exhausted'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a failure that keeps recurring ends the run once the bounded recoveries are spent' },
+  { union: 'run log[job-failed].data.reason', values: ['recovery-exhausted'], file: 'subs/harness/src/tests/nonfunctional-recovery.test.ts', test: 'an exhausted crash with changed source leaves merge readiness unavailable' },
   { union: 'run log[job-failed].data.reason', values: ['writer-unsettled'], file: 'subs/harness/src/tests/writer-settlement.test.ts', test: 'fails as writer-unsettled, and runs no gate against that tree' },
   { union: 'run log[iteration-closed].data.outcome', values: ['exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'run log[gate-attempted].data.verdict', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'observation log[hook-check].data.outcome', values: ['passed'], file: 'subs/harness/src/tests/hook-checks.test.ts', test: 'a check that passed with nothing new tells the engineer nothing' },
   { union: 'observation log[hook-check].data.outcome', values: ['findings'], file: 'subs/harness/src/tests/hook-checks.test.ts', test: 'findings are reported with their count, and the same finding reported again is not new' },
+  { union: 'observation log[hook-check].data.dispositions[].disposition', values: ['checked', 'not-analyzed', 'not-checked'], file: 'subs/harness/src/tests/hook-checks.test.ts', test: 'PB3-H01: mixed results keep every path\'s disposition and reason, under a verdict and under exit 2' },
+  { union: 'observation log[coverage-gap].data.kind', values: ['unsupported-check-result'], file: 'subs/harness/src/tests/hook-checks.test.ts', test: 'a result the harness does not read is an explicit gap, never a pass' },
   { union: 'observation log[coverage-gap].data.kind', values: ['observation-truncated'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after writer-released keeps what the shell wrote, closes the invocation and releases no second writer' },
   { union: 'observation log[coverage-gap].data.kind', values: ['transcript-incomplete'], file: 'subs/harness/src/tests/transcript-run.test.ts', test: 'is a coverage gap in its invocation\'s observations, and the run completes' },
-  { union: 'record ramify-agent.readiness-attempt/1.steps[].outcome', values: ['failed', 'not-verified'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a Ramify command line that does not answer is recovered by restarting the daemon, and the run ends when it still does not' },
-  { union: 'record ramify-agent.readiness-attempt/1.verdict', values: ['failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
-  { union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['infrastructure'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'missing nested dependencies consume a recovery attempt, and the run continues when it repairs them' },
-  { union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['timeout'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a timed-out baseline is recoverable, and the rerun passes' },
-  { union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['daemon-unavailable'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a Ramify command line that does not answer is recovered by restarting the daemon, and the run ends when it still does not' },
-  { union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['reinstall-nested'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'missing nested dependencies consume a recovery attempt, and the run continues when it repairs them' },
-  { union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['rerun-command'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a timed-out baseline is recoverable, and the rerun passes' },
-  { union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['restart-daemon'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a Ramify command line that does not answer is recovered by restarting the daemon, and the run ends when it still does not' },
-  { union: 'record ramify-agent.infrastructure-recovery/1.outcome', values: ['recovered'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'missing nested dependencies consume a recovery attempt, and the run continues when it repairs them' },
-  { union: 'record ramify-agent.infrastructure-recovery/1.outcome', values: ['failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a recovery that does not repair the failure ends the run at once, with the attempt it spent' },
+  { union: 'record ramify-agent.readiness-attempt/1.steps[].outcome', values: ['failed', 'not-verified'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a failed setup stops before the provider and leaves a named readiness failure' },
+  { union: 'record ramify-agent.readiness-attempt/1.verdict', values: ['failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService stops immediately when a declared installation repair is ineffective' },
+  { union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['infrastructure'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService repairs a missing declared installation once and then completes readiness' },
+  { union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['timeout'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService reruns once after configured timeout and stops on failing tests without recovery' },
+  { union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['daemon-unavailable'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService records a failed Ramify restart and performs no audit' },
+  { union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['reinstall-nested'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService repairs a missing declared installation once and then completes readiness' },
+  { union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['rerun-command'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService reruns once after configured timeout and stops on failing tests without recovery' },
+  { union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['restart-daemon'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService records a failed Ramify restart and performs no audit' },
+  { union: 'record ramify-agent.infrastructure-recovery/1.outcome', values: ['recovered'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService repairs a missing declared installation once and then completes readiness' },
+  { union: 'record ramify-agent.infrastructure-recovery/1.outcome', values: ['failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'RunService stops immediately when a declared installation repair is ineffective' },
   { union: 'record ramify-agent.invocation/1.scope.size.components[].state', values: ['unknown'], file: 'subs/harness/src/tests/measurement.test.ts', test: 'a module that does not exist yet has an unknown size, not a zero one' },
   { union: 'record ramify-agent.invocation/1.scope.size.coverage', values: ['complete'], file: 'subs/harness/src/tests/measurement.test.ts', test: 'the initial architect\'s invocation records its snapshot reference and its S_s components' },
   { union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['idle-timeout'], file: 'subs/harness/src/tests/run-bounds.test.ts', test: 'no port event for invocationIdleMs ends the invocation as failed, idle-timeout' },
@@ -533,25 +704,43 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.gate-attempt/3.next', values: ['repair', 'exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['timeout'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['runner-error'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'records a runner error with the structured error the spawn gave it' },
-  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['command-missing'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
-  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['discovery-error'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a discovery that fails never falls back to an earlier list' },
-  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['required-suite-missing'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'refuses a selection that lost a required suite, and one discovery could not establish' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['command-missing'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'runs nothing at all when one command is missing, and says which' },
   // The fixture declares no setup command, so no composed run runs one: a
   // run over a copy that declares a build, whose first iteration gate finds
   // it broken, and readiness running one in place produce them.
   { union: 'record ramify-agent.gate-attempt/3.commands[].kind', values: ['setup'], file: 'subs/harness/src/tests/setup-attribution.test.ts', test: 'the build the engineer broke fails its iteration gate in scope, and the engineer repairs it from the build\'s own output' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['setup-failed'], file: 'subs/harness/src/tests/setup-attribution.test.ts', test: 'the build the engineer broke fails its iteration gate in scope, and the engineer repairs it from the build\'s own output' },
-  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['audit-unselected'], file: 'subs/harness/src/tests/audit-check-execution.test.ts', test: 'narrows a registered Vitest run to Ramify-selected source after a full root' },
-  { union: 'record ramify-agent.gate-operation/1.request.checks[].kind', values: ['setup'], file: 'subs/harness/src/tests/setup-attribution.test.ts', test: 'the build the engineer broke fails its iteration gate in scope, and the engineer repairs it from the build\'s own output' },
-  { union: 'run log[gate-command-started].data.kind', values: ['setup'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'runs first, at the project root, so the baseline reads what it built, and is announced and recorded as a gate command' },
-  { union: 'run log.type', values: ['gate-command-waiting'], file: 'subs/harness/src/tests/gate-progress.test.ts', test: 'a composed readiness records the provider wait for tests and scenarios before their commands start' },
-  { union: 'run log[gate-command-waiting].data.kind', values: ['tests', 'scenarios'], file: 'subs/harness/src/tests/gate-progress.test.ts', test: 'a composed readiness records the provider wait for tests and scenarios before their commands start' },
-  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['infrastructure'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a discovery that fails never falls back to an earlier list' },
+  { union: 'run log[gate-command-started].data.kind', values: ['setup'], file: 'subs/harness/src/tests/setup-attribution.test.ts', test: 'the build the engineer broke fails its iteration gate in scope, and the engineer repairs it from the build\'s own output' },
+  { union: 'run log.type', values: ['gate-command-waiting'], file: 'subs/harness/src/tests/gate-progress.test.ts', test: 'a composed readiness records the configured check wait and start' },
   { union: 'record ramify-agent.gate-attempt/3.cause', values: ['timeout'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['infrastructure'], file: 'subs/harness/src/tests/accepted-commit.test.ts', test: 'an unchanged retry accepts the earlier commit, and later unchanged checkpoints retain it without repeating notices' },
+  { union: 'run log[gate-attempted].data.verdict', values: ['not-verified'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
+  { union: 'record ramify-agent.gate-attempt/3.verdict', values: ['not-verified'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
+  { union: 'record ramify-agent.gate-attempt/3.next', values: ['return-to-local-architect'], file: 'subs/harness/src/tests/tree-identity.test.ts', test: 'never passes an unauthorized guarded change, whatever the commands said' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.status', values: ['failed'], file: 'subs/harness/src/tests/accepted-commit.test.ts', test: 'an unchanged retry accepts the earlier commit, and later unchanged checkpoints retain it without repeating notices' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.status', values: ['cancelled'], file: 'subs/harness/src/tests/test-lock-gate.test.ts', test: 'cancelling a gate whose configured check waits for the lock is not verified, never a pass' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.verdict', values: ['fail'], file: 'subs/harness/src/tests/audit-check-execution.test.ts', test: 'a failing configured command fails the gate with its output and no invented command record' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.reuse.requestedMode', values: ['full'], file: 'subs/harness/src/tests/audit-check-execution.test.ts', test: 'reuses applicable full evidence across an ignored-only change, keeping both source identities and executing nothing' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.reuse.requestedMode', values: ['ramify-partial'], file: 'subs/harness/src/tests/audit-check-execution.test.ts', test: 'narrows real Vitest and Cucumber checks by ownership, keeps runner discovery and empty selection as producer facts, and carries failures through a zero-selection link' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.reuse.resolution', values: ['defaulted'], file: 'subs/harness/src/tests/audit-check-execution.test.ts', test: 'reuses applicable full evidence across an ignored-only change, keeping both source identities and executing nothing' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.reuse.resolution', values: ['requested'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'cancellation during a nested project settles its process and workspace before a replacement attempt' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.projects[].verdict', values: ['fail'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'audits every eligible project, skips the external tree with its reason, and fails on a nested failure under a passing root' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.projects[].verdict', values: ['indeterminate'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'cancellation during a nested project settles its process and workspace before a replacement attempt' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.projects[].execution', values: ['reused'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'audits every eligible project, skips the external tree with its reason, and fails on a nested failure under a passing root' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.projects[].execution', values: ['not-run'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'cancellation during a nested project settles its process and workspace before a replacement attempt' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.projects[].status', values: ['cancelled'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'cancellation during a nested project settles its process and workspace before a replacement attempt' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.projects[].reuse.requestedMode', values: ['full'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'audits every eligible project, skips the external tree with its reason, and fails on a nested failure under a passing root' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.projects[].reuse.resolution', values: ['requested'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'audits every eligible project, skips the external tree with its reason, and fails on a nested failure under a passing root' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.discovery.status', values: ['indeterminate'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'indeterminate nested discovery leaves the final gate unverified, whatever the root answered' },
+  { union: 'record ramify-agent.gate-attempt/3.audit.discovery.skipped[].reason', values: ['external'], file: 'subs/harness/src/tests/project-boundary-audit.integration.test.ts', test: 'audits every eligible project, skips the external tree with its reason, and fails on a nested failure under a passing root' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].kind', values: ['ramify-check', 'type-check'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'passes when every verified command exited zero, and keeps the complete output beside the attempt' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].outcome', values: ['passed'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'passes when every verified command exited zero, and keeps the complete output beside the attempt' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].outcome', values: ['not-verified'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'records a timeout as a timeout, not as a failure' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['interrupted'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'reports what a cancelled attempt did not reach as interrupted' },
+  { union: 'run log[gate-command-waiting].data.kind', values: ['configured'], file: 'subs/harness/src/tests/gate-progress.test.ts', test: 'a composed readiness records the configured check wait and start' },
+  { union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[].type', values: ['check-finding-reported'], file: 'subs/harness/src/tests/nonfunctional-deviation-runtime.test.ts', test: 'an NFR-only exhausted run completes pending review with an exact source-bound CheckFinding' },
+  { union: 'query scenarios.scenarios[].gates[].status', values: ['passed', 'failed'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'the scenario list, the review, the progress counts, the gate summary and the event references agree with the run' },
   { union: 'record ramify-agent.gate-attempt/3.cause', values: ['guarded-change'], file: 'subs/harness/src/tests/breaking-work.test.ts', test: 'an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes' },
-  { union: 'record ramify-agent.gate-attempt/3.commands[].scenarios.selection.kind', values: ['identity'], file: 'subs/harness/src/tests/scenario-check.test.ts', test: 'a passing identity run: the profile written outside the project, its argv, and a summary that passes' },
-  { union: 'record ramify-agent.gate-attempt/3.commands[].scenarios.scenarios[].status', values: ['passed', 'failed', 'undefined', 'pending', 'ambiguous'], file: 'subs/harness/src/tests/scenario-check.test.ts', test: 'all-untagged: every tracked failure by ID, the project\'s own by count, and the pending one excluded' },
-  { union: 'record ramify-agent.gate-attempt/3.commands[].scenarios.scenarios[].status', values: ['skipped'], file: 'subs/harness/src/tests/scenario-check.test.ts', test: 'a dry run passes skipped scenarios and fails on undefined and ambiguous steps' },
   { union: 'record ramify-agent.gate-attempt/3.next', values: ['retry-infrastructure'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
   { union: 'record ramify-agent.capability/1.origin', values: ['global-decision'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the first creates a capability and revises its hypothesis; the second inherits its brief and reuses the entry' },
   { union: 'record ramify-agent.iteration-result/1.outcome', values: ['superseded'], file: 'subs/harness/src/tests/contract-revision.test.ts', test: 'an unfinished item is reused and its open assignment closes as superseded; a completed one is followed' },
@@ -580,18 +769,15 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.scenario/1.origin.kind', values: ['plan'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'analysis-accepted commits one pending scenario record per scenario, with IDs, owners, hashes and the integration owner' },
   // The composed runs start without the review stop.
   { union: 'run log.type', values: ['review-requested', 'analysis-approved'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'waits at awaiting-review holding the project, and an approval continues it to completion' },
-  { union: 'run log.type', values: ['scenario-bound-passed', 'scenario-due'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'a declaration while a requirement is open is bound and keeps its tag, passes against the fake, survives the yield, is due at requirement-verified and implemented by the work-item gate' },
-  { union: 'run log[scenario-declared].data.state', values: ['bound'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'a declaration while a requirement is open is bound and keeps its tag, passes against the fake, survives the yield, is due at requirement-verified and implemented by the work-item gate' },
-  { union: 'run log.type', values: ['scenarios-withdrawing', 'scenario-withdrawn'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'by exhaustion: the iteration spends its repair rounds, and "Withdraw sc-001" restores the pending tag at once' },
+  // The composed runs' architects report their scenarios done without an engineer binding them.
+  { union: 'run log.type', values: ['obligation-bound'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'a binding makes a scenario bound and takes its tag off before the gate that selects it; a done report finishes it, directly from pending too; the final gate runs every scenario in full mode' },
   { union: 'run log[work-item-started].data.origin', values: ['verification'], file: 'subs/harness/src/tests/contract-revision-scripted.test.ts', test: 'two consumers complete revision 1, a third revises it, and the follow-ups finish the run' },
-  { union: 'run log[work-item-started].data.origin', values: ['integration'], file: 'subs/harness/src/tests/integration-scenarios.test.ts', test: 'created by the last sub-scenario\'s implementation at the common ancestor, queued, briefed, bound at the ancestor, implemented by its iteration gate, and completed' },
-  { union: 'query work-items.workItems[].origin', values: ['integration'], file: 'subs/harness/src/tests/integration-scenarios.test.ts', test: 'created by the last sub-scenario\'s implementation at the common ancestor, queued, briefed, bound at the ancestor, implemented by its iteration gate, and completed' },
-  { union: 'run log[job-failed].data.reason', values: ['acceptance-incomplete'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'a passing final gate whose scenario check did not pass a tracked scenario does not complete the run' },
+  { union: 'run log[work-item-started].data.origin', values: ['integration'], file: 'subs/harness/src/tests/integration-scenarios.test.ts', test: 'PB3-D07 created by the last sub-scenario\'s done report and not before, at the common ancestor, queued, briefed, bound at the ancestor, reported done by its architect, and completed' },
+  { union: 'query work-items.workItems[].origin', values: ['integration'], file: 'subs/harness/src/tests/integration-scenarios.test.ts', test: 'PB3-D07 created by the last sub-scenario\'s done report and not before, at the common ancestor, queued, briefed, bound at the ancestor, reported done by its architect, and completed' },
   { union: 'command.type', values: ['approve-analysis'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'start-run with reviewStop and approve-analysis are accepted as stop-job is, and a malformed approval is refused' },
   { union: 'query runs.runs[].phase', values: ['awaiting-review'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'start-run with reviewStop and approve-analysis are accepted as stop-job is, and a malformed approval is refused' },
-  // The composed runs declare no scenario while a requirement is open; the
-  // query projects the state from scenario-declared, whose bound value
-  // scenario-states produces.
+  // The composed runs bind no scenario; the query projects the state from
+  // obligation-bound, which scenario-projections produces.
   { union: 'query scenarios.scenarios[].state', values: ['bound'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'every state, the entry\'s work item, an integration scenario without its work item yet, and no gate that did not run it' },
   // Where a failed gate's cause was read from: a Ramify report in a driven
   // run, a declared tsc output and both together at a gate of their own.
@@ -651,15 +837,26 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
   ['query gate.gate.rules[].outcome', 'record ramify-agent.gate-attempt/3.rules[].outcome'],
   ['query gate.gate.commands[].kind', 'record ramify-agent.gate-attempt/3.commands[].kind'],
   ['query gate.gate.commands[].notVerified', 'record ramify-agent.gate-attempt/3.commands[].notVerified'],
-  ['query gate.gate.commands[].selection.policy', 'record ramify-agent.gate-attempt/3.commands[].selection.policy'],
+  ['query gate.gate.audit.status', 'record ramify-agent.gate-attempt/3.audit.status'],
+  ['query gate.gate.audit.verdict', 'record ramify-agent.gate-attempt/3.audit.verdict'],
+  ['query gate.gate.audit.reuse.requestedMode', 'record ramify-agent.gate-attempt/3.audit.reuse.requestedMode'],
+  ['query gate.gate.audit.reuse.resolution', 'record ramify-agent.gate-attempt/3.audit.reuse.resolution'],
+  ['query gate.gate.audit.projects[].verdict', 'record ramify-agent.gate-attempt/3.audit.projects[].verdict'],
+  ['query gate.gate.audit.projects[].execution', 'record ramify-agent.gate-attempt/3.audit.projects[].execution'],
+  ['query gate.gate.audit.projects[].status', 'record ramify-agent.gate-attempt/3.audit.projects[].status'],
+  ['query gate.gate.audit.projects[].requestedMode', 'record ramify-agent.gate-attempt/3.audit.projects[].requestedMode'],
+  ['query gate.gate.audit.projects[].executedMode', 'record ramify-agent.gate-attempt/3.audit.projects[].executedMode'],
+  ['query gate.gate.audit.projects[].reuse.requestedMode', 'record ramify-agent.gate-attempt/3.audit.projects[].reuse.requestedMode'],
+  ['query gate.gate.audit.projects[].reuse.resolution', 'record ramify-agent.gate-attempt/3.audit.projects[].reuse.resolution'],
+  ['query gate.gate.audit.discovery.status', 'record ramify-agent.gate-attempt/3.audit.discovery.status'],
+  ['query gate.gate.audit.discovery.skipped[].reason', 'record ramify-agent.gate-attempt/3.audit.discovery.skipped[].reason'],
+  ['query work-item.iterations[].gates[].verdict', 'record ramify-agent.gate-attempt/3.verdict'],
   ['query analysis.analysis[accepted].scenarios[].kind', 'record ramify-agent.scenario/1.kind'],
   ['query analysis.analysis[accepted].scenarios[].origin.kind', 'record ramify-agent.scenario/1.origin.kind'],
   ['query analysis.analysis[accepted].warnings[].kind', 'run log[analysis-accepted].data.warnings[].kind'],
   ['query analysis.analysis[accepted].planEvidence[available].elements[].kind', 'record ramify-agent.element-catalog/1.elements[].kind'],
   ['query analysis.analysis[accepted].planEvidence[available].elements[].conditions[].source', 'record ramify-agent.element-catalog/1.elements[].conditions[].source'],
   ['query analysis.analysis[accepted].planEvidence[available].findings[].action', 'run log[analysis-accepted].data.findings[].action'],
-  ['query scenarios.scenarios[].gates[].status', 'record ramify-agent.gate-attempt/3.commands[].scenarios.scenarios[].status'],
-  ['query gate.gate.commands[].scenarios.selection.kind', 'record ramify-agent.gate-attempt/3.commands[].scenarios.selection.kind'],
 ];
 
 /**
@@ -670,15 +867,16 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  * a producer, so the list can neither hide a new gap nor outlive a closed one.
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
-  { union: 'query work-item.iterations[].gates[].cause', values: ['in-scope'], reason: 'Historical iterations may project the former in-scope cause; new ordinary gates record the neutral check-failed cause without owner attribution.' },
-  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['in-scope', 'outside-assignment'], reason: 'Historical gates retain this inferred attribution, but current gates no longer assign failure ownership from locations or scope probes.' },
-  { union: 'run log.type', values: ['capability-candidate-accepted', 'capability-review-recorded', 'capability-assignment-interrupted'],
-    reason: 'Historical capability-only transitions remain readable; current policy records ordinary iteration gates, review requests and invocation endings instead.' },
-  { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings', 'type-check-errors', 'ramify-findings-and-type-check-errors'],
-    reason: 'Historical inferred repair ownership remains readable; current gates retain provider diagnostics and agents decide the repair owner without this field.' },
+  { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.ownership.exclusions[].kind', values: ['repository', 'packages', 'generated'], reason: 'The current public rooted ownership topology does not emit these synthesized reserved path facts. Real installed F1 queries their excluded descendants; that is a path-answer witness, not a producer of captured topology table entries.' },
+  { union: 'submission local-architect[assign].assignment.scope.extra[].kind', values: ['directory'], reason: 'Current architect assignment validation rejects directory extras. Whole assigned child/project trees use included entries, and registry bootstrap creates its internal directory authority. Negative-input validation remains covered; no accepted submission produces this value.' },
+
   {
     union: 'run log[capability-assignment-settled].data.outcome', values: ['failed', 'interrupted'],
     reason: 'Current driven capability runs recover interrupted writers into a later settlement or stop the stack; no test commits these terminal settlement outcomes yet.',
+  },
+  {
+    union: 'run log[job-failed].data.reason', values: ['acceptance-incomplete'],
+    reason: 'A completion request missing a done report is a rejected submission (invalid-submission when exhausted), so no driven run reaches the final gate with a scenario not done; the rule itself is tested on incompleteScenarios, and exhausted capability-blocker refusals have no driven fixture yet.',
   },
   {
     union: 'submission engineer[capability-needed].request.examples[].designation', values: ['executable'],
@@ -686,7 +884,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   },
   {
     union: 'query analysis.analysis[accepted].planEvidence.status', values: ['unavailable'],
-    reason: 'Legacy coverage unavailability is exercised at the record helper boundary, but the current query suite does not construct an accepted legacy run for this projection branch.',
+    reason: 'Projected when the accepted catalog or incorporation file fails its integrity check against the committed event, or the captured documents cannot be read; the query suite does not corrupt a run\'s evidence files.',
   },
   {
     union: 'run log[context-package-appended].data.outcome', values: ['already-present', 'failed', 'no-session'],
@@ -741,14 +939,6 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: "The shared CheckFinding union permits this value, but the non-functional deviation event carries only its fixed source-grounded report and request-user-decision. This variant is not emitted by that carrier.",
   },
   {
-    union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.coverage', values: ['partial', 'not-run'],
-    reason: 'A witness the child accepts executed its obligation completely and passed. The scenario adapter offers partial and unrun witnesses, and the child refuses them before anything reaches the log; the refusal stays a note on the gate\'s line (scenario-findings.test.ts).',
-  },
-  {
-    union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.outcome', values: ['failed', 'inconclusive'],
-    reason: 'A witness the child accepts executed its obligation completely and passed. The scenario adapter offers failed and inconclusive witnesses, and the child refuses them before anything reaches the log; the refusal stays a note on the gate\'s line (scenario-findings.test.ts).',
-  },
-  {
     union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[waive].authority.kind', values: ['work-item-assessment', 'governing-record'],
     reason: "The shared CheckFinding union permits this value, but the non-functional deviation event carries only its fixed source-grounded report and request-user-decision. This variant is not emitted by that carrier.",
   },
@@ -763,15 +953,6 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-related].data.relation.relation', values: ['same-issue', 'related-but-distinct', 'distinct', 'uncertain'],
     reason: "The shared CheckFinding union permits this value, but the non-functional deviation event carries only its fixed source-grounded report and request-user-decision. This variant is not emitted by that carrier.",
-  },
-  {
-    union: 'run log[gate-attempted].data.scenarioFindings.refused.reason', values: ['transition-refused'],
-    reason: 'The scenario adapter decides every command of a gate\'s CheckFinding part in order before the transition decides them again, and leaves out each one the child refuses, so the transition has nothing left to refuse. The value keeps an unexpected refusal from failing the gate; it has never been reached.',
-  },
-  {
-    union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0',
-    values: ['invalid-command', 'invalid-report', 'report-key-conflict', 'ambiguous-issue-key', 'unknown-check-finding', 'unknown-report', 'stale-revision', 'invalid-transition', 'waived', 'not-waived', 'no-pending-user-decision', 'unknown-option', 'insufficient-authority', 'verification-kind-mismatch', 'factual-obligation', 'required-obligation', 'producer-mismatch', 'wrong-subject', 'source-mismatch', 'relation-self', 'cross-owner', 'relation-cycle', 'replay-conflict', 'invalid-query'],
-    reason: 'A note carries the child\'s own rejection code. The scenario adapter reports only a failure of a tracked scenario it bound itself, attaching to the one CheckFinding its key names, and offers a witness only of the same scenario for an open scenario CheckFinding of its own work item, so none of these refusals can follow; the child\'s own tests produce each one.',
   },
   {
     union: 'run log[iteration-closed].data.outcome', values: ['superseded'],
@@ -790,10 +971,6 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'A run started on pi. No pi session ran in this environment: there is no pi login, so the real trial (T2) was not run and nothing produced it. It is produced only by a real `serve --agent pi` run.',
   },
   {
-    union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['check-failed', 'in-scope', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown', 'session-lost'],
-    reason: 'An InfrastructureRecovery is written only by readiness, whose recoveries have three causes. The gate\'s own infrastructure retry reruns the gate and writes no recovery record, and a reconstructed session is recorded on the invocation, so these causes, shared with GateAttempt.cause and the session vocabulary, have no writer.',
-  },
-  {
     union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['reconstruct-session', 'none'],
     reason: 'Readiness plans only reinstall-nested, restart-daemon and rerun-command; an unrecoverable failure records no recovery at all (iteration 4, deviation 9), and session reconstruction is recorded on the invocation, not as a recovery.',
   },
@@ -806,27 +983,79 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'No code path writes it: a provider error reaches the harness as a failed session outcome, which is recorded as ended: failed with the error text and no interruption.',
   },
   {
-    union: 'record ramify-agent.gate-attempt/3.commands[].kind', values: ['conformance'],
-    reason: 'A conformance suite runs inside the project\'s own tests command, selected through extraSuites (iteration 9); no gate records a command of kind conformance.',
+    union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['local-rule-failed'],
+    reason: 'Only an in-place standalone diagnosis records it, for planned commands a failed scratch rule kept from running; a committing gate plans none, so a scratch rule failing before commit leaves its commands empty (accepted-commit.test.ts), and no test runs an in-place diagnosis over unsafe scratch.',
   },
   {
-    union: 'run log[gate-command-started].data.kind', values: ['conformance'],
-    reason: 'A gate announces the commands it plans, and no gate plans a command of kind conformance: a conformance suite runs inside the project\'s own tests command, selected through extraSuites (iteration 9).',
+    union: 'record ramify-agent.gate-attempt/3.commands[].kind', values: ['configured'],
+    reason: 'A committing gate records no harness command: its configured checks are the audit\'s, and its `commands` stay empty (iteration 9). A configured check is named only by the gate-command progress events, and an in-place diagnosis records only the planned kinds.',
   },
   {
-    union: 'record ramify-agent.gate-attempt/3.commands[].selection.policy', values: ['all-project'],
-    reason: 'An all-project checkpoint attaches no TestSelection to its commands (iteration 4, deviation 10), so no recorded selection has this policy; current gates do not run scope probes.',
+    union: 'record ramify-agent.gate-attempt/3.cause', values: ['unknown'],
+    reason: 'Unreachable in current gates: a committing gate\'s unanswered audit is a timeout or infrastructure, and an in-place diagnosis is not verified only for a timeout, runner error, missing command or interruption, each with its own cause.',
   },
   {
-    union: 'record ramify-agent.gate-attempt/3.cause', values: ['invalid-session'],
-    reason: 'A session the implementation can no longer read is detected before the gate and recorded on the invocation as a degraded session mode (iteration 6, deviation 8), so no gate attempt carries this cause.',
+    union: 'record ramify-agent.gate-attempt/3.audit.status', values: ['refused'],
+    reason: 'Written when completed provider evidence does not answer the request (another project, definition, check universe or commit); the composed audits answer their own requests, and no test hands the gate mismatched evidence.',
+  },
+  {
+    union: 'record ramify-agent.gate-attempt/3.audit.verdict', values: ['indeterminate'],
+    reason: 'The provider\'s composed verdict; no scripted or real audit in the suite composes an indeterminate one. The standalone gate-audit outcome record\'s indeterminate value is a different union.',
+  },
+  {
+    union: 'record ramify-agent.gate-attempt/3.audit.projects[].status', values: ['failed'],
+    reason: 'A nested project whose provider request failed before completing (an infrastructure failure of its preparation or execution); F4\'s projects either complete or are cancelled, and no test makes a nested request fail.',
+  },
+  {
+    union: 'record ramify-agent.gate-attempt/3.audit.projects[].status', values: ['refused'],
+    reason: 'Written when a nested project\'s completed record does not answer the request (another project, commit or a partial answer to a full request); the provider answers its own projects, and the refusal is witnessed by the audit child\'s unit tests of `configuredProjectResult`, not by a gate record.',
+  },
+  {
+    union: 'record ramify-agent.gate-attempt/3.audit.projects[].requestedMode', values: ['ramify-partial'],
+    reason: 'Only the final gate asks a nested audit, and it asks a full one: every nested project is requested full.',
+  },
+  {
+    union: 'record ramify-agent.gate-attempt/3.audit.projects[].executedMode', values: ['ramify-partial'],
+    reason: 'Only the final gate asks a nested audit, and it asks a full one; a project that executed partially is refused rather than recorded as completed.',
+  },
+  {
+    union: 'record ramify-agent.gate-attempt/3.audit.projects[].reuse.requestedMode', values: ['ramify-partial'],
+    reason: 'A nested project\'s reuse answers the full request the final gate makes; a partial request is never nested.',
+  },
+  {
+    union: 'record ramify-agent.gate-attempt/3.audit.projects[].reuse.resolution', values: ['defaulted'],
+    reason: 'The final gate requests full explicitly, so a nested project\'s reuse resolves it as requested.',
+  },
+  {
+    union: 'record ramify-agent.gate-attempt/3.audit.discovery.skipped[].reason', values: ['output', 'repository', 'packages', 'generated'],
+    reason: 'The provider\'s other exclusion kinds: a definition beneath a declared output tree, `.git`, a package directory or Ramify\'s generated views. F4 declares only an external tree, which the nested final audit witnesses.',
+  },
+  {
+    union: 'run log[gate-command-started].data.kind', values: ['ramify-check', 'type-check'],
+    reason: 'Committing gates and readiness announce each configured check as configured, and setup commands as setup (iteration 9); only an in-place diagnosis plans a Ramify check or a type check, and no test drives one through a run.',
+  },
+  {
+    union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['fix-by-check'],
+    reason: 'A check witnessed the fix only through the harness scenario producer, which gates no longer run (iteration 9); the decision itself stays a legal CheckFinding variant, decided by the child (check-findings decide.test.ts).',
+  },
+  {
+    union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.coverage', values: ['complete', 'partial', 'not-run'],
+    reason: 'No run decides fix-by-check since the harness scenario producer was removed (iteration 9).',
+  },
+  {
+    union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.outcome', values: ['passed', 'failed', 'inconclusive'],
+    reason: 'No run decides fix-by-check since the harness scenario producer was removed (iteration 9).',
+  },
+  {
+    union: 'query scenarios.scenarios[].gates[].status', values: ['undefined', 'pending', 'ambiguous', 'skipped'],
+    reason: 'Read from the provider\'s parsed Cucumber run; the composed and projection fixtures\' runs report passing and failing scenarios only, and no query test supplies a run with these statuses.',
   },
   {
     union: 'record ramify-agent.iteration-assignment/1.kind', values: ['integration'],
     reason: 'Not assignable: the architect\'s assignment body has no integration kind, and no harness path creates one. It is in the record\'s vocabulary from the proposal and has never had a use.',
   },
   {
-    union: 'record ramify-agent.iteration-assignment/1.scope.extra[].purpose', values: ['consumer'],
+    union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.extra[].purpose', values: ['consumer'],
     reason: 'The consumer is a contract scope\'s base, not an extra location (iteration 9), so no writer names it.',
   },
   {

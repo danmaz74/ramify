@@ -3,45 +3,9 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { capabilityTasksResponseSchema, type CapabilityTasksResponse } from '../../../harness/src/interfaces/protocol/capability-tasks.js';
 import type { ProtocolClient } from '../client.js';
 import { CapabilityTasksArea } from '../capability-tasks.js';
+import { capabilityTasksResponse as response } from './helpers/capability-tasks.js';
 
 afterEach(cleanup);
-
-function response(version: number, stage: 'waiting' | 'repair' | 'handed-back'): CapabilityTasksResponse {
-  const handedBack = stage === 'handed-back';
-  return capabilityTasksResponseSchema.parse({ schema: 'capability-tasks/1', version,
-    terminal: { state: 'running', reason: null, message: null },
-    requests: [{ id: 'need-001', parent: 'wi-001', assignment: 'wi-001.i01', need: 'A needs B source', outcome: 'delegated', task: 'cap-001', evidence: [] }],
-    stack: handedBack ? ['wi-001'] : ['wi-001', 'cap-001'], tasks: [{ id: 'cap-001', request: 'need-001',
-      parent: { kind: 'work-item', id: 'wi-001' }, consumer: 'a', provider: 'b',
-      status: handedBack ? 'handed-back' : stage === 'waiting' ? 'awaiting-consumer' : 'coordinating', active: !handedBack,
-      currentCoordinator: 'inv-0002', original: { need: 'A needs B source',
-        usage: [{ path: 'subs/a/src/caller.ts', symbol: 'renderA', use: 'Display B source', prospective: false }],
-        constraints: ['Keep D compatible'], knownInterface: { kind: 'none-known' },
-        suggestedProvider: { module: 'b', reason: 'B owns source' }, examples: [{ id: 'need-001.ex01', title: 'source appears',
-          code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }] },
-      source: { acceptedBase: 'base', tree: 'a'.repeat(40), delta: [{ path: 'subs/a/src/caller.ts', staged: false }] },
-      placementReason: 'B owns source', relatedEntries: [{ entry: 'b-entry', reason: 'B has its own entry' }],
-      deferredWorkItems: ['wi-002'], plan: { revision: handedBack ? 3 : 2, revisionReason: 'Consumer feedback',
-        need: 'A needs B source', proposedInterface: 'B exports readWithSource',
-        useCases: [{ id: 'need-001.ex01', expectedBehavior: 'A displays B source', derivedFrom: ['need-001.ex01'],
-          coverage: handedBack ? { state: 'exercised', tests: ['A real test'], candidate: 'tree', configuration: 'vitest' }
-            : { state: 'unresolved', reason: 'Type migration still fails' } }],
-        compatibility: ['D must migrate'], outline: ['Implement B', 'Migrate D', 'Integrate A'],
-        decisions: [{ decision: 'Place in B', reason: 'B owns the fact', evidence: [] }],
-        openQuestions: [], requirementRefs: [] },
-      assignments: stage === 'waiting' ? [] : [{ id: 'cap-001.i01', owner: 'b', purpose: 'Implement B', approach: 'Add reader',
-        status: handedBack ? 'accepted' : 'partial', intendedEvidence: ['A real test'],
-        failures: handedBack ? [] : ['Type check failed in D'] }],
-      consultations: [{ id: 'ex-001', question: 'What should A display?', references: ['subs/a/src/caller.ts'],
-        answer: stage === 'waiting' ? null : 'B source metadata', objections: [] }],
-      children: [], activeChild: null,
-      verification: { status: handedBack ? 'passed' : stage === 'repair' ? 'failed' : 'pending',
-        gates: stage === 'waiting' ? [] : ['ga-001'], reviews: [], findings: stage === 'repair' ? ['D type migration failed'] : [] },
-      handback: handedBack ? { summary: 'B source is usable by A', returnedTree: 'b'.repeat(40),
-        deltaFromSuspension: ['subs/b/src/source.ts'], interfaces: [{ path: 'subs/b/src/source.ts', symbols: ['readWithSource'], use: 'A reads source' }],
-        limitations: [], checks: [{ id: 'ga-001', revision: 1 }], reviews: [] } : null,
-    }] });
-}
 
 function client(load: (version: number) => Promise<CapabilityTasksResponse>): ProtocolClient {
   return { getCapabilityTasks: (_planId: string, _runId: string, version: number) => load(version) } as ProtocolClient;
@@ -62,6 +26,21 @@ test('CA23 CA34: the browser follows consultation, provisional failure and handb
   expect(await screen.findByText('B source is usable by A')).toBeTruthy();
   expect(screen.getByText(/Handback does not complete them/)).toBeTruthy();
   expect(screen.getByText(/Original assignment and separate entry work require their own completion/)).toBeTruthy();
+});
+
+test('PB3-D08: examples are the request\'s context and the handback is the architect\'s report, with no per-example state', async () => {
+  const pending = render(<CapabilityTasksArea client={client(async () => response(2, 'repair'))} planId="p" runId="r" version={2} />);
+  const reports = await screen.findByRole('region', { name: 'Architect reports of cap-001' });
+  expect(reports.textContent).toContain('cap-001 · delegated outcome · pending · no architect report');
+  expect(screen.getByText(/The request's original examples, unchanged by plan revisions/)).toBeTruthy();
+  expect(screen.getByText(/need-001.ex01/, { selector: 'strong' }).parentElement?.textContent).toBe('need-001.ex01: A displays B source');
+  for (const state of ['unresolved', 'exercised', 'corrected']) expect(screen.queryByText(new RegExp(state))).toBeNull();
+  pending.unmount();
+  render(<CapabilityTasksArea client={client(async () => response(3, 'handed-back'))} planId="p" runId="r" version={3} />);
+  expect((await screen.findByRole('region', { name: 'Architect reports of cap-001' })).textContent)
+    .toContain('cap-001 · delegated outcome · done · architect report done by inv-0002 (revision 1), where: subs/b/src/source.ts readWithSource');
+  expect(screen.getByText(/Handed back on the architect's report:/).textContent)
+    .toBe("Handed back on the architect's report: cap-001 done by inv-0002, where: subs/b/src/source.ts readWithSource.");
 });
 
 test('a slow old response cannot replace the newer task and plan revision', async () => {

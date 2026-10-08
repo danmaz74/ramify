@@ -1,5 +1,9 @@
 # Iteration 0: Pi and session lifecycle spike
 
+Historical brief: the iteration completed, and its obsolete `spikes/` tree
+was removed on 2026-10-04. The [results](iteration0-results.md) remain;
+the paths and commands below describe the original execution.
+
 **Goal:** answer, against the pinned SDK and not against documentation, whether
 each session behavior the plan depends on exists, and return the revisions the
 plan needs. Also re-establish the complete baseline before any change.

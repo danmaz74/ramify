@@ -110,7 +110,7 @@ describe('ST06: transcript content through the port', () => {
       expect(made).toBeGreaterThanOrEqual(0);
       expect(harness.events.indexOf(assistant[made]!)).toBeLessThan(harness.events.indexOf(result));
     }
-    expect(results[0]!.blocks).toEqual([{ type: 'text', text: expect.stringContaining('module demo') }]);
+    expect(results[0]!.blocks).toEqual([{ type: 'text', text: expect.stringContaining('root module demo') }]);
     expect(results[2]!.blocks).toEqual([{ type: 'text', text: 'The submission was accepted and recorded.' }]);
 
     // The events hold every conversation message pi's own file holds, and none

@@ -8,7 +8,7 @@ import { addModule, assign, byRole, completionProposed, installMiniRunner, outli
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -237,7 +237,7 @@ async function run(root: string, plan: Parameters<typeof byRole>[0], commits: re
   const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits], previews: final.previews });
   const opened = await openRuns(root, {
     script: byRole(plan), inputs: treeInputs(), git, candidates: final.candidates,
-    readinessExecution: directReadinessExecution(),
+
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
@@ -429,7 +429,7 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
     expect(first.verdict).toBe('failed');
     // Nothing the harness spawned failed: the verdict is the rule's.
     expect(first.commands.every(command => command.outcome === 'passed')).toBe(true);
-    // The rule is the engineer's to repair, so the attempt's cause is in-scope.
+    // A failed rule is a check failure for the engineer to repair.
     expect(first.cause).toBe('check-failed');
     expect(first.commit).not.toBeNull();
     expect(first.audited).toBe(first.commit);
@@ -459,10 +459,10 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
     expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02']);
     expect(contractGates.map(attempt => attempt.commit)).toEqual(['revision-01', null, null]);
     expect(contractGates.slice(1).map(attempt => attempt.head)).toEqual(['revision-01', 'revision-01']);
-    // No attempt at the agreement was ever accepted, so every observation
-    // the run made was taken against the feature files' commit it worked
-    // from: a failed attempt's commit is not a boundary.
-    expect([...new Set(git.bases('changedPaths'))]).toEqual(['scenarios-of-review-notes']);
+    // Failed contract commits never advance the accepted boundary. Producer
+    // preparation observes the initial head; the shared final authority guard
+    // observes the later accepted repair boundary.
+    expect([...new Set(git.bases('changedPaths'))]).toEqual(['revision-00', 'scenarios-of-review-notes', 'revision-02']);
     expect([...new Set(git.bases('changedEntries'))]).toEqual(['scenarios-of-review-notes']);
     expect(git.bases('diffNameStatus')).toEqual(['scenarios-of-review-notes']);
     git.assertAnswered();

@@ -211,12 +211,10 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
         failure = { reason: event.data.reason, message: event.data.message, evidence: event.data.evidence };
         break;
       default:
-        // A scenario event moves one scenario by the events table. The
-        // harness commits no transition the table rejects, so one that is
-        // rejected here leaves the states as they were.
+        // An accepted binding or report moves one scenario; one naming
+        // another kind of obligation moves none.
         if ((scenarioEventTypes as readonly string[]).includes(event.type)) {
-          const applied = applyScenarioEvent(scenarios, event as unknown as ScenarioEvent);
-          if (applied.ok) scenarios = applied.states;
+          scenarios = applyScenarioEvent(scenarios, event as unknown as ScenarioEvent);
         }
         break;
     }

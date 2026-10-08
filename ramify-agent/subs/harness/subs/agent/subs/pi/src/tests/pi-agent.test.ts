@@ -1,3 +1,4 @@
+import { rootDescription } from '../../../../../../src/tests/helpers/root-description.js';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
@@ -43,7 +44,7 @@ async function run(steps: readonly ReplyStep[], options: {
 } = {}): Promise<Harness> {
   const workingDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-pi-cwd-'));
   cleanups.push(() => rm(workingDirectory, { recursive: true, force: true }));
-  await writeFile(join(workingDirectory, 'module.ramify'), 'ramify 1\nmodule demo\n');
+  await writeFile(join(workingDirectory, 'module.ramify'), rootDescription('demo'));
   await mkdir(join(workingDirectory, 'subs'));
   await writeFile(join(workingDirectory, 'subs', 'notes.md'), 'expose-sub appears here\n');
   const sessionDirectory = join(workingDirectory, 'session');
@@ -137,7 +138,7 @@ describe('the pi adapter', () => {
     // The built-in read ran for real on the working directory, and the echo tool's result reached the model.
     const toolResults = harness.scripted.requests[2]!.messages.filter(message => message.role === 'toolResult');
     expect(JSON.stringify(toolResults)).toContain('echo hello');
-    expect(JSON.stringify(harness.scripted.requests[1]!.messages)).toContain('module demo');
+    expect(JSON.stringify(harness.scripted.requests[1]!.messages)).toContain('root module demo');
   });
 
   test('returns a rejection to the same session, which corrects its submission', async () => {

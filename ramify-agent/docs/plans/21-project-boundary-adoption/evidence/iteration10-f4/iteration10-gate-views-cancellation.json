@@ -1,0 +1,1526 @@
+{
+  "schema": "plan21.iteration10.gate-views/1",
+  "source": "project-boundary-audit.integration.test.ts",
+  "gates": {
+    "cancelled": {
+      "id": "ga-0001",
+      "checkpoint": "final",
+      "subject": {},
+      "repairRound": 0,
+      "infrastructureAttempt": 0,
+      "head": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "commit": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "audited": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "evidence": {
+        "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+        "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+        "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+      },
+      "provider": {
+        "result": {
+          "status": "completed",
+          "requestId": "run-configured-witness:ga-0001",
+          "runId": "8278249d-3956-43db-92c2-5356c50e1a53",
+          "summary": {
+            "evidenceSchemaVersion": 4,
+            "execution": {
+              "requestId": "run-configured-witness:ga-0001",
+              "runId": "8278249d-3956-43db-92c2-5356c50e1a53"
+            },
+            "producer": {
+              "name": "ramify-audit",
+              "version": "0.7.2"
+            },
+            "undetectedConfigFilesForcingFullAudit": [],
+            "coverage": {
+              "status": "declared",
+              "selector": {
+                "id": "full",
+                "version": "1",
+                "config": {},
+                "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+              },
+              "universe": {
+                "id": "project:.",
+                "digest": "sha256:67495d1986f8f6d8c53f129530b1a036f13ccf68e55aad45553bd7df7ad8dac8",
+                "checkIds": [
+                  "root-check"
+                ],
+                "testUnitIds": [
+                  "root"
+                ]
+              },
+              "selection": {
+                "kind": "full",
+                "selectedCheckIds": [
+                  "root-check"
+                ],
+                "omittedCheckIds": [],
+                "selectedTestUnitIds": [
+                  "root"
+                ],
+                "omittedTestUnitIds": []
+              },
+              "claim": {
+                "configuration": {
+                  "blob": "652662174f83964710cb7c6015d414e8bbcea16e",
+                  "path": "ramify-audit.json",
+                  "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2"
+                },
+                "scope": "repository"
+              },
+              "projectRoot": ".",
+              "expectedFiles": {
+                "contract": "runner-configured-files/1",
+                "source": "not-needed",
+                "expected": 0,
+                "run": 0,
+                "missing": [],
+                "status": "complete",
+                "runnerConfigFiles": []
+              }
+            },
+            "mode": {
+              "requestedMode": "full",
+              "resolution": "requested",
+              "executedMode": "full"
+            },
+            "overall": "pass",
+            "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "sourceTree": "1864ab25e1bfbe22f03e101b0b9c740f49225024",
+            "sourceBranch": "main",
+            "auditedAt": "2026-10-08T05:20:12.175Z",
+            "durationSeconds": 0.067,
+            "checks": {
+              "root-check": {
+                "commands": {
+                  "root": {
+                    "durationSeconds": 0.024,
+                    "output": "Command completed with no output",
+                    "passed": true,
+                    "status": "pass",
+                    "summary": "Command completed with no output"
+                  }
+                },
+                "durationSeconds": 0.024,
+                "output": "### root [PASS]\nCommand completed with no output",
+                "passed": true,
+                "status": "pass",
+                "summary": "root: PASS"
+              }
+            },
+            "workspacePreparation": {
+              "preparationId": "nodejs",
+              "payload": {
+                "linkedPackageDirectories": [
+                  ""
+                ],
+                "projectPrefix": "",
+                "setupCommands": []
+              }
+            },
+            "definitions": {
+              "digest": "sha256:e80afc97e0d76e85cc5c44da2143276d271cf3c857c505c04d404bb60a99c71a",
+              "manifest": {
+                "manifestVersion": 1,
+                "workingDirectory": ".",
+                "checks": [
+                  {
+                    "id": "root-check",
+                    "dependsOn": [],
+                    "requiresPackageScripts": [],
+                    "executor": {
+                      "kind": "command",
+                      "parallel": false,
+                      "mutex": false,
+                      "continueOnFailure": true,
+                      "commands": [
+                        {
+                          "name": "root",
+                          "cmd": "node",
+                          "args": [
+                            "-e",
+                            "require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-baRmnQ/runs\", \"root\\n\")"
+                          ],
+                          "parser": "none",
+                          "contracts": null,
+                          "timeoutMs": 120000,
+                          "env": {}
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "workspacePreparation": {
+                  "preparationId": "nodejs",
+                  "optionsDigest": "sha256:568fad48d1ba58748d2eecb1bc90d7a15e489543325bd70f7071ac3f51601b5f"
+                }
+              }
+            }
+          },
+          "refs": {
+            "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+            "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+            "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit show b8328afb97032c1ab81718e9db89703767a616c2",
+            "git show refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+          ],
+          "composition": {
+            "verdict": "pass",
+            "scoped": false,
+            "chainDepth": 0,
+            "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b"
+          },
+          "projects": [
+            {
+              "projectRoot": ".",
+              "verdict": "pass",
+              "execution": "ran",
+              "failures": [],
+              "result": {
+                "status": "completed",
+                "requestId": "run-configured-witness:ga-0001",
+                "runId": "8278249d-3956-43db-92c2-5356c50e1a53",
+                "summary": {
+                  "evidenceSchemaVersion": 4,
+                  "execution": {
+                    "requestId": "run-configured-witness:ga-0001",
+                    "runId": "8278249d-3956-43db-92c2-5356c50e1a53"
+                  },
+                  "producer": {
+                    "name": "ramify-audit",
+                    "version": "0.7.2"
+                  },
+                  "undetectedConfigFilesForcingFullAudit": [],
+                  "coverage": {
+                    "status": "declared",
+                    "selector": {
+                      "id": "full",
+                      "version": "1",
+                      "config": {},
+                      "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+                    },
+                    "universe": {
+                      "id": "project:.",
+                      "digest": "sha256:67495d1986f8f6d8c53f129530b1a036f13ccf68e55aad45553bd7df7ad8dac8",
+                      "checkIds": [
+                        "root-check"
+                      ],
+                      "testUnitIds": [
+                        "root"
+                      ]
+                    },
+                    "selection": {
+                      "kind": "full",
+                      "selectedCheckIds": [
+                        "root-check"
+                      ],
+                      "omittedCheckIds": [],
+                      "selectedTestUnitIds": [
+                        "root"
+                      ],
+                      "omittedTestUnitIds": []
+                    },
+                    "claim": {
+                      "configuration": {
+                        "blob": "652662174f83964710cb7c6015d414e8bbcea16e",
+                        "path": "ramify-audit.json",
+                        "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2"
+                      },
+                      "scope": "repository"
+                    },
+                    "projectRoot": ".",
+                    "expectedFiles": {
+                      "contract": "runner-configured-files/1",
+                      "source": "not-needed",
+                      "expected": 0,
+                      "run": 0,
+                      "missing": [],
+                      "status": "complete",
+                      "runnerConfigFiles": []
+                    }
+                  },
+                  "mode": {
+                    "requestedMode": "full",
+                    "resolution": "requested",
+                    "executedMode": "full"
+                  },
+                  "overall": "pass",
+                  "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+                  "sourceTree": "1864ab25e1bfbe22f03e101b0b9c740f49225024",
+                  "sourceBranch": "main",
+                  "auditedAt": "2026-10-08T05:20:12.175Z",
+                  "durationSeconds": 0.067,
+                  "checks": {
+                    "root-check": {
+                      "commands": {
+                        "root": {
+                          "durationSeconds": 0.024,
+                          "output": "Command completed with no output",
+                          "passed": true,
+                          "status": "pass",
+                          "summary": "Command completed with no output"
+                        }
+                      },
+                      "durationSeconds": 0.024,
+                      "output": "### root [PASS]\nCommand completed with no output",
+                      "passed": true,
+                      "status": "pass",
+                      "summary": "root: PASS"
+                    }
+                  },
+                  "workspacePreparation": {
+                    "preparationId": "nodejs",
+                    "payload": {
+                      "linkedPackageDirectories": [
+                        ""
+                      ],
+                      "projectPrefix": "",
+                      "setupCommands": []
+                    }
+                  },
+                  "definitions": {
+                    "digest": "sha256:e80afc97e0d76e85cc5c44da2143276d271cf3c857c505c04d404bb60a99c71a",
+                    "manifest": {
+                      "manifestVersion": 1,
+                      "workingDirectory": ".",
+                      "checks": [
+                        {
+                          "id": "root-check",
+                          "dependsOn": [],
+                          "requiresPackageScripts": [],
+                          "executor": {
+                            "kind": "command",
+                            "parallel": false,
+                            "mutex": false,
+                            "continueOnFailure": true,
+                            "commands": [
+                              {
+                                "name": "root",
+                                "cmd": "node",
+                                "args": [
+                                  "-e",
+                                  "require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-baRmnQ/runs\", \"root\\n\")"
+                                ],
+                                "parser": "none",
+                                "contracts": null,
+                                "timeoutMs": 120000,
+                                "env": {}
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "workspacePreparation": {
+                        "preparationId": "nodejs",
+                        "optionsDigest": "sha256:568fad48d1ba58748d2eecb1bc90d7a15e489543325bd70f7071ac3f51601b5f"
+                      }
+                    }
+                  }
+                },
+                "refs": {
+                  "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+                  "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+                  "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+                },
+                "retrievalCommands": [
+                  "git notes --ref=audit show b8328afb97032c1ab81718e9db89703767a616c2",
+                  "git show refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+                ],
+                "composition": {
+                  "verdict": "pass",
+                  "scoped": false,
+                  "chainDepth": 0,
+                  "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b"
+                }
+              }
+            },
+            {
+              "projectRoot": "engine",
+              "verdict": "pass",
+              "execution": "ran",
+              "failures": [],
+              "result": {
+                "status": "completed",
+                "requestId": "eeff0c79-7fa8-4e5f-92f5-31953010d1c5",
+                "runId": "2946603d-ec83-4a41-9c57-9720427ddda5",
+                "summary": {
+                  "evidenceSchemaVersion": 4,
+                  "execution": {
+                    "requestId": "eeff0c79-7fa8-4e5f-92f5-31953010d1c5",
+                    "runId": "2946603d-ec83-4a41-9c57-9720427ddda5"
+                  },
+                  "producer": {
+                    "name": "ramify-audit",
+                    "version": "0.7.2"
+                  },
+                  "undetectedConfigFilesForcingFullAudit": [],
+                  "ignorePaths": [
+                    "docs/**"
+                  ],
+                  "coverage": {
+                    "status": "declared",
+                    "selector": {
+                      "id": "full",
+                      "version": "1",
+                      "config": {},
+                      "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+                    },
+                    "universe": {
+                      "id": "project:engine",
+                      "digest": "sha256:aeebedf472b39aa647abd91864643adb0ecd3b659261fc9077f0b3a26ad3d350",
+                      "checkIds": [
+                        "engine-check"
+                      ],
+                      "testUnitIds": [
+                        "engine"
+                      ]
+                    },
+                    "selection": {
+                      "kind": "full",
+                      "selectedCheckIds": [
+                        "engine-check"
+                      ],
+                      "omittedCheckIds": [],
+                      "selectedTestUnitIds": [
+                        "engine"
+                      ],
+                      "omittedTestUnitIds": []
+                    },
+                    "claim": {
+                      "configuration": {
+                        "blob": "0a25f6e110dd910b9210298ca4a2fe9317e69804",
+                        "path": "engine/ramify-audit.json",
+                        "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2"
+                      },
+                      "scope": "repository"
+                    },
+                    "projectRoot": "engine"
+                  },
+                  "mode": {
+                    "requestedMode": "full",
+                    "resolution": "requested",
+                    "executedMode": "full"
+                  },
+                  "overall": "pass",
+                  "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+                  "sourceTree": "1864ab25e1bfbe22f03e101b0b9c740f49225024",
+                  "sourceBranch": "main",
+                  "auditedAt": "2026-10-08T05:20:12.816Z",
+                  "durationSeconds": 0.066,
+                  "checks": {
+                    "engine-check": {
+                      "commands": {
+                        "engine": {
+                          "durationSeconds": 0.026,
+                          "output": "Command completed with no output",
+                          "passed": true,
+                          "status": "pass",
+                          "summary": "Command completed with no output"
+                        }
+                      },
+                      "durationSeconds": 0.031,
+                      "output": "### engine [PASS]\nCommand completed with no output",
+                      "passed": true,
+                      "status": "pass",
+                      "summary": "engine: PASS"
+                    }
+                  },
+                  "workspacePreparation": {
+                    "preparationId": "nodejs",
+                    "payload": {
+                      "linkedPackageDirectories": [],
+                      "projectPrefix": "engine",
+                      "setupCommands": []
+                    }
+                  },
+                  "definitions": {
+                    "digest": "sha256:74f1cc74a49ad20f6a81fb3b0d14224345fa2e057c9f99e0e7415756ca74d5e2",
+                    "manifest": {
+                      "manifestVersion": 1,
+                      "workingDirectory": "engine",
+                      "checks": [
+                        {
+                          "id": "engine-check",
+                          "dependsOn": [],
+                          "requiresPackageScripts": [],
+                          "executor": {
+                            "kind": "command",
+                            "parallel": false,
+                            "mutex": false,
+                            "continueOnFailure": true,
+                            "commands": [
+                              {
+                                "name": "engine",
+                                "cmd": "node",
+                                "args": [
+                                  "-e",
+                                  "require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-baRmnQ/runs\", \"engine\\n\")"
+                                ],
+                                "parser": "none",
+                                "contracts": null,
+                                "timeoutMs": 120000,
+                                "env": {}
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "workspacePreparation": {
+                        "preparationId": "nodejs",
+                        "optionsDigest": "sha256:b1a9cfd7e933eb26d4f32643287d5525998099b89bb4b3c69a7223ecc14683e7"
+                      }
+                    }
+                  }
+                },
+                "refs": {
+                  "reportCommit": "ab5ba7dc4750027ff118f31259c77045553545bb",
+                  "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9",
+                  "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+                },
+                "retrievalCommands": [
+                  "git notes --ref=audit-projects/engine-ed9f6f250686 show b8328afb97032c1ab81718e9db89703767a616c2",
+                  "git show refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+                ],
+                "composition": {
+                  "verdict": "pass",
+                  "scoped": false,
+                  "chainDepth": 0,
+                  "reportCommit": "ab5ba7dc4750027ff118f31259c77045553545bb"
+                }
+              }
+            },
+            {
+              "projectRoot": "engine/tools",
+              "verdict": "indeterminate",
+              "execution": "not-run",
+              "failures": [
+                "engine-tools: CANCELLED"
+              ],
+              "result": {
+                "status": "cancelled",
+                "requestId": "b27bda3a-f59b-4b9c-b046-fdf0a4c0b734",
+                "runId": "f922afee-1d62-4546-9e9b-a5c9a14c065b",
+                "reason": "engine-tools: CANCELLED"
+              }
+            }
+          ],
+          "discovery": {
+            "status": "complete",
+            "skipped": [
+              {
+                "projectRoot": "vendor/lib",
+                "enclosingProject": ".",
+                "reason": "external",
+                "directory": "vendor"
+              }
+            ],
+            "unavailable": []
+          },
+          "invocationVerdict": "indeterminate"
+        },
+        "checks": {
+          "root-check": {
+            "commands": {
+              "root": {
+                "durationSeconds": 0.024,
+                "output": "Command completed with no output",
+                "passed": true,
+                "status": "pass",
+                "summary": "Command completed with no output"
+              }
+            },
+            "durationSeconds": 0.024,
+            "output": "### root [PASS]\nCommand completed with no output",
+            "passed": true,
+            "status": "pass",
+            "summary": "root: PASS"
+          }
+        }
+      },
+      "audit": {
+        "requestId": "run-configured-witness:ga-0001",
+        "mode": "full",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "652662174f83964710cb7c6015d414e8bbcea16e"
+        },
+        "requestedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+        "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+        "requestedMode": "full",
+        "executedMode": "full",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "indeterminate",
+        "detail": "invocation indeterminate over 3 projects; indeterminate: engine/tools; skipped: vendor/lib (external)",
+        "nested": true,
+        "projects": [
+          {
+            "projectRoot": ".",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "run-configured-witness:ga-0001",
+            "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+              "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+              "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit show b8328afb97032c1ab81718e9db89703767a616c2",
+              "git show refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.067,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "eeff0c79-7fa8-4e5f-92f5-31953010d1c5",
+            "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9",
+              "reportCommit": "ab5ba7dc4750027ff118f31259c77045553545bb",
+              "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/engine-ed9f6f250686 show b8328afb97032c1ab81718e9db89703767a616c2",
+              "git show refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.066,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine/tools",
+            "verdict": "indeterminate",
+            "execution": "not-run",
+            "status": "cancelled",
+            "failures": [
+              "engine-tools: CANCELLED"
+            ],
+            "requestId": "b27bda3a-f59b-4b9c-b046-fdf0a4c0b734",
+            "auditedSourceCommit": null,
+            "requestedMode": null,
+            "executedMode": null,
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": null,
+            "retrievalCommands": [],
+            "durationSeconds": null,
+            "counts": null,
+            "detail": "engine-tools: CANCELLED"
+          }
+        ],
+        "discovery": {
+          "status": "complete",
+          "skipped": [
+            {
+              "projectRoot": "vendor/lib",
+              "enclosingProject": ".",
+              "reason": "external",
+              "directory": "vendor"
+            }
+          ],
+          "unavailable": []
+        }
+      },
+      "scenarios": [],
+      "verdict": "not-verified",
+      "cause": "infrastructure",
+      "next": "retry-infrastructure",
+      "guardedChanges": [],
+      "rules": [],
+      "commands": []
+    },
+    "replacement": {
+      "id": "ga-0002",
+      "checkpoint": "final",
+      "subject": {},
+      "repairRound": 0,
+      "infrastructureAttempt": 0,
+      "head": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "commit": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "audited": "b8328afb97032c1ab81718e9db89703767a616c2",
+      "evidence": {
+        "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+        "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+        "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+      },
+      "provider": {
+        "result": {
+          "status": "completed",
+          "requestId": "run-configured-witness:ga-0002",
+          "runId": "9b90404e-b14a-4489-b095-97a5494754e1",
+          "summary": {
+            "auditedAt": "2026-10-08T05:20:12.175Z",
+            "checks": {
+              "root-check": {
+                "commands": {
+                  "root": {
+                    "durationSeconds": 0.024,
+                    "output": "Command completed with no output",
+                    "passed": true,
+                    "status": "pass",
+                    "summary": "Command completed with no output"
+                  }
+                },
+                "durationSeconds": 0.024,
+                "output": "### root [PASS]\nCommand completed with no output",
+                "passed": true,
+                "status": "pass",
+                "summary": "root: PASS"
+              }
+            },
+            "coverage": {
+              "claim": {
+                "configuration": {
+                  "blob": "652662174f83964710cb7c6015d414e8bbcea16e",
+                  "path": "ramify-audit.json",
+                  "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2"
+                },
+                "scope": "repository"
+              },
+              "expectedFiles": {
+                "contract": "runner-configured-files/1",
+                "expected": 0,
+                "missing": [],
+                "run": 0,
+                "runnerConfigFiles": [],
+                "source": "not-needed",
+                "status": "complete"
+              },
+              "projectRoot": ".",
+              "selection": {
+                "kind": "full",
+                "omittedCheckIds": [],
+                "omittedTestUnitIds": [],
+                "selectedCheckIds": [
+                  "root-check"
+                ],
+                "selectedTestUnitIds": [
+                  "root"
+                ]
+              },
+              "selector": {
+                "config": {},
+                "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+                "id": "full",
+                "version": "1"
+              },
+              "status": "declared",
+              "universe": {
+                "checkIds": [
+                  "root-check"
+                ],
+                "digest": "sha256:67495d1986f8f6d8c53f129530b1a036f13ccf68e55aad45553bd7df7ad8dac8",
+                "id": "project:.",
+                "testUnitIds": [
+                  "root"
+                ]
+              }
+            },
+            "definitions": {
+              "digest": "sha256:e80afc97e0d76e85cc5c44da2143276d271cf3c857c505c04d404bb60a99c71a",
+              "manifest": {
+                "checks": [
+                  {
+                    "dependsOn": [],
+                    "executor": {
+                      "commands": [
+                        {
+                          "args": [
+                            "-e",
+                            "require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-baRmnQ/runs\", \"root\\n\")"
+                          ],
+                          "cmd": "node",
+                          "contracts": null,
+                          "env": {},
+                          "name": "root",
+                          "parser": "none",
+                          "timeoutMs": 120000
+                        }
+                      ],
+                      "continueOnFailure": true,
+                      "kind": "command",
+                      "mutex": false,
+                      "parallel": false
+                    },
+                    "id": "root-check",
+                    "requiresPackageScripts": []
+                  }
+                ],
+                "manifestVersion": 1,
+                "workingDirectory": ".",
+                "workspacePreparation": {
+                  "optionsDigest": "sha256:568fad48d1ba58748d2eecb1bc90d7a15e489543325bd70f7071ac3f51601b5f",
+                  "preparationId": "nodejs"
+                }
+              }
+            },
+            "durationSeconds": 0.067,
+            "evidenceSchemaVersion": 4,
+            "execution": {
+              "requestId": "run-configured-witness:ga-0001",
+              "runId": "8278249d-3956-43db-92c2-5356c50e1a53"
+            },
+            "mode": {
+              "executedMode": "full",
+              "requestedMode": "full",
+              "resolution": "requested"
+            },
+            "overall": "pass",
+            "producer": {
+              "name": "ramify-audit",
+              "version": "0.7.2"
+            },
+            "sourceBranch": "main",
+            "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "sourceTree": "1864ab25e1bfbe22f03e101b0b9c740f49225024",
+            "undetectedConfigFilesForcingFullAudit": [],
+            "workspacePreparation": {
+              "payload": {
+                "linkedPackageDirectories": [
+                  ""
+                ],
+                "projectPrefix": "",
+                "setupCommands": []
+              },
+              "preparationId": "nodejs"
+            }
+          },
+          "refs": {
+            "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+            "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+            "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit show b8328afb97032c1ab81718e9db89703767a616c2",
+            "git show refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+          ],
+          "reused": {
+            "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "auditedCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "ignoredChangedPaths": [],
+            "requestedMode": "full",
+            "resolution": "requested"
+          },
+          "composition": {
+            "verdict": "pass",
+            "scoped": false,
+            "chainDepth": 0,
+            "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b"
+          },
+          "projects": [
+            {
+              "projectRoot": ".",
+              "verdict": "pass",
+              "execution": "reused",
+              "failures": [],
+              "result": {
+                "status": "completed",
+                "requestId": "run-configured-witness:ga-0002",
+                "runId": "9b90404e-b14a-4489-b095-97a5494754e1",
+                "summary": {
+                  "auditedAt": "2026-10-08T05:20:12.175Z",
+                  "checks": {
+                    "root-check": {
+                      "commands": {
+                        "root": {
+                          "durationSeconds": 0.024,
+                          "output": "Command completed with no output",
+                          "passed": true,
+                          "status": "pass",
+                          "summary": "Command completed with no output"
+                        }
+                      },
+                      "durationSeconds": 0.024,
+                      "output": "### root [PASS]\nCommand completed with no output",
+                      "passed": true,
+                      "status": "pass",
+                      "summary": "root: PASS"
+                    }
+                  },
+                  "coverage": {
+                    "claim": {
+                      "configuration": {
+                        "blob": "652662174f83964710cb7c6015d414e8bbcea16e",
+                        "path": "ramify-audit.json",
+                        "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2"
+                      },
+                      "scope": "repository"
+                    },
+                    "expectedFiles": {
+                      "contract": "runner-configured-files/1",
+                      "expected": 0,
+                      "missing": [],
+                      "run": 0,
+                      "runnerConfigFiles": [],
+                      "source": "not-needed",
+                      "status": "complete"
+                    },
+                    "projectRoot": ".",
+                    "selection": {
+                      "kind": "full",
+                      "omittedCheckIds": [],
+                      "omittedTestUnitIds": [],
+                      "selectedCheckIds": [
+                        "root-check"
+                      ],
+                      "selectedTestUnitIds": [
+                        "root"
+                      ]
+                    },
+                    "selector": {
+                      "config": {},
+                      "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+                      "id": "full",
+                      "version": "1"
+                    },
+                    "status": "declared",
+                    "universe": {
+                      "checkIds": [
+                        "root-check"
+                      ],
+                      "digest": "sha256:67495d1986f8f6d8c53f129530b1a036f13ccf68e55aad45553bd7df7ad8dac8",
+                      "id": "project:.",
+                      "testUnitIds": [
+                        "root"
+                      ]
+                    }
+                  },
+                  "definitions": {
+                    "digest": "sha256:e80afc97e0d76e85cc5c44da2143276d271cf3c857c505c04d404bb60a99c71a",
+                    "manifest": {
+                      "checks": [
+                        {
+                          "dependsOn": [],
+                          "executor": {
+                            "commands": [
+                              {
+                                "args": [
+                                  "-e",
+                                  "require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-baRmnQ/runs\", \"root\\n\")"
+                                ],
+                                "cmd": "node",
+                                "contracts": null,
+                                "env": {},
+                                "name": "root",
+                                "parser": "none",
+                                "timeoutMs": 120000
+                              }
+                            ],
+                            "continueOnFailure": true,
+                            "kind": "command",
+                            "mutex": false,
+                            "parallel": false
+                          },
+                          "id": "root-check",
+                          "requiresPackageScripts": []
+                        }
+                      ],
+                      "manifestVersion": 1,
+                      "workingDirectory": ".",
+                      "workspacePreparation": {
+                        "optionsDigest": "sha256:568fad48d1ba58748d2eecb1bc90d7a15e489543325bd70f7071ac3f51601b5f",
+                        "preparationId": "nodejs"
+                      }
+                    }
+                  },
+                  "durationSeconds": 0.067,
+                  "evidenceSchemaVersion": 4,
+                  "execution": {
+                    "requestId": "run-configured-witness:ga-0001",
+                    "runId": "8278249d-3956-43db-92c2-5356c50e1a53"
+                  },
+                  "mode": {
+                    "executedMode": "full",
+                    "requestedMode": "full",
+                    "resolution": "requested"
+                  },
+                  "overall": "pass",
+                  "producer": {
+                    "name": "ramify-audit",
+                    "version": "0.7.2"
+                  },
+                  "sourceBranch": "main",
+                  "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+                  "sourceTree": "1864ab25e1bfbe22f03e101b0b9c740f49225024",
+                  "undetectedConfigFilesForcingFullAudit": [],
+                  "workspacePreparation": {
+                    "payload": {
+                      "linkedPackageDirectories": [
+                        ""
+                      ],
+                      "projectPrefix": "",
+                      "setupCommands": []
+                    },
+                    "preparationId": "nodejs"
+                  }
+                },
+                "refs": {
+                  "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+                  "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+                  "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+                },
+                "retrievalCommands": [
+                  "git notes --ref=audit show b8328afb97032c1ab81718e9db89703767a616c2",
+                  "git show refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+                ],
+                "reused": {
+                  "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+                  "auditedCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+                  "ignoredChangedPaths": [],
+                  "requestedMode": "full",
+                  "resolution": "requested"
+                },
+                "composition": {
+                  "verdict": "pass",
+                  "scoped": false,
+                  "chainDepth": 0,
+                  "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b"
+                }
+              }
+            },
+            {
+              "projectRoot": "engine",
+              "verdict": "pass",
+              "execution": "reused",
+              "failures": [],
+              "result": {
+                "status": "completed",
+                "requestId": "e9e40970-5b3c-4c14-9c53-f13345f584b0",
+                "runId": "8ef46d8b-1605-4c0e-bc07-77c6b9da453c",
+                "summary": {
+                  "auditedAt": "2026-10-08T05:20:12.816Z",
+                  "checks": {
+                    "engine-check": {
+                      "commands": {
+                        "engine": {
+                          "durationSeconds": 0.026,
+                          "output": "Command completed with no output",
+                          "passed": true,
+                          "status": "pass",
+                          "summary": "Command completed with no output"
+                        }
+                      },
+                      "durationSeconds": 0.031,
+                      "output": "### engine [PASS]\nCommand completed with no output",
+                      "passed": true,
+                      "status": "pass",
+                      "summary": "engine: PASS"
+                    }
+                  },
+                  "coverage": {
+                    "claim": {
+                      "configuration": {
+                        "blob": "0a25f6e110dd910b9210298ca4a2fe9317e69804",
+                        "path": "engine/ramify-audit.json",
+                        "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2"
+                      },
+                      "scope": "repository"
+                    },
+                    "projectRoot": "engine",
+                    "selection": {
+                      "kind": "full",
+                      "omittedCheckIds": [],
+                      "omittedTestUnitIds": [],
+                      "selectedCheckIds": [
+                        "engine-check"
+                      ],
+                      "selectedTestUnitIds": [
+                        "engine"
+                      ]
+                    },
+                    "selector": {
+                      "config": {},
+                      "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+                      "id": "full",
+                      "version": "1"
+                    },
+                    "status": "declared",
+                    "universe": {
+                      "checkIds": [
+                        "engine-check"
+                      ],
+                      "digest": "sha256:aeebedf472b39aa647abd91864643adb0ecd3b659261fc9077f0b3a26ad3d350",
+                      "id": "project:engine",
+                      "testUnitIds": [
+                        "engine"
+                      ]
+                    }
+                  },
+                  "definitions": {
+                    "digest": "sha256:74f1cc74a49ad20f6a81fb3b0d14224345fa2e057c9f99e0e7415756ca74d5e2",
+                    "manifest": {
+                      "checks": [
+                        {
+                          "dependsOn": [],
+                          "executor": {
+                            "commands": [
+                              {
+                                "args": [
+                                  "-e",
+                                  "require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-baRmnQ/runs\", \"engine\\n\")"
+                                ],
+                                "cmd": "node",
+                                "contracts": null,
+                                "env": {},
+                                "name": "engine",
+                                "parser": "none",
+                                "timeoutMs": 120000
+                              }
+                            ],
+                            "continueOnFailure": true,
+                            "kind": "command",
+                            "mutex": false,
+                            "parallel": false
+                          },
+                          "id": "engine-check",
+                          "requiresPackageScripts": []
+                        }
+                      ],
+                      "manifestVersion": 1,
+                      "workingDirectory": "engine",
+                      "workspacePreparation": {
+                        "optionsDigest": "sha256:b1a9cfd7e933eb26d4f32643287d5525998099b89bb4b3c69a7223ecc14683e7",
+                        "preparationId": "nodejs"
+                      }
+                    }
+                  },
+                  "durationSeconds": 0.066,
+                  "evidenceSchemaVersion": 4,
+                  "execution": {
+                    "requestId": "eeff0c79-7fa8-4e5f-92f5-31953010d1c5",
+                    "runId": "2946603d-ec83-4a41-9c57-9720427ddda5"
+                  },
+                  "ignorePaths": [
+                    "docs/**"
+                  ],
+                  "mode": {
+                    "executedMode": "full",
+                    "requestedMode": "full",
+                    "resolution": "requested"
+                  },
+                  "overall": "pass",
+                  "producer": {
+                    "name": "ramify-audit",
+                    "version": "0.7.2"
+                  },
+                  "sourceBranch": "main",
+                  "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+                  "sourceTree": "1864ab25e1bfbe22f03e101b0b9c740f49225024",
+                  "undetectedConfigFilesForcingFullAudit": [],
+                  "workspacePreparation": {
+                    "payload": {
+                      "linkedPackageDirectories": [],
+                      "projectPrefix": "engine",
+                      "setupCommands": []
+                    },
+                    "preparationId": "nodejs"
+                  }
+                },
+                "refs": {
+                  "reportCommit": "ab5ba7dc4750027ff118f31259c77045553545bb",
+                  "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9",
+                  "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+                },
+                "retrievalCommands": [
+                  "git notes --ref=audit-projects/engine-ed9f6f250686 show b8328afb97032c1ab81718e9db89703767a616c2",
+                  "git show refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+                ],
+                "reused": {
+                  "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+                  "auditedCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+                  "ignoredChangedPaths": [],
+                  "requestedMode": "full",
+                  "resolution": "requested"
+                },
+                "composition": {
+                  "verdict": "pass",
+                  "scoped": false,
+                  "chainDepth": 0,
+                  "reportCommit": "ab5ba7dc4750027ff118f31259c77045553545bb"
+                }
+              }
+            },
+            {
+              "projectRoot": "engine/tools",
+              "verdict": "pass",
+              "execution": "ran",
+              "failures": [],
+              "result": {
+                "status": "completed",
+                "requestId": "ab37e4e6-d4ae-472d-9c5e-2c49ee2d3200",
+                "runId": "3992ebe7-953d-418a-8a40-f788953f0bce",
+                "summary": {
+                  "evidenceSchemaVersion": 4,
+                  "execution": {
+                    "requestId": "ab37e4e6-d4ae-472d-9c5e-2c49ee2d3200",
+                    "runId": "3992ebe7-953d-418a-8a40-f788953f0bce"
+                  },
+                  "producer": {
+                    "name": "ramify-audit",
+                    "version": "0.7.2"
+                  },
+                  "undetectedConfigFilesForcingFullAudit": [],
+                  "coverage": {
+                    "status": "declared",
+                    "selector": {
+                      "id": "full",
+                      "version": "1",
+                      "config": {},
+                      "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+                    },
+                    "universe": {
+                      "id": "project:engine/tools",
+                      "digest": "sha256:b96dc7a6067e898f72699bfbfd0ed81e4dc3e8824b0b5e99a4391cf9552e74fb",
+                      "checkIds": [
+                        "engine-tools-check"
+                      ],
+                      "testUnitIds": [
+                        "engine-tools"
+                      ]
+                    },
+                    "selection": {
+                      "kind": "full",
+                      "selectedCheckIds": [
+                        "engine-tools-check"
+                      ],
+                      "omittedCheckIds": [],
+                      "selectedTestUnitIds": [
+                        "engine-tools"
+                      ],
+                      "omittedTestUnitIds": []
+                    },
+                    "claim": {
+                      "configuration": {
+                        "blob": "2aaaf8a2574c9605d0ff996d657475d7f04eae39",
+                        "path": "engine/tools/ramify-audit.json",
+                        "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2"
+                      },
+                      "scope": "repository"
+                    },
+                    "projectRoot": "engine/tools"
+                  },
+                  "mode": {
+                    "requestedMode": "full",
+                    "resolution": "requested",
+                    "executedMode": "full"
+                  },
+                  "overall": "pass",
+                  "sourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+                  "sourceTree": "1864ab25e1bfbe22f03e101b0b9c740f49225024",
+                  "sourceBranch": "main",
+                  "auditedAt": "2026-10-08T05:20:13.795Z",
+                  "durationSeconds": 0.07,
+                  "checks": {
+                    "engine-tools-check": {
+                      "commands": {
+                        "engine-tools": {
+                          "durationSeconds": 0.023,
+                          "output": "Command completed with no output",
+                          "passed": true,
+                          "status": "pass",
+                          "summary": "Command completed with no output"
+                        }
+                      },
+                      "durationSeconds": 0.028,
+                      "output": "### engine-tools [PASS]\nCommand completed with no output",
+                      "passed": true,
+                      "status": "pass",
+                      "summary": "engine-tools: PASS"
+                    }
+                  },
+                  "workspacePreparation": {
+                    "preparationId": "nodejs",
+                    "payload": {
+                      "linkedPackageDirectories": [],
+                      "projectPrefix": "engine/tools",
+                      "setupCommands": []
+                    }
+                  },
+                  "definitions": {
+                    "digest": "sha256:f1ea7f7814d3e41ecc35a34fc6ffc7171cd3c7986754986df00f793df1642554",
+                    "manifest": {
+                      "manifestVersion": 1,
+                      "workingDirectory": "engine/tools",
+                      "checks": [
+                        {
+                          "id": "engine-tools-check",
+                          "dependsOn": [],
+                          "requiresPackageScripts": [],
+                          "executor": {
+                            "kind": "command",
+                            "parallel": false,
+                            "mutex": false,
+                            "continueOnFailure": true,
+                            "commands": [
+                              {
+                                "name": "engine-tools",
+                                "cmd": "node",
+                                "args": [
+                                  "-e",
+                                  "require('fs').appendFileSync(\"/tmp/ramify-agent-f4-nested-baRmnQ/runs\", \"engine/tools\\n\"); const fs = require('fs'); if (fs.existsSync(\"/tmp/ramify-agent-f4-nested-baRmnQ/hold\")) { fs.writeFileSync(\"/tmp/ramify-agent-f4-nested-baRmnQ/held\", String(process.pid)); setInterval(() => {}, 1000); } else if (fs.readFileSync('state.txt', 'utf8').trim() !== 'pass') { console.error('grandchild state is not pass'); process.exit(1); }"
+                                ],
+                                "parser": "none",
+                                "contracts": null,
+                                "timeoutMs": 120000,
+                                "env": {}
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "workspacePreparation": {
+                        "preparationId": "nodejs",
+                        "optionsDigest": "sha256:b1a9cfd7e933eb26d4f32643287d5525998099b89bb4b3c69a7223ecc14683e7"
+                      }
+                    }
+                  }
+                },
+                "refs": {
+                  "reportCommit": "4006fe2286774240d8061b6fdbaf996aa2161509",
+                  "runRef": "refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-13Z-b8328afb9",
+                  "treeRef": "refs/audited/projects/tools-ae58fc96b90f/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+                },
+                "retrievalCommands": [
+                  "git notes --ref=audit-projects/tools-ae58fc96b90f show b8328afb97032c1ab81718e9db89703767a616c2",
+                  "git show refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-13Z-b8328afb9:reports/audit/summary.json"
+                ],
+                "composition": {
+                  "verdict": "pass",
+                  "scoped": false,
+                  "chainDepth": 0,
+                  "reportCommit": "4006fe2286774240d8061b6fdbaf996aa2161509"
+                }
+              }
+            }
+          ],
+          "discovery": {
+            "status": "complete",
+            "skipped": [
+              {
+                "projectRoot": "vendor/lib",
+                "enclosingProject": ".",
+                "reason": "external",
+                "directory": "vendor"
+              }
+            ],
+            "unavailable": []
+          },
+          "invocationVerdict": "pass"
+        },
+        "checks": {
+          "root-check": {
+            "commands": {
+              "root": {
+                "durationSeconds": 0.024,
+                "output": "Command completed with no output",
+                "passed": true,
+                "status": "pass",
+                "summary": "Command completed with no output"
+              }
+            },
+            "durationSeconds": 0.024,
+            "output": "### root [PASS]\nCommand completed with no output",
+            "passed": true,
+            "status": "pass",
+            "summary": "root: PASS"
+          }
+        }
+      },
+      "audit": {
+        "requestId": "run-configured-witness:ga-0002",
+        "mode": "full",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "652662174f83964710cb7c6015d414e8bbcea16e"
+        },
+        "requestedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+        "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+        "requestedMode": "full",
+        "executedMode": "full",
+        "fallbackReason": null,
+        "reuse": {
+          "auditedCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+          "ignoredChangedPaths": [],
+          "requestedMode": "full",
+          "resolution": "requested"
+        },
+        "verdict": "pass",
+        "detail": "invocation pass over 3 projects; skipped: vendor/lib (external)",
+        "nested": true,
+        "projects": [
+          {
+            "projectRoot": ".",
+            "verdict": "pass",
+            "execution": "reused",
+            "status": "completed",
+            "failures": [],
+            "requestId": "run-configured-witness:ga-0002",
+            "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": {
+              "auditedCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+              "ignoredChangedPaths": [],
+              "requestedMode": "full",
+              "resolution": "requested"
+            },
+            "evidence": {
+              "runRef": "refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9",
+              "reportCommit": "673e9b79fdfa1b4b25f3d211ad869af447bf5e7b",
+              "treeRef": "refs/audited/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit show b8328afb97032c1ab81718e9db89703767a616c2",
+              "git show refs/audited/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.067,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine",
+            "verdict": "pass",
+            "execution": "reused",
+            "status": "completed",
+            "failures": [],
+            "requestId": "e9e40970-5b3c-4c14-9c53-f13345f584b0",
+            "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": {
+              "auditedCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+              "ignoredChangedPaths": [],
+              "requestedMode": "full",
+              "resolution": "requested"
+            },
+            "evidence": {
+              "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9",
+              "reportCommit": "ab5ba7dc4750027ff118f31259c77045553545bb",
+              "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/engine-ed9f6f250686 show b8328afb97032c1ab81718e9db89703767a616c2",
+              "git show refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-12Z-b8328afb9:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.066,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "engine/tools",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "ab37e4e6-d4ae-472d-9c5e-2c49ee2d3200",
+            "auditedSourceCommit": "b8328afb97032c1ab81718e9db89703767a616c2",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "runRef": "refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-13Z-b8328afb9",
+              "reportCommit": "4006fe2286774240d8061b6fdbaf996aa2161509",
+              "treeRef": "refs/audited/projects/tools-ae58fc96b90f/by-tree/1864ab25e1bfbe22f03e101b0b9c740f49225024"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/tools-ae58fc96b90f show b8328afb97032c1ab81718e9db89703767a616c2",
+              "git show refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-13Z-b8328afb9:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.07,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          }
+        ],
+        "discovery": {
+          "status": "complete",
+          "skipped": [
+            {
+              "projectRoot": "vendor/lib",
+              "enclosingProject": ".",
+              "reason": "external",
+              "directory": "vendor"
+            }
+          ],
+          "unavailable": []
+        }
+      },
+      "scenarios": [],
+      "verdict": "passed",
+      "cause": null,
+      "next": "accept",
+      "guardedChanges": [],
+      "rules": [],
+      "commands": []
+    }
+  }
+}

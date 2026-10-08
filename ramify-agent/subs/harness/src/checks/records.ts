@@ -1,12 +1,10 @@
 import { childEnvironment, environmentNames } from '../../subs/evidence/src/run-command.js';
-import type { ScenarioMode, ScenarioSelection } from '../../subs/scenarios/src/profiles.js';
-import type { ScenarioRunResult } from '../../subs/scenarios/src/messages.js';
 
 /*
  * The gate's record and the shapes it is built from. Nothing here knows about
- * a run: a checkpoint names what must hold, a check command names what to run,
- * and a selection names which test files the checkpoint requires. The policy
- * that chooses them belongs to the iterations that assign work.
+ * a run: a checkpoint names what must hold, and a committing gate's audit
+ * record names what the project's committed audit answered for it. A check
+ * command names what a standalone session's in-place diagnosis runs.
  *
  * A check command names its environment and never holds its values, which is
  * why the shapes are built here rather than written out by each caller:
@@ -87,29 +85,27 @@ export function checkCommandEnvironment(command: CheckCommand): Record<string, s
 /** What a set of checks is being run for. */
 export type Checkpoint = 'readiness' | 'iteration' | 'contract' | 'breaking-iteration' | 'work-item' | 'final';
 
-/** Which tests a checkpoint requires, captured on an assignment as a policy, never as a file list. */
+/**
+ * The owners an assignment is judged on, captured as a policy and never as a
+ * file list. It is briefing text only: the engineer is told the test areas
+ * of these owners, and the gate's audit runs what the project configured.
+ */
 export interface TestSelectionPolicy {
   readonly policy: 'owned-by-scope' | 'all-project';
   readonly exactOwners: string[];
   readonly subtrees: string[];
-  /** Suites a registered evidence obligation requires; each must be selected. */
+  /** Suites a registered evidence obligation names, briefed beside the owners' test areas. */
   readonly extraSuites: string[];
-  /** Paths outside every module whose test files each resolution finds anew and adds to `extraSuites`. */
-  readonly outsideModules?: string[] | undefined;
-}
-
-/** A policy resolved against the current tree, recorded on the attempt that ran it. */
-export interface TestSelection extends Omit<TestSelectionPolicy, 'outsideModules'> {
-  readonly resolved: string[];
 }
 
 /**
- * The kinds of command a gate runs. `scenarios` is one Cucumber run per
- * module, with the mode's setup and teardown around them. `setup` is one of
- * the project's declared setup commands, such as its build, which run in
- * order before every other command of the gate.
+ * The kinds of command a gate announces. `setup`, `type-check` and
+ * `ramify-check` are a standalone session's in-place diagnosis; `setup` is
+ * one of the project's declared setup commands, which run in order before
+ * every other command. `configured` is one check of the project's committed
+ * audit definition, as the provider starts it.
  */
-export type CheckCommandKind = 'setup' | 'ramify-check' | 'type-check' | 'tests' | 'conformance' | 'scenarios';
+export type CheckCommandKind = 'setup' | 'ramify-check' | 'type-check' | 'configured';
 
 /**
  * Why a command was not verified. Every one of them means the command did not
@@ -119,18 +115,12 @@ export type CheckCommandKind = 'setup' | 'ramify-check' | 'type-check' | 'tests'
  *   `interrupted` also covers a command of an attempt that never ran, because
  *   another command of the same attempt failed verification.
  * - `command-missing`: the executable or its working directory is not there.
- * - `empty-selection`: the checkpoint requires tests and the selection has none.
- * - `discovery-error`, `required-suite-missing`: discovery over the current
- *   tree failed, or a required suite is not in what it selected. Neither ever
- *   falls back to an earlier list. A failed discovery is infrastructure: the
- *   inventory the harness needs could not be refreshed, and no repair of the
- *   source would change that.
  * - `setup-failed`: a setup command before it did not pass, so it never ran.
  *   It is not a cause of its own: the setup command's record is.
+ * - `local-rule-failed`: a harness rule failed before the command could run.
  */
 export type NotVerified =
-  | 'timeout' | 'runner-error' | 'command-missing' | 'empty-selection'
-  | 'interrupted' | 'discovery-error' | 'required-suite-missing' | 'setup-failed' | 'audit-unselected';
+  | 'timeout' | 'runner-error' | 'command-missing' | 'interrupted' | 'setup-failed' | 'local-rule-failed';
 
 /**
  * A format of the type checker's output the project declares in
@@ -139,34 +129,11 @@ export type NotVerified =
  */
 export type TypeCheckOutput = 'tsc';
 
-/** What an attribution's locations were read from: a Ramify report, the type check's errors, or both. */
-export type GateAttributionBasis = 'ramify-findings' | 'type-check-errors' | 'ramify-findings-and-type-check-errors';
-
-/**
- * What the cause was read from, beyond the runner error, the timeout and the
- * exit codes. A Ramify check prints a structured report that names each
- * finding's own file, and a type check whose output format the project
- * declared names each error's file, so a failure of either is attributed to
- * where its findings or errors lie: `inScope` and `outside` are those
- * locations against the write scope of the assignment the attempt followed.
- * No test output is parsed for this, nor the output of a command whose
- * format the project did not declare, and an attempt with neither records
- * no attribution.
- */
-export interface GateAttribution {
-  readonly basis: GateAttributionBasis;
-  readonly inScope: string[];
-  readonly outside: string[];
-}
-
 /**
  * Why a gate did not pass. `check-failed` records a command or rule failure
- * without assigning its location or repair owner. `in-scope` and
- * `outside-assignment` remain readable for historical attempts.
+ * without assigning its location or repair owner.
  */
-export type GateCause =
-  | 'check-failed' | 'in-scope' | 'infrastructure' | 'timeout' | 'invalid-session'
-  | 'outside-assignment' | 'guarded-change' | 'unknown';
+export type GateCause = 'check-failed' | 'infrastructure' | 'timeout' | 'guarded-change' | 'unknown';
 
 /** What the harness does with the attempt. */
 export type GateNext = 'accept' | 'repair' | 'retry-infrastructure' | 'return-to-local-architect' | 'exhausted';
@@ -177,7 +144,7 @@ export type GateNext = 'accept' | 'repair' | 'retry-infrastructure' | 'return-to
  * and what it found is the diagnostics the engineer repairs from.
  */
 export interface GateRuleRecord {
-  readonly rule: 'fake-naming' | 'fake-exposure-parity';
+  readonly rule: 'fake-naming' | 'fake-exposure-parity' | 'scratch-safety' | 'write-scope';
   readonly outcome: 'passed' | 'failed';
   readonly violations: ReadonlyArray<{ readonly rule: string; readonly path: string; readonly detail: string }>;
   /** What the rule could not establish, or found and did not attribute to this attempt; absent when nothing. */
@@ -192,7 +159,6 @@ export interface GateCommandRecord {
   /** A setup command's declared name, such as `build`; absent for every other kind and for an unnamed one. */
   readonly name?: string;
   readonly command: CheckCommand;
-  readonly selection?: TestSelection;
   readonly startedAt: string;
   readonly elapsedMs: number;
   /** Machine test lock wait before the process started, when one occurred. */
@@ -212,59 +178,108 @@ export interface GateCommandRecord {
   readonly stopped?: string;
   /** The command's output streams stayed open after it ended, so what it printed may be incomplete. */
   readonly outputIncomplete?: true;
-  /** For a `scenarios` command: what its message streams said. Its outcome is read from this, not from the exit codes alone. */
-  readonly scenarios?: ScenarioCheckSummary;
-}
-
-/** One Cucumber run of a scenario check: one module's step and feature files. */
-export interface ScenarioCheckRun {
-  /** The module's declared-name path. */
-  readonly module: string;
-  /** Null when the run did not complete, or was never started. */
-  readonly exit: number | null;
-  /** The profile it ran, relative to the attempt's directory. */
-  readonly profile: string;
-  /** Its message stream, relative to the attempt's directory. */
-  readonly messages: string;
-}
-
-/** One tracked scenario's result, with the run that executed it. */
-export interface ScenarioCheckResult extends ScenarioRunResult {
-  /** The module whose run executed it. */
-  readonly run: string;
 }
 
 /**
- * What a `scenarios` command established, read from the runs' message
- * streams. It passes only when every run exited zero, every selected tracked
- * scenario passed and every one of the project's own scenarios passed; a dry
- * run passes a scenario whose steps all have a definition.
+ * The published audit record that answers `audited`: the record the request
+ * ran, or the applicable earlier record the provider reused, whose own
+ * source commit the attempt's `audit.auditedSourceCommit` names.
  */
-export interface ScenarioCheckSummary {
-  readonly mode: ScenarioMode;
-  readonly selection: ScenarioSelection;
-  readonly dryRun: boolean;
-  /** Tracked scenarios the runs' files held and the selection kept out. */
-  readonly excluded: number;
-  /** The mode's `setup` and `teardown`, where configured, by exit code. */
-  readonly setup: { readonly exit: number | null } | null;
-  readonly teardown: { readonly exit: number | null } | null;
-  readonly runs: readonly ScenarioCheckRun[];
-  readonly scenarios: readonly ScenarioCheckResult[];
-  /** The project's own scenarios, by count, over every run. */
-  readonly untracked: { readonly passed: number; readonly skipped: number; readonly failed: number };
-  /** Why the check did not pass, one line each; empty when it passed. */
-  readonly failures: readonly string[];
-}
-
-/** Published evidence that certifies the exact commit named by `audited`. */
 export interface GateEvidence {
   readonly runRef: string;
   readonly reportCommit: string;
   readonly treeRef: string;
 }
 
-/** One run of a checkpoint's commands over the working directory. */
+/**
+ * What a committing gate asked of the project's committed audit and what the
+ * provider answered. The request is the committed definition at the
+ * candidate commit; the harness names only the mode. `project-default` leaves
+ * it to the provider, which audits a Ramify project `ramify-partial` from its
+ * baseline; `full` asks for a full audit. A reused record keeps both source
+ * identities: the requested commit and the commit it audited, with the
+ * ignored changes between them that make it applicable. `refused` is a
+ * completed answer that does not answer this request, which never passes.
+ */
+export interface GateAuditRecord {
+  readonly requestId: string;
+  readonly mode: 'project-default' | 'full';
+  readonly status: 'completed' | 'failed' | 'cancelled' | 'refused';
+  readonly definition: { readonly path: string; readonly blob: string };
+  readonly requestedSourceCommit: string;
+  readonly auditedSourceCommit: string | null;
+  readonly requestedMode: 'full' | 'ramify-partial' | null;
+  readonly executedMode: 'full' | 'ramify-partial' | null;
+  readonly fallbackReason: string | null;
+  readonly reuse: {
+    readonly auditedCommit: string;
+    readonly ignoredChangedPaths: readonly string[];
+    readonly requestedMode: 'full' | 'ramify-partial';
+    readonly resolution: 'requested' | 'defaulted';
+  } | null;
+  /**
+   * The provider's composed verdict; null when the audit did not complete or
+   * was refused. A nested request's is the invocation's verdict over every
+   * project and its discovery, never the root's alone.
+   */
+  readonly verdict: 'pass' | 'fail' | 'indeterminate' | null;
+  readonly detail: string;
+  /** Whether the request audited the tracked nested definitions too. */
+  readonly nested: boolean;
+  /** Every project of a nested request, the root first; null for a request of the root alone. */
+  readonly projects: readonly GateAuditProjectRecord[] | null;
+  /** What nested discovery skipped, with reasons, and what it could not decide; null for a request of the root alone. */
+  readonly discovery: {
+    readonly status: 'complete' | 'indeterminate';
+    readonly skipped: readonly {
+      readonly projectRoot: string;
+      readonly enclosingProject: string;
+      readonly reason: 'external' | 'output' | 'repository' | 'packages' | 'generated';
+      readonly directory: string;
+    }[];
+    readonly unavailable: readonly { readonly enclosingProject: string; readonly reason: string; readonly definitions: readonly string[] }[];
+  } | null;
+}
+
+/** A count of one kind over a project record's checks. */
+export interface GateAuditCountBucket {
+  readonly total: number;
+  readonly passed: number;
+  readonly failed: number;
+  readonly skipped: number;
+}
+
+/**
+ * One project of a nested audit: the provider's verdict and failures for
+ * it, whether this request ran it, reused an applicable earlier record or
+ * did not run it, and the record that answers it with its counts and
+ * duration. A project record's `refused` status is a completed record that
+ * does not answer the request.
+ */
+export interface GateAuditProjectRecord {
+  readonly projectRoot: string;
+  readonly verdict: 'pass' | 'fail' | 'indeterminate';
+  readonly execution: 'ran' | 'reused' | 'not-run';
+  readonly status: 'completed' | 'failed' | 'cancelled' | 'refused';
+  readonly failures: readonly string[];
+  readonly requestId: string;
+  readonly auditedSourceCommit: string | null;
+  readonly requestedMode: 'full' | 'ramify-partial' | null;
+  readonly executedMode: 'full' | 'ramify-partial' | null;
+  readonly fallbackReason: string | null;
+  readonly reuse: GateAuditRecord['reuse'];
+  readonly evidence: GateEvidence | null;
+  readonly retrievalCommands: readonly string[];
+  readonly durationSeconds: number | null;
+  readonly counts: {
+    readonly checks: GateAuditCountBucket;
+    readonly tests: GateAuditCountBucket | null;
+    readonly scenarios: GateAuditCountBucket | null;
+  } | null;
+  readonly detail: string;
+}
+
+/** One checkpoint attempt: a committing gate's audit, or a standalone session's in-place diagnosis. */
 export interface GateAttempt {
   readonly schema: 'ramify-agent.gate-attempt/3';
   readonly id: GateAttemptId;
@@ -278,30 +293,28 @@ export interface GateAttempt {
   readonly head: AcceptedCommit;
   /** The commit this attempt made, whatever its verdict; null when the tree was unchanged. */
   readonly commit: AcceptedCommit | null;
-  /** The commit the checks ran over; null when execution never began or ran in place. */
+  /**
+   * The commit the audit's verdict answers: the requested candidate, whether
+   * its record ran or an applicable one was reused. Null when no audit
+   * completed for it, or the checks ran in place.
+   */
   readonly audited: AcceptedCommit | null;
   /** The audit publication bound to `audited`; null when no evidence was published. */
   readonly evidence: GateEvidence | null;
   /** Exact external report result. Kept on the in-memory attempt for atomic durable publication. */
   readonly auditOverall?: 'pass' | 'fail' | 'indeterminate' | null;
-  /** Exact versioned provider payload and check results. Legacy attempts omit it. */
+  /** Exact versioned provider payload and published check results. */
   readonly provider?: { readonly result: unknown; readonly checks: unknown };
+  /** A committing gate's configured audit request and answer; absent for an in-place diagnosis. */
+  readonly audit?: GateAuditRecord;
   /** `after: null` is a deletion, which is a change like any other. */
-  readonly guardedChanges: Array<{ readonly path: string; readonly before: string; readonly after: string | null; readonly authorizedBy: RecordReference | null }>;
+  readonly guardedChanges: Array<{ readonly path: string; readonly before: string | null; readonly after: string | null; readonly authorizedBy: RecordReference | null }>;
   /** Rules the harness verified itself. A checkpoint with none records none. */
   readonly rules?: GateRuleRecord[];
+  /** An in-place diagnosis's commands; a committing gate plans none, so its list is empty. */
   readonly commands: GateCommandRecord[];
-  /**
-   * `none-selected` when the checkpoint's scenario check had nothing to run:
-   * no tracked scenario of the scope was past `pending`, or no module had
-   * feature files. That is not a failure. Absent where a scenario check ran,
-   * and for a gate without a project configuration.
-   */
-  readonly scenarios?: 'none-selected';
   readonly verdict: 'passed' | 'failed' | 'not-verified';
   readonly cause: GateCause | null;
-  /** What the cause was read from, where a report or declared output of its own named the files. */
-  readonly attribution?: GateAttribution;
   readonly next: GateNext;
 }
 

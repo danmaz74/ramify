@@ -3,18 +3,18 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { commitMessage } from '../run/gates.js';
 import { acceptedCommit } from '../checks/accepted.js';
-import { checkOutputPath, type CheckExecutionPort } from '../checks/execution.js';
+import type { ConfiguredAuditPort } from '../../subs/audit/src/check-execution.js';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
 import type { RunWrite } from '../run/service.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
-import { addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { RunQueries } from '../projections/queries.js';
 import {
   staleCrashLock, freeze, installTestRunner, onlyRun, openRuns,
@@ -47,7 +47,7 @@ vi.mock('node:child_process', async original =>
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
   try { expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
@@ -113,6 +113,141 @@ const storeWrite = write('store.ts', 'export const store = new Map();\n');
 const latePath = `${notesDirectory}/src/late.ts`;
 
 describe('a change to the working directory blocks nothing', () => {
+  test('an engineer uses ignored scratch through acceptance, then closure removes it before final audit', async () => {
+    const root = await target();
+    const temporary = join(root, notesDirectory, 'src/tmp/draft.txt');
+    const final = finalCandidate(root, 'revision-01');
+    const scripted = gateGit(root, {
+      head: base, previews: final.previews,
+      commits: [scenarios, { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }, unchanged, unchanged],
+    });
+    const opened = await openRuns(root, {
+      script: byRole(onePass([write('tmp/draft.txt', 'temporary evidence\n'), storeWrite])),
+      inputs: treeInputs(), git: scripted.git, candidates: final.candidates,
+
+      afterWrite: async current => {
+        if (current === 'gate-attempted' && scripted.messages.length === 1) {
+          expect(await readFile(temporary, 'utf8')).toBe('temporary evidence\n');
+        }
+      },
+    });
+    cleanups.push(() => opened.service.close());
+    const receipt = await opened.service.execute(startRun('review-notes'));
+    await opened.service.settled('review-notes', receipt.jobId);
+    expect(onlyRun(opened.service, 'review-notes').state, JSON.stringify(onlyRun(opened.service, 'review-notes').failure)).toBe('completed');
+    await expect(readFile(temporary)).rejects.toThrow();
+    const result = await readResult(root, receipt.jobId, 1);
+    const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate(result.gate!)), 'utf8')) as GateAttempt;
+    expect(attempt).toMatchObject({ verdict: 'passed', audited: 'revision-01' });
+    expect(scripted.messages[1]).toContain('Ramify-Iteration: wi-001.i01');
+    expect(scripted.calls.filter(call => call.operation === 'commitAccepted')).toHaveLength(4);
+    scripted.assertComplete();
+  }, 120_000);
+
+  test('recovery finishes cleanup after the durable accepted close event', async () => {
+    const root = await target();
+    const scratch = join(root, notesDirectory, 'src/tmp/recovery.txt');
+    const scripted = gateGit(root, { head: base,
+      commits: [scenarios, { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }] });
+    const crashed = await openRuns(root, {
+      script: byRole(onePass([write('tmp/recovery.txt', 'recover me\n'), storeWrite])),
+      inputs: treeInputs(), git: scripted.git,
+      afterWrite: async current => { if (current === 'iteration-closed') await freeze(); },
+    });
+    const receipt = await crashed.service.execute(startRun('review-notes'));
+    await until(() => (crashed.service.events('review-notes', receipt.jobId) ?? []).some(event => event.type === 'iteration-closed'), 30_000);
+    expect(await readFile(scratch, 'utf8')).toBe('recover me\n');
+    await staleCrashLock(root);
+    const recoveryGit = gateGit(root, { head: 'revision-01', commits: [] });
+    const reopened = await openRuns(root, { inputs: treeInputs(), git: recoveryGit.git,
+      });
+    cleanups.push(() => reopened.service.close());
+    await expect(readFile(scratch)).rejects.toMatchObject({ code: 'ENOENT' });
+    recoveryGit.assertComplete();
+  }, 120_000);
+
+  test('a nested ignore exception fails the gate before commit and repair retains scratch', async () => {
+    const root = await target();
+    const override = join(root, notesDirectory, 'src/.gitignore');
+    const scratch = join(root, notesDirectory, 'src/tmp/draft.txt');
+    const final = finalCandidate(root, 'revision-01');
+    const scripted = gateGit(root, {
+      head: base, previews: final.previews,
+      commits: [scenarios, { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }, unchanged, unchanged],
+    });
+    const git = {
+      ...scripted.git,
+      async trackedPaths() { return []; },
+      async ignoreStatus(_project: string, paths: readonly string[]) {
+        const changed = await readFile(override, 'utf8').catch(() => '');
+        return paths.map(path => path === `${notesDirectory}/src/tmp/` && changed.includes('!tmp/')
+          ? { path, ignored: false, rule: { source: `${notesDirectory}/src/.gitignore`, line: 1, pattern: '!tmp/' } }
+          : { path, ignored: true, rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } });
+      },
+    };
+    const plan = onePass();
+    const opened = await openRuns(root, {
+      script: byRole({ ...plan, engineer: [
+        submit(completionProposed('First candidate.'), write('tmp/draft.txt', 'draft\n'), write('.gitignore', '!tmp/\n')),
+        submit(completionProposed('Repaired ignore exception.'), edit('tmp/draft.txt', 'draft', 'kept'), write('.gitignore', ''), storeWrite),
+      ] }),
+      inputs: treeInputs(), git, scratchGit: 'provided', candidates: final.candidates,
+
+    });
+    cleanups.push(() => opened.service.close());
+    const receipt = await opened.service.execute(startRun('review-notes'));
+    await opened.service.settled('review-notes', receipt.jobId);
+    expect(onlyRun(opened.service, 'review-notes').state, JSON.stringify(onlyRun(opened.service, 'review-notes').failure)).toBe('completed');
+    const first = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as GateAttempt;
+    expect(first).toMatchObject({ verdict: 'failed', cause: 'check-failed', commit: null, audited: null, next: 'repair' });
+    // The rule failed before commit, so the audit was never asked, and no
+    // command record stands in for the checks it did not run.
+    expect(first.commands).toEqual([]);
+    expect(first.audit).toBeUndefined();
+    expect(first.rules?.find(rule => rule.rule === 'scratch-safety')?.violations).toEqual([expect.objectContaining({
+      path: `${notesDirectory}/src/tmp/`, detail: expect.stringContaining(`${notesDirectory}/src/.gitignore:1`),
+    })]);
+    expect(scripted.messages).toHaveLength(4);
+    await expect(readFile(scratch)).rejects.toThrow();
+    scripted.assertComplete();
+  }, 120_000);
+
+  test('a forced-staged scratch file fails the run gate and closure preserves only indexed scratch', async () => {
+    const root = await target();
+    const indexed = `${notesDirectory}/src/tmp/indexed.txt`;
+    const other = `${notesDirectory}/src/tmp/other.txt`;
+    const scripted = gateGit(root, { head: base, commits: [scenarios] });
+    const git = {
+      ...scripted.git,
+      async trackedPaths() { return await readFile(join(root, indexed)).then(() => [indexed], () => []); },
+      async ignoreStatus(_project: string, paths: readonly string[]) {
+        return paths.map(path => ({ path, ignored: true,
+          rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } }));
+      },
+    };
+    const plan = onePass();
+    const opened = await openRuns(root, {
+      script: byRole({ ...plan, engineer: [
+        submit(completionProposed('Candidate with indexed scratch.'), write('tmp/indexed.txt', 'indexed\n'), write('tmp/other.txt', 'other\n')),
+        submit({ kind: 'partial', done: ['Source inspected'], unfinished: ['Remove indexed scratch'], findings: [] }),
+      ] }),
+      inputs: treeInputs(), git, scratchGit: 'provided',
+    });
+    cleanups.push(() => opened.service.close());
+    const receipt = await opened.service.execute(startRun('review-notes'));
+    await until(() => (opened.service.events('review-notes', receipt.jobId) ?? []).some(event => event.type === 'scratch-preserved'), 30_000);
+    const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
+    expect(events.find(event => event.type === 'scratch-preserved')?.data).toMatchObject({
+      iteration: 'wi-001.i01', paths: [indexed],
+    });
+    const failed = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as GateAttempt;
+    expect(failed).toMatchObject({ verdict: 'failed', cause: 'check-failed', commit: null, audited: null });
+    expect(failed.rules?.find(rule => rule.rule === 'scratch-safety')?.violations).toEqual([expect.objectContaining({ path: indexed })]);
+    expect(await readFile(join(root, indexed), 'utf8')).toBe('indexed\n');
+    await expect(readFile(join(root, other))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(scripted.messages).toHaveLength(1);
+  }, 120_000);
+
   test('a verified gate makes one commit before audit, including a late change before that commit', async () => {
     const root = await target();
     const final = finalCandidate(root, 'revision-01');
@@ -134,7 +269,7 @@ describe('a change to the working directory blocks nothing', () => {
       inputs: treeInputs(),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
       afterWrite: async current => {
         // A late write lands after verification and before the commit. It
         // blocks nothing and joins the revision the audit checks.
@@ -202,7 +337,7 @@ describe('a change to the working directory blocks nothing', () => {
         script: byRole(onePass([storeWrite])),
         inputs: treeInputs(),
         git: crashedGit.git,
-        readinessExecution: directReadinessExecution(),
+
         afterWrite: async current => {
           if (current === row.boundary) await freeze();
         },
@@ -242,7 +377,7 @@ describe('a change to the working directory blocks nothing', () => {
       const reopened = await openRuns(root, {
         inputs: treeInputs(),
         git: recoveryGit.git,
-        readinessExecution: directReadinessExecution(),
+
       });
       cleanups.push(() => reopened.service.close());
       expect(onlyRun(reopened.service, 'review-notes').state).toBe('interrupted');
@@ -292,7 +427,7 @@ describe('a change to the working directory blocks nothing', () => {
       inputs: treeInputs(),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -336,32 +471,18 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
         { commit: null, against: 'revision-01' },
       ],
     });
-    const direct = createPassingCheckExecution();
+    const passing = passingAudit();
     let failedOnce = false;
-    const checkExecution: CheckExecutionPort = {
-      async run(checks, request) {
-        if (!failedOnce && request.context.checkpoint === 'iteration') {
+    // The first iteration gate's request cannot be answered: the audit
+    // service is unavailable. Readiness made the one full request before it.
+    const configuredAudit: ConfiguredAuditPort = {
+      read: passing.read,
+      async run(input) {
+        if (!failedOnce && input.mode === 'project-default') {
           failedOnce = true;
-          await mkdir(request.directory, { recursive: true });
-          const commands = await Promise.all(checks.map(async (check, index) => {
-            const path = checkOutputPath(request.directory, index, check);
-            await writeFile(path, 'the audit service was unavailable\n');
-            return {
-              kind: check.kind,
-              command: check.command,
-              ...(check.selection === undefined ? {} : { selection: check.selection }),
-              startedAt: new Date().toISOString(),
-              elapsedMs: 0,
-              exitCode: null,
-              outcome: 'not-verified' as const,
-              notVerified: 'runner-error' as const,
-              runnerError: { kind: 'audit-infrastructure', message: 'the audit service was unavailable' },
-              output: { path, bytes: 34, truncated: false, tail: 'the audit service was unavailable\n' },
-            };
-          }));
-          return { commands, audited: null, evidence: null };
+          throw new Error('the audit service was unavailable');
         }
-        return direct.run(checks, request);
+        return passing.run(input);
       },
     };
     const opened = await openRuns(root, {
@@ -382,8 +503,8 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
       inputs: treeInputs(),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
-      checkExecution,
+
+      configuredAudit,
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -398,6 +519,8 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
     expect(failed).toMatchObject({ verdict: 'not-verified', cause: 'infrastructure' });
     expect(failed!.commit).toBe('revision-01');
     expect(failed!.audited).toBeNull();
+    expect(failed!.audit).toMatchObject({ status: 'failed', requestedSourceCommit: 'revision-01', auditedSourceCommit: null });
+    expect(failed!.audit!.detail).toContain('the audit service was unavailable');
     expect(retry).toMatchObject({ verdict: 'passed', commit: null, audited: 'revision-01' });
 
     const accepted = failed!.commit!;
@@ -451,22 +574,20 @@ describe('the message the harness writes', () => {
       subject: { workItem: 'wi-001', iteration: 'wi-001.i02' },
       proposedBy: 'inv-0014', repairRound: 1, infrastructureAttempt: 0,
       head: 'abc', commit: null, audited: 'abc', evidence: null, guardedChanges: [],
-      commands: [
-        { kind: 'ramify-check', command: { argv: ['ramify'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 1200, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'a', bytes: 0, truncated: false, tail: '' } },
-        { kind: 'type-check', command: { argv: ['npm'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 8400, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'b', bytes: 0, truncated: false, tail: '' } },
-        {
-          kind: 'tests', command: { argv: ['vitest'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 21000, exitCode: 0, outcome: 'passed', runnerError: null,
-          selection: { policy: 'owned-by-scope', exactOwners: ['workspace/reviews'], subtrees: ['reviews/core'], extraSuites: [], resolved: ['a.test.ts', 'b.test.ts'] },
-          output: { path: 'c', bytes: 0, truncated: false, tail: '' },
-        },
-      ],
+      commands: [],
+      audit: {
+        requestId: '20260920T101500Z-3f9a1c:ga-0012', mode: 'project-default', status: 'completed',
+        definition: { path: 'ramify-audit.json', blob: 'b'.repeat(40) },
+        requestedSourceCommit: 'abc', auditedSourceCommit: 'abc', requestedMode: 'ramify-partial', executedMode: 'ramify-partial',
+        fallbackReason: null, reuse: null, verdict: 'pass', detail: 'composed pass', nested: false, projects: null, discovery: null,
+      },
       verdict: 'passed', cause: null, next: 'accept',
     };
     const parts = {
       runId: '20260920T101500Z-3f9a1c', planId: 'review-notes', gate,
       goal: 'send the customer email from the page',
       summary: 'Send the customer email from the page.',
-      earlier: [{ id: 'ga-0011', verdict: 'failed', cause: 'in-scope' }],
+      earlier: [{ id: 'ga-0011', verdict: 'failed', cause: 'check-failed' }],
       notCovered: ['test:cucumber (one supported runner)'],
       invocations: ['inv-0012', 'inv-0014'],
       modules: [{ kind: 'module-created' as const, module: 'workspace/reviews/notes', declaration: 'subs/workspace/subs/reviews/subs/notes/module.ramify' }],
@@ -477,7 +598,7 @@ describe('the message the harness writes', () => {
     expect(message).toContain('wi-001.i02: send the customer email from the page');
     expect(message).toContain('Send the customer email from the page.');
     expect(message).not.toContain('Checks:');
-    expect(message).toContain('Earlier attempts: ga-0011 failed (in-scope)');
+    expect(message).toContain('Earlier attempts: ga-0011 failed (check-failed)');
     expect(message).toContain('Not covered: test:cucumber (one supported runner)');
     expect(message).toContain('Modules created: workspace/reviews/notes (subs/workspace/subs/reviews/subs/notes/module.ramify)');
     expect(message).toContain('Ramify-Run: 20260920T101500Z-3f9a1c');

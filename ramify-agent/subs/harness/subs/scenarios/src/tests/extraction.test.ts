@@ -5,7 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { extractPlanScenarios, planScenarioExtractionSchema } from '../extraction.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
-const collectionReview = join(here, '../../../../../../fixtures/collection-review/plans');
+const collectionReview = join(here, '../../../../fixtures/collection-review/plans');
 
 const plan = [
   '# Send customer email', //                                      1

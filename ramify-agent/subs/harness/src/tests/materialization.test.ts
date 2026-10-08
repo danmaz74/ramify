@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
@@ -11,13 +11,13 @@ import {
 } from '../run/feature-files.js';
 import { runLayout } from '../run/records.js';
 import { iterationLayout, type IterationAssignment } from '../work/iterations.js';
-import { captureGuardedFiles } from '../work/scope.js';
+import { auditPreparationPaths, captureGuardedFiles } from '../work/scope.js';
 import { scenarioRecordSchema, scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import { initialScenarioStates } from '../../subs/scenarios/src/states.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { statedCommands } from './helpers/composition.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
-import { expectNoProcesses, forgetExternalTools, directReadinessExecution } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
 import { gateGit, scenariosCommit as gateScenariosCommit, type GateCommit } from './helpers/gate-git.js';
 import {
@@ -65,7 +65,7 @@ const rootFeature = `src/tests/features/${plan}/note-in-panel.feature`;
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 
 describe('materializing the feature files', () => {
-  test('a scripted run commits every tracked file once readiness has passed, and each work-item gate implements the scenario its request declared', async () => {
+  test('a scripted run commits every tracked file once readiness has passed, and each work item\'s completion request reports its scenario done', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
@@ -94,7 +94,8 @@ describe('materializing the feature files', () => {
     const events = await runEventsOnDisk(project, plan, receipt.jobId);
     const types = events.map(event => event.type);
     expect(types.slice(types.indexOf('readiness-passed'), types.indexOf('work-item-started') + 1)).toEqual([
-      'readiness-passed', 'scenarios-materializing', 'scenarios-materialized', 'work-item-started',
+      'readiness-passed', 'scratch-setting-up', 'scratch-setup-complete',
+      'scenarios-materializing', 'scenarios-materialized', 'work-item-started',
     ]);
     expect(events.find(event => event.type === 'scenarios-materializing')!.data).toEqual({ files: [rootFeature, reviewsFeature] });
     expect(events.find(event => event.type === 'scenarios-materialized')!.data).toEqual({
@@ -118,7 +119,7 @@ describe('materializing the feature files', () => {
       `Scenarios of ${plan}`,
       '',
       'The 2 acceptance scenarios of the accepted analysis, written by ramify-agent',
-      'with the pending tag until the harness declares each due. Agents never edit these files.',
+      'with the pending tag until each is bound or reported done. Agents never edit these files.',
       '',
       `  ${rootFeature}`,
       `  ${reviewsFeature}`,
@@ -136,13 +137,13 @@ describe('materializing the feature files', () => {
 
     // The content is the rendering of the records: each scenario tagged by
     // its identity, its source verbatim. Each work item's completion request
-    // declared its scenario, so the pending tag is gone from both.
+    // reported its scenario done, so the pending tag is gone from both.
     const reviewsText = await readFile(join(project, reviewsFeature), 'utf8');
     expect(reviewsText.split('\n').slice(0, 9)).toEqual([
       `# Written by ramify-agent for plan ${plan}, run ${receipt.jobId}.`,
       '# The scenarios are the plan\'s requirements. Agents never edit this file;',
       '# step definitions bind it from src/tests/steps/. @ramify-pending marks a',
-      '# scenario the harness has not yet declared due.',
+      '# scenario that nothing has bound or reported done yet.',
       '',
       'Feature: reviewer-note',
       '  A reviewer can attach one note to a completed review run.',
@@ -157,21 +158,21 @@ describe('materializing the feature files', () => {
     const firstArchitect = JSON.parse(await readFile(runPath(project, plan, receipt.jobId, runLayout.invocation('inv-0004')), 'utf8')) as { role: string; base: string };
     expect(firstArchitect).toMatchObject({ role: 'local-architect', base: 'scenarios-revision' });
 
-    // Each work-item gate plans the scenario check over both owners with the
-    // pending tag excluded, and passes: the first runs its own declared
-    // scenario and excludes the other, still pending; the second runs both.
+    // Each work-item gate plans no scenario run of its own: it asks the
+    // committed audit about the commit it made, in the provider's default
+    // mode, and the definition's configured scenario check runs the bound
+    // scenarios. The harness records no command and no scenario selection.
     const gateIds = events.filter(event => event.type === 'gate-attempted').map(event => (event.data as { gate: string }).gate);
     const attempts = await Promise.all(gateIds.map(async id =>
       JSON.parse(await readFile(runPath(project, plan, receipt.jobId, runLayout.gate(id)), 'utf8')) as GateAttempt));
     const workItemGates = attempts.filter(attempt => attempt.checkpoint === 'work-item');
     expect(workItemGates).toHaveLength(2);
-    for (const [index, attempt] of workItemGates.entries()) {
+    for (const attempt of workItemGates) {
       expect(attempt.verdict).toBe('passed');
-      const scenarios = attempt.commands.find(command => command.kind === 'scenarios')!;
-      expect(scenarios.scenarios).toMatchObject({ mode: 'quick', selection: { kind: 'all-untagged' }, excluded: 1 - index, failures: [] });
-      expect(scenarios.scenarios!.runs.map(run => run.module)).toEqual(expect.arrayContaining([root, reviews]));
-      expect(scenarios.scenarios!.scenarios.map(result => `${result.id} ${result.status}`).sort())
-        .toEqual(index === 0 ? ['sc-001 passed'] : ['sc-001 passed', 'sc-002 passed']);
+      expect(attempt.commands).toEqual([]);
+      expect(attempt.audit).toMatchObject({ mode: 'project-default', status: 'completed', verdict: 'pass',
+        requestedSourceCommit: attempt.head, auditedSourceCommit: attempt.head });
+      expect(JSON.stringify(attempt)).not.toContain('all-untagged');
     }
   }, 300_000);
 
@@ -250,7 +251,7 @@ describe('re-rendering', () => {
     cleanups.push(directory.remove);
     const before = expectedFeatureFiles(tracked(), { planId: 'demo', runId: 'run-1' });
     await rerenderFeatureFiles(directory.path, before);
-    const after = expectedFeatureFiles({ ...tracked(), states: new Map([['sc-001', 'declared'], ['sc-002', 'pending']]) }, { planId: 'demo', runId: 'run-1' });
+    const after = expectedFeatureFiles({ ...tracked(), states: new Map([['sc-001', 'bound'], ['sc-002', 'pending']]) }, { planId: 'demo', runId: 'run-1' });
     const rendered = await rerenderFeatureFiles(directory.path, after);
     expect(rendered.written).toEqual(['subs/shelf/src/tests/features/demo/shelve-book.feature']);
     expect(await readFile(join(directory.path, rendered.written[0]!), 'utf8')).toContain('  @ramify-sc-001\n  Scenario: A book is shelved');
@@ -274,10 +275,10 @@ describe('re-rendering', () => {
         ] } },
         { body: one }, { body: two },
       ] } },
-      { transaction: { event: { type: 'scenario-declared', data: { scenario: 'sc-002', by: 'inv-0004', state: 'declared' } } as { type: string }, records: [] } },
+      { transaction: { event: { type: 'obligation-bound', data: { id: 'sc-002', fakes: [], by: 'inv-0004', submission: 'a'.repeat(64) } } as { type: string }, records: [] } },
     ]);
     expect(replayed.records.map(record => record.id)).toEqual(['sc-001', 'sc-002']);
-    expect([...replayed.states]).toEqual([['sc-001', 'pending'], ['sc-002', 'declared']]);
+    expect([...replayed.states]).toEqual([['sc-001', 'pending'], ['sc-002', 'bound']]);
     expect(replayed.entries).toEqual([{ capability: 'shelve-book', description: 'A book can be shelved.' }]);
   });
 });
@@ -287,7 +288,7 @@ describe('the materialization commit', () => {
 
   test('a live attempt commits at once, with nothing looked up', async () => {
     const git = mockGit({ commitAccepted: async () => 'made-1' });
-    expect(await commitForMaterialization('/project', 'run-1', message, false, git)).toBe('made-1');
+    expect(await commitForMaterialization('/project', 'run-1', message, false, git, async () => undefined)).toBe('made-1');
     expect(git.commitAccepted).toHaveBeenCalledWith('/project', message);
     expect(git.findCommitByTrailers).not.toHaveBeenCalled();
     expect(message.split('\n')[0]).toBe('Scenarios of demo');
@@ -296,7 +297,7 @@ describe('the materialization commit', () => {
 
   test('a recovery finds the commit by the run and scenario trailers and makes no second one', async () => {
     const git = mockGit({ findCommitByTrailers: async () => 'made-1' });
-    expect(await commitForMaterialization('/project', 'run-1', message, true, git)).toBe('made-1');
+    expect(await commitForMaterialization('/project', 'run-1', message, true, git, async () => undefined)).toBe('made-1');
     expect(git.findCommitByTrailers).toHaveBeenCalledWith('/project', [
       { key: 'Ramify-Run', value: 'run-1' },
       { key: 'Ramify-Scenarios', value: 'materialized' },
@@ -306,13 +307,77 @@ describe('the materialization commit', () => {
 
   test('a recovery that finds none makes the commit', async () => {
     const git = mockGit({ findCommitByTrailers: async () => null, commitAccepted: async () => null });
-    expect(await commitForMaterialization('/project', 'run-1', message, true, git)).toBeNull();
+    expect(await commitForMaterialization('/project', 'run-1', message, true, git, async () => undefined)).toBeNull();
     expect(git.commitAccepted).toHaveBeenCalledWith('/project', message);
   });
 });
 
 describe('the guarded list', () => {
-  test('holds the configuration, the support files as they stand and each feature file at the hash of its expected rendering', async () => {
+  test('captures declared audit and package inputs, and a changed package manifest fails the candidate gate', async () => {
+    const directory = await temporaryDirectory();
+    cleanups.push(directory.remove);
+    const deep = 'subs/a/subs/b/subs/c/subs/d/tools';
+    await mkdir(join(directory.path, deep), { recursive: true });
+    await writeFile(join(directory.path, 'ramify-audit.json'), '{"checks":[]}\n');
+    await writeFile(join(directory.path, deep, 'package.json'), '{"name":"tools"}\n');
+    await writeFile(join(directory.path, deep, 'package-lock.json'), '{"lockfileVersion":3}\n');
+    const guarded = await captureGuardedFiles(directory.path, [], {}, [
+      'ramify-audit.json', `${deep}/package.json`, `${deep}/package-lock.json`,
+    ]);
+    expect(guarded.filter(file => file.hash !== null).map(file => file.path)).toEqual(['ramify-audit.json', `${deep}/package-lock.json`, `${deep}/package.json`]);
+    await writeFile(join(directory.path, deep, 'package.json'), '{"name":"changed"}\n');
+    const attempt = await runGate(createPassingCheckExecution(), 'iteration', {
+      id: 'ga-0002', projectRoot: directory.path, directory: join(directory.path, '.gates', 'ga-0002'),
+      head: 'a'.repeat(40), checks: [{ kind: 'type-check', command: checkCommand({ argv: ['true'], cwd: directory.path, timeoutMs: 30_000 }) }],
+      guarded,
+    });
+    expect(attempt).toMatchObject({ verdict: 'failed', cause: 'guarded-change' });
+    expect(attempt.guardedChanges.map(change => change.path)).toEqual([`${deep}/package.json`]);
+  });
+
+  test('PB3-P04: declared included package configuration creation and deletion require recorded authorization', async () => {
+    const directory = await temporaryDirectory(); cleanups.push(directory.remove);
+    const child = 'subs/group/physical';
+    await mkdir(join(directory.path, child), { recursive: true });
+    await writeFile(join(directory.path, child, 'package.json'), '{"name":"child"}');
+    await mkdir(join(directory.path, child, 'compiler/existing'), { recursive: true });
+    await writeFile(join(directory.path, child, 'compiler/existing/tsconfig.json'), '{}');
+    const configuration = { path: 'ramify-audit.json', projectRoot: '.', workspace: { packageDirectories: [child] },
+      checks: [{ executor: { commands: [{ cmd: 'vitest', args: ['--config', 'runner/custom.ts', '--project', 'node'], cwd: child }, { cmd: 'vitest', args: ['--project', 'tsc'], cwd: child }, { cmd: 'tsc', args: ['-p', 'compiler/custom.json'], cwd: child }, { cmd: 'tsc', args: ['--project', 'compiler/existing'], cwd: child }, { cmd: 'tsc', args: ['-p', 'compiler/absent'], cwd: child }] } }] };
+    const paths = await auditPreparationPaths(configuration, directory.path);
+    expect(paths).toContain(`${child}/vitest.config.ts`);
+    expect(paths).toContain(`${child}/runner/custom.ts`);
+    expect(paths).toContain(`${child}/tsconfig.json`);
+    expect(paths).toContain(`${child}/compiler/custom.json`);
+    expect(paths).not.toContain(`${child}/node`);
+    expect(paths).not.toContain(`${child}/tsc`);
+    expect(paths).not.toContain(`${child}/tsc/tsconfig.json`);
+    expect(paths).not.toContain(`${child}/compiler/existing`);
+    expect(paths).toContain(`${child}/compiler/existing/tsconfig.json`);
+    expect(paths).toContain(`${child}/compiler/absent/tsconfig.json`);
+    expect(paths).toContain(`${child}/vite.config.mts`);
+    const guarded = await captureGuardedFiles(directory.path, [], {}, paths);
+    expect(guarded).toContainEqual({ path: `${child}/vitest.config.ts`, hash: null });
+    expect(guarded).toContainEqual({ path: `${child}/runner/custom.ts`, hash: null });
+    expect(guarded).toContainEqual({ path: `${child}/compiler/absent/tsconfig.json`, hash: null });
+    await expect(captureGuardedFiles(directory.path, [], {}, [`${child}/compiler/existing`])).rejects.toMatchObject({ code: 'EISDIR' });
+    await writeFile(join(directory.path, child, 'vitest.config.ts'), 'export default {};');
+    await rm(join(directory.path, child, 'package.json'));
+    const request = { id: 'ga-0002', projectRoot: directory.path, directory: join(directory.path, '.gates/ga-0002'), head: 'a'.repeat(40),
+      checks: [{ kind: 'type-check' as const, command: checkCommand({ argv: ['true'], cwd: directory.path, timeoutMs: 30_000 }) }], guarded };
+    const refused = await runGate(createPassingCheckExecution(), 'iteration', request);
+    expect(refused).toMatchObject({ verdict: 'failed', cause: 'guarded-change' });
+    expect(refused.guardedChanges.map(change => [change.path, change.before === null, change.after === null])).toEqual([
+      [`${child}/package.json`, false, true], [`${child}/vitest.config.ts`, true, false],
+    ]);
+    const by = { path: 'iterations/it-0001/assignment.json', id: 'it-0001', revision: 1, hash: 'a'.repeat(64) };
+    const allowed = await runGate(createPassingCheckExecution(), 'iteration', { ...request, id: 'ga-0003', directory: join(directory.path, '.gates/ga-0003'),
+      authorizations: [`${child}/package.json`, `${child}/vitest.config.ts`].map(path => ({ path, by })) });
+    expect(allowed.verdict).toBe('passed');
+    expect(allowed.guardedChanges.every(change => change.authorizedBy?.id === 'it-0001')).toBe(true);
+  });
+
+  test('holds the configuration, the Cucumber configuration as it stands and each feature file at the hash of its expected rendering', async () => {
     const directory = await temporaryDirectory();
     cleanups.push(directory.remove);
     const write = async (path: string, content: string) => {
@@ -321,22 +386,25 @@ describe('the guarded list', () => {
     };
     await write('package.json', '{}\n');
     await write('ramify-agent.json', '{"schema":"ramify-agent.project/1"}\n');
+    await write('cucumber.json', '{"default":{"tags":"not @ramify-pending"}}\n');
+    // Support code is the project's own: the harness guards no file it names.
     await write('src/tests/support/world.ts', 'export {};\n');
     const expected = expectedFeatureFiles(tracked(), { planId: 'demo', runId: 'run-1' });
     // The tree holds a drifted copy of one file: the list is the rendering's, not the tree's.
     await write(expected[0]!.path, 'Feature: drifted\n');
 
     const guarded = await captureGuardedFiles(directory.path, [], {
-      support: ['src/tests/support/world.ts'],
       expected: expectedFeatureHashes(expected),
     });
-    expect(guarded).toEqual([
+    expect(guarded.filter(file => file.hash !== null)).toEqual(expect.arrayContaining([
       { path: 'package.json', hash: sha256('{}\n') },
       { path: 'ramify-agent.json', hash: sha256('{"schema":"ramify-agent.project/1"}\n') },
+      { path: 'cucumber.json', hash: sha256('{"default":{"tags":"not @ramify-pending"}}\n') },
       { path: expected[0]!.path, hash: contentHash(expected[0]!.content) },
-      { path: 'src/tests/support/world.ts', hash: sha256('export {};\n') },
       { path: expected[1]!.path, hash: contentHash(expected[1]!.content) },
-    ]);
+    ]));
+    expect(guarded.filter(file => file.hash !== null)).toHaveLength(5);
+    expect(guarded.map(file => file.path)).not.toContain('src/tests/support/world.ts');
   });
 
   test('a feature file that differs from its expected rendering at a gate is a guarded change', async () => {
@@ -427,7 +495,7 @@ describe('an engineer and the feature files', () => {
       inputs: treeInputs(),
       git: scripted.git,
       candidates: finalEvidence.candidates,
-      readinessExecution: directReadinessExecution(),
+
       commandExecution: commands,
     });
     cleanups.push(() => opened.service.close());
@@ -447,14 +515,16 @@ describe('an engineer and the feature files', () => {
     const rendered = final.replace('  @ramify-sc-001\n', '  @ramify-sc-001 @ramify-pending\n');
 
     // The assignment guards the feature file at its rendering's hash, the
-    // configuration and the support files the configuration names.
+    // configuration, the audit definition and every Cucumber configuration
+    // the configured scenario check reads; support code stays the project's.
     const assignment = JSON.parse(await readFile(runPath(project, plan, runId, iterationLayout.assignment('wi-001', 1)), 'utf8')) as IterationAssignment;
     const guarded = new Map(assignment.guarded.map(file => [file.path, file.hash]));
     expect(guarded.get(notesFeature)).toBe(contentHash(rendered));
     expect(guarded.get('ramify-agent.json')).toBe(sha256(await readFile(join(project, 'ramify-agent.json'), 'utf8')));
     expect([...guarded.keys()]).toEqual(expect.arrayContaining([
-      'subs/integration-tests/src/support/world.ts', 'subs/integration-tests/src/support/hooks.ts',
+      'ramify-audit.json', 'cucumber.js', 'cucumber.cjs', 'cucumber.mjs', 'cucumber.json', 'cucumber.yaml', 'cucumber.yml',
     ]));
+    expect([...guarded.keys()].some(path => path.includes('/support/'))).toBe(false);
 
     // The two guarded writes were refused outright, the feature file although
     // it lies inside the scope; the observation says why.

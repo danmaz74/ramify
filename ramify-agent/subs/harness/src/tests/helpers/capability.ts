@@ -5,7 +5,7 @@ import {
 import { capabilityPolicyFrom } from '../../capability/policy.js';
 import { createCapabilityWorkflow } from '../../capability/workflow.js';
 import { openRuns, testPolicy, type OpenRunsOptions } from './runs.js';
-import { cp } from 'node:fs/promises';
+import { cp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { temporaryDirectory } from './fixture.js';
@@ -14,9 +14,12 @@ import { temporaryDirectory } from './fixture.js';
 export async function copyCapabilityFixture(nested = false): Promise<{ root: string; remove: () => Promise<void> }> {
   const directory = await temporaryDirectory();
   const name = nested ? 'capability-coordination-nested' : 'capability-coordination';
-  const source = fileURLToPath(new URL(`../../../../../fixtures/${name}/`, import.meta.url));
+  const source = fileURLToPath(new URL(`../../../fixtures/${name}/`, import.meta.url));
   const root = join(directory.path, name);
   await cp(source, root, { recursive: true });
+  const ignore = join(root, '.gitignore');
+  const content = await readFile(ignore, 'utf8');
+  await writeFile(ignore, `${content}${content.endsWith('\n') ? '' : '\n'}**/src/tmp/\n`);
   return { root, remove: directory.remove };
 }
 
@@ -24,7 +27,7 @@ export async function copyCapabilityFixture(nested = false): Promise<{ root: str
  * capturing the current shared-lifecycle policy. This seam lives only in the harness test tree. */
 export function openCapabilityRuns(root: string, options: OpenRunsOptions) {
   return openRuns(root, { ...options, capabilityWorkflowFactory: createCapabilityWorkflow,
-    policy: (projectRoot, nested) => capabilityPolicyFrom(options.policy?.(projectRoot, nested) ?? testPolicy(projectRoot)) });
+    policy: (projectRoot: string) => capabilityPolicyFrom(options.policy?.(projectRoot) ?? testPolicy(projectRoot)) });
 }
 
 /** Small record builders for scripted Plan 16 transitions. Later fixtures
@@ -69,7 +72,7 @@ export function fixturePlan(request: CapabilityRequest = fixtureRequest(), task:
   return {
     schema: 'ramify-agent.capability-plan/1', task: task.id, revision: 1, basedOn: 0, updatedBy: 'inv-0002',
     revisionReason: 'Initial qualified plan', need: request.original.need, proposedInterface: 'B exports a result reader',
-    useCases: [{ id: example.id, expectedBehavior: 'A formats the fact', derivedFrom: [example.id], coverage: { state: 'unresolved', reason: 'Implementation pending' } }],
+    useCases: [{ id: example.id, expectedBehavior: 'A formats the fact', derivedFrom: [example.id] }],
     compatibility: ['D uses the old result shape'], outline: ['Implement B', 'Migrate D', 'Integrate A'],
     decisions: [{ decision: 'Place in B', reason: 'B owns fact source', evidence: ['architect-view'] }],
     openQuestions: [], requirementRefs: [], originalExamples: [example.id],

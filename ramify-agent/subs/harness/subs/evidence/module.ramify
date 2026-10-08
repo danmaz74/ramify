@@ -5,7 +5,7 @@ module evidence
 // The executable's own path crosses, because a run captures the complete
 // command it ran the Ramify check with, environment included, and a captured
 // command that names no executable cannot be run again.
-expose-src RamifyCli, RamifyRun, RamifyCheckResult, MaterializeResult, ramifyVersion, privateRamify, ramifyExecutable from "ramify-cli.ts" to parent
+expose-src RamifyCli, RamifyRun, RamifyCheckResult, CheckProvider, MaterializeResult, ramifyVersion, privateRamify, ramifyExecutable from "ramify-cli.ts" to parent
 
 // Reading what Ramify generates: the architect view, a requester API view and
 // the measurement document. Their file formats stay here.
@@ -36,5 +36,8 @@ expose-src CandidateSource, gitCandidateSource, TreeEntry, TreeMatch, commitTree
 
 // Consumers inject this boundary; real Git integration tests live with the adapter.
 expose-src GitService, gitService, currentHead, runBranchName from "git.ts" to parent
+expose-src trackedPaths, ignoreStatus, IgnoreRule, IgnoreStatus from "git.ts" to parent
 expose-src GitInspection, inspectGit from "git.ts" to parent
 expose-src CandidateTreePreview, previewCandidateTree from "candidate-tree.ts" to parent
+
+expose-src productionSourceGit, ProvisionalSourceGit from "provisional-git.ts" to parent

@@ -8,8 +8,8 @@ import { forkDecision, registryChange, requestPlacement } from './placement.js';
 import { installTestRunner, openRuns, startRun } from './runs.js';
 import { scenariosCommit, scriptedGit, type GitCheckpoint } from './scripted-git.js';
 import { FakeRamifyCli } from './fake-ramify.js';
-import { directReadinessExecution } from './external-tools.js';
 import { createPassingCheckExecution } from './direct-check-execution.js';
+import { passingAudit } from './direct-check-execution.js';
 
 /*
  * The capability-progress fixture: one copy of the `collection-review`
@@ -278,8 +278,8 @@ export async function progressFixture(): Promise<ProgressFixture> {
         inputs: treeInputs(),
         git, ...(final ? { candidates: final.candidates } : {}),
         ramify,
-        readinessExecution: directReadinessExecution(),
-        checkExecution: createPassingCheckExecution(),
+
+        configuredAudit: passingAudit(),
       });
       try {
         const runId = (await opened.service.execute(startRun(planId))).jobId;
@@ -329,15 +329,16 @@ export async function writeArchitectTreeFixture(root: string): Promise<void> {
   const directory = join(root, '.ramify-architect');
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, '_meta.json'), JSON.stringify({
-    schema: 'ramify.architect-view/1',
+    schema: 'ramify.architect-view/3',
     revision: tree.revision,
     input: tree.input,
     modules: tree.modules.size,
     dependencies: 'measured',
+    dependencyScope: 'production',
   }));
   for (const module of tree.modules.values()) {
     const target = join(directory, ...module.module.split('/'));
     await mkdir(target, { recursive: true });
-    await writeFile(join(target, 'module.json'), JSON.stringify(module));
+    await writeFile(join(target, 'module.json'), JSON.stringify({ schema: 'ramify.architect-module/3', ...module }));
   }
 }

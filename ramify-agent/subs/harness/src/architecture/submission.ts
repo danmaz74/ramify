@@ -299,7 +299,7 @@ function deviationErrors(body: DeviationBody, question: Extract<ForkQuestion, { 
     } else if (state !== 'pending') {
       errors.push({
         path: `${path}.scenario`,
-        message: `${scenario.scenario} is ${state}; a deviation rewords only a pending scenario, since no gate may have verified the text it replaces`,
+        message: `${scenario.scenario} is ${state}; a deviation rewords only a pending scenario, since nothing may have bound the text it replaces`,
         expected: 'a pending scenario',
       });
     }

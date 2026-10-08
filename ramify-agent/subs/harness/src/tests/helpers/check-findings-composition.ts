@@ -1,3 +1,4 @@
+import { rootDescription } from './root-description.js';
 import type { ScriptStep } from '../../../subs/agent/src/scripted.js';
 import type { CheckFindingSummary } from '../../../subs/check-findings/src/interfaces/check-findings.js';
 import type { RunEvent } from '../../run/log.js';
@@ -56,7 +57,7 @@ export async function compositionTarget(cleanups: Array<() => Promise<void>>): P
 /** The candidates: each holds its module declarations, the guidance and the source so far. */
 export function compositionCommits(): Record<string, ScriptedCommit> {
   const declarations = {
-    'module.ramify': 'ramify 1\nmodule collection-review\n',
+    'module.ramify': rootDescription('collection-review'),
     'subs/workspace/module.ramify': 'ramify 1\nmodule workspace\n',
     'subs/workspace/subs/reviews/module.ramify': 'ramify 1\nmodule reviews\n',
     [`${notesDirectory}/module.ramify`]: 'ramify 1\nmodule notes\n',

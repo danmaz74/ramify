@@ -1,0 +1,233 @@
+{
+  "implementationCommit": "5fd5c55c2f943d3b6048813a0f24a60fd2e30cdd",
+  "reconciliationMergeCommit": "aec0c0569a619ee13d2b1f3e4049cc7183c4c906",
+  "adoptedPlan21Commit": "292154763c95d5338405fad41c27dd06caefb914",
+  "codeConsumerChange": "composition.test.ts: three producedElsewhere file paths updated; titles, union sites and values unchanged. Existing Plan21 CA08 updates retained.",
+  "commands": [
+    "node_modules/.bin/vitest run subs/harness/src/tests/write-guard.test.ts subs/harness/src/tests/write-guard.boundary.test.ts subs/harness/src/tests/write-guard-ownership.test.ts subs/harness/src/tests/composition.test.ts --reporter=json --outputFile=/tmp/plan22-write-guard-reconciled.json",
+    "npm run type-check",
+    "npm run check:self",
+    "git diff --check"
+  ],
+  "cwd": "ramify-agent/",
+  "counts": {
+    "numTotalTests": 31,
+    "numPassedTests": 31,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "files": [
+    {
+      "path": "subs/harness/src/tests/composition.test.ts",
+      "durationMs": 10417.5830078125,
+      "cases": [
+        {
+          "title": "the composed runs removed included child keeps scope authority: the iteration gate audits and commits the removal, and the work-item gate finds it unchanged",
+          "status": "passed",
+          "durationMs": 3.565074000001914
+        },
+        {
+          "title": "the composed runs a rejected iteration cannot send its unauthorized dirty file through a later work-item or final committing checkpoint",
+          "status": "passed",
+          "durationMs": 1371.0074509999977
+        },
+        {
+          "title": "the composed runs PB3: equal captured bytes, feature tampering and later render aliases cannot bypass the actual committing gate",
+          "status": "passed",
+          "durationMs": 1566.5996449999984
+        },
+        {
+          "title": "the composed runs PB3: scripted nested predecessors require every intermediate inherited hash to match",
+          "status": "passed",
+          "durationMs": 1160.2995159999991
+        },
+        {
+          "title": "the composed runs each scenario runs to the end it is written for, and asks Git exactly what it states",
+          "status": "passed",
+          "durationMs": 4.604854000001069
+        },
+        {
+          "title": "the sessions of the composed runs every invocation belongs to a session the log derives, and no final run holds a live or suspended session",
+          "status": "passed",
+          "durationMs": 3.7111750000003667
+        },
+        {
+          "title": "the sessions of the composed runs a yielded revision resumes its architect fresh with one recorded orientation and selection",
+          "status": "passed",
+          "durationMs": 1.2723249999980908
+        },
+        {
+          "title": "the recovery tables of the ten state machines there is a row for every durable boundary, every machine has rows, and the three recovery files run all of them",
+          "status": "passed",
+          "durationMs": 3.5671849999998813
+        },
+        {
+          "title": "no query appends an event every query, over every completed and failed composed run, leaves its log, its files and its project as they were",
+          "status": "passed",
+          "durationMs": 4762.259288999998
+        },
+        {
+          "title": "every value of every union has a producer the union list is complete, and every value is produced by a composed run, by a named test, or is named with the reason it has none",
+          "status": "passed",
+          "durationMs": 1511.2411810000012
+        },
+        {
+          "title": "the acceptance matrix, composed every case has exactly one owning iteration, and its owning tests are present by name and belong to that iteration",
+          "status": "passed",
+          "durationMs": 27.58292000000074
+        }
+      ]
+    },
+    {
+      "path": "subs/harness/src/tests/write-guard-ownership.test.ts",
+      "durationMs": 13.808349609375,
+      "cases": [
+        {
+          "title": "caught ownership calls with the wrong project root still fail completion",
+          "status": "passed",
+          "durationMs": 9.464693000000011
+        },
+        {
+          "title": "caught exhausted or unstated ownership queries still fail completion",
+          "status": "passed",
+          "durationMs": 1.4406399999999735
+        },
+        {
+          "title": "a required query cannot invent a seed outside the literal ownership facts",
+          "status": "passed",
+          "durationMs": 1.6161860000000274
+        },
+        {
+          "title": "unused required ownership answers fail completion",
+          "status": "passed",
+          "durationMs": 0.8082279999999855
+        }
+      ]
+    },
+    {
+      "path": "subs/harness/src/tests/write-guard.boundary.test.ts",
+      "durationMs": 34829.2734375,
+      "cases": [
+        {
+          "title": "PB3-S01\u2013S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions",
+          "status": "passed",
+          "durationMs": 19154.999754
+        },
+        {
+          "title": "PB3-S06: actual changed declarations narrow an invocation and restart; removed captured exclusions never widen",
+          "status": "passed",
+          "durationMs": 4780.282552000001
+        },
+        {
+          "title": "PB3-S07: unavailable placement and mismatched bootstrap identities cannot grant writes",
+          "status": "passed",
+          "durationMs": 960.5926870000003
+        },
+        {
+          "title": "PB3-S04 P04: intercepted and direct candidate-classifier controls cannot bypass captured inputs or harness state",
+          "status": "passed",
+          "durationMs": 3834.308374
+        },
+        {
+          "title": "PB3-P04: explicitly included independent project configs are guarded without workspace membership",
+          "status": "passed",
+          "durationMs": 747.8823279999997
+        },
+        {
+          "title": "PB3-S06: removing child declarations cannot widen capture; included child removal remains within both permissions",
+          "status": "passed",
+          "durationMs": 5350.273377999998
+        }
+      ]
+    },
+    {
+      "path": "subs/harness/src/tests/write-guard.test.ts",
+      "durationMs": 159.810302734375,
+      "cases": [
+        {
+          "title": "X3: allowed and denied targets the table: existing files, a new file, a traversal, a symlink and the assigned contract location",
+          "status": "passed",
+          "durationMs": 48.87935399999992
+        },
+        {
+          "title": "X3: allowed and denied targets a child subtree the assignment did not include is outside the scope, whatever lies beneath it",
+          "status": "passed",
+          "durationMs": 12.352469999999926
+        },
+        {
+          "title": "X3: allowed and denied targets a bootstrap scope reaches a directory that does not exist yet, and nothing beside it",
+          "status": "passed",
+          "durationMs": 19.72075200000006
+        },
+        {
+          "title": "the files only the harness writes a feature file and the configuration are refused outright, although the scope contains them, and nothing is written",
+          "status": "passed",
+          "durationMs": 16.899729999999977
+        },
+        {
+          "title": "X5: a resolution failure is not a scope violation blocked-unresolved and blocked-scope are distinct verdicts with distinct reasons",
+          "status": "passed",
+          "durationMs": 10.867473000000018
+        },
+        {
+          "title": "X5: a resolution failure is not a scope violation a call that is not one write of one path is unresolved, whatever its tool is called",
+          "status": "passed",
+          "durationMs": 9.687914000000092
+        },
+        {
+          "title": "X5: a resolution failure is not a scope violation a symlink loop cannot be resolved, and is not reported as a scope violation",
+          "status": "passed",
+          "durationMs": 9.071729000000005
+        },
+        {
+          "title": "what a block tells the agent it names the target and the scope, and directs the engineer to report rather than retry",
+          "status": "passed",
+          "durationMs": 16.431266999999934
+        },
+        {
+          "title": "the lifted containment check it stays lexical: an absolute candidate and one that escapes are both refused",
+          "status": "passed",
+          "durationMs": 1.1944330000000036
+        },
+        {
+          "title": "the lifted containment check the real target of a new path is its nearest existing ancestor with the rest appended",
+          "status": "passed",
+          "durationMs": 13.810227999999938
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "type-check": {
+      "exitCode": 0,
+      "scopes": 4
+    },
+    "check:self": {
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 0,
+      "analysisLimits": 313,
+      "coverage": "partial"
+    },
+    "diff-check": {
+      "exitCode": 0
+    }
+  },
+  "scriptedOwnershipQueriesRequiredAndConsumed": 35,
+  "ordinaryProcessAttempts": 0,
+  "sourceSha256": {
+    "subs/harness/src/tests/composition.test.ts": "d7c0bf2c0bd0856ef0dc8b543a95bc535317aa45cf90af6c42baa3498b1aea5c",
+    "subs/harness/src/tests/write-guard.test.ts": "4fe2516272d843b587992cd01cc2114bed4e6e9d1b9c315187bf7721e86955a9",
+    "subs/harness/src/tests/write-guard.boundary.test.ts": "c48adf363f739ef713fe9290cc8577f8a2bcb3bd00519a58b374293f5dbee7a3",
+    "subs/harness/src/tests/write-guard-ownership.test.ts": "a775ad0142517ebd2382409790aab3406bf68767c7f05bfd4a26f29a2cfbeacd",
+    "subs/harness/src/tests/helpers/write-guard-fixture.ts": "14ea33c69a6357fdc8f52840b5b19864aa968e76d2a4ebe760dd472bb8958a2a",
+    "subs/harness/src/tests/helpers/write-guard-ownership.ts": "8578ca25d06ce0c0314a441d9025e92ed41381ac99633e496016d78fefafcce5",
+    "vitest.config.ts": "c0f54f605e468027bffb775b4847c487bb88fb59f1b06528dbacb09738f07e7e",
+    "package.json": "df8473368f6e34409bc6f7917ba183bda93db16cf2b75f8a561c42ab12c29551",
+    "package-lock.json": "9d0b5e4332475cfc10b20c6f8c3d2aff035703a25af88710bc2beeb361ea96d6"
+  },
+  "limits": [
+    "The reconciled focused run overlapped compiler and self-check activity; provider timing comparison is observational.",
+    "No full audit or semantic-completion judgment performed in this cut."
+  ]
+}

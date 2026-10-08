@@ -8,7 +8,7 @@ import { addModule, assign, byRole, completionProposed, installMiniRunner, outli
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -108,9 +108,10 @@ describe('where a fake may be injected', () => {
     ]), { seams: { ...seams, index: withBoth } });
     expect(refused.ok).toBe(false);
     if (refused.ok) return;
-    expect(refused.errors.map(error => error.path)).toEqual(['injectionSites.0', 'injectionSites.1', 'injectionSites.2', 'injectionSites.3']);
+    expect(refused.errors.map(error => error.path)).toEqual(['injectionSites.0', 'injectionSites.1', 'injectionSites.3']);
     expect(refused.errors[0]!.message).toContain('the own contents of "collection-review/workspace/reviews/core"');
-    expect(refused.errors[1]!.message).toContain('no module\'s own contents');
+    expect(refused.errors[1]!.message).toContain('collection-review');
+    expect(validateEngineer(contractNeeded([`${providerDirectory}/scripts/tool.ts`]), { seams: { ...seams, index: withBoth } }).ok).toBe(true);
     for (const error of refused.errors) expect(error.message).toContain("a fake injection site lies in the consumer's or the provider's own contents");
 
     // Without a view nothing can be placed, and the harness judges the sites
@@ -179,7 +180,7 @@ async function run(root: string, plan: Parameters<typeof byRole>[0], commits: re
   const final = finalCandidate(root, finalHead);
   const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits], previews: final.previews });
   const opened = await openRuns(root, { script: byRole(plan), inputs: treeInputs(), git,
-    candidates: final.candidates, readinessExecution: directReadinessExecution() });
+    candidates: final.candidates, });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);

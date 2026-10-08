@@ -1,0 +1,9 @@
+{
+  "command": "PLAN13_READINESS_FIXTURE=docs/plans/13-plan-evidence-and-nonfunctional-work/evidence/plan13-readiness-fixture.json npx tsx scripts/browser-acceptance/plan13-readiness.ts",
+  "exitCode": 1,
+  "savedFixtureSha256": "c0d28e5e63f7ddd6a5b37b31f4adfd6f3a42e31197b3883547448d85b37c7d64",
+  "observedPageError": "Cannot read properties of undefined (reading 'join')",
+  "observedBehavior": "The root element stayed empty and the expected Merge readiness label did not appear; the 5-second diagnostic wait failed.",
+  "freshFixtureSha256": "b499cb076852310b8b8a5eb8465470e9245853716edfc0bb9130132dcdb8b42f",
+  "freshRun": "plan13/plan13-readiness-browser-results.json"
+}

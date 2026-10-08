@@ -4,8 +4,7 @@ import type { GitCheckpoint } from './helpers/scripted-git.js';
 import { protocolPorts } from './helpers/protocol-ports.js';
 import { openUnchangedRuns, unchangedGit, assertUnchangedGit, type UnchangedRunsOptions } from './helpers/unchanged-run.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
-import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -24,15 +23,17 @@ import { startServerWith, type RunningServer } from '../http/server.js';
 import { terminalRunEvents } from '../run/log.js';
 import { treeInputs } from './helpers/iterations.js';
 import {
-  draftsDirectory, drafts, fileHashes, longOutputBytes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
+  draftsDirectory, drafts, fileHashes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
 } from './helpers/protocol.js';
 import {
   emptyAnalysis, installTestRunner, openRuns as openRealRuns, runEventsOnDisk, runPath, startRun, testPolicy, until,
 } from './helpers/runs.js';
 import { copyFixture } from './helpers/fixture.js';
+import { fixtureScratchGit } from './helpers/mock-git.js';
 import { acquireProjectLock } from '../store/lock.js';
 import { ObservationLog } from '../run/observations.js';
 import { runLayout } from '../run/records.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 
 /*
  * The run protocol over HTTP, read by a plain Node client: `fetch` and the
@@ -130,8 +131,8 @@ async function serve(
     runs: {
       inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
       ...extra.runs,
-      ...(ports ?? { git: unchangedGit(root, unchangedCheckpoints, unchangedCheckpoints.length ? 4 : 0),
-        candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution() }),
+      ...(ports ?? { git: fixtureScratchGit(unchangedGit(root, unchangedCheckpoints, unchangedCheckpoints.length ? 4 : 0)),
+        candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, configuredAudit: passingAudit() }),
     },
   });
 }
@@ -154,7 +155,7 @@ describe('C1: a run completes with no client, and a client attached afterwards r
     await opened.service.settled(plan, runId);
     await opened.service.close();
     const onDisk = await runEventsOnDisk(root, plan, runId);
-    expect(onDisk.at(-1)!.type).toBe('job-completed');
+    expect(onDisk.at(-1)!.type, JSON.stringify(onDisk.slice(-20))).toBe('job-completed');
     fixtures.get(root)!.git.assertComplete();
 
     // A client attaches afterwards, to a harness that has just loaded the run.
@@ -241,6 +242,7 @@ describe('every query of a completed run, over HTTP', () => {
     const decisions = decisionListResponseSchema.parse((await get(server, protocolPaths.runDecisions(plan, runId))).body);
     expect(decisions.decisions.filter(decision => decision.kind === 'scope').map(decision => decision.kind === 'scope' && [decision.iteration, decision.modules])).toEqual([
       ['wi-001.i01', [notes]],
+      ['wi-001.i02', ['collection-review/workspace/reviews']],
       ['wi-002.i01', [drafts]],
     ]);
     // Each outline revision is a plan decision: the one the assignment came
@@ -255,8 +257,9 @@ describe('every query of a completed run, over HTTP', () => {
       ['wi-002', 'completed', 'note-drafts'],
     ]);
     const detail = workItemResponseSchema.parse((await get(server, protocolPaths.runWorkItem(plan, runId, 'wi-001'))).body);
-    expect(detail.iterations).toHaveLength(1);
-    expect(detail.iterations[0]!.result?.outcome).toBe('accepted');
+    expect(detail.iterations).toHaveLength(2);
+    expect(detail.iterations[0]!.result?.outcome).toBe('partial');
+    expect(detail.iterations[1]!.result?.outcome).toBe('accepted');
     const engineer = detail.iterations[0]!.invocations.find(invocation => invocation.role === 'engineer')!;
     expect(engineer.outsideScope).toContain(outsidePath);
 
@@ -267,16 +270,16 @@ describe('every query of a completed run, over HTTP', () => {
       ['note-search', 'todo', true],
     ]);
 
-    // The final gate's project tests printed more than a client receives:
-    // the tail is bounded at 8 KiB and the complete output stays a file.
+    // The final gate asked the committed audit in full and plans no command
+    // of its own: a client reads the request and its answer, and no
+    // environment of any command.
     const final = items.workItems.length > 0 ? (await allEvents(server, runId)).events.find(event => event.transition === 'job-completed')!.refs.find(ref => ref.kind === 'gate')!.id : '';
     const gate = gateResponseSchema.parse((await get(server, protocolPaths.runGate(plan, runId, final))).body).gate;
     expect(gate.checkpoint).toBe('final');
-    const tests = gate.commands.find(command => command.kind === 'tests')!;
-    expect(tests.output.bytes).toBe(longOutputBytes);
-    expect(Buffer.byteLength(tests.output.tail, 'utf8')).toBe(runQueryLimits.outputTailBytes);
-    expect(tests.output.tail.endsWith('all passed\n')).toBe(true);
-    expect(Object.keys(tests)).not.toContain('env');
+    expect(gate.commands).toEqual([]);
+    expect(gate.audit).toMatchObject({ mode: 'full', status: 'completed', verdict: 'pass', requestedSourceCommit: gate.audited, executedMode: 'full' });
+    expect(gate.verdict).toBe('passed');
+    expect(JSON.stringify(gate)).not.toContain('envAdditions');
 
     // The evaluation projection shows every change outside a write scope,
     // which tools were guarded, and the sentence that refuses to read zero
@@ -556,7 +559,9 @@ describe('a record of an unsupported version', () => {
     expect(status).toBe(422);
     const error = errorResponseSchema.parse(body).error;
     expect(error.code).toBe('unsupported-version');
-    expect(error.evidence).toEqual([`plans/${plan}/.harness/jobs/${runId}/job.json`, 'declares ramify-agent.job/4']);
+    expect(error.message).toContain('(missing policy)');
+    expect(error.message).toContain('run-policy/7');
+    expect(error.message).toContain('fresh run is required');
     for (const path of [protocolPaths.runEvents(plan, runId, 0), protocolPaths.runMetrics(plan, runId), protocolPaths.runGate(plan, runId, 'ga-0001')]) {
       expect(errorResponseSchema.parse((await get(server, path)).body).error.code).toBe('unsupported-version');
     }
@@ -564,7 +569,7 @@ describe('a record of an unsupported version', () => {
     const list = runListResponseSchema.parse((await get(server, protocolPaths.runs(plan))).body);
     expect(list.unserved).toEqual([{
       jobId: runId, path: `plans/${plan}/.harness/jobs/${runId}/job.json`, code: 'unsupported-version',
-      message: expect.stringContaining('ramify-agent.job/4'),
+      message: expect.stringContaining('fresh run is required'),
     }]);
 
     // A run that does not exist is `not-found`; the difference is the point.

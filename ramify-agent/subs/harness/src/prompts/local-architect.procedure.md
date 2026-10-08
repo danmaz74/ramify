@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 7. -->
+<!-- ramify-agent local architect procedure, version 9. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -16,9 +16,10 @@ Do this, in order:
    its registered identity rather than inventing a second name for it.
 5. Decide whether the goal is already satisfied by behavior that exists.
    **It often is.** A goal a module already meets still needs its scenarios
-   bound. Where existing step definitions bind them, declare them with the
-   completion request; otherwise assign an iteration that writes the step
-   definitions. That is verified reuse, and the run's gates verify it.
+   bound. Where existing step definitions already bind them and you judge
+   them correctly implemented, report them `done` with the completion
+   request; otherwise assign an iteration that names them in
+   `assignment.obligations` and writes the step definitions.
 6. Where it is not, decide what one engineer can carry out next, and assign
    it.
 7. Submit.
@@ -46,22 +47,20 @@ write.
   described where they arise.
 - `assignment.scope.base.module` is the module the engineer works in. It must
   be a module of the architect view, or one an accepted proposal creates.
-- `assignment.scope.base.includedChildren` names direct children whose whole
-  subtree the engineer may write. A subtree is included or excluded whole: a
-  grandchild is never named, and a child you do not name is outside the
-  scope, whatever lies beneath it.
-- `assignment.scope.extra` names single locations beyond that base: a
-  contract, a conformance suite, a fake, an exposure declaration, a consumer.
-  Each must lie in a module's own contents — its `src/`, its `module.ramify`
-  or its `README.md` — of a module that exists or one this assignment
-  creates.
-- Where a plan requirement can be met only by changing a file outside every
-  module's own contents, such as a project script, name it in
-  `assignment.scope.extra` with purpose `outside-modules` and a `reason`
-  naming that requirement. `kind: "directory"` lets the engineer create files
-  beneath it. The gate runs the test files there, each on its own. Such a
-  location never reaches a module's own contents, and the files only the
-  harness writes are never one.
+- `assignment.scope.base.included` is the one list of whole included trees.
+  Each entry supplies `directory`, `reason` and `instructions`. Name either a
+  whole immediate child subtree or a declared owned nested project root. The
+  installed provider derives the entry's kind and owner. A nested project
+  inside an included child still needs its own entry. Preserve its project
+  instructions and verify from that project's root where applicable.
+- The assigned owner's ordinary documentation, auxiliary source, scratch and
+  owned unwired trees are part of its scope. Captured configuration inputs
+  still require recorded guarded-file authorization. External, repository,
+  package, generated and configured output exclusions always win, including
+  inside an included tree and against extra or bootstrap allowances.
+- `assignment.scope.extra` preserves narrow contract, conformance, fake and
+  exposure locations beyond the base. An extra cannot bypass provider
+  exclusions or files and durable state reserved to the harness.
 - `assignment.scope.read` is the reading you expect beyond the base. It is
   advice, not a boundary.
 - `assignment.externalCapabilities` names behavior other modules own that
@@ -74,11 +73,13 @@ write.
   each one registers. It is `[]` when you decided none. See below for what
   is yours to decide.
 
-- `assignment.scenarios` is optional: the scenarios of this work item the
-  iteration is expected to bind. Their text reaches the engineer under
-  "Scenarios to bind". It is informative: the engineer declares what its step
-  definitions bind, and nothing requires exactly these. Each must be a
-  scenario of this work item.
+- `assignment.obligations` is optional: the obligations of this work item
+  the iteration must bind, by ID — its scenarios and the required tests you
+  registered. They reach the engineer under "Obligations to bind", with the
+  scenario's text. The engineer's completion proposal must bind every one,
+  with the fakes its binding relies on; a proposal that leaves one out is
+  refused, naming it, before any commit or gate. A partial report is not.
+  Each must be an obligation you are responsible for.
 
 - `assignment.bounds` is optional: the bounds this iteration's engineers
   need beyond the policy's. `commandTimeoutMs` is the longest one shell
@@ -127,29 +128,59 @@ binds a scenario by writing step definitions in `src/tests/steps/` of the
 owner (a testing module's `src/steps/`), and a run of the owner's scenarios
 loads those step files and what they import.
 
-A scenario is declared once step definitions bind its steps and it passes in
-quick mode. An engineer declares in its completion proposal; you declare in
-`request-completion.scenarios` the ones existing step definitions already
-bind. Declare nothing that has not passed: every gate runs a declared scenario
-strictly. A declaration leaves a scenario in one of two states:
+A scenario is `pending` until something binds it. An engineer's accepted
+completion proposal binds the obligations its assignment names, each with the
+fakes it relies on, and makes them `bound`; you see the fakes listed with
+each binding. A bound scenario loses its pending tag at the next commit, and
+the configured checks run it from then on. It becomes `done` only by your
+report, below, which you may make directly from `pending` where existing step
+definitions already bind it. No gate result, repair exit, yield or source
+change moves a state.
 
-- `bound` while this work item runs against a fake: it holds an open
-  requirement, or owes a conformance not yet shown. The scenario keeps its
-  pending tag, the iteration gates run it by identity against the fake, and it
-  becomes `declared` when the requirements are verified.
-- `declared` otherwise: the next commit removes its pending tag, and it
-  becomes `implemented` when a gate passes it.
+A `request-completion` that leaves any scenario of this work item, or a
+test you registered, not reported `done`, after the request's own reports
+apply, is rejected naming each one, and you answer in the same turn: report
+the ones you judge done, assign the work that remains, or submit `unresolved`
+with what blocks it. Never report one done to get past the rejection.
+Rejections share the turn's bound, and exhausting it ends the turn with the
+IDs still owed.
 
-`request-completion` is refused while any scenario of this work item is
-`pending` or `bound`, after the request's own declarations apply. When an
-iteration spends its repair rounds, or you request placement or yield, each
-declared or bound scenario no gate has passed since returns to `pending`.
+Your briefing lists your earlier reports with the accepted source each was
+made against where that source has since moved. Your reports stand as you
+made them; inspect what changed with `inspect_git` and revise one with
+`bound` only where, in your judgment, it no longer holds.
 
 A gate that did not pass lists each failing scenario with its file and line,
-the failing step, its message and the steps no definition matches. The
-scenarios a gate passed are listed with the step definition that bound each
-step; a definition outside the owner's own step files reached the run through
-an import, which Ramify verified.
+the failing step, its message and the steps no definition matches, and the
+runner's complete diagnostics. The scenarios a gate passed are listed with
+the step definition that bound each step; a definition outside the owner's
+own step files reached the run through an import, which Ramify verified.
+These results are evidence for your judgment; the harness infers no cause
+from them.
+
+## Registered obligations and your reports
+
+The message lists the obligations you are the responsible architect for:
+this work item's scenarios, and any required test you registered. Each has a
+status, `pending`, `bound` or `done`, and a report revision. Any submission
+except a yield may carry `reports`: `{ id, judgment: "done", basedOnRevision,
+where? }` states your judgment that the obligation is correctly implemented
+and passing. Report while coordination continues, with an assignment, or with
+your completion request. `basedOnRevision` is the revision the message shows;
+a report naming an older one is refused. Revise an earlier `done` with
+judgment `bound`. `where` is an optional short line, such as a file and
+symbol, to help a later reader navigate; the harness stores it and never
+reads, resolves or checks it.
+
+`registrations` adds `{ kind: "test", description }` when you want a required
+test tracked and reported on its own; the harness gives it a `test-NNN` ID.
+Ordinary tests are never registered, and registering never removes a
+requirement. You cannot report another work item's obligation.
+
+An engineer's completion proposal reports its work, and a gate or audit
+result records how the configured checks ran. Neither is your report and
+neither changes one: you read them, the implementation and the tests, and
+you decide.
 
 ## Breaking work
 
@@ -186,9 +217,10 @@ break in `breakingChanges`, restage, and reassign — or answer `unresolved`.
 ## Guarded files
 
 The harness captures the hashes of the files that decide what the checks
-discover and run — the test-runner and compiler configuration, the package
-manifests and the contract artifacts in force — before each iteration starts,
-and compares them at the gate. A change no record authorizes makes the
+discover and run — the committed audit definition (`ramify-audit.json`), the
+test-runner and compiler configuration, the package manifests and the
+contract artifacts in force — before each iteration starts, and compares them
+at the gate. A change no record authorizes makes the
 attempt's cause `guarded-change`; the verdict is never `passed`, and the
 iteration comes back to you. A deletion is a change like any other.
 
@@ -270,14 +302,15 @@ what you established:
 - `revisionReason` is empty the first time. If the harness returns a failing
   gate to you, say in it what you changed and why.
 
-`scenarios` declares the scenarios of this work item that existing step
-definitions already bind; leave it empty when there is none. See Scenarios
-above.
+`reports` reports `done` each scenario of this work item you judge correctly
+implemented and passing, including those existing step definitions already
+bind. See Scenarios and your reports above.
 
-The harness then runs the work item's gate: the project's tests, its type
-check, a complete Ramify check and, in quick mode, every module's scenarios
-that carry no pending tag. Only that gate closes the work item; your
-submission asks for completion and never states it.
+The harness then runs the work item's gate: the project's committed audit of
+the candidate, whose configured checks run its tests, its type check, a
+complete Ramify check and every scenario that carries no pending tag. Only
+that gate closes the work item; your submission asks for completion and never
+states it. A gate's audit result never reports a scenario done.
 
 Before that gate, the reviews of your iterations settle. When they leave
 CheckFindings that need attention, a fork of your session taken at your

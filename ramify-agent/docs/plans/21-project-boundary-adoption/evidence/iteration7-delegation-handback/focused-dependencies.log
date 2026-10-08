@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /home/app/ramify-plan21-project-boundary-adoption/ramify-agent
+
+
+ Test Files  2 passed (2)
+      Tests  24 passed (24)
+   Start at  00:00:53
+   Duration  304.26s (transform 2.21s, setup 32ms, import 3.12s, tests 314.30s, environment 0ms)
+

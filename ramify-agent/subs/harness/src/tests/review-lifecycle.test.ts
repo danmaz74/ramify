@@ -1,14 +1,14 @@
 import { readdir, readFile, rm } from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ScriptStep } from '../../subs/agent/src/scripted.js';
-import type { CheckExecutionPort } from '../checks/execution.js';
+import type { ConfiguredAuditPort } from '../../subs/audit/src/check-execution.js';
 import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
 import { reviewLayout } from '../reviews/records.js';
 import { snapshotToolNames } from '../reviews/snapshot.js';
 import { scriptedCandidates, testReviewPolicy } from './helpers/candidates.js';
-import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { completionProposed, submit, write } from './helpers/iterations.js';
 import { mockGit } from './helpers/mock-git.js';
@@ -327,20 +327,21 @@ describe('the gate audit and the run mutex', () => {
     const root = await reviewTarget(cleanups);
     const auditing = gate();
     const release = gate();
-    const passing = createPassingCheckExecution();
-    const slowAudit: CheckExecutionPort = {
-      async run(checks, request) {
+    const passing = passingAudit();
+    const slowAudit: ConfiguredAuditPort = {
+      read: passing.read,
+      async run(input) {
         // The second iteration's gate audits slowly, as a real audit does.
-        if (request.context.attemptId === 'ga-0003') {
+        if (input.attemptId === 'ga-0003') {
           auditing.open();
           await release.opened;
         }
-        return passing.run(checks, request);
+        return passing.run(input);
       },
     };
     const run = await reviewRun(root, cleanups, {
       detached: true,
-      checkExecution: slowAudit,
+      configuredAudit: slowAudit,
       engineer: engineers(),
       reviewers: {
         'rq-0001': [{ kind: 'await', until: () => auditing.opened }, ...clean(store)],

@@ -1,0 +1,204 @@
+{
+  "status": "completed",
+  "requestId": "d38bb0c4-3c7c-4031-91a0-e1943b20400b",
+  "runId": "37ec754f-bf38-46e7-bc27-aee811f1aa61",
+  "summary": {
+    "evidenceSchemaVersion": 4,
+    "execution": {
+      "requestId": "d38bb0c4-3c7c-4031-91a0-e1943b20400b",
+      "runId": "37ec754f-bf38-46e7-bc27-aee811f1aa61"
+    },
+    "producer": {
+      "name": "ramify-audit",
+      "version": "0.7.1"
+    },
+    "undetectedConfigFilesForcingFullAudit": [],
+    "coverage": {
+      "status": "declared",
+      "selector": {
+        "id": "ramify-partial",
+        "version": "2",
+        "config": {
+          "chainCap": 25,
+          "failureThreshold": {
+            "minimum": 3,
+            "percentOfRootTests": 10
+          }
+        },
+        "configDigest": "sha256:d5a7603cfc87a91ed6b47831ffe580558eb2ac63619b9228b32aba593219dfc9"
+      },
+      "universe": {
+        "id": "project:.",
+        "digest": "sha256:59b043de3cc8511b7fb912ab0a3b2d10999ffe6adef9771458eee419c41e398e",
+        "checkIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "testUnitIds": [
+          "aux",
+          "source"
+        ]
+      },
+      "selection": {
+        "kind": "scoped",
+        "selectedCheckIds": [],
+        "omittedCheckIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "selectedTestUnitIds": [],
+        "omittedTestUnitIds": [
+          "aux",
+          "source"
+        ]
+      },
+      "claim": {
+        "configuration": {
+          "blob": "35bda1067c8a3518e94e555e1a0f2bf6822e3294",
+          "path": "ramify-audit.json",
+          "sourceCommit": "46db62a7c96e3029501e99552d1f1318276543d6"
+        },
+        "scope": "repository",
+        "strategy": "ramify-partial-link"
+      },
+      "projectRoot": ".",
+      "selectedModules": [],
+      "selectedPaths": [],
+      "ramifyAnswer": {
+        "ramifyVersion": "0.4.0",
+        "cliSchema": "ramify.affected-cli/4",
+        "selectionSchema": "ramify.affected/4",
+        "binaryPath": "node_modules/.bin/ramify"
+      },
+      "baseline": {
+        "sourceCommit": "e5ddbc3e267141238d90bb345968796799ad278c",
+        "sourceTree": "697420cb448d89f1185fd0e2d0db22ccd46fd04a",
+        "reportCommit": "0b940bab71689dff36be521cd12576c3952b1875",
+        "runRef": "refs/audited/runs/2026-10-07T10-48-35Z-e5ddbc3e2",
+        "chainDepth": 2
+      },
+      "carriedFailures": [],
+      "expectedFiles": {
+        "contract": "runner-configured-files/1",
+        "source": "partial-answer",
+        "expected": 0,
+        "run": 0,
+        "missing": [],
+        "status": "complete",
+        "runnerConfigFiles": [
+          "vitest.aux.config.mjs",
+          "vitest.source.config.mjs"
+        ]
+      }
+    },
+    "mode": {
+      "requestedMode": "ramify-partial",
+      "resolution": "defaulted",
+      "executedMode": "ramify-partial"
+    },
+    "overall": "pass",
+    "sourceCommit": "46db62a7c96e3029501e99552d1f1318276543d6",
+    "sourceTree": "f077ae43b4830eb4bd1682de38d06a9a614893fa",
+    "sourceBranch": "deletion-witness",
+    "auditedAt": "2026-10-07T10:48:47.849Z",
+    "durationSeconds": 0.783,
+    "checks": {},
+    "workspacePreparation": {
+      "preparationId": "nodejs"
+    },
+    "definitions": {
+      "digest": "sha256:3af66430fd0f43e2aec4587adf595e614e4bb00f130aea85dbae4c77914e75dd",
+      "manifest": {
+        "manifestVersion": 1,
+        "workingDirectory": ".",
+        "checks": [
+          {
+            "id": "aux-vitest",
+            "dependsOn": [],
+            "requiresPackageScripts": [],
+            "executor": {
+              "kind": "command",
+              "parallel": false,
+              "mutex": false,
+              "continueOnFailure": false,
+              "commands": [
+                {
+                  "name": "aux",
+                  "cmd": "npm",
+                  "args": [
+                    "run",
+                    "test:aux"
+                  ],
+                  "parser": "vitest",
+                  "contracts": {
+                    "selection": "ramify-module-ownership-groups/2",
+                    "failureIdentity": "vitest-test-identity/1",
+                    "completeness": "vitest-run-witness/1"
+                  },
+                  "timeoutMs": 120000,
+                  "env": {}
+                }
+              ]
+            }
+          },
+          {
+            "id": "source-vitest",
+            "dependsOn": [],
+            "requiresPackageScripts": [],
+            "executor": {
+              "kind": "command",
+              "parallel": false,
+              "mutex": false,
+              "continueOnFailure": false,
+              "commands": [
+                {
+                  "name": "source",
+                  "cmd": "npm",
+                  "args": [
+                    "run",
+                    "test:source"
+                  ],
+                  "parser": "vitest",
+                  "contracts": {
+                    "selection": "ramify-module-ownership-groups/2",
+                    "failureIdentity": "vitest-test-identity/1",
+                    "completeness": "vitest-run-witness/1"
+                  },
+                  "timeoutMs": 120000,
+                  "env": {}
+                }
+              ]
+            }
+          }
+        ],
+        "workspacePreparation": {
+          "preparationId": "nodejs",
+          "optionsDigest": "sha256:adbb2bf32776f44988c31873158ae0ff83c60643de5b7e209f0c188c12723a5c"
+        }
+      }
+    },
+    "failureLedger": {
+      "completeness": "complete",
+      "witness": [],
+      "entries": []
+    },
+    "noExecution": true
+  },
+  "refs": {
+    "reportCommit": "cbf484d21b613002d2952e7cdee64d5ab4a4af01",
+    "runRef": "refs/audited/runs/2026-10-07T10-48-47Z-46db62a7c",
+    "treeRef": "refs/audited/by-tree/f077ae43b4830eb4bd1682de38d06a9a614893fa"
+  },
+  "retrievalCommands": [
+    "git notes --ref=audit show 46db62a7c96e3029501e99552d1f1318276543d6",
+    "git show refs/audited/runs/2026-10-07T10-48-47Z-46db62a7c:reports/audit/summary.json"
+  ],
+  "composition": {
+    "scoped": true,
+    "chainDepth": 2,
+    "reportCommit": "cbf484d21b613002d2952e7cdee64d5ab4a4af01",
+    "rootReportCommit": "940badd75b0600dca08b346d4de6e1d6a1ac5551",
+    "outstandingFailures": 0,
+    "verdict": "pass"
+  }
+}

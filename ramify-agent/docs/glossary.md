@@ -153,9 +153,9 @@ A **capability architect** is the agent coordinating one
 
 ## Handback
 
-A **handback** is the accepted return of a verified
-[capability task](#capability-task) result to its suspended parent coordinator
-and requesting engineer.
+A **handback** is the accepted return of a
+[capability task](#capability-task) result, on its capability architect's done
+report, to its suspended parent coordinator and requesting engineer.
 
 ## Contract
 
@@ -311,20 +311,16 @@ to. A scenario's step definitions are its
 ## Binding
 
 A scenario's **binding** is the set of [step definitions](#step-definition)
-a run matched to its steps, read from Cucumber's message stream. Binding is
-verified mechanically and says nothing about the fidelity of the
-[interpretation](#interpretation) those step definitions carry.
+a run matched to its steps, read from the Cucumber run a gate's audit
+published. Binding is verified mechanically and says nothing about the
+fidelity of the [interpretation](#interpretation) those step definitions
+carry.
 
 ## Scenario harness
 
 The **scenario harness** is the target project's world, driver, hooks and
-the two commands that run scenarios in quick and full
-[execution mode](#execution-mode), declared in its `ramify-agent.json`.
-
-## Execution mode
-
-An **execution mode** is `quick` or `full`, fixed for one run of the scenario
-runner and never written into a scenario.
+the configured Cucumber check of its committed audit definition that runs
+its scenarios.
 
 ## Identity tag
 
@@ -334,5 +330,5 @@ An **identity tag** is `@ramify-sc-NNN`, the tag that names one tracked
 ## Pending tag
 
 The **pending tag** is `@ramify-pending`, which the harness keeps on a
-[scenario](#scenario) while it is `pending` or `bound`, so that only a run
-that selects it by [identity tag](#identity-tag) runs it.
+[scenario](#scenario) while it is `pending`, and which the project's
+committed Cucumber profile excludes, so that no run executes it.

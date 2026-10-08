@@ -37,6 +37,9 @@ run.
   and thinking, file contents, tool input and output, the prompts and
   appended texts are collapsed; a stored or file body is fetched on its first
   expansion, and a read is shown as a file with its range and line numbers.
+  A post-write check shows the project's verdict apart from each named
+  path's own disposition: a path in a declared tree Ramify does not analyze
+  is `not-analyzed` with its tree and reason, never a pass.
   `src/session-progress.ts` (`useSessionTranscript`) reads the transcript
   after a cursor and follows a run's session with the run's update poll until
   it is finished or interrupted and its entries are complete. The view keeps
@@ -48,7 +51,10 @@ run.
   with the review of the scenarios; hypotheses as forecasts with standing
   and revision beside the decisions; work items, each with its reviews and
   CheckFindings (`src/check-findings.tsx`); the scenarios; checks with
-  bounded output tails and each scenario check's summary; capability
+  bounded output tails and the tracked scenario results read from each
+  gate's audit, and for a nested final audit each project's verdict,
+  execution, failures, counts, duration and record, and every definition
+  discovery skipped, as the harness recorded them; capability
   progress; the run's sessions, each opening its transcript and each
   invocation its chapter; and the metrics with the evaluation evidence. The
   connection to the harness is shown apart from the run's state.

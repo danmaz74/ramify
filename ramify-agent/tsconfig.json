@@ -19,5 +19,5 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*", "subs/**/src/**/*"],
-  "exclude": ["node_modules", "dist", "subs/web/src/**/*"]
+  "exclude": ["node_modules", "dist", "subs/web/src/**/*", "subs/harness/fixtures/**/*", "**/src/tmp/**/*"]
 }

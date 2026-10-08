@@ -6,13 +6,13 @@ import { copyFixture } from './helpers/fixture.js';
 import {
   staleCrashLock, emptyAnalysis, freeze, installTestRunner, onlyRun, openRuns,
   runEventsOnDisk, runPath, startRun, until } from './helpers/runs.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { modified, scenarioGit, untracked, type CommitResponse, type RecoveredCommit, type ScenarioGit } from './helpers/recovery-git.js';
 import { workLayout } from '../work/records.js';
 import { type IterationAssignment, iterationLayout } from '../work/iterations.js';
 import {
   addModule, assign, byRole, byWork, completionProposed, installMiniRunner, outline, shell,
-  submit as submitStep, treeInputs,
+  submit as submitStep, treeInputs, write,
 } from './helpers/iterations.js';
 import { analysisLayout } from '../analysis/records.js';
 import { contractsLayout } from '../contracts/records.js';
@@ -28,6 +28,7 @@ import { scriptedCandidates } from './helpers/candidates.js';
 import { declaringScenarios } from './helpers/declarations.js';
 import type { OpenRunsOptions } from './helpers/runs.js';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
+import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import type { RunWrite } from '../run/service.js';
 import type { RunEvent } from '../run/log.js';
@@ -61,13 +62,16 @@ vi.mock('node:child_process', async original =>
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
+  const errors: unknown[] = [];
   try {
-    for (const cleanup of cleanups.splice(0)) await cleanup();
+    // Settle services before removing the fixtures they are still writing.
+    for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
     const unanswered = [...gits.values()].flatMap(git => [...git.unexpected]);
     gits.clear();
-    expect(unanswered, 'Git operations a scenario states no answer for').toEqual([]);
-    expectNoProcesses();
+    try { expect(unanswered, 'Git operations a scenario states no answer for').toEqual([]); } catch (error) { errors.push(error); }
+    try { expectNoProcesses(); } catch (error) { errors.push(error); }
   } finally { forgetExternalTools(); }
+  if (errors.length) throw new AggregateError(errors, 'Recovery fixture teardown failed');
 });
 
 /** The revision every project of this file is on before its run commits anything. */
@@ -147,13 +151,13 @@ async function crashAfter(
   let frozenAtBoundary = false;
   const { service } = await openRuns(root, {
     git: gitOf(root),
-    readinessExecution: directReadinessExecution(),
+
     ...(commandExecution === undefined ? {} : { commandExecution }),
     ...(agent === undefined ? { script: script ?? [{ kind: 'submit', input: emptyAnalysis() }] } : { agent }),
-    ...(inputs === undefined ? {} : { inputs }),
+    ...(inputs === undefined ? changeTree ? { inputs: treeInputs() } : {} : { inputs }),
     afterWrite: async (current, runId) => {
       void runId;
-      if (changeTree && current === 'readiness-attempted') {
+      if (changeTree && current === 'iteration-assigned') {
         await writeFile(join(root, 'src', 'late.ts'), 'export const late = true;\n');
       }
       if (freezeAt === undefined ? current === write : freezeAt(current)) {
@@ -203,12 +207,15 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'context-package-appended': return types.includes('context-package-appended');
     case 'analysis-evidence-staged': return types.includes('invocation-ended') && !types.includes('analysis-accepted');
     case 'readiness-attempted': return types.includes('readiness-passed') || types.includes('readiness-failed');
+    case 'scratch-setting-up': case 'scratch-rule-appended': case 'scratch-committed': return types.includes('scratch-setting-up');
+    case 'scratch-setup-complete': return types.includes('scratch-setup-complete');
     // The materialization's intent is in the log; its commit is made at the second.
     case 'scenarios-materializing': case 'scenarios-committed': return types.includes('scenarios-materializing');
     case 'scenarios-materialized': return types.includes('scenarios-materialized');
     case 'work-item-started': return types.includes('work-item-started');
     case 'hypotheses-delivered': return types.includes('hypotheses-delivered');
     case 'outline-revised': return types.includes('outline-revised');
+    case 'obligation-reported': return types.includes('obligation-reported');
     case 'iteration-assigned': return types.includes('iteration-assigned');
     case 'writer-acquired': return types.includes('writer-acquired');
     case 'writer-process-registered': return types.includes('writer-process-registered');
@@ -239,14 +246,12 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'evidence-reopened': return types.includes('evidence-reopened');
     case 'revision-needed': return types.includes('revision-needed');
     case 'dependency-cycle-detected': return types.includes('dependency-cycle-detected');
-    case 'capability-assignment-interrupted': return types.includes('capability-assignment-interrupted');
     case 'capability-coordinator-resumed': return types.includes('capability-coordinator-resumed');
     case 'capability-verification-started': return types.includes('capability-verification-started');
     case 'capability-source-captured': return types.includes('invocation-ended');
     case 'capability-exchange-opened': return types.includes('capability-exchange-opened');
     case 'capability-exchange-answered': return types.includes('capability-exchange-answered');
     case 'capability-gate-recorded': return types.includes('gate-attempted');
-    case 'capability-review-recorded': return types.includes('capability-review-recorded');
     case 'capability-handed-back': return types.includes('capability-handed-back');
     case 'capability-assignment-settled': return types.includes('capability-assignment-settled');
     case 'capability-assigned': return types.includes('capability-assigned');
@@ -280,13 +285,16 @@ async function eventTypes(path: string): Promise<string[]> {
 }
 
 /** One entry capability, one hypothesis, and a local architect that asks for completion. */
-function oneWorkItem(): OpenRunsOptions['script'] {
+function oneWorkItem(assignRoot = false): OpenRunsOptions['script'] {
   const submitted = analysis(
     [entry('reviewer-note', 'collection-review/workspace/reviews')],
     [{ id: 'note-storage', capability: 'note-storage', change: 'reuse' as const, changesExistingSymbols: false, suggestedOwner: 'collection-review/workspace/reviews',
       anticipatedConsumers: [], involvedModules: [], dependsOn: [], confidence: 'medium' as const,
       rationale: 'A note may already have somewhere to live.', assumptions: [], uncertainties: [], citations: [] }],
   );
+  if (assignRoot) return byRole({ 'initial-architect': [submitStep(submitted)],
+    'local-architect': [submitStep(assign('collection-review', {}, outline())), submitStep(requestCompletion())],
+    engineer: [submitStep(completionProposed('Added the root-owned late source.'), write('late.ts', 'export const late = true;\n'))] });
   // The catalog extractor's turns are the default ones.
   return (spec: SessionSpec) => spec.role === 'catalog-extractor' ? []
     : [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? submitted : requestCompletion() }];
@@ -296,7 +304,7 @@ function oneWorkItem(): OpenRunsOptions['script'] {
 async function reopen(root: string, agent?: OpenRunsOptions['agent']) {
   const reopened = await openRuns(root, {
     git: gitOf(root),
-    readinessExecution: directReadinessExecution(),
+
     ...(agent === undefined ? {} : { agent }),
   });
   cleanups.push(() => reopened.service.close());
@@ -398,7 +406,7 @@ describe('the recovery table', () => {
     expect((await runEventsOnDisk(root, 'review-notes', runId)).some(event => event.type === 'analysis-accepted')).toBe(false);
     // The fresh run's intake reads a non-functional requirement the crashed
     // one did not, so its catalog, and the file it is staged in, differ.
-    const resumed = await openRuns(root, { git: gitOf(root), readinessExecution: directReadinessExecution(),
+    const resumed = await openRuns(root, { git: gitOf(root),
       script: spec => spec.submission.name === intakeToolName
         ? [{ kind: 'submit', input: { goal: 'Keep reviewer notes on a review run.', elements: [
           { key: 'bounded', kind: 'non-functional', document: 'doc-001', text: 'Reviewer notes stay bounded.', conditions: [], uncertainty: '' },
@@ -561,10 +569,40 @@ describe('the recovery table', () => {
     expect(agent.sessions.filter(session => session.spec.submission.name === 'submit_work_item_result')).toHaveLength(1);
   }, 180_000);
 
+  test.each(['unassigned-dirt', 'new-external-declaration'] as const)('PB3: pending gate intent refuses %s on restart before rendering or making a commit', async variant => {
+    const root = await target(lateCommit, [{ gate: 'ga-0002', answers: [null] }], source(1));
+    const git = gitOf(root);
+    const { runId } = await crashAfter(root, 'gate-attempted', true, oneWorkItem(true));
+    const beforeHead = git.head();
+    const beforeCommits = [...git.commits()];
+    const late = await readFile(join(root, 'src/late.ts'), 'utf8');
+    const outside = 'subs/workspace/subs/reviews/src/unassigned.ts';
+    const changed = vi.mocked(git.changedPaths).getMockImplementation()!;
+    if (variant === 'unassigned-dirt') {
+      await writeFile(join(root, outside), 'unassigned source must remain pending\n');
+      vi.spyOn(git, 'changedPaths').mockImplementation(async (project, base) => [...await changed(project, base), outside]);
+    } else {
+      const declaration = join(root, 'module.ramify');
+      await writeFile(declaration, `${await readFile(declaration, 'utf8')}\nexternal "src/late.ts"\n`);
+    }
+    const ramify = new FakeRamifyCli();
+    const query = vi.spyOn(ramify, 'queryOwnership');
+    const restarting = openRuns(root, { git, ramify });
+    await expect(restarting).rejects.toThrow('Recovered gate candidate has no current captured authority');
+    await expect(restarting).rejects.toThrow(variant === 'unassigned-dirt' ? outside : 'src/late.ts');
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(git.head()).toBe(beforeHead);
+    expect(git.commits()).toEqual(beforeCommits);
+    expect(await readFile(join(root, 'src/late.ts'), 'utf8')).toBe(late);
+    if (variant === 'unassigned-dirt') expect(await readFile(join(root, outside), 'utf8')).toBe('unassigned source must remain pending\n');
+    else expect(await readFile(join(root, 'module.ramify'), 'utf8')).toContain('external "src/late.ts"');
+    expect((await runEventsOnDisk(root, 'review-notes', runId)).filter(event => event.type === 'gate-attempted')).toHaveLength(0);
+  }, 180_000);
+
   test('a crash between the commit intent and the commit performs the effect again and makes one commit', async () => {
     const root = await target(lateCommit, lateRecovery, source(1));
     const git = gitOf(root);
-    const { runId } = await crashAfter(root, 'gate-attempted', true, oneWorkItem());
+    const { runId } = await crashAfter(root, 'gate-attempted', true, oneWorkItem(true));
 
     // The verified operation is durable and no commit was made for it.
     expect(git.commits()).toEqual([{ gate: 'scenarios', commit: materialized }]);
@@ -591,7 +629,7 @@ describe('the recovery table', () => {
   test('a crash after the commit, before its completion line, finds the commit and makes no second one', async () => {
     const root = await target(lateCommit, lateRecovery, source(1));
     const git = gitOf(root);
-    const { runId } = await crashAfter(root, 'gate-committing', true, oneWorkItem());
+    const { runId } = await crashAfter(root, 'gate-committing', true, oneWorkItem(true));
 
     // The commit was made before the crash, and its attempt is not written.
     const before = [...git.commits()];
@@ -612,7 +650,7 @@ describe('the recovery table', () => {
   test('a crash after the complete attempt leaves the commit alone and appends the interruption only', async () => {
     const root = await target(lateCommit, lateRecovery, source(1));
     const git = gitOf(root);
-    const { runId } = await crashAfter(root, 'gate-committed', true, oneWorkItem());
+    const { runId } = await crashAfter(root, 'gate-committed', true, oneWorkItem(true));
 
     const before = [...git.commits()];
     const { recovery } = await reopen(root);
@@ -634,7 +672,7 @@ describe('the recovery table', () => {
     const git = gitOf(root);
     const { service } = await openRuns(root, {
       git, candidates: scriptedCandidates(root, { [base]: { tree, base, files: {}, changes: [] } }),
-      readinessExecution: directReadinessExecution(),
+
       script: [{ kind: 'submit', input: emptyAnalysis() }],
     });
     const receipt = await service.execute(startRun('review-notes'));
@@ -693,6 +731,28 @@ describe('the recovery table', () => {
     expect(existsSync(runPath(root, 'review-notes', runId, workLayout.outline('wi-001', 2)))).toBe(false);
   }, 180_000);
 
+  test('PB3-C04 PB3-C05: a crash after obligation-reported keeps the report once, with its invocation and submission, and gates nothing', async () => {
+    const root = await target([materialize], [], materialized);
+    const { runId } = await crashAfter(root, 'obligation-reported', false, oneWorkItem());
+    const before = await runEventsOnDisk(root, 'review-notes', runId);
+    const architect = before.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect').at(-1)!;
+    const accepted = before.find(event => event.type === 'invocation-ended' && event.data.invocation === (architect.data as { invocation: string }).invocation)!;
+
+    const { service } = await reopen(root);
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    // The accepted completion request's report stands once, as it was made:
+    // recovery reports nothing again and starts no writer, outline or gate.
+    expect(events.filter(event => event.type === 'obligation-reported').map(event => event.data)).toEqual([{
+      id: 'sc-001', judgment: 'done', basedOnRevision: 0, revision: 1,
+      by: (architect.data as { invocation: string }).invocation, submission: (accepted.data as { submission: string }).submission,
+    }]);
+    expect(events.filter(event => event.type === 'invocation-ended')).toHaveLength(before.filter(event => event.type === 'invocation-ended').length);
+    expect(events.some(event => event.type === 'outline-revised' || event.type === 'gate-committing' || event.type === 'writer-acquired')).toBe(false);
+    expect(events.at(-1)!.type).toBe('job-interrupted');
+    // The declaration survives the restart: the reopened run's scenario is done.
+    expect(onlyRun(service, 'review-notes').counts.scenarios).toEqual({ pending: 0, bound: 0, done: 1 });
+  }, 180_000);
+
   test('a crash after work-item-completed leaves the item completed and starts it no second time', async () => {
     // Nothing was written, so the work-item checkpoint before the boundary
     // has nothing to commit.
@@ -723,7 +783,7 @@ describe('the recovery table', () => {
 
     const { service, recovery, warnings } = await openRuns(root, {
       git: gitOf(root),
-      readinessExecution: directReadinessExecution(),
+
       script: [{ kind: 'submit', input: emptyAnalysis() }],
     });
     cleanups.push(() => service.close());

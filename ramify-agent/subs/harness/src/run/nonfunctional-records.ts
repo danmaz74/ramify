@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { writeScopeSchema } from '../work/scope.js';
 import { elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { candidateSchema } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 
@@ -22,6 +23,7 @@ export const nonfunctionalRepairAssignmentSchema = z.object({
   id: text, round: z.int().positive().max(3), assessment: text, candidate: text,
   nfrs: z.array(z.string().regex(/^(nfr|fix)-\d{3,}$/)).min(1),
   startingModule: text, task: text, evidence: z.array(text), uncertainty: z.string(),
+  scope: writeScopeSchema, guarded: z.array(z.object({ path: text, hash: text.nullable() }).strict()),
 }).strict();
 export type NonfunctionalRepairAssignment = z.infer<typeof nonfunctionalRepairAssignmentSchema>;
 
@@ -47,10 +49,3 @@ export const nonfunctionalDeviationSchema = z.object({
   proposedAlternative: z.string(),
   checkFinding: text,
 }).strict();
-
-export function legacyNonfunctionalCoverage(manifest: { readonly documentManifest?: unknown }): MergeReadiness {
-  return {
-    status: 'unavailable', candidate: null, finalGate: null, checkFindings: [],
-    reason: manifest.documentManifest === undefined ? 'This run predates captured non-functional evidence' : 'No matching final assessment and gate are recorded',
-  };
-}

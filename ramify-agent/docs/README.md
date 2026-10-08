@@ -2,7 +2,18 @@
 
 Design documents for the separate agent harness:
 
+- [Plan 22: enforced test boundaries and prompt command cleanup](plans/22-test-boundaries/main-plan.md),
+  draft: scripted external systems in ordinary tests, explicit real-boundary
+  verification, preserved full-audit coverage and removal of needless cleanup waits
 - [Harness principles](harness.principles.md)
+- [Agent declarations and automated audit evidence](analysis/2026-10-07-agent-declarations-and-audit-responsibilities.md),
+  desired responsibility boundary and issues in the current implementation and
+  Plan 21, with relevant principles, adopted decisions and remaining design
+  questions
+- [Plan 21: provider adoption and architect-owned completion](plans/21-project-boundary-adoption/main-plan.md),
+  expanded Phase 3 migration with eleven serial iterations; current provider
+  adoption, architect declarations, delegation handback, bounded clarification,
+  recovery and independent full-audit final verification; implementation unstarted
 - [Harness specification](harness.spec.md), scope, verification, scratch,
   preparation, session behavior and pending specification discovery and sealing
 - [CheckFinding principles](check-findings.principles.md), proposed rules for
@@ -35,8 +46,8 @@ Design documents for the separate agent harness:
 - [State machine architecture with XState](analysis/2026-09-26-state-machine-architecture.md),
   analysis of owner-local workflow machines with the run ledger as authority
 - [What the plan-to-brief spike taught us](analysis/2026-09-19-plan-to-brief-spike.md),
-  analysis of the [spike](../spikes/briefs/README.md) that mapped three toolkit
-  plans and assembled their briefs
+  analysis of the former `spikes/briefs/` experiment that mapped three toolkit
+  plans and assembled their briefs; the spike tree was removed on 2026-10-04
 - [From a plan to a brief: a merge of the two spikes](analysis/2026-09-19-merged-brief-process.md),
   proposal
 - [A merged implementation loop](analysis/2026-09-19-loop-merge-proposal.md),
@@ -83,8 +94,9 @@ Design documents for the separate agent harness:
   the design of the first step, implemented by Plan 10, with Dan's decisions of 2026-09-23: plan
   scenarios extracted at capture, frozen at analysis, a review stop,
   harness-materialized feature files, four scenario states, declarations
-  verified by every gate, one Cucumber run per owner module read from its
-  message stream, and an integration work item at the common ancestor
+  verified by every gate, and an integration work item at the common
+  ancestor; since Plan 21, scenarios run as a configured Cucumber check of
+  the project's committed audit
 - [Work-brief decomposition spike](spikes/work-brief-examples/README.md), isolated example requests and Sol planning runs
 - [Autonomous-loop initial capability and module hypothesis](spikes/autonomous-loop-initial-analysis/README.md),
   spike output and reusable input for the later implementation plan

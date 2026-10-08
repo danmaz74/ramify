@@ -33,13 +33,13 @@ afterAll(() => {
 
 describe('the policy a run captures in job.json', () => {
   it('names the variables each command receives and holds no value of one', () => {
-    const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
+    const policy = defaultRunPolicy({ projectRoot: '/project' });
     const recorded = JSON.stringify(runPolicySchema.parse(policy));
 
     expect(recorded).not.toContain(secretValue);
     expect(recorded).not.toContain(secretName);
 
-    for (const command of [policy.commands.typeCheck, policy.commands.allTests, policy.commands.scopedTests, policy.commands.ramifyCheck]) {
+    for (const command of [policy.commands.typeCheck, policy.commands.ramifyCheck, policy.commands.ramifyChanged]) {
       expect(command.env).toContain('PATH');
       expect(command.env).toContain('HOME');
       expect(command.env).not.toContain(secretName);
@@ -48,18 +48,13 @@ describe('the policy a run captures in job.json', () => {
     }
   });
 
-  it('reads a run recorded before the names, keeping the names it mapped and none of its values', () => {
-    const parsed = checkCommandSchema.parse({
-      argv: ['npm', 'test'],
-      cwd: '/project',
-      env: { PATH: '/usr/bin', [secretName]: secretValue },
-      timeoutMs: 1000,
-    });
-
-    expect(parsed.env).toEqual(['PATH', secretName]);
-    expect(parsed.envAdditions).toEqual({});
-    expect(JSON.stringify(parsed)).not.toContain(secretValue);
+  it('refuses a historical environment map instead of executing or migrating it', () => {
+    expect(checkCommandSchema.safeParse({ argv: ['npm', 'test'], cwd: '/project',
+      env: { PATH: '/usr/bin', [secretName]: secretValue }, timeoutMs: 1000 }).success).toBe(false);
+    expect(checkCommandSchema.safeParse({ argv: ['npm', 'test'], cwd: '/project',
+      env: ['PATH'], timeoutMs: 1000 }).success).toBe(false);
   });
+
 });
 
 describe('a gate attempt', () => {

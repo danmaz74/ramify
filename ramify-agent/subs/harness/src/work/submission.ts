@@ -10,10 +10,12 @@ import {
   type PlacementEvidence,
 } from '../architecture/submission.js';
 import { assignmentBodySchema, assignmentErrors, type AssignmentBody } from './assignment.js';
-import { declarationErrors, type DeclarationContext } from './declarations.js';
 import type { IntegrationScope } from './integration.js';
 import { decompositionSchema } from './records.js';
 import type { EngineerBounds } from '../run/policy.js';
+import {
+  incompleteRequestError, obligationSubmissionErrors, obligationSubmissionFields, outstandingReports, type ObligationContext,
+} from './obligations.js';
 
 /*
  * What a local architect submits at a coordination point. This iteration
@@ -27,7 +29,9 @@ import type { EngineerBounds } from '../run/policy.js';
  * `request-completion` commits a `WorkItemOutline` and runs the `work-item`
  * gate. Requesting completion with no iteration is a legitimate outcome: the
  * goal is already satisfied by existing behavior, which is verified reuse,
- * and the outline records why.
+ * and the outline records why. A request that leaves an obligation this
+ * architect is responsible for without a `done` report is rejected, naming
+ * the IDs, like any other invalid submission.
  *
  * `request-placement` asks the global architect where a capability belongs,
  * when the choice is not the local architect's to make. It records the
@@ -49,6 +53,13 @@ import type { EngineerBounds } from '../run/policy.js';
  * request. The global architect answers it with a placement fix, a plan
  * deviation the work item goes on under, or nothing possible, which ends
  * the run.
+ *
+ * `assign`, `request-placement`, `request-completion` and `unresolved` may
+ * each carry `registrations` and `reports`: a required test this architect
+ * chooses to track independently, and its judgment that an obligation it
+ * is responsible for is correctly implemented and passing. They apply when
+ * the submission is accepted, before its action, and an engineer's report
+ * never supplies them.
  *
  * The fields the harness already knows are absent: the work item, the
  * revision, the invocation and the hypothesis revisions it delivered are the
@@ -88,21 +99,18 @@ export const localArchitectSubmissionSchema = z.discriminatedUnion('kind', [
     /** Placement this architect decided within its own authority, with what it registers. */
     localDecisions: z.array(localDecisionSchema),
     assignment: assignmentBodySchema,
+    ...obligationSubmissionFields,
   }).strict(),
   z.object({
     kind: z.literal('request-placement'),
     request: placementRequestBodySchema,
+    ...obligationSubmissionFields,
   }).strict(),
   z.object({
     kind: z.literal('request-completion'),
     summary: text,
     outline: outlineBodySchema,
-    /**
-     * Scenarios of this work item's entry that existing step definitions
-     * already bind, declared with the request. They apply before the request
-     * is judged, and the work-item gate verifies them.
-     */
-    scenarios: z.array(text).default([]),
+    ...obligationSubmissionFields,
   }).strict(),
   z.object({
     kind: z.literal('yield-for-providers'),
@@ -114,9 +122,12 @@ export const localArchitectSubmissionSchema = z.discriminatedUnion('kind', [
     kind: z.literal('unresolved'),
     conflict: text,
     evidence: z.array(text),
+    ...obligationSubmissionFields,
   }).strict(),
 ]);
 export type LocalArchitectSubmission = z.infer<typeof localArchitectSubmissionSchema>;
+/** A submission as an agent writes it, before the defaults apply. */
+export type LocalArchitectSubmissionInput = z.input<typeof localArchitectSubmissionSchema>;
 
 /** The members this iteration's package offers the role. */
 export const localArchitectSubmissionKinds = ['assign', 'request-placement', 'request-completion', 'yield-for-providers', 'unresolved'] as const;
@@ -153,14 +164,14 @@ export interface WorkEvidence {
   readonly guardedPaths?: ReadonlySet<string> | undefined;
   /** The files only the harness writes: its configuration for the project and the tracked feature files. */
   readonly harnessOnly?: ReadonlySet<string> | undefined;
-  /** The work item's entry and the run's tracked scenarios, which a declaration's IDs are judged against. */
-  readonly scenarios?: DeclarationContext | undefined;
   /** For an integration work item: the scope its engineer must be given. */
   readonly integration?: IntegrationScope | undefined;
   /** The policy's engineer bounds and their ceilings, which an assignment's `bounds` is judged against. */
   readonly bounds?: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } | undefined;
   /** The element IDs of the work item's current package, which an assignment's `citedElements` is judged against. */
   readonly package?: ReadonlySet<string> | undefined;
+  /** This work item's architect and the run's obligations, which registrations and reports are judged against. */
+  readonly obligations?: ObligationContext | undefined;
 }
 
 /** The same evidence, as the placement rules read it. */
@@ -182,16 +193,55 @@ function placementEvidence(evidence: WorkEvidence): PlacementEvidence {
 export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): SubmissionValidation<LocalArchitectSubmission> {
   const shape = validateAgainst(localArchitectSubmissionSchema, input);
   if (!shape.ok) return shape;
+  const checked = validateKind(shape.value, evidence);
+  const reporting = shape.value.kind === 'yield-for-providers' ? [] : obligationErrors(shape.value, evidence);
+  const outstanding = reporting.length === 0 ? unreportedBy(shape.value, evidence.obligations) : [];
+  const incomplete = outstanding.length === 0 ? [] : [incompleteRequestError(outstanding, 'completion')];
+  if (reporting.length === 0 && incomplete.length === 0) return checked;
+  return { ok: false, errors: [...(checked.ok ? [] : checked.errors), ...reporting, ...incomplete] };
+}
+
+/**
+ * The registered IDs a completion request would leave without a `done`
+ * report, once its own reports apply; none for any other input, for one
+ * whose reports are themselves invalid, or where the turn has no obligation
+ * context. The rejection and the exhausted turn's failure both name these.
+ */
+export function unreportedByCompletion(input: unknown, obligations: ObligationContext | undefined): string[] {
+  const shape = localArchitectSubmissionSchema.safeParse(input);
+  if (!shape.success || shape.data.kind === 'yield-for-providers') return [];
+  if (obligations === undefined || obligationSubmissionErrors(shape.data, obligations).length > 0) return [];
+  return unreportedBy(shape.data, obligations);
+}
+
+function unreportedBy(value: LocalArchitectSubmission, obligations: ObligationContext | undefined): string[] {
+  return value.kind === 'request-completion' && obligations !== undefined ? outstandingReports(value, obligations) : [];
+}
+
+/**
+ * Registrations and reports are judged against the run's obligations and
+ * this work item's authority. Without that context nothing may be named:
+ * an unknown context never licenses a report.
+ */
+function obligationErrors(
+  value: Exclude<LocalArchitectSubmission, { kind: 'yield-for-providers' }>, evidence: WorkEvidence,
+): SubmissionError[] {
+  if (value.registrations.length === 0 && value.reports.length === 0) return [];
+  if (evidence.obligations === undefined) {
+    return [{ path: 'reports', message: 'This turn has no obligation context, so it registers and reports nothing', expected: 'empty registrations and reports' }];
+  }
+  return obligationSubmissionErrors(value, evidence.obligations);
+}
+
+function validateKind(value: LocalArchitectSubmission, evidence: WorkEvidence): SubmissionValidation<LocalArchitectSubmission> {
+  const shape = { ok: true as const, value };
   if (shape.value.kind === 'unresolved') return shape;
   if (shape.value.kind === 'request-placement') {
     const errors = placementRequestErrors(shape.value.request, placementEvidence(evidence), 'request');
     return errors.length === 0 ? shape : { ok: false, errors };
   }
   if (shape.value.kind === 'request-completion') {
-    const errors = [
-      ...outlineErrors(shape.value.outline, evidence),
-      ...declarationErrors(shape.value.scenarios, evidence.scenarios ?? { entry: null, records: [] }),
-    ];
+    const errors = outlineErrors(shape.value.outline, evidence);
     return errors.length === 0 ? shape : { ok: false, errors };
   }
   if (shape.value.kind === 'yield-for-providers') {
@@ -227,7 +277,7 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
       ...(evidence.guardedPaths === undefined ? {} : { guardedPaths: evidence.guardedPaths }),
       ...(evidence.harnessOnly === undefined ? {} : { harnessOnly: evidence.harnessOnly }),
       ...(evidence.integration === undefined ? {} : { integration: evidence.integration }),
-      ...(evidence.scenarios === undefined ? {} : { scenarios: evidence.scenarios }),
+      ...(evidence.obligations === undefined ? {} : { obligations: { ...evidence.obligations, registrations: shape.value.registrations } }),
       ...(evidence.bounds === undefined ? {} : { bounds: evidence.bounds }),
       ...(evidence.package === undefined ? {} : { package: evidence.package }),
     }),

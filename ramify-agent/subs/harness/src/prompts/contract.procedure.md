@@ -31,8 +31,9 @@ Do this, in order:
    `incomplete` naming that file, so the consumer's engineer names it as an
    injection site and the next contract iteration may write it. Never widen
    the fake's exposure instead.
-7. Run `run_scope_tests` until the consumer's tests pass against the fake and
-   the fake passes the conformance suite.
+7. Run the consumer's tests and the conformance suite by naming their files
+   from `shell` until the tests pass against the fake and the fake passes the
+   suite. The gate's audit runs the project's checks.
 8. Submit.
 
 ## Revising an agreement in force

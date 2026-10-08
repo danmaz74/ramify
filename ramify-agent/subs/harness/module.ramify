@@ -1,5 +1,8 @@
 ramify 1
 module harness
+owned-nested-project "fixtures/capability-coordination"
+owned-nested-project "fixtures/capability-coordination-nested"
+owned-nested-project "fixtures/collection-review"
 
 // The server for one project, which the root starts with the web client's
 // build output. Runs, their records, plan discovery, the evidence the
@@ -18,6 +21,7 @@ expose-src SingleSessionResult, SessionSummary, SessionProgress, SessionGateResu
 expose-src EngineerSubmission, engineerSubmissionSchema from "work/engineer.ts" to parent
 expose-src HookFinding from "hooks/post-write.ts" to parent
 expose-src InvocationOutcome, invocationOutcomeSchema from "run/records.ts" to parent
+expose-test rootDescription from "helpers/root-description.ts" to descendants
 
 // The public contracts of the behavior this module implements: the
 // vocabulary of the evidence a run works from, and the HTTP protocol it
@@ -52,18 +56,10 @@ expose-src * from "interfaces/protocol/sessions.ts" tagged [browser] to parent
 // verifies that publication does not disturb repository cleanliness. The git
 // behavior and process execution remain owned by evidence; harness relays the
 // narrow contracts the audit adapter implements rather than duplicating them.
-expose-src CheckExecutionPort, CheckExecutionRequest, CheckExecutionContext, CheckExecutionResult, CheckHarnessGuardedChange, checkOutputPath, GateCommandStart, GateCommandStarted, commandStart, notRun from "checks/execution.ts" to descendants
+expose-src CheckExecutionPort, CheckExecutionRequest, CheckExecutionContext, CheckExecutionResult, checkOutputPath, GateCommandStart, GateCommandStarted, commandStart, notRun from "checks/execution.ts" to descendants
 expose-src PlannedCheck from "checks/verify.ts" to descendants
-expose-src Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, TestSelectionPolicy, TestSelection, CheckCommand, CheckCommandKind, NotVerified, TypeCheckOutput, checkCommandEnvironment from "checks/records.ts" to descendants
-expose-src ScenarioCheckSummary, ScenarioCheckRun, ScenarioCheckResult from "checks/records.ts" to descendants
+expose-src Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, TestSelectionPolicy, CheckCommand, CheckCommandKind, NotVerified, TypeCheckOutput, checkCommandEnvironment from "checks/records.ts" to descendants
 expose-src PausableDeadline from "run/pausable-deadline.ts" to descendants
 
-// The scenario check's runs, which both the in-place runner and the audit's
-// executor perform: the profiles, setup and teardown, and the reduction of
-// the message streams. The named types of the scenarios child that its
-// signature mentions are exposed beside it.
-expose-src runScenarioCheck, ScenarioCheckExecution, ScenarioCheckOutcome, ScenarioCheckPlan, ScenarioCheckModuleRun from "checks/scenario-check.ts" to descendants
-expose-sub ScenarioMode, scenarioModeSchema, ScenarioSelection, scenarioSelectionSchema, ScenarioModule from scenarios to descendants
-expose-sub ScenarioRunResult, scenarioRunResultSchema, ScenarioRunStatus, scenarioRunStatusSchema, TrackedScenario from scenarios to descendants
 expose-sub commitAccepted, createRunBranch, isCleanRepository from evidence to descendants
 expose-sub runCommand, childEnvironment, outputTailBytes, CommandRequest, CommandRun, CommandOutcome, CommandOutput, CommandRunner from evidence to descendants

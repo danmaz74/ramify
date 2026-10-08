@@ -29,7 +29,7 @@ function watcher() {
   return new ExcursionWatcher({
     projectRoot: root,
     index,
-    scope: { revision: 1, roots: [join(root, notesDirectory, 'src')], files: [join(root, notesDirectory, 'module.ramify')] },
+    scope: { revision: 1, projectRoot: root, placement: async paths => paths.map(path => ({ path, allowed: true })), roots: [join(root, notesDirectory, 'src')], files: [join(root, notesDirectory, 'module.ramify')] },
   });
 }
 

@@ -13,7 +13,8 @@ const bucketSchema = z.object({
   production: z.object({ sourceFiles: z.number(), sourceBytes: z.number(), resourceFiles: z.number(), resourceBytes: z.number() }),
   tests: z.object({ sourceFiles: z.number(), sourceBytes: z.number(), resourceFiles: z.number(), resourceBytes: z.number() }),
   documentation: z.object({ files: z.number(), bytes: z.number() }),
-  views: z.object({ ordinaryBytes: z.number(), testsBytes: z.number() }),
+  // The /2 producer omits view bytes when its projection was unavailable.
+  views: z.object({ ordinaryBytes: z.number(), testsBytes: z.number() }).optional(),
 });
 
 export const moduleSchema = z.object({
@@ -27,21 +28,26 @@ export const moduleSchema = z.object({
 });
 
 /** The one document version this reader supports. */
-export const measureSchemaVersion = 'ramify.measure/1';
+export const measureSchemaVersion = 'ramify.measure/2';
 
 export const documentSchema = z.object({
   schema: z.literal(measureSchemaVersion),
   revision: z.string(),
   root: z.string(),
+  ownershipRule: z.string(),
   /** Whether the generated views were measured, as the producer reports it. */
-  views: z.string(),
+  views: z.union([z.literal('measured'), z.object({ state: z.literal('unavailable'), reason: z.enum(['not-requested', 'resource-unavailable', 'analysis-failed']) })]),
   modules: z.array(moduleSchema),
+  files: z.array(z.object({
+    path: z.string(), owner: z.string(), area: z.enum(['ordinary', 'tests', 'documentation']),
+    kind: z.enum(['source', 'resource', 'documentation']), bytes: z.number(),
+  })),
 }).loose();
 
 /** One module's measured bytes, by source area, for itself and for its subtree. */
 export type ModuleMeasurement = z.infer<typeof moduleSchema>;
 
-/** A `ramify.measure/1` document: its revision, its root and its per-module buckets. */
+/** A `ramify.measure/2` document: its revision, its root and its per-module buckets. */
 export type MeasurementDocument = z.infer<typeof documentSchema>;
 
 /** The document, or the reason the project has none. A reason is never a zero. */

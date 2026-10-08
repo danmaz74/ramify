@@ -3,10 +3,10 @@
 Holds what the harness knows about acceptance scenarios as pure functions:
 extracting plan scenarios from a Markdown plan, the form rules of the initial
 architect's scenarios, the `ramify-agent.scenario/1` record and its
-numbering, the reducer from scenario events to states, the rendering of the
-tracked feature files, the Cucumber profile of one module's run and the
-reducer of a run's message stream. It hides the Gherkin parser and
-Cucumber's message types: it is the one importer of `@cucumber/gherkin` and
+numbering, the reducer from scenario events to states and the rendering of
+the tracked feature files. The project's own Cucumber configuration runs the
+scenarios as checks of its committed audit definition; nothing here builds a
+run. It hides the Gherkin parser and Cucumber's message types: it is the one importer of `@cucumber/gherkin` and
 `@cucumber/messages`, and its exports speak in lines, names, steps and its
 own types. It has no I/O. It reads no file, writes no file, starts no process
 and never reads the architect view; its callers pass in what it needs.
@@ -15,8 +15,8 @@ and never reads the architect view; its callers pass in what it needs.
 
 Each rule about a scenario is decided once, here, and the harness applies it
 at plan capture, analysis acceptance, materialization, gates, recovery and
-the projections. Being pure, every rule is tested over literal input and
-recorded streams, with no run, agent, git or runner. The module receives
+the projections. Being pure, every rule is tested over literal input, with
+no run, agent, git or runner. The module receives
 nothing from the harness. Every export is exposed to `parent` with the named
 types its signature mentions, so the harness can name what it receives.
 
@@ -68,12 +68,13 @@ entry scenario's owner is its entry's; an integration scenario's is the
 `<owner>/src/tests/features/<planId>/<entry>.feature` or
 `…/integration.feature`, beneath `src/features/` for a testing module.
 
-`applyScenarioEvent` and `reduceScenarioStates` derive the four states from
-`scenario-declared`, `scenario-due`, `scenario-implemented` and
-`scenario-withdrawn`, from every scenario `pending`. They allow exactly the
-transitions of architecture's events table and reject every other one with
-its reason; the reduction stops at the first rejected event and names its
-position. Which event a gate or a declaration calls for is the harness's.
+`applyScenarioEvent` and `reduceScenarioStates` derive the three states,
+`pending`, `bound` and `done`, from the two accepted-submission events, from
+every scenario `pending`. `obligation-bound`, an engineer's accepted binding,
+makes a scenario `bound` and leaves a `done` one `done`; `obligation-reported`,
+its responsible architect's accepted report, sets the judgment, `done` or the
+revision back to `bound`. An event naming another kind of obligation changes
+no scenario. No gate, audit or repair exit moves a state.
 
 ## Rendering
 
@@ -81,76 +82,18 @@ position. Which event a gate or a declaration calls for is the harness's.
 and content, ordered by path: the header comment, the feature named by the
 entry's slug and described by its recorded description, and each scenario
 with its identity tag `@ramify-sc-NNN`, the pending tag exactly while it is
-`pending` or `bound`, and its source lines verbatim. A description is wrapped
+`pending`, and its source lines verbatim. A description is wrapped
 so that no line reads as a tag, a comment or a keyword. The same input yields
 byte-identical output in any record order, so a re-rendering writes only what
 a state change altered.
-
-## Profiles
-
-`buildScenarioProfile(module, mode, selection, config, attemptDir, options?)`
-returns one module's Cucumber profile text, where it goes and where its
-message stream goes under `<attemptDir>/scenarios/`, and the argv: the
-mode's command, `--config` with the profile, and `--dry-run` when asked. The
-profile imports the configured support files in order and the module's step
-files, runs the module's feature files, sets the tag expression of the
-selection (`identity`, `all-untagged` or `all`), `strict` and the message
-formatter. A testing module's areas are its `src/steps/` and
-`src/features/`. `cucumber-js` 13 joins its working directory with the
-`--config` path even when that path is absolute, so an absolute attempt
-directory needs `options.projectRoot`, and the argv names the profile
-relative to it. Writing the profile and rebasing it into an audit worktree
-are the caller's.
-
-## The message stream
-
-The harness runs each profile and captures its complete NDJSON output. The
-audit child passes that output to ramify-audit's public Cucumber parser,
-which owns final scenario results, errors, counts and raw evidence. The
-harness associates the producer's final identities and step bindings with
-its frozen tracked scenario IDs for briefings and state transitions.
-
-## Composition failures
-
-`compositionFailures(records, results)` reads one scenario check's results
-and returns every integration scenario that `failed` while each of its
-sub-scenarios `passed` in the same check. For each it names the suspects:
-the sub-scenarios with a bridging Given, which `bridgingGivens(integration,
-sub)` finds as the context steps of the sub-scenario that appear in no step
-of the integration scenario, compared by kind and text as rule 5 compares
-them. A sub-scenario the check did not run or did not pass, and an
-integration scenario that is undefined rather than failed, are ordinary
-failures and no composition failure.
-
-## Recordings
-
-The reducer's tests replay message streams recorded with the real
-`cucumber-js` 13.2.1 on Node 22 on 2026-09-23, in `src/tests/fixtures/streams/`.
-`src/tests/fixtures/record-streams.ts` recorded them and records them again:
-from `ramify-agent/`, run
-
-```text
-npx tsx subs/harness/subs/scenarios/src/tests/fixtures/record-streams.ts
-```
-
-For each case it builds the `shelf` module's quick profile with
-`buildScenarioProfile` into a temporary attempt directory, runs the runner
-with it in `src/tests/fixtures/sample-project/`, and copies the stream into
-`streams/<case>.ndjson`. The cases are one scenario each passing, failing,
-undefined, ambiguous and pending, an outline with a failing example, a bound
-scenario selected by identity, the `all-untagged` selection over the tracked
-file and the project's own `own.feature`, and a dry run of everything. The
-sample project's tracked file is exactly what `renderFeatureFiles` writes for
-its records, which a rendering test verifies. A recording carries run IDs,
-times and the absolute path of the checkout it was made in, so tests assert
-on none of them. No test starts the runner.
 
 ## Tests
 
 `src/tests/` covers extraction over the collection-review plans and over a
 plan with a background, an outline, two blocks and an unparsable block; a
 rejection per form rule and each warning; ID assignment and the lowest common
-ancestor; every allowed and every rejected state transition; rendering
-against the golden files in `src/tests/golden/` (`UPDATE_GOLDEN=1` rewrites
-them) and its idempotence; the profile per selection kind and module kind;
-and the reducer over each recording.
+ancestor; every state transition; and rendering against the golden files in
+`src/tests/golden/` (`UPDATE_GOLDEN=1` rewrites them), its idempotence, and
+the tracked file of `src/tests/fixtures/sample-project/`, which is exactly
+what `renderFeatureFiles` writes for its records. No test starts the
+runner.

@@ -1,0 +1,15 @@
+{
+  "plan": "../main-plan.md",
+  "status": "implementation-in-progress",
+  "execution": "serial",
+  "iterations": [
+    { "id": "0", "file": "00-inventory.md", "dependsOn": [], "cases": ["TB01", "TB02"], "status": "in-progress" },
+    { "id": "1", "file": "01-command-cleanup.md", "dependsOn": ["0"], "cases": ["TB03", "TB04"], "status": "in-progress" },
+    { "id": "2", "file": "02-test-boundaries.md", "dependsOn": ["1"], "cases": ["TB05", "TB06"], "status": "not-started" },
+    { "id": "3", "file": "03-acceptance-matrix.md", "dependsOn": ["2"], "cases": ["TB09", "TB11"], "status": "not-started" },
+    { "id": "4", "file": "04-dependency-flows.md", "dependsOn": ["3"], "cases": ["TB08"], "status": "not-started" },
+    { "id": "5", "file": "05-remaining-consumers.md", "dependsOn": ["4"], "cases": ["TB07", "TB08", "TB10", "TB12"], "status": "not-started" },
+    { "id": "6", "file": "06-runner-enforcement.md", "dependsOn": ["5"], "cases": ["TB06", "TB13", "TB14"], "status": "not-started" },
+    { "id": "7", "file": "07-qualification.md", "dependsOn": ["6"], "cases": ["TB02", "TB04", "TB11", "TB14", "TB15", "TB16"], "status": "not-started" }
+  ]
+}

@@ -1,0 +1,9 @@
+$ npx vitest run subs/harness/src/tests/{local-architect-submission,capability-submission,scenario-states,capability-dependencies,capability-recovery,run-recovery,composition,composition-recovery,composition-recovery-delegation,composition-recovery-chains,union-values,protocol-contract,scenario-briefings,integration-scenarios,acceptance-trial,requirement-verification,plan-deviations}.test.ts
+
+ RUN  v4.1.11 /home/app/ramify-plan21-project-boundary-adoption/ramify-agent
+
+
+ Test Files  17 passed (17)
+      Tests  304 passed | 2 skipped (306)
+   Start at  01:15:40
+   Duration  306.63s (transform 13.05s, setup 620ms, import 27.45s, tests 698.85s, environment 2ms)

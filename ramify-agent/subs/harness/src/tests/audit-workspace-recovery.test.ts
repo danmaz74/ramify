@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
@@ -9,19 +10,43 @@ import { afterEach, describe, expect, test } from 'vitest';
 import type { IntendedAuditWorkspace } from '../../subs/audit/src/check-execution.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { initRepository } from './helpers/runs.js';
+import { auditDefinition, commandCheck } from './helpers/configured-repository.js';
 
 const exec = promisify(execFile);
 const killedAudit = fileURLToPath(new URL('./helpers/killed-audit.ts', import.meta.url));
+/**
+ * The committed check: pass, or wait (writing the marker first during
+ * execution) until the auditing process dies. The provider gives a check no
+ * ambient environment, so the killed-audit process writes what to do into a
+ * control file beside the repository, whose path the check names.
+ */
+const killableCheck = (control: string) => [
+  `const { mode, marker, owner } = JSON.parse(require("fs").readFileSync(${JSON.stringify(control)}, "utf8"));`,
+  'if (mode === "pass") process.exit(0);',
+  'if (mode === "during-execution") require("fs").writeFileSync(marker, "running");',
+  'setInterval(() => { try { process.kill(owner, 0); } catch { process.exit(0); } }, 25);',
+].join(' ');
 const cleanups: string[] = [];
 afterEach(async () => {
   const { rm } = await import('node:fs/promises');
   for (const path of cleanups.splice(0)) await rm(path, { recursive: true, force: true });
 });
 
-async function fixture() {
+async function fixture(options: { readonly nested?: boolean } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'ramify-agent-workspace-owner-'));
   cleanups.push(root);
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  // A nested fixture's root is not a Ramify project, so discovery needs no
+  // ownership query (this fixture installs no `ramify`) and excludes nothing.
+  if (options.nested !== true) await writeFile(join(root, 'module.ramify'), rootDescription('fixture'));
+  cleanups.push(`${root}.killed-audit.json`);
+  await writeFile(join(root, 'ramify-audit.json'), auditDefinition([commandCheck('killable', [{ name: 'killable', cmd: 'node', args: ['-e', killableCheck(`${root}.killed-audit.json`)] }])]));
+  if (options.nested === true) {
+    // A nested project whose check counts its executions outside the repository.
+    cleanups.push(`${root}.nested-runs`);
+    await mkdir(join(root, 'nested'), { recursive: true });
+    await writeFile(join(root, 'nested', 'ramify-audit.json'), auditDefinition([commandCheck('nested', [{ name: 'nested', cmd: 'node',
+      args: ['-e', `require("fs").appendFileSync(${JSON.stringify(`${root}.nested-runs`)}, "ran\\n")`] }])], { packageDirectories: [] }));
+  }
   await mkdir(join(root, 'plans', 'plan', '.harness', 'jobs', '20260921T000000Z-aabbcc', 'gates', 'ga-0001'), { recursive: true });
   const commit = await initRepository(root);
   await mkdir(join(root, 'node_modules'), { recursive: true });
@@ -65,8 +90,8 @@ async function marker(pid: number): Promise<string> {
   return `linux:${boot.trim()}:${ticks}`;
 }
 
-function auditProcess(mode: 'after-creation' | 'during-execution' | 'pass', root: string, commit: string, signal: string): ChildProcessWithoutNullStreams {
-  return spawn(process.execPath, ['--import', 'tsx', killedAudit, mode, root, commit, signal], {
+function auditProcess(mode: 'after-creation' | 'during-execution' | 'pass', root: string, commit: string, signal: string, scope: 'root' | 'nested' = 'root'): ChildProcessWithoutNullStreams {
+  return spawn(process.execPath, ['--import', 'tsx', killedAudit, mode, root, commit, signal, scope], {
     cwd: process.cwd(),
     env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -162,7 +187,7 @@ describe('durable audit workspace ownership', () => {
 
     await expect(f.ownership.recoverAbandonedWorkspaces(f.repository)).rejects.toThrow('Refusing non-audit temporary directory');
 
-    expect(await readFile(marker, 'utf8')).toBe('ramify 1\nmodule fixture\n');
+    expect(await readFile(marker, 'utf8')).toBe(rootDescription('fixture'));
     const record = JSON.parse(await readFile(join(f.root, 'plans/plan/.harness/jobs/20260921T000000Z-aabbcc/gates/ga-0001/audit-workspace.json'), 'utf8')) as { state: string };
     expect(record.state).toBe('intended');
   });
@@ -194,13 +219,55 @@ describe('durable audit workspace ownership', () => {
       expect(await exists(abandoned.worktreePath)).toBe(true);
 
       const retry = auditProcess('pass', f.root, f.commit, signal);
-      const attempt = JSON.parse((await output(retry)).trim()) as { audited: string | null; evidence: unknown };
-      expect(attempt.audited).toBe(f.commit);
-      expect(attempt.evidence).not.toBeNull();
+      const result = JSON.parse((await output(retry)).trim()) as { status: string; auditedSourceCommit: string | null; reportCommit: string | null; detail: string };
+      expect(result.status, result.detail).toBe('completed');
+      expect(result.auditedSourceCommit).toBe(f.commit);
+      expect(result.reportCommit).toMatch(/^[0-9a-f]{40}$/u);
       expect(await exists(abandoned.worktreePath)).toBe(false);
       const list = (await exec('git', ['worktree', 'list', '--porcelain'], { cwd: f.root })).stdout;
       expect(list).not.toContain(abandoned.worktreePath);
       expect(list).toContain(unrelated);
     }, 45_000);
   }
+
+  test('a restarted nested audit retrieves its recorded root and nested records, and an unrecorded one is answered from published evidence; nothing runs again', async () => {
+    const f = await fixture({ nested: true });
+    const signal = join(await mkdtemp(join(tmpdir(), 'ramify-killed-audit-signal-')), 'running');
+    cleanups.push(resolve(signal, '..'));
+    const receiptPath = join(f.root, 'plans/plan/.harness/jobs/20260921T000000Z-aabbcc/gates/ga-0001/audit-invocation.json');
+    const nestedRuns = async () => (await readFile(`${f.root}.nested-runs`, 'utf8').catch(() => '')).split('\n').filter(Boolean).length;
+    type Answer = { status: string; verdict: string | null; detail: string; reportCommit: string | null;
+      discovery: unknown; projects: Array<{ projectRoot: string; verdict: string; execution: string; reportCommit: string | null; runRef: string | null }> | null };
+    const ask = async () => JSON.parse((await output(auditProcess('pass', f.root, f.commit, signal, 'nested'))).trim()) as Answer;
+
+    const first = await ask();
+    expect([first.status, first.verdict], first.detail).toEqual(['completed', 'pass']);
+    expect(first.projects?.map(project => [project.projectRoot, project.execution])).toEqual([['.', 'ran'], ['nested', 'ran']]);
+    expect(await nestedRuns()).toBe(1);
+    const receipt = JSON.parse(await readFile(receiptPath, 'utf8')) as { schema: string; requestId: string; projects: Array<{ projectRoot: string; record: { reportCommit: string } | null }> };
+    expect(receipt.schema).toBe('ramify-agent.audit-invocation/1');
+    expect(receipt.projects.map(project => [project.projectRoot, project.record?.reportCommit]))
+      .toEqual(first.projects!.map(project => [project.projectRoot, project.reportCommit]));
+
+    // Restart after the provider answered: the receipt's records, exactly.
+    const recovered = await ask();
+    expect(recovered).toEqual(first);
+    expect(await nestedRuns()).toBe(1);
+
+    // Interrupted between the provider's answer and the receipt: asked
+    // again, the provider answers each project from its published record.
+    await (await import('node:fs/promises')).rm(receiptPath);
+    const reasked = await ask();
+    expect(reasked.projects?.map(project => [project.projectRoot, project.execution, project.reportCommit]))
+      .toEqual(first.projects!.map(project => [project.projectRoot, 'reused', project.reportCommit]));
+    expect(reasked.verdict).toBe('pass');
+    expect(await nestedRuns()).toBe(1);
+    expect(await exists(receiptPath)).toBe(true);
+    const evidenceDirectory = process.env['PLAN21_ITERATION10_EVIDENCE'];
+    if (evidenceDirectory !== undefined) {
+      await writeFile(join(evidenceDirectory, 'iteration10-nested-restart.json'), `${JSON.stringify({
+        schema: 'plan21.iteration10.nested-restart/1', commit: f.commit, receipt, first, recovered, reasked, nestedExecutions: await nestedRuns(),
+      }, null, 2)}\n`);
+    }
+  }, 90_000);
 });

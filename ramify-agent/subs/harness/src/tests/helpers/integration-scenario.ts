@@ -1,13 +1,13 @@
 import { finalCandidate } from './final-candidate.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { GateAttempt, ScenarioCheckSummary } from '../../checks/records.js';
+import type { GateAttempt } from '../../checks/records.js';
+import { scenarioResultsOf, type ScenarioResult } from '../../checks/scenario-results.js';
 import type { RunEvent } from '../../run/log.js';
 import { runLayout } from '../../run/records.js';
 import { analysis, entry, requestCompletion } from './analysis.js';
 import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged, type CommitResponse } from './contracts-git.js';
 import type { DirectCheckScript } from './direct-check-execution.js';
-import { directReadinessExecution } from './external-tools.js';
 import { copyFixture } from './fixture.js';
 import { addModule, assign, byWork, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './iterations.js';
 import { openRuns, runPath, startRun } from './runs.js';
@@ -156,22 +156,23 @@ export async function integrationProject(cleanups: Cleanups): Promise<string> {
 /** The turns of the two entries' work items: each binds its own sub-scenario in one iteration. */
 export const entryTurns = {
   'initial-architect': [submit(integrationAnalysis())],
-  'local-architect:wi-001': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
-  'engineer:wi-001': [submit(completionProposed('The note\'s sub-scenario is bound.', { scenarios: ['sc-001'] }), write('tests/steps/review-note.steps.ts', noteStepFile))],
-  'local-architect:wi-002': [submit(assign(tags, {}, outline())), submit(requestCompletion())],
-  'engineer:wi-002': [submit(completionProposed('The tags\' sub-scenario is bound.', { scenarios: ['sc-002'] }), write('tests/steps/review-tags.steps.ts', tagStepFile))],
+  'local-architect:wi-001': [submit(assign(notes, { obligations: ['sc-001'] }, outline())), submit(requestCompletion())],
+  'engineer:wi-001': [submit(completionProposed('The note\'s sub-scenario is bound.', { bindings: [{ id: 'sc-001' }] }), write('tests/steps/review-note.steps.ts', noteStepFile))],
+  'local-architect:wi-002': [submit(assign(tags, { obligations: ['sc-002'] }, outline())), submit(requestCompletion())],
+  'engineer:wi-002': [submit(completionProposed('The tags\' sub-scenario is bound.', { bindings: [{ id: 'sc-002' }] }), write('tests/steps/review-tags.steps.ts', tagStepFile))],
 };
 
 /** The integration work item's assignment: the ancestor, with both children on the paths to the owners. */
 export const bindAtAncestor = assign(reviews, {
   goal: 'Bind sc-003 at the common ancestor.',
+  obligations: ['sc-003'],
   approach: 'Import both step files by name, and expose them to this module with expose-test.',
-  scope: { base: { module: reviews, includedChildren: [notes, tags] }, extra: [], read: [], rationale: 'The ancestor and both paths down to the owners.' },
+  scope: { base: { module: reviews, included: [notes, tags].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) }, extra: [], read: [], rationale: 'The ancestor and both paths down to the owners.' },
 }, outline());
 
-/** The engineer that binds it: the ancestor's step file, the two exposures, and the declaration. */
+/** The engineer that binds it: the ancestor's step file, the two exposures, and the binding. */
 export const bindTurn = submit(
-  completionProposed('The integration scenario binds to both sub-scenarios\' definitions.', { scenarios: ['sc-003'] }),
+  completionProposed('The integration scenario binds to both sub-scenarios\' definitions.', { bindings: [{ id: 'sc-003' }] }),
   write('tests/steps/integration.steps.ts', ancestorStepFile),
   write('../subs/notes/module.ramify', exposing('notes', 'reviewNoteSteps', 'review-note.steps.ts')),
   write('../subs/tags/module.ramify', exposing('tags', 'reviewTagsSteps', 'review-tags.steps.ts')),
@@ -201,7 +202,7 @@ export async function runIntegration(
     script: byWork(script),
     inputs: treeInputs(),
     git, candidates: candidate.candidates,
-    readinessExecution: directReadinessExecution(),
+
     ...(checkScript === undefined ? {} : { checkScript }),
   });
   cleanups.push(() => opened.service.close());
@@ -215,8 +216,9 @@ export async function gates(root: string, runId: string, log: readonly RunEvent[
   return Promise.all(ids.map(async id => JSON.parse(await readFile(runPath(root, plan, runId, runLayout.gate(id)), 'utf8')) as GateAttempt));
 }
 
-export function summaryOf(attempt: GateAttempt): ScenarioCheckSummary | undefined {
-  return attempt.commands.find(command => command.kind === 'scenarios')?.scenarios;
+/** What the gate's audit said of each tracked scenario, read from the configured scenario check's raw output. */
+export function scenarioResults(attempt: GateAttempt): ScenarioResult[] {
+  return scenarioResultsOf(attempt);
 }
 
 /** The index of the first event of a type that matches. */

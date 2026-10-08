@@ -6,10 +6,11 @@ import type { SessionSpec } from '../../../subs/agent/src/interfaces/port.js';
 import type { RamifyCli } from '../../../subs/evidence/src/ramify-cli.js';
 import type { ArchitectIndex, ModuleEntry } from '../../../subs/evidence/src/views.js';
 import { architectRunInputs, type RunInputs } from '../../run/inputs.js';
+import { parseModuleHeader } from '../../run/module-header.js';
 import type { AssignmentBody } from '../../work/assignment.js';
 import type { z } from 'zod';
 import type { engineerSubmissionSchema } from '../../work/engineer.js';
-import type { LocalArchitectSubmission } from '../../work/submission.js';
+import type { LocalArchitectSubmission, LocalArchitectSubmissionInput } from '../../work/submission.js';
 import { defaultTurn } from './declarations.js';
 import type { FailureCause } from '../../interfaces/protocol/runs.js';
 import type { FailureAnalysisSubmission } from '../../work/failure.js';
@@ -39,8 +40,8 @@ export function assign(
   module: string,
   extra: Partial<AssignmentBody> = {},
   outline?: Extract<LocalArchitectSubmission, { kind: 'request-completion' }>['outline'],
-): Extract<LocalArchitectSubmission, { kind: 'assign' }> {
-  const scope = extra.scope ?? { base: { module, includedChildren: [] }, extra: [], read: [], rationale: 'The work is in this module.' };
+): Extract<LocalArchitectSubmissionInput, { kind: 'assign' }> {
+  const scope = extra.scope ?? { base: { module, included: [] }, extra: [], read: [], rationale: 'The work is in this module.' };
   return {
     kind: 'assign',
     ...(outline === undefined ? {} : { outline }),
@@ -161,11 +162,6 @@ export function write(path: string, content: string): ScriptStep {
 /** An `edit` call, as the implementation's built-in takes it. */
 export function edit(path: string, oldText: string, newText: string): ScriptStep {
   return { kind: 'tool', tool: 'edit', input: { path, edits: [{ oldText, newText }] } };
-}
-
-/** A call of the engineer's own test tool. */
-export function runScopeTests(input: unknown = {}): ScriptStep {
-  return { kind: 'tool', tool: 'run_scope_tests', input };
 }
 
 /** A call of the engineer's shell, whose writes pass no guard. */
@@ -325,10 +321,9 @@ export async function readDeclaredTree(projectRoot: string): Promise<ArchitectIn
   const children = new Map<string, string[]>();
   for (const directory of directories) {
     const declaration = await readFile(join(projectRoot, directory, 'module.ramify'), 'utf8');
-    const matched = /^module\s+(?:"([^"]+)"|(\S+))/m.exec(declaration);
-    const name = matched?.[1] ?? matched?.[2];
-    if (name === undefined) continue;
-    const tags = /^module\s+\S+.*tagged\s*\[([^\]]*)\]/m.exec(declaration)?.[1]?.split(',').map(tag => tag.trim()).filter(Boolean) ?? [];
+    const header = parseModuleHeader(declaration);
+    if (header === null) continue;
+    const { name, tags } = header;
     const parentDirectory = directories.filter(candidate => candidate !== directory && within(directory, candidate)).at(-1);
     const parent = parentDirectory === undefined ? null : names.get(parentDirectory) ?? null;
     const path = parent === null ? name : `${parent}/${name}`;

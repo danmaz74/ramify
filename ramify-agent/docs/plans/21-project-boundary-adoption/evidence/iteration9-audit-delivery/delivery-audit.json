@@ -1,0 +1,618 @@
+{
+  "command": "ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent --cwd . --json",
+  "raw": {
+    "path": "/tmp/pb3-it9-audit.json",
+    "sha256": "4bee9a03f18d0e3a40c27249e3b4a3e4277a424fb4c915f2740c94baf35758b6"
+  },
+  "cliExit": 0,
+  "window": {
+    "startUtc": "2026-10-08T04:16:49Z",
+    "endUtc": "2026-10-08T04:33:55Z"
+  },
+  "status": "completed",
+  "requestId": "1d5708d4-96e6-48a5-8c0d-c9dc043abeaf",
+  "runId": "3f94f5e6-d609-4338-b0c6-11ae0d960de5",
+  "producer": {
+    "name": "ramify-audit",
+    "version": "0.7.2"
+  },
+  "sourceCommit": "392a1367fc3e937d84b101e8abd10ec296ff7fd8",
+  "sourceTree": "ba2782aec5570c32cbc832b172172777609e00f1",
+  "sourceBranch": "feat/plan21-project-boundary-adoption",
+  "auditedAt": "2026-10-08T04:33:54.863Z",
+  "durationSeconds": 1024.832,
+  "mode": {
+    "requestedMode": "ramify-partial",
+    "resolution": "defaulted",
+    "executedMode": "ramify-partial"
+  },
+  "overall": "pass",
+  "selection": {
+    "kind": "scoped",
+    "selectedCheckIds": [
+      "agent-scenarios",
+      "agent-structure",
+      "agent-tests",
+      "agent-typecheck",
+      "agent-web-build",
+      "patch-integrity"
+    ],
+    "omittedCheckIds": [],
+    "selectedTestUnitIds": [
+      "agent-check-self",
+      "agent-cucumber",
+      "agent-typecheck",
+      "agent-vitest",
+      "agent-web-build",
+      "git-diff-check"
+    ],
+    "omittedTestUnitIds": [],
+    "ignorePaths": [
+      "docs/**"
+    ],
+    "selectedModules": [
+      {
+        "id": "ramify-agent",
+        "directory": "."
+      },
+      {
+        "id": "ramify-agent/harness",
+        "directory": "subs/harness"
+      },
+      {
+        "id": "ramify-agent/harness/agent/pi",
+        "directory": "subs/harness/subs/agent/subs/pi"
+      },
+      {
+        "id": "ramify-agent/harness/audit",
+        "directory": "subs/harness/subs/audit"
+      },
+      {
+        "id": "ramify-agent/web",
+        "directory": "subs/web"
+      }
+    ],
+    "carriedFailures": [
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/composition-recovery.test.ts",
+        "kind": "test",
+        "testId": "the composed recovery table: the run, its work items, iterations, gates, writer, budget and stop > gate-attempted (SM7, a gate, its repair and infrastructure recovery; SM4, a module work item): The verified operation is durable and the commit is not made: recovery makes and audits one commit, then writes the complete attempt once"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/composition-recovery.test.ts",
+        "kind": "test",
+        "testId": "the composed recovery table: the run, its work items, iterations, gates, writer, budget and stop > gate-committing (SM7, a gate, its repair and infrastructure recovery; SM4, a module work item): The commit is made and the audit is not complete: recovery finds and re-audits that commit, then writes one complete attempt"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/execution-map-projection.test.ts",
+        "kind": "test",
+        "testId": "execution core from committed run records > does not let a dry-run pass color a scenario green"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/execution-map-projection.test.ts",
+        "kind": "test",
+        "testId": "execution core from committed run records > keeps full descriptions, latest real scenario status, every gate and every session"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/execution-map-projection.test.ts",
+        "kind": "test",
+        "testId": "execution core from committed run records > keeps two accepted roots, a lower provider, ordered assignments, final and active gates"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/execution-map-projection.test.ts",
+        "kind": "test",
+        "testId": "execution core from committed run records > reads old gates without an audit fact and a failed published audit independently of verdict"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/execution-map-projection.test.ts",
+        "kind": "test",
+        "testId": "execution core from committed run records > targets ordered gate history for a scenario beyond the capped list"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/protocol-contract.test.ts",
+        "kind": "test",
+        "testId": "the acceptance scenarios a client reads > PB3-D04: an obligation carries its architect report and optional where text apart from any gate result"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/protocol-contract.test.ts",
+        "kind": "test",
+        "testId": "the acceptance scenarios a client reads > a gate's scenario command carries its compact summary; the others carry none"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/protocol-contract.test.ts",
+        "kind": "test",
+        "testId": "the acceptance scenarios a client reads > the scenario list: a scenario with its origin, work item and gates, strictly"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/work-item-api-views.test.ts",
+        "kind": "test",
+        "testId": "the API view of a local architect's continued turns > a view that could not be materialized is materialized again for the next turn"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "Approve after the run completed, without a note, is sent again at the version a stale refusal names"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "By module names its loading and unavailable conditions"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "By module: every row in its node on the packaged canvas; row selection is Run-page state, apart from the module"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "CA24: Run page keeps historical contract views and names an empty capability-task view"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "CM15\u2013CM17: Dependencies lays out retained dependencies with literal states, owners and the selected evidence"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "CM19: a failed run says failed at run level only; a capability keeps its literal state and links to its work-item history"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "CM20: Progress offers By module and Dependencies, By module by default, and mounts only the selected view"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "CM20: Progress stays visible while loading, empty or unavailable, naming the condition and never showing todo"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "Run \u2192 Sessions draws the timeline, each segment opening its chapter; Measurements no longer lists invocations"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "Stop sends stop-job with the run's version; the only fields on the page are the approval's"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a gate's scenario check shows each scenario's status and failure"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a lost connection is shown apart from the run's state, which stays as last read"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a refused approval says why; a reviewed, failed, stopped or unanalysed run offers no Approve"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a run held on an environment problem shows its diagnosis and suggestion in the overview, with the answer form that resumes it"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a run that recorded plan deviations reads completed with those to review, never plainly completed, and lists them"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a run that waits for the person's decision says so above every area and marks its work item; the banner opens the request; the answer clears it"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a run with a degraded start notices it with its count and a link to its chapter; a run without one asks for no sessions"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a setup command whose process tree ramify-audit stopped says how, and that its output may be incomplete"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a work item row counts its iterations and gates in the singular for one and the plural otherwise"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "a work item's CheckFindings sit in its history, and the overview shows the modules' unsettled counts"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "after the run ends the notices stay, and an empty list says that nothing was created"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "an iteration shows the assignment package its engineer received, or why it cannot be rendered"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "an iteration whose engineer ended without a result shows the digest and the analysis its architect read"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "an unavailable metric reads unavailable with its known subtotal, never zero; the guarding statement stays"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "at the review stop the run says it waits, and Approve sends approve-analysis with the reviewer and the note"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "before the analysis is accepted the Scenarios area says nothing is tracked"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "hypotheses are shown as forecasts with standing and revision, beside the decisions that revised them"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "one iteration shows its failed and passed audits, attempt-local commit, evidence refs and unpublished states"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "overview presents the harness verdict with its exact candidate tree and audited gate commit"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "the Scenarios area lists every tracked scenario with its state, origin, work item, file and the gates that ran it"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "the gate shows complete provider diagnostics beyond its bounded output tail"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "the lineage measurements show their values, coverage and reasons; an unavailable one reads unavailable, never zero"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "the overview shows notices first: the module created, then every cycle, resolved or not"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "the plan and entries: each entry names the elements it cites, and the plan context catalog shows every kind, the checkers' findings and what is no requirement"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "the plan context catalog of a run without one says it is unavailable, and one without findings says every reading was faithful"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/run-page.test.tsx",
+        "kind": "test",
+        "testId": "the review on the analysis page: each entry's scenarios with their origin, the integration scenario's plan text beside its sub-scenarios, and the warnings"
+      }
+    ]
+  },
+  "checks": {
+    "agent-scenarios": {
+      "agent-cucumber": {
+        "status": "pass",
+        "durationSeconds": 0.565,
+        "counts": {
+          "scenarios": {
+            "failed": 0,
+            "passed": 0,
+            "skipped": 0,
+            "total": 0
+          },
+          "steps": {
+            "failed": 0,
+            "passed": 0,
+            "skipped": 0,
+            "total": 0,
+            "undefined": 0
+          }
+        }
+      }
+    },
+    "agent-structure": {
+      "agent-check-self": {
+        "status": "pass",
+        "durationSeconds": 17.358
+      }
+    },
+    "agent-tests": {
+      "agent-vitest": {
+        "status": "pass",
+        "durationSeconds": 988.7600000000001,
+        "counts": {
+          "files": {
+            "failed": 0,
+            "passed": 202,
+            "skipped": 1,
+            "total": 203
+          },
+          "tests": {
+            "failed": 0,
+            "passed": 1586,
+            "skipped": 2,
+            "total": 1588
+          }
+        }
+      }
+    },
+    "agent-typecheck": {
+      "agent-typecheck": {
+        "status": "pass",
+        "durationSeconds": 5.547
+      }
+    },
+    "agent-web-build": {
+      "agent-web-build": {
+        "status": "pass",
+        "durationSeconds": 0.585
+      }
+    },
+    "patch-integrity": {
+      "git-diff-check": {
+        "status": "pass",
+        "durationSeconds": 0.006
+      }
+    }
+  },
+  "lockWaitSeconds": [
+    0,
+    0
+  ],
+  "expectedFiles": {
+    "contract": "runner-configured-files/1",
+    "source": "partial-answer",
+    "expected": 203,
+    "run": 203,
+    "missing": [],
+    "status": "complete",
+    "runnerConfigFiles": [
+      "vitest.config.ts"
+    ]
+  },
+  "counts": {
+    "files": {
+      "failed": 0,
+      "passed": 202,
+      "skipped": 1,
+      "total": 203
+    },
+    "tests": {
+      "failed": 0,
+      "passed": 1586,
+      "skipped": 2,
+      "total": 1588
+    }
+  },
+  "skippedFiles": [
+    "ramify-agent/subs/harness/src/tests/fixture-trials.test.ts"
+  ],
+  "failureLedger": {
+    "completeness": "complete",
+    "entries": []
+  },
+  "composition": {
+    "scoped": true,
+    "chainDepth": 1,
+    "reportCommit": "38803658136b9c88433ebdd00374db4f541db8e8",
+    "rootReportCommit": "800a0dc3dfe7c40b93ba52066f72e4cd23ca461b",
+    "outstandingFailures": 0,
+    "verdict": "pass"
+  },
+  "refs": {
+    "reportCommit": "38803658136b9c88433ebdd00374db4f541db8e8",
+    "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T04-33-54Z-392a1367f",
+    "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/ba2782aec5570c32cbc832b172172777609e00f1"
+  },
+  "reused": null
+}

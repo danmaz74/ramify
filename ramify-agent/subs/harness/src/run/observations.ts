@@ -26,6 +26,23 @@ const activitySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('message'), text: z.string(), usage: usageSchema.nullable() }).strict(),
 ]);
 
+/** The provider document a hook check was decoded from. */
+const hookProviderSchema = z.object({ schema: text, revision: z.string().nullable() }).strict();
+
+/**
+ * One named path's analysis status, as the provider stated it: `checked`
+ * with its content identity or deletion, `not-analyzed` with its owner and
+ * exclusion, or `not-checked` with its reason.
+ */
+const hookDispositionSchema = z.object({
+  path: text,
+  disposition: z.enum(['checked', 'not-analyzed', 'not-checked']),
+  reason: text,
+  module: z.string().nullable(),
+  exclusion: z.object({ kind: text, directory: text, owner: z.string().nullable() }).strict().nullable(),
+  sha256: z.string().nullable(),
+}).strict();
+
 const observation = <T extends string, D extends z.ZodType>(type: T, data: D) =>
   z.object({ n: z.int().positive(), at: z.iso.datetime(), type: z.literal(type), data }).strict();
 
@@ -62,10 +79,15 @@ export const observationSchema = z.discriminatedUnion('type', [
   observation('hook-check', z.object({
     paths: z.array(z.string()),
     mode: z.enum(['changed', 'complete']),
+    /** The project verdict, which says nothing about a path the provider did not analyze. */
     outcome: z.enum(['passed', 'findings', 'not-checked']),
     reason: z.string().nullable(),
     newFindings: z.int().nonnegative(),
     log: z.string().nullable(),
+    /** The decoded provider document's schema and revision; null where none was decoded. */
+    provider: hookProviderSchema.nullable(),
+    /** Each named path's own analysis status, as the provider stated it; empty where it stated none. */
+    dispositions: z.array(hookDispositionSchema),
     /**
      * Set on the fresh check a claimed completion is judged against, which
      * covers the write scope rather than one mutation's paths. Absent on the
@@ -74,30 +96,6 @@ export const observationSchema = z.discriminatedUnion('type', [
     atCompletion: z.boolean().optional(),
   }).strict()),
   observation('excursion', z.object({ callId: z.string(), module: z.string(), firstEntry: z.boolean() }).strict()),
-  /**
-   * One diagnostic run of the assignment's own tests, asked for by the
-   * engineer. The selection is resolved anew from the tree on every call, so
-   * this is where the files of that call are recorded; a gate attempt records
-   * its own.
-   */
-  observation('scope-tests', z.object({
-    callId: z.string(),
-    resolved: z.array(z.string()),
-    outcome: z.enum(['passed', 'failed', 'not-verified']),
-    notVerified: z.string().nullable(),
-    exitCode: z.int().nullable(),
-    elapsedMs: z.int().nonnegative(),
-    /**
-     * The scenario check the call ran beside the tests, where the run tracks
-     * scenarios: the ones it selected, the ones that passed, and how many
-     * reasons it did not pass.
-     */
-    scenarios: z.object({
-      selected: z.array(z.string()),
-      passed: z.array(z.string()),
-      failures: z.int().nonnegative(),
-    }).strict().optional(),
-  }).strict()),
   /** Always an estimate; `tokens: null` is unknown and never room. */
   observation('context', z.object({
     tokens: z.number().nullable(),
@@ -114,10 +112,10 @@ export const observationSchema = z.discriminatedUnion('type', [
     kind: z.enum([
       'unguarded-shell', 'changed-paths-unknown', 'usage-unavailable', 'context-unavailable',
       'observation-truncated',
-      /** A suite of the project that the MVP's one supported runner does not select. */
-      'unsupported-runner',
       /** An entry of the session's transcript could not be written; the session went on without it. */
       'transcript-incomplete',
+      /** A Ramify check printed a result the harness does not read; it is never a pass. */
+      'unsupported-check-result',
     ]),
     detail: z.string(),
   }).strict()),

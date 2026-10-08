@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createScriptedAgent, type ScriptStep } from '../../subs/agent/src/scripted.js';
@@ -20,7 +20,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { addModule, completionProposed, edit, installMiniRunner, read, readDeclaredTree, shell, unsuitableScope, write } from './helpers/iterations.js';
 import { testPolicy } from './helpers/runs.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
-import { mockGit } from './helpers/mock-git.js';
+import { fixtureScratchGit, mockGit } from './helpers/mock-git.js';
 import { createDirectCheckExecution, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { commandResult } from './helpers/command-result.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
@@ -32,8 +32,7 @@ vi.mock('node:child_process', async original =>
  * One engineer session on one module, from a prompt, on the scripted fake.
  *
  * The session is given the equipment of an implementation run: the guard,
- * the hook check, the shell, the scoped test tool and the validated
- * submission. What these tests hold it to is what the command promises: it
+ * the hook check, the shell and the validated submission. What these tests hold it to is what the command promises: it
  * refuses before any agent starts when it cannot run, it never commits, its
  * records are plain files git ignores, and nothing follows a submission.
  */
@@ -80,6 +79,7 @@ interface SessionBoundaries {
   readonly gate?: readonly DirectCheckStep[] | undefined;
   readonly commandExecution?: CommandRunner | undefined;
   readonly starts?: boolean | undefined;
+  readonly preparationChangedPaths?: number | undefined;
 }
 
 async function session(
@@ -103,20 +103,27 @@ async function session(
   const answers = boundaries.ramify ?? [];
   let answerIndex = 0;
   const ramify = new FakeRamifyCli();
-  const answer = async (form: 'changed' | 'complete'): Promise<RamifyCheckResult> => {
+  // A scripted verdict checked every named path; a scripted not-checked is
+  // an unavailable answer that printed no check document.
+  const answer = async (form: 'changed' | 'complete', paths: readonly string[]): Promise<RamifyCheckResult> => {
     const scripted = answers[answerIndex];
     expect(scripted, `no Ramify ${form} answer was scripted at index ${answerIndex}`).toBeDefined();
     expect(scripted!.form).toBe(form);
     answerIndex += 1;
     const report = scripted!.outcome === 'findings' ? { findings: [finding()] } : { findings: [] };
+    const verdict = scripted!.outcome !== 'not-checked';
     return {
       form, exitCode: scripted!.outcome === 'checked' ? 0 : scripted!.outcome === 'findings' ? 1 : 2,
-      outcome: scripted!.outcome, reason: scripted!.outcome === 'not-checked' ? 'scripted unavailable' : null,
+      outcome: scripted!.outcome, reason: verdict ? null : 'scripted unavailable',
       report, stdout: JSON.stringify(report), stderr: '',
+      provider: verdict ? { schema: form === 'changed' ? 'ramify.check/3' : 'ramify.analysis/3', revision: 'scripted' } : null,
+      execution: verdict ? 'completed' : null,
+      paths: verdict ? paths.map(path => ({ path, disposition: 'checked' as const, module: 'scripted', exclusion: null, reason: 'content' as const, sha256: '0'.repeat(64) })) : [],
+      removed: [], unsupported: null,
     };
   };
-  vi.spyOn(ramify, 'checkChanged').mockImplementation(async () => answer('changed'));
-  vi.spyOn(ramify, 'checkComplete').mockImplementation(async () => answer('complete'));
+  vi.spyOn(ramify, 'checkChanged').mockImplementation(async paths => answer('changed', paths));
+  vi.spyOn(ramify, 'checkComplete').mockImplementation(async () => answer('complete', []));
   const checkExecution = createDirectCheckExecution({ script: boundaries.gate ?? [] });
   const result = await runSingleSession({
     projectRoot: root,
@@ -124,7 +131,7 @@ async function session(
     prompt: 'Raise the note limit to 500.',
     agent,
     ramify,
-    git,
+    git: fixtureScratchGit(git),
     checkExecution,
     commandExecution: boundaries.commandExecution ?? (async request => {
       throw new Error(`No command result scripted for ${request.argv.join(' ')}`);
@@ -134,12 +141,12 @@ async function session(
     onProgress: event => events.push(event),
     ...extra,
   });
-  expect(answerIndex).toBe(answers.length);
+  expect(answerIndex, JSON.stringify(result)).toBe(answers.length);
   checkExecution.assertComplete();
   expect(git.unexpected).toEqual([]);
   const starts = boundaries.starts ?? true;
   expect(git.currentHead).toHaveBeenCalledTimes(starts ? (extra.gate === true ? 2 : 1) : 0);
-  expect(git.changedPaths).toHaveBeenCalledTimes(starts ? 4 : 0);
+  expect(git.changedPaths).toHaveBeenCalledTimes(starts ? 4 : boundaries.preparationChangedPaths ?? 0);
   expect(git.commitAccepted).not.toHaveBeenCalled();
   return { result, agent, events, git };
 }
@@ -155,7 +162,8 @@ function finding() {
 }
 
 const checked = (form: 'changed' | 'complete') => ({ form, outcome: 'checked' as const });
-const passingGate = [{}, {}, {}] as const;
+/** The in-place diagnosis's type check and Ramify check, both passing. */
+const passingGate = [{}, {}] as const;
 
 function finished(result: SingleSessionResult) {
   if (result.status !== 'finished') throw new Error(`the session did not start: ${result.reason}`);
@@ -362,7 +370,7 @@ describe('a single engineer session', () => {
   test('a declared module with missing src is refused before the agent starts', async () => {
     const root = await project();
     await rm(join(root, notesDirectory, 'src'), { recursive: true });
-    const { result, agent } = await session(root, [], {}, { starts: false });
+    const { result, agent } = await session(root, [], {}, { starts: false, preparationChangedPaths: 1 });
     expect(result).toMatchObject({ status: 'not-started', exitStatus: 2 });
     expect(result.status === 'not-started' ? result.reason : '').toContain('has no src directory');
     expect(agent.sessions).toHaveLength(0);
@@ -385,6 +393,41 @@ describe('a single engineer session', () => {
 });
 
 describe('the gate option', () => {
+  test('PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint', async () => {
+    // This one witness explicitly starts a bounded shell. Provider ownership and
+    // automated check answers remain labeled scripted lifecycle controls.
+    const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    const argv: string[][] = [];
+    const commandExecution: CommandRunner = async request => {
+      argv.push([...request.argv]);
+      const output = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => actual.execFile(request.argv[0]!, request.argv.slice(1),
+        { cwd: request.cwd, timeout: Math.min(request.timeoutMs, 5000) }, (error, stdout, stderr) => error ? reject(error) : resolve({ stdout, stderr })));
+      return commandResult(request, output);
+    };
+    const allowedRoot = await project();
+    const allowed = await session(allowedRoot, [shell("printf '%s' 'export const noteLimit = 500;' > notes.ts"),
+      { kind: 'submit', input: completionProposed('Actual shell updated ordinary owned source') }], { gate: true },
+      { changed: [notesSource], commandExecution, ramify: [checked('complete'), checked('changed')], gate: passingGate });
+    expect(await readFile(join(allowedRoot, notesSource), 'utf8')).toContain('noteLimit = 500');
+    expect(finished(allowed.result).gate).toMatchObject({ verdict: 'passed' });
+    expect(allowed.git.commitAccepted).not.toHaveBeenCalled();
+    const deniedRoot = await project();
+    await mkdir(join(deniedRoot, 'src'), { recursive: true });
+    await writeFile(join(deniedRoot, 'src/root.ts'), 'export const root = true;');
+    const state = 'plans/plan/.harness/jobs/run/unsafe.json';
+    const denied = await session(deniedRoot, [shell(`mkdir -p '${deniedRoot}/plans/plan/.harness/jobs/run' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/ramify-audit.json' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/${state}'`),
+      { kind: 'submit', input: completionProposed('Actual shell created protected audit configuration and durable job state') }], { gate: true, module: 'collection-review' },
+      { changed: ['ramify-audit.json', state], commandExecution, ramify: [checked('complete')], gate: [] });
+    expect(await readFile(join(deniedRoot, 'ramify-audit.json'), 'utf8')).toContain('createdByShell');
+    expect(finished(denied.result).gate).toMatchObject({ verdict: 'failed' });
+    const attempt = gateAttemptSchema.parse(JSON.parse(await readFile(join(finished(denied.result).records, 'gate/attempt.json'), 'utf8')));
+    expect(attempt.rules?.find(rule => rule.rule === 'write-scope')).toMatchObject({ outcome: 'failed', violations: [{ rule: 'write-scope', path: state, detail: expect.any(String) }, { rule: 'write-scope', path: 'ramify-audit.json', detail: expect.any(String) }] });
+    expect(await readFile(join(deniedRoot, state), 'utf8')).toContain('createdByShell');
+    expect(attempt.commit).toBeNull();
+    expect(denied.git.commitAccepted).not.toHaveBeenCalled();
+    expect(argv).toHaveLength(2);
+  });
+
   test('passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed', async () => {
     const root = await project();
 
@@ -403,7 +446,9 @@ describe('the gate option', () => {
     const attempt = gateAttemptSchema.parse(JSON.parse(await readFile(join(summary.records, 'gate', 'attempt.json'), 'utf8')));
     expect(attempt.checkpoint).toBe('iteration');
     expect(attempt.commit).toBeNull();
-    expect(attempt.commands.find(command => command.kind === 'tests')?.selection?.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
+    // A standalone diagnosis runs the project's type check and Ramify check in
+    // place; it selects and runs no test, which a committing gate's audit owns.
+    expect(attempt.commands.map(command => command.kind)).toEqual(['type-check', 'ramify-check']);
     expect((await outcomeOf(summary.records)).gate).toEqual({ attempt: join('gate', 'attempt.json'), verdict: 'passed', cause: attempt.cause });
     expect(git.commitAccepted).not.toHaveBeenCalled();
     expect(events.map(event => event.type).slice(-3)).toEqual(['gate-started', 'gate', 'summary']);
@@ -417,7 +462,7 @@ describe('the gate option', () => {
       { kind: 'submit', input: completionProposed('The limit is already right.') },
     ], { gate: true }, {
       ramify: [checked('changed')],
-      gate: [{ outcome: { kind: 'completed', exitCode: 1 } }, {}, {}],
+      gate: [{ outcome: { kind: 'completed', exitCode: 1 } }, {}],
     });
 
     const summary = finished(result);
@@ -459,7 +504,7 @@ describe('the session\'s records', () => {
     expect(record).toMatchObject({ id: summary.session, module: notes, directory: notesDirectory, prompt: 'Raise the note limit to 500.', gate: true });
     // The session records its executor and the model it was asked for: none, for the fake.
     expect(record).toMatchObject({ schema: 'ramify-agent.session/2', agent: 'scripted', model: null });
-    expect(record.scope.roots).toEqual([`${notesDirectory}/src`]);
+    expect(record.scope.roots).toEqual([notesDirectory]);
 
     const observations = await observationsOf(records);
     expect(observations.map(line => line.type)).toEqual(expect.arrayContaining(['activity', 'guard', 'mutation', 'hook-check', 'coverage-gap']));

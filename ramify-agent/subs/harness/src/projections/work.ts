@@ -1,7 +1,8 @@
 import {
   runQueryLimits,
-  type GateView, type WorkItemResponse, type WorkItemSummary,
+  type GateAuditView, type GateView, type WorkItemResponse, type WorkItemSummary,
 } from '../interfaces/protocol/runs.js';
+import type { GateAttempt } from '../checks/records.js';
 import { digestLines } from '../work/failure.js';
 import { originKindOf, type WorkItem } from '../work/records.js';
 import type { IterationAssignment } from '../work/iterations.js';
@@ -10,7 +11,7 @@ import { deliverPackage } from '../context-selection/delivery.js';
 import { packageDeviation, planDeviationSchema } from '../deviations/records.js';
 import type { PackageDeviation } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { ProjectionError, type RunView } from './inputs.js';
-import { scenarioCheckViewOf } from './scenarios.js';
+import { gateScenarioViewsOf } from './scenarios.js';
 
 /*
  * Work items, their iterations and their gates, as a client reads them.
@@ -108,7 +109,7 @@ function scopeOf(assignment: IterationAssignment) {
   const broad = 'modules' in base;
   return {
     modules: broad ? [...base.modules] : [base.module],
-    includedChildren: broad ? [] : [...base.includedChildren],
+    included: broad ? [] : base.included.map(entry => ({ ...entry })),
     broad,
     rationale: broad ? base.rationale : assignment.scope.rationale,
     extra: assignment.scope.extra.map(extra => ({ path: extra.path, purpose: extra.purpose })),
@@ -247,6 +248,25 @@ export function boundedTail(text: string, bytes: number = runQueryLimits.outputT
   return encoded.subarray(start).toString('utf8');
 }
 
+/** A gate's audit record as its view carries it: every nested project and discovery result, copied as recorded. */
+function gateAuditView(audit: NonNullable<GateAttempt['audit']>): GateAuditView {
+  const reuse = (value: NonNullable<GateAttempt['audit']>['reuse']) => value === null ? null : { ...value, ignoredChangedPaths: [...value.ignoredChangedPaths] };
+  return {
+    ...audit, definition: { ...audit.definition }, reuse: reuse(audit.reuse),
+    projects: audit.projects === null ? null : audit.projects.map(project => ({
+      ...project, failures: [...project.failures], reuse: reuse(project.reuse),
+      evidence: project.evidence === null ? null : { ...project.evidence }, retrievalCommands: [...project.retrievalCommands],
+      counts: project.counts === null ? null : { checks: { ...project.counts.checks },
+        tests: project.counts.tests === null ? null : { ...project.counts.tests },
+        scenarios: project.counts.scenarios === null ? null : { ...project.counts.scenarios } },
+    })),
+    discovery: audit.discovery === null ? null : {
+      status: audit.discovery.status, skipped: audit.discovery.skipped.map(skip => ({ ...skip })),
+      unavailable: audit.discovery.unavailable.map(gap => ({ ...gap, definitions: [...gap.definitions] })),
+    },
+  };
+}
+
 /** One gate attempt with bounded output tails and no command environment. */
 export function gateOf(view: RunView, id: string): GateView {
   const gate = view.gates.get(id)?.body;
@@ -262,6 +282,8 @@ export function gateOf(view: RunView, id: string): GateView {
     audited: gate.audited,
     evidence: gate.evidence === null ? null : { ...gate.evidence },
     ...(gate.provider === undefined ? {} : { provider: gate.provider }),
+    ...(gate.audit === undefined ? {} : { audit: gateAuditView(gate.audit) }),
+    scenarios: gateScenarioViewsOf(gate),
     verdict: gate.verdict,
     cause: gate.cause,
     next: gate.next,
@@ -290,15 +312,6 @@ export function gateOf(view: RunView, id: string): GateView {
       outcome: command.outcome,
       notVerified: command.notVerified ?? null,
       runnerError: command.runnerError,
-      selection: command.selection === undefined
-        ? null
-        : {
-            policy: command.selection.policy,
-            exactOwners: [...command.selection.exactOwners],
-            subtrees: [...command.selection.subtrees],
-            extraSuites: [...command.selection.extraSuites],
-            resolved: [...command.selection.resolved],
-          },
       output: {
         path: command.output.path,
         bytes: command.output.bytes,
@@ -307,7 +320,6 @@ export function gateOf(view: RunView, id: string): GateView {
       },
       stopped: command.stopped ?? null,
       outputIncomplete: command.outputIncomplete === true,
-      scenarios: command.scenarios === undefined ? null : scenarioCheckViewOf(command.scenarios),
     })),
   };
 }

@@ -1,7 +1,7 @@
 # Written by ramify-agent for plan send-customer-email, run 20260923T1200Z-1a2b3c.
 # The scenarios are the plan's requirements. Agents never edit this file;
 # step definitions bind it from src/steps/. @ramify-pending marks a
-# scenario the harness has not yet declared due.
+# scenario that nothing has bound or reported done yet.
 
 Feature: audit-trail
   Every send leaves one audit line.

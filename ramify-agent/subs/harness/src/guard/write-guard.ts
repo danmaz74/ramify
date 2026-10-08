@@ -1,3 +1,4 @@
+import { relative, resolve } from 'node:path';
 import type { ToolAction } from '../../subs/agent/src/interfaces/port.js';
 import { isContained, resolveRealTarget } from './resolve-contained-path.js';
 
@@ -22,6 +23,9 @@ import { isContained, resolveRealTarget } from './resolve-contained-path.js';
 export interface GuardedScope {
   /** The revision of the `WriteScope` these paths were captured at. */
   readonly revision: number;
+  readonly excluded?: readonly string[];
+  readonly projectRoot: string;
+  readonly placement: (paths: readonly string[]) => Promise<ReadonlyArray<{ path: string; allowed: boolean }>>;
   /** Canonical directories whose whole contents the assignment may write. */
   readonly roots: readonly string[];
   /** Canonical single files the assignment may write, such as a declaration or a contract. */
@@ -87,6 +91,9 @@ export async function decideWrite(
       denied: true,
     };
   }
+  const boundary = await placementDecisions(scope, workingDirectory, [requested]);
+  if (boundary[0] !== true) return { verdict: 'blocked-scope', requested, resolved: target.resolved,
+    reason: 'The current and captured ownership boundaries do not permit this target' };
   if (scope.files.includes(target.resolved)) {
     return { verdict: 'allowed', requested, resolved: target.resolved, reason: 'the write scope names this file' };
   }
@@ -100,6 +107,29 @@ export async function decideWrite(
     resolved: target.resolved,
     reason: `${target.resolved} lies outside every location this assignment may write`,
   };
+}
+
+/** All logical and physical candidates for a coherent provider query shared by a gate's originating scopes. */
+export async function placementPaths(projectRoot: string, paths: readonly string[]): Promise<string[]> {
+  const targets = await Promise.all(paths.map(async path => ({ logical: resolve(projectRoot, path), target: await resolveRealTarget(projectRoot, path) })));
+  return [...new Set(targets.flatMap(({ logical, target }) => target.ok ? [logical, target.resolved] : [])
+    .map(path => relative(projectRoot, path).split('\\').join('/') || '.'))];
+}
+
+/** Batch both logical and real targets, including deletions and absent targets, through one provider identity. */
+export async function placementDecisions(scope: GuardedScope, cwd: string, paths: readonly string[]): Promise<boolean[]> {
+  const targets = await Promise.all(paths.map(async path => ({ logical: resolve(cwd, path), target: await resolveRealTarget(cwd, path) })));
+  const requested = targets.flatMap(({ logical, target }) => target.ok ? [logical, target.resolved] : []);
+  if (scope.placement === undefined || scope.projectRoot === undefined) return paths.map(() => false);
+  let answers = new Map<string, boolean>();
+  {
+    const relativePaths = [...new Set(requested.map(path => relative(scope.projectRoot!, path).split('\\').join('/') || '.'))];
+    try { answers = new Map((await scope.placement(relativePaths)).map(answer => [resolve(scope.projectRoot!, answer.path), answer.allowed])); }
+    catch { return paths.map(() => false); }
+  }
+  return targets.map(({ logical, target }) => target.ok && [logical, target.resolved].every(path =>
+    !scope.denied?.includes(path) && !scope.excluded?.some(excluded => path === excluded || isContained(excluded, path)) &&
+    answers.get(path) === true));
 }
 
 /**

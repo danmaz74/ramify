@@ -4,11 +4,11 @@
 [iteration brief](iteration0.md) is satisfied: the baseline was re-established,
 sixteen probes were run against the pinned SDK and none is recorded as assumed.
 
-No production code was written. The probes live in
-[`spikes/autonomous-loop/`](../../../../spikes/autonomous-loop/README.md),
+No production code was written. The probes lived in `spikes/autonomous-loop/`,
 outside every module, outside the compiler's scope and outside the Vitest
-selection; nothing imports them. Run them with
-`node_modules/.bin/tsx spikes/autonomous-loop/run-all.ts`.
+selection; nothing imported them. The obsolete spike tree was removed on
+2026-10-04. The results below retain the evidence from that run; its probe
+command is no longer available in the checkout.
 
 **How the probes reach pi.** There is no pi login on this machine, so no probe
 made a real model call. Each instead runs a real pi session — its own agent

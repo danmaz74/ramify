@@ -3,9 +3,8 @@ import type { CapabilityPlan, CapabilityRequest, CapabilityTask } from './record
 
 const capabilityTypes = [
   'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
-  'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-interrupted', 'capability-assignment-settled',
-  'capability-candidate-accepted', 'capability-review-recorded',
-  'capability-verification-started', 'capability-verification-failed', 'capability-handed-back', 'capability-stopped',
+  'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-settled',
+  'capability-verification-started', 'capability-handed-back', 'capability-stopped',
 ] as const;
 export type CapabilityEvent = Extract<RunEvent, { type: typeof capabilityTypes[number] }>;
 
@@ -65,11 +64,6 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
   };
 
   switch (event.type) {
-    case 'capability-review-recorded': {
-      const current = active(event.data.task);
-      if (current.status !== 'coordinating' || current.planRevision !== event.data.planRevision) return fail('review basis is stale');
-      break;
-    }
     case 'capability-requested': {
       const { request, parent, assignment, invocation } = event.data;
       if (requests.has(request)) return fail(`request ${request} already exists`);
@@ -139,13 +133,6 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
       update(current, { status: 'implementing', activeAssignment: assignment, assignments, nextAssignmentSequence: sequence + 1 });
       break;
     }
-    case 'capability-assignment-interrupted': {
-      const current = active(event.data.task);
-      if (current.status !== 'implementing' || current.activeAssignment !== event.data.assignment) {
-        return fail(`assignment ${event.data.assignment} is not active`);
-      }
-      break;
-    }
     case 'capability-assignment-settled': {
       const { task, assignment, outcome } = event.data;
       const current = active(task);
@@ -155,28 +142,11 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
       update(current, { status: 'coordinating', activeAssignment: null, assignments });
       break;
     }
-    case 'capability-candidate-accepted': {
-      const current = active(event.data.task);
-      if (current.status !== 'coordinating' || current.planRevision !== event.data.planRevision) return fail('candidate basis is stale');
-      const assignments = new Map(current.assignments);
-      const provisional = [...assignments].filter(([, outcome]) => outcome === 'partial').map(([id]) => id);
-      if (provisional.length === 0 || provisional.join(',') !== event.data.assignments.join(',')) return fail('candidate assignments differ');
-      if ([...assignments.values()].some(outcome => outcome === 'active' || outcome === 'failed' || outcome === 'interrupted')) return fail('candidate has unfinished assignments');
-      for (const id of provisional) assignments.set(id, 'accepted');
-      update(current, { assignments });
-      break;
-    }
     case 'capability-verification-started': {
       const current = coordinating(event.data.task, event.data.invocation);
       if ([...current.assignments.values()].some(result => result === 'active')) return fail('active assignment prevents verification');
       if (current.activeChild !== null) return fail('unfinished child task prevents verification');
       update(current, { status: 'verifying' });
-      break;
-    }
-    case 'capability-verification-failed': {
-      const current = active(event.data.task);
-      if (current.status !== 'verifying') return fail('verification is not active');
-      update(current, { status: 'coordinating' });
       break;
     }
     case 'capability-handed-back': {
@@ -218,8 +188,9 @@ export function isCapabilityEvent(event: RunEvent): event is CapabilityEvent {
   return (capabilityTypes as readonly string[]).includes(event.type);
 }
 
-/** Structural readiness only. Test adequacy and real-provider use remain
- * agent/review judgments, while the gate later verifies recorded executions. */
+/** Structural readiness only. Test adequacy, real-provider use and every
+ * original example's outcome are the task architect's judgment, reported on
+ * its obligations; no per-example state or cited test is consulted. */
 export function capabilityHandbackReadiness(task: CapabilityTask, request: CapabilityRequest, plan: CapabilityPlan, state: CapabilityTaskState): readonly string[] {
   const failures: string[] = [];
   if (task.request !== request.id || plan.task !== task.id || state.id !== task.id) failures.push('Task, request and plan references differ');
@@ -227,10 +198,6 @@ export function capabilityHandbackReadiness(task: CapabilityTask, request: Capab
   if (plan.revision !== state.planRevision) failures.push('Plan revision is stale');
   if (state.activeAssignment || [...state.assignments.values()].some(outcome => outcome === 'active')) failures.push('An assignment is active');
   if (state.activeChild) failures.push('A child task is unfinished');
-  for (const example of request.original.examples) {
-    const useCase = plan.useCases.find(item => item.id === example.id);
-    if (!useCase || useCase.coverage.state === 'unresolved') failures.push(`Example ${example.id} lacks resolved coverage`);
-  }
   return failures;
 }
 

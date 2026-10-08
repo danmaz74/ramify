@@ -312,7 +312,7 @@ test('a running readiness gate card says Running and for how long, Run-wide, wit
   try {
     const readiness = { key: 'gate:ga-0001', label: 'Readiness gate ga-0001', runVersion: 42, modules: [],
       sourceRefs: [{ kind: 'run-event' as const, id: 'ev-8', sequence: 8, revision: null }], kind: 'gate' as const, checkpoint: 'readiness' as const,
-      verdict: null, audit: 'not-applicable' as const, repairRound: 0, commit: null, auditedCommit: null, active: true,
+      verdict: null, audit: 'not-started' as const, repairRound: 0, commit: null, auditedCommit: null, active: true,
       subject: { workItem: null, iteration: null }, cause: null, evidencePresent: false };
     const canvas = await gateView([...map.nodes, readiness], [{ sequence: 8, at: '2026-09-24T21:43:40.000Z' }]);
     const card = within(canvas).getByRole('button', { name: /^Readiness gate ga-0001, gate/ });
@@ -358,7 +358,7 @@ test('a drag that starts on a card pans the canvas: its buttons refuse a node dr
 
 const readiness = { key: 'gate:ga-0001', label: 'Readiness gate ga-0001', runVersion: 42, modules: [],
   sourceRefs: [{ kind: 'run-event' as const, id: 'ev-8', sequence: 8, revision: null }], kind: 'gate' as const, checkpoint: 'readiness' as const,
-  verdict: null, audit: 'not-applicable' as const, repairRound: 0, commit: null, auditedCommit: null, active: true,
+  verdict: null, audit: 'not-started' as const, repairRound: 0, commit: null, auditedCommit: null, active: true,
   subject: { workItem: null, iteration: null }, cause: null, evidencePresent: false };
 
 test('the All gates list words each gate as its card does: verdict, module, repair round and audit only where they apply', async () => {
@@ -419,7 +419,7 @@ test('a running gate card and its detail name the command it is on', async () =>
 test('a queued gate card and detail show the machine test lock wait', async () => {
   const line = 'Waiting for another test run (fixture)';
   const running = { ...map, nodes: [...map.nodes, readiness], current: { awaitedSession: null, runningGate: readiness.key, source: readiness.sourceRefs[0]!,
-    gateCommand: { kind: 'tests' as const, position: 1, total: 4, waitingLine: line,
+    gateCommand: { kind: 'configured' as const, position: 1, total: 4, waitingLine: line,
       source: { kind: 'run-event' as const, id: 'ev-9', sequence: 9, revision: null } } } };
   const c = { ...client(), getExecutionMap: async () => running } as ProtocolClient;
   render(<ExecutionMapArea client={c} planId="nested-provider-map" runId="run-scripted-map" version={42} events={[]} onOpenGate={vi.fn()} />);
@@ -493,4 +493,37 @@ describe('the initial view', () => {
       expect(flow.setViewport).toHaveBeenCalledWith({ x: 24, y: 24, zoom: 0.8 }, { duration: 0 });
     } finally { restore(); }
   });
+});
+
+test('PB3-E07: a final gate shows its invocation verdict as indeterminate, and its detail each nested project\'s verdict, execution and record, and each skipped definition', async () => {
+  const final = { ...readiness, key: 'gate:ga-0009', label: 'Final gate ga-0009', checkpoint: 'final' as const, verdict: 'not-verified' as const,
+    audit: 'indeterminate' as const, active: false, cause: 'infrastructure', commit: 'c'.repeat(40), auditedCommit: 'c'.repeat(40), evidencePresent: true };
+  const project = (projectRoot: string, verdict: 'pass' | 'fail' | 'indeterminate', execution: 'ran' | 'reused' | 'not-run', report: string | null, failures: string[] = []) => ({
+    projectRoot, verdict, execution, failures, status: report === null ? 'cancelled' : 'completed',
+    evidence: report === null ? null : { reportCommit: report.repeat(40), runRef: `refs/audited/runs/${projectRoot}`, treeRef: 'refs/audited/by-tree/t' },
+  });
+  const nested = {
+    commit: final.commit, audited: final.auditedCommit, evidence: { reportCommit: 'a'.repeat(40), runRef: 'refs/audited/runs/root', treeRef: 'refs/audited/by-tree/t' },
+    commands: [],
+    audit: {
+      nested: true, verdict: 'indeterminate',
+      projects: [project('.', 'pass', 'reused', 'a'), project('engine', 'fail', 'ran', 'b', ['engine-check: FAIL']), project('engine/tools', 'indeterminate', 'not-run', null)],
+      discovery: { status: 'complete', skipped: [{ projectRoot: 'vendor/lib', enclosingProject: '.', reason: 'external', directory: 'vendor' }], unavailable: [] },
+    },
+  };
+  const c = { ...client(), getExecutionMap: async () => ({ ...map, nodes: [...map.nodes, final] }), getGate: async () => nested } as unknown as ProtocolClient;
+  render(<ExecutionMapArea client={c} planId="nested-provider-map" runId="run-scripted-map" version={42} events={[]} onOpenGate={vi.fn()} />);
+  const canvas = await screen.findByLabelText('Zoomable execution canvas');
+  const card = within(canvas).getByRole('button', { name: /^Final gate ga-0009, gate/ });
+  expect(card.textContent).toContain('Audit indeterminate');
+  expect(card.textContent).not.toContain('Audit failed');
+  fireEvent.click(card);
+  const projects = await screen.findByRole('list', { name: 'Audited projects' });
+  expect(within(projects).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+    `.: pass, reused; report ${'a'.repeat(12)}`,
+    `engine: fail, ran; engine-check: FAIL; report ${'b'.repeat(12)}`,
+    'engine/tools: indeterminate, not-run; no published record',
+  ]);
+  expect(screen.getByText(/Invocation indeterminate over 3 projects; discovery complete/)).toBeTruthy();
+  expect(within(screen.getByRole('list', { name: 'Skipped projects' })).getByRole('listitem').textContent).toBe('Not audited: vendor/lib (external vendor)');
 });

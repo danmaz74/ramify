@@ -1,0 +1,103 @@
+{
+  "command": "ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent --cwd . --json",
+  "raw": {
+    "path": "/tmp/pb3-it6-audit.json",
+    "sha256": "b631941fec9f8110b365054d0fe40eb2c853bf7c76e0b270cc3d4a5ffc272253"
+  },
+  "cliExit": 0,
+  "window": {
+    "startUtc": "2026-10-07T23:32:51Z",
+    "endUtc": "2026-10-07T23:49:31Z"
+  },
+  "status": "completed",
+  "requestId": "a1e36ddf-43b9-4127-a175-f9ca0269fafc",
+  "runId": "7793e658-7e73-49e0-a480-6130a73bb2fd",
+  "producer": {
+    "name": "ramify-audit",
+    "version": "0.7.2"
+  },
+  "sourceCommit": "5f18be0da2e2bb2bfa7f0c4fa21595c225deaef5",
+  "sourceTree": "4fe65a919ed4fa1bd5ef291597f0159f25ab6648",
+  "sourceBranch": "feat/plan21-project-boundary-adoption",
+  "auditedAt": "2026-10-07T23:49:31.203Z",
+  "durationSeconds": 999.385,
+  "mode": {
+    "requestedMode": "ramify-partial",
+    "resolution": "defaulted",
+    "executedMode": "full",
+    "fallbackReason": "drift-cap: 75 distinct paths selected a module since the full audit at e8155386527a5429ba09a354b4e6f8c5ca3a6103 (limit 25)"
+  },
+  "overall": "pass",
+  "checks": {
+    "agent-structure": {
+      "agent-check-self": {
+        "status": "pass",
+        "durationSeconds": 17.352
+      }
+    },
+    "agent-tests": {
+      "agent-vitest": {
+        "status": "pass",
+        "durationSeconds": 964.049
+      }
+    },
+    "agent-typecheck": {
+      "agent-typecheck": {
+        "status": "pass",
+        "durationSeconds": 5.675
+      }
+    },
+    "agent-web-build": {
+      "agent-web-build": {
+        "status": "pass",
+        "durationSeconds": 0.621
+      }
+    },
+    "patch-integrity": {
+      "git-diff-check": {
+        "status": "pass",
+        "durationSeconds": 0.007
+      }
+    }
+  },
+  "expectedFiles": {
+    "expected": 253,
+    "run": 253,
+    "missing": [],
+    "status": "complete"
+  },
+  "counts": {
+    "files": {
+      "failed": 0,
+      "passed": 251,
+      "skipped": 2,
+      "total": 253
+    },
+    "tests": {
+      "failed": 0,
+      "passed": 2030,
+      "skipped": 6,
+      "total": 2036
+    }
+  },
+  "skippedFiles": [
+    "subs/harness/src/tests/fixture-acceptance.test.ts",
+    "subs/harness/src/tests/fixture-trials.test.ts"
+  ],
+  "failureLedger": {
+    "completeness": "complete",
+    "entries": []
+  },
+  "composition": {
+    "verdict": "pass",
+    "scoped": false,
+    "chainDepth": 0,
+    "reportCommit": "6654b7d8bf85963fba53f6101919bfba09a3f6b6",
+    "outstandingFailures": 0
+  },
+  "refs": {
+    "reportCommit": "6654b7d8bf85963fba53f6101919bfba09a3f6b6",
+    "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-07T23-49-31Z-5f18be0da",
+    "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/4fe65a919ed4fa1bd5ef291597f0159f25ab6648"
+  }
+}

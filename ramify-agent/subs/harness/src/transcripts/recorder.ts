@@ -27,10 +27,20 @@ import type { TranscriptBodies, TranscriptEntryInput, TranscriptWriter } from '.
 export interface PostWriteCheckNote {
   readonly paths: readonly string[];
   readonly mode: 'changed' | 'complete';
+  /** The project verdict; each path's own status is in `dispositions`. */
   readonly outcome: 'passed' | 'findings' | 'not-checked';
   readonly reason: string | null;
   readonly newFindings: number;
   readonly log: string | null;
+  readonly provider: { readonly schema: string; readonly revision: string | null } | null;
+  readonly dispositions: readonly {
+    readonly path: string;
+    readonly disposition: 'checked' | 'not-analyzed' | 'not-checked';
+    readonly reason: string;
+    readonly module: string | null;
+    readonly exclusion: { readonly kind: string; readonly directory: string; readonly owner: string | null } | null;
+    readonly sha256: string | null;
+  }[];
 }
 
 /**
@@ -303,7 +313,10 @@ function harnessEntry(note: HarnessNote, invocation: string | null): Build {
       case 'post-write-check': {
         const checks = [];
         for (const check of note.checks) {
-          checks.push({ ...check, paths: [...check.paths], log: check.log === null ? null : await bodies.file(check.log) });
+          checks.push({
+            ...check, paths: [...check.paths], log: check.log === null ? null : await bodies.file(check.log),
+            dispositions: check.dispositions.map(path => ({ ...path, exclusion: path.exclusion === null ? null : { ...path.exclusion } })),
+          });
         }
         return entry({ ...note, checks, text: note.text === null ? null : await bodies.text(note.text) });
       }

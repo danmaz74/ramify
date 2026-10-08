@@ -7,19 +7,21 @@ import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { findModule, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { writeFileAtomic } from '../../subs/ledger/src/atomic.js';
-import { resolveTestSelection } from '../checks/selection.js';
 import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execution.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
+import { placementDecisions } from '../guard/write-guard.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import type { HookFinding } from '../hooks/post-write.js';
 import { inputsHash, loadPromptPackages, renderEngineerPrompt, sha256 } from '../prompts/packages.js';
 import { ExcursionWatcher } from '../run/excursions.js';
 import { runCheckpoint } from '../run/gates.js';
 import { captureProjectConfig } from '../run/project-config.js';
+import { readCommittedAuditConfiguration } from '../../subs/audit/src/check-execution.js';
+import { declaredModuleDirectories } from '../run/project-config.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { recordSettledSnapshot } from '../run/mutations.js';
 import { ObservationLog } from '../run/observations.js';
-import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages } from '../run/policy.js';
+import { contextPolicyOf, defaultRunPolicy } from '../run/policy.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from '../run/port-events.js';
 import { gateAttemptId, gateAttemptSchema, type InvocationOutcome, type RunPolicy } from '../run/records.js';
 import { SubmissionJudge } from '../run/submissions.js';
@@ -30,12 +32,13 @@ import { ContentStore } from '../transcripts/store.js';
 import { TranscriptWriter } from '../transcripts/writer.js';
 import { engineerEquipment } from '../work/engineer-equipment.js';
 import { engineerWorkingDirectory } from '../work/engineer-directory.js';
+import { ensureScratchRule, removeScratchDirectories, scratchSafetyRule, trackedScratchPaths } from '../work/scratch.js';
 import {
   capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
   type EngineerSubmission,
 } from '../work/engineer.js';
 import type { IterationAssignment } from '../work/iterations.js';
-import { captureGuardedFiles, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
+import { auditPreparationPaths, scopeConfigurationPaths, captureGuardedFiles, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
 import { iterationApiViews } from '../work/session.js';
 import {
   sessionLayout, sessionOutcomeSchema, sessionRecordSchema, sessionsDirectory,
@@ -47,12 +50,12 @@ import {
  *
  * The session is given what an implementation run gives its engineers: the
  * engineer prompt, the module's API views, the write guard, the Ramify hook
- * check after each mutation, the shell, the scoped test tool and the
- * validated submission. It holds the project lock for its whole life, so it
- * never runs beside an implementation run. Nothing follows its submission:
- * no capability task, no architect turn and no commit. With the gate
- * option the iteration checkpoint runs over the module afterwards, and its
- * verdict is recorded; the changes stay in the working tree either way.
+ * check after each mutation, the shell and the validated submission. It
+ * holds the project lock for its whole life, so it never runs beside an
+ * implementation run. Nothing follows its submission: no capability task,
+ * no architect turn and no commit. With the gate option the in-place
+ * diagnosis runs over the current bytes afterwards, and its verdict is
+ * recorded; the changes stay in the working tree either way.
  *
  * Its records are plain files under `plans/.harness/sessions/<id>/`, and
  * its transcript is `transcript.jsonl` beside them, written as a run's is.
@@ -115,6 +118,10 @@ export interface SessionSummary {
   readonly standingViolations: readonly HookFinding[];
   /** Every uncommitted path when the session settled. */
   readonly changed: readonly string[];
+  /** A path changed by the harness while preparing scratch, rather than by the engineer. */
+  readonly harnessChanged: readonly string[];
+  /** Indexed scratch kept at session end; it must be removed from the index before readiness. */
+  readonly preservedTracked: readonly string[];
   /** Changed paths outside the write scope. */
   readonly outsideScope: readonly string[];
   readonly usage: InvocationOutcome['usage'];
@@ -186,6 +193,7 @@ export function sessionAcceptance(kind: EngineerSubmission['kind'], gate: boolea
 
 /** Runs one engineer session on one module, from the lock to the records. */
 export async function runSingleSession(options: SingleSessionOptions): Promise<SingleSessionResult> {
+  if (options.policy !== undefined && options.policy.version !== 'run-policy/7') return notStarted(`Run policy ${options.policy.version} is refused by run-policy/7; a fresh run is required`);
   if (options.prompt.trim() === '') return notStarted('The prompt is empty, so there is no goal to work on.');
   let projectRoot: string;
   try {
@@ -237,8 +245,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
 
   // The write scope: the module's own contents, as a run's ordinary
   // assignment has it, and each extra path the person named.
-  const base = { module: entry.module, includedChildren: [] as string[] };
-  const own = await resolveWriteScope({
+  const base = { module: entry.module, included: [] as { directory: string; reason: string; instructions: string }[] };
+  let own = await resolveWriteScope({ ramify,
     projectRoot,
     index: initial,
     view: { status: 'materialized', revision: initial.revision, input: initial.input, coverageLimits: [] },
@@ -249,7 +257,6 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     bootstrap: [],
     rationale: 'A single engineer session on this module.',
   });
-  const roots = [...own.resolved.roots];
   const files = [...own.resolved.files];
   const extra = [...new Set(options.write ?? [])];
   for (const path of extra) {
@@ -258,27 +265,57 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
       return notStarted(`The write path "${path}" is not a project-relative path inside the project.`);
     }
     const directory = path.endsWith('/') || await stat(target.resolved).then(found => found.isDirectory(), () => false);
-    const list = directory ? roots : files;
-    if (!list.includes(target.resolved)) list.push(target.resolved);
+    if (directory) {
+      const requested = path.replace(/\/$/u, '');
+      const topology = own.resolved.ownership;
+      const wholeTree = topology.modules.some(module => module.parent === entry.module && module.directory === requested)
+        || topology.exclusions.some(exclusion => exclusion.kind === 'owned-nested-project' && exclusion.directory === requested);
+      if (wholeTree) base.included.push({ directory: requested, reason: 'The user assigned this whole tree to the standalone session', instructions: options.prompt });
+      else if ((await placementDecisions(guardedScopeOf(own, [], ramify), projectRoot, [requested]))[0] !== true) return notStarted(`The directory ${path} is not one whole immediate child or declared owned nested project root`);
+    } else if (!files.includes(target.resolved)) files.push(target.resolved);
   }
-  const scope = { ...own, resolved: { ...own.resolved, roots, files } };
-  const workingDirectory = await engineerWorkingDirectory(projectRoot, scope, initial)
+  if (base.included.length > 0) own = await resolveWriteScope({ ramify, projectRoot, index: initial, view: own.resolved.view, revision: 1,
+    base, extra: [], read: [], bootstrap: [], rationale: 'A standalone session with explicitly included whole trees' });
+  const scope = { ...own, resolved: { ...own.resolved, files } };
+  let harnessChanged: string[] = [];
+  let alreadyChanged: string[];
+  try {
+    const modules = await declaredModuleDirectories(projectRoot);
+    const tracked = await trackedScratchPaths(projectRoot, modules, git);
+    if (tracked.length > 0) return notStarted(`Tracked scratch prevents this session: ${tracked.join(', ')}; nothing was deleted`);
+    const removed = await removeScratchDirectories(projectRoot, modules, git);
+    if (removed.preservedTracked.length > 0) return notStarted(`Tracked scratch appeared during preparation: ${removed.preservedTracked.join(', ')}`);
+    alreadyChanged = await git.changedPaths(projectRoot);
+    const prepared = await ensureScratchRule(projectRoot, modules, git);
+    if (prepared.appended) harnessChanged = ['.gitignore'];
+  } catch (error) {
+    return notStarted(`Scratch preparation refused this session: ${message(error)}`);
+  }
+  const workingDirectory = await engineerWorkingDirectory(projectRoot, scope, initial, git)
     .catch(error => ({ error: message(error) }));
   if (typeof workingDirectory !== 'string') return notStarted(`The engineer cannot start in the module's src directory: ${workingDirectory.error}`);
-  // The project's configuration for the harness is never an agent's to write.
-  const guarded: GuardedScope = guardedScopeOf(scope, await deniedFiles(projectRoot, []));
-  const tests = testPolicyOf('ordinary', base, []);
+  let scratchSettled = false;
+  try {
+  // A standalone session guards the same committed preparation inputs where a definition exists.
+  const head = await git.currentHead(projectRoot);
+  const auditExists = await stat(join(projectRoot, 'ramify-audit.json')).then(found => found.isFile(), () => false);
+  let auditPaths: string[] = [];
+  if (auditExists) {
+    try { auditPaths = await auditPreparationPaths(await readCommittedAuditConfiguration(projectRoot, head), projectRoot); }
+    catch (error) { return notStarted(`Committed audit configuration cannot be guarded: ${message(error)}`); }
+  }
+  const guardedFiles = await captureGuardedFiles(projectRoot, [], {}, [...auditPaths, ...scopeConfigurationPaths(scope)]);
+  const guarded: GuardedScope = guardedScopeOf(scope, await deniedFiles(projectRoot, guardedFiles.map(file => file.path)), ramify);
+  const tests = testPolicyOf('ordinary', base, [], [], scope.resolved.included);
 
-  const policy = options.policy ?? defaultRunPolicy({ projectRoot, nested: await discoverNestedPackages(projectRoot) });
+  const policy = options.policy ?? defaultRunPolicy({ projectRoot });
   const { limits } = policy;
   const { packages } = await loadPromptPackages();
   const loaded = packages.get('engineer');
   if (loaded === undefined) return notStarted('No prompt package is loaded for the engineer.');
 
   const views = await iterationApiViews(ramify, projectRoot, initial, scope.base);
-  const head = await git.currentHead(projectRoot);
-  const guardedFiles = await captureGuardedFiles(projectRoot);
-  const alreadyChanged = await git.changedPaths(projectRoot).catch(() => [] as string[]);
+
 
   const id = sessionId();
   const records = join(projectRoot, sessionsDirectory, id);
@@ -308,7 +345,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const shown = scopePaths(projectRoot, scope);
 
   const record: SessionRecord = sessionRecordSchema.parse({
-    schema: 'ramify-agent.session/2',
+    schema: 'ramify-agent.session/2', policy: { version: 'run-policy/7', contract: 'plan21-whole-owner-and-architect-reporting/1' }, authority: scope,
     id,
     role: 'engineer',
     module: entry.module,
@@ -350,7 +387,6 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     index: () => index,
     guarded,
     scopeRevision: scope.revision,
-    tests,
     outputPath: (kind, _invocation, number) => at(kind === 'shell' ? sessionLayout.shellOutput(number) : sessionLayout.hookOutput(number)),
   });
 
@@ -462,11 +498,14 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     agentSession = agent.startSession(spec);
   } catch (error) {
     const settled = await writer.release(id);
+    const removed = await removeScratchDirectories(projectRoot, [entry.dir], git);
+    scratchSettled = true;
     const reason = `The agent session could not start: ${message(error)}`;
     await transcript.end({ ended: 'failed', interruption: 'adapter-fault', error: reason, actual: null });
     await writeOutcome(at(sessionLayout.outcome), {
       session: id, ended: 'failed', interruption: 'adapter-fault', error: reason, submission: null, rejectedSubmissions: 0,
-      standingViolations: [], settled, changed: alreadyChanged, alreadyChanged, outsideScope: [],
+      standingViolations: [], settled, changed: alreadyChanged, alreadyChanged, harnessChanged,
+      preservedTracked: [...removed.preservedTracked], outsideScope: [],
       usage: recorder.outcomeUsage(agent), elapsedMs: Date.now() - started, gate: null,
     });
     return notStarted(reason, records);
@@ -490,6 +529,9 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   await equipment.settle?.().catch(() => undefined);
   const settled = await writer.release(id, agentSession);
   const snapshot = await recordSettledSnapshot({ projectRoot, changed: () => git.changedPaths(projectRoot), scope: guarded }, observations);
+  const removed = await removeScratchDirectories(projectRoot, [entry.dir], git);
+  scratchSettled = true;
+  const safety = await scratchSafetyRule(projectRoot, await declaredModuleDirectories(projectRoot), git);
 
   const interruption = bounds.interruption ?? (stoppedByCaller ? 'stopped-by-caller' as const : undefined);
   const ended: InvocationOutcome['ended'] = bounds.interruption !== undefined
@@ -509,16 +551,16 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     actual: { mode: agentSession.start.mode, degradedReason: agentSession.start.degradedReason ?? null },
   });
 
-  // The gate: the iteration checkpoint over the tree the session left,
-  // with the module's own tests resolved anew and the guarded files as
-  // they stood at the start. It never commits.
+  // The gate: an in-place diagnosis of the tree the session left, its
+  // setup, type check and Ramify check, with the guarded files as they
+  // stood at the start. It never commits and runs no test or scenario: the
+  // project's tests run only through its committed audit.
   let gate: SessionGateResult | null = null;
   if (options.gate === true) {
     if (!settled.confirmed) {
       gate = { ran: false, reason: 'the session did not settle, so a check of the tree it may still be writing would prove nothing' };
     } else {
       progress({ type: 'gate-started' });
-      const selection = await resolveTestSelection({ projectRoot, index: await refresh(), policy: tests });
       // The project's declared setup, such as its build, runs first, as at
       // every gate of a run.
       const config = await captureProjectConfig(projectRoot);
@@ -532,9 +574,9 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
         policy,
         proposedBy: id,
         subject: {},
-        tests: selection,
         guarded: guardedFiles,
         authorizations: [],
+        rules: [safety, { rule: 'write-scope', outcome: snapshot.failure !== null || snapshot.outsideScope.length > 0 ? 'failed' : 'passed', violations: snapshot.outsideScope.map(path => ({ rule: 'write-scope', path, detail: 'Candidate change is outside current and captured write authority' })), ...(snapshot.failure === null ? {} : { limits: [snapshot.failure] }) }],
         ...(setup === undefined ? {} : { setup }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
@@ -570,7 +612,9 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     settled,
     changed: [...snapshot.paths],
     alreadyChanged: alreadyChanged.map(path => path.split(sep).join('/')).sort(),
-    outsideScope: [...snapshot.outsideScope],
+    harnessChanged,
+    preservedTracked: [...removed.preservedTracked],
+    outsideScope: snapshot.outsideScope.filter(path => !harnessChanged.includes(path)),
     usage: recorder.outcomeUsage(agent),
     elapsedMs,
     gate: gate === null ? null : gate.ran
@@ -586,7 +630,9 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     rejectedSubmissions: judge.rejections,
     standingViolations: standing,
     changed: [...snapshot.paths],
-    outsideScope: [...snapshot.outsideScope],
+    harnessChanged,
+    preservedTracked: removed.preservedTracked,
+    outsideScope: snapshot.outsideScope.filter(path => !harnessChanged.includes(path)),
     usage: recorder.outcomeUsage(agent),
     elapsedMs,
     records,
@@ -596,6 +642,9 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   progress({ type: 'summary', summary });
   const passed = ended === 'submitted' && (gate === null || (gate.ran && gate.verdict === 'passed'));
   return { status: 'finished', summary, exitStatus: passed ? 0 : 1 };
+  } finally {
+    if (!scratchSettled) await removeScratchDirectories(projectRoot, [entry.dir], git);
+  }
 }
 
 async function writeOutcome(path: string, body: Omit<SessionOutcomeRecord, 'schema' | 'finishedAt'>): Promise<void> {

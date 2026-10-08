@@ -1,0 +1,27 @@
+[
+  {
+    "repository": "/home/app/ramify-audit-pb",
+    "head": "5c5d8c53f506e93a5511f305b1b64d390e9e0f62",
+    "status": [
+      " M docs/plans/08-ignore-paths/acceptance.md",
+      " M docs/plans/08-ignore-paths/contracts.md",
+      " M docs/plans/08-ignore-paths/main-plan.md",
+      " M docs/plans/08-ignore-paths/protected-documents.md"
+    ],
+    "documents": {
+      "docs/2026-10-06-ignore-list-analysis.md": "a2d33fe950717f7e379cd2ff7478df6159ba5a11209280795058db7a717c7218",
+      "docs/2026-10-06-ramify-only-partial-audits.md": "1994d6a5d257d85c20ed7f31e4392a0ddda405dbe0e58f5a291ea7ce56bb6422",
+      "docs/plans/08-ignore-paths/main-plan.md": "8725bffdb8ea67d62de4d61ee51520c0494bcc725f53197ddc799b1bc1f91412",
+      "src/index.ts": "5f84a53a403e2a5af815e702d4ef1183abf44c5a9163417b5fe28a03780b429b"
+    }
+  },
+  {
+    "repository": "/home/app/ramify-affected",
+    "head": "3561ce60cf05e04c6cdbfaa368e07491e729a47a",
+    "status": [],
+    "documents": {
+      "docs/plans/affected-rule-selection/contracts.md": "e38fa7697d997b3880aadab684ead9acd099118cf6f68b1496ebcdccbd0cf4df",
+      "docs/plans/affected-rule-selection/main-plan.md": "88a66db8655a11e81242f3f38e22ce4c3751387b861e2e4abbb91342bfbf7e71"
+    }
+  }
+]

@@ -1,0 +1,142 @@
+{
+  "sourceCommit": "68cde9ecc8a2f29f2a01121f6357586c2b99c484",
+  "sourceTree": "80e1b9308198ea1795c8110d2a39deef269e7e63",
+  "mode": {
+    "requestedMode": "full",
+    "resolution": "requested",
+    "executedMode": "full"
+  },
+  "overall": "pass",
+  "producer": {
+    "name": "ramify-audit",
+    "version": "0.7.2"
+  },
+  "durationSeconds": 338.575,
+  "definitionDigest": "sha256:5cfeaba8ac88984ab1452922da869afcd5046371a7935af6995e43d5d43007f3",
+  "refs": {
+    "reportCommit": "b83c479c94cfcd581607e14a60eb9825de9af3a7",
+    "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T05-38-51Z-68cde9ecc",
+    "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/80e1b9308198ea1795c8110d2a39deef269e7e63"
+  },
+  "composition": {
+    "verdict": "pass",
+    "scoped": false,
+    "chainDepth": 0,
+    "reportCommit": "b83c479c94cfcd581607e14a60eb9825de9af3a7",
+    "outstandingFailures": 0
+  },
+  "discovery": {
+    "status": "complete",
+    "skipped": [],
+    "unavailable": []
+  },
+  "projects": [
+    {
+      "projectRoot": "ramify-agent",
+      "verdict": "pass"
+    }
+  ],
+  "checks": {
+    "agent-scenarios": {
+      "status": "pass",
+      "durationSeconds": 0.782,
+      "commands": {
+        "agent-cucumber": {
+          "counts": {
+            "scenarios": {
+              "failed": 0,
+              "passed": 0,
+              "skipped": 0,
+              "total": 0
+            },
+            "steps": {
+              "failed": 0,
+              "passed": 0,
+              "skipped": 0,
+              "total": 0,
+              "undefined": 0
+            }
+          },
+          "durationSeconds": 0.776,
+          "passed": true,
+          "status": "pass",
+          "summary": "scenarios 0 passed, 0 failed, 0 skipped; steps 0 passed, 0 failed, 0 skipped, 0 undefined"
+        }
+      }
+    },
+    "agent-structure": {
+      "status": "pass",
+      "durationSeconds": 20.275,
+      "commands": {
+        "agent-check-self": {
+          "durationSeconds": 20.275,
+          "passed": true,
+          "status": "pass",
+          "summary": "Walked source areas: src, src/tests, subs/harness/src, subs/harness/src/tests, subs/harness/subs/agent/src, subs/harness/subs/agent/src/tests, subs/harness/subs/agent/subs/pi/src, subs/harness/subs..."
+        }
+      }
+    },
+    "agent-tests": {
+      "status": "pass",
+      "durationSeconds": 296.677,
+      "commands": {
+        "agent-vitest": {
+          "counts": {
+            "files": {
+              "failed": 0,
+              "passed": 252,
+              "skipped": 1,
+              "total": 253
+            },
+            "tests": {
+              "failed": 0,
+              "passed": 1975,
+              "skipped": 2,
+              "total": 1977
+            }
+          },
+          "durationSeconds": 296.67,
+          "passed": true,
+          "status": "pass",
+          "summary": "files 252 passed, 0 failed, 1 skipped; tests 1975 passed, 0 failed, 2 skipped"
+        }
+      }
+    },
+    "agent-typecheck": {
+      "status": "pass",
+      "durationSeconds": 5.772,
+      "commands": {
+        "agent-typecheck": {
+          "durationSeconds": 5.772,
+          "passed": true,
+          "status": "pass",
+          "summary": "> tsc --noEmit && tsc --noEmit -p subs/web/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p scripts/browser-acceptance/tsconfig.json"
+        }
+      }
+    },
+    "agent-web-build": {
+      "status": "pass",
+      "durationSeconds": 0.586,
+      "commands": {
+        "agent-web-build": {
+          "durationSeconds": 0.586,
+          "passed": true,
+          "status": "pass",
+          "summary": "- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+        }
+      }
+    },
+    "patch-integrity": {
+      "status": "pass",
+      "durationSeconds": 0.004,
+      "commands": {
+        "git-diff-check": {
+          "durationSeconds": 0.003,
+          "passed": true,
+          "status": "pass",
+          "summary": "Command completed with no output"
+        }
+      }
+    }
+  }
+}

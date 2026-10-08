@@ -33,7 +33,7 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile);
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
-const fixture = join(packageRoot, 'fixtures', 'collection-review');
+const fixture = join(packageRoot, 'subs', 'harness', 'fixtures', 'collection-review');
 const baselineName = 'loop-trial-baseline.json';
 
 interface Baseline {

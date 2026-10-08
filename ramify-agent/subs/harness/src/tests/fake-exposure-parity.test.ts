@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -8,7 +9,7 @@ import { addModule, assign, byRole, completionProposed, installMiniRunner, outli
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -94,7 +95,7 @@ function tree(files: Readonly<Record<string, string>>) {
 
 const fakeSource = 'export const enrichImportDiagnosticsFake = (report) => report;\n';
 const declarations = {
-  'module.ramify': 'ramify 1\nmodule "ramify"\n\n// CLI uses the explicitly named analysis stand-in.\nexpose-sub enrichImportDiagnosticsFake from analysis to descendants\n',
+  'module.ramify': rootDescription('"ramify"', "\n// CLI uses the explicitly named analysis stand-in.\nexpose-sub enrichImportDiagnosticsFake from analysis to descendants\n"),
   'subs/analysis/module.ramify': 'ramify 1\nmodule analysis\nexpose-src enrichImportDiagnosticsFake from "fakes/enrich-import-diagnostics.fake.ts" to parent\n',
 };
 
@@ -294,7 +295,7 @@ describe('the fake-exposure-parity rule', () => {
     const retired = await fakeExposureParity({
       index: toolkit([realRecord()]),
       standIns: [registered],
-      read: tree({ 'module.ramify': 'ramify 1\nmodule "ramify"\n', 'subs/analysis/module.ramify': 'ramify 1\nmodule analysis\n' }),
+      read: tree({ 'module.ramify': rootDescription('"ramify"'), 'subs/analysis/module.ramify': 'ramify 1\nmodule analysis\n' }),
       writeScope: ['subs/analysis'],
     });
     expect(retired).toEqual({ rule: 'fake-exposure-parity', outcome: 'passed', violations: [] });
@@ -429,7 +430,7 @@ async function run(root: string, plan: Parameters<typeof byRole>[0], commits: re
   const final = finalCandidate(root, finalHead);
   const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits], previews: final.previews });
   const opened = await openRuns(root, { script: byRole(plan), inputs: viewedTree(), git,
-    candidates: final.candidates, readinessExecution: directReadinessExecution() });
+    candidates: final.candidates, });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);
@@ -503,6 +504,8 @@ describe('the rule at a run\'s contract gate', () => {
     expect(repaired!.rules).toEqual([
       { rule: 'fake-naming', outcome: 'passed', violations: [] },
       { rule: 'fake-exposure-parity', outcome: 'passed', violations: [] },
+      { rule: 'scratch-safety', outcome: 'passed', violations: [] },
+      { rule: 'write-scope', outcome: 'passed', violations: [] },
     ]);
 
     // The registered agreement names what the fake stands for.
@@ -514,7 +517,11 @@ describe('the rule at a run\'s contract gate', () => {
     // recorded it once it existed: both exposed to the parent, so it passed.
     const providerGate = attempts.find(attempt => attempt.subject.iteration === 'wi-002.i01')!;
     expect(providerGate.verdict).toBe('passed');
-    expect(providerGate.rules).toEqual([{ rule: 'fake-exposure-parity', outcome: 'passed', violations: [] }]);
+    expect(providerGate.rules).toEqual([
+      { rule: 'fake-exposure-parity', outcome: 'passed', violations: [] },
+      { rule: 'scratch-safety', outcome: 'passed', violations: [] },
+      { rule: 'write-scope', outcome: 'passed', violations: [] },
+    ]);
     git.assertAnswered();
   }, 120_000);
 });

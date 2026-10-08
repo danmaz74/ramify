@@ -1,0 +1,50 @@
+{
+  "command": "ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent --cwd . --full --nested --json",
+  "cwd": "repository root",
+  "requestedSourceCommit": "b52aa48ff2ba7e34b4b158e99dac32b8312c649d",
+  "status": "completed",
+  "invocationVerdict": "pass",
+  "overall": "pass",
+  "mode": {
+    "executedMode": "full",
+    "requestedMode": "full",
+    "resolution": "requested"
+  },
+  "requestId": "26064e83-e15d-429c-bd73-4d10e38c6152",
+  "runId": "b7667a7e-c16d-490f-ba2f-7c7066e6039e",
+  "reused": {
+    "sourceCommit": "b52aa48ff2ba7e34b4b158e99dac32b8312c649d",
+    "auditedCommit": "4531e00a0afdad8bf43de273664d4085a5781acb",
+    "requestedMode": "full",
+    "resolution": "requested"
+  },
+  "ignoredChangedPathCount": 32,
+  "composition": {
+    "verdict": "pass",
+    "scoped": false,
+    "chainDepth": 0,
+    "reportCommit": "185cf09995f1172771a6a0487a29962ad2f9ab2e",
+    "outstandingFailures": 0
+  },
+  "discovery": {
+    "status": "complete",
+    "skipped": [],
+    "unavailable": []
+  },
+  "projects": [
+    {
+      "projectRoot": "ramify-agent",
+      "verdict": "pass",
+      "execution": "reused"
+    }
+  ],
+  "producer": {
+    "name": "ramify-audit",
+    "version": "0.7.2"
+  },
+  "raw": {
+    "path": "/tmp/pb3-final-head-audit.json",
+    "bytes": 1082698,
+    "sha256": "89392fb748f925fd4f4fad1e40a3f67e6fc1eeb9a95c35d4aecc5ccdbb2a6568"
+  }
+}

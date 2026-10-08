@@ -7,21 +7,18 @@ import type {
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { ProjectCommands } from '../checks/checkpoint.js';
-import type { TestSelectionPolicy } from '../checks/records.js';
 import { blockExplanation, decideWrite, type GuardedScope } from '../guard/write-guard.js';
 import {
-  completionCheckDeadlineMs, completionCheckFileLimit, FindingsSeen, runHookCheck, type HookFinding,
+  completionCheckDeadlineMs, completionCheckFileLimit, FindingsSeen, runHookCheck, type HookCheck, type HookFinding,
 } from '../hooks/post-write.js';
 import { ownerOf } from '../kpi/lines.js';
 import type { ObservationLog } from '../run/observations.js';
 import type { TranscriptNotes } from '../transcripts/recorder.js';
 import { ToolInputJudge, validateAgainst } from '../run/submissions.js';
 import { createShellTool, shellInputSchemaFor, shellMaxTimeoutMs, shellToolName, type ShellTool } from '../tools/shell.js';
-import { createScopeTestsTool, scopeTestsInputSchema, scopeTestsToolName, type ScopeScenarioCheck } from './engineer.js';
 
 /*
- * The equipment of one implementation session: the shell, the scoped test
- * tool, the write guard and the hook check that runs after each mutating
+ * The equipment of one implementation session: the shell, the write guard and the hook check that runs after each mutating
  * call. It is built from explicit inputs and knows nothing of a run, so an
  * implementation run and a standalone session give an engineer the same
  * tools, guarded the same way and recorded in the same observations.
@@ -75,7 +72,7 @@ export interface EngineerEquipmentInputs {
   readonly workingDirectory?: string | undefined;
   /** The Ramify command line the hook check runs. */
   readonly ramify: RamifyCli;
-  /** The project's own commands: the scoped test run's template and the hook check's timeout. */
+  /** The project's own commands: the hook check's timeout. */
   readonly commands: ProjectCommands & { readonly hookTimeoutMs: number };
   /** How many invalid inputs one tool accepts in a turn before the session is ended. */
   readonly bounds: { readonly rejectedToolInputsPerTurn: number };
@@ -86,20 +83,11 @@ export interface EngineerEquipmentInputs {
   /** The scope the guard lets the session write, and the revision it was captured at. */
   readonly guarded: GuardedScope;
   readonly scopeRevision: number;
-  /** The tests the scoped test tool resolves on each call. */
-  readonly tests: TestSelectionPolicy;
-  /**
-   * The scenario check the scoped test tool runs beside the tests, where the
-   * session is given one: its planning and the scenarios' names. Absent, the
-   * tool runs the tests alone.
-   */
-  readonly scenarios?: Omit<ScopeScenarioCheck, 'directory'> | undefined;
   /**
    * Where one invocation's numbered shell output or hook-check log is
-   * written, or the directory of one scoped scenario check's profiles,
-   * streams and log.
+   * written.
    */
-  readonly outputPath: (kind: 'shell' | 'hook' | 'scenarios', invocation: string, number: number) => string;
+  readonly outputPath: (kind: 'shell' | 'hook', invocation: string, number: number) => string;
   /** The longest one shell command may run: the policy's, or what the assignment raised it to. */
   readonly commandTimeoutMs?: number | undefined;
 }
@@ -164,7 +152,6 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
   const { projectRoot } = inputs;
   const workingDirectory = inputs.workingDirectory ?? projectRoot;
   let seen: FindingsSeen | undefined;
-  let toolJudge: ToolInputJudge<Record<string, never>> | undefined;
   let shellJudge: ToolInputJudge<{ command: string; timeoutMs?: number }> | undefined;
   let shell: ShellTool | undefined;
   /** The invocation now equipped, which the check at completion records against. */
@@ -246,51 +233,10 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       },
     });
 
-    // Each call's scenario check keeps its profiles and streams apart.
-    let scenarioChecks = 0;
-    toolJudge = new ToolInputJudge({
-      tool: scopeTestsToolName,
-      bound: inputs.bounds.rejectedToolInputsPerTurn,
-      validate: input => validateAgainst(scopeTestsInputSchema, input),
-      observations: session.observations,
-    });
     return {
       builtinTools: ['read', 'grep', 'ls', 'edit', 'write'],
       settle: () => shell!.settle(),
-      tools: [shell.definition, createScopeTestsTool({
-        commandExecution,
-        projectRoot,
-        commands: inputs.commands,
-        policy: inputs.tests,
-        refresh: inputs.refresh,
-        judge: input => toolJudge!.judge(input, session.callId(scopeTestsToolName)),
-        ...(inputs.scenarios === undefined ? {} : {
-          scenarios: {
-            ...inputs.scenarios,
-            directory: () => inputs.outputPath('scenarios', session.invocation, ++scenarioChecks),
-          },
-        }),
-        observe: async observation => {
-          await session.observations.record({
-            type: 'scope-tests',
-            data: {
-              callId: session.callId(scopeTestsToolName),
-              resolved: [...observation.resolved],
-              outcome: observation.outcome,
-              notVerified: observation.notVerified,
-              exitCode: observation.exitCode,
-              elapsedMs: observation.elapsedMs,
-              ...(observation.scenarios === undefined ? {} : {
-                scenarios: {
-                  selected: [...observation.scenarios.selected],
-                  passed: [...observation.scenarios.passed],
-                  failures: observation.scenarios.failures,
-                },
-              }),
-            },
-          });
-        },
-      })],
+      tools: [shell.definition],
       guard: async call => {
         if (call.action.kind === 'command') {
           // The shell declares itself mutating so that the hook check
@@ -348,19 +294,18 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
           hookTimeoutMs: inputs.commands.hookTimeoutMs,
           seen: seen!,
           ran: hookChecks,
-          outsideModules: inputs.tests.outsideModules,
           logFile: check => inputs.outputPath('hook', session.invocation, check),
         }).catch(error => ({
           checks: [{
             paths: paths ?? [], mode: 'changed' as const, outcome: 'not-checked' as const,
-            reason: `the hook check could not be run: ${message(error)}`, newFindings: 0, log: null,
-          }],
+            reason: `the hook check could not be run: ${message(error)}`, newFindings: 0, log: null, provider: null, dispositions: [],
+          }] satisfies HookCheck[],
           gaps: [],
           text: `Ramify hook check: it could not be run (${message(error)}). Nothing was verified.`,
         }));
         hookChecks += hook.checks.filter(check => check.log !== null).length;
         for (const check of hook.checks) {
-          await session.observations.record({ type: 'hook-check', data: { ...check, paths: [...check.paths] } });
+          await session.observations.record({ type: 'hook-check', data: observedCheck(check) });
         }
         for (const gap of hook.gaps) await session.observations.record({ type: 'coverage-gap', data: gap });
         const reminders = session.reminders();
@@ -387,17 +332,13 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     const claimed = typeof input === 'object' && input !== null ? (input as { readonly kind?: unknown }).kind : undefined;
     if (claimed !== 'completion-proposed' || standing === undefined || session === undefined) return standing?.open() ?? [];
 
-    const record = async (check: {
-      readonly paths: readonly string[]; readonly mode: 'changed' | 'complete';
-      readonly outcome: 'passed' | 'findings' | 'not-checked'; readonly reason: string | null;
-      readonly newFindings: number; readonly log: string | null;
-    }) => {
-      await session.observations.record({ type: 'hook-check', data: { ...check, paths: [...check.paths], atCompletion: true } });
+    const record = async (check: HookCheck) => {
+      await session.observations.record({ type: 'hook-check', data: { ...observedCheck(check), atCompletion: true } });
       session.transcript?.note({ kind: 'post-write-check', callId: null, atCompletion: true, checks: [check], text: null });
     };
     const notChecked = async (reason: string): Promise<readonly HookFinding[]> => {
       completion = { kind: 'not-checked', reason };
-      await record({ paths: [], mode: 'changed', outcome: 'not-checked', reason, newFindings: 0, log: null });
+      await record({ paths: [], mode: 'changed', outcome: 'not-checked', reason, newFindings: 0, log: null, provider: null, dispositions: [] });
       return standing.open();
     };
 
@@ -431,7 +372,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
 
   return {
     equip,
-    exhausted: () => toolJudge?.exhausted === true || shellJudge?.exhausted === true,
+    exhausted: () => shellJudge?.exhausted === true,
     shellCalls: () => shell?.calls ?? 0,
     openFindings: () => seen?.open() ?? [],
     findingsAtCompletion,
@@ -489,5 +430,15 @@ export function heldCommands(runner: CommandRunner, hold: ((timeoutMs: number) =
     } finally {
       release();
     }
+  };
+}
+
+/** One hook check as its observation records it: the project verdict, and each named path's own disposition. */
+function observedCheck(check: HookCheck) {
+  return {
+    ...check,
+    paths: [...check.paths],
+    provider: check.provider === null ? null : { ...check.provider },
+    dispositions: check.dispositions.map(path => ({ ...path, exclusion: path.exclusion === null ? null : { ...path.exclusion } })),
   };
 }

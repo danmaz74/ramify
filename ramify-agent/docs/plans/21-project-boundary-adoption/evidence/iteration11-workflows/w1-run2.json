@@ -1,0 +1,903 @@
+{
+  "runId": "20261008T065415Z-12a9ed",
+  "final": {
+    "schema": "ramify-agent.gate-attempt/3",
+    "id": "ga-0006",
+    "checkpoint": "final",
+    "subject": {},
+    "proposedBy": null,
+    "repairRound": 0,
+    "infrastructureAttempt": 0,
+    "head": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+    "commit": null,
+    "audited": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+    "evidence": {
+      "reportCommit": "1c1844b7accd53f06253542eb1e5ba70ae7f8352",
+      "runRef": "refs/audited/runs/2026-10-08T06-56-56Z-a47489bf5",
+      "treeRef": "refs/audited/by-tree/0830a7cbe370f3f430e24239803f1f1f0470ab3d"
+    },
+    "provider": {
+      "result": {
+        "status": "completed",
+        "requestId": "20261008T065415Z-12a9ed:ga-0006",
+        "runId": "771131d3-297a-44fe-b71b-02351f518180",
+        "summary": {
+          "auditedAt": "2026-10-08T06:56:56.698Z",
+          "checks": {
+            "notes-tests": {
+              "commands": {
+                "tests": {
+                  "durationSeconds": 0.082,
+                  "output": "ok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts the note limit is what the plan asks for\nok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts a note at the limit fits",
+                  "passed": true,
+                  "status": "pass",
+                  "summary": "ok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts a note at the limit fits"
+                }
+              },
+              "durationSeconds": 0.083,
+              "output": "### tests [PASS]\nok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts the note limit is what the plan asks for\nok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts a note at the limit fits",
+              "passed": true,
+              "status": "pass",
+              "summary": "tests: PASS"
+            }
+          },
+          "coverage": {
+            "claim": {
+              "configuration": {
+                "blob": "531faceb10335e67644555b75443b188faa4b4f7",
+                "path": "ramify-audit.json",
+                "sourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934"
+              },
+              "scope": "repository"
+            },
+            "expectedFiles": {
+              "contract": "runner-configured-files/1",
+              "expected": 0,
+              "missing": [],
+              "run": 0,
+              "runnerConfigFiles": [],
+              "source": "not-needed",
+              "status": "complete"
+            },
+            "projectRoot": ".",
+            "selection": {
+              "kind": "full",
+              "omittedCheckIds": [],
+              "omittedTestUnitIds": [],
+              "selectedCheckIds": [
+                "notes-tests"
+              ],
+              "selectedTestUnitIds": [
+                "tests"
+              ]
+            },
+            "selector": {
+              "config": {},
+              "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "id": "full",
+              "version": "1"
+            },
+            "status": "declared",
+            "universe": {
+              "checkIds": [
+                "notes-tests"
+              ],
+              "digest": "sha256:953fd51252c5ba45a8d25d6d27a552ca319790e9e74589a0a58aa6a8ac4c7511",
+              "id": "project:.",
+              "testUnitIds": [
+                "tests"
+              ]
+            }
+          },
+          "definitions": {
+            "digest": "sha256:39f84f8188b61274eb8125225140308047a0db075575829179d10209ed020d59",
+            "manifest": {
+              "checks": [
+                {
+                  "dependsOn": [],
+                  "executor": {
+                    "commands": [
+                      {
+                        "args": [
+                          "run",
+                          "subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts"
+                        ],
+                        "cmd": "node_modules/.bin/vitest",
+                        "contracts": null,
+                        "env": {},
+                        "name": "tests",
+                        "parser": "none",
+                        "timeoutMs": 120000
+                      }
+                    ],
+                    "continueOnFailure": true,
+                    "kind": "command",
+                    "mutex": false,
+                    "parallel": false
+                  },
+                  "id": "notes-tests",
+                  "requiresPackageScripts": []
+                }
+              ],
+              "manifestVersion": 1,
+              "workingDirectory": ".",
+              "workspacePreparation": {
+                "optionsDigest": "sha256:568fad48d1ba58748d2eecb1bc90d7a15e489543325bd70f7071ac3f51601b5f",
+                "preparationId": "nodejs"
+              }
+            }
+          },
+          "durationSeconds": 0.259,
+          "evidenceSchemaVersion": 4,
+          "execution": {
+            "requestId": "20261008T065415Z-12a9ed:ga-0004",
+            "runId": "20451f64-8011-4180-ba08-4e6104e017e6"
+          },
+          "mode": {
+            "executedMode": "full",
+            "fallbackReason": "baseline-incompatible: baseline 901d7b777b95f2bf7bcce7e7de027e235be19e12 (report bf54f7092d3742c9337b7b003920c303a168092b) records no failure ledger, so it has no Vitest or Cucumber command",
+            "requestedMode": "ramify-partial",
+            "resolution": "defaulted"
+          },
+          "overall": "pass",
+          "producer": {
+            "name": "ramify-audit",
+            "version": "0.7.2"
+          },
+          "sourceBranch": "ramify-agent-run/20261008T065415Z-12a9ed",
+          "sourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+          "sourceTree": "0830a7cbe370f3f430e24239803f1f1f0470ab3d",
+          "undetectedConfigFilesForcingFullAudit": [],
+          "workspacePreparation": {
+            "payload": {
+              "linkedPackageDirectories": [
+                ""
+              ],
+              "projectPrefix": "",
+              "setupCommands": []
+            },
+            "preparationId": "nodejs"
+          }
+        },
+        "refs": {
+          "reportCommit": "1c1844b7accd53f06253542eb1e5ba70ae7f8352",
+          "runRef": "refs/audited/runs/2026-10-08T06-56-56Z-a47489bf5",
+          "treeRef": "refs/audited/by-tree/0830a7cbe370f3f430e24239803f1f1f0470ab3d"
+        },
+        "retrievalCommands": [
+          "git notes --ref=audit show a47489bf5aa097c9337245e6a6fe0684f5641934",
+          "git show refs/audited/runs/2026-10-08T06-56-56Z-a47489bf5:reports/audit/summary.json"
+        ],
+        "reused": {
+          "sourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+          "auditedCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+          "ignoredChangedPaths": [],
+          "requestedMode": "full",
+          "resolution": "requested"
+        },
+        "composition": {
+          "verdict": "pass",
+          "scoped": false,
+          "chainDepth": 0,
+          "reportCommit": "1c1844b7accd53f06253542eb1e5ba70ae7f8352"
+        },
+        "projects": [
+          {
+            "projectRoot": ".",
+            "verdict": "pass",
+            "execution": "reused",
+            "failures": [],
+            "result": {
+              "status": "completed",
+              "requestId": "20261008T065415Z-12a9ed:ga-0006",
+              "runId": "771131d3-297a-44fe-b71b-02351f518180",
+              "summary": {
+                "auditedAt": "2026-10-08T06:56:56.698Z",
+                "checks": {
+                  "notes-tests": {
+                    "commands": {
+                      "tests": {
+                        "durationSeconds": 0.082,
+                        "output": "ok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts the note limit is what the plan asks for\nok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts a note at the limit fits",
+                        "passed": true,
+                        "status": "pass",
+                        "summary": "ok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts a note at the limit fits"
+                      }
+                    },
+                    "durationSeconds": 0.083,
+                    "output": "### tests [PASS]\nok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts the note limit is what the plan asks for\nok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts a note at the limit fits",
+                    "passed": true,
+                    "status": "pass",
+                    "summary": "tests: PASS"
+                  }
+                },
+                "coverage": {
+                  "claim": {
+                    "configuration": {
+                      "blob": "531faceb10335e67644555b75443b188faa4b4f7",
+                      "path": "ramify-audit.json",
+                      "sourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934"
+                    },
+                    "scope": "repository"
+                  },
+                  "expectedFiles": {
+                    "contract": "runner-configured-files/1",
+                    "expected": 0,
+                    "missing": [],
+                    "run": 0,
+                    "runnerConfigFiles": [],
+                    "source": "not-needed",
+                    "status": "complete"
+                  },
+                  "projectRoot": ".",
+                  "selection": {
+                    "kind": "full",
+                    "omittedCheckIds": [],
+                    "omittedTestUnitIds": [],
+                    "selectedCheckIds": [
+                      "notes-tests"
+                    ],
+                    "selectedTestUnitIds": [
+                      "tests"
+                    ]
+                  },
+                  "selector": {
+                    "config": {},
+                    "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+                    "id": "full",
+                    "version": "1"
+                  },
+                  "status": "declared",
+                  "universe": {
+                    "checkIds": [
+                      "notes-tests"
+                    ],
+                    "digest": "sha256:953fd51252c5ba45a8d25d6d27a552ca319790e9e74589a0a58aa6a8ac4c7511",
+                    "id": "project:.",
+                    "testUnitIds": [
+                      "tests"
+                    ]
+                  }
+                },
+                "definitions": {
+                  "digest": "sha256:39f84f8188b61274eb8125225140308047a0db075575829179d10209ed020d59",
+                  "manifest": {
+                    "checks": [
+                      {
+                        "dependsOn": [],
+                        "executor": {
+                          "commands": [
+                            {
+                              "args": [
+                                "run",
+                                "subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts"
+                              ],
+                              "cmd": "node_modules/.bin/vitest",
+                              "contracts": null,
+                              "env": {},
+                              "name": "tests",
+                              "parser": "none",
+                              "timeoutMs": 120000
+                            }
+                          ],
+                          "continueOnFailure": true,
+                          "kind": "command",
+                          "mutex": false,
+                          "parallel": false
+                        },
+                        "id": "notes-tests",
+                        "requiresPackageScripts": []
+                      }
+                    ],
+                    "manifestVersion": 1,
+                    "workingDirectory": ".",
+                    "workspacePreparation": {
+                      "optionsDigest": "sha256:568fad48d1ba58748d2eecb1bc90d7a15e489543325bd70f7071ac3f51601b5f",
+                      "preparationId": "nodejs"
+                    }
+                  }
+                },
+                "durationSeconds": 0.259,
+                "evidenceSchemaVersion": 4,
+                "execution": {
+                  "requestId": "20261008T065415Z-12a9ed:ga-0004",
+                  "runId": "20451f64-8011-4180-ba08-4e6104e017e6"
+                },
+                "mode": {
+                  "executedMode": "full",
+                  "fallbackReason": "baseline-incompatible: baseline 901d7b777b95f2bf7bcce7e7de027e235be19e12 (report bf54f7092d3742c9337b7b003920c303a168092b) records no failure ledger, so it has no Vitest or Cucumber command",
+                  "requestedMode": "ramify-partial",
+                  "resolution": "defaulted"
+                },
+                "overall": "pass",
+                "producer": {
+                  "name": "ramify-audit",
+                  "version": "0.7.2"
+                },
+                "sourceBranch": "ramify-agent-run/20261008T065415Z-12a9ed",
+                "sourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+                "sourceTree": "0830a7cbe370f3f430e24239803f1f1f0470ab3d",
+                "undetectedConfigFilesForcingFullAudit": [],
+                "workspacePreparation": {
+                  "payload": {
+                    "linkedPackageDirectories": [
+                      ""
+                    ],
+                    "projectPrefix": "",
+                    "setupCommands": []
+                  },
+                  "preparationId": "nodejs"
+                }
+              },
+              "refs": {
+                "reportCommit": "1c1844b7accd53f06253542eb1e5ba70ae7f8352",
+                "runRef": "refs/audited/runs/2026-10-08T06-56-56Z-a47489bf5",
+                "treeRef": "refs/audited/by-tree/0830a7cbe370f3f430e24239803f1f1f0470ab3d"
+              },
+              "retrievalCommands": [
+                "git notes --ref=audit show a47489bf5aa097c9337245e6a6fe0684f5641934",
+                "git show refs/audited/runs/2026-10-08T06-56-56Z-a47489bf5:reports/audit/summary.json"
+              ],
+              "reused": {
+                "sourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+                "auditedCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+                "ignoredChangedPaths": [],
+                "requestedMode": "full",
+                "resolution": "requested"
+              },
+              "composition": {
+                "verdict": "pass",
+                "scoped": false,
+                "chainDepth": 0,
+                "reportCommit": "1c1844b7accd53f06253542eb1e5ba70ae7f8352"
+              }
+            }
+          },
+          {
+            "projectRoot": "subs/workspace/subs/reviews/subs/notes/report",
+            "verdict": "pass",
+            "execution": "ran",
+            "failures": [],
+            "result": {
+              "status": "completed",
+              "requestId": "9f55c020-ed05-469e-ab68-81dc5dc14a1d",
+              "runId": "cf0afd35-faab-4b0c-b32e-9cf8594a6c19",
+              "summary": {
+                "evidenceSchemaVersion": 4,
+                "execution": {
+                  "requestId": "9f55c020-ed05-469e-ab68-81dc5dc14a1d",
+                  "runId": "cf0afd35-faab-4b0c-b32e-9cf8594a6c19"
+                },
+                "producer": {
+                  "name": "ramify-audit",
+                  "version": "0.7.2"
+                },
+                "undetectedConfigFilesForcingFullAudit": [],
+                "coverage": {
+                  "status": "declared",
+                  "selector": {
+                    "id": "full",
+                    "version": "1",
+                    "config": {},
+                    "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+                  },
+                  "universe": {
+                    "id": "project:subs/workspace/subs/reviews/subs/notes/report",
+                    "digest": "sha256:073dc59811bf1c6a47c3aec26cbbd49d2c7f12f93b4988aed9f132a6c15497b6",
+                    "checkIds": [
+                      "report-limit"
+                    ],
+                    "testUnitIds": [
+                      "report-limit"
+                    ]
+                  },
+                  "selection": {
+                    "kind": "full",
+                    "selectedCheckIds": [
+                      "report-limit"
+                    ],
+                    "omittedCheckIds": [],
+                    "selectedTestUnitIds": [
+                      "report-limit"
+                    ],
+                    "omittedTestUnitIds": []
+                  },
+                  "claim": {
+                    "configuration": {
+                      "blob": "756235735ea77192a8032224622e57684f251376",
+                      "path": "subs/workspace/subs/reviews/subs/notes/report/ramify-audit.json",
+                      "sourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934"
+                    },
+                    "scope": "repository"
+                  },
+                  "projectRoot": "subs/workspace/subs/reviews/subs/notes/report"
+                },
+                "mode": {
+                  "requestedMode": "full",
+                  "resolution": "requested",
+                  "executedMode": "full"
+                },
+                "overall": "pass",
+                "sourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+                "sourceTree": "0830a7cbe370f3f430e24239803f1f1f0470ab3d",
+                "sourceBranch": "ramify-agent-run/20261008T065415Z-12a9ed",
+                "auditedAt": "2026-10-08T06:57:09.667Z",
+                "durationSeconds": 0.239,
+                "checks": {
+                  "report-limit": {
+                    "commands": {
+                      "report-limit": {
+                        "durationSeconds": 0.054,
+                        "output": "report states 500",
+                        "passed": true,
+                        "status": "pass",
+                        "summary": "report states 500"
+                      }
+                    },
+                    "durationSeconds": 0.065,
+                    "output": "### report-limit [PASS]\nreport states 500",
+                    "passed": true,
+                    "status": "pass",
+                    "summary": "report-limit: PASS"
+                  }
+                },
+                "workspacePreparation": {
+                  "preparationId": "nodejs",
+                  "payload": {
+                    "linkedPackageDirectories": [],
+                    "projectPrefix": "subs/workspace/subs/reviews/subs/notes/report",
+                    "setupCommands": []
+                  }
+                },
+                "definitions": {
+                  "digest": "sha256:9433020066b4b2ef59c09f6704be18e2c17aee7ac6e0a2f436d7d62d7f6dd275",
+                  "manifest": {
+                    "manifestVersion": 1,
+                    "workingDirectory": "subs/workspace/subs/reviews/subs/notes/report",
+                    "checks": [
+                      {
+                        "id": "report-limit",
+                        "dependsOn": [],
+                        "requiresPackageScripts": [],
+                        "executor": {
+                          "kind": "command",
+                          "parallel": false,
+                          "mutex": false,
+                          "continueOnFailure": true,
+                          "commands": [
+                            {
+                              "name": "report-limit",
+                              "cmd": "node",
+                              "args": [
+                                "check.mjs"
+                              ],
+                              "parser": "none",
+                              "contracts": null,
+                              "timeoutMs": 120000,
+                              "env": {}
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "workspacePreparation": {
+                      "preparationId": "nodejs",
+                      "optionsDigest": "sha256:b1a9cfd7e933eb26d4f32643287d5525998099b89bb4b3c69a7223ecc14683e7"
+                    }
+                  }
+                }
+              },
+              "refs": {
+                "reportCommit": "7250f402f69d63a747375b8f6dcf642ae4c0e3d5",
+                "runRef": "refs/audited/projects/report-dd519d11b6ae/runs/2026-10-08T06-57-09Z-a47489bf5",
+                "treeRef": "refs/audited/projects/report-dd519d11b6ae/by-tree/0830a7cbe370f3f430e24239803f1f1f0470ab3d"
+              },
+              "retrievalCommands": [
+                "git notes --ref=audit-projects/report-dd519d11b6ae show a47489bf5aa097c9337245e6a6fe0684f5641934",
+                "git show refs/audited/projects/report-dd519d11b6ae/runs/2026-10-08T06-57-09Z-a47489bf5:reports/audit/summary.json"
+              ],
+              "composition": {
+                "verdict": "pass",
+                "scoped": false,
+                "chainDepth": 0,
+                "reportCommit": "7250f402f69d63a747375b8f6dcf642ae4c0e3d5"
+              }
+            }
+          }
+        ],
+        "discovery": {
+          "status": "complete",
+          "skipped": [],
+          "unavailable": []
+        },
+        "invocationVerdict": "pass"
+      },
+      "checks": {
+        "notes-tests": {
+          "commands": {
+            "tests": {
+              "durationSeconds": 0.082,
+              "output": "ok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts the note limit is what the plan asks for\nok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts a note at the limit fits",
+              "passed": true,
+              "status": "pass",
+              "summary": "ok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts a note at the limit fits"
+            }
+          },
+          "durationSeconds": 0.083,
+          "output": "### tests [PASS]\nok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts the note limit is what the plan asks for\nok subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts a note at the limit fits",
+          "passed": true,
+          "status": "pass",
+          "summary": "tests: PASS"
+        }
+      }
+    },
+    "audit": {
+      "requestId": "20261008T065415Z-12a9ed:ga-0006",
+      "mode": "full",
+      "nested": true,
+      "status": "completed",
+      "definition": {
+        "path": "ramify-audit.json",
+        "blob": "531faceb10335e67644555b75443b188faa4b4f7"
+      },
+      "requestedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+      "auditedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+      "requestedMode": "ramify-partial",
+      "executedMode": "full",
+      "fallbackReason": "baseline-incompatible: baseline 901d7b777b95f2bf7bcce7e7de027e235be19e12 (report bf54f7092d3742c9337b7b003920c303a168092b) records no failure ledger, so it has no Vitest or Cucumber command",
+      "reuse": {
+        "auditedCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+        "ignoredChangedPaths": [],
+        "requestedMode": "full",
+        "resolution": "requested"
+      },
+      "verdict": "pass",
+      "detail": "invocation pass over 2 projects",
+      "projects": [
+        {
+          "projectRoot": ".",
+          "verdict": "pass",
+          "execution": "reused",
+          "status": "completed",
+          "failures": [],
+          "requestId": "20261008T065415Z-12a9ed:ga-0006",
+          "auditedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+          "requestedMode": "ramify-partial",
+          "executedMode": "full",
+          "fallbackReason": "baseline-incompatible: baseline 901d7b777b95f2bf7bcce7e7de027e235be19e12 (report bf54f7092d3742c9337b7b003920c303a168092b) records no failure ledger, so it has no Vitest or Cucumber command",
+          "reuse": {
+            "auditedCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+            "ignoredChangedPaths": [],
+            "requestedMode": "full",
+            "resolution": "requested"
+          },
+          "evidence": {
+            "reportCommit": "1c1844b7accd53f06253542eb1e5ba70ae7f8352",
+            "runRef": "refs/audited/runs/2026-10-08T06-56-56Z-a47489bf5",
+            "treeRef": "refs/audited/by-tree/0830a7cbe370f3f430e24239803f1f1f0470ab3d"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit show a47489bf5aa097c9337245e6a6fe0684f5641934",
+            "git show refs/audited/runs/2026-10-08T06-56-56Z-a47489bf5:reports/audit/summary.json"
+          ],
+          "durationSeconds": 0.259,
+          "counts": {
+            "checks": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "tests": null,
+            "scenarios": null
+          },
+          "detail": "composed pass"
+        },
+        {
+          "projectRoot": "subs/workspace/subs/reviews/subs/notes/report",
+          "verdict": "pass",
+          "execution": "ran",
+          "status": "completed",
+          "failures": [],
+          "requestId": "9f55c020-ed05-469e-ab68-81dc5dc14a1d",
+          "auditedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+          "requestedMode": "full",
+          "executedMode": "full",
+          "fallbackReason": null,
+          "reuse": null,
+          "evidence": {
+            "reportCommit": "7250f402f69d63a747375b8f6dcf642ae4c0e3d5",
+            "runRef": "refs/audited/projects/report-dd519d11b6ae/runs/2026-10-08T06-57-09Z-a47489bf5",
+            "treeRef": "refs/audited/projects/report-dd519d11b6ae/by-tree/0830a7cbe370f3f430e24239803f1f1f0470ab3d"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit-projects/report-dd519d11b6ae show a47489bf5aa097c9337245e6a6fe0684f5641934",
+            "git show refs/audited/projects/report-dd519d11b6ae/runs/2026-10-08T06-57-09Z-a47489bf5:reports/audit/summary.json"
+          ],
+          "durationSeconds": 0.239,
+          "counts": {
+            "checks": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "tests": null,
+            "scenarios": null
+          },
+          "detail": "composed pass"
+        }
+      ],
+      "discovery": {
+        "status": "complete",
+        "skipped": [],
+        "unavailable": []
+      }
+    },
+    "guardedChanges": [],
+    "rules": [
+      {
+        "rule": "scratch-safety",
+        "outcome": "passed",
+        "violations": []
+      },
+      {
+        "rule": "write-scope",
+        "outcome": "passed",
+        "violations": []
+      }
+    ],
+    "commands": [],
+    "verdict": "passed",
+    "cause": null,
+    "next": "accept"
+  },
+  "gates": [
+    {
+      "id": "ga-0002",
+      "checkpoint": "iteration",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065415Z-12a9ed:ga-0002",
+        "mode": "project-default",
+        "nested": false,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "531faceb10335e67644555b75443b188faa4b4f7"
+        },
+        "requestedSourceCommit": "ef8927e8abaf2a82088f442df0d3ab5990fba6d6",
+        "auditedSourceCommit": "ef8927e8abaf2a82088f442df0d3ab5990fba6d6",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline 3df4f866b357e4e826f310d014cedd2a39435489 (report a536df383779febf0f0dee740e69691628d8fed8) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass",
+        "projects": null,
+        "discovery": null
+      }
+    },
+    {
+      "id": "ga-0003",
+      "checkpoint": "iteration",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065415Z-12a9ed:ga-0003",
+        "mode": "project-default",
+        "nested": false,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "531faceb10335e67644555b75443b188faa4b4f7"
+        },
+        "requestedSourceCommit": "901d7b777b95f2bf7bcce7e7de027e235be19e12",
+        "auditedSourceCommit": "901d7b777b95f2bf7bcce7e7de027e235be19e12",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline ef8927e8abaf2a82088f442df0d3ab5990fba6d6 (report 54e4d8c4e884dfe771f9812793f7eb331b34485f) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass",
+        "projects": null,
+        "discovery": null
+      }
+    },
+    {
+      "id": "ga-0004",
+      "checkpoint": "iteration",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065415Z-12a9ed:ga-0004",
+        "mode": "project-default",
+        "nested": false,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "531faceb10335e67644555b75443b188faa4b4f7"
+        },
+        "requestedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+        "auditedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline 901d7b777b95f2bf7bcce7e7de027e235be19e12 (report bf54f7092d3742c9337b7b003920c303a168092b) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass",
+        "projects": null,
+        "discovery": null
+      }
+    },
+    {
+      "id": "ga-0005",
+      "checkpoint": "work-item",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065415Z-12a9ed:ga-0005",
+        "mode": "project-default",
+        "nested": false,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "531faceb10335e67644555b75443b188faa4b4f7"
+        },
+        "requestedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+        "auditedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline 901d7b777b95f2bf7bcce7e7de027e235be19e12 (report bf54f7092d3742c9337b7b003920c303a168092b) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": {
+          "auditedCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+          "ignoredChangedPaths": [],
+          "requestedMode": "ramify-partial",
+          "resolution": "defaulted"
+        },
+        "verdict": "pass",
+        "detail": "composed pass",
+        "projects": null,
+        "discovery": null
+      }
+    },
+    {
+      "id": "ga-0006",
+      "checkpoint": "final",
+      "verdict": "passed",
+      "audit": {
+        "requestId": "20261008T065415Z-12a9ed:ga-0006",
+        "mode": "full",
+        "nested": true,
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "531faceb10335e67644555b75443b188faa4b4f7"
+        },
+        "requestedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+        "auditedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline 901d7b777b95f2bf7bcce7e7de027e235be19e12 (report bf54f7092d3742c9337b7b003920c303a168092b) records no failure ledger, so it has no Vitest or Cucumber command",
+        "reuse": {
+          "auditedCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+          "ignoredChangedPaths": [],
+          "requestedMode": "full",
+          "resolution": "requested"
+        },
+        "verdict": "pass",
+        "detail": "invocation pass over 2 projects",
+        "projects": [
+          {
+            "projectRoot": ".",
+            "verdict": "pass",
+            "execution": "reused",
+            "status": "completed",
+            "failures": [],
+            "requestId": "20261008T065415Z-12a9ed:ga-0006",
+            "auditedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+            "requestedMode": "ramify-partial",
+            "executedMode": "full",
+            "fallbackReason": "baseline-incompatible: baseline 901d7b777b95f2bf7bcce7e7de027e235be19e12 (report bf54f7092d3742c9337b7b003920c303a168092b) records no failure ledger, so it has no Vitest or Cucumber command",
+            "reuse": {
+              "auditedCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+              "ignoredChangedPaths": [],
+              "requestedMode": "full",
+              "resolution": "requested"
+            },
+            "evidence": {
+              "reportCommit": "1c1844b7accd53f06253542eb1e5ba70ae7f8352",
+              "runRef": "refs/audited/runs/2026-10-08T06-56-56Z-a47489bf5",
+              "treeRef": "refs/audited/by-tree/0830a7cbe370f3f430e24239803f1f1f0470ab3d"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit show a47489bf5aa097c9337245e6a6fe0684f5641934",
+              "git show refs/audited/runs/2026-10-08T06-56-56Z-a47489bf5:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.259,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          },
+          {
+            "projectRoot": "subs/workspace/subs/reviews/subs/notes/report",
+            "verdict": "pass",
+            "execution": "ran",
+            "status": "completed",
+            "failures": [],
+            "requestId": "9f55c020-ed05-469e-ab68-81dc5dc14a1d",
+            "auditedSourceCommit": "a47489bf5aa097c9337245e6a6fe0684f5641934",
+            "requestedMode": "full",
+            "executedMode": "full",
+            "fallbackReason": null,
+            "reuse": null,
+            "evidence": {
+              "reportCommit": "7250f402f69d63a747375b8f6dcf642ae4c0e3d5",
+              "runRef": "refs/audited/projects/report-dd519d11b6ae/runs/2026-10-08T06-57-09Z-a47489bf5",
+              "treeRef": "refs/audited/projects/report-dd519d11b6ae/by-tree/0830a7cbe370f3f430e24239803f1f1f0470ab3d"
+            },
+            "retrievalCommands": [
+              "git notes --ref=audit-projects/report-dd519d11b6ae show a47489bf5aa097c9337245e6a6fe0684f5641934",
+              "git show refs/audited/projects/report-dd519d11b6ae/runs/2026-10-08T06-57-09Z-a47489bf5:reports/audit/summary.json"
+            ],
+            "durationSeconds": 0.239,
+            "counts": {
+              "checks": {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0
+              },
+              "tests": null,
+              "scenarios": null
+            },
+            "detail": "composed pass"
+          }
+        ],
+        "discovery": {
+          "status": "complete",
+          "skipped": [],
+          "unavailable": []
+        }
+      }
+    }
+  ],
+  "obligations": [
+    "registered test-001",
+    "bound sc-001 (FakeReportReader)",
+    "reported sc-001 done with where",
+    "bound sc-001 (no fakes)",
+    "reported sc-001 bound",
+    "bound sc-001 (no fakes)",
+    "reported sc-001 done with where",
+    "reported test-001 done"
+  ],
+  "failedRunStillHolds": {
+    "runId": "20261008T065252Z-ca784d",
+    "gate": "ga-0005",
+    "report": "f92d4c5a0c244984ee0e472daa9ec7d33a28149d"
+  },
+  "witnessed": {
+    "run1-repair": {
+      "continued": "continue",
+      "gateDigest": true,
+      "scratchKept": true
+    },
+    "run1-completion-briefing": {
+      "sc001": "bound",
+      "test001": "pending"
+    },
+    "run2-after-partial": {
+      "unfinished": true
+    },
+    "run2-reassessment-briefing": {
+      "sc001": "done",
+      "test001": "pending"
+    }
+  }
+}

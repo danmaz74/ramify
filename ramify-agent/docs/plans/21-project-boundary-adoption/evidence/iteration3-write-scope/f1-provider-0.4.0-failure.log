@@ -1,0 +1,38 @@
+
+ RUN  v4.1.11 /home/app/ramify-plan21-project-boundary-adoption/ramify-agent
+
+ ❯ |node| subs/harness/src/tests/write-guard.test.ts (14 tests | 1 failed | 13 skipped) 1622ms
+   × PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions 1621ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |node| subs/harness/src/tests/write-guard.test.ts > PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions
+AssertionError: expected { 'README.md': true, …(22) } to deeply equal { 'README.md': true, …(22) }
+
+- Expected
++ Received
+
+@@ -5,11 +5,11 @@
+    "cache/extra.txt": false,
+    "cache/new.txt": false,
+    "dist/absent.ts": false,
+    "docs/module.ramify": true,
+    "docs/new.mts": true,
+-   "fixture/.git/config": false,
++   "fixture/.git/config": true,
+    "fixture/module.ramify": true,
+    "fixture/new.txt": true,
+    "node_modules/new": false,
+    "scripts/new.ts": true,
+    "src/.ramify/new": false,
+
+ ❯ subs/harness/src/tests/write-guard.test.ts:355:103
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  16:11:23
+   Duration  2.16s (transform 273ms, setup 17ms, import 409ms, tests 1.62s, environment 0ms)

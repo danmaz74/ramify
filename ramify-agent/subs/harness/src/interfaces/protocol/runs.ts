@@ -115,8 +115,6 @@ export const runFailureReasonSchema = z.enum([
   'readiness-failed',
   /** Readiness found no valid `ramify-agent.json`, or support code it names outside every test area. */
   'project-config-invalid',
-  /** Readiness found no `cucumber-js`, or an acceptance mode's command that does not resolve. */
-  'acceptance-harness-missing',
   /** An agent session crashed or could not start. */
   'agent-failed',
   /** Every allowed submission of one invocation was invalid. */
@@ -130,10 +128,9 @@ export const runFailureReasonSchema = z.enum([
   /** Repair rounds were spent without a passing gate. */
   'repair-exhausted',
   /**
-   * A tracked scenario was not `implemented` before the final gate, or the
-   * final gate's scenario check did not pass every one in full mode, or a
-   * work item asked for completion with a scenario of its entry unfinished
-   * more often than the bound allows.
+   * A tracked scenario had no `done` report from its responsible architect
+   * before the final gate, or a work item asked for completion with
+   * capability work unresolved more often than the bound allows.
    */
   'acceptance-incomplete',
   /** Infrastructure recoveries were spent without a running check. */
@@ -181,6 +178,8 @@ export const runQueryLimits = {
   capabilities: 500,
   /** Tracked scenarios of the scenario list and of the analysis's review. */
   scenarios: 500,
+  /** Registered obligations of the scenario list: scenarios, delegated outcomes and registered cases and tests. */
+  obligations: 1000,
   /** Module-capability rows of one comparison, of the capabilities kept whole within `capabilities`. */
   moduleCapabilityRows: 2000,
   /** Bytes of a gate command's output a client receives; the complete output stays a file of the run. */
@@ -325,7 +324,7 @@ export const runSnapshotSchema = z.object({
     readinessAttempts: count,
     gateAttempts: count,
     /** The tracked acceptance scenarios in each state. */
-    scenarios: z.object({ pending: count, bound: count, declared: count, implemented: count }).strict(),
+    scenarios: z.object({ pending: count, bound: count, done: count }).strict(),
     /** Invocations whose executor started otherwise than the harness asked: a continuation or fork made fresh. */
     degradedStarts: count,
   }).strict(),
@@ -483,20 +482,18 @@ export const scenarioOriginViewSchema = z.discriminatedUnion('kind', [
 export type ScenarioOriginView = z.infer<typeof scenarioOriginViewSchema>;
 
 /**
- * A tracked scenario's state: `pending` and `bound` keep the pending tag in
- * the source, `declared` waits for a gate to verify it, `implemented` passed
- * one. Only the harness moves a state.
+ * A tracked scenario's state, which is its obligation status: `pending`
+ * keeps the pending tag in the source, `bound` was bound by an engineer's
+ * accepted proposal, `done` was reported by its responsible architect. Only
+ * an accepted submission moves a state; a gate or audit result never does.
  */
-export const trackedScenarioStateSchema = z.enum(['pending', 'bound', 'declared', 'implemented']);
+export const trackedScenarioStateSchema = z.enum(['pending', 'bound', 'done']);
 export type TrackedScenarioState = z.infer<typeof trackedScenarioStateSchema>;
 
 /** One scenario's result in one Cucumber run: the worst of its steps. */
 export const scenarioStatusSchema = z.enum(['passed', 'failed', 'undefined', 'pending', 'ambiguous', 'skipped']);
 export type ScenarioStatus = z.infer<typeof scenarioStatusSchema>;
 
-/** The execution mode of a scenario check, fixed for the whole check. */
-export const scenarioCheckModeSchema = z.enum(['quick', 'full']);
-export type ScenarioCheckMode = z.infer<typeof scenarioCheckModeSchema>;
 
 /** The kinds of warning the accepted analysis recorded on its scenarios. */
 export const scenarioWarningKindSchema = z.enum(['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps']);
@@ -636,7 +633,7 @@ export const decisionViewSchema = z.discriminatedUnion('kind', [
     iteration: text,
     iterationKind: text,
     modules: z.array(text).min(1),
-    includedChildren: z.array(text),
+    included: z.array(z.object({ directory: text, reason: text, instructions: text }).strict()),
     /** An explicitly broad breaking scope, with its rationale. */
     broad: z.boolean(),
     rationale: text,
@@ -716,7 +713,7 @@ export type WorkItemListResponse = z.infer<typeof workItemListResponseSchema>;
 
 export const gateVerdictSchema = z.enum(['passed', 'failed', 'not-verified']);
 export const gateCheckpointSchema = z.enum(['readiness', 'iteration', 'contract', 'breaking-iteration', 'work-item', 'final']);
-export const gateCauseSchema = z.enum(['check-failed', 'in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']);
+export const gateCauseSchema = z.enum(['check-failed', 'infrastructure', 'timeout', 'guarded-change', 'unknown']);
 export const gateNextSchema = z.enum(['accept', 'repair', 'retry-infrastructure', 'return-to-local-architect', 'exhausted']);
 
 const gateSummary = z.object({
@@ -730,7 +727,7 @@ const gateSummary = z.object({
 
 const scopeView = z.object({
   modules: z.array(text).min(1),
-  includedChildren: z.array(text),
+  included: z.array(z.object({ directory: text, reason: text, instructions: text }).strict()),
   broad: z.boolean(),
   rationale: text,
   extra: z.array(z.object({ path: text, purpose: text }).strict()),
@@ -875,8 +872,8 @@ export const capabilityProgressSchema = z.object({
   dependsOn: z.array(z.object({ capability: text, tentative: z.boolean() }).strict()),
   workItems: z.array(text),
   evidence: z.array(text),
-  /** An entry's scenarios: how many are implemented of all it has. Null for a capability that is not an entry. */
-  scenarios: z.object({ implemented: count, total: count }).strict().nullable(),
+  /** An entry's scenarios: how many its architect reported done of all it has. Null for a capability that is not an entry. */
+  scenarios: z.object({ done: count, total: count }).strict().nullable(),
 }).strict();
 export type CapabilityProgress = z.infer<typeof capabilityProgressSchema>;
 
@@ -1047,40 +1044,102 @@ const tailBytes = (tail: string): number => new TextEncoder().encode(tail).byteL
 /** A failing scenario's first failing step and its message. */
 const scenarioFailureView = z.object({ step: z.string(), message: z.string() }).strict();
 
-/**
- * What a `scenarios` command established, in compact form: its mode and
- * selection, each module's run by exit code, each tracked scenario's status
- * with its failure and undefined steps, the project's own scenarios by count,
- * and why the check did not pass. The bindings and message streams stay
- * files of the run.
- */
-export const scenarioCheckViewSchema = z.object({
-  mode: scenarioCheckModeSchema,
-  selection: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('identity'), scenarios: z.array(text).min(1) }).strict(),
-    z.object({ kind: z.literal('all-untagged') }).strict(),
-    z.object({ kind: z.literal('all') }).strict(),
-  ]),
-  dryRun: z.boolean(),
-  /** Tracked scenarios the runs' files held and the selection kept out. */
-  excluded: count,
-  runs: z.array(z.object({ module: text, exit: z.int().nullable() }).strict()),
-  scenarios: z.array(z.object({
-    id: text,
-    /** The module whose run executed it. */
-    run: text,
-    status: scenarioStatusSchema,
-    file: z.string(),
-    line: z.int().positive(),
-    failure: scenarioFailureView.nullable(),
-    /** Step texts no definition matched. */
-    undefined: z.array(z.string()),
-  }).strict()),
-  untracked: z.object({ passed: count, skipped: count, failed: count }).strict(),
-  /** One line per reason the check did not pass; empty when it passed. */
-  failures: z.array(z.string()),
+const auditCountView = z.object({ total: count, passed: count, failed: count, skipped: count }).strict();
+const auditReuseView = z.object({
+  auditedCommit: text,
+  ignoredChangedPaths: z.array(z.string()),
+  requestedMode: z.enum(['full', 'ramify-partial']),
+  resolution: z.enum(['requested', 'defaulted']),
 }).strict();
-export type ScenarioCheckView = z.infer<typeof scenarioCheckViewSchema>;
+
+/**
+ * One project of a nested audit, as the harness recorded the provider's
+ * answer: its verdict and failures, whether the request ran it, reused an
+ * applicable earlier record or did not run it, and the record that answers
+ * it, with that record's counts, duration and retrieval commands.
+ */
+export const gateAuditProjectViewSchema = z.object({
+  projectRoot: text,
+  verdict: z.enum(['pass', 'fail', 'indeterminate']),
+  execution: z.enum(['ran', 'reused', 'not-run']),
+  status: z.enum(['completed', 'failed', 'cancelled', 'refused']),
+  failures: z.array(z.string()),
+  requestId: text,
+  auditedSourceCommit: text.nullable(),
+  requestedMode: z.enum(['full', 'ramify-partial']).nullable(),
+  executedMode: z.enum(['full', 'ramify-partial']).nullable(),
+  fallbackReason: z.string().nullable(),
+  reuse: auditReuseView.nullable(),
+  evidence: z.object({ runRef: text, reportCommit: text, treeRef: text }).strict().nullable(),
+  retrievalCommands: z.array(z.string()),
+  durationSeconds: z.number().nonnegative().nullable(),
+  counts: z.object({ checks: auditCountView, tests: auditCountView.nullable(), scenarios: auditCountView.nullable() }).strict().nullable(),
+  detail: z.string(),
+}).strict();
+export type GateAuditProjectView = z.infer<typeof gateAuditProjectViewSchema>;
+
+/** What a nested audit's discovery skipped, each with its reason, and what it could not decide. */
+export const gateAuditDiscoveryViewSchema = z.object({
+  status: z.enum(['complete', 'indeterminate']),
+  skipped: z.array(z.object({
+    projectRoot: text, enclosingProject: text,
+    reason: z.enum(['external', 'output', 'repository', 'packages', 'generated']), directory: text,
+  }).strict()),
+  unavailable: z.array(z.object({ enclosingProject: text, reason: z.string(), definitions: z.array(z.string()) }).strict()),
+}).strict();
+export type GateAuditDiscoveryView = z.infer<typeof gateAuditDiscoveryViewSchema>;
+
+/**
+ * A committing gate's configured audit: what the gate requested of the
+ * project's committed definition and what answered it, the source commit it
+ * asked about and the one whose record answered, which differ only when an
+ * applicable record was reused. A nested request's verdict is the
+ * invocation's, over every project and its discovery.
+ */
+export const gateAuditViewSchema = z.object({
+  requestId: text,
+  mode: z.enum(['project-default', 'full']),
+  status: z.enum(['completed', 'failed', 'cancelled', 'refused']),
+  definition: z.object({ path: z.string(), blob: z.string() }).strict(),
+  requestedSourceCommit: text,
+  auditedSourceCommit: text.nullable(),
+  requestedMode: z.enum(['full', 'ramify-partial']).nullable(),
+  executedMode: z.enum(['full', 'ramify-partial']).nullable(),
+  fallbackReason: z.string().nullable(),
+  reuse: z.object({
+    auditedCommit: text,
+    ignoredChangedPaths: z.array(z.string()),
+    requestedMode: z.enum(['full', 'ramify-partial']),
+    resolution: z.enum(['requested', 'defaulted']),
+  }).strict().nullable(),
+  verdict: z.enum(['pass', 'fail', 'indeterminate']).nullable(),
+  detail: z.string(),
+  /** Whether the request audited the tracked nested definitions too. */
+  nested: z.boolean(),
+  /** Every project of a nested request, the root first; null for a request of the root alone. */
+  projects: z.array(gateAuditProjectViewSchema).nullable(),
+  discovery: gateAuditDiscoveryViewSchema.nullable(),
+}).strict();
+export type GateAuditView = z.infer<typeof gateAuditViewSchema>;
+
+/**
+ * One tracked scenario as a configured Cucumber check of the gate's audit
+ * ran it, read from the provider's raw runner output by its identity tag.
+ * Display only: it decides no verdict and moves no state.
+ */
+export const gateScenarioResultViewSchema = z.object({
+  id: text,
+  /** The configured check, and its command where the provider names one. */
+  check: text,
+  command: text.nullable(),
+  status: scenarioStatusSchema,
+  file: z.string(),
+  line: z.int().positive(),
+  failure: scenarioFailureView.nullable(),
+  /** Step texts no definition matched. */
+  undefined: z.array(z.string()),
+}).strict();
+export type GateScenarioResultView = z.infer<typeof gateScenarioResultViewSchema>;
 
 /** One gate attempt, with each command's output tail bounded at 8 KiB and its environment withheld. */
 export const gateViewSchema = z.object({
@@ -1093,14 +1152,18 @@ export const gateViewSchema = z.object({
   commit: text.nullable(),
   audited: text.nullable(),
   evidence: z.object({ runRef: text, reportCommit: text, treeRef: text }).strict().nullable(),
-  /** Complete producer evidence, including diagnostic details and artifact references. Absent on historical attempts. */
+  /** Complete producer evidence, including diagnostic details and artifact references. Absent on an attempt without provider results. */
   provider: z.object({ result: z.unknown(), checks: z.unknown() }).strict().optional(),
+  /** A committing gate's configured audit request and answer; absent for an attempt that ended before its audit and an in-place diagnosis. */
+  audit: gateAuditViewSchema.optional(),
+  /** The tracked scenarios its audit's Cucumber checks ran; empty where none ran. */
+  scenarios: z.array(gateScenarioResultViewSchema),
   verdict: gateVerdictSchema,
   cause: gateCauseSchema.nullable(),
   next: gateNextSchema,
   guardedChanges: z.array(z.object({
     path: text,
-    before: z.string(),
+    before: z.string().nullable(),
     /** Null is a deletion, which is a change like any other. */
     after: z.string().nullable(),
     authorizedBy: z.object({ id: z.string(), revision: count }).strict().nullable(),
@@ -1113,7 +1176,7 @@ export const gateViewSchema = z.object({
     limits: z.array(text).optional(),
   }).strict()),
   commands: z.array(z.object({
-    kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+    kind: z.enum(['setup', 'ramify-check', 'type-check', 'configured']),
     /** A setup command's declared name, such as `build`; null for every other command and an unnamed one. */
     name: text.nullable(),
     providerCheckId: text.optional(),
@@ -1124,15 +1187,8 @@ export const gateViewSchema = z.object({
     lockWaitMs: count.optional(),
     exitCode: z.int().nullable(),
     outcome: gateVerdictSchema,
-    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed', 'audit-unselected']).nullable(),
+    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'interrupted', 'setup-failed', 'local-rule-failed']).nullable(),
     runnerError: z.object({ kind: z.string(), message: z.string() }).strict().nullable(),
-    selection: z.object({
-      policy: z.enum(['owned-by-scope', 'all-project']),
-      exactOwners: z.array(z.string()),
-      subtrees: z.array(z.string()),
-      extraSuites: z.array(z.string()),
-      resolved: z.array(z.string()),
-    }).strict().nullable(),
     output: z.object({
       /** The complete output, a file of the run. */
       path: z.string(),
@@ -1144,8 +1200,6 @@ export const gateViewSchema = z.object({
     stopped: text.nullable(),
     /** The command's output streams stayed open after it ended, so what it printed may be incomplete. */
     outputIncomplete: z.boolean(),
-    /** A `scenarios` command's summary; null for every other kind, and for one that recorded none. */
-    scenarios: scenarioCheckViewSchema.nullable(),
   }).strict()),
 }).strict();
 export type GateView = z.infer<typeof gateViewSchema>;
@@ -1154,15 +1208,16 @@ export type GateView = z.infer<typeof gateViewSchema>;
 export const gateResponseSchema = z.object({ gate: gateViewSchema }).strict();
 export type GateResponse = z.infer<typeof gateResponseSchema>;
 
-/** One gate attempt whose scenario check ran a tracked scenario, with the scenario's status there. */
+/** One gate attempt whose audit ran a tracked scenario, with the scenario's status in the check that ran it. */
 export const scenarioGateResultSchema = z.object({
   gate: text,
   checkpoint: gateCheckpointSchema,
   subject: z.object({ workItem: text.optional(), iteration: text.optional() }).strict(),
   /** The attempt's verdict, which covers every check it ran. */
   verdict: gateVerdictSchema,
-  mode: scenarioCheckModeSchema,
-  dryRun: z.boolean(),
+  /** The configured check, and its command where the provider names one. */
+  check: text,
+  command: text.nullable(),
   status: scenarioStatusSchema,
   failure: scenarioFailureView.nullable(),
   undefined: z.array(z.string()),
@@ -1187,25 +1242,69 @@ export const scenarioViewSchema = z.object({
   subScenarios: z.array(text),
   /**
    * The work item that binds it: its entry's, or for an integration scenario
-   * the integration work item, null until its sub-scenarios are implemented.
+   * the integration work item, null until its sub-scenarios are all done.
    */
   workItem: text.nullable(),
   owner: text,
   file: text,
-  /** The gate whose pass made it `implemented`; null while it is not. */
-  implementedBy: text.nullable(),
+  /** Execution evidence beside the state, never folded into it. */
   gates: z.array(scenarioGateResultSchema),
 }).strict();
 export type ScenarioView = z.infer<typeof scenarioViewSchema>;
 
 /**
+ * One registered obligation, its latest engineer binding and its
+ * responsible architect's latest report. Its status is moved by accepted
+ * submissions alone: a binding makes it `bound`, a report sets the
+ * architect's judgment, and a gate or audit result is a separate fact,
+ * shown beside it and never folded into it. `where` is the architect's navigation text, shown
+ * as written and never resolved.
+ */
+export const obligationViewSchema = z.object({
+  id: text,
+  /** An analysis scenario or a registered case, a delegated outcome, or a registered test. */
+  kind: z.enum(['scenario', 'outcome', 'test']),
+  /** Who reports on it; an integration scenario is held by its key until its work item exists. */
+  responsible: z.object({ kind: z.enum(['work-item', 'capability-task', 'integration-scenario']), id: text }).strict(),
+  status: z.enum(['pending', 'bound', 'done']),
+  /** The report revision a next report names: 0 until the first accepted report. */
+  revision: count,
+  case: text.nullable(),
+  description: text.nullable(),
+  /** The explicit registration; null for an analysis scenario or a delegated outcome. */
+  registeredBy: z.object({ invocation: text, submission: text }).strict().nullable(),
+  /** The latest accepted engineer binding and the fakes it relies on; null while there is none. */
+  binding: z.object({
+    fakes: z.array(text),
+    invocation: text,
+    submission: text,
+    sequence: z.int().positive(),
+    at: timestamp,
+  }).strict().nullable(),
+  /** The responsible architect's latest accepted report; null while there is none. */
+  report: z.object({
+    judgment: z.enum(['done', 'bound']),
+    revision: z.int().positive(),
+    basedOnRevision: count,
+    where: text.nullable(),
+    invocation: text,
+    submission: text,
+    sequence: z.int().positive(),
+    at: timestamp,
+  }).strict().nullable(),
+}).strict();
+export type ObligationView = z.infer<typeof obligationViewSchema>;
+
+/**
  * `GET /api/v1/plans/:planId/runs/:runId/scenarios`: every tracked scenario,
  * at most 500, entry scenarios first, then integration scenarios. Empty until
- * the analysis is accepted.
+ * the analysis is accepted. Beside them, every registered obligation with its
+ * architect's report, in registration order.
  */
 export const scenarioListResponseSchema = z.object({
   scenarios: z.array(scenarioViewSchema).max(runQueryLimits.scenarios),
   total: count,
+  obligations: z.array(obligationViewSchema).max(runQueryLimits.obligations),
 }).strict();
 export type ScenarioListResponse = z.infer<typeof scenarioListResponseSchema>;
 

@@ -1,3 +1,4 @@
+import { rootDescription } from '../../../../../../../src/tests/helpers/root-description.js';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -91,7 +92,7 @@ export interface PiOptions {
 export async function workspace(cleanups: Array<() => Promise<void>>, files: Record<string, string> = {}): Promise<{ workingDirectory: string; sessionDirectory: string }> {
   const workingDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-pi-cwd-'));
   cleanups.push(() => rm(workingDirectory, { recursive: true, force: true }));
-  await writeFile(join(workingDirectory, 'module.ramify'), 'ramify 1\nmodule demo\n');
+  await writeFile(join(workingDirectory, 'module.ramify'), rootDescription('demo'));
   for (const [name, content] of Object.entries(files)) await writeFile(join(workingDirectory, name), content);
   const sessionDirectory = join(workingDirectory, 'session');
   await mkdir(sessionDirectory);

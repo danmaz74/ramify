@@ -18,6 +18,26 @@ export interface ReadinessDeviation {
   readonly decision: { readonly standing: 'accepted' | 'rejected'; readonly revision: number } | null;
 }
 
+/**
+ * The final gate's audit as its attempt recorded it: what was requested,
+ * what executed and what the provider composed, with each project's verdict.
+ * Null when the attempt kept no audit.
+ */
+export interface FinalAuditFacts {
+  readonly mode: 'project-default' | 'full';
+  readonly nested: boolean;
+  readonly status: 'completed' | 'failed' | 'cancelled' | 'refused';
+  readonly executedMode: 'full' | 'ramify-partial' | null;
+  readonly verdict: 'pass' | 'fail' | 'indeterminate' | null;
+  readonly discovery: 'complete' | 'indeterminate' | null;
+  readonly projects: readonly {
+    readonly projectRoot: string;
+    readonly verdict: 'pass' | 'fail' | 'indeterminate';
+    readonly status: 'completed' | 'failed' | 'cancelled' | 'refused';
+    readonly executedMode: 'full' | 'ramify-partial' | null;
+  }[] | null;
+}
+
 export interface MergeReadinessInput {
   readonly completed: boolean;
   readonly candidate: Candidate | null;
@@ -26,6 +46,7 @@ export interface MergeReadinessInput {
     readonly tree: string;
     readonly assessment: string;
     readonly passed: boolean;
+    readonly audit: FinalAuditFacts | null;
   } | null;
   /** Null means the fixed catalog is unavailable; [] is an explicit empty catalog. */
   readonly nfrIds: readonly string[] | null;
@@ -45,6 +66,19 @@ export function projectMergeReadiness(input: MergeReadinessInput): MergeReadines
   });
 
   if (input.finalGate?.passed === false) return result('gate-failed', 'The required final gate failed');
+  // Final verification is a full audit of the configured suite with every
+  // required nested project. A composed failure anywhere fails it; anything
+  // short of a completed full nested pass leaves it unestablished, however
+  // the run-local summary or the root alone answered.
+  const audit = input.finalGate?.audit;
+  if (input.finalGate !== null && input.finalGate !== undefined) {
+    const failedProjects = (audit?.projects ?? []).filter(project => project.verdict === 'fail').map(project => project.projectRoot);
+    if (audit?.verdict === 'fail' || failedProjects.length > 0) {
+      return result('gate-failed', `The final audit composed a failure${failedProjects.length === 0 ? '' : ` in ${failedProjects.join(', ')}`}`);
+    }
+    const gap = finalAuditGap(audit ?? null);
+    if (gap !== null) return result('unavailable', `The final gate has no applicable full nested audit pass: ${gap}`);
+  }
   if (!input.completed) return result('unavailable', 'The run has not completed');
   if (input.candidate === null || input.finalGate === null || input.assessment === null || input.nfrIds === null) {
     return result('unavailable', 'The candidate, final gate, catalog or assessment is unavailable');
@@ -98,4 +132,18 @@ export function projectMergeReadiness(input: MergeReadinessInput): MergeReadines
     return result('pending-review', 'A plan deviation awaits user review');
   }
   return result('ready', 'The final gate passed and every cataloged obligation is satisfied or accepted at this revision');
+}
+
+/** Why a final gate's audit does not establish a full nested pass, or null when it does. */
+function finalAuditGap(audit: FinalAuditFacts | null): string | null {
+  if (audit === null) return 'the attempt kept no audit';
+  if (audit.mode !== 'full' || !audit.nested) return 'the request was not a full nested audit';
+  if (audit.status !== 'completed') return `the audit ${audit.status === 'refused' ? 'was refused' : audit.status === 'cancelled' ? 'was cancelled' : 'failed to complete'}`;
+  if (audit.executedMode !== 'full') return `the root executed ${audit.executedMode ?? 'nothing'}, not a full audit`;
+  if (audit.verdict !== 'pass') return `the composed verdict is ${audit.verdict ?? 'none'}`;
+  if (audit.discovery !== 'complete') return `nested discovery is ${audit.discovery ?? 'absent'}`;
+  if (audit.projects === null || audit.projects.length === 0) return 'the audit carries no project results';
+  const unpassed = audit.projects.find(project => project.status !== 'completed' || project.verdict !== 'pass' || project.executedMode !== 'full');
+  if (unpassed !== undefined) return `project ${unpassed.projectRoot} is ${unpassed.status === 'completed' ? `${unpassed.verdict} over ${unpassed.executedMode ?? 'no'} execution` : unpassed.status}`;
+  return null;
 }

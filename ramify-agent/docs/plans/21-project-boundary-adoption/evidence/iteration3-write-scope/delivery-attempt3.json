@@ -1,0 +1,30 @@
+{
+  "attemptTiming": {
+    "argv": [
+      "ramify-agent/node_modules/.bin/ramify-audit",
+      "audit",
+      "--project-root",
+      "ramify-agent",
+      "--cwd",
+      ".",
+      "--json"
+    ],
+    "cwd": "/home/app/ramify-plan21-project-boundary-adoption",
+    "sourceCommit": "1f920462d2495dd4a7c9786d15d5be2f81b4a2d7",
+    "sourceTree": "05d6415e002db37167ad7ea228586000ea21398a",
+    "start": "2026-10-07T19:42:41.346591+00:00",
+    "end": null,
+    "wallSeconds": null,
+    "exitCode": null,
+    "ramifyVersion": "0.4.1",
+    "auditVersion": "0.7.2",
+    "status": "running"
+  },
+  "raw": {
+    "path": "/tmp/pb3-delivery-attempt3-audit.json",
+    "bytes": 0,
+    "sha256": null
+  },
+  "result": null,
+  "note": "The audit process (pid 626475) was killed when the implementing session aborted; the timing record was never made terminal and stdout is empty. No report, verdict or source qualification exists; this attempt is not a pass."
+}

@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { modulePathSchema, sha256Schema } from '../interfaces/protocol/evidence.js';
 import { recordRefSchema } from '../run/records.js';
 import { elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
-import { writeScopeSchema, testSelectionPolicySchema } from '../work/iterations.js';
 
 /* Durable capability coordination records. The original request and every
  * plan revision are immutable; the event log, rather than a mutable status
@@ -104,24 +103,15 @@ export const capabilityTaskSchema = z.object({
 }).strict();
 export type CapabilityTask = z.infer<typeof capabilityTaskSchema>;
 
-const coverage = z.discriminatedUnion('state', [
-  z.object({ state: z.literal('unresolved'), reason: text }).strict(),
-  z.object({ state: z.literal('exercised'), tests: z.array(text).min(1) }).strict(),
-  z.object({ state: z.literal('corrected'), reason: text, evidence: z.array(text).min(1), decidedBy: text, tests: z.array(text).min(1) }).strict(),
-]);
-// Historical coverage records retain their model-authored identities verbatim.
-// New tools cannot author those fields: the common gate/handback binds source
-// and provider report identities, under the run's execution policy.
-const recordedCoverage = z.discriminatedUnion('state', [
-  coverage.options[0],
-  coverage.options[1].extend({ candidate: text.optional(), configuration: text.optional() }),
-  coverage.options[2].extend({ candidate: text.optional(), configuration: text.optional() }),
-]);
 /** The editable plan content is shared with the plan-update tool schema. */
 export const capabilityPlanContentSchema = z.object({
   need: text,
   proposedInterface: text,
-  useCases: z.array(z.object({ id: z.union([exampleId, id]), expectedBehavior: text, derivedFrom: z.array(exampleId).min(1), coverage }).strict()),
+  /** The plan's behavioral cases. An original example keeps its case
+   * through every revision as immutable request context; a case carries no
+   * coverage state, cited evidence or test list. A case is tracked on its own
+   * only when the task's architect registers it as an obligation. */
+  useCases: z.array(z.object({ id: z.union([exampleId, id]), expectedBehavior: text, derivedFrom: z.array(exampleId).min(1) }).strict()),
   compatibility: z.array(text),
   outline: z.array(text),
   decisions: z.array(z.object({ decision: text, reason: text, evidence: z.array(text) }).strict()),
@@ -137,7 +127,6 @@ export const capabilityPlanSchema = z.object({
   updatedBy: text,
   revisionReason: text,
   ...capabilityPlanContentSchema.shape,
-  useCases: z.array(capabilityPlanContentSchema.shape.useCases.element.extend({ coverage: recordedCoverage })),
   /** Original example IDs cannot disappear. Additional cases may be derived. */
   originalExamples: z.array(exampleId).min(1),
 }).strict().superRefine((plan, context) => {
@@ -148,7 +137,7 @@ export const capabilityPlanSchema = z.object({
   }
   for (const [index, item] of plan.useCases.entries()) {
     if (!item.derivedFrom.every(example => plan.originalExamples.includes(example))) {
-      context.addIssue({ code: 'custom', path: ['useCases', index, 'derivedFrom'], message: 'Coverage links name original examples' });
+      context.addIssue({ code: 'custom', path: ['useCases', index, 'derivedFrom'], message: 'A case derives from original examples' });
     }
   }
 });
@@ -165,29 +154,6 @@ export const capabilityExchangeSchema = z.object({
   answer: z.object({ invocation: text, text, objections: z.array(text) }).strict().nullable(),
 }).strict();
 export type CapabilityExchange = z.infer<typeof capabilityExchangeSchema>;
-
-export const capabilityAssignmentSchema = z.object({
-  schema: z.literal('ramify-agent.capability-assignment/1'),
-  id: text,
-  task: id,
-  sequence: positive,
-  owner: modulePathSchema,
-  plan: recordRefSchema,
-  purpose: text,
-  approach: text,
-  requirementRefs: z.array(elementIdSchema),
-  intendedEvidence: z.array(text).min(1),
-  scope: writeScopeSchema,
-  gate: z.object({ tests: testSelectionPolicySchema }).strict(),
-  startingTree: treeIdentity,
-  /** Dirty paths that predate this writer, retained for attribution after restart. */
-  startingPaths: z.array(z.object({ path: location, hash: z.string().nullable() }).strict()).optional(),
-}).strict().superRefine((assignment, context) => {
-  if (assignment.id !== capabilityAssignmentId(assignment.task, assignment.sequence)) {
-    context.addIssue({ code: 'custom', path: ['id'], message: 'Assignment ID contains its task and sequence' });
-  }
-});
-export type CapabilityAssignment = z.infer<typeof capabilityAssignmentSchema>;
 
 export const capabilityHandbackSchema = z.object({
   schema: z.literal('ramify-agent.capability-handback/1'),
@@ -206,26 +172,13 @@ export const capabilityHandbackSchema = z.object({
 }).strict();
 export type CapabilityHandback = z.infer<typeof capabilityHandbackSchema>;
 
-export const capabilityReviewSchema = z.object({
-  schema: z.literal('ramify-agent.capability-review/1'), task: id, planRevision: positive,
-  tree: treeIdentity, gate: text,
-  outcome: z.enum(['passed', 'failed']), findings: z.array(text),
-  assessments: z.array(z.object({ kind: z.enum(['code', 'scope', 'design']), invocation: text,
-    inspected: z.array(location), missing: z.array(z.object({ path: location, reason: text }).strict()),
-    findings: z.array(text) }).strict()).length(3),
-}).strict();
-export type CapabilityReview = z.infer<typeof capabilityReviewSchema>;
-
 export const capabilityLayout = {
   /** A request may be satisfied by existing behavior before a task exists. */
   request: (request: string): string => join('capabilities', 'requests', `${request}.json`),
   task: (task: string): string => join('capabilities', task, 'task.json'),
   plan: (task: string, revision: number): string => join('capabilities', task, 'plan', `${revision}.json`),
   exchange: (task: string, exchange: string, revision: number): string => join('capabilities', task, 'exchanges', `${exchange}.${revision}.json`),
-  assignment: (task: string, assignment: string): string => join('capabilities', task, 'assignments', `${assignment}.json`),
   handback: (task: string): string => join('capabilities', task, 'handback.json'),
-  review: (task: string, gate: string, planRevision: number): string =>
-    join('capabilities', task, 'reviews', `${gate}.p${planRevision}.json`),
 } as const;
 
 export const capabilitySchemas = {
@@ -233,6 +186,5 @@ export const capabilitySchemas = {
   task: { schema: 'ramify-agent.capability-task/1', body: capabilityTaskSchema },
   plan: { schema: 'ramify-agent.capability-plan/1', body: capabilityPlanSchema },
   exchange: { schema: 'ramify-agent.capability-exchange/1', body: capabilityExchangeSchema },
-  assignment: { schema: 'ramify-agent.capability-assignment/1', body: capabilityAssignmentSchema },
   handback: { schema: 'ramify-agent.capability-handback/1', body: capabilityHandbackSchema },
 } as const;

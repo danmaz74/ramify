@@ -1,147 +1,36 @@
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
-import { gitService } from '../../subs/evidence/src/git.js';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
 import { analysis, entry } from './helpers/analysis.js';
-import { captureProvisionalSource } from '../capability/source.js';
-import { commitCapabilityTransition } from '../capability/ledger.js';
-import { capabilityLayout } from '../capability/records.js';
 import { RunLog } from '../run/log.js';
 import { committedRecords } from '../work/committed.js';
-import { copyCapabilityFixture, fixtureRequest, openCapabilityRuns } from './helpers/capability.js';
-import { temporaryDirectory } from './helpers/fixture.js';
-import { assign, edit, installMiniRunner, outline, shell, submit, treeInputs } from './helpers/iterations.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
-import { freeze, git, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
-import { nodeProcessGroups } from '../run/writer.js';
+import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
+import { assign, edit, outline, submit, treeInputs } from './helpers/iterations.js';
+import { freeze, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 
-const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-
-test('CA20: a registered real process group survives a service crash and is settled before any successor work', async () => {
-  const fixture = await copyCapabilityFixture();
-  cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
-  const a = 'capability-coordination/a';
-  const b = 'capability-coordination/b';
-  let engineerTurns = 0;
-  let frozen = false;
-  const script: Script = spec => {
-    if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
-    if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
-    if (spec.submission.name === 'submit_capability_qualification') {
-      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
-      return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
-        placementReason: 'B owns the source fact', constraints: [], requirementRefs: [] });
-    }
-    if (spec.role === 'engineer') {
-      engineerTurns += 1;
-      if (engineerTurns === 1) return submit({ kind: 'capability-needed', summary: 'A needs source', request: {
-        need: 'B source for A', usage: [{ path: 'subs/a/src/caller.ts', use: 'Display B source', prospective: false }],
-        constraints: [], knownInterface: { kind: 'none-known' },
-        examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
-      } });
-      return [shell('node -e "setTimeout(() => {}, 60000)"', { timeoutMs: 60000 })];
-    }
-    if (spec.role === 'capability-architect') {
-      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
-      return submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3], kind: 'assign', assignment: assign(b, { goal: 'Provide B source', approach: 'Implement B source', completionEvidence: 'A consumes B source' }).assignment });
-    }
-    return [];
-  };
-  const first = await openCapabilityRuns(fixture.root, {
-    git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
-    afterWrite: async write => { if (write === 'writer-process-registered' && !frozen) { frozen = true; await freeze(); } },
-  });
-  const receipt = await first.service.execute(startRun('need'));
-  await until(() => frozen, 30_000);
-  const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  const registered = before.find(event => event.type === 'writer-process-registered');
-  if (registered?.type !== 'writer-process-registered') throw new Error('Missing durable process registration');
-  const pid = registered.data.pid;
-  cleanups.push(async () => nodeProcessGroups.kill(pid));
-  expect(nodeProcessGroups.alive(pid)).toBe(true);
-  expect(before.some(event => event.type === 'writer-released' && event.data.invocation === registered.data.invocation)).toBe(false);
-
-  await staleCrashLock(fixture.root);
-  const second = await openCapabilityRuns(fixture.root, {
-    git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
-  });
-  cleanups.push(() => second.service.close());
-  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(nodeProcessGroups.alive(pid)).toBe(false);
-  expect(events.find(event => event.type === 'job-failed')?.data.reason).toBe('writer-unsettled');
-  expect(events.filter(event => event.type === 'capability-handed-back' || event.type === 'gate-attempted')).toHaveLength(0);
-  expect(events.filter(event => event.type === 'work-item-started' && event.data.workItem === 'wi-002')).toHaveLength(0);
-}, 45_000);
-
-test('CA19 CA30: a snapshot written before its request commit is adopted with the exact dirty index and tree', async () => {
-  const fixture = await copyCapabilityFixture();
-  const directory = await temporaryDirectory();
-  cleanups.push(fixture.remove, directory.remove);
-  const base = await initRepository(fixture.root);
-  const tracked = 'subs/a/src/caller.ts';
-  const untracked = 'subs/a/src/pending.ts';
-  const deleted = 'subs/d/src/consumer.ts';
-  await writeFile(join(fixture.root, tracked), 'export const staged = true;\n');
-  await git(fixture.root, 'add', tracked);
-  await writeFile(join(fixture.root, tracked), 'export const worktree = true;\n');
-  await writeFile(join(fixture.root, untracked), 'export const pending = true;\n');
-  await rm(join(fixture.root, deleted));
-  await git(fixture.root, 'add', deleted);
-  const input = { projectRoot: fixture.root, runDirectory: directory.path, request: 'need-001',
-    acceptedBase: base, writerSettledBy: 'inv-0001', changedPaths: await gitService.changedPaths(fixture.root, base) };
-  const before = await captureProvisionalSource(input);
-  const snapshotBytes = await readFile(join(directory.path, before.snapshot));
-  // Simulate a process stop after the exclusive write, before ledger append.
-  const recovered = await captureProvisionalSource(input);
-  expect(recovered).toEqual(before);
-  expect(await readFile(join(directory.path, before.snapshot))).toEqual(snapshotBytes);
-  expect((await git(fixture.root, 'show', ':subs/a/src/caller.ts')).trim()).toContain('staged = true');
-  expect(await readFile(join(fixture.root, untracked), 'utf8')).toContain('pending = true');
-  expect((await git(fixture.root, 'status', '--porcelain')).trim()).toContain('D  subs/d/src/consumer.ts');
-  expect(before.delta.find(change => change.path === deleted)?.staged).toBe(true);
-
-  const log = await RunLog.open(join(directory.path, 'events.jsonl'), 'job-001');
-  const request = { ...fixtureRequest(), source: recovered };
-  await commitCapabilityTransition(log, { type: 'capability-requested', data: {
-    request: request.id, parent: request.parent.id, assignment: request.assignment, invocation: request.invocation,
-  } }, [{ path: capabilityLayout.request(request.id), id: request.id, revision: 1, body: request }]);
-  const reopened = await RunLog.open(join(directory.path, 'events.jsonl'), 'job-001');
-  expect(committedRecords(reopened.ledger.replay()).capabilityRequests.get(request.id)?.source).toEqual(before);
-  expect(await captureProvisionalSource(input)).toEqual(before);
+import { recoveryBoundaries } from './helpers/recovery-boundaries.js';
+import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
+vi.mock('node:child_process', async importOriginal => {
+  const { guardedChildProcess } = await import('./helpers/process-guard.js');
+  return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
 });
-
-test('CA19: retry refuses a changed staged or untracked candidate and preserves its bytes', async () => {
-  const fixture = await copyCapabilityFixture();
-  const directory = await temporaryDirectory();
-  cleanups.push(fixture.remove, directory.remove);
-  const base = await initRepository(fixture.root);
-  const tracked = 'subs/a/src/caller.ts';
-  const untracked = 'subs/a/src/pending.ts';
-  await writeFile(join(fixture.root, tracked), 'export const staged = true;\n');
-  await git(fixture.root, 'add', tracked);
-  await writeFile(join(fixture.root, untracked), 'export const pending = true;\n');
-  const input = { projectRoot: fixture.root, runDirectory: directory.path, request: 'need-001',
-    acceptedBase: base, writerSettledBy: 'inv-0001', changedPaths: await gitService.changedPaths(fixture.root, base) };
-  await captureProvisionalSource(input);
-  await writeFile(join(fixture.root, untracked), 'export const pending = false;\n');
-  await expect(captureProvisionalSource(input)).rejects.toThrow('source was preserved');
-  expect(await readFile(join(fixture.root, untracked), 'utf8')).toContain('pending = false');
-  await writeFile(join(fixture.root, untracked), 'export const pending = true;\n');
-  await writeFile(join(fixture.root, tracked), 'export const changedIndex = true;\n');
-  await git(fixture.root, 'add', tracked);
-  await expect(captureProvisionalSource(input)).rejects.toThrow('source was preserved');
-  expect((await git(fixture.root, 'show', ':subs/a/src/caller.ts')).trim()).toContain('changedIndex = true');
+beforeEach(resetSpawnAttempts);
+const answers: ReturnType<typeof recoveryBoundaries>[] = [];
+const cleanups: Array<() => Promise<void>> = [];
+afterEach(async () => {
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
+  for (const answer of answers.splice(0)) try { answer.assertComplete(); } catch (error) { errors.push(error); }
+  try { expect(spawnAttempts(), 'ordinary recovery setup/flow/teardown process attempts').toEqual([]); } catch (error) { errors.push(error); }
+  if (errors.length) throw new AggregateError(errors, 'Recovery fixture teardown failed');
 });
 
 async function lostBWriterCase(restartBeforeSettlement: boolean): Promise<void> {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = recoveryBoundaries(fixture.root, 'a');
+  answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
   let engineerTurns = 0;
@@ -164,7 +53,7 @@ async function lostBWriterCase(restartBeforeSettlement: boolean): Promise<void> 
         examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
       } });
       prompts.push(spec.prompt);
-      if (engineerTurns === 2) return [edit('fact.ts', "return 'old';", "return 'old from B';"), { kind: 'end', message: 'Context lost before submission' }];
+      if (engineerTurns === 2) { boundaryAnswers.stage('b'); return [edit('fact.ts', "return 'old';", "return 'old from B';"), { kind: 'end', message: 'Context lost before submission' }]; }
       throw new Error('An ended engineer must close partial rather than restart automatically');
     }
     if (spec.role === 'capability-architect') {
@@ -175,7 +64,7 @@ async function lostBWriterCase(restartBeforeSettlement: boolean): Promise<void> 
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
     ...(restartBeforeSettlement ? {
       policy: (root: string) => ({ ...testPolicy(root), limits: {
         ...testPolicy(root).limits, sessionReconstructionsPerWork: 1,
@@ -229,8 +118,8 @@ test('CA18 CA26 CA29: restart after an ended B writer preserves its ordinary par
 test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect without dispatching the B entry', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = recoveryBoundaries(fixture.root, 'a+b', true);
+  answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
   let architectTurns = 0;
@@ -267,7 +156,7 @@ test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect wit
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'capability-coordinator-resumed' || frozen) return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -305,8 +194,8 @@ test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect wit
 test('a restart after a capability architect budget return reconstructs from committed task state', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = recoveryBoundaries(fixture.root);
+  answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
   let frozen = false;
@@ -338,7 +227,7 @@ test('a restart after a capability architect budget return reconstructs from com
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'capability-coordinator-resumed' || frozen) return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -376,8 +265,8 @@ test('a restart after a capability architect budget return reconstructs from com
 test('CA19: accepted qualification before delegation replays one decision after restart', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = recoveryBoundaries(fixture.root);
+  answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
   let frozen = false;
@@ -397,7 +286,7 @@ test('CA19: accepted qualification before delegation replays one decision after 
     if (spec.role === 'capability-architect') return [{ kind: 'wait', ms: 60_000 }];
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'invocation-ended' || frozen) return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -433,8 +322,8 @@ test('CA19: accepted qualification before delegation replays one decision after 
 test('CA19: accepted assign action before its effect replays without a second coordinator', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = recoveryBoundaries(fixture.root, 'a+b', true);
+  answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
   let engineerTurns = 0;
@@ -464,7 +353,7 @@ test('CA19: accepted assign action before its effect replays without a second co
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'capability-coordinator-resumed' || frozen) return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -497,12 +386,100 @@ test('CA19: accepted assign action before its effect replays without a second co
   await second.service.close();
 }, 60_000);
 
+for (const boundary of ['invocation-ended', 'obligation-reported'] as const) {
+test(`PB3-C04 PB3-C05: restart after ${boundary} keeps the accepted action's report once, with no second coordinator or writer, and the next turn retrieves it`, async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  const boundaryAnswers = recoveryBoundaries(fixture.root, 'a+b', true);
+  answers.push(boundaryAnswers);
+  const a = 'capability-coordination/a';
+  const b = 'capability-coordination/b';
+  let engineerTurns = 0;
+  let architectTurns = 0;
+  let frozen = false;
+  const architectPrompts: string[] = [];
+  const script: Script = spec => {
+    if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
+    if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
+    if (spec.submission.name === 'submit_capability_qualification') {
+      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
+        placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
+    }
+    if (spec.role === 'engineer') {
+      engineerTurns += 1;
+      return engineerTurns === 1 ? submit({ kind: 'capability-needed', summary: 'A needs source', request: {
+        need: 'B fact for A', usage: [{ path: 'subs/a/src/caller.ts', use: 'Display source', prospective: false }],
+        constraints: [], knownInterface: { kind: 'none-known' },
+        examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
+      } }) : submit({ kind: 'completion-proposed', summary: 'B submitted its result', findings: [] });
+    }
+    if (spec.role === 'capability-architect') {
+      architectTurns += 1;
+      architectPrompts.push(spec.prompt);
+      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      // The accepted assignment carries the architect's own done report.
+      return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
+        kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B result' }).assignment,
+        reports: [{ id: 'cap-001', judgment: 'done', basedOnRevision: 0 }] }) : [{ kind: 'wait', ms: 60_000 }];
+    }
+    return [];
+  };
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
+    afterWrite: async (write: string, runId: string) => {
+      if (write !== boundary || frozen) return;
+      const events = await runEventsOnDisk(fixture.root, 'need', runId);
+      const last = events.at(-1);
+      const architect = new Set(events.flatMap(event => event.type === 'invocation-started' && event.data.role === 'capability-architect'
+        ? [event.data.invocation] : []));
+      if ((last?.type === 'invocation-ended' && architect.has(last.data.invocation) && last.data.ended === 'submitted')
+        || (last?.type === 'obligation-reported' && last.data.id === 'cap-001')) {
+        frozen = true;
+        await freeze();
+      }
+    } };
+  const first = await openCapabilityRuns(fixture.root, options);
+  const receipt = await first.service.execute(startRun('need'));
+  await until(() => frozen, 30_000);
+  await staleCrashLock(fixture.root);
+  const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(before.filter(event => event.type === 'obligation-reported')).toHaveLength(boundary === 'obligation-reported' ? 1 : 0);
+  expect(before.filter(event => event.type === 'capability-assigned')).toHaveLength(0);
+  const second = await openCapabilityRuns(fixture.root, options);
+  cleanups.push(() => second.service.close());
+  await until(() => architectTurns >= 2 || (second.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'), 30_000);
+  const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
+  // The report is recorded once, by the accepted invocation, before the
+  // action's effect; the action is replayed, not asked for again.
+  const reports = after.filter(event => event.type === 'obligation-reported');
+  expect(reports.map(event => event.data)).toEqual([expect.objectContaining({ id: 'cap-001', judgment: 'done', revision: 1 })]);
+  const assigned = after.filter(event => event.type === 'capability-assigned');
+  expect(assigned).toHaveLength(1);
+  expect(reports[0]!.sequence).toBeLessThan(assigned[0]!.sequence);
+  const coordinators = after.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect' &&
+    event.data.work.capabilityTask === 'cap-001' && event.sequence < assigned[0]!.sequence);
+  expect(coordinators).toHaveLength(1);
+  expect(reports[0]!.data).toMatchObject({ by: coordinators[0]!.type === 'invocation-started' ? coordinators[0]!.data.invocation : '' });
+  // No writer was acquired between the crash and the replayed effect, and
+  // the assignment has one writer.
+  expect(after.filter(event => event.type === 'writer-acquired' && event.sequence > before.length && event.sequence < assigned[0]!.sequence)).toHaveLength(0);
+  expect(after.filter(event => event.type === 'writer-acquired' && event.sequence > assigned[0]!.sequence)).toHaveLength(1);
+  expect(after.filter(event => event.type === 'capability-assignment-settled')).toHaveLength(1);
+  // The architect's next turn retrieves its own report.
+  expect(architectPrompts).toHaveLength(2);
+  expect(architectPrompts[1]).toContain('# Registered obligations');
+  expect(architectPrompts[1]).toMatch(/- cap-001 \(delegated outcome\): done, revision 1; not bound; last report done by inv-\d+/u);
+  await second.service.close();
+}, 60_000);
+}
+
 for (const boundary of ['capability-assigned', 'invocation-ended'] as const) {
 test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial once`, async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = recoveryBoundaries(fixture.root);
+  answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
   let engineerTurns = 0;
@@ -524,8 +501,8 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
         constraints: [], knownInterface: { kind: 'none-known' },
         examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
       } });
-      if (engineerTurns === 2) return submit({ kind: 'partial', done: ['Edited B source'], unfinished: ['Submit provider result'], findings: [] },
-        edit('fact.ts', "return 'old';", "return 'old from B';"));
+      if (engineerTurns === 2) { boundaryAnswers.stage('b'); return submit({ kind: 'partial', done: ['Edited B source'], unfinished: ['Submit provider result'], findings: [] },
+        edit('fact.ts', "return 'old';", "return 'old from B';")); }
       throw new Error('A settled partial must not start another B writer');
     }
     if (spec.role === 'capability-architect') {
@@ -536,7 +513,7 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
     afterWrite: async (write: string) => {
       if (write === boundary && (boundary !== 'invocation-ended' || engineerTurns === 2) && closing === undefined) closing = closeFirst?.();
     } };
@@ -575,7 +552,6 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
   const partialResult = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
     'work-items/cap-001/iterations/01/result.json'), 'utf8')) as { outcome: string; findings: string[] };
   expect(partialResult).toMatchObject({ outcome: 'partial', findings: expect.arrayContaining(['unfinished: Submit provider result']) });
-  expect(after.filter(event => event.type === 'capability-assignment-interrupted')).toHaveLength(0);
   expect(after.filter(event => event.type === 'invocation-started' && event.data.role === 'engineer' && event.data.work.iteration === 'cap-001.i01'), JSON.stringify(after.slice(-25))).toHaveLength(1);
   expect(await readFile(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')).toContain('old from B');
   for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -590,8 +566,8 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
 test('CA19: accepted B completion before assignment settlement replays without a second writer', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = recoveryBoundaries(fixture.root, 'a+b', true);
+  answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
   let engineerTurns = 0;
@@ -622,7 +598,7 @@ test('CA19: accepted B completion before assignment settlement replays without a
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
     afterWrite: async (write: string) => {
       if (write === 'invocation-ended' && engineerTurns === 2 && closing === undefined) closing = closeFirst?.();
     } };
@@ -656,8 +632,8 @@ test('CA19: accepted B completion before assignment settlement replays without a
 test('CA20 CA32: restart with a B writer lacking confirmed release stops the stack and frontier', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = recoveryBoundaries(fixture.root);
+  answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
   let engineerTurns = 0;
@@ -685,7 +661,7 @@ test('CA20 CA32: restart with a B writer lacking confirmed release stops the sta
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
     afterWrite: async (write: string, runId: string) => {
       if (write !== 'writer-acquired') return;
       const events = await runEventsOnDisk(fixture.root, 'need', runId);
@@ -718,8 +694,8 @@ test('CA20 CA32: restart with a B writer lacking confirmed release stops the sta
 test('CA19 CA30: service restart adopts a source snapshot before its request ledger commit', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-  await installMiniRunner(fixture.root);
+  const boundaryAnswers = recoveryBoundaries(fixture.root);
+  answers.push(boundaryAnswers);
   const a = 'capability-coordination/a';
   const b = 'capability-coordination/b';
   let architectTurns = 0;
@@ -733,18 +709,18 @@ test('CA19 CA30: service restart adopts a source snapshot before its request led
       return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
         placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
     }
-    if (spec.role === 'engineer') return submit({ kind: 'capability-needed', summary: 'A has unfinished source', request: {
+    if (spec.role === 'engineer') { boundaryAnswers.stage('a'); return submit({ kind: 'capability-needed', summary: 'A has unfinished source', request: {
       need: 'B source for A', usage: [{ path: 'subs/a/src/caller.ts', use: 'Display source', prospective: false }],
       constraints: [], knownInterface: { kind: 'none-known' },
       examples: [{ title: 'source displayed', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
-    } }, edit('caller.ts', 'Fact: ${value}', 'A is waiting for B: ${value}'));
+    } }, edit('caller.ts', 'Fact: ${value}', 'A is waiting for B: ${value}')); }
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
       return [{ kind: 'wait', ms: 60_000 }];
     }
     return [];
   };
-  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
     afterWrite: async (write: string) => {
       if (write === 'capability-source-captured' && closing === undefined) closing = closeFirst?.();
     } };
@@ -779,8 +755,8 @@ for (const boundary of ['capability-exchange-opened', 'capability-exchange-answe
   test(`CA05 CA20: restart after ${boundary} keeps one consumer question and answer`, async () => {
     const fixture = await copyCapabilityFixture();
     cleanups.push(fixture.remove);
-    await initRepository(fixture.root);
-    await installMiniRunner(fixture.root);
+    const boundaryAnswers = recoveryBoundaries(fixture.root, 'a');
+    answers.push(boundaryAnswers);
     const a = 'capability-coordination/a';
     const b = 'capability-coordination/b';
     let closing: Promise<void> | undefined;
@@ -811,7 +787,7 @@ for (const boundary of ['capability-exchange-opened', 'capability-exchange-answe
       }
       return [];
     };
-    const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    const options = { ...boundaryAnswers.options, script, inputs: treeInputs(),
       afterWrite: async (write: string) => { if (write === boundary && closing === undefined) closing = closeFirst?.(); } };
     const first = await openCapabilityRuns(fixture.root, options);
     closeFirst = () => first.service.close();

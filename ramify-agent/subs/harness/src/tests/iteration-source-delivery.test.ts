@@ -82,9 +82,9 @@ test('an assigned non-functional element reaches the engineer once per session, 
     ]);
     if (spec.role === 'initial-architect') return submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core', 'Summarizes a review.')]));
     if (spec.submission.name === 'submit_work_item_result') return localTurn++ === 0
-      ? submit(assign('collection-review/workspace/reviews/core', { citedElements: ['fr-001', 'fr-002', 'nfr-001'] }, outline()))
-      : submit({ ...requestCompletion(), scenarios: ['sc-001'] });
-    if (spec.role === 'engineer') return submit(completionProposed('The existing behavior satisfies the assignment.', { scenarios: ['sc-001'] }));
+      ? submit(assign('collection-review/workspace/reviews/core', { citedElements: ['fr-001', 'fr-002', 'nfr-001'], obligations: ['sc-001'] }, outline()))
+      : submit({ ...requestCompletion(), reports: [{ id: 'sc-001', judgment: 'done', basedOnRevision: 0 }] });
+    if (spec.role === 'engineer') return submit(completionProposed('The existing behavior satisfies the assignment.', { bindings: [{ id: 'sc-001' }] }));
     if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [
       { nfr: 'nfr-001', result: 'satisfied', inspectedScope: ['subs/workspace/subs/reviews/subs/core/src'],
         evidence: ['The scripted timeout check passes.'], uncertainty: '' },
@@ -128,6 +128,29 @@ test('an assigned non-functional element reaches the engineer once per session, 
   expect(engineers[0]!.spec.prompt).toContain(text.trimEnd());
   expect(engineers[1]!.spec.prompt).not.toContain(quote);
   for (const engineer of engineers) expect(engineer.spec.prompt).not.toContain(advice);
+  // PB3-T07: no scoped test tool; the briefing names the scenarios to bind
+  // and the owners' test areas as text, and the failed gate audit continues
+  // the same engineer session with the gate's digest.
+  for (const engineer of engineers) {
+    expect(JSON.stringify([engineer.spec.tools, engineer.spec.builtinTools])).not.toContain('run_scope_tests');
+    expect(engineer.spec.prompt).not.toContain('run_scope_tests');
+  }
+  expect(engineers[0]!.spec.prompt).toContain('The tests this assignment owns are those of collection-review/workspace/reviews/core, in:\n'
+    + '- `subs/workspace/subs/reviews/subs/core/src/tests/` (`collection-review/workspace/reviews/core`)');
+  expect(engineers[0]!.spec.prompt).toContain('A whole-suite run is refused there: the gate\'s audit runs it.');
+  expect(engineers[0]!.spec.prompt).toContain('### sc-001 (pending): A person uses review-summary');
+  const continued = engineers[1]!.spec.session;
+  expect(continued.mode).toBe('continue');
+  expect(continued.mode === 'continue' && String(continued.ref).split('@')[0]).toBe(String(engineers[0]!.ref).split('@')[0]);
+  expect(engineers[1]!.spec.prompt).toContain('## The gate did not pass');
+  expect(engineers[1]!.spec.prompt).toMatch(/- audit `[^`]+:ga-\d{4}`, the project's default audit of `[^`]+` under `ramify-audit\.json`: requested ramify-partial, executed ramify-partial; composed verdict `fail`/u);
+  expect(engineers[1]!.spec.prompt).toContain('- `tests`: failed; the provider\'s record of it follows:');
+  expect(engineers[1]!.spec.prompt).toContain('not ok');
+  // The failed audit neither created nor withdrew a report: the one done
+  // report is the architect's own, after the passing gate.
+  expect(events.filter(event => event.type === 'gate-attempted').length).toBeGreaterThan(1);
+  const reports = events.filter(event => event.type === 'obligation-reported').map(event => event.data as { id: string; judgment: string });
+  expect(reports.filter(report => report.judgment === 'done')).toEqual([expect.objectContaining({ id: 'sc-001', judgment: 'done' })]);
   await expect(readFile(runPath(fixture.root, 'revision-diff', receipt.jobId, 'assignments/wi-001.i01-context.json'))).rejects.toThrow();
   expect(events.filter(event => event.type === 'context-selection-recorded')).toHaveLength(1);
 }, 120_000);

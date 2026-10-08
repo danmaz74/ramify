@@ -1,35 +1,30 @@
-import { join } from 'node:path';
+import { writeFileSync } from 'node:fs';
 
-import { createAuditCheckExecution } from '../../../subs/audit/src/check-execution.js';
-import { checkCommand } from '../../checks/records.js';
-import { runGate } from '../../checks/gate.js';
+import { createConfiguredAudit } from '../../../subs/audit/src/check-execution.js';
 import { createAuditWorkspaceOwnership } from '../../run/audit-workspaces.js';
-import { runDirectory, runLayout } from '../../run/records.js';
 
-const [mode, projectRoot, sourceCommit, marker] = process.argv.slice(2);
+/*
+ * One configured audit in its own process, for a test to kill. The fixture's
+ * committed check reads what to do from the environment this process gives
+ * it: write the marker and wait (`during-execution`), wait without it
+ * (`after-creation`), or pass. A waiting check stops once this process dies.
+ * A fifth argument `nested` asks a nested invocation.
+ */
+
+const [mode, projectRoot, sourceCommit, marker, scope] = process.argv.slice(2);
 if (mode === undefined || projectRoot === undefined || sourceCommit === undefined || marker === undefined) {
   throw new Error('mode, project root, source commit and marker are required');
 }
+writeFileSync(`${projectRoot}.killed-audit.json`, JSON.stringify({ mode, marker, owner: process.pid }));
 
-const runId = '20260921T000000Z-aabbcc';
-const attemptId = 'ga-0001';
-const stopAfterOwnerDies = `setInterval(() => { try { process.kill(${process.pid}, 0); } catch { process.exit(0); } }, 25)`;
-const program = mode === 'pass'
-  ? 'process.exit(0)'
-  : `${mode === 'during-execution' ? `require('fs').writeFileSync(${JSON.stringify(marker)}, 'running');` : ''}${stopAfterOwnerDies}`;
-const attempt = await runGate(
-  createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) }),
-  'iteration',
-  {
-    id: attemptId,
-    runId,
-    projectRoot,
-    directory: join(runDirectory(projectRoot, 'plan', runId), runLayout.gateOutput(attemptId)),
-    head: sourceCommit,
-    checks: [{
-      kind: 'tests',
-      command: checkCommand({ argv: [process.execPath, '-e', program], cwd: projectRoot, timeoutMs: 60_000 }),
-    }],
-  },
-);
-process.stdout.write(`${JSON.stringify(attempt)}\n`);
+const audit = createConfiguredAudit({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) });
+const configuration = await audit.read(projectRoot, sourceCommit);
+const result = await audit.run({
+  projectRoot, sourceCommit, configuration, mode: 'full', runId: '20260921T000000Z-aabbcc', attemptId: 'ga-0001', nested: scope === 'nested',
+});
+process.stdout.write(`${JSON.stringify({
+  status: result.status, auditedSourceCommit: result.auditedSourceCommit, reportCommit: result.reportCommit, detail: result.detail,
+  verdict: result.verdict, discovery: result.discovery,
+  projects: result.projects?.map(project => ({ projectRoot: project.projectRoot, verdict: project.verdict, execution: project.execution,
+    reportCommit: project.reportCommit, runRef: project.runRef })) ?? null,
+})}\n`);

@@ -1,42 +1,45 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import {
-  AUDIT_PROTOCOL_VERSION,
   createAuditService,
-  createInProcessRegisteredExecutorBridge,
   createNodeExecutionLeaseProcessLookup,
   createNodeProcessExecutor,
   createNodeRepositoryExecutionLease,
   findCompletedAuditRequest,
+  requestFromCommittedConfiguration,
   readRawCheckResults,
   resolveRepositoryExecutionLeaseIdentity,
+  TEST_LOCK_HELD_ENVIRONMENT,
   type AuditCheckSummary,
-  type AuditRequest,
+  type AuditEvent,
+  type AuditProjectOutcome,
   type AuditResult,
-  type CheckDefinition,
   type GitExecutorPort,
-  type JsonObject,
+  type NestedDiscoveryOutcome,
   type ProcessExecutorPort,
-  type RegisteredExecutorResult,
+  type ProjectAuditResult,
 } from 'ramify-audit';
 
-import { childEnvironment, outputTailBytes, runCommand } from '../../evidence/src/run-command.js';
-import type { CommandOutcome, CommandRun } from '../../evidence/src/run-command.js';
-import { checkOutputPath, commandStart, notRun } from '../../../src/checks/execution.js';
-import type { CheckExecutionPort, CheckExecutionRequest } from '../../../src/checks/execution.js';
-import type { CheckExecutionResult } from '../../../src/checks/execution.js';
-import { checkCommandEnvironment } from '../../../src/checks/records.js';
-import type { GateCommandRecord } from '../../../src/checks/records.js';
-import { runScenarioCheck } from '../../../src/checks/scenario-check.js';
-import { testLockedRunner, type TestLockOverride } from './test-lock.js';
-import type { TestLockHooks } from './test-lock.js';
-import { PausableDeadline } from '../../../src/run/pausable-deadline.js';
-import type { PlannedCheck } from '../../../src/checks/verify.js';
+import { childEnvironment } from '../../evidence/src/run-command.js';
+import type { GateCommandStart, GateCommandStarted } from '../../../src/checks/execution.js';
+import type { TestLockOverride } from './test-lock.js';
 
-const executorId = 'ramify-agent.gate-check';
+/*
+ * The project's committed audit, run through the installed provider's public
+ * service. This module is the only importer of ramify-audit's audit service.
+ *
+ * Every audit the harness requests is of a committed source: readiness's
+ * HEAD, and each committing gate's candidate commit. The request is the one
+ * `requestFromCommittedConfiguration` builds from the project's committed
+ * `ramify-audit.json` at that commit, so its checks, ignore list, preparation
+ * and universe are the project's own. The harness plans no command, walks no
+ * test file and adds no check: the provider owns discovery, selection,
+ * completeness, reuse and the verdict, and the harness keeps its result.
+ */
+
 /**
  * ramify-audit's built-in preparation: it links each package directory's
  * installed dependencies into the worktree and then runs the project's
@@ -44,7 +47,6 @@ const executorId = 'ramify-agent.gate-check';
  * its own.
  */
 const preparationId = 'nodejs';
-const harnessCheckId = 'harness-rules';
 const gitTimeoutMs = 60_000;
 
 /**
@@ -75,6 +77,65 @@ export interface AuditWorkspaceOwnershipRecorder {
   }): Promise<void>;
   /** Called only after ramify-audit's own worktree cleanup has returned. */
   recordWorkspaceCleaned(workspace: IntendedAuditWorkspace): Promise<void>;
+  /**
+   * Persist a completed nested invocation's identities as soon as the
+   * provider answers it, before anything else reads the answer. Returning
+   * means the receipt is durable.
+   */
+  recordAuditInvocation(receipt: AuditInvocationReceipt): Promise<void>;
+  /** The receipt recorded for this run's attempt, or null when none was. */
+  auditInvocation(runId: string, attemptId: string): Promise<AuditInvocationReceipt | null>;
+}
+
+/**
+ * One project of a nested invocation as the provider answered it, by its
+ * durable identities: the request and report that hold its evidence. A
+ * project the provider did not run keeps the provider's own answer, since
+ * nothing was published for it.
+ */
+export interface AuditInvocationProject {
+  readonly projectRoot: string;
+  readonly verdict: 'pass' | 'fail' | 'indeterminate';
+  readonly execution: 'ran' | 'reused' | 'not-run';
+  readonly failures: readonly string[];
+  /** The request the provider answered this project under. */
+  readonly requestId: string;
+  readonly runId: string | null;
+  /** The published record's own request and source commit: where its evidence is found again. */
+  readonly record: {
+    readonly requestId: string;
+    readonly sourceCommit: string;
+    readonly reportCommit: string;
+    readonly runRef: string;
+    readonly treeRef: string;
+  } | null;
+  /** The provider's account of a reused record, kept as it answered it. */
+  readonly reused: {
+    readonly sourceCommit: string;
+    readonly auditedCommit: string;
+    readonly ignoredChangedPaths: readonly string[];
+    readonly requestedMode: 'full' | 'ramify-partial';
+    readonly resolution: 'requested' | 'defaulted';
+  } | null;
+  /** A project that did not complete: the provider's answer, which nothing published. */
+  readonly unpublished: unknown;
+}
+
+/**
+ * The durable receipt of one completed nested invocation: the request, the
+ * source it answered, every project's identities, and the invocation's own
+ * discovery and verdict, which the provider publishes in no project's record.
+ */
+export interface AuditInvocationReceipt {
+  readonly schema: 'ramify-agent.audit-invocation/1';
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly requestId: string;
+  readonly projectRoot: string;
+  readonly sourceCommit: string;
+  readonly projects: readonly AuditInvocationProject[];
+  readonly discovery: ConfiguredNestedDiscovery;
+  readonly invocationVerdict: 'pass' | 'fail' | 'indeterminate';
 }
 
 export interface AuditCheckExecutionOptions {
@@ -83,387 +144,804 @@ export interface AuditCheckExecutionOptions {
   readonly testLock?: TestLockOverride;
 }
 
-/**
- * Runs a verified gate plan over an existing commit in ramify-audit's
- * isolated worktree. This module is the only importer of ramify-audit.
- */
-export function createAuditCheckExecution(options: AuditCheckExecutionOptions): CheckExecutionPort {
-  return {
-    async run(checks, request) {
-      const runId = request.context.runId;
-      if (runId === undefined || runId.trim() === '') {
-        return executionFailure(await infrastructureRecords(checks, request, {
-          kind: 'audit-context',
-          message: 'An audit gate requires the durable run ID that owns its workspace',
-        }));
-      }
-      const receipt = await readAuditReceipt(checks, request);
-      if (receipt !== null) return receipt;
-      if (request.signal.aborted) return executionFailure(await interruptedRecords(checks, request, signalReason(request.signal)));
-
-      const baseGit = gitWithHarnessEnvironment();
-      let mapping: PathMapping;
-      let repository: Awaited<ReturnType<typeof resolveRepositoryExecutionLeaseIdentity>>;
-      let identity: Awaited<ReturnType<ReturnType<typeof createNodeExecutionLeaseProcessLookup>['lookup']>>;
-      try {
-        mapping = await resolvePathMapping(request.context.projectRoot, baseGit, request.signal);
-        repository = await resolveRepositoryExecutionLeaseIdentity(mapping.repositoryRoot, { git: baseGit });
-        identity = await createNodeExecutionLeaseProcessLookup().lookup(process.pid);
-      } catch (error) {
-        if (request.signal.aborted) return executionFailure(await interruptedRecords(checks, request, signalReason(request.signal)));
-        return executionFailure(await infrastructureRecords(checks, request, { kind: 'audit-context', message: errorMessage(error) }));
-      }
-      if (identity.status !== 'alive') {
-        return executionFailure(await infrastructureRecords(checks, request, {
-          kind: 'audit-process-identity',
-          message: 'The audit process identity could not be established before workspace creation',
-        }));
-      }
-
-      // The project's setup commands lead the plan. They are not checks of
-      // the audit: its preparation runs them in the worktree before any check.
-      const setupCount = leadingSetup(checks);
-      if (checks.slice(setupCount).some(check => check.kind === 'setup')) {
-        return executionFailure(await infrastructureRecords(checks, request, {
-          kind: 'audit-plan',
-          message: 'A setup command must come before every other command of an audited gate',
-        }));
-      }
-      const records = new Map<string, GateCommandRecord>();
-      const definitions = await checkDefinitions(checks, mapping, baseGit, request.context.sourceCommit, request.signal, request.context.auditAllTests);
-      const bound = new PausableDeadline(request.context.timeoutMs);
-      const signal = AbortSignal.any([request.signal, bound.signal]);
-      const pauseWait = () => {
-        const resumeAudit = bound.pause();
-        const resumeGate = request.pauseForTestLock?.();
-        return () => { resumeAudit(); resumeGate?.(); };
-      };
-      const bridge = createInProcessRegisteredExecutorBridge({
-        [executorId]: async (registered, signal) => {
-          if (registered.checkId === harnessCheckId) return harnessSummary(request);
-          const planned = plannedCheck(checks, registered.checkId);
-          if (planned === null) {
-            return {
-              status: 'failed',
-              error: { code: 'unknown-check', message: `No planned harness check matches "${registered.checkId}"` },
-            };
-          }
-          const [index, check] = planned;
-          const suite = check.kind === 'tests' || check.kind === 'scenarios';
-          const owner = { repositoryPath: mapping.repositoryRoot, runId, checkId: registered.checkId, command: check.command.argv.join(' ') };
-          let announced = false;
-          const start = async () => { if (announced) return; announced = true; await request.started?.(commandStart(checks, index)); };
-          let releaseWait: (() => void) | undefined;
-          let announcedWait = false;
-          const hooks: TestLockHooks = {
-            waiting: async line => {
-              releaseWait ??= pauseWait();
-              if (!announcedWait) {
-                announcedWait = true;
-                await request.waiting?.(commandStart(checks, index), line);
-              }
-            },
-            acquired: () => { releaseWait?.(); releaseWait = undefined; },
-            settled: () => { releaseWait?.(); releaseWait = undefined; },
-          };
-          const runner = suite ? testLockedRunner(async input => { await start(); return runCommand(input); }, owner, hooks, options.testLock) : runCommand;
-          if (!suite) await start();
-          const outputFile = checkOutputPath(request.directory, index, check);
-          const auditedProjectRoot = registered.workingDirectory;
-          const worktreeRoot = mapping.projectPrefix === '' ? auditedProjectRoot
-            : resolve(auditedProjectRoot, ...mapping.projectPrefix.split('/').map(() => '..'));
-          if (check.scenarios !== undefined) {
-            // The profiles and streams go into the attempt's directory,
-            // outside the worktree; the runs start in the worktree, and the
-            // configured commands' paths are rebased into it.
-            const outcome = await runScenarioCheck({
-              command: check.command,
-              plan: check.scenarios,
-              projectRoot: auditedProjectRoot,
-              attemptDirectory: request.directory,
-              outputFile,
-              rebase: argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot),
-              restore: text => mapping.restoreText(text, worktreeRoot),
-              signal,
-              runner: suite ? runner : undefined,
-            });
-            const record = request.classify(check, outcome.run, outputFile, outcome.summary);
-            const identified = { ...record, providerCheckId: registered.checkId };
-            await writeCommandReceipt(request, registered.checkId, identified);
-            records.set(registered.checkId, identified);
-            if (outcome.run.outcome.kind === 'cancelled') {
-              return { status: 'cancelled', reason: 'Gate execution was interrupted' };
-            }
-            // The producer parsed and aggregated every actual profile invocation.
-            // Keep that complete result, including each raw message stream, as
-            // the published check rather than rebuilding a second Cucumber
-            // verdict from the host's display summary.
-            return { status: 'completed', result: outcome.provider as AuditCheckSummary };
-          }
-          const testRun = registered.testRun;
-          const command = {
-            ...check.command,
-            cwd: mapping.rebaseProjectPath(check.command.cwd, auditedProjectRoot),
-            argv: testRun === undefined
-              ? check.command.argv.map(argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot))
-              : [testRun.command, ...testRun.args].map(argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot)),
-          };
-          const run = await runner({
-            argv: command.argv,
-            cwd: command.cwd,
-            env: { ...checkCommandEnvironment(check.command), ...testRun?.environment },
-            timeoutMs: testRun === undefined ? check.command.timeoutMs : request.context.auditAllTests?.timeoutMs ?? check.command.timeoutMs,
-            signal,
-          });
-          const mapped = await writeMappedRun(run, outputFile, mapping, worktreeRoot);
-          const record = request.classify(check, mapped, outputFile);
-          const identified = { ...record, providerCheckId: registered.checkId };
-          await writeCommandReceipt(request, registered.checkId, identified);
-          records.set(registered.checkId, identified);
-          if (mapped.outcome.kind === 'cancelled') {
-            return { status: 'cancelled', reason: 'Gate execution was interrupted' };
-          }
-          return {
-            status: 'completed', result: auditSummary(record, mapped),
-            ...(testRun === undefined ? {} : { testRun: { exitCode: mapped.outcome.kind === 'completed' ? mapped.outcome.exitCode : null } }),
-          };
-        },
-      });
-
-      // Each setup command is announced as the preparation starts its
-      // process: the audit runs no process of its own for a registered check,
-      // so every process it starts is the next setup command.
-      const setupStarts: string[] = [];
-      const processes = createNodeProcessExecutor();
-      const processExecutor: ProcessExecutorPort = {
-        async execute(input, signal) {
-          const index = setupStarts.length;
-          if (index < setupCount) {
-            setupStarts.push(new Date().toISOString());
-            await request.started?.(commandStart(checks, index));
-          }
-          return processes.execute(input, signal);
-        },
-      };
-      const auditStartedAt = new Date().toISOString();
-      const recordedWorkspace: { current: IntendedAuditWorkspace | null } = { current: null };
-      const git = recordingGit({
-        base: baseGit,
-        mapping,
-        repository,
-        request,
-        runId,
-        processIdentity: identity.startMarker,
-        recorder: options.workspaceOwnership,
-        recorded: workspace => { recordedWorkspace.current = workspace; },
-      });
-      const baseLease = createNodeRepositoryExecutionLease({ git: baseGit });
-      const executionLease = {
-        async acquire(input: Parameters<typeof baseLease.acquire>[0]) {
-          const ownership = await baseLease.acquire(input);
-          try {
-            await options.workspaceOwnership.recoverAbandonedWorkspaces({
-              repositoryRoot: mapping.repositoryRoot,
-              gitCommonDirectory: repository.gitCommonDirectory,
-              repositoryId: repository.repositoryId,
-            });
-            return ownership;
-          } catch (error) {
-            await ownership.release();
-            throw error;
-          }
-        },
-        validateOwnership: baseLease.validateOwnership.bind(baseLease),
-      };
-      const service = createAuditService({ git, processExecutor, registeredExecutors: bridge, executionLease });
-      let preparation: AuditRequest['workspacePreparation'];
-      try {
-        preparation = workspacePreparationOf({
-          projectRoot: mapping.projectRoot,
-          projectPrefix: mapping.projectPrefix,
-          dependencyDirectories: request.context.dependencyDirectories,
-          directory: request.directory,
-          setup: checks.slice(0, setupCount),
-        });
-      } catch (error) {
-        bound.dispose();
-        return executionFailure(await infrastructureRecords(checks, request, { kind: 'audit-plan', message: errorMessage(error) }));
-      }
-      const recovered = await findCompletedAuditRequest({
-        repositoryPath: mapping.repositoryRoot,
-        projectRoot: mapping.projectPrefix || '.',
-        requestId: `${runId}:${request.context.attemptId}`,
-        sourceCommit: request.context.sourceCommit,
-        git: baseGit,
-      });
-      if (recovered !== null) {
-        for (const [id, record] of await readCommandReceipts(request, checks)) records.set(id, record);
-      }
-      const result = recovered ?? await service.run(auditRequest(definitions, request, mapping, runId, preparation), signal).finally(() => bound.dispose());
-      if (recovered !== null) bound.dispose();
-      if (recordedWorkspace.current !== null) await options.workspaceOwnership.recordWorkspaceCleaned(recordedWorkspace.current);
-      // After workspace intent is recorded, library results may name the
-      // isolated worktree even though its finally block has removed it.
-      // Restore that exact prefix; before worktree selection there is no
-      // temporary path to restore, so repositoryRoot is a safe no-op.
-      const worktreePath = recordedWorkspace.current?.worktreePath ?? mapping.repositoryRoot;
-      const setup = { count: setupCount, starts: setupStarts, auditStartedAt, restore: (text: string) => mapping.restoreText(text, worktreePath) };
-
-      if (result.status === 'cancelled') return executionFailure(await interruptedRecords(checks, request, result.reason));
-      if (result.status === 'failed') {
-        const failed = await failedSetupRecords(checks, request, result.error, setup);
-        if (failed !== null) return executionFailure(failed);
-        return executionFailure(await infrastructureRecords(checks, request, {
-          kind: result.error.code,
-          message: auditFailureMessage(result.error, setup.restore),
-        }));
-      }
-      const unexpected = unexpectedCompletedAudit(result, request.context.sourceCommit);
-      if (unexpected !== null) return executionFailure(await infrastructureRecords(checks, request, unexpected));
-      const selected = new Set(result.summary.coverage.selection.selectedCheckIds);
-      const noExecution = result.summary.evidenceSchemaVersion === 3 && result.summary.noExecution === true;
-      const prepared = noExecution
-        ? { records: await omittedRecords(checks.slice(0, setupCount), request, 0) }
-        : await preparedSetupRecords(checks, request, result, setup, baseGit, mapping.repositoryRoot);
-      if ('missing' in prepared) {
-        return executionFailure(await infrastructureRecords(checks, request, {
-          kind: 'audit-result',
-          message: `The completed audit recorded no setup command at position ${prepared.missing.join(', ')}; the installed ramify-audit may not run setup commands`,
-        }));
-      }
-      const missing = missingExecutedRecords(definitions, selected, records);
-      if (missing.length > 0) {
-        return executionFailure(await infrastructureRecords(checks, request, {
-          kind: 'audit-result',
-          message: `The completed audit returned no harness command record for ${missing.join(', ')}`,
-        }));
-      }
-      const commands = [...prepared.records];
-      for (const [index, check] of checks.entries()) {
-        if (index < setupCount) continue;
-        const id = checkId(index, check);
-        const record = records.get(id);
-        if (record !== undefined) commands.push(record);
-        else if (!selected.has(id)) commands.push(...await omittedRecords([check], request, index));
-      }
-      let publishedChecks: Awaited<ReturnType<typeof readRawCheckResults>>;
-      try {
-        publishedChecks = await readRawCheckResults(result.summary, result.refs.reportCommit, mapping.repositoryRoot);
-      } catch (error) {
-        return executionFailure(await infrastructureRecords(checks, request, {
-          kind: 'audit-evidence-unavailable',
-          message: `The exact published check results at ${result.refs.reportCommit} could not be retrieved: ${errorMessage(error)}`,
-        }));
-      }
-      const reconciled = commands.map(command => {
-        const provider = command.providerCheckId === undefined ? undefined : publishedChecks[command.providerCheckId];
-        if (provider === undefined || provider.passed || command.outcome !== 'passed') return command;
-        const error = provider.runnerError;
-        return error === undefined ? { ...command, outcome: 'failed' as const }
-          : { ...command, outcome: 'not-verified' as const, notVerified: 'runner-error' as const,
-            runnerError: { kind: error.kind ?? 'provider-error', message: error.message ?? provider.summary } };
-      });
-      const completed: CheckExecutionResult = {
-        commands: reconciled,
-        audited: result.summary.sourceCommit,
-        evidence: { runRef: result.refs.runRef, reportCommit: result.refs.reportCommit, treeRef: result.refs.treeRef },
-        auditOverall: result.composition.verdict,
-        provider: { result, checks: publishedChecks },
-      };
-      await writeAuditReceipt(checks, request, completed);
-      return completed;
-    },
+/** The harness's durable view of a committed audit definition. Provider types stay in this child. */
+export interface CommittedAuditConfiguration {
+  readonly sourceCommit: string;
+  readonly path: string;
+  readonly blob: string;
+  readonly projectRoot: string;
+  readonly checks: readonly unknown[];
+  readonly ignorePaths: readonly string[];
+  readonly undetectedConfigFilesForcingFullAudit: readonly string[];
+  readonly workspace: {
+    readonly preparationId: string;
+    readonly packageDirectoriesDeclared: boolean;
+    readonly linkNodeModules: boolean;
+    readonly packageDirectories: readonly string[];
+    readonly setupCommands: readonly {
+      readonly name?: string;
+      readonly argv: readonly string[];
+      readonly cwd: string;
+      readonly env: Readonly<Record<string, string>>;
+      readonly timeoutMs: number;
+    }[];
   };
 }
 
-/** A receipt binds an exact published provider answer to one durable gate operation. */
-function auditReceiptIdentity(checks: readonly PlannedCheck[], request: CheckExecutionRequest): string {
-  return createHash('sha256').update(JSON.stringify({
-    runId: request.context.runId,
-    attemptId: request.context.attemptId,
-    sourceCommit: request.context.sourceCommit,
-    checks,
-  })).digest('hex');
+/**
+ * What the harness asks of the committed audit. `project-default` leaves the
+ * mode to the provider, which audits a Ramify project `ramify-partial` from
+ * its baseline and any other project in full; `full` asks for a full audit.
+ * Neither forces a fresh run: applicable evidence the provider returns is
+ * reused.
+ */
+export type ConfiguredAuditMode = 'project-default' | 'full';
+
+/** The provider's account of a reused record: what it audited and why it applies to the request. */
+export interface ConfiguredAuditReuse {
+  /** The commit the reused record audited. */
+  readonly auditedCommit: string;
+  /** Committed paths between that commit and the requested one, each ignored by the record's policy. */
+  readonly ignoredChangedPaths: readonly string[];
+  /** The mode this request resolved to; the record's own mode is `executedMode`. */
+  readonly requestedMode: 'full' | 'ramify-partial';
+  readonly resolution: 'requested' | 'defaulted';
 }
 
-function auditReceiptPath(request: CheckExecutionRequest): string {
-  return join(request.directory, 'provider-receipt.json');
+/** A count of one kind, summed over a project's checks. */
+export interface ConfiguredCountBucket {
+  readonly total: number;
+  readonly passed: number;
+  readonly failed: number;
+  readonly skipped: number;
 }
 
-function commandReceiptPath(request: CheckExecutionRequest, id: string): string {
-  return join(request.directory, 'provider-commands', `${id}.json`);
+/**
+ * One project of a nested invocation, the requested root first: the
+ * provider's verdict, failures and execution for it, and the identities of
+ * the record that answers it. Counts and duration are the record's own;
+ * a reused record's are those of the run that produced it.
+ */
+export interface ConfiguredProjectResult {
+  readonly projectRoot: string;
+  readonly verdict: 'pass' | 'fail' | 'indeterminate';
+  /** `ran` this invocation, `reused` an applicable earlier record, or `not-run`. */
+  readonly execution: 'ran' | 'reused' | 'not-run';
+  readonly failures: readonly string[];
+  /** `refused` when its completed record does not answer the request. */
+  readonly status: 'completed' | 'failed' | 'cancelled' | 'refused';
+  readonly requestId: string;
+  readonly auditedSourceCommit: string | null;
+  readonly requestedMode: 'full' | 'ramify-partial' | null;
+  readonly executedMode: 'full' | 'ramify-partial' | null;
+  readonly fallbackReason: string | null;
+  readonly reuse: ConfiguredAuditReuse | null;
+  readonly reportCommit: string | null;
+  readonly runRef: string | null;
+  readonly treeRef: string | null;
+  /** The provider's commands that retrieve the record. */
+  readonly retrievalCommands: readonly string[];
+  readonly durationSeconds: number | null;
+  readonly counts: {
+    readonly checks: ConfiguredCountBucket;
+    readonly tests: ConfiguredCountBucket | null;
+    readonly scenarios: ConfiguredCountBucket | null;
+  } | null;
+  readonly detail: string;
 }
 
-async function writeCommandReceipt(request: CheckExecutionRequest, id: string, record: GateCommandRecord): Promise<void> {
-  const path = commandReceiptPath(request, id);
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, JSON.stringify({
-    schema: 'ramify-agent.provider-command-receipt/1',
-    sourceCommit: request.context.sourceCommit,
-    id,
-    record,
-  }));
-  await rename(temporary, path);
+/** What nested discovery skipped and could not decide, as the provider answered it. */
+export interface ConfiguredNestedDiscovery {
+  readonly status: 'complete' | 'indeterminate';
+  readonly skipped: readonly {
+    readonly projectRoot: string;
+    readonly enclosingProject: string;
+    readonly reason: 'external' | 'output' | 'repository' | 'packages' | 'generated';
+    readonly directory: string;
+  }[];
+  readonly unavailable: readonly {
+    readonly enclosingProject: string;
+    readonly reason: string;
+    readonly definitions: readonly string[];
+  }[];
 }
 
-async function readCommandReceipts(request: CheckExecutionRequest, checks: readonly PlannedCheck[]): Promise<Map<string, GateCommandRecord>> {
-  const found = new Map<string, GateCommandRecord>();
-  for (const [index, check] of checks.entries()) {
-    if (check.kind === 'setup') continue;
-    const id = checkId(index, check);
-    const text = await readFile(commandReceiptPath(request, id), 'utf8').catch(() => null);
-    if (text === null) continue;
-    const body = JSON.parse(text) as { schema?: string; sourceCommit?: string; id?: string; record?: GateCommandRecord };
-    if (body.schema !== 'ramify-agent.provider-command-receipt/1' || body.sourceCommit !== request.context.sourceCommit
-      || body.id !== id || body.record?.providerCheckId !== id || body.record.kind !== check.kind
-      || JSON.stringify(body.record.command.argv) !== JSON.stringify(check.command.argv)) {
-      throw new Error(`The provider command receipt for ${id} does not match this gate operation`);
+/**
+ * One configured audit request's outcome, in the harness's vocabulary. A
+ * `completed` result carries the provider's composed verdict, which is the
+ * audit's health; a `refused` one completed with evidence that does not
+ * answer the request (another definition, universe or project, or a
+ * partial record for a full request), which the harness never treats as a
+ * pass. The provider result and its published check results are retained
+ * whole.
+ *
+ * A nested request's verdict is the provider's invocation verdict: a
+ * nested project's failure fails it, and indeterminate discovery or an
+ * unrun project leaves it indeterminate, whatever the root answered.
+ */
+export interface ConfiguredAuditResult {
+  readonly status: 'completed' | 'failed' | 'cancelled' | 'refused';
+  readonly requestId: string;
+  readonly mode: ConfiguredAuditMode;
+  /** Whether the request audited the tracked nested definitions too. */
+  readonly nested: boolean;
+  /** Every project of a nested invocation, the root first; null for a request of the root alone. */
+  readonly projects: readonly ConfiguredProjectResult[] | null;
+  /** What nested discovery skipped or could not decide; null for a request of the root alone. */
+  readonly discovery: ConfiguredNestedDiscovery | null;
+  readonly requestedSourceCommit: string;
+  /** The commit the returned record audited: the requested one, or the original one of a reused record. */
+  readonly auditedSourceCommit: string | null;
+  readonly reused: boolean;
+  readonly reuse: ConfiguredAuditReuse | null;
+  /** The mode the provider resolved the request to, and the one it executed. */
+  readonly requestedMode: 'full' | 'ramify-partial' | null;
+  readonly executedMode: 'full' | 'ramify-partial' | null;
+  readonly fallbackReason: string | null;
+  readonly verdict: 'pass' | 'fail' | 'indeterminate' | null;
+  readonly reportCommit: string | null;
+  readonly runRef: string | null;
+  readonly treeRef: string | null;
+  readonly definition: { readonly path: string; readonly blob: string };
+  readonly detail: string;
+  /** The exact provider result. */
+  readonly provider: unknown;
+  /** The published per-check results of the returned record, raw runner output included by reference. */
+  readonly checks: unknown;
+}
+
+/** Readiness's name for the same result. */
+export type ConfiguredFullAuditResult = ConfiguredAuditResult;
+
+/** Only machine-readable producer failures qualify a bounded rerun. */
+export function configuredFullRecovery(provider: unknown): 'timeout' | 'infrastructure' | null {
+  if (typeof provider !== 'object' || provider === null || !('status' in provider)) return null;
+  const result = provider as AuditResult;
+  if (result.status === 'failed') {
+    if (result.error.code === 'timeout' || result.error.code === 'test-lock-wait-exceeded' ||
+      (result.error.code === 'setup-command-timed-out' && result.error.details?.['cause'] === 'environment')) return 'timeout';
+    if (result.error.retryable === true && result.error.code !== 'discovery-failed') return 'infrastructure';
+    return null;
+  }
+  if (result.status !== 'completed') return null;
+  const commands = Object.values(result.summary.checks).flatMap(check => [check, ...Object.values(check.commands ?? {})]);
+  if (commands.some(command => (command.termination as { reason?: unknown } | undefined)?.reason === 'timeout' || command.runnerError?.kind === 'timeout')) return 'timeout';
+  return null;
+}
+
+/** One configured audit, as readiness and every committing gate ask for it. */
+export interface ConfiguredAuditInput {
+  readonly projectRoot: string;
+  readonly sourceCommit: string;
+  /** The configuration the run captured; the commit's own must equal it. */
+  readonly configuration: CommittedAuditConfiguration;
+  readonly mode: ConfiguredAuditMode;
+  /** Audit the tracked nested definitions too, as readiness's baseline and the final gate do. */
+  readonly nested?: boolean;
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly signal?: AbortSignal;
+  readonly started?: GateCommandStarted;
+  readonly waiting?: (command: GateCommandStart, line: string) => Promise<void>;
+  readonly lockAcquired?: () => void;
+}
+
+/**
+ * Whether two reads of the committed audit definition carry the same policy:
+ * the same definition path and blob, checks, ignore list, undetected
+ * configuration and workspace preparation. The commit each was read at is
+ * not part of the policy: a run captures it at readiness and asks it of
+ * every later candidate commit, whose definition must be unchanged.
+ */
+export function sameAuditPolicy(current: CommittedAuditConfiguration, captured: CommittedAuditConfiguration): boolean {
+  const policy = ({ sourceCommit: _commit, ...rest }: CommittedAuditConfiguration) => canonical(rest);
+  return policy(current) === policy(captured);
+}
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (typeof value === 'object' && value !== null) {
+    return `{${Object.keys(value).sort().filter(key => (value as Record<string, unknown>)[key] !== undefined)
+      .map(key => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export interface ConfiguredAuditPort {
+  read(projectRoot: string, sourceCommit: string, signal?: AbortSignal): Promise<CommittedAuditConfiguration>;
+  run(input: ConfiguredAuditInput): Promise<ConfiguredAuditResult>;
+}
+
+export function createConfiguredAudit(options: AuditCheckExecutionOptions): ConfiguredAuditPort {
+  return {
+    read: readCommittedAuditConfiguration,
+    run: input => runConfiguredAudit({ ...input, workspaceOwnership: options.workspaceOwnership,
+      ...(options.testLock === undefined ? {} : { testLock: options.testLock }) }),
+  };
+}
+
+/**
+ * Run the project's committed audit over `sourceCommit` with durable
+ * workspace ownership. A completed request of the same identity is
+ * recovered rather than run again. The captured configuration must equal the
+ * commit's own: a run never audits under a policy it did not capture.
+ */
+export async function runConfiguredAudit(input: ConfiguredAuditInput & {
+  readonly workspaceOwnership: AuditWorkspaceOwnershipRecorder;
+  readonly testLock?: TestLockOverride;
+}): Promise<ConfiguredAuditResult> {
+  const baseGit = gitWithHarnessEnvironment();
+  const signal = input.signal ?? new AbortController().signal;
+  const mapping = await resolvePathMapping(input.projectRoot, baseGit, signal);
+  const current = await readCommittedAuditConfiguration(input.projectRoot, input.sourceCommit, signal);
+  if (!sameAuditPolicy(current, input.configuration)) {
+    throw new Error(`Captured audit policy conflicts with ${current.path} at ${input.sourceCommit}; start a new run after reconciling the configuration`);
+  }
+  const nested = input.nested === true;
+  const request = await requestFromCommittedConfiguration({
+    git: baseGit, repositoryPath: mapping.repositoryRoot, sourceCommit: input.sourceCommit,
+    projectRoot: mapping.projectPrefix || '.', full: input.mode === 'full', force: false, nested,
+  });
+  request.requestId = `${input.runId}:${input.attemptId}`;
+  const repository = await resolveRepositoryExecutionLeaseIdentity(mapping.repositoryRoot, { git: baseGit });
+  const identity = await createNodeExecutionLeaseProcessLookup().lookup(process.pid);
+  if (identity.status !== 'alive') throw new Error('The audit process identity could not be established before workspace creation');
+  let workspace: IntendedAuditWorkspace | null = null;
+  const git = recordingGit({
+    base: baseGit, mapping, repository, sourceCommit: input.sourceCommit, attemptId: input.attemptId,
+    runId: input.runId, processIdentity: identity.startMarker, recorder: input.workspaceOwnership,
+    recorded: value => { workspace = value; },
+  });
+  const baseLease = createNodeRepositoryExecutionLease({ git: baseGit });
+  const executionLease = {
+    async acquire(value: Parameters<typeof baseLease.acquire>[0]) {
+      const ownership = await baseLease.acquire(value);
+      try {
+        await input.workspaceOwnership.recoverAbandonedWorkspaces({
+          repositoryRoot: mapping.repositoryRoot,
+          gitCommonDirectory: repository.gitCommonDirectory,
+          repositoryId: repository.repositoryId,
+        });
+        return ownership;
+      } catch (error) {
+        await ownership.release();
+        throw error;
+      }
+    },
+    validateOwnership: baseLease.validateOwnership.bind(baseLease),
+  };
+  // A completed request is retrieved by its durable identities, never run
+  // again. A root alone is found by its request; a nested invocation by the
+  // receipt the harness recorded when the provider answered it. A root
+  // record without a receipt is an invocation interrupted before its nested
+  // projects completed: the provider is asked again, and answers every
+  // project it already published from that evidence.
+  const receipt = nested ? await input.workspaceOwnership.auditInvocation(input.runId, input.attemptId) : null;
+  if (receipt !== null && (receipt.requestId !== request.requestId || receipt.sourceCommit !== input.sourceCommit
+    || receipt.projectRoot !== (mapping.projectPrefix || '.'))) {
+    throw new Error(`The recorded audit invocation of ${input.attemptId} answers request ${receipt.requestId} at ${receipt.sourceCommit}, not ${request.requestId} at ${input.sourceCommit}`);
+  }
+  const recovered = receipt !== null
+    ? await retrieveInvocation(receipt, mapping.repositoryRoot, baseGit)
+    : nested ? null : await findCompletedAuditRequest({ repositoryPath: mapping.repositoryRoot,
+      projectRoot: mapping.projectPrefix || '.', requestId: request.requestId, sourceCommit: input.sourceCommit, git: baseGit });
+  if (recovered?.status === 'completed') {
+    // Settle any abandoned workspace of this request before its recovered result is used.
+    const ownership = await executionLease.acquire({ repositoryPath: mapping.repositoryRoot,
+      operation: 'audit-request-recovery', metadata: { requestId: request.requestId }, signal });
+    await ownership.release();
+  }
+  const checkStarts = new Map(request.checks.map((check, index) => [check.id, {
+    kind: 'configured' as const, name: check.name, position: index + 1, total: request.checks.length,
+  }]));
+  const progress = configuredAuditProgress(checkStarts, input);
+  const result = recovered ?? await createAuditService({ git, processExecutor: configuredProcessExecutor(input.configuration, () => {
+    if (workspace === null) throw new Error('The configured audit workspace was not recorded before process execution');
+    return mapping.projectRootIn(workspace.worktreePath);
+  }, nested ? nestedDefinitionCommands(baseGit, mapping.repositoryRoot, input.sourceCommit, () => {
+    if (workspace === null) throw new Error('The configured audit workspace was not recorded before process execution');
+    return workspace.worktreePath;
+  }) : undefined), executionLease,
+    ...(input.testLock === undefined ? {} : { machineTestLock: input.testLock }),
+    eventSink: { emit: progress.emit },
+  }).run(request, signal).finally(progress.settleAll);
+  if (workspace !== null) await input.workspaceOwnership.recordWorkspaceCleaned(workspace);
+  // A cancelled invocation keeps no receipt: asked again, the provider
+  // answers the projects it published and runs the ones it did not.
+  if (nested && recovered === null && !signal.aborted
+    && result.projects !== undefined && result.discovery !== undefined && result.invocationVerdict !== undefined) {
+    await input.workspaceOwnership.recordAuditInvocation(invocationReceipt(result, input, request.requestId, mapping.projectPrefix || '.'));
+  }
+  return configuredAuditResult(result, { ...input, nested }, request.requestId, mapping.repositoryRoot);
+}
+
+/** The identities of a nested invocation's answer, as its durable receipt holds them. */
+function invocationReceipt(
+  result: AuditResult,
+  input: Pick<ConfiguredAuditInput, 'runId' | 'attemptId' | 'sourceCommit'>,
+  requestId: string,
+  projectRoot: string,
+): AuditInvocationReceipt {
+  return {
+    schema: 'ramify-agent.audit-invocation/1', runId: input.runId, attemptId: input.attemptId, requestId, projectRoot,
+    sourceCommit: input.sourceCommit,
+    projects: (result.projects ?? []).map(project => {
+      const answer = project.result;
+      return {
+        projectRoot: project.projectRoot, verdict: project.verdict, execution: project.execution, failures: [...project.failures],
+        requestId: answer.requestId, runId: answer.status === 'failed' ? answer.runId ?? null : answer.runId,
+        record: answer.status === 'completed' ? {
+          requestId: answer.summary.execution?.requestId ?? answer.requestId, sourceCommit: answer.summary.sourceCommit,
+          reportCommit: answer.refs.reportCommit, runRef: answer.refs.runRef, treeRef: answer.refs.treeRef,
+        } : null,
+        reused: answer.status === 'completed' && answer.reused !== undefined ? {
+          sourceCommit: answer.reused.sourceCommit, auditedCommit: answer.reused.auditedCommit,
+          ignoredChangedPaths: [...answer.reused.ignoredChangedPaths],
+          requestedMode: answer.reused.requestedMode, resolution: answer.reused.resolution,
+        } : null,
+        unpublished: answer.status === 'completed' ? null : structuredClone(answer),
+      };
+    }),
+    discovery: structuredClone(result.discovery!) as ConfiguredNestedDiscovery,
+    invocationVerdict: result.invocationVerdict!,
+  };
+}
+
+/**
+ * A recorded nested invocation, rebuilt from its projects' exact published
+ * records: each found again by its own request and source commit, never by
+ * a mutable latest ref, and checked against the receipt. Nothing runs. The
+ * invocation's discovery and verdict are the receipt's, which no project
+ * record holds.
+ */
+async function retrieveInvocation(receipt: AuditInvocationReceipt, repositoryRoot: string, git: GitExecutorPort): Promise<AuditResult> {
+  const projects: NonNullable<AuditResult['projects']> = [];
+  for (const project of receipt.projects) {
+    let answer: ProjectAuditResult;
+    if (project.record === null) {
+      answer = structuredClone(project.unpublished) as ProjectAuditResult;
+      if (typeof answer !== 'object' || answer === null || answer.status === 'completed') {
+        throw new Error(`The recorded audit invocation keeps no answer for unpublished project ${project.projectRoot}`);
+      }
+    } else {
+      const found = await findCompletedAuditRequest({ repositoryPath: repositoryRoot, projectRoot: project.projectRoot,
+        requestId: project.record.requestId, sourceCommit: project.record.sourceCommit, git });
+      if (found?.status !== 'completed' || found.refs.reportCommit !== project.record.reportCommit || found.refs.runRef !== project.record.runRef) {
+        throw new Error(`The recorded audit report ${project.record.reportCommit} of project ${project.projectRoot} is not retrievable`);
+      }
+      if (found.composition.verdict !== project.verdict) {
+        throw new Error(`The recorded audit report of project ${project.projectRoot} composes ${found.composition.verdict}, not the recorded ${project.verdict}`);
+      }
+      answer = {
+        ...found, requestId: project.requestId, runId: project.runId ?? found.runId,
+        ...(project.reused === null ? {} : { reused: { ...project.reused, ignoredChangedPaths: [...project.reused.ignoredChangedPaths] } }),
+      };
     }
-    found.set(id, body.record);
+    projects.push({ projectRoot: project.projectRoot, verdict: project.verdict, execution: project.execution,
+      failures: [...project.failures], result: answer });
   }
-  return found;
+  const root = projects.find(project => project.projectRoot === receipt.projectRoot);
+  if (root === undefined) throw new Error(`The recorded audit invocation has no result for its root ${receipt.projectRoot}`);
+  return { ...root.result, projects, discovery: structuredClone(receipt.discovery) as NestedDiscoveryOutcome,
+    invocationVerdict: receipt.invocationVerdict };
 }
 
-async function readAuditReceipt(checks: readonly PlannedCheck[], request: CheckExecutionRequest): Promise<CheckExecutionResult | null> {
-  const text = await readFile(auditReceiptPath(request), 'utf8').catch(() => null);
-  if (text === null) return null;
-  const body = JSON.parse(text) as { schema?: string; identity?: string; completed?: CheckExecutionResult };
-  if (body.schema !== 'ramify-agent.provider-receipt/1' || body.identity !== auditReceiptIdentity(checks, request) || body.completed === undefined) {
-    throw new Error(`The provider receipt at ${auditReceiptPath(request)} does not match this gate operation`);
+/** The harness's account of one provider result, refusing completed evidence that does not answer the request. */
+async function configuredAuditResult(
+  result: AuditResult,
+  input: Pick<ConfiguredAuditInput, 'sourceCommit' | 'configuration' | 'mode'> & { readonly nested: boolean },
+  requestId: string,
+  repositoryRoot: string,
+): Promise<ConfiguredAuditResult> {
+  const nested = input.nested;
+  const projects = nested && result.projects !== undefined
+    ? result.projects.map(project => configuredProjectResult(project, input.configuration.projectRoot, input.mode, input.sourceCommit))
+    : null;
+  const discovery = nested && result.discovery !== undefined ? structuredClone(result.discovery) as ConfiguredNestedDiscovery : null;
+  const base = {
+    requestId, mode: input.mode, nested, projects, discovery, requestedSourceCommit: input.sourceCommit,
+    definition: { path: input.configuration.path, blob: input.configuration.blob },
+  };
+  if (result.status !== 'completed') return {
+    ...base, status: result.status, auditedSourceCommit: null, reused: false, reuse: null,
+    requestedMode: null, executedMode: null, fallbackReason: null,
+    verdict: null, reportCommit: null, runRef: null, treeRef: null,
+    detail: result.status === 'failed' ? `${result.error.code}: ${result.error.message}` : result.reason,
+    provider: result, checks: {},
+  };
+  const reuse = result.reused === undefined ? null : {
+    auditedCommit: result.reused.auditedCommit, ignoredChangedPaths: [...result.reused.ignoredChangedPaths],
+    requestedMode: result.reused.requestedMode, resolution: result.reused.resolution,
+  };
+  const completed = {
+    ...base, auditedSourceCommit: result.summary.sourceCommit, reused: reuse !== null, reuse,
+    requestedMode: result.summary.mode.requestedMode, executedMode: result.summary.mode.executedMode,
+    fallbackReason: result.summary.mode.fallbackReason ?? null,
+    reportCommit: result.refs.reportCommit, runRef: result.refs.runRef, treeRef: result.refs.treeRef,
+    provider: result,
+  };
+  const refusal = configuredResultRefusal(result, input.configuration, input.mode, input.sourceCommit)
+    ?? (nested ? nestedInvocationRefusal(result, projects ?? []) : null);
+  if (refusal !== null) return { ...completed, status: 'refused', verdict: null, detail: refusal, checks: {} };
+  // The record's published check results carry each command's complete
+  // runner evidence; the run-local summary is never read in their place.
+  const checks = await readRawCheckResults(result.summary, result.refs.reportCommit, repositoryRoot, gitWithHarnessEnvironment());
+  if (nested) {
+    // The invocation's verdict, never the root's alone: a nested failure,
+    // an unrun project or indeterminate discovery decides it.
+    const verdict = result.invocationVerdict!;
+    return { ...completed, status: 'completed', verdict, detail: invocationDetail(verdict, projects ?? [], discovery!), checks };
   }
-  return body.completed;
+  return {
+    ...completed, status: 'completed', verdict: result.composition.verdict,
+    detail: result.composition.reason ?? `composed ${result.composition.verdict}`, checks,
+  };
 }
 
-async function writeAuditReceipt(checks: readonly PlannedCheck[], request: CheckExecutionRequest, completed: CheckExecutionResult): Promise<void> {
-  const path = auditReceiptPath(request);
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, JSON.stringify({
-    schema: 'ramify-agent.provider-receipt/1',
-    identity: auditReceiptIdentity(checks, request),
-    completed,
-  }));
-  await rename(temporary, path);
+/**
+ * Why a completed nested invocation does not answer the request, or null
+ * when it does: it must carry every project, its discovery and its verdict,
+ * name the root first, and every nested project's completed record must
+ * answer the request as the root's does. A project that did not complete is
+ * an unrun project, which the invocation verdict already accounts for.
+ */
+export function nestedInvocationRefusal(result: AuditResult, projects: readonly ConfiguredProjectResult[]): string | null {
+  if (result.projects === undefined || result.discovery === undefined || result.invocationVerdict === undefined) {
+    return 'a nested request was answered without its project results, discovery and invocation verdict';
+  }
+  const root = result.status === 'completed' ? result.summary.coverage.projectRoot : null;
+  if (projects[0]?.projectRoot !== root) return `a nested request was answered without the root project ${root ?? 'unknown'} first`;
+  if (new Set(projects.map(project => project.projectRoot)).size !== projects.length) return 'a nested request was answered with a project twice';
+  const refused = projects.find(project => project.status === 'refused');
+  return refused === undefined ? null : `nested project ${refused.projectRoot}: ${refused.detail}`;
 }
 
-/** Only a check the audit selected and executed owes the harness a command record. */
-export function missingExecutedRecords(
-  definitions: readonly CheckDefinition[], selected: ReadonlySet<string>, records: ReadonlyMap<string, GateCommandRecord>,
-): string[] {
-  return definitions.filter(definition => definition.id !== harnessCheckId && selected.has(definition.id) && !records.has(definition.id))
-    .map(definition => definition.id);
+/** One provider project outcome in the harness's vocabulary, its completed record checked as the root's is. */
+export function configuredProjectResult(
+  outcome: AuditProjectOutcome,
+  rootProject: string,
+  mode: ConfiguredAuditMode,
+  sourceCommit: string,
+): ConfiguredProjectResult {
+  const answer = outcome.result;
+  const common = {
+    projectRoot: outcome.projectRoot, verdict: outcome.verdict, execution: outcome.execution, failures: [...outcome.failures],
+    requestId: answer.requestId,
+  };
+  if (answer.status !== 'completed') return {
+    ...common, status: answer.status, auditedSourceCommit: null, requestedMode: null, executedMode: null, fallbackReason: null,
+    reuse: null, reportCommit: null, runRef: null, treeRef: null, retrievalCommands: [], durationSeconds: null, counts: null,
+    detail: answer.status === 'failed' ? `${answer.error.code}: ${answer.error.message}` : answer.reason,
+  };
+  // The root is checked against the captured definition; a nested project
+  // against its own record: the same project, source and full execution.
+  const refusal = outcome.projectRoot === rootProject ? null : nestedProjectRefusal(answer, outcome.projectRoot, mode, sourceCommit);
+  return {
+    ...common, status: refusal === null ? 'completed' : 'refused',
+    auditedSourceCommit: answer.summary.sourceCommit,
+    requestedMode: answer.summary.mode.requestedMode, executedMode: answer.summary.mode.executedMode,
+    fallbackReason: answer.summary.mode.fallbackReason ?? null,
+    reuse: answer.reused === undefined ? null : {
+      auditedCommit: answer.reused.auditedCommit, ignoredChangedPaths: [...answer.reused.ignoredChangedPaths],
+      requestedMode: answer.reused.requestedMode, resolution: answer.reused.resolution,
+    },
+    reportCommit: answer.refs.reportCommit, runRef: answer.refs.runRef, treeRef: answer.refs.treeRef,
+    retrievalCommands: [...answer.retrievalCommands],
+    durationSeconds: answer.summary.durationSeconds ?? null,
+    counts: countsOf(answer.summary.checks),
+    detail: refusal ?? answer.composition.reason ?? `composed ${answer.composition.verdict}`,
+  };
 }
 
-async function omittedRecords(checks: readonly PlannedCheck[], request: CheckExecutionRequest, offset: number): Promise<GateCommandRecord[]> {
-  return Promise.all(checks.map(async (check, position) => {
-    const outputFile = checkOutputPath(request.directory, offset + position, check);
-    await writeFile(outputFile, '');
-    return notRun(check, outputFile, new Date().toISOString(), 'audit-unselected');
-  }));
+/** Why a nested project's completed record does not answer the request, or null when it does. */
+function nestedProjectRefusal(
+  answer: Extract<ProjectAuditResult, { status: 'completed' }>,
+  projectRoot: string,
+  mode: ConfiguredAuditMode,
+  sourceCommit: string,
+): string | null {
+  if (answer.summary.evidenceSchemaVersion !== 4 || answer.summary.producer.name !== 'ramify-audit') return 'the result is not schema-4 ramify-audit evidence';
+  if (answer.summary.coverage.projectRoot !== projectRoot) return `the result audited project ${answer.summary.coverage.projectRoot}, not ${projectRoot}`;
+  if (answer.reused === undefined ? answer.summary.sourceCommit !== sourceCommit
+    : answer.reused.sourceCommit !== sourceCommit || answer.reused.auditedCommit !== answer.summary.sourceCommit) {
+    return `the result does not answer source ${sourceCommit}`;
+  }
+  if (mode === 'full' && (answer.summary.mode.executedMode !== 'full' || answer.composition.scoped || answer.summary.coverage.selection.kind !== 'full')) {
+    return 'a full request was answered by evidence that is not an executed full audit';
+  }
+  return null;
 }
 
-function executionFailure(commands: readonly GateCommandRecord[]) {
-  return { commands, audited: null, evidence: null };
+/** The record's own counts: its checks by status, and its tests and scenarios summed over every check that reports them. */
+function countsOf(checks: Readonly<Record<string, AuditCheckSummary>>): ConfiguredProjectResult['counts'] {
+  const bucket = () => ({ total: 0, passed: 0, failed: 0, skipped: 0 });
+  const tally = bucket();
+  let tests: ConfiguredCountBucket | null = null;
+  let scenarios: ConfiguredCountBucket | null = null;
+  const add = (into: ConfiguredCountBucket | null, value: unknown): ConfiguredCountBucket | null => {
+    if (typeof value !== 'object' || value === null) return into;
+    const counts = value as Partial<Record<keyof ConfiguredCountBucket, unknown>>;
+    const number = (key: keyof ConfiguredCountBucket) => (typeof counts[key] === 'number' ? counts[key] as number : 0);
+    const base = into ?? bucket();
+    return { total: base.total + number('total'), passed: base.passed + number('passed'), failed: base.failed + number('failed'), skipped: base.skipped + number('skipped') };
+  };
+  for (const check of Object.values(checks)) {
+    tally.total += 1;
+    const status = check.status ?? (check.passed ? 'pass' : 'fail');
+    if (status === 'pass' || status === 'warn') tally.passed += 1;
+    else if (status === 'fail') tally.failed += 1;
+    else tally.skipped += 1;
+    tests = add(tests, check.counts?.['tests']);
+    scenarios = add(scenarios, check.counts?.['scenarios']);
+  }
+  return { checks: tally, tests, scenarios };
+}
+
+/** One sentence for a nested invocation's verdict: which projects failed or did not run, and what discovery could not decide. */
+function invocationDetail(verdict: 'pass' | 'fail' | 'indeterminate', projects: readonly ConfiguredProjectResult[], discovery: ConfiguredNestedDiscovery): string {
+  const parts = [`invocation ${verdict} over ${projects.length} project${projects.length === 1 ? '' : 's'}`];
+  const failed = projects.filter(project => project.verdict === 'fail').map(project => project.projectRoot);
+  const unsettled = projects.filter(project => project.verdict === 'indeterminate').map(project => project.projectRoot);
+  if (failed.length > 0) parts.push(`failed: ${failed.join(', ')}`);
+  if (unsettled.length > 0) parts.push(`indeterminate: ${unsettled.join(', ')}`);
+  if (discovery.status === 'indeterminate') parts.push(`discovery indeterminate beneath ${discovery.unavailable.map(gap => gap.enclosingProject).join(', ')}`);
+  if (discovery.skipped.length > 0) parts.push(`skipped: ${discovery.skipped.map(skip => `${skip.projectRoot} (${skip.reason})`).join(', ')}`);
+  return parts.join('; ');
+}
+
+/**
+ * Why a completed provider result does not answer this request, or null
+ * when it does. Its record must be schema-4 ramify-audit evidence of the
+ * same project, definition and check universe, for the requested commit or,
+ * when reused, applicable to it. A full request is answered only by an
+ * executed full record; a partial chain never stands in for one.
+ */
+export function configuredResultRefusal(
+  result: Extract<AuditResult, { status: 'completed' }>,
+  configuration: CommittedAuditConfiguration,
+  mode: ConfiguredAuditMode,
+  sourceCommit: string,
+): string | null {
+  const claim = result.summary.coverage.claim['configuration'];
+  const identity = typeof claim === 'object' && claim !== null && !Array.isArray(claim) ? claim as Record<string, unknown> : {};
+  const expected = configuration.checks.flatMap(check => typeof check === 'object' && check !== null && 'id' in check && typeof check.id === 'string' ? [check.id] : []);
+  if (result.summary.evidenceSchemaVersion !== 4 || result.summary.producer.name !== 'ramify-audit') return 'the result is not schema-4 ramify-audit evidence';
+  if (result.summary.coverage.projectRoot !== configuration.projectRoot) return `the result audited project ${result.summary.coverage.projectRoot}, not ${configuration.projectRoot}`;
+  if (identity['path'] !== configuration.path || identity['blob'] !== configuration.blob) return `the result was not produced under the captured definition ${configuration.path} blob ${configuration.blob}`;
+  if (expected.length !== configuration.checks.length ||
+    JSON.stringify([...result.summary.coverage.universe.checkIds].sort()) !== JSON.stringify([...expected].sort())) return 'the result ran another check universe';
+  if (result.reused === undefined ? result.summary.sourceCommit !== sourceCommit
+    : result.reused.sourceCommit !== sourceCommit || result.reused.auditedCommit !== result.summary.sourceCommit) {
+    return `the result does not answer source ${sourceCommit}`;
+  }
+  if (mode === 'full' && (result.summary.mode.executedMode !== 'full' || result.composition.scoped || result.summary.coverage.selection.kind !== 'full')) {
+    return 'a full request was answered by evidence that is not an executed full audit';
+  }
+  // Every check of the universe is either selected or omitted by the
+  // provider's own selection, and every selected check has its record: no
+  // required check passes through an absent result. The record is the
+  // original audit's; reuse adds no receipt and needs none.
+  const selection = result.summary.coverage.selection;
+  const accounted = [...selection.selectedCheckIds, ...selection.omittedCheckIds].sort();
+  if (JSON.stringify(accounted) !== JSON.stringify([...expected].sort())) return 'the result\'s selection does not account for every configured check';
+  const unrecorded = selection.selectedCheckIds.filter(id => result.summary.checks[id] === undefined);
+  if (unrecorded.length > 0) return `the result has no record of selected check ${unrecorded.join(', ')}`;
+  return null;
+}
+
+/** Internal recovery predicate: only compatible executed-full evidence may complete readiness. */
+export function configuredFullResultMatches(result: Extract<AuditResult, { status: 'completed' }>, configuration: CommittedAuditConfiguration): boolean {
+  return configuredResultRefusal(result, configuration, 'full', result.reused?.sourceCommit ?? result.summary.sourceCommit) === null;
+}
+
+/** Read only the exact committed definition through the installed public provider. */
+export async function readCommittedAuditConfiguration(projectRoot: string, sourceCommit: string, signal?: AbortSignal): Promise<CommittedAuditConfiguration> {
+  const git = gitWithHarnessEnvironment();
+  const mapping = await resolvePathMapping(projectRoot, git, signal ?? new AbortController().signal);
+  const request = await requestFromCommittedConfiguration({
+    git, repositoryPath: mapping.repositoryRoot, sourceCommit, projectRoot: mapping.projectPrefix || '.', full: true, force: false,
+  });
+  const configuration = (request.coverageClaim as { configuration?: { path?: string; sourceCommit?: string; blob?: string } } | undefined)?.configuration;
+  if (configuration?.sourceCommit !== sourceCommit || typeof configuration.path !== 'string' || typeof configuration.blob !== 'string') {
+    throw new Error(`The audit provider did not bind the committed definition to ${sourceCommit}`);
+  }
+  if (request.workspaceMode === 'existing-worktree' || request.workspacePreparation?.preparationId !== preparationId) {
+    throw new Error(`${configuration.path} must declare supported nodejs preparation for a harness run`);
+  }
+  const options = request.workspacePreparation.options ?? {};
+  const projectPrefix = options['projectPrefix'];
+  if (projectPrefix !== undefined && projectPrefix !== mapping.projectPrefix && projectPrefix !== (mapping.projectPrefix || '.')) {
+    throw new Error(`${configuration.path} workspace.options.projectPrefix must equal the audited project root ${mapping.projectPrefix || '.'}`);
+  }
+  const linkNodeModules = options['linkNodeModules'] ?? true;
+  if (typeof linkNodeModules !== 'boolean') throw new Error(`${configuration.path} workspace.options.linkNodeModules must be boolean`);
+  const directories = options['packageDirectories'];
+  const setup = options['setupCommands'];
+  if (directories !== undefined && (!Array.isArray(directories) || directories.some(value => typeof value !== 'string'))) {
+    throw new Error(`${configuration.path} workspace.options.packageDirectories must be string paths`);
+  }
+  if (directories !== undefined && linkNodeModules === false) throw new Error(`${configuration.path} cannot list packageDirectories with linkNodeModules: false`);
+  const relativeDirectory = (value: string) => value.replaceAll('\\', '/').split('/').every(segment => segment !== '..') &&
+    !value.startsWith('/') && !/^[A-Za-z]:/u.test(value);
+  if ((directories ?? []).some(value => typeof value !== 'string' || !relativeDirectory(value))) {
+    throw new Error(`${configuration.path} workspace packageDirectories must remain inside the project`);
+  }
+  if (setup !== undefined && !Array.isArray(setup)) {
+    throw new Error(`${configuration.path} workspace.options.setupCommands must be an ordered command array`);
+  }
+  const commands = (setup ?? []).map((value: unknown, index: number) => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error(`${configuration.path} setup command ${index + 1} must be an object`);
+    const item = value as Record<string, unknown>;
+    if (typeof item['cmd'] !== 'string' || item['cmd'] === '' || !Array.isArray(item['args']) || item['args'].some(arg => typeof arg !== 'string') ||
+      (item['cwd'] !== undefined && typeof item['cwd'] !== 'string') ||
+      (item['env'] !== undefined && (typeof item['env'] !== 'object' || item['env'] === null || Array.isArray(item['env']) || Object.values(item['env']).some(entry => typeof entry !== 'string'))) ||
+      (item['timeoutMs'] !== undefined && (!Number.isInteger(item['timeoutMs']) || (item['timeoutMs'] as number) <= 0))) {
+      throw new Error(`${configuration.path} setup command ${index + 1} has unsupported argv, cwd, env or timeout`);
+    }
+    return {
+      ...(typeof item['name'] === 'string' ? { name: item['name'] } : {}),
+      argv: [item['cmd'], ...item['args']] as string[],
+      cwd: typeof item['cwd'] === 'string' ? item['cwd'] : '.',
+      env: (item['env'] ?? {}) as Record<string, string>,
+      timeoutMs: typeof item['timeoutMs'] === 'number' ? item['timeoutMs'] : 600_000,
+    };
+  });
+  const build = options['build'] === undefined ? setup === undefined : options['build'];
+  if (typeof build !== 'boolean') throw new Error(`${configuration.path} workspace.options.build must be boolean`);
+  if (build) {
+    const manifest = await gitText(git, mapping.repositoryRoot,
+      ['show', `${sourceCommit}:${mapping.projectPrefix === '' ? '' : `${mapping.projectPrefix}/`}package.json`], signal ?? new AbortController().signal).catch(() => null);
+    let scripts: unknown;
+    try { scripts = manifest === null ? undefined : (JSON.parse(manifest) as { scripts?: unknown }).scripts; }
+    catch { scripts = undefined; }
+    if (typeof scripts === 'object' && scripts !== null && typeof (scripts as Record<string, unknown>)['build'] === 'string') {
+      commands.unshift({ name: 'build', argv: ['npm', 'run', 'build'], cwd: '.', env: {}, timeoutMs: 120_000 });
+    }
+  }
+  return {
+    sourceCommit, path: configuration.path, blob: configuration.blob, projectRoot: mapping.projectPrefix || '.',
+    checks: structuredClone(request.checks), ignorePaths: request.ignorePaths ?? [],
+    undetectedConfigFilesForcingFullAudit: request.undetectedConfigFilesForcingFullAudit ?? [],
+    workspace: { preparationId, packageDirectoriesDeclared: directories !== undefined, linkNodeModules,
+      packageDirectories: (directories ?? ['']) as string[], setupCommands: commands },
+  };
+}
+
+/** Project provider check events into existing run progress without command records. */
+export function configuredAuditProgress(
+  checks: ReadonlyMap<string, GateCommandStart>,
+  callbacks: { readonly started?: GateCommandStarted; readonly waiting?: (command: GateCommandStart, line: string) => Promise<void>;
+    readonly lockAcquired?: () => void },
+): { emit(event: AuditEvent): Promise<void>; settleAll(): void } {
+  const waits = new Set<string>();
+  let activeWait = false;
+  const releaseIfIdle = () => { if (activeWait && waits.size === 0) { activeWait = false; callbacks.lockAcquired?.(); } };
+  return {
+    async emit(event) {
+      if (event.type === 'check.started') {
+        const command = checks.get(event.checkId);
+        if (command !== undefined) await callbacks.started?.(command);
+      }
+      if (event.type === 'check.waiting') {
+        const command = checks.get(event.checkId);
+        if (command !== undefined) {
+          waits.add(`${event.checkId}\0${event.command}`);
+          activeWait = true;
+          await callbacks.waiting?.(command, `Waiting for audit test lock ${event.lockPath}`);
+        }
+      }
+      if (event.type === 'check.lock-acquired') {
+        if (waits.delete(`${event.checkId}\0${event.command}`)) releaseIfIdle();
+      }
+      if (event.type === 'check.completed') {
+        for (const key of waits) if (key.startsWith(`${event.checkId}\0`)) waits.delete(key);
+        releaseIfIdle();
+      }
+    },
+    settleAll() { waits.clear(); releaseIfIdle(); },
+  };
+}
+
+/** One command a committed definition declares: a setup command or a check's command. */
+interface DeclaredCommand {
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+  readonly env: Readonly<Record<string, string>>;
+}
+
+/** The commands a nested project's own committed definition declares, and its directory in the audit worktree. */
+type NestedCommands = (workingDirectory: string) => Promise<{ readonly root: string; readonly commands: readonly DeclaredCommand[] } | null>;
+
+function checkCommands(checks: readonly unknown[]): DeclaredCommand[] {
+  const commands: DeclaredCommand[] = [];
+  for (const check of checks) {
+    if (typeof check !== 'object' || check === null) continue;
+    const executor = (check as { executor?: { kind?: string; commands?: Array<{ cmd: string; args: string[]; cwd?: string; env?: Record<string, string> }> } }).executor;
+    if (executor?.kind !== 'command') continue;
+    for (const command of executor.commands ?? []) commands.push({ command: command.cmd, args: command.args,
+      cwd: command.cwd ?? '.', env: command.env ?? {} });
+  }
+  return commands;
+}
+
+/**
+ * Keep the harness's inherited environment boundary while retaining
+ * declared/provider-added values. A command of a nested project, which a
+ * nested invocation runs from that project's directory, is matched against
+ * that project's own committed definition rather than the root's.
+ */
+export function configuredProcessExecutor(configuration: CommittedAuditConfiguration, projectRoot: () => string, nested?: NestedCommands): ProcessExecutorPort {
+  const node = createNodeProcessExecutor();
+  const providerEnvironment = new Set([
+    TEST_LOCK_HELD_ENVIRONMENT, 'RAMIFY_AUDIT_VITEST_SUMMARY', 'RAMIFY_AUDIT_VITEST_ROOT',
+    'RAMIFY_AUDIT_VITEST_DISCOVERY', 'RAMIFY_AUDIT_VITEST_EXCLUDES',
+    'RAMIFY_AUDIT_CUCUMBER_SELECTION', 'CUCUMBER_SUMMARY_FILE',
+  ]);
+  const rootCommands: DeclaredCommand[] = [
+    ...configuration.workspace.setupCommands.map(command => ({ command: command.argv[0]!, args: command.argv.slice(1),
+      cwd: command.cwd, env: command.env })),
+    ...checkCommands(configuration.checks),
+  ];
+  return { async execute(request, signal) {
+    const owner = (await nested?.(request.workingDirectory)) ?? { root: projectRoot(), commands: rootCommands };
+    const commands = owner.commands;
+    const declaredNames = new Set(commands.flatMap(command => Object.keys(command.env)));
+    const allowed = childEnvironment();
+    const environment = { ...allowed };
+    const matches = commands.filter(command => command.command === request.command && command.args.every((arg, index) => request.args[index] === arg)
+      && resolve(owner.root, command.cwd) === resolve(request.workingDirectory));
+    const longestArgs = Math.max(0, ...matches.map(command => command.args.length));
+    const exact = matches.filter(command => command.args.length === longestArgs);
+    if (exact.length === 0 && Object.keys(request.environment ?? {}).some(name => declaredNames.has(name))) {
+      throw new Error(`No committed command identity matches ${request.command} ${request.args.join(' ')}; its declared environment cannot be projected safely`);
+    }
+    const signature = new Set(exact.map(command => JSON.stringify(command.env)));
+    if (signature.size > 1) throw new Error(`Ambiguous declared environment for configured audit command ${request.command} ${request.args.join(' ')}`);
+    const declared = exact[0]?.env ?? {};
+    for (const [name, value] of Object.entries(declared)) {
+      if (request.environment?.[name] !== value) throw new Error(`The provider did not preserve declared environment ${name} for ${request.command}`);
+    }
+    for (const [name, value] of Object.entries(request.environment ?? {})) {
+      if (name in allowed || providerEnvironment.has(name)) environment[name] = value;
+      else if (declared[name] !== undefined) environment[name] = declared[name];
+    }
+    return node.execute({ ...request, environment }, signal);
+  } };
+}
+
+/**
+ * The nested project a working directory of the audit worktree lies in:
+ * the nearest directory below the worktree root with its own
+ * `ramify-audit.json`, whose definition is read from the audited commit
+ * through the provider. Null for the root project's own directories.
+ */
+function nestedDefinitionCommands(git: GitExecutorPort, repositoryRoot: string, sourceCommit: string, worktree: () => string): NestedCommands {
+  const read = new Map<string, Promise<readonly DeclaredCommand[]>>();
+  return async workingDirectory => {
+    const top = resolve(worktree());
+    let directory = resolve(workingDirectory);
+    while (directory !== top && directory.startsWith(`${top}${sep}`) && !existsSync(join(directory, 'ramify-audit.json'))) directory = dirname(directory);
+    if (directory === top || !directory.startsWith(`${top}${sep}`)) return null;
+    const projectRoot = relative(top, directory).split(sep).join('/');
+    let commands = read.get(projectRoot);
+    if (commands === undefined) {
+      commands = requestFromCommittedConfiguration({ git, repositoryPath: repositoryRoot, sourceCommit, projectRoot, full: true, force: false })
+        .then(request => {
+          const setup = request.workspacePreparation?.options?.['setupCommands'];
+          const declared: DeclaredCommand[] = Array.isArray(setup) ? setup.flatMap(value => {
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) return [];
+            const item = value as { cmd?: unknown; args?: unknown; cwd?: unknown; env?: unknown };
+            if (typeof item.cmd !== 'string' || !Array.isArray(item.args)) return [];
+            return [{ command: item.cmd, args: item.args.map(String), cwd: typeof item.cwd === 'string' ? item.cwd : '.',
+              env: typeof item.env === 'object' && item.env !== null ? item.env as Record<string, string> : {} }];
+          }) : [];
+          return [...declared, ...checkCommands(request.checks)];
+        });
+      read.set(projectRoot, commands);
+    }
+    return { root: directory, commands: await commands };
+  };
 }
 
 interface PathMapping {
@@ -472,9 +950,6 @@ interface PathMapping {
   readonly projectRoot: string;
   readonly projectPrefix: string;
   projectRootIn(worktreeRoot: string): string;
-  rebaseProjectPath(value: string, auditedProjectRoot: string): string;
-  rebaseProjectArgument(value: string, auditedProjectRoot: string): string;
-  restoreText(value: string, worktreeRoot: string): string;
 }
 
 async function resolvePathMapping(projectRoot: string, git: GitExecutorPort, signal: AbortSignal): Promise<PathMapping> {
@@ -485,268 +960,11 @@ async function resolvePathMapping(projectRoot: string, git: GitExecutorPort, sig
   if (isAbsolute(projectPrefix) || projectPrefix === '..' || projectPrefix.startsWith(`..${sep}`)) {
     throw new Error(`Project root ${project} is outside repository ${repository}`);
   }
-  const projectRootIn = (worktreeRoot: string): string => projectPrefix === '' ? worktreeRoot : join(worktreeRoot, projectPrefix);
   return {
     repositoryRoot: repository,
     projectPrefix: projectPrefix.split(sep).join('/'),
     projectRoot: project,
-    projectRootIn,
-    rebaseProjectPath(value, auditedProjectRoot) {
-      const suffix = containedSuffix(project, value);
-      if (suffix === null) throw new Error(`Check working directory ${value} is outside project ${project}`);
-      return suffix === '' ? auditedProjectRoot : join(auditedProjectRoot, suffix);
-    },
-    rebaseProjectArgument(value, auditedProjectRoot) {
-      if (!isAbsolute(value)) return value;
-      const suffix = containedSuffix(project, value);
-      return suffix === null ? value : suffix === '' ? auditedProjectRoot : join(auditedProjectRoot, suffix);
-    },
-    restoreText(value, worktreeRoot) {
-      return replacePath(value, worktreeRoot, repository);
-    },
-  };
-}
-
-function containedSuffix(root: string, candidate: string): string | null {
-  const suffix = relative(root, resolve(candidate));
-  return isAbsolute(suffix) || suffix === '..' || suffix.startsWith(`..${sep}`) ? null : suffix;
-}
-
-/** Replace only a complete path prefix, never the prefix of another segment. */
-function replacePath(value: string, from: string, to: string): string {
-  let cursor = 0;
-  let answer = '';
-  while (cursor < value.length) {
-    const found = value.indexOf(from, cursor);
-    if (found < 0) return answer + value.slice(cursor);
-    const before = found === 0 ? '' : value[found - 1]!;
-    const after = value[found + from.length] ?? '';
-    const beforeBoundary = before === '' || !/[A-Za-z0-9._-]/u.test(before);
-    const afterBoundary = after === '' || after === '/' || after === '\\' || !/[A-Za-z0-9._-]/u.test(after);
-    if (beforeBoundary && afterBoundary) {
-      answer += value.slice(cursor, found) + to;
-      cursor = found + from.length;
-    } else {
-      answer += value.slice(cursor, found + from.length);
-      cursor = found + from.length;
-    }
-  }
-  return answer;
-}
-
-/** How many setup checks lead the plan. */
-function leadingSetup(checks: readonly PlannedCheck[]): number {
-  const index = checks.findIndex(check => check.kind !== 'setup');
-  return index < 0 ? checks.length : index;
-}
-
-/** The audit's checks: every planned check but the setup commands, which its preparation runs, and the harness's rules. */
-async function checkDefinitions(
-  checks: readonly PlannedCheck[], mapping: PathMapping, git: GitExecutorPort, commit: string, signal: AbortSignal,
-  auditAllTests?: PlannedCheck['command'],
-): Promise<CheckDefinition[]> {
-  const planned: CheckDefinition[] = [];
-  for (const [index, check] of checks.entries()) {
-    if (check.kind === 'setup') continue;
-    const testCommand = check.kind === 'tests' && check.selection !== undefined ? auditAllTests ?? check.command : check.command;
-    const vitest = check.kind === 'tests' && await isVitestCommand(testCommand, mapping, git, commit, signal);
-    planned.push({
-      id: checkId(index, check),
-      name: `${check.kind} ${index + 1}`,
-      description: `Harness-planned ${check.kind} check at position ${index + 1}`,
-      scope: 'both',
-      category: 'registered',
-      executor: {
-        kind: 'registered', executorId,
-        ...(vitest ? {
-          acceptsNarrowing: true,
-          testCommand: {
-            name: 'tests', cmd: testCommand.argv[0]!, args: testCommand.argv.slice(1),
-            parser: 'vitest' as const, timeoutMs: testCommand.timeoutMs,
-            env: { ...testCommand.envAdditions },
-          },
-        } : {}),
-      },
-      onFailure: 'record',
-      metadata: { kind: check.kind, position: index + 1 },
-    });
-  }
-  planned.push({
-    id: harnessCheckId,
-    name: 'Harness rules',
-    description: 'Guarded-file authorization and harness-owned rules computed before the commit',
-    scope: 'both',
-    category: 'registered',
-    executor: { kind: 'registered', executorId },
-    onFailure: 'record',
-  });
-  return planned;
-}
-
-async function isVitestCommand(
-  command: PlannedCheck['command'], mapping: PathMapping, git: GitExecutorPort, commit: string, signal: AbortSignal,
-): Promise<boolean> {
-  const executable = command.argv[0] ?? '';
-  if ((executable === 'vitest' || executable.endsWith('/vitest')) && command.argv[1] === 'run') {
-    return true;
-  }
-  if (executable !== 'npm' || command.argv[1] !== 'test') return false;
-  try {
-    const suffix = containedSuffix(mapping.projectRoot, command.cwd);
-    if (suffix === null) return false;
-    const path = [mapping.projectPrefix, suffix.split(sep).join('/'), 'package.json'].filter(Boolean).join('/');
-    const manifest = JSON.parse(await gitText(git, mapping.repositoryRoot, ['show', `${commit}:${path}`], signal)) as { scripts?: { test?: string } };
-    return /(?:^|\s|\/)vitest(?:\s|$)/u.test(manifest.scripts?.test ?? '');
-  } catch {
-    return false;
-  }
-}
-
-function checkId(index: number, check: PlannedCheck): string {
-  return `check-${String(index + 1).padStart(2, '0')}-${check.kind}`;
-}
-
-function plannedCheck(checks: readonly PlannedCheck[], id: string): readonly [number, PlannedCheck] | null {
-  const index = checks.findIndex((check, position) => check.kind !== 'setup' && checkId(position, check) === id);
-  const check = checks[index];
-  return index < 0 || check === undefined ? null : [index, check];
-}
-
-/**
- * The workspace preparation an audit request names: ramify-audit's
- * built-in `nodejs` preparation, which links the installed dependencies of
- * the project root and of each nested package into the worktree, then runs
- * the project's setup commands there in order. A published preparation
- * artifact supplies each successful command's output to the attempt record.
- * It never runs a build the project did not
- * declare.
- */
-export function workspacePreparationOf(input: {
-  /** The project root, its real path; each setup command's directory lies inside it. */
-  readonly projectRoot: string;
-  /** The project's directory relative to the repository root, `''` for the root. */
-  readonly projectPrefix: string;
-  readonly dependencyDirectories: readonly string[];
-  /** The attempt's directory, outside the worktree. */
-  readonly directory: string;
-  /** The gate's leading setup checks. */
-  readonly setup: readonly PlannedCheck[];
-}): { preparationId: string; options: JsonObject } {
-  return {
-    preparationId,
-    options: {
-      projectPrefix: input.projectPrefix,
-      packageDirectories: [...new Set(['', ...input.dependencyDirectories])],
-      build: false,
-      setupCommands: input.setup.map(check => setupCommandOf(check, input.projectRoot)),
-      // Per-attempt paths change the definition digest and force every partial link full.
-      // Successful setup output is read from the published preparation artifact.
-    },
-  };
-}
-
-/**
- * One setup command as ramify-audit's preparation takes it. Its working
- * directory is relative to the project, and its environment is the
- * project's declared additions: the preparation adds them to the one it
- * inherits.
- */
-function setupCommandOf(check: PlannedCheck, projectRoot: string): JsonObject {
-  const [cmd, ...args] = check.command.argv;
-  if (cmd === undefined) throw new Error('A setup command names no executable');
-  const suffix = containedSuffix(projectRoot, check.command.cwd);
-  if (suffix === null) throw new Error(`Setup working directory ${check.command.cwd} is outside project ${projectRoot}`);
-  const cwd = suffix.split(sep).join('/');
-  return {
-    ...(check.name === undefined ? {} : { name: check.name }),
-    cmd,
-    args,
-    timeoutMs: check.command.timeoutMs,
-    ...(cwd === '' ? {} : { cwd }),
-    ...(Object.keys(check.command.envAdditions).length === 0 ? {} : { env: { ...check.command.envAdditions } }),
-  };
-}
-
-function auditRequest(
-  checks: CheckDefinition[],
-  request: CheckExecutionRequest,
-  mapping: PathMapping,
-  runId: string,
-  workspacePreparation: AuditRequest['workspacePreparation'],
-): AuditRequest {
-  const selection = request.context.selection;
-  const owners = selection.policy === 'owned-by-scope'
-    ? [...selection.exactOwners.map(owner => `exact:${owner}`), ...selection.subtrees.map(owner => `subtree:${owner}`)].sort()
-    : [];
-  const universeId = 'ramify-agent:gates';
-  return {
-    protocolVersion: AUDIT_PROTOCOL_VERSION,
-    requestId: `${runId}:${request.context.attemptId}`,
-    repositoryPath: mapping.repositoryRoot,
-    source: { kind: 'existing-commit', revision: request.context.sourceCommit },
-    checks,
-    projectRoot: mapping.projectPrefix || '.',
-    ...(request.context.checkpoint === 'final' ? { mode: 'full' as const } : {}),
-    universeId,
-    coverageClaim: {
-      checkpoint: request.context.checkpoint,
-      selectionPolicy: selection.policy,
-      ...(owners.length === 0 ? {} : { owners }),
-    },
-    workspaceMode: 'isolated-worktree',
-    ...(workspacePreparation === undefined ? {} : { workspacePreparation }),
-    registeredExecutorIds: [executorId],
-    metadata: { runId, attemptId: request.context.attemptId },
-    // A gate's evidence must come from checks run over the commit it just
-    // made, with this attempt's plan and records. ramify-audit 0.2 would
-    // otherwise answer with an earlier audit of the same code, whose checks
-    // and records are not this attempt's, so reuse is never harmless here.
-    force: true,
-  };
-}
-
-/**
- * Why a completed audit is not this gate's answer, or null where it is.
- * The request forces a new audit, so an answer that reused an existing one,
- * or that audited another commit, is the audit's own failure: it is never
- * read as the gate's verdict.
- */
-export function unexpectedCompletedAudit(
-  result: Extract<AuditResult, { status: 'completed' }>,
-  sourceCommit: string,
-): { readonly kind: string; readonly message: string } | null {
-  if (result.reused !== undefined) {
-    return {
-      kind: 'audit-reused',
-      message: `The audit of ${sourceCommit} returned the existing audit of ${result.reused.auditedCommit}`
-        + ` (run ${result.refs.runRef}) instead of running the gate's checks, although the request forced a new audit`,
-    };
-  }
-  if (result.summary.sourceCommit !== sourceCommit) {
-    return {
-      kind: 'audit-result',
-      message: `The audit requested for ${sourceCommit} recorded ${result.summary.sourceCommit} as its source commit`,
-    };
-  }
-  return null;
-}
-
-function harnessSummary(request: CheckExecutionRequest): RegisteredExecutorResult {
-  const unauthorized = request.context.harness.guardedChanges.filter(change => change.authorizedBy === null);
-  const failedRules = request.context.harness.rules.filter(rule => rule.outcome === 'failed');
-  const passed = unauthorized.length === 0 && failedRules.length === 0;
-  return {
-    status: 'completed',
-    result: {
-      passed,
-      status: passed ? 'pass' : 'fail',
-      summary: passed ? 'Harness rules passed' : 'Harness rules found guarded or rule violations',
-      details: {
-        guardedChanges: request.context.harness.guardedChanges.length,
-        unauthorizedGuardedChanges: unauthorized.length,
-        failedRules: failedRules.map(rule => rule.rule),
-      },
-    },
+    projectRootIn: worktreeRoot => projectPrefix === '' ? worktreeRoot : join(worktreeRoot, projectPrefix),
   };
 }
 
@@ -827,7 +1045,8 @@ function recordingGit(input: {
   readonly base: GitExecutorPort;
   readonly mapping: PathMapping;
   readonly repository: Awaited<ReturnType<typeof resolveRepositoryExecutionLeaseIdentity>>;
-  readonly request: CheckExecutionRequest;
+  readonly sourceCommit: string;
+  readonly attemptId: string;
   readonly runId: string;
   readonly processIdentity: string;
   readonly recorder: AuditWorkspaceOwnershipRecorder;
@@ -842,8 +1061,8 @@ function recordingGit(input: {
         if (worktreePath === undefined || sourceCommit === undefined) {
           throw new Error('git worktree add did not name its intended directory and source commit');
         }
-        if (sourceCommit !== input.request.context.sourceCommit) {
-          throw new Error(`git worktree add selected ${sourceCommit}, expected ${input.request.context.sourceCommit}`);
+        if (sourceCommit !== input.sourceCommit) {
+          throw new Error(`git worktree add selected ${sourceCommit}, expected ${input.sourceCommit}`);
         }
         const workspace: IntendedAuditWorkspace = {
           repositoryRoot: input.mapping.repositoryRoot,
@@ -853,7 +1072,7 @@ function recordingGit(input: {
           worktreePath,
           sourceCommit,
           runId: input.runId,
-          attemptId: input.request.context.attemptId,
+          attemptId: input.attemptId,
           process: { id: process.pid, startMarker: input.processIdentity },
         };
         await input.recorder.recordIntendedWorkspace(workspace);
@@ -865,361 +1084,10 @@ function recordingGit(input: {
   };
 }
 
-async function writeMappedRun(
-  run: CommandRun,
-  outputFile: string,
-  mapping: PathMapping,
-  worktreeRoot: string,
-): Promise<CommandRun> {
-  const stdout = mapping.restoreText(run.stdout, worktreeRoot);
-  const stderr = mapping.restoreText(run.stderr, worktreeRoot);
-  const complete = `${stdout}${stderr}`;
-  const bytes = Buffer.from(complete, 'utf8');
-  await writeFile(outputFile, bytes);
-  const outcome = run.outcome.kind === 'runner-error'
-    ? { ...run.outcome, error: { ...run.outcome.error, message: mapping.restoreText(run.outcome.error.message, worktreeRoot) } }
-    : run.outcome;
-  return {
-    ...run,
-    outcome,
-    stdout,
-    stderr,
-    output: {
-      path: outputFile,
-      bytes: bytes.byteLength,
-      truncated: run.output.truncated,
-      tail: bytes.subarray(Math.max(0, bytes.byteLength - outputTailBytes)).toString('utf8'),
-    },
-  };
-}
-
-function auditSummary(record: GateCommandRecord, run: CommandRun): AuditCheckSummary {
-  const status = record.outcome === 'passed' ? 'pass' : 'fail';
-  const summary = record.outcome === 'not-verified'
-    ? `${record.kind} was not verified (${record.notVerified ?? 'unknown'})`
-    : `${record.kind} ${record.outcome}`;
-  return {
-    passed: record.outcome === 'passed',
-    status,
-    summary,
-    output: `${run.stdout}${run.stderr}`,
-    durationSeconds: Number((record.elapsedMs / 1000).toFixed(3)),
-    details: {
-      kind: record.kind,
-      exitCode: record.exitCode,
-      notVerified: record.notVerified ?? null,
-      ...(record.scenarios === undefined ? {} : {
-        scenarios: {
-          mode: record.scenarios.mode,
-          selection: record.scenarios.selection.kind,
-          runs: record.scenarios.runs.length,
-          scenarios: record.scenarios.scenarios.map(result => ({ id: result.id, status: result.status })),
-          untracked: { ...record.scenarios.untracked },
-          failures: [...record.scenarios.failures],
-        },
-      }),
-    },
-    outputBytes: record.output.bytes,
-    outputTruncated: record.output.truncated,
-    ...(record.runnerError === null ? {} : { runnerError: record.runnerError }),
-  };
-}
-
-// The project's setup commands, as the preparation recorded them.
-
-/** What the harness needs of the setup commands' run: how many, when each started, and the worktree's paths restored. */
-interface SetupRun {
-  readonly count: number;
-  readonly starts: readonly string[];
-  readonly auditStartedAt: string;
-  readonly restore: (text: string) => string;
-}
-
-/** One command's record as ramify-audit's preparation writes it, read without trusting its shape. */
-interface PreparedCommand {
-  readonly index: number;
-  readonly status: string;
-  readonly exitCode: number | null;
-  readonly durationMs: number;
-  readonly outputFile: string | null;
-  /** Published artifact of a successful setup command. */
-  readonly outputPath: string | null;
-  readonly outputTruncated: boolean;
-  readonly outputTail: string | null;
-  /** How the preparation stopped the command's process tree, in words, where it stopped it. */
-  readonly stopped: string | null;
-  readonly outputIncomplete: boolean;
-}
-
-function preparedCommandOf(value: unknown): PreparedCommand | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const entry = value as Record<string, unknown>;
-  if (typeof entry['index'] !== 'number' || typeof entry['status'] !== 'string') return null;
-  return {
-    index: entry['index'],
-    status: entry['status'],
-    exitCode: typeof entry['exitCode'] === 'number' ? entry['exitCode'] : null,
-    durationMs: typeof entry['durationMs'] === 'number' && entry['durationMs'] >= 0 ? Math.round(entry['durationMs']) : 0,
-    outputFile: typeof entry['outputFile'] === 'string' ? entry['outputFile'] : null,
-    outputPath: typeof entry['outputPath'] === 'string' ? entry['outputPath'] : null,
-    outputTruncated: entry['outputTruncated'] === true,
-    outputTail: typeof entry['outputTail'] === 'string' ? entry['outputTail'] : null,
-    stopped: stoppedOf(entry['termination']),
-    outputIncomplete: entry['outputIncomplete'] === true,
-  };
-}
-
-/**
- * The words for how ramify-audit stopped a command's process tree, from the
- * `termination` it records where it stopped one (ramify-audit 0.1.1 and
- * later): what stopped it, how many processes, and whether any outlived
- * SIGTERM. Null where it recorded none.
- */
-function stoppedOf(value: unknown): string | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const termination = value as Record<string, unknown>;
-  const why = termination['reason'] === 'timeout' ? 'after it timed out'
-    : termination['reason'] === 'cancelled' ? 'when the audit was cancelled'
-      : termination['reason'] === 'leader-signalled' ? 'after a signal ramify-audit did not send stopped the command'
-        : null;
-  if (why === null) return null;
-  const count = typeof termination['processCount'] === 'number' ? termination['processCount'] : null;
-  const what = termination['scope'] === 'process-group' ? 'its process group'
-    : termination['scope'] === 'pid' ? 'the command\'s own process'
-      : count === null ? 'its processes' : `${count} process${count === 1 ? '' : 'es'}`;
-  const graceMs = typeof termination['graceMs'] === 'number' ? termination['graceMs'] : null;
-  const signals = termination['sigkillRequired'] === true || termination['finalSignal'] === 'SIGKILL'
-    ? `SIGTERM, and SIGKILL${graceMs === null ? '' : ` after ${graceMs / 1000} s`}`
-    : 'SIGTERM';
-  const survivors = Array.isArray(termination['survivingPids'])
-    ? termination['survivingPids'].filter((pid): pid is number => typeof pid === 'number')
-    : [];
-  const left = survivors.length === 0 ? '' : `; still present after SIGKILL: ${survivors.join(', ')}`;
-  return `its process tree was stopped ${why}: ${what} received ${signals}${left}`;
-}
-
-/**
- * What an audit that failed outside any setup command says: ramify-audit's
- * message with the worktree's paths restored, and, where the audited
- * worktree's HEAD moved during the audit, where it found that.
- */
-function auditFailureMessage(
-  error: { readonly code: string; readonly message: string; readonly details?: unknown },
-  restore: (text: string) => string,
-): string {
-  const message = restore(error.message);
-  if (error.code !== 'source-revision-moved') return message;
-  const details = typeof error.details === 'object' && error.details !== null ? error.details as Record<string, unknown> : {};
-  const expected = typeof details['expectedRevision'] === 'string' ? details['expectedRevision'] : 'unknown';
-  const actual = typeof details['actualRevision'] === 'string' ? details['actualRevision'] : 'unknown';
-  const stage = typeof details['stage'] === 'string' ? details['stage'] : 'unknown';
-  const mode = typeof details['workspaceMode'] === 'string' ? details['workspaceMode'] : 'unknown';
-  const check = typeof details['checkId'] === 'string' ? `, check ${details['checkId']}` : '';
-  const completed = Array.isArray(details['completedCheckIds'])
-    ? details['completedCheckIds'].filter((id): id is string => typeof id === 'string')
-    : [];
-  return `${message} The audited HEAD moved from ${expected} to ${actual} (stage ${stage}${check}, workspace ${mode});`
-    + ` checks completed before it: ${completed.length === 0 ? 'none' : completed.join(', ')}.`;
-}
-
-function preparedCommandsOf(value: unknown): PreparedCommand[] {
-  return Array.isArray(value) ? value.flatMap(entry => preparedCommandOf(entry) ?? []) : [];
-}
-
-/**
- * The setup commands' records of a completed audit, from the preparation's
- * evidence in its summary: each one passed, or the audit would not have
- * run a check. A declared command the evidence does not record is named,
- * which an installed ramify-audit that does not run setup commands answers.
- */
-async function preparedSetupRecords(
-  checks: readonly PlannedCheck[],
-  request: CheckExecutionRequest,
-  result: Extract<AuditResult, { status: 'completed' }>,
-  setup: SetupRun,
-  git: GitExecutorPort,
-  repositoryRoot: string,
-): Promise<{ readonly records: GateCommandRecord[] } | { readonly missing: number[] }> {
-  if (setup.count === 0) return { records: [] };
-  const evidence = (result.summary as { workspacePreparation?: { payload?: { setupCommands?: unknown } } }).workspacePreparation;
-  const prepared = preparedCommandsOf(evidence?.payload?.setupCommands);
-  const records: GateCommandRecord[] = [];
-  const missing: number[] = [];
-  for (const [index, check] of checks.slice(0, setup.count).entries()) {
-    const entry = prepared.find(candidate => candidate.index === index + 1);
-    if (entry === undefined || entry.status !== 'passed') {
-      missing.push(index + 1);
-      continue;
-    }
-    records.push(await setupRecord(check, index, entry, request, setup, { kind: 'completed', exitCode: entry.exitCode ?? 0 },
-      async path => gitText(git, repositoryRoot, ['show', `${result.refs.reportCommit}:${path}`], request.signal)));
-  }
-  return missing.length > 0 ? { missing } : { records };
-}
-
-/**
- * The records of an audit whose preparation stopped at a setup command:
- * each setup command before it passed, the one that stopped it as the
- * preparation recorded it, and every later command not run because of it.
- * A command that ran and exited non-zero is a failed command, which the
- * gate attributes as it attributes any failure; one that timed out, was
- * terminated or could not start is not verified. Null where the failure
- * named no setup command, which is the audit's own failure.
- */
-async function failedSetupRecords(
-  checks: readonly PlannedCheck[],
-  request: CheckExecutionRequest,
-  error: { readonly code: string; readonly message: string; readonly details?: unknown },
-  setup: SetupRun,
-): Promise<GateCommandRecord[] | null> {
-  const details = typeof error.details === 'object' && error.details !== null ? error.details as Record<string, unknown> : {};
-  const failed = preparedCommandOf(details['failedCommand']);
-  if (details['preparationId'] !== preparationId || failed === null || failed.index < 1 || failed.index > setup.count) return null;
-  const passed = preparedCommandsOf(details['setupCommands']);
-  const records: GateCommandRecord[] = [];
-  for (const [index, check] of checks.entries()) {
-    const position = index + 1;
-    if (index < setup.count && position < failed.index) {
-      const entry = passed.find(candidate => candidate.index === position && candidate.status === 'passed');
-      if (entry === undefined) return null;
-      records.push(await setupRecord(check, index, entry, request, setup, { kind: 'completed', exitCode: entry.exitCode ?? 0 }));
-      continue;
-    }
-    if (position === failed.index) {
-      const outcome = failedOutcome(error, failed, check, setup);
-      // A refused command printed nothing: its output is why it was refused.
-      const entry = outcome.kind === 'runner-error' && failed.status === 'refused'
-        ? { ...failed, outputFile: null, outputTail: outcome.error.message }
-        : failed;
-      records.push(await setupRecord(check, index, entry, request, setup, outcome));
-      continue;
-    }
-    const outputFile = checkOutputPath(request.directory, index, check);
-    await writeFile(outputFile, '');
-    records.push(notRun(check, outputFile, setup.starts[failed.index - 1] ?? setup.auditStartedAt, 'setup-failed'));
-  }
-  return records;
-}
-
-/** How the failed setup command ended: its exit code where it ran to one, and otherwise the preparation's error. */
-function failedOutcome(
-  error: { readonly code: string; readonly message: string },
-  failed: PreparedCommand,
-  check: PlannedCheck,
-  setup: SetupRun,
-): CommandOutcome {
-  if (failed.status === 'failed' && failed.exitCode !== null) return { kind: 'completed', exitCode: failed.exitCode };
-  if (failed.status === 'timed-out') return { kind: 'timed-out', timeoutMs: check.command.timeoutMs };
-  if (error.code === 'setup-command-unsafe-with-linked-modules') {
-    // The same setup passed readiness, which refuses an install ramify-audit
-    // would refuse, so this is not the source's failure: it stays
-    // infrastructure, and the message says what the project must change.
-    return {
-      kind: 'runner-error',
-      error: {
-        kind: error.code,
-        message: `${setup.restore(error.message)} ramify-audit links the project's installed dependencies into the audited worktree, `
-          + 'so a setup command must not install them: remove it from `setup` in ramify-agent.json.',
-      },
-    };
-  }
-  return { kind: 'runner-error', error: { kind: error.code, message: setup.restore(error.message) } };
-}
-
-/**
- * One setup command's record, classified by the gate's own policy. Its
- * output is the preparation's captured file for it, beside the attempt,
- * with the worktree's paths restored, and it is written where the harness
- * keeps each command's output.
- */
-async function setupRecord(
-  check: PlannedCheck,
-  index: number,
-  entry: PreparedCommand,
-  request: CheckExecutionRequest,
-  setup: SetupRun,
-  outcome: CommandOutcome,
-  readPublished?: (path: string) => Promise<string>,
-): Promise<GateCommandRecord> {
-  const captured = entry.outputFile === null ? null : await readFile(entry.outputFile, 'utf8').catch(() => null);
-  const published = captured === null && entry.outputPath !== null && readPublished !== undefined
-    ? await readPublished(entry.outputPath).catch(() => null) : null;
-  const text = setup.restore(captured ?? published ?? entry.outputTail ?? '');
-  const outputFile = checkOutputPath(request.directory, index, check);
-  const bytes = Buffer.from(text, 'utf8');
-  await writeFile(outputFile, bytes);
-  const run: CommandRun = {
-    outcome,
-    startedAt: setup.starts[index] ?? setup.auditStartedAt,
-    elapsedMs: entry.durationMs,
-    output: {
-      path: outputFile,
-      bytes: bytes.byteLength,
-      truncated: entry.outputTruncated,
-      tail: bytes.subarray(Math.max(0, bytes.byteLength - outputTailBytes)).toString('utf8'),
-    },
-    stdout: text,
-    stderr: '',
-  };
-  const record = request.classify(check, run, outputFile);
-  return {
-    ...record,
-    ...(entry.stopped === null ? {} : { stopped: entry.stopped }),
-    ...(entry.outputIncomplete ? { outputIncomplete: true } : {}),
-  };
-}
-
-async function interruptedRecords(
-  checks: readonly PlannedCheck[],
-  request: CheckExecutionRequest,
-  reason: string,
-): Promise<GateCommandRecord[]> {
-  return syntheticRecords(checks, request, reason, { kind: 'cancelled' });
-}
-
-async function infrastructureRecords(
-  checks: readonly PlannedCheck[],
-  request: CheckExecutionRequest,
-  error: { readonly kind: string; readonly message: string },
-): Promise<GateCommandRecord[]> {
-  return syntheticRecords(checks, request, error.message, { kind: 'runner-error', error });
-}
-
-async function syntheticRecords(
-  checks: readonly PlannedCheck[],
-  request: CheckExecutionRequest,
-  output: string,
-  outcome: CommandRun['outcome'],
-): Promise<GateCommandRecord[]> {
-  const startedAt = new Date().toISOString();
-  return Promise.all(checks.map(async (check, index) => {
-    const outputFile = checkOutputPath(request.directory, index, check);
-    const text = `${output}\n`;
-    await writeFile(outputFile, text);
-    const bytes = Buffer.byteLength(text);
-    return request.classify(check, {
-      outcome,
-      startedAt,
-      elapsedMs: 0,
-      output: { path: outputFile, bytes, truncated: false, tail: text },
-      stdout: '',
-      stderr: text,
-    }, outputFile);
-  }));
-}
-
 async function gitText(git: GitExecutorPort, root: string, args: string[], signal: AbortSignal): Promise<string> {
   const result = await git.execute({ repositoryPath: root, args }, signal);
   if (result.exitCode !== 0) {
     throw new Error(`git ${args.join(' ')} failed: ${(result.stderr || result.stdout).trim() || `exit ${String(result.exitCode)}`}`);
   }
   return result.stdout.trim();
-}
-
-function signalReason(signal: AbortSignal): string {
-  return typeof signal.reason === 'string' ? signal.reason : 'Gate execution was interrupted';
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

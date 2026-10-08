@@ -2,21 +2,21 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { commandStart, inPlaceCheckExecution, type CheckExecutionPort, type GateCommandStart } from '../checks/execution.js';
+import { inPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
 import { projectEvent } from '../projections/events.js';
 import type { RunEvent } from '../run/log.js';
 import { copyFixture } from './helpers/fixture.js';
-import { announcingCheckExecution, createPassingCheckExecution } from './helpers/direct-check-execution.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, startRun } from './helpers/runs.js';
 import { assertUnchangedGit, openUnchangedRuns } from './helpers/unchanged-run.js';
+import { announcingAudit, passingAudit, type ScriptedAudit } from './helpers/direct-check-execution.js';
+import type { ConfiguredAuditInput } from '../../subs/audit/src/check-execution.js';
 
 /*
  * A running gate says which step it is on: each command it starts is a
- * `gate-command-started` line, readiness's included, with its kind and its
- * place among the gate's commands.
+ * `gate-command-started` line. The configured provider check is projected
+ * into that existing progress event without a fabricated command record.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -38,7 +38,7 @@ describe('the in-place executor', () => {
       directory: join(root, 'gate'),
       head: 'HEAD',
       checks: [
-        { kind: 'tests', command: passes },
+        { kind: 'setup', name: 'build', command: passes },
         { kind: 'type-check', command: passes },
         { kind: 'ramify-check', command: passes },
       ],
@@ -47,7 +47,7 @@ describe('the in-place executor', () => {
 
     expect(gate.verdict).toBe('passed');
     expect(announced).toEqual([
-      { kind: 'tests', position: 1, total: 3 },
+      { kind: 'setup', name: 'build', position: 1, total: 3 },
       { kind: 'type-check', position: 2, total: 3 },
       { kind: 'ramify-check', position: 3, total: 3 },
     ]);
@@ -55,32 +55,15 @@ describe('the in-place executor', () => {
 });
 
 describe('a run', () => {
-  test('a composed readiness records the provider wait for tests and scenarios before their commands start', async () => {
+  test('a composed readiness records the configured check wait and start', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    const direct = directReadinessExecution();
-    const waitingExecution: CheckExecutionPort = {
-      async run(checks, request) {
-        for (const [index, check] of checks.entries()) {
-          if (check.kind === 'tests' || check.kind === 'scenarios') {
-            const release = request.pauseForTestLock?.();
-            try {
-              await request.waiting?.(commandStart(checks, index), 'Waiting for another test run (injected lock)');
-            } finally {
-              release?.();
-            }
-          }
-          await request.started?.(commandStart(checks, index));
-        }
-        return direct.run(checks, request);
-      },
-    };
+    const configuredAudit = readinessProgress(passingAudit(), true);
     const { service } = await openUnchangedRuns(fixture.root, {
       script: [{ kind: 'submit', input: emptyAnalysis() }],
       unchangedCheckpoints: ['final verification of plan "review-notes"'],
-      readinessExecution: waitingExecution,
-      checkExecution: createPassingCheckExecution(),
+      configuredAudit,
     });
     cleanups.push(() => service.close());
 
@@ -89,7 +72,7 @@ describe('a run', () => {
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
     const waits = events.filter((event): event is Extract<RunEvent, { type: 'gate-command-waiting' }> => event.type === 'gate-command-waiting');
-    expect(waits.map(event => event.data.kind)).toEqual(['tests', 'scenarios', 'scenarios']);
+    expect(waits.map(event => event.data.kind)).toEqual(['configured']);
     for (const wait of waits) {
       expect(wait.data).toMatchObject({ gate: 'ga-0001', checkpoint: 'readiness', line: 'Waiting for another test run (injected lock)' });
       const started = events.find(event => event.type === 'gate-command-started' &&
@@ -99,15 +82,14 @@ describe('a run', () => {
     }
   }, 120_000);
 
-  test('records the start of each command of readiness and of a committing gate', async () => {
+  test('records the configured check start and each committing gate command', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
     const { service } = await openUnchangedRuns(fixture.root, {
       script: [{ kind: 'submit', input: emptyAnalysis() }],
       unchangedCheckpoints: ['final verification of plan "review-notes"'],
-      readinessExecution: announcingCheckExecution(directReadinessExecution()),
-      checkExecution: announcingCheckExecution(createPassingCheckExecution()),
+      configuredAudit: readinessProgress(announcingAudit(), false),
     });
     cleanups.push(() => service.close());
 
@@ -123,11 +105,12 @@ describe('a run', () => {
 
     expect(readiness.length).toBeGreaterThan(0);
     expect(readiness.map(event => event.data)).toEqual(readiness.map((event, index) => ({
-      gate: 'ga-0001', checkpoint: 'readiness', kind: event.data.kind, position: index + 1, total: readiness.length,
+      gate: 'ga-0001', checkpoint: 'readiness', kind: event.data.kind, name: 'scripted-provider-check', position: index + 1, total: readiness.length,
     })));
-    expect(readiness.map(event => event.data.kind).slice(0, 3)).toEqual(['tests', 'type-check', 'ramify-check']);
-    expect(final.map(event => [event.data.checkpoint, event.data.position, event.data.total]))
-      .toEqual(final.map((_, index) => ['final', index + 1, final.length]));
+    expect(readiness.map(event => event.data.kind)).toEqual(['configured']);
+    // The final gate's audit announces each configured check as the provider starts it.
+    expect(final.map(event => [event.data.checkpoint, event.data.kind, event.data.name, event.data.position, event.data.total]))
+      .toEqual(['tests', 'type-check', 'ramify-check'].map((name, index) => ['final', 'configured', name, index + 1, final.length]));
     // Each lies between its gate's start and its end.
     expect(types.indexOf('gate-started')).toBeLessThan(events.indexOf(readiness[0]!));
     expect(events.indexOf(readiness.at(-1)!)).toBeLessThan(types.indexOf('readiness-passed'));
@@ -136,8 +119,27 @@ describe('a run', () => {
 
     expect(projectEvent(final[1]!)).toMatchObject({
       transition: 'gate-command-started',
-      summary: `Gate ga-0002 (final): the type check started, command 2 of ${final.length}`,
+      summary: `Gate ga-0002 (final): the configured check "type-check" started, command 2 of ${final.length}`,
       refs: [{ kind: 'gate', id: 'ga-0002' }],
     });
   }, 120_000);
 });
+
+/**
+ * The scripted audit, whose readiness request (the run's first gate, which
+ * records no gate operation) announces one configured provider check, after
+ * waiting for the machine test lock where `waits` asks it to.
+ */
+function readinessProgress(base: ScriptedAudit, waits: boolean): ScriptedAudit {
+  return { ...base, async run(input: ConfiguredAuditInput) {
+    if (input.attemptId === 'ga-0001') {
+      const check = { kind: 'configured' as const, name: 'scripted-provider-check', position: 1, total: 1 };
+      if (waits) {
+        await input.waiting?.(check, 'Waiting for another test run (injected lock)');
+        input.lockAcquired?.();
+      }
+      await input.started?.(check);
+    }
+    return base.run(input);
+  } };
+}

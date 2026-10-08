@@ -1,49 +1,42 @@
-import { readFile } from 'node:fs/promises';
+import { mockGit } from './helpers/mock-git.js';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { gitService } from '../../subs/evidence/src/git.js';
 import { copyCapabilityFixture } from './helpers/capability.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
-import { initRepository, openRuns, runEventsOnDisk, runPath, startRun, until } from './helpers/runs.js';
+import { FakeRamifyCli } from './helpers/fake-ramify.js';
+import { openRuns, runPath } from './helpers/runs.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
-test('CA24: production restart preserves an incomplete historical run and refuses its old workflow', async () => {
-  const fixture = await copyCapabilityFixture();
-  cleanups.push(fixture.remove);
-  await initRepository(fixture.root);
-
-  const historical = await openRuns(fixture.root, {
-    git: gitService,
-    script: spec => spec.role === 'initial-architect' ? [{ kind: 'wait', ms: 60_000 }] : [],
-    readinessExecution: directReadinessExecution(),
-  });
-  cleanups.push(() => historical.service.close());
-  const receipt = await historical.service.execute(startRun('need'));
-  await until(() => (historical.service.events('need', receipt.jobId) ?? []).some(event =>
-    event.type === 'invocation-started' && event.data.role === 'initial-architect'));
-  const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  expect(before.some(event => event.type === 'job-interrupted' || event.type === 'job-failed' || event.type === 'job-completed')).toBe(false);
-  await historical.service.close();
-
-  const reopened = await openRuns(fixture.root, {
-    production: true, git: gitService, script: () => [],
-    readinessExecution: directReadinessExecution(),
-  });
-  cleanups.push(() => reopened.service.close());
-  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  const interruptions = events.filter(event => event.type === 'job-interrupted');
-  expect(interruptions).toHaveLength(1);
-  expect(interruptions[0]?.type === 'job-interrupted' ? interruptions[0].data.message : null)
-    .toContain('Unsupported historical workflow run-policy/4');
-  expect(events.some(event => event.type === 'capability-delegated' || event.type === 'capability-handed-back')).toBe(false);
-  expect(events.some(event => event.type === 'job-completed' || event.type === 'job-failed')).toBe(false);
-  expect(events.filter(event => event.type === 'invocation-started').length)
-    .toBe(before.filter(event => event.type === 'invocation-started').length);
-  expect(reopened.service.getRun('need', receipt.jobId)?.state).toBe('interrupted');
-  const record = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'job.json'), 'utf8')) as {
-    policy: { version: string };
-  };
-  expect(record.policy.version).toBe('run-policy/4');
-  expect(reopened.service.events('need', receipt.jobId)?.at(-1)?.type).toBe('job-interrupted');
-}, 30_000);
+test('PB3-R01: old and unversioned raw jobs are refusal-only, before decoding, recovery, cleanup or launch', async () => {
+  const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
+  const ids: string[] = [];
+  const original = new Map<string, string>();
+  for (const version of [undefined, ...Array.from({ length: 6 }, (_, index) => `run-policy/${index + 1}`)]) {
+    const id = `20261007T160000Z-${String(ids.length).padStart(6, '0')}`; ids.push(id);
+    const directory = runPath(fixture.root, 'need', id, ''); await mkdir(directory, { recursive: true });
+    const files = { 'job.json': JSON.stringify({ kind: 'implementation', policy: version === undefined ? undefined : { version }, invalidBody: true }),
+      'events.jsonl': 'intentionally invalid old ledger that must not be decoded\n', 'scratch.txt': 'old pending writer artifact\n' };
+    for (const [file, text] of Object.entries(files)) { const path = join(directory, file); await writeFile(path, text); original.set(path, text); }
+  }
+  await mkdir(join(fixture.root, 'subs/a/src/tmp'), { recursive: true });
+  await writeFile(join(fixture.root, 'subs/a/src/tmp/preserved.txt'), 'must survive refusal');
+  let launches = 0;
+  const ramify = new FakeRamifyCli();
+  const opened = await openRuns(fixture.root, { production: true, git: mockGit(), ramify, script: () => { launches += 1; return []; } });
+  cleanups.push(() => opened.service.close());
+  expect(opened.recovery.skipped).toHaveLength(7);
+  expect(opened.recovery.interrupted).toEqual([]);
+  for (const id of ids) {
+    expect(() => opened.service.getRun('need', id)).toThrow(/refused by run-policy\/7; a fresh run is required/u);
+    expect(() => opened.service.recordOf('need', id)).toThrow(/fresh run/u);
+    expect(() => opened.service.committed('need', id)).toThrow(/fresh run/u);
+    await expect(opened.service.settled('need', id)).rejects.toThrow(/fresh run/u);
+    await expect(opened.service.execute({ commandId: `resume-${id}`, type: 'respond-to-check-finding', expectedVersion: 0, payload: { planId: 'need', jobId: id, checkFinding: 'cf-0001', findingRevision: 1, responder: 'operator', request: 'decision-1', option: 'resume' } } as never)).rejects.toThrow(/fresh run/u);
+    await expect(opened.service.execute({ commandId: `stop-${id}`, type: 'stop-job', expectedVersion: 0, payload: { planId: 'need', jobId: id } } as never)).rejects.toThrow(/fresh run/u);
+  }
+  for (const [path, text] of original) expect(await readFile(path, 'utf8')).toBe(text);
+  expect(await readFile(join(fixture.root, 'subs/a/src/tmp/preserved.txt'), 'utf8')).toBe('must survive refusal');
+  expect(launches).toBe(0); expect(ramify.calls).toEqual([]);
+});

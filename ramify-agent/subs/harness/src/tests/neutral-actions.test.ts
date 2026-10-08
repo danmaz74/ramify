@@ -12,7 +12,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { addModule, assign, byRole, completionProposed, edit, outline, read, submit, treeInputs, write } from './helpers/iterations.js';
 import { declaringScenarios } from './helpers/declarations.js';
 import { gateGit, scenariosCommit } from './helpers/gate-git.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
 import { finalCandidate } from './helpers/final-candidate.js';
 
@@ -153,7 +153,7 @@ async function engineerRecord(naming: Naming) {
     inputs: treeInputs(),
     git: scripted.git,
     candidates: final.candidates,
-    readinessExecution: directReadinessExecution(),
+
   });
   cleanups.push(() => service.close());
   const receipt = await service.execute(startRun('review-notes'));

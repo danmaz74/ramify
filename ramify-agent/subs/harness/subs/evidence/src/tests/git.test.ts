@@ -103,18 +103,6 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
     });
   });
 
-  it('resumes a run on a branch of the earlier prefix, and commits there', async () => {
-    await withRepository(async repository => {
-      const root = repository.root;
-      await repository.git('switch', '--create', 'ramify-agent/run-run-earlier');
-      await repository.git('switch', 'main');
-      expect(await git.createRunBranch(root, 'run-earlier'))
-        .toEqual({ branch: 'ramify-agent/run-run-earlier', created: false });
-      await repository.write('src/one.ts', 'export const one = 1;\n');
-      expect(await git.commitAccepted(root, 'earlier run')).toMatch(/^[0-9a-f]{40}$/);
-    });
-  });
-
   it('refuses a run branch git cannot create, with git\'s own message', async () => {
     await withRepository(async repository => {
       const root = repository.root;

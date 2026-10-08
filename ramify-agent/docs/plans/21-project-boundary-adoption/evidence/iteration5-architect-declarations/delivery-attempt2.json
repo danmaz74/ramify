@@ -1,0 +1,195 @@
+{
+  "attemptTiming": {
+    "argv": [
+      "ramify-agent/node_modules/.bin/ramify-audit",
+      "audit",
+      "--project-root",
+      "ramify-agent",
+      "--cwd",
+      ".",
+      "--json"
+    ],
+    "cwd": "/home/app/ramify-plan21-project-boundary-adoption",
+    "sourceCommit": "5a5237f9f01b5bb013d6778e50fdfac285597435",
+    "sourceTree": "9bd1fe711038c9612ba330fc76cd953aa17f4c9b",
+    "start": "2026-10-07T22:00:18Z",
+    "end": "2026-10-07T22:16:19Z",
+    "wallSeconds": 961.0,
+    "exitCode": 0,
+    "ramifyVersion": "0.4.1",
+    "auditVersion": "0.7.2",
+    "status": "terminal"
+  },
+  "raw": {
+    "path": "/tmp/pb3-it5-audit2.json",
+    "bytes": 517471,
+    "sha256": "dc455ea4c45f9e5f28142c30eb540cabda481112eb81b0f00e38782c9fbcab5d"
+  },
+  "result": {
+    "status": "completed",
+    "requestId": "321b4f92-bc03-418e-96d0-2a8a2cb3e0e8",
+    "runId": "92d033f8-43de-4e4f-bd71-680466f837dd",
+    "producer": {
+      "name": "ramify-audit",
+      "version": "0.7.2"
+    },
+    "evidenceSchemaVersion": 4,
+    "mode": {
+      "requestedMode": "ramify-partial",
+      "resolution": "defaulted",
+      "executedMode": "ramify-partial"
+    },
+    "overall": "pass",
+    "sourceCommit": "5a5237f9f01b5bb013d6778e50fdfac285597435",
+    "sourceTree": "9bd1fe711038c9612ba330fc76cd953aa17f4c9b",
+    "auditedAt": "2026-10-07T22:16:18.846Z",
+    "durationSeconds": 959.725,
+    "ignorePaths": [
+      "docs/**"
+    ],
+    "ownershipAnswer": {
+      "ramifyVersion": "0.4.1",
+      "cliSchema": "ramify.affected-cli/4",
+      "selectionSchema": "ramify.affected/4",
+      "binaryPath": "ramify-agent/node_modules/.bin/ramify"
+    },
+    "selection": {
+      "kind": "scoped",
+      "selectedCheckIds": [
+        "agent-structure",
+        "agent-tests",
+        "agent-typecheck",
+        "agent-web-build",
+        "patch-integrity"
+      ],
+      "omittedCheckIds": [],
+      "selectedTestUnitIds": [
+        "agent-check-self",
+        "agent-typecheck",
+        "agent-vitest",
+        "agent-web-build",
+        "git-diff-check"
+      ],
+      "omittedTestUnitIds": []
+    },
+    "selectedModules": [
+      "ramify-agent",
+      "ramify-agent/harness",
+      "ramify-agent/harness/agent/pi",
+      "ramify-agent/harness/audit",
+      "ramify-agent/web"
+    ],
+    "selectedPaths": [
+      "subs/harness/src/tests/scenario-states.test.ts",
+      "subs/harness/src/work/obligations.ts",
+      "subs/web/src/tests/client.test.ts"
+    ],
+    "baseline": {
+      "sourceCommit": "e8155386527a5429ba09a354b4e6f8c5ca3a6103",
+      "sourceTree": "58fefdd898d6183c03a1d2dadc3e89363b51670e",
+      "reportCommit": "04c452035226e28aec0fd62e84bd4797c1453165",
+      "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-07T21-56-13Z-e81553865",
+      "chainDepth": 1
+    },
+    "carriedFailures": [
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/execution-map-projection.test.ts",
+        "kind": "test",
+        "testId": "execution core from committed run records > targets ordered gate history for a scenario beyond the capped list"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "web",
+        "path": "ramify-agent/subs/web/src/tests/client.test.ts",
+        "kind": "test",
+        "testId": "reads the scenario list at its path and validates it"
+      }
+    ],
+    "expectedFiles": {
+      "contract": "runner-configured-files/1",
+      "source": "partial-answer",
+      "expected": 211,
+      "run": 211,
+      "missing": [],
+      "status": "complete",
+      "runnerConfigFiles": [
+        "vitest.config.ts"
+      ]
+    },
+    "checks": {
+      "agent-structure": {
+        "status": "pass",
+        "durationSeconds": 17.762
+      },
+      "agent-tests": {
+        "status": "pass",
+        "durationSeconds": 922.782
+      },
+      "agent-typecheck": {
+        "status": "pass",
+        "durationSeconds": 5.746
+      },
+      "agent-web-build": {
+        "status": "pass",
+        "durationSeconds": 0.608
+      },
+      "patch-integrity": {
+        "status": "pass",
+        "durationSeconds": 0.005
+      }
+    },
+    "vitest": {
+      "counts": {
+        "files": {
+          "failed": 0,
+          "passed": 209,
+          "skipped": 2,
+          "total": 211
+        },
+        "tests": {
+          "failed": 0,
+          "passed": 1668,
+          "skipped": 6,
+          "total": 1674
+        }
+      },
+      "summary": "group 1: PASS; group 2: PASS",
+      "skippedFiles": [
+        {
+          "path": "ramify-agent/subs/harness/src/tests/fixture-acceptance.test.ts",
+          "project": "node",
+          "state": "skipped"
+        },
+        {
+          "path": "ramify-agent/subs/harness/src/tests/fixture-trials.test.ts",
+          "project": "node",
+          "state": "skipped"
+        }
+      ],
+      "invocationGroups": 2
+    },
+    "failureLedger": {
+      "completeness": "complete",
+      "entries": []
+    },
+    "refs": {
+      "reportCommit": "5ffe3b22aad046af71217c35692fee24e92cfa9c",
+      "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-07T22-16-18Z-5a5237f9f",
+      "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/9bd1fe711038c9612ba330fc76cd953aa17f4c9b"
+    },
+    "composition": {
+      "scoped": true,
+      "chainDepth": 1,
+      "reportCommit": "5ffe3b22aad046af71217c35692fee24e92cfa9c",
+      "rootReportCommit": "04c452035226e28aec0fd62e84bd4797c1453165",
+      "outstandingFailures": 0,
+      "verdict": "pass"
+    }
+  }
+}

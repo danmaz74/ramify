@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { modulePathSchema, sha256Schema } from '../interfaces/protocol/evidence.js';
 import { invocationOutcomeSchema } from '../run/records.js';
 import { capabilityEngineerSubmissionKinds, engineerSubmissionKinds, engineerSubmissionSchema } from '../work/engineer.js';
-import { testSelectionPolicySchema } from '../work/iterations.js';
+import { writeScopeSchema, testSelectionPolicySchema } from '../work/iterations.js';
 
 /*
  * The records of one single engineer session, under
@@ -43,6 +43,8 @@ export const sessionLayout = {
 /** What a session was started with, written before the agent starts. */
 export const sessionRecordSchema = z.object({
   schema: z.literal('ramify-agent.session/2'),
+  policy: z.object({ version: z.literal('run-policy/7'), contract: z.literal('plan21-whole-owner-and-architect-reporting/1') }).strict(),
+  authority: writeScopeSchema,
   id: text,
   role: z.literal('engineer'),
   module: modulePathSchema,
@@ -59,11 +61,11 @@ export const sessionRecordSchema = z.object({
   base: z.string(),
   /** What the session may write, project-relative: the module's own contents and each extra path. */
   scope: z.object({ roots: z.array(z.string()), files: z.array(z.string()), extra: z.array(text) }).strict(),
-  /** The tests the scoped test tool and the gate resolve. */
+  /** The test selection the session's assignment records; its in-place diagnosis runs no test. */
   tests: testSelectionPolicySchema,
   gate: z.boolean(),
   /** The guarded files as they stood at the start, which a gate compares the tree with. */
-  guarded: z.array(z.object({ path: text, hash: text }).strict()),
+  guarded: z.array(z.object({ path: text, hash: text.nullable() }).strict()),
   views: z.array(z.object({
     module: text,
     views: z.array(z.object({ area: text, path: text, revision: text.optional(), coverage: z.number().nullable() }).strict()),
@@ -103,6 +105,10 @@ export const sessionOutcomeSchema = z.object({
   changed: z.array(z.string()),
   /** Those of them that were already uncommitted when it started. */
   alreadyChanged: z.array(z.string()),
+  /** Uncommitted paths the harness itself changed while preparing the session. */
+  harnessChanged: z.array(z.string()),
+  /** Indexed scratch that cleanup preserved at session end. */
+  preservedTracked: z.array(z.string()),
   /** Changed paths outside the write scope: the shell's writes pass no guard. */
   outsideScope: z.array(z.string()),
   usage: invocationOutcomeSchema.shape.usage,

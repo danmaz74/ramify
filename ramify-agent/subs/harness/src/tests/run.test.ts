@@ -1,5 +1,5 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit, unchangedGit } from './helpers/unchanged-run.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { GitError } from '../../subs/evidence/src/git.js';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -71,6 +71,8 @@ describe('an implementation run with no entry capabilities', () => {
       'analysis-accepted',
       'gate-started',
       'readiness-passed',
+      'scratch-setting-up',
+      'scratch-setup-complete',
       'nonfunctional-phase-started',
       'candidate-prepared',
       'nonfunctional-assessed',
@@ -108,9 +110,8 @@ describe('an implementation run with no entry capabilities', () => {
     expect(attempt.verdict).toBe('passed');
     expect(attempt.steps.every(step => step.outcome === 'passed')).toBe(true);
     expect(attempt.steps.map(step => step.step)).toEqual([
-      'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
-      'nested-packages', 'test-discovery', 'ramify-daemon', 'baseline-setup', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
-      'baseline-acceptance', 'acceptance-full', 'run-branch',
+      'project-root', 'scratch-cleanup', 'git-clean', 'compiler-config', 'project-config',
+      'ramify-daemon', 'audit-config', 'declared-packages', 'declared-preparation', 'configured-full-audit', 'run-branch',
     ]);
   }, 120_000);
 
@@ -147,7 +148,7 @@ describe('an implementation run with no entry capabilities', () => {
         });
       },
     };
-    const { service } = await openRunsWithGit(root, { git, readinessExecution: directReadinessExecution(), script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const { service } = await openRunsWithGit(root, { git,  script: [{ kind: 'submit', input: emptyAnalysis() }] });
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun('review-notes'));
@@ -194,7 +195,8 @@ describe('an implementation run with no entry capabilities', () => {
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended',
       'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'gate-started', 'readiness-passed', 'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
+      'gate-started', 'readiness-passed', 'scratch-setting-up', 'scratch-setup-complete',
+      'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
       'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-failed',
     ]);
     // The unchanged tree needs no new commit, but its current revision was

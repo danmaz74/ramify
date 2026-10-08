@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { architectViewDirectory, findModule, readApiView, type ApiViewSnapshot, type ArchitectIndex, type SourceArea } from '../../subs/evidence/src/views.js';
+import { architectViewDirectory, findModule, readApiView, readArchitectMeta, type ApiViewSnapshot, type ArchitectIndex, type SourceArea } from '../../subs/evidence/src/views.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ApiViewEvidence } from '../interfaces/protocol/jobs.js';
 import type { RegistryEntry, Hypothesis } from '../analysis/records.js';
@@ -72,6 +72,15 @@ export async function apiViewsOf(
   if (!entry) return { evidence: null, unavailable: `"${module}" is not a module of the architect view, so it has no API view yet` };
   const result = await ramify.materialize(projectRoot, entry.dir);
   if (!result.ok) return { evidence: null, unavailable: `the API view could not be materialized: ${result.message}` };
+  // Materialization refreshes the architect and API views together. A run's
+  // earlier index remains useful for module selection, but its revision may
+  // correctly predate edits made during the run.
+  let current;
+  try {
+    current = await readArchitectMeta(projectRoot);
+  } catch (error) {
+    return { evidence: null, unavailable: `the materialized architect view could not be read: ${error instanceof Error ? error.message : String(error)}` };
+  }
   const views: ApiViewEvidence['views'][number][] = [];
   const unavailable: string[] = [];
   for (const area of ['src', 'src/tests'] as const satisfies readonly SourceArea[]) {
@@ -84,8 +93,8 @@ export async function apiViewsOf(
       if (!source.isDirectory()) throw new Error('the source area is not a directory');
       const snapshot: ApiViewSnapshot | undefined = await readApiView(projectRoot, entry, area);
       if (!snapshot) throw new Error('materialization reported success but the existing source area has no generated API metadata');
-      if (snapshot.module !== entry.module || typeof snapshot.revision !== 'string' || snapshot.revision.length === 0) {
-        throw new Error('the generated API metadata has no valid module/revision identity');
+      if (snapshot.revision !== current.revision) {
+        throw new Error(`the generated API revision ${snapshot.revision} differs from the architect revision ${current.revision}`);
       }
       views.push({ area: snapshot.area, path: snapshot.path, revision: snapshot.revision, coverage: snapshot.coverage });
     } catch (error) {
@@ -107,8 +116,7 @@ export async function iterationApiViews(
   base: WriteScope['base'],
 ): Promise<IterationApiViews[]> {
   const modules = 'module' in base
-    ? [base.module, ...base.includedChildren, ...[...index?.modules.keys() ?? []].filter(module =>
-      base.includedChildren.some(child => module.startsWith(`${child}/`)))]
+    ? [base.module, ...[...index?.modules.values() ?? []].filter(module => base.included.some(entry => module.dir === entry.directory || module.dir.startsWith(`${entry.directory}/`))).map(module => module.module)]
     : base.modules;
   const entries: IterationApiViews[] = [];
   for (const module of new Set(modules)) {
@@ -403,7 +411,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
   if (delegation?.blocked !== undefined && delegation.blocked.length > 0) {
     lines.push('## Completion was refused', '');
     for (const reason of delegation.blocked) lines.push(`- ${reason}`);
-    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider; a scenario is implemented when a gate passes it after its declaration, so declare with the request the ones existing step definitions bind, and assign an iteration that writes the step definitions for the others.', '');
+    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider; a capability request closes with an accepted current handback of its task, or an accepted consumer verification where it used an existing interface.', '');
   }
 
   if (briefing.unresolvedRequest !== undefined) {
@@ -564,7 +572,7 @@ function integrationSection(integration: IntegrationBriefing): string[] {
     `## The integration scenario ${scenario.id}: ${scenario.name}`,
     '',
     `This work item exists to bind one scenario of the plan, which combines several entries. Its owner is \`${scenario.owner}\`,`,
-    'the lowest common ancestor of its sub-scenarios\' owners, and every sub-scenario is implemented already.',
+    'the lowest common ancestor of its sub-scenarios\' owners, and every sub-scenario is reported done already.',
     `The harness wrote it into \`${scenario.file}\`; no agent edits a feature file.`,
     '',
     '```gherkin',
@@ -575,9 +583,7 @@ function integrationSection(integration: IntegrationBriefing): string[] {
     '',
   ];
   for (const sub of integration.subScenarios) {
-    lines.push(`- \`${sub.id}\` (${sub.name}), owned by \`${sub.owner}\`, in \`${sub.file}\`.${sub.bridging.length === 0
-      ? ''
-      : ` Its bridging Given${sub.bridging.length === 1 ? '' : 's'}, stating what another entry leaves instead of taking its action: ${sub.bridging.map(step => `"${step}"`).join(', ')}.`}`);
+    lines.push(`- \`${sub.id}\` (${sub.name}), owned by \`${sub.owner}\`, in \`${sub.file}\`.`);
   }
   lines.push('', '### The step files of their owners', '');
   for (const owner of integration.owners) {
@@ -591,12 +597,11 @@ function integrationSection(integration: IntegrationBriefing): string[] {
       ? ''
       : ` with the children ${scope.includedChildren.map(child => `\`${child}\``).join(', ')} included`}; the harness refuses any other base.`,
     `Its engineer writes a step file in \`${scenario.steps}/\` that imports, by name, the step files above, adds the`,
-    '`expose-test` declarations along each path so this module receives them, defines no step of its own, and declares',
-    `\`${scenario.id}\` in its completion proposal. Its gate runs this module's feature files with the scenario selected by`,
-    'identity; a pass implements it, and this work item completes at its own work-item gate.',
-    '',
-    'When the scenario fails while its sub-scenarios pass, it is a composition failure: a bridging Given assumed what',
-    'the real behavior does not do. It is this work item\'s to resolve, through repair, placement and delegation, or `unresolved`.',
+    '`expose-test` declarations along each path so this module receives them, and defines no step of its own. Name',
+    `\`${scenario.id}\` in \`assignment.obligations\`; the engineer's proposal binds it. Its gate runs this module's feature`,
+    'files; a failure arrives with the runner\'s own diagnostics, which you and the engineer investigate. The harness',
+    'draws no conclusion about its cause. When, in your judgment, it is correctly implemented and passing, report it',
+    '`done`; this work item completes at its own work-item gate.',
     '',
   );
   return lines;

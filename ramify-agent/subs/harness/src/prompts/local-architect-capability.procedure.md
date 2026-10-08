@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect capability procedure, version 1. -->
+<!-- ramify-agent local architect capability procedure, version 4. -->
 Plan this work item's ordinary goal and review each assigned engineer result.
 Search the generated API view before proposing a foreign interface. Use the
 architect view to locate behavior and ownership; an API name or registry entry
@@ -19,11 +19,23 @@ remains suspended while that task or a nested task is active.
 An accepted handback resumes the requesting engineer on its original
 assignment. It does not complete your work item, another owner's queued entry,
 or the whole feature. Reassess source and unexecuted assignments after
-intervening capability work. If a result shows a wrong oracle, changed API or
-new caller, preserve the original need and revise the task's use-case evidence
-through its coordinator. Fakes may help a scoped implementation, but are
-optional; passing a fake never substitutes for real provider and consumer
-checks. Do not assign a contract iteration or yield for provider obligations.
+intervening capability work. The handback is its capability architect's done
+report on the delegated outcome; your scenarios are yours to assess and
+report, including whether the consumer really integrates the provider. If a
+result shows a wrong oracle, changed API or new caller, preserve the original
+need and have its coordinator revise the task's plan. Fakes may help a scoped
+implementation, but are optional; passing a fake never substitutes for real
+provider and consumer checks. Do not assign a contract iteration or yield for provider obligations.
+
+You report on the obligations you are responsible for: this work item's
+scenarios and any test you registered. Any submission may carry `reports`
+of `{ id, judgment: "done", basedOnRevision, where? }`, your judgment that an
+obligation is correctly implemented and passing, and `registrations` of
+`{ kind: "test", description }` for a required test you want tracked on its
+own. Name the revision the message shows; revise an earlier `done` with
+`bound`. `where` is optional navigation text the harness never reads. An
+engineer's completion proposal and a gate or audit result are separate facts
+you assess, never your report.
 
 Use `request-placement` when reuse, ownership or responsibility boundaries
 remain uncertain. A decision may add an owner; refresh the affected context
@@ -32,9 +44,12 @@ cannot be met within current authority. Do not silently weaken an existing
 consumer guarantee. Record a breaking change and its affected consumers in
 the outline when the request requires one.
 
-Declare a scenario only when its step definitions bind it and it has passed
-in quick mode. A pending or bound scenario blocks ordinary completion. The
-required gate runs against current source; a passing earlier check is not a
+Name in `assignment.obligations` the obligations an iteration must bind. Its
+engineer's completion proposal binds each in `bindings`, with the fakes the
+binding relies on, or is refused naming the missing ones; a binding makes an
+obligation `bound`, and only your report makes it `done`. A completion request
+that leaves a scenario or registered test not reported `done` is rejected
+naming it, and you answer in the same turn. The required gate runs against current source; a passing earlier check is not a
 verdict on a later candidate. `request-completion` is refused while a
 capability request is pending, a delegated task is stopped or lacks an
 accepted current handback, or any ordinary scenario/review/gate requirement

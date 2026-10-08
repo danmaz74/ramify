@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -7,7 +8,8 @@ import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { runLayout, type LineEventSummary } from '../run/records.js';
 import { changedPaths, diffNumstat } from '../../subs/evidence/src/git.js';
 import { childEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
-import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
+import { createConfiguredAudit } from '../../subs/audit/src/check-execution.js';
+import { gateDiagnostics } from '../checks/diagnostics.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
@@ -19,9 +21,10 @@ import { gitService } from '../../subs/evidence/src/git.js';
  * A gate that really fails, with every external system this project has.
  *
  * This is the retained witness of real failing diagnostics: a real defect in
- * real source, a real runner over the files the selection resolved to, the
- * real audit execution publishing its notes and refs against each committed
- * revision, and the audit command line reading the branch back. What it
+ * real source, the project's committed audit definition running its real
+ * test command over each committed candidate, the provider publishing its
+ * notes and refs against each revision, and the audit command line reading
+ * the branch back. The harness lists no test file: the definition does. What it
  * proves is the boundary itself, which no scripted answer can establish.
  * Every other gate-policy scenario states its command results and Git's
  * answers instead, in `iteration-gate.test.ts`.
@@ -53,10 +56,29 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     const root = fixture.root;
     await addModule(root, notesDirectory, 'notes', {
       'src/notes.ts': 'export const noteLimit = 400;\n',
-      'src/tests/notes.test.ts': limitTest,
+      // Readiness audits the starting commit in full, so the project starts
+      // passing: its test states the limit it has today.
+      'src/tests/notes.test.ts': limitTest.replace('toBe(500)', 'toBe(400)'),
     });
     await installMiniRunner(root);
+    // The project's committed audit definition: its own test command, in the
+    // audited worktree with linked dependencies. The stand-in runner has no
+    // configuration of its own, so the definition names the module's tests;
+    // the fixture's other suites need dependencies this copy does not install.
+    await writeFile(join(root, 'ramify-audit.json'), `${JSON.stringify({
+      ignorePaths: [],
+      workspace: { preparation: 'nodejs', options: { packageDirectories: [''], setupCommands: [] } },
+      checks: [{
+        id: 'project-tests', name: 'Project tests', description: 'The project\'s own tests',
+        scope: 'both', category: 'deterministic', onFailure: 'record',
+        executor: { kind: 'command', commands: [
+          { name: 'tests', cmd: 'node_modules/.bin/vitest', args: ['run', `${notesDirectory}/src/tests/notes.test.ts`], parser: 'none', timeoutMs: 60_000 },
+        ], continueOnFailure: true },
+      }],
+    }, null, 2)}\n`);
     await initRepository(root);
+    const lockDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-lock-'));
+    cleanups.push(() => rm(lockDirectory, { recursive: true, force: true }));
 
     const opened = await openRuns(root, {
       git: gitService,
@@ -64,15 +86,18 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
         engineer: [
-          // The first attempt proposes completion with the defect still there.
-          submit(completionProposed('Added the note store.'), write('store.ts', 'export const store = new Map();\n')),
+          // The first attempt states the limit the plan asks for in the test
+          // and proposes completion with the source still short of it.
+          submit(completionProposed('Added the note store.'), write('store.ts', 'export const store = new Map();\n'),
+            edit('tests/notes.test.ts', 'toBe(400)', 'toBe(500)')),
           // The repair is a real edit of the real defect.
           submit(completionProposed('Raised the limit to 500, which is what the test states.'),
             edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500')),
         ],
       }),
       inputs: treeInputs(),
-      checkExecution: createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(root) }),
+      configuredAudit: createConfiguredAudit({ workspaceOwnership: createAuditWorkspaceOwnership(root),
+        testLock: { lockPath: join(lockDirectory, 'machine-test.lock') } }),
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -95,18 +120,21 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     expect(failed.commit).not.toBeNull();
     expect(failed.audited).toBe(failed.commit);
     expect(failed.evidence).not.toBeNull();
-    expect(failed.commands[0]!.exitCode).toBe(1);
-    expect(failed.commands[0]!.output.tail).toContain('not ok');
+    // The audit's own answer, not a harness command record, carries the
+    // failure: the committed check failed over the committed candidate.
+    expect(failed.commands).toEqual([]);
+    expect(failed.audit).toMatchObject({ status: 'completed', verdict: 'fail', requestedSourceCommit: failed.commit, auditedSourceCommit: failed.commit });
+    expect((await gateDiagnostics(failed, 'engineer')).summary.join('\n')).toContain('not ok');
 
-    // The rerun is a repair round and runs the complete required set again,
-    // not only the command that failed.
+    // The rerun is a repair round and asks the committed audit again, which
+    // runs the complete definition, not only the check that failed.
     expect(repaired.repairRound).toBe(1);
     expect(repaired.verdict).toBe('passed');
     expect(repaired.commit).not.toBeNull();
     expect(repaired.audited).toBe(repaired.commit);
     expect(repaired.evidence).not.toBeNull();
-    expect(repaired.commands.map(command => command.kind)).toEqual(failed.commands.map(command => command.kind));
-    expect(repaired.commands.every(command => command.outcome === 'passed')).toBe(true);
+    expect(repaired.audit).toMatchObject({ status: 'completed', verdict: 'pass', requestedSourceCommit: repaired.commit });
+    expect(repaired.audit!.definition).toEqual(failed.audit!.definition);
 
     const result = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;
     expect(result.outcome).toBe('accepted');

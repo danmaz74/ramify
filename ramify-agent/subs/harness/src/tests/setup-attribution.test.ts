@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { gateDiagnostics } from '../checks/diagnostics.js';
 import { runGate } from '../checks/gate.js';
 import { setupChecks } from '../checks/checkpoint.js';
-import { checkCommand, type GateAttempt } from '../checks/records.js';
+import { checkCommand, checkCommandEnvironment, type GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
 import { runLayout } from '../run/records.js';
 import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
@@ -12,8 +12,9 @@ import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs } from './helpers/iterations.js';
 import { mockGit } from './helpers/mock-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { createMappedCheckExecution, type DirectCheckStep } from './helpers/direct-check-execution.js';
+import { commandResult } from './helpers/command-result.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
@@ -28,9 +29,12 @@ import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRu
  * nothing after it ran, and the attempt says so rather than that its
  * commands selected or found nothing.
  *
- * Every command here is answered by a direct executor, which keeps every
- * later command from running once a setup command did not pass, as the
- * in-place and audit executors do; no process is started.
+ * A standalone diagnosis is answered by a direct executor, which keeps
+ * every later command from running once a setup command did not pass, as
+ * the in-place executor does. A committing gate asks the configured audit,
+ * whose preparation runs the setup: a setup command that exits non-zero
+ * fails the request with the provider's `setup-command-failed`, and no check
+ * runs. No process is started.
  */
 
 vi.mock('node:child_process', async original =>
@@ -50,12 +54,8 @@ async function attempt(setup: DirectCheckStep, checkpoint: GateAttempt['checkpoi
   cleanups.push(directory.remove);
   const checks: PlannedCheck[] = [
     ...setupChecks([{ name: 'build', command: [process.execPath, 'scripts/build.mjs'] }], directory.path),
-    {
-      kind: 'tests', command: checkCommand({ argv: [process.execPath, 'run'], cwd: directory.path, timeoutMs: 30_000 }), attribution: 'in-scope',
-      selection: { policy: 'owned-by-scope', exactOwners: ['project/notes'], subtrees: [], extraSuites: [], resolved: ['src/tests/notes.test.ts'] },
-      requiresTests: true,
-    },
-    { kind: 'type-check', command: checkCommand({ argv: [process.execPath, 'tsc'], cwd: directory.path, timeoutMs: 30_000 }), attribution: 'project' },
+    { kind: 'type-check', command: checkCommand({ argv: [process.execPath, 'tsc'], cwd: directory.path, timeoutMs: 30_000 }) },
+    { kind: 'ramify-check', command: checkCommand({ argv: [process.execPath, 'ramify'], cwd: directory.path, timeoutMs: 30_000 }) },
   ];
   return runGate(createMappedCheckExecution({ script: ({ check }) => (check.kind === 'setup' ? setup : {}) }), checkpoint, {
     id: 'ga-0002',
@@ -64,7 +64,6 @@ async function attempt(setup: DirectCheckStep, checkpoint: GateAttempt['checkpoi
     head: 'HEAD',
     checks,
     limits: { repairRounds: 2, infrastructureRetries: 2 },
-    writeScope: ['src'],
   });
 }
 
@@ -74,8 +73,8 @@ describe('a setup command that did not pass at a gate', () => {
 
     expect(gate.commands.map(command => [command.kind, command.outcome, command.notVerified ?? null])).toEqual([
       ['setup', 'failed', null],
-      ['tests', 'not-verified', 'setup-failed'],
       ['type-check', 'not-verified', 'setup-failed'],
+      ['ramify-check', 'not-verified', 'setup-failed'],
     ]);
     expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'check-failed', 'repair']);
     expect(gate.commands[0]).toMatchObject({ name: 'build', exitCode: 2 });
@@ -84,7 +83,7 @@ describe('a setup command that did not pass at a gate', () => {
     expect(briefed.summary).toEqual([
       `- \`setup\`, the setup command "build" (\`${process.execPath} scripts/build.mjs\`): failed, exit 2; its complete output is in \`${gate.commands[0]!.output.path}\`; the end of what it printed:`,
       `      ${buildError}`,
-      '- not run, because the setup command "build" (`' + `${process.execPath} scripts/build.mjs` + '`) did not pass: `tests`, `type-check`',
+      '- not run, because the setup command "build" (`' + `${process.execPath} scripts/build.mjs` + '`) did not pass: `type-check`, `ramify-check`',
     ]);
     // Nothing says a selection was empty or a test was missing.
     expect(briefed.summary.join('\n')).not.toMatch(/selected no|empty-selection|not verified/u);
@@ -153,7 +152,17 @@ describe('the declared setup over a run', () => {
       .mockImplementationOnce(async () => { head = 'repaired-build'; return head; })
       .mockResolvedValue(null);
     const opened = await openRuns(root, {
-      inputs: treeInputs(), git, candidates: final.candidates, readinessExecution: directReadinessExecution(),
+      inputs: treeInputs(), git, candidates: final.candidates,
+      commandExecution: request => {
+        expect(request.argv).toEqual(['node', 'scripts/build.mjs']);
+        expect(request.cwd).toBe(root);
+        expect(request.env).toEqual(checkCommandEnvironment(setupChecks([
+          { name: 'build', command: ['node', 'scripts/build.mjs'] },
+        ], root)[0]!.command));
+        expect(request.timeoutMs).toBe(600_000);
+        expect(request.signal).toBeInstanceOf(AbortSignal);
+        return commandResult(request, {});
+      },
       // The engineer's first change breaks the build; its repair builds.
       checkScript: ({ check, context }) => check.kind === 'setup' && context.sourceCommit === 'broken-build'
         ? { stderr: `${buildError}\n`, outcome: { kind: 'completed', exitCode: 2 } }
@@ -171,7 +180,8 @@ describe('the declared setup over a run', () => {
     const receipt = await opened.service.execute(startRun('review-notes'));
     await opened.service.settled('review-notes', receipt.jobId);
     const runId = receipt.jobId;
-    expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');
+    const snapshot = onlyRun(opened.service, 'review-notes');
+    expect(snapshot.state, JSON.stringify(snapshot.failure)).toBe('completed');
     expect(previewIndex).toBe(final.previews.length);
 
     const events = await runEventsOnDisk(root, 'review-notes', runId);
@@ -180,18 +190,24 @@ describe('the declared setup over a run', () => {
       JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate(id)), 'utf8')) as GateAttempt));
     const iteration = attempts.filter(gate => gate.checkpoint === 'iteration');
     expect(iteration.map(gate => [gate.verdict, gate.cause, gate.next])).toEqual([['failed', 'check-failed', 'repair'], ['passed', null, 'accept']]);
-    // Every committing gate ran the declared setup first; the first found the build broken and ran nothing after it.
-    for (const gate of attempts) expect(gate.commands[0]).toMatchObject({ kind: 'setup', name: 'build' });
-    expect(iteration[0]!.commands.slice(1).every(command => command.notVerified === 'setup-failed')).toBe(true);
+    // Every committing gate asked the configured audit, whose preparation runs
+    // the declared setup first; the first found the build broken, so its
+    // preparation failed and no check ran: the candidate's own failure.
+    const committing = attempts.filter(gate => gate.checkpoint !== 'readiness');
+    for (const gate of committing) expect(gate.commands).toEqual([]);
+    expect(iteration[0]!.audit).toMatchObject({ status: 'failed', requestedSourceCommit: 'broken-build', verdict: null });
+    expect(iteration[0]!.audit!.detail).toContain('setup-command-failed');
+    expect(iteration[0]!.audit!.detail).toContain(buildError);
+    expect(iteration[0]!.audited).toBeNull();
     expect(iteration[0]!.evidence).toBeNull();
+    expect(iteration[1]!.audit).toMatchObject({ status: 'completed', requestedSourceCommit: 'repaired-build', verdict: 'pass' });
 
     // The engineer's repair was briefed with the command, its exit code and what it printed.
     const engineers = opened.agent!.sessions.filter(session => session.spec.role === 'engineer');
     const repair = engineers.at(-1)!.spec.prompt;
     expect(repair).toContain(`Attempt \`${iteration[0]!.id}\` (check-failed). What ran, and what it reported:`);
-    expect(repair).toContain('- `setup`, the setup command "build" (`node scripts/build.mjs`): failed, exit 2');
+    expect(repair).toContain(`- audit \`${iteration[0]!.audit!.requestId}\`, the project's default audit of \`broken-build\` under \`ramify-audit.json\`: failed, setup-command-failed: Setup command build exited with code 2.`);
     expect(repair).toContain(buildError);
-    expect(repair).toContain('- not run, because the setup command "build"');
     expect(git.unexpected).toEqual([]);
   }, 300_000);
 });

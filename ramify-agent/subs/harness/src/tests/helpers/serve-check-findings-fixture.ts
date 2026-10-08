@@ -10,7 +10,6 @@ import { scriptedCandidates, testReviewPolicy, type ScriptedCommit } from './can
 import { concern, disposition, reconcile, review, submission } from './check-findings-composition.js';
 import { declaringScenarios } from './declarations.js';
 import { createPassingCheckExecution } from './direct-check-execution.js';
-import { directReadinessExecution } from './external-tools.js';
 import { FakeRamifyCli } from './fake-ramify.js';
 import { gateGit, scenariosCommit } from './gate-git.js';
 import { completionProposed, submit, treeInputs, write } from './iterations.js';
@@ -18,6 +17,7 @@ import {
   base, candidates, limit, materialized, notesDirectory, plan, reviewScript, reviewTarget, revisionGates, store, tool, unchanged,
 } from './reviews.js';
 import { startRun, testPolicy, until } from './runs.js';
+import { passingAudit } from './direct-check-execution.js';
 
 /*
  * Serves one live CheckFinding run to the built web client, for the browser
@@ -114,8 +114,8 @@ const server = await startServerWith({
     inputs: treeInputs(),
     git: git.git,
     candidates: scriptedCandidates(root, commits()),
-    readinessExecution: directReadinessExecution(),
-    checkExecution: createPassingCheckExecution(),
+
+    configuredAudit: passingAudit(),
     policy: projectRoot => testPolicy(projectRoot, { reviews: testReviewPolicy({ kinds: ['code', 'scope', 'design'], concurrency: 1, settleMs: 120_000 }) }),
     stopGraceMs: 500,
     warn: () => undefined,

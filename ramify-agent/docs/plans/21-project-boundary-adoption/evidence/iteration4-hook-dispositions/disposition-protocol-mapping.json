@@ -1,0 +1,81 @@
+{
+  "purpose": "Iteration 10 browser handoff: how each ramify.check/3 path disposition and project verdict reaches the harness records, transcript protocol and engineer text after iteration 4.",
+  "source": "ramify-agent/subs/harness/subs/evidence/src/ramify-cli.ts (decode), ramify-agent/subs/harness/src/hooks/post-write.ts (records, settlement, text)",
+  "verdict": {
+    "providerField": "process exit code with document outcome/reason (ramify.check/3) or outcome.execution/check (ramify.analysis/3)",
+    "adapter": "RamifyCheckResult.outcome: checked (exit 0) | findings (exit 1) | not-checked (exit 2, reason = CLI reason or ramify.analysis/3 execution); unsupported (undecodable) is not-checked with reason 'unsupported result: <detail>'",
+    "records": "hook-check observation data.outcome: passed | findings | not-checked; data.reason; transcript post-write-check checks[].outcome/reason",
+    "rule": "The verdict is the project's. It says nothing about a path whose disposition is not checked."
+  },
+  "provider": {
+    "records": "hook-check data.provider and transcript checks[].provider: { schema: 'ramify.check/3' | 'ramify.analysis/3', revision: revision id or null } | null",
+    "nullWhen": "no document was decoded: unsupported result, invocation failure, a check that was not run (changed set unknown)"
+  },
+  "dispositions": {
+    "records": "hook-check data.dispositions[] and transcript checks[].dispositions[]: { path, disposition, reason, module, exclusion: { kind, directory, owner } | null, sha256 }",
+    "emptyWhen": "complete checks (ramify.analysis/3 has no per-path list), undecoded results and unrun checks",
+    "rows": [
+      {
+        "disposition": "checked",
+        "reason": "content",
+        "sha256": "content SHA-256",
+        "covers": true,
+        "engineerText": "named only inside a not-checked block, as '- <path>: checked (content)'"
+      },
+      {
+        "disposition": "checked",
+        "reason": "deleted",
+        "sha256": null,
+        "covers": true,
+        "engineerText": "as above, '(deleted)'; clears the file's standing findings when the result was established"
+      },
+      {
+        "disposition": "not-analyzed",
+        "reason": "owned-unwired | owned-nested-project | external | scratch",
+        "exclusion": "kind, directory, owner",
+        "covers": false,
+        "engineerText": "'Not analyzed by Ramify: ... is no pass for them.' then '- <path>: in the <kind> tree|scratch directory `<directory>` of module `<owner>` [not-analyzed <reason>]', whatever the verdict"
+      },
+      {
+        "disposition": "not-analyzed",
+        "reason": "reserved",
+        "exclusion": "null or as given",
+        "covers": false,
+        "engineerText": "'- <path>: a reserved path of module `<module>` [not-analyzed reserved]' when no exclusion is given"
+      },
+      {
+        "disposition": "not-analyzed",
+        "reason": "owned-non-source",
+        "exclusion": null,
+        "covers": false,
+        "engineerText": "'- <path>: an owned file of module `<module>` that is neither source nor an analysis input [not-analyzed owned-non-source]'"
+      },
+      {
+        "disposition": "not-checked",
+        "reason": "NotCheckedReason (e.g. cold, deadline-exceeded, configuration-changed)",
+        "covers": false,
+        "engineerText": "head line '- changed check over <paths>: not-checked (<reason>)'; a path with a reason other than the check's is listed under it as '- <path>: not checked (<reason>)'"
+      }
+    ]
+  },
+  "settlement": {
+    "covered": "changed: paths with disposition checked; complete: every analyzed path ('all'); only when the result was established (exit 0/1, decoded)",
+    "removed": "document removed[] ids clear only when established and execution is completed",
+    "exit2": "reported findings are admitted and stand; nothing clears",
+    "uncovered": "standing findings of not-analyzed and not-checked paths are kept (union), never replaced"
+  },
+  "gaps": {
+    "unsupported-check-result": "coverage-gap observation per check whose printed result the adapter refused; never a pass",
+    "changed-paths-unknown": "unchanged: the only case that runs a complete check instead"
+  },
+  "warnings": {
+    "codes": [
+      "compiler-selected-owned-unwired",
+      "compiler-selected-owned-nested-project",
+      "compiler-selected-scratch",
+      "ignored-but-walked"
+    ],
+    "relay": "'[warning <code>]' with Ramify's own message, not blocking, for a file this invocation wrote that the warning lists or that lies under its path; repeated warnings are told once"
+  },
+  "browserStatus": "subs/web/src/transcript.tsx is unchanged: its 'post-write-check' case receives the extended entries, typed by the transcript protocol, but renders neither provider nor dispositions. Rendering is iteration 10."
+}

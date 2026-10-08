@@ -8,6 +8,19 @@ Capability coordination adds the consumer/provider context and a task owner for
 sequence, limits, nested dependencies and final handback. Partial or failed
 iterations remain partial or failed even after later work succeeds.
 
+A handback is the capability architect's done report on the task's delegated
+outcome, `cap-NNN`, and on every case or test it registered: a
+`request-handback` that leaves one not reported `done` is a rejected
+submission naming each one, under the per-turn bound and before any gate
+runs, and the architect answers in the same turn. The request's original examples and approved
+requirements stay immutable context through every plan revision; a plan case
+carries no coverage state, and the handback cites no evidence. The harness
+checks the non-test boundaries (no active assignment or child, the current
+plan revision and candidate, the task gate, reviews and reconciliation), never
+a cited file, an executed test or a provider/consumer test inventory. A
+handback completes neither the requesting engineer's assignment nor its
+architect's scenarios, which that architect assesses and reports separately.
+
 Both architects inspect source and Git through the same read-only tools. Current
 results point to common iteration, gate and review records; there is no full
 capability-history replay tool or model-authored source/configuration hash.
@@ -127,45 +140,50 @@ hiding or measured complexity justifies it.
     one way to the environment a spawn is given, built from
     `childEnvironment`'s allowlist at the moment it runs. The policy that
     chooses them belongs to the iterations that assign work.
-  - `verify.ts`: verification before execution. Every command and every
-    selection of an attempt is verified before the first command runs, so a
-    checkpoint that cannot run what it requires runs nothing at all: a
-    missing executable or working directory, an empty selection the
-    checkpoint requires, a required suite rediscovery did not select, and a
-    discovery that failed are each a reason the attempt records.
-  - `checkpoint.ts`: what each checkpoint requires beyond the type check and
-    the complete Ramify check, which every one of them runs: which tests, and
-    whether it audits a candidate commit. It is mechanical and hardcoded;
-    no submission carries it and no agent chooses it. Required commands run
-    once; there is no additional scope probe. The engineer diagnoses the
-    complete provider evidence and requests another owner when needed. The
-    project's setup commands, which `ramify-agent.json` declares in `setup`,
-    lead every checkpoint's plan as commands of kind `setup`.
-  - `selection.ts`: resolving a policy against the tree as it stands. Each
-    exact owner's own test area, every descendant owner's for an included
-    subtree, the ordinary source of a testing module inside the selection,
-    and the suites a registered obligation requires. Owner-to-directory
-    mapping comes from the refreshed architect view and from nothing else; a
-    discovery that fails is not verified and never falls back to an earlier
-    list.
-  - `gate.ts`: the policy half of a gate. It verifies the command plan,
-    compares the captured guarded hashes with the tree, classifies the
-    executor's command records and answers one attempt. Committing checkpoints
-    use the audit executor in `subs/audit`; readiness and the standalone
-    session's optional gate use the in-place executor because they do not
-    commit. Both run the project's setup commands before any other command,
-    the in-place executor at the project root and the audit through
-    ramify-audit's preparation of the worktree, and once one has not passed
-    no later command runs: each is recorded as not verified, `setup-failed`,
-    and the setup command's own record decides the attempt. One that exited
-    non-zero fails it `in-scope`, the engineer's to repair after readiness
-    passed; one that timed out, could not start or was stopped is
-    infrastructure. The guarded set is the configuration, the
-    manifests, `ramify-agent.json`, the support files it names, the contract
+  - `verify.ts`: verification before execution of a standalone session's
+    in-place diagnosis. Every command is verified before the first one runs,
+    so a diagnosis that cannot run what it requires runs nothing at all: a
+    missing executable or working directory is a reason the attempt records.
+    A committing gate plans no command and verifies none.
+  - `checkpoint.ts`: what each checkpoint requires. It is mechanical and
+    hardcoded; no submission carries it and no agent chooses it. A
+    committing checkpoint (`iteration`, `contract`, `breaking-iteration`,
+    `work-item`, `final`) asks the project's committed audit, its
+    `ramify-audit.json`, about the candidate commit: the ordinary gates in
+    the provider's default mode, which audits a Ramify project
+    `ramify-partial` from its baseline and any other project in full, and
+    `final` in full and nested, the same request as readiness's baseline. The definition names every check, the
+    project's tests and scenarios among them; the harness adds none, selects
+    no test and runs no scenario. A standalone session's in-place diagnosis
+    runs the project's setup commands, which `ramify-agent.json` declares in
+    `setup`, its type check and a complete Ramify check, and no test.
+  - `gate.ts`: the policy half of a gate. A committing gate compares the
+    captured guarded hashes with the tree, makes one request of the
+    committed audit for its commit, bounded by the gate's timeout with lock
+    waits excepted, and answers one attempt from the provider's composed
+    verdict beside the harness's own rules. The attempt records no command:
+    it keeps the request (its ID, mode and definition path and blob), the
+    requested source commit, the audited source commit, the requested and
+    executed modes with any fallback reason, the reuse the provider applied,
+    the composed verdict and the provider's result and published check
+    results. A `pass` is a pass; `fail`, a failed harness rule or a declared
+    setup command that exited non-zero (`setup-command-failed`) fails the
+    attempt, the engineer's to repair; an `indeterminate` verdict, a failed,
+    cancelled or refused request is not verified, never a pass, with cause
+    `timeout` when the provider or the gate's own bound timed it out and
+    `infrastructure` otherwise. Applicable evidence the provider reuses
+    answers the request as a fresh record does and keeps both source
+    commits; it carries no new execution receipt. The standalone session's
+    diagnosis uses the in-place executor (`execution.ts`): it runs the
+    project's setup commands first, and once one has not passed no later
+    command runs, each recorded as not verified, `setup-failed`. The guarded
+    set is the configuration, the manifests, `ramify-agent.json`,
+    `ramify-audit.json` and the project's Cucumber configuration
+    (`cucumber.js`, `.cjs`, `.mjs`, `.json`, `.yaml` or `.yml`), the contract
     artifacts in force and every tracked feature file at the hash of its
-    expected rendering; a change no record the
-    assignment names authorized is `guarded-change`, never a pass, and a
-    deletion is `after: null`. An outcome comes from how the command ended and
+    expected rendering; a change no record the assignment names authorized
+    is `guarded-change`, never a pass, and a deletion is `after: null`. In
+    an in-place diagnosis an outcome comes from how the command ended and
     the code it chose, never from what it printed; a Ramify check exiting 2
     was not checked, which is never a pass. The complete output of each
     command is a file beside the attempt, and the record carries its path,
@@ -188,28 +206,38 @@ hiding or measured complexity justifies it.
     parsed for any of this, nor any output whose format the project did not
     declare. The attempt is returned, not written:
     the harness commits it with the event that closes the checkpoint. The
-    audit executor runs each planned command
-    through the harness's own command runner in a temporary worktree of the
-    exact commit, then returns the published run, report and tree refs with
-    the harness command records. Both executors announce each command as it
-    starts, and a run writes the announcement as `gate-command-started`, with
-    the gate, the command's kind and its place among the gate's commands
-    (`position` of `total`), readiness's gate included. It records progress
+    in-place executor announces each command as it starts, and a committing
+    gate announces each configured check as the provider starts it, as kind
+    `configured` with the check's name; a run writes the announcement as
+    `gate-command-started`, with the gate, the kind and its place among the
+    gate's commands or checks (`position` of `total`), readiness's gate
+    included. A configured check waiting for the machine test lock is
+    written as `gate-command-waiting`, and the wait does not count against
+    the gate's bound. An announcement records progress
     and decides nothing; the execution map's current activity names the
     running gate's last started command as `gateCommand`.
   - `diagnostics.ts`: what a failing attempt says to the agent that receives
-    it. Each command that did not pass is named with what it reported: a
-    Ramify check's findings, worded by the one function that words a finding
-    anywhere, or the bounded end of the command's own output where it
-    reported no structure. A scenario check is read from its summary
-    instead: each tracked scenario that did not pass with its name, file and
-    line, its failing step, its bounded message and the steps no definition
-    matched; each one that passed with the definition that bound each step
-    as `uri:line`; and the check's other failure lines. A setup command that
-    did not pass is named with its declared name, its argv, its exit code,
-    where its complete output is and the end of what it printed, followed by
-    one line naming the commands it kept from running. The local architect
-    also receives what a module violation leaves it to decide.
+    it. A committing gate's digest names its audit request: the mode asked,
+    the commit and definition, the requested and executed modes with any
+    fallback reason, the composed verdict, or why the request did not
+    answer, and the record it reused with the ignored changed paths. Each
+    published check that passed is one line; each that did not is named with
+    the provider's record of it and the bounded end of what it printed, and
+    a check the provider did not select is named as not run by the record.
+    `scenario-results.ts` reads the tracked scenarios from the Cucumber
+    checks' raw runner output, by their identity tags: where any did not
+    pass, each result with its file and line, its failing step, its bounded
+    message and the steps no definition matched, and the project's own
+    failing scenarios by count. These results are display only: they never
+    move a scenario's state and never create or withdraw a report. An
+    in-place diagnosis names each command that did not pass with what it
+    reported: a Ramify check's findings, worded by the one function that
+    words a finding anywhere, or the bounded end of the command's own
+    output. A setup command that did not pass is named with its declared
+    name, its argv, its exit code, where its complete output is and the end
+    of what it printed, followed by one line naming the commands it kept
+    from running. The local architect also receives what a module violation
+    leaves it to decide.
 - `run/`: implementation runs. A run is a job, and the only durable authority
   of one is its `events.jsonl`: one flushed line is one transition, carrying
   the bodies of every record it commits, and the files beneath the run are
@@ -254,27 +282,28 @@ hiding or measured complexity justifies it.
   - `project-config.ts`: the project's `ramify-agent.json`, read at
     `start-run` through `subs/evidence`, validated and captured into
     `job.json` beside the policy, with the reason where it is missing or
-    invalid; and what readiness asks of a valid one: the modules' test areas
-    its support code must match, and whether each mode's commands resolve.
-    Its optional `typeCheck.output` retains the declared output format for
-    historical configuration compatibility; the harness does not parse error
-    locations to assign repair ownership. Its
-    optional `timeouts` the gate command timeouts, which `start-run`
-    captures into the policy in place of the harness's own
+    invalid. The file names no test and no scenario: an `acceptance`
+    section, `timeouts.tests` or `timeouts.scopedTests` makes it invalid.
+    Its optional `typeCheck.output` declares the format the type check
+    prints, from which a standalone diagnosis attributes a failed type
+    check by its error locations. Its optional `timeouts` replace the
+    harness's own for a standalone diagnosis's type check and Ramify check
     (`withProjectTimeouts` in `policy.ts`). Its optional `setup` declares
     the project's setup commands, such as its build, each
     `{ name?, command, cwd?, timeoutMs?, env? }` with `cwd` inside the
     project and a positive bound, ten minutes by default, which `timeouts`
-    does not replace; every gate runs them first.
-  - `readiness.ts`: the readiness steps, their bounded recovery and the
-    discovery of the project's test files. A failure a preparation can
-    repair consumes one recovery; one it cannot consumes none. The baseline
-    gate runs the project's setup commands first, which `baseline-setup`
-    records: a setup command that exits non-zero fails readiness with the
-    end of its output and no recovery. So does one that installs
-    dependencies where an audited gate links the project's `node_modules`,
-    before any command runs, since ramify-audit would refuse it at every
-    audited gate.
+    does not replace; a standalone diagnosis runs them first, and readiness
+    requires them to equal the committed audit definition's workspace
+    setup commands.
+  - `readiness.ts`: the readiness steps and their bounded recovery. A
+    failure a preparation can repair consumes one recovery; one it cannot
+    consumes none. `declared-preparation` runs the committed definition's
+    setup commands in the run working tree: a setup command that exits
+    non-zero fails readiness with the end of its output and no recovery. So
+    does one that installs dependencies where an audited gate links the
+    project's `node_modules`, before any command runs, since ramify-audit
+    would refuse it at every audited gate. `configured-full-audit` asks the
+    provider for a full audit of HEAD, whose gate attempt is the baseline.
   - `gates.ts`: a checkpoint of a run and the candidate commit audited before acceptance,
     with the message the harness writes mechanically from records.
   - `inputs.ts`: the evidence seam. A run's lifecycle, its log and its
@@ -310,7 +339,7 @@ hiding or measured complexity justifies it.
     observations and transcript, and the policy's two bounds on one
     session: no port event for `invocationIdleMs`, and
     `invocationAbsoluteMs` in all. A command the implementation equipment
-    runs for the session, a `shell` call or a scoped test run, is the
+    runs for the session, such as a `shell` call, is the
     harness's work and not the session's silence: it holds the idle bound
     for the command's own timeout plus a margin of one minute. Its release
     starts the idle bound afresh, and the absolute bound is unchanged, so
@@ -320,8 +349,9 @@ hiding or measured complexity justifies it.
     session's last assistant text, which a failure digest reads.
   - `mutations.ts`: what a writer changed, read from `git status` when it
     settles. That snapshot is the only observation that sees a write no
-    guard saw; comparing it with the write scope fills `outsideScope`, and
-    a path is reported there rather than blocked.
+    guard saw; comparing it with captured and current provider facts fills
+    `outsideScope`. Shell mutations are observed after execution; the committing
+    gate refuses candidates outside the captured and current boundary.
   - `excursions.ts`: read boundaries, which are soft. The first read into
     another module is one `excursion` observation and one concise reminder;
     a later read of the same module is neither. What Ramify generates is
@@ -436,19 +466,21 @@ hiding or measured complexity justifies it.
     analysis that fails or is invalid is `unavailable`, and never fails the
     run.
   - `scope.ts`: capturing a write scope's real paths. An ordinary assignment
-    reaches the assigned module's own source area and its two declaration
-    files, plus the complete directory of each immediate child it named, plus
-    the locations assigned beyond that base. A bootstrap scope reaches a
-    directory that does not exist yet, through its nearest existing ancestor.
-    The paths are captured once; a later refresh never widens them.
-  - `engineer.ts`: what an engineer submits, its own test tool, and the
-    briefing it starts from. `run_scope_tests` takes nothing: the assignment
-    and the files its policy selects are the harness's, and it resolves them
-    anew on every call. Where the run tracks scenarios it also runs the
-    scope's scenarios in quick mode, selected by identity as an iteration
-    gate selects them plus the work item's pending ones, and reports each
-    one; its profiles and streams go beneath the invocation. Beside it the engineer receives `shell`, which the
-    `tools/` directory owns. `contract-needed` is how it reports that the
+    reaches the assigned owner's ordinary documents, auxiliary source, scratch
+    and owned unwired contents, plus whole included immediate child subtrees
+    and declared owned nested projects. The one inclusion list carries each
+    directory's reason and instructions; the provider derives kind and owner.
+    Hard exclusions apply before all allowances. Logical and physical paths,
+    including absent targets, are checked against captured and current facts.
+    Configuration creation, changes and deletion need recorded authorization.
+    Captured authority survives current-policy recovery; refresh only narrows.
+  - `engineer.ts`: what an engineer submits and the briefing it starts
+    from. An engineer has no test tool of its own: the briefing says, as
+    text, that the gate commits a candidate and asks the project's committed
+    audit about it, names the assigned owners and their test areas, and
+    lists the scenarios it must bind. To see particular tests run, the
+    engineer names their files to the project's runner through `shell`,
+    which the `tools/` directory owns and which refuses a whole-suite run. `contract-needed` is how it reports that the
     behavior it needs is owned elsewhere: the need is stated as behavior, its
     turn ends there, and no session of its own is started for it.
     `break-discovered` reports that the goal needs a break; it returns to the
@@ -476,13 +508,13 @@ hiding or measured complexity justifies it.
     scenarios (architecture §6). The local architect is given every
     scenario of its entry with its ID, state, text, feature file and, for a
     sub-scenario, the integration scenario it came from; the engineer each
-    one not implemented, the ones `assignment.scenarios` names under
-    "Scenarios to bind", the rules of binding and the request for named
-    imports of another owner's step files; an integration item's engineer
-    its scenario and the step files it imports. A provider or follow-up work
-    item's briefings say nothing about scenarios. `assignment.scenarios` is
-    informative: the judge accepts only scenarios of the work item, and no
-    engineer must declare exactly those.
+    one not done, the ones `assignment.obligations` names under "Scenarios
+    to bind", the rules of binding and the request for named imports of
+    another owner's step files; an integration item's engineer its scenario
+    and the step files it imports. A provider or follow-up work item's
+    briefings say nothing about scenarios. The engineer's proposal must bind
+    exactly the obligations `assignment.obligations` names (`work/engineer.ts`
+    renders them under "Obligations to bind").
 - `contracts/`: one agreement between a consumer and a provider, and the
   scheduling it creates. Nothing here writes the log; the run drives it.
   - `records.ts`: the `ContractRecord`, the one `ProviderObligation` keyed
@@ -555,18 +587,21 @@ hiding or measured complexity justifies it.
   projects each event to its transition, references and time; `analysis.ts`
   holds the hypotheses and the decision list, read from the records that hold
   each choice; `work.ts` the work items and gates, each output tail bounded
-  at 8 KiB and each command's environment withheld, and a scenario check's
-  summary in compact form (statuses and failures, without bindings);
+  at 8 KiB and each command's environment withheld, and the tracked
+  scenario results read from the raw runner output its audit published, in
+  compact form (statuses and failures, without bindings);
   `progress.ts` the capability progress, where `completed` needs current
   verification evidence, a provider wait stays working with its reason, a
   reopening returns a completed capability to working and a superseded
   hypothesis leaves the list, and each entry counts its scenarios,
-  implemented of all it has; `scenarios.ts` the tracked scenarios, replayed
+  reported done of all it has; `scenarios.ts` the tracked scenarios, replayed
   as `run/feature-files.ts` replays them: the review's frozen text with the
   warnings `analysis-accepted` recorded, and the scenario list
   (`GET .../runs/:runId/scenarios`) with each scenario's state, origin, work
-  item, owner, file, implementing gate and every gate attempt whose scenario
-  check ran it, with its status there read from that attempt's summary;
+  item, owner, file and every gate attempt whose audit ran it, with its
+  status there read from that attempt's raw runner output, shown beside the
+  state and never moving it, and each obligation
+  with its binding's fakes and its architect report;
   `metrics.ts` the KPIs and the evaluation evidence, with invocations grouped
   into sessions by the harness session each one started in; `queries.ts` the
   one entry point the HTTP adapter calls. A projected scenario event refers to
@@ -612,11 +647,18 @@ hiding or measured complexity justifies it.
   writer is released.
 - `hooks/`: the post-write hook check the harness installs itself, because
   the adapter disables automatic extension discovery. After each settled
-  mutation it runs `ramify check --changed` over the paths that mutation
-  named. Exit 2 is not checked, with the CLI's reason; it permits continued
-  editing and is never a pass. Where the changed set cannot be established,
-  or where a changed path is a named configuration file that no changed
-  check covers, the harness answers that at once as not checked and runs a
+  mutation it runs `ramify check --changed` over every path that mutation
+  named, configuration included: the provider classifies each path, so no
+  filename list decides what the hook covers. Its exit code is the project
+  verdict, and each named path keeps the provider's own disposition in the
+  `hook-check` record and the transcript: `checked` with its content or
+  deletion identity, `not-analyzed` with its owner and exclusion, or
+  `not-checked` with its reason. A not-analyzed path is told as such
+  whatever the verdict, never as passing source checks. Exit 2 is not
+  checked, with the CLI's reason; it permits continued editing and is never
+  a pass, and findings it still carries are reported. An answer the adapter
+  cannot decode is an `unsupported-check-result` gap, never a pass. Only
+  where the changed set cannot be established does the harness run a
   complete check instead of claiming hook coverage. That complete check is
   then the one that speaks: where it answered, the changed form it replaced
   is not reported as a gap, because saying nothing was verified when the
@@ -624,8 +666,13 @@ hiding or measured complexity justifies it.
   learns to ignore the hook ignores the one message that matters. Only a
   complete check that could not run itself leaves a gap to state. A finding
   this invocation has already been told about is not newly introduced, so it
-  is not reported at the engineer twice, and a check that no longer reports
-  one says in a line that what was reported no longer stands.
+  is not reported at the engineer twice. A finding clears only on the
+  provider's coverage: a check that analyzed its file, or that file's
+  deletion, and no longer reports it, or a covering revision that lists it
+  as removed; naming a not-analyzed or not-checked path clears nothing.
+  A check that clears one says so in a line. Warnings and analysis limits
+  on files this invocation wrote are relayed with Ramify's own code and
+  message, as not blocking.
 
   A claimed completion is checked afresh over the whole write scope before
   it is judged, because the hook checks saw only the mutations they covered:
@@ -635,7 +682,7 @@ hiding or measured complexity justifies it.
   either: the submission proceeds, the acceptance says the check could not
   run, and the gate's own complete check answers. A completion is not held
   back for a check the harness could not get an answer from.
-- `kpi/`: measurement capture. A snapshot holds one `ramify.measure/1`
+- `kpi/`: measurement capture. A snapshot holds one `ramify.measure/2`
   document verbatim with its hash, and `scopeSize` is the `S_s` recipe over
   it. A missing component makes the total unavailable with its known
   subtotal beside it, never a zero, and a module that does not exist yet has
@@ -802,27 +849,10 @@ changed source or request set, or a new or changed signal that warrants a
 round that remains, refuses the completion and reconciles again, and
 otherwise the work item completes naming each signal it leaves unresolved.
 
-`src/checks/scenario-findings.ts` is the one factual producer: the scenario
-check of a committing gate that has a work item. A failed tracked scenario
-stays on its gate attempt, where the immediate repair answers it, unless it
-needs continuity: it failed an earlier gate of the same work item too, or a
-CheckFinding for it exists. Then the gate's own `gate-attempted` line
-carries a report of each of those failures, oldest first, under the issue
-key `scenario:<id>`: an objective, required, high-risk signal whose
-repeated failures make it reproduced. A passing gate is the witness: for
-each open scenario CheckFinding of its work item that its scenario check
-observed, it offers the same scenario at its frozen obligation, on the
-audited tree being accepted, with the coverage and outcome the message
-stream established, and the child decides whether that fixes it. A run
-narrower than the one that observed the failure covers it only in part,
-and a pass on the tree of the latest failure is intermittent evidence,
-classified and never a fix. What was left out is a note on the line, and a
-part that cannot be decided, such as an audited tree Git cannot read, is
-refused on the line while the attempt and its verdict are committed as
-they were. The trees and earlier attempts are read before the completion
-takes the mutex. The verdict is decided first and never reads any of this.
-The project's own scenarios are counted, never identified; a dry run, the
-readiness and final gates and every other command stay on their attempts.
+A gate's scenario results produce no CheckFinding. They are read from the
+raw runner output its audit published, for display only: a failed tracked
+scenario stays on its gate attempt, where the same engineer session answers
+it with the gate's digest, and a passing gate withdraws no report.
 
 `src/projections/check-findings.ts` answers the CheckFinding protocol from
 the committed run alone: the state replayed from the log's carriers, the
@@ -1000,35 +1030,36 @@ pi actually made and what the snapshot tools answered.
   iteration, budget returns included, and the shell's schema and the
   engineer's prompt state the command maximum. `runAbsoluteMs` is
   unchanged.
-- **Readiness.** The project root, a clean git repository, the compiler
-  configuration, the test runner, the project's configuration, its scenario
-  harness, the independent nested packages whose tests the gate runs
-  installed (one without a test script is noted and need not be), test
-  discovery, the Ramify command line, and then the project's own baseline:
-  its tests, its type check, a complete Ramify check and two scenario
-  checks, as one gate attempt through the in-place runner.
-  `baseline-acceptance` runs every module with feature files in quick mode
-  with `not @ramify-pending`; `acceptance-full` loads full mode with
-  `--dry-run` and fails on an `undefined` or `ambiguous` step, or, with the
-  configuration's `readiness: run`, executes it between its `setup` and
-  `teardown`. Both fail as `baseline-tests` fails, and the attempt records
-  them beside the other baseline steps, where they are verified. The last
-  step, `run-branch`, creates and checks out the run branch,
+- **Readiness.** The project root, stale scratch removed, a clean git
+  repository, the compiler configuration, the project's configuration, the
+  Ramify command line, the committed audit definition, its declared package
+  directories installed and its declared preparation, then one configured
+  full nested audit of HEAD through the installed provider, the final
+  gate's own request and answered by an applicable earlier record where the
+  provider finds one, and last the run branch (`run/readiness.ts`). `audit-config` fails where the definition
+  `ramify-audit.json` at HEAD no longer has the policy `start-run` captured.
+  `declared-preparation` runs the committed workspace setup commands in the
+  run working tree, and fails where `ramify-agent.json`'s `setup` differs
+  from them. `configured-full-audit` passes on a completed audit whose
+  invocation verdict is `pass`: a nested project's failure fails it and an
+  indeterminate answer leaves it not verified, either before the run branch
+  exists. Its gate attempt is the baseline, which records every project and
+  the discovery outcome, and its audit outcome beside it. The
+  last step, `run-branch`, creates and checks out the run branch,
   `ramify-agent-run/<run-id>`, once the repository is clean and the baseline
   passed; a branch git refuses, such as one beneath an existing branch's
   name, fails readiness there with git's own message, and nothing is
   assigned. A run whose branch has the earlier prefix, `ramify-agent/run-`,
   is still found and committed on. Agents never commit, and the harness
   never resets or reverts. `project-config` fails a run whose captured
-  `ramify-agent.json` is missing or invalid, or names support code outside
-  every module's test area (a module's `src/tests/`, a testing module's
-  `src/`), with reason `project-config-invalid`; `acceptance-runner` fails one
-  without `node_modules/.bin/cucumber-js` or with a mode command that does not
-  resolve (`npm run <script>` resolves when the script exists), with reason
-  `acceptance-harness-missing`. Neither consumes a recovery, and neither is a
-  code-repair assignment. A missing or invalid file never refuses
-  `start-run`. Once the configuration names the acceptance modes, a `test:`
-  script that runs `cucumber-js` is no longer an unsupported runner.
+  `ramify-agent.json` is missing or invalid, with reason
+  `project-config-invalid`; the file holds only `schema`, `typeCheck`,
+  `timeouts` (for a standalone diagnosis's type check and Ramify check) and
+  `setup`, and an `acceptance` section or a test timeout makes it invalid.
+  Neither consumes a recovery, and neither is a code-repair assignment. A
+  missing or invalid file never refuses `start-run`. The project's tests
+  and scenarios are checks of its committed audit definition, and nothing in
+  `ramify-agent.json` names them.
 - **The feature files.** Once readiness has passed and the run branch
   exists, and before the first local architect starts, the harness renders
   every tracked feature file from the scenario records and their states
@@ -1052,85 +1083,78 @@ pi actually made and what the snapshot tools answered.
   refuses an agent's edit or write of a feature file or of
   `ramify-agent.json` outright, whatever the scope contains; no
   authorization names either.
-- **The scenario check.** Every gate of a run with a valid configuration
-  plans a `scenarios` command (`checks/checkpoint.ts`) per the architecture's
-  table: `iteration` and `contract` select by identity tag the scope owners'
-  scenarios past `pending`, and with none record `scenarios: none-selected`
-  and run nothing; `breaking-iteration` and `work-item` run every module with
-  feature files in quick mode with `not @ramify-pending`; `final` runs them
-  all in full mode. Both runners execute it with `runScenarioCheck`
-  (`checks/scenario-check.ts`): the mode's `setup`, one Cucumber run per
-  module in sequence with a profile from the `scenarios` module written into
-  the attempt's directory outside the worktree, then `teardown`, even after
-  a failure. A run is bounded at 600 s in quick mode and 1,800 s in full
-  mode, and the check at their sum plus setup and teardown. The check passes
-  by its message streams, reduced by the `scenarios` module: every run
-  exited 0, every selected tracked scenario and every one of the project's
-  own passed; `undefined`, `pending` and `ambiguous` fail it. Its
-  `ScenarioCheckSummary` is on the command record of the
-  `ramify-agent.gate-attempt/3`, whose output ends with the failures, and a
-  failure is repaired like failing tests.
-- **Scenario states** (architecture §7 to §9). An engineer's
-  `completion-proposed` and a local architect's `request-completion` carry
-  `scenarios: string[]`, default empty. The judge accepts IDs of entry
-  scenarios of the work item's own entry, or an integration work item's one
-  scenario (`work/declarations.ts`), and rejects an unknown ID, another
-  entry's scenario or an integration scenario of any other work item with
-  the reason, under the per-turn bound. At acceptance each `pending`
-  one becomes `bound` while the work item has an open requirement or owes a
-  conformance, and `declared` otherwise (`scenario-declared { scenario, by,
-  state }`); a `bound`, `declared` or `implemented` one is left as it is.
-  After a passing committing gate every `declared` scenario its check passed
-  is `implemented` (`scenario-implemented { scenario, gate }`), and every
-  `bound` one stays bound with the attempt recorded as its fake-backed pass
-  (`scenario-bound-passed { scenario, gate }`). When `requirement-verified`
-  closes the last open requirement of a work item that owes no conformance,
-  its bound scenarios are `declared` (`scenario-due`). A work item that
-  leaves its repair path without a pass, because an iteration exhausted its
-  repair rounds, or it requests placement or yields, withdraws every
-  `declared` or `bound` scenario no gate passed since its declaration
-  (`scenario-withdrawn { scenario, reason, commit }`). Where that restores
-  a pending tag the harness re-renders and commits "Withdraw sc-001, …"
-  with `Ramify-Run` and `Ramify-Scenarios: withdrawn-<n>`, as a ledger
-  effect whose intent is `scenarios-withdrawing` and whose completion is the
-  first `scenario-withdrawn`; the commit is not an accepted boundary, and a
-  recovery finds it by its trailers and records the rest. A withdrawal of
-  bound scenarios alone changes no file, and names the accepted boundary.
-  An `implemented` scenario never returns: a later failure fails its gate.
+- **The scenario check.** The harness plans no scenario run of its own.
+  A project's scenarios run as a configured Cucumber check of its committed
+  audit definition, whose committed profile excludes `@ramify-pending`, and
+  the provider selects it and narrows its feature files by ownership as it
+  does Vitest. A gate's audit verdict decides the gate. The tracked
+  scenario results are read from the check's raw runner output by their
+  identity tags (`checks/scenario-results.ts`) for display only: they reach
+  the engineer in the gate's digest and the pages beside each scenario's
+  state, and a failure is repaired like failing tests.
+- **Scenario states** (architecture §7 to §9). A tracked scenario's state is
+  its obligation status, `pending`, `bound` or `done`, folded with every
+  other obligation in `work/obligations.ts`. A local or capability
+  assignment names the obligations its iteration must bind in
+  `assignment.obligations`; the judge accepts only obligations the assigning
+  architect is responsible for. An engineer's `completion-proposed` binds
+  each of them exactly once in `bindings: { id, fakes }[]`; a proposal that
+  leaves one out is rejected naming the missing IDs under the per-turn bound,
+  before any commit, audit or review, and a `partial` report is exempt. An
+  accepted binding is recorded as `obligation-bound { id, fakes, by,
+  submission }` before the iteration gate: a `pending` obligation becomes
+  `bound`, and a `done` one keeps `done` with the new fakes list. Only the
+  responsible architect's accepted report (`obligation-reported`, judgment
+  `done` or `bound`) makes it `done` or revises it back. No gate result,
+  repair exit, yield, bound exhaustion or source edit moves a state, and
+  nothing is withdrawn. The pending tag comes off at `bound` or `done`, when
+  the next gate commit, materialization or rewording renders the files. A
+  gate's scenario results are raw evidence beside the state: its
+  failures, with their steps and the runner's complete diagnostics, reach
+  the engineer and architect without an inferred cause.
 - **Integration work items** (architecture §10, `work/integration.ts`). The
-  `scenario-implemented` that implements the last sub-scenario of an
-  integration scenario commits, in the same transaction, a work item with
-  origin `{ integration: sc-NNN }` at the scenario's owner, the lowest
-  common ancestor of the sub-scenarios' owners. It is committed after every
-  earlier item, so it queues behind the current one; `work-item-started`
-  names every item's `origin`, and an integration item's `scenario`. Its
-  local architect's briefing carries the scenario, the sub-scenarios with
-  their owners and bridging Givens, each owner's step files as the tree
-  holds them (`src/tests/steps/`, or a testing module's `src/steps/`), and
-  the scope its engineer must be given: the ancestor with the child on each
-  path to a sub-scenario's owner included, which the assignment's judge
-  requires. The engineer writes a step file at the ancestor that imports
-  the sub-scenarios' step files by name, adds the `expose-test` declarations
-  along each path and declares the scenario; the iteration gate selects it
-  by identity with the implemented sub-scenarios, and the item completes at
-  its own work-item gate. A failing gate whose scenario check failed an
-  integration scenario while each of its sub-scenarios passed adds a
-  composition failure to the diagnostics its engineer and architect
-  receive, naming the sub-scenarios whose bridging Given is suspect
-  (`compositionFailures` of the `scenarios` child); it is repaired like any
-  failure.
-- **The work-item and final gates.** All project tests, the type check, a
-  complete Ramify check and the scenario check, on the current tree. A
-  completion request applies its own declarations first and is refused,
-  under the refusal bound, while a scenario of its entry is `pending` or
-  `bound`. `work-item-completed` requires
-  a passing `work-item` attempt and every scenario of the item's entry, or
-  an integration item's scenario, `implemented`, and is the only thing that
-  closes a work item. Before the final run the rule `acceptance-incomplete`
-  requires every tracked scenario `implemented`, integration scenarios
-  included; `job-completed` requires a passing `final` attempt whose
-  scenario check passed every one in full mode, and an empty work queue
-  alone never satisfies it. A change to the working
+  `obligation-reported` that reports the last sub-scenario of an integration
+  scenario `done` commits, in the same transaction, a work item with origin
+  `{ integration: sc-NNN }` at the scenario's owner, the lowest common
+  ancestor of the sub-scenarios' owners. A `bound` sub-scenario is not
+  enough. It is committed after every earlier item, so it queues behind the
+  current one; `work-item-started` names every item's `origin`, and an
+  integration item's `scenario`. Its local architect's briefing carries the
+  scenario, the sub-scenarios with their owners, each owner's step files as
+  the tree holds them (`src/tests/steps/`, or a testing module's
+  `src/steps/`), and the scope its engineer must be given: the ancestor with
+  the child on each path to a sub-scenario's owner included, which the
+  assignment's judge requires. The architect assigns the scenario; the
+  engineer writes a step file at the ancestor that imports the
+  sub-scenarios' step files by name, adds the `expose-test` declarations
+  along each path and binds it, and the architect reports it done. A failure
+  of the integration scenario reaches the repair round as the raw failure
+  with every result; no composition diagnosis is generated.
+- **The work-item and final gates.** The project's committed audit of the
+  candidate commit: its default mode at `work-item`, a full nested audit at
+  `final`. The final attempt keeps every project's verdict, execution,
+  failures, counts, duration and record, and every definition discovery
+  skipped with its reason; its verdict is the invocation's, so a passing
+  root never hides a nested failure, and an unrun project or indeterminate
+  discovery leaves the gate not verified. Merge readiness requires that the
+  final gate's audit was a completed full nested request that executed full
+  with every project passing and discovery complete; a composed failure is
+  `gate-failed`, and any lesser answer leaves readiness `unavailable`. A
+  completion request applies its own reports first. One that leaves a
+  registered obligation of its architect not reported `done` (a scenario of
+  its entry, an integration item's scenario or a test it registered) is a
+  rejected submission naming the IDs, under the per-turn bound and before
+  any outline, commit or gate; the same turn continues, and an exhausted
+  bound fails the run as `invalid-submission` naming the IDs still owed, no
+  verdict on the code. A capability handback request is judged the same
+  way. Only open requirements and unresolved capability work still refuse a
+  valid request, under the refusal bound. `work-item-completed` requires a passing
+  `work-item` attempt, and is the only thing that closes a work item. Before
+  the final run the rule `acceptance-incomplete` requires every tracked
+  scenario reported `done`, integration scenarios included; `job-completed`
+  requires a passing `final` attempt, whose scenario results are
+  recorded as raw evidence and never matched to the states, and an empty
+  work queue alone never satisfies it. A change to the working
   directory blocks nothing: a committing gate first captures a candidate
   commit, then audits that exact source. A failed candidate remains inspectable
   in Git; only a passing applicable gate establishes acceptance. The commit
@@ -1142,9 +1166,11 @@ pi actually made and what the snapshot tools answered.
   has no completion is performed again under its key, an invocation whose
   start has no end is closed as `failed` with `session-lost`, and the run is
   marked interrupted. None of it calls an agent and none of it makes a
-  duplicate. The tree is outside every transaction and is never restored: an
-  engineer interrupted mid-edit leaves a dirty tree, and `git diff` shows the
-  work that is not yet accepted.
+  duplicate. A gate whose audit completed is answered from the provider's
+  published records, a nested one through its recorded invocation receipt,
+  and nothing runs again. The tree is outside every transaction and is never
+  restored: an engineer interrupted mid-edit leaves a dirty tree, and
+  `git diff` shows the work that is not yet accepted.
 - **Measurement.** The baseline `B` is frozen from the run's first snapshot,
   before `job.json` is written, because `job.json` names it. Every invocation
   records the snapshot it was measured against and the components of its own
@@ -1193,18 +1219,29 @@ captures, nor a gate attempt, nor the environment a gate command prints of
 itself, while the names a command received are recorded and a run written
 before the names is still read.
 
-`scenario-check.test.ts` covers the scenario check: what each checkpoint
-plans, `none-selected`, and execution with a scripted runner that copies the
-`scenarios` module's recorded message streams where each profile asks, with
-setup and teardown ordering, a teardown after a failed run, the timeouts and
-the verdict. `scenario-check-integration.test.ts` starts the real
-`cucumber-js` over a project it writes, in the in-place runner and in the
-audit's executor, and runs readiness's two acceptance steps over it with
-`dry-run` and `run`. `fixture-acceptance.test.ts`, run with
-`RAMIFY_AGENT_FIXTURE_ACCEPTANCE=1` because it installs the fixture's
-toolchain, runs the fixture's own scenario at readiness and at the work-item
-and final gates. Lifecycle tests reach a scripted `cucumber-js` that writes
-the stream of a successful run with nothing in it.
+`audit-check-execution.test.ts` asks the installed provider, through the
+harness's configured audit port, about real Git projects it writes
+(`helpers/configured-repository.ts`), each under a private test lock: real
+Vitest and Cucumber checks narrowed by ownership, with a failing scenario
+carried to the gate's digest from the raw runner output; applicable reuse
+across an ignored-only change, which keeps both source identities and
+executes nothing, and a changed ignore list that refuses the active run;
+a failing configured command, a failing harness rule, a setup command that
+fails or does not finish, cancellation and the gate's own bound; and a
+standalone session's in-place diagnosis, which publishes nothing.
+
+`project-boundary-audit.integration.test.ts` asks the final gate's full
+nested audit of a Ramify root with an owned nested project, its own nested
+grandchild and an external tree: every eligible project audited under its
+own definition, the external definition skipped with its reason, a failing
+grandchild failing the gate under a passing root, a documentation change of
+the nested project reusing its full evidence, and indeterminate discovery
+leaving the gate not verified. It recovers a completed invocation from its
+receipt, and one without a receipt from the provider's published records,
+running nothing again, and settles a cancelled nested project's process and
+workspace before a replacement runs only that project.
+`audit-workspace-recovery.test.ts` restarts the audit process after a
+nested invocation completed, with and without its receipt.
 
 `gate-not-verified.test.ts` and `tree-identity.test.ts` cover the check
 engine on commands of their own: every reason a check can record for not
@@ -1228,7 +1265,15 @@ The run's own tests are beside them.
   break each submission's schema and each rule beyond it, and show that
   nothing changes, that every error carries its path, that a corrected input
   is accepted, and that the bound ends the invocation as
-  `invalid-submission`.
+  `invalid-submission`. Its PB3-C cases reject a completion request that
+  leaves a registered obligation without a done report, naming the IDs,
+  before any outline or gate, and resolve it in the same turn by the report,
+  by an exhausted bound that names the IDs still owed, or by a blocker
+  stated as `unresolved`; `capability-submission.test.ts` does the same for a
+  handback request, and `capability-recovery.test.ts` restarts after the
+  accepted action's `invocation-ended` and its `obligation-reported` to show
+  the report kept once, with no second coordinator or writer, and retrieved
+  by the architect's next turn.
 - `materialization.test.ts` drives a run that commits its feature files once
   readiness has passed, with the commit's content, subject, trailers and
   call arguments through the scripted Git, and whose work-item gates
@@ -1239,51 +1284,53 @@ The run's own tests are beside them.
   guarded change, and whose file the gate's commit restores. The crash
   between the commit and its record is the recovery table's
   `scenarios-committed` row.
-- `scenario-states.test.ts` covers declarations and every transition: a
-  declared scenario implemented by its iteration gate and one a request
-  declares implemented by the work-item gate, with the final gate in full
-  mode; a bound scenario through its fake-backed pass, the yield,
-  `requirement-verified` and `scenario-due` to its implementation; rejected
-  declarations under the bound; withdrawal by exhaustion, by a placement
-  request and by a yield; a refused completion request and the bound; an
-  implemented scenario failing a later gate; the final rule; and the crash
-  between a withdrawal commit and its record. Scripted local architects in
-  every lifecycle test declare their entry's scenarios, or their
-  integration scenario, with their completion requests
-  (`helpers/declarations.ts`), and the scripted runners
-  report the scenarios a selection reaches as passed.
+- `scenario-states.test.ts` covers the three states: a binding with and
+  without fakes that takes the pending tag off before the gate selecting the
+  scenario, a done report directly from `pending`, a passing gate that
+  leaves a scenario `bound` and a rejected completion request until the
+  report, in the same turn, a done report that survives a failing gate, a
+  repair exit and a source edit, the architect's revision back to `bound`
+  with the accepted source since its report shown beside it, a rebinding of
+  `done`, an incomplete proposal rejected with the missing IDs and the
+  complete one that follows, a partial report under the same assignment,
+  a rejected request answered by an assignment in the same turn, the
+  rejection bound, and the final gate whose raw scenario results never
+  decide completion. Scripted local architects in every lifecycle test
+  report their entry's scenarios, or their integration scenario, `done`
+  with their completion requests (`helpers/declarations.ts`), and the
+  scripted runners report the scenarios a selection reaches as passed.
 - `integration-scenarios.test.ts` drives one integration scenario: its
-  work item created by the last sub-scenario's `scenario-implemented` at
-  the common ancestor and queued behind the current item, the briefing, a
-  refused scope that leaves out a path, the declaration, the iteration gate
-  selecting it by identity and the completion; a composition failure's
-  finding in the repair briefing; and the rules over literal records.
-  `integration-scenarios-integration.test.ts` runs the same scenario to
-  completion and gives the tree to the installed Ramify, which accepts the
-  ancestor's named imports of both step files and refuses one once its
-  `expose-test` is removed. Both share `helpers/integration-scenario.ts`.
+  work item created by the last sub-scenario's done report, and not by a
+  binding, at the common ancestor and queued behind the current item, the
+  briefing without bridging diagnoses, a refused scope that leaves out a
+  path, the binding, the architect's report and the completion; a repair
+  briefing with the raw failure and every result; and the rules over
+  literal records. `integration-scenarios-integration.test.ts` runs the
+  same scenario to completion and gives the tree to the installed Ramify,
+  which accepts the ancestor's named imports of both step files and refuses
+  one once its `expose-test` is removed. Both share
+  `helpers/integration-scenario.ts`.
 - `acceptance-trial.test.ts` is the scripted acceptance trial: one run on
   the fixture through every stage, the review stop and its approval, the
-  four acceptance readiness steps, materialization, a declaration while a
-  requirement is open (`bound`), a withdrawal by a yield and one by
-  exhaustion with its commit, `scenario-due`, an integration work item and
-  the final gate in full mode, with its event sequence and final states. A
-  second run binds the fixture plan `status-badge-tone`'s two scenarios in
+  configured full audit at readiness, materialization, a binding over a
+  contract's fake that stays `bound` through a failing gate and a yield, a
+  rebinding without fakes and the architect's done report, an exhausted
+  iteration that leaves its binding, an integration work item and the final
+  gate's full audit, with its event sequence and final states. Every gate
+  asks a scripted configured audit whose scenario check reports each
+  scenario the tree carries without its pending tag, and the harness runs
+  no scenario itself. A second run binds the fixture plan `status-badge-tone`'s two scenarios in
   `shared-ui` with a step file that renders the badge and needs no World
-  (`helpers/badge-scenarios.ts`). The final gate runs its commands in the
-  project through the fixture's `acceptance:full` script: with the scripted
-  `cucumber-js` by default, and with the real one, over the step files the
-  engineers wrote, when `RAMIFY_AGENT_FIXTURE_ACCEPTANCE=1` installs the
-  fixture's toolchain.
+  (`helpers/badge-scenarios.ts`), and the final gate's full audit passes
+  them.
 - `scenario-briefings.test.ts` covers what the agents are told of
   scenarios: the local architect's section per scenario, the engineer's
-  "Scenarios to bind", other unimplemented scenarios and rules, the
-  integration engineer's section and a provider's silence;
-  `assignment.scenarios`' judge; `run_scope_tests` with a scripted runner
-  over the recorded streams; and the diagnostics rendered from a recorded
-  failing stream. `helpers/project-config.ts`' `scriptedScenarioRun` answers
-  a scenario run in the test's own process where the command runner is a
-  function, and the composition states each one.
+  "Scenarios to bind" and "Obligations to bind", other scenarios not done
+  and the rules, the integration engineer's section and a provider's
+  silence; `assignment.obligations`' judge; that an engineer is told the
+  gate's audit runs its scenarios and is offered no scope test tool; and the
+  diagnostics rendered from the raw runner output of a configured scenario
+  check, failing and passing.
 - `analysis-scenarios.test.ts` captures plans with and without `gherkin`
   blocks and with one that does not parse, rejects a submission per form
   rule through the real validation path and under the per-turn bound, and

@@ -1,0 +1,139 @@
+{
+  "baseline": "/home/app/pb3-it4-scratch/protected-start.sha256 (entry f314f8f9)",
+  "head": "2789fa1ade1e492c150bc5536c10880c4053bf47",
+  "count": 16,
+  "trackedProtectedEqualsBaselineSet": true,
+  "allEqual": true,
+  "protectedStatus": "",
+  "committedChangesSinceEntry": "",
+  "rows": [
+    {
+      "path": "docs/agents/module-architect.principles.md",
+      "expected": "3858898770ab5f2a54fd375ba5aa6a4c3f72a5ac00f04f974405ac95aa580d25",
+      "head": "3858898770ab5f2a54fd375ba5aa6a4c3f72a5ac00f04f974405ac95aa580d25",
+      "index": "3858898770ab5f2a54fd375ba5aa6a4c3f72a5ac00f04f974405ac95aa580d25",
+      "worktree": "3858898770ab5f2a54fd375ba5aa6a4c3f72a5ac00f04f974405ac95aa580d25",
+      "equal": true
+    },
+    {
+      "path": "docs/architecture/architect-view-diff.spec.md",
+      "expected": "da621110a5557ae955e2c39f4abb718b3d4c3f74396114e05d66d3a1fc19b573",
+      "head": "da621110a5557ae955e2c39f4abb718b3d4c3f74396114e05d66d3a1fc19b573",
+      "index": "da621110a5557ae955e2c39f4abb718b3d4c3f74396114e05d66d3a1fc19b573",
+      "worktree": "da621110a5557ae955e2c39f4abb718b3d4c3f74396114e05d66d3a1fc19b573",
+      "equal": true
+    },
+    {
+      "path": "docs/architecture/architect-view.spec.md",
+      "expected": "f8989ad661566eaf668ad6c213994e345988a4f31d7d733e175302225a826794",
+      "head": "f8989ad661566eaf668ad6c213994e345988a4f31d7d733e175302225a826794",
+      "index": "f8989ad661566eaf668ad6c213994e345988a4f31d7d733e175302225a826794",
+      "worktree": "f8989ad661566eaf668ad6c213994e345988a4f31d7d733e175302225a826794",
+      "equal": true
+    },
+    {
+      "path": "docs/architecture/cli-invocation.spec.md",
+      "expected": "7386295542372967c25040735d89e8e9e5230323d4320e57490bf2c031f32e6a",
+      "head": "7386295542372967c25040735d89e8e9e5230323d4320e57490bf2c031f32e6a",
+      "index": "7386295542372967c25040735d89e8e9e5230323d4320e57490bf2c031f32e6a",
+      "worktree": "7386295542372967c25040735d89e8e9e5230323d4320e57490bf2c031f32e6a",
+      "equal": true
+    },
+    {
+      "path": "docs/architecture/materialized-api-view.spec.md",
+      "expected": "abf24295d49ff32ad1202c8c8209d76e68ed4c18a2aa0ab758811b0527a92bb5",
+      "head": "abf24295d49ff32ad1202c8c8209d76e68ed4c18a2aa0ab758811b0527a92bb5",
+      "index": "abf24295d49ff32ad1202c8c8209d76e68ed4c18a2aa0ab758811b0527a92bb5",
+      "worktree": "abf24295d49ff32ad1202c8c8209d76e68ed4c18a2aa0ab758811b0527a92bb5",
+      "equal": true
+    },
+    {
+      "path": "docs/architecture/modularity-report.spec.md",
+      "expected": "00fc9dba0b42145267e9e83a9b454d2d332deecc845adeadf14cfcf60472c1b4",
+      "head": "00fc9dba0b42145267e9e83a9b454d2d332deecc845adeadf14cfcf60472c1b4",
+      "index": "00fc9dba0b42145267e9e83a9b454d2d332deecc845adeadf14cfcf60472c1b4",
+      "worktree": "00fc9dba0b42145267e9e83a9b454d2d332deecc845adeadf14cfcf60472c1b4",
+      "equal": true
+    },
+    {
+      "path": "docs/architecture/quick-testing.spec.md",
+      "expected": "b04db2008bacef3146dbfc211206187ac28abb41866f91b07568f56d1d271002",
+      "head": "b04db2008bacef3146dbfc211206187ac28abb41866f91b07568f56d1d271002",
+      "index": "b04db2008bacef3146dbfc211206187ac28abb41866f91b07568f56d1d271002",
+      "worktree": "b04db2008bacef3146dbfc211206187ac28abb41866f91b07568f56d1d271002",
+      "equal": true
+    },
+    {
+      "path": "docs/model/cross-module-importability.principles.md",
+      "expected": "c3b6539448902130822c183f6d3613f49c4686cb91eef17d5f73cfe546b441ea",
+      "head": "c3b6539448902130822c183f6d3613f49c4686cb91eef17d5f73cfe546b441ea",
+      "index": "c3b6539448902130822c183f6d3613f49c4686cb91eef17d5f73cfe546b441ea",
+      "worktree": "c3b6539448902130822c183f6d3613f49c4686cb91eef17d5f73cfe546b441ea",
+      "equal": true
+    },
+    {
+      "path": "docs/model/cross-module-importability.spec.md",
+      "expected": "4aba3df0be6ff7356e7107f8d7c2786ff45ab35c9ede0b319454547b5029d789",
+      "head": "4aba3df0be6ff7356e7107f8d7c2786ff45ab35c9ede0b319454547b5029d789",
+      "index": "4aba3df0be6ff7356e7107f8d7c2786ff45ab35c9ede0b319454547b5029d789",
+      "worktree": "4aba3df0be6ff7356e7107f8d7c2786ff45ab35c9ede0b319454547b5029d789",
+      "equal": true
+    },
+    {
+      "path": "docs/model/module-description.spec.md",
+      "expected": "19e292a9bc44bff47d60398b7cc1a507523e1aa73e11cc4b2c56e0988c10b07c",
+      "head": "19e292a9bc44bff47d60398b7cc1a507523e1aa73e11cc4b2c56e0988c10b07c",
+      "index": "19e292a9bc44bff47d60398b7cc1a507523e1aa73e11cc4b2c56e0988c10b07c",
+      "worktree": "19e292a9bc44bff47d60398b7cc1a507523e1aa73e11cc4b2c56e0988c10b07c",
+      "equal": true
+    },
+    {
+      "path": "docs/model/typescript-source-interpretation.spec.md",
+      "expected": "c1fd4d6551d130bbcd723c8b1a56075e858c06e2a6eaacb50fb147ea0e3a1a95",
+      "head": "c1fd4d6551d130bbcd723c8b1a56075e858c06e2a6eaacb50fb147ea0e3a1a95",
+      "index": "c1fd4d6551d130bbcd723c8b1a56075e858c06e2a6eaacb50fb147ea0e3a1a95",
+      "worktree": "c1fd4d6551d130bbcd723c8b1a56075e858c06e2a6eaacb50fb147ea0e3a1a95",
+      "equal": true
+    },
+    {
+      "path": "ramify-agent/docs/architecture/plan-context-catalog.spec.md",
+      "expected": "0ce605884b1f2996401040d5ba4d2a49e59906c7a12fb223c28d3c0c1ef4fa14",
+      "head": "0ce605884b1f2996401040d5ba4d2a49e59906c7a12fb223c28d3c0c1ef4fa14",
+      "index": "0ce605884b1f2996401040d5ba4d2a49e59906c7a12fb223c28d3c0c1ef4fa14",
+      "worktree": "0ce605884b1f2996401040d5ba4d2a49e59906c7a12fb223c28d3c0c1ef4fa14",
+      "equal": true
+    },
+    {
+      "path": "ramify-agent/docs/check-findings.principles.md",
+      "expected": "6c72c2175de7ecbe3e0746cba469fac7a9051a47c529b3769d11f6b7107bbfea",
+      "head": "6c72c2175de7ecbe3e0746cba469fac7a9051a47c529b3769d11f6b7107bbfea",
+      "index": "6c72c2175de7ecbe3e0746cba469fac7a9051a47c529b3769d11f6b7107bbfea",
+      "worktree": "6c72c2175de7ecbe3e0746cba469fac7a9051a47c529b3769d11f6b7107bbfea",
+      "equal": true
+    },
+    {
+      "path": "ramify-agent/docs/check-findings.spec.md",
+      "expected": "ad0c9df605cd60385775c676a7920fbd7865857f84fe02b721b475e2c3c132df",
+      "head": "ad0c9df605cd60385775c676a7920fbd7865857f84fe02b721b475e2c3c132df",
+      "index": "ad0c9df605cd60385775c676a7920fbd7865857f84fe02b721b475e2c3c132df",
+      "worktree": "ad0c9df605cd60385775c676a7920fbd7865857f84fe02b721b475e2c3c132df",
+      "equal": true
+    },
+    {
+      "path": "ramify-agent/docs/harness.principles.md",
+      "expected": "263cbe26589c9501f6a1bac37ccb2c7dc8b93d83a7cc182cf3f4d25e8b082695",
+      "head": "263cbe26589c9501f6a1bac37ccb2c7dc8b93d83a7cc182cf3f4d25e8b082695",
+      "index": "263cbe26589c9501f6a1bac37ccb2c7dc8b93d83a7cc182cf3f4d25e8b082695",
+      "worktree": "263cbe26589c9501f6a1bac37ccb2c7dc8b93d83a7cc182cf3f4d25e8b082695",
+      "equal": true
+    },
+    {
+      "path": "ramify-agent/docs/harness.spec.md",
+      "expected": "f3635d7e25b8b6d175e543197be9c7d12356048f92266fbf1c5df6431ff948bc",
+      "head": "f3635d7e25b8b6d175e543197be9c7d12356048f92266fbf1c5df6431ff948bc",
+      "index": "f3635d7e25b8b6d175e543197be9c7d12356048f92266fbf1c5df6431ff948bc",
+      "worktree": "f3635d7e25b8b6d175e543197be9c7d12356048f92266fbf1c5df6431ff948bc",
+      "equal": true
+    }
+  ]
+}

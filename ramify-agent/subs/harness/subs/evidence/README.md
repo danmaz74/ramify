@@ -40,14 +40,20 @@ that what it ran is in the record. A captured command that names no
 executable is not a command. Of the environment it captures the names only;
 the values come from the allowlist again when the command runs.
 
-`checkComplete` and `checkChanged` are Ramify's two check forms, read from
-their exit codes alone: 0 is checked with no findings, 1 is findings or an
-invalid revision, and 2 is not checked with the CLI's reason. Exit 2 is never
-a pass. `checkChanged` is the bounded hook check and never falls back to a
-complete one; a cold daemon, an expired deadline or a named configuration
-file is answered at once as not checked, which permits continued editing.
-A caller that needs a verdict runs `checkComplete`, rather than claiming hook
-coverage.
+`checkComplete` and `checkChanged` are Ramify's two check forms. The exit
+code gives the project verdict: 0 is checked with no findings, 1 is findings
+or an invalid revision, and 2 is not checked with the CLI's reason. Exit 2 is
+never a pass. The printed document is decoded strictly, `ramify.check/3` for
+the changed form and `ramify.analysis/3` for the complete one: its root must
+be the checked project, the changed form must name each requested path once,
+and its outcome must agree with the exit code. Each named path keeps its
+disposition with module, exclusion, reason and, where checked, its content or
+deletion identity, beside the covering revision and the findings it no longer
+reports. Any other answer is `unsupported` and not checked. `checkChanged` is
+the bounded hook check and never falls back to a complete one; a cold daemon,
+an expired deadline or an uncovered configuration change is answered as not
+checked, which permits continued editing. A caller that needs a verdict runs
+`checkComplete`, rather than claiming hook coverage.
 
 ## Running one of the project's own commands
 
@@ -92,7 +98,7 @@ symbols. `readApiView` reads one module's ordinary or testing API view, and
 `findInView` answers whether a named original is available to that requester.
 
 `measure.ts` holds `readMeasurement`, which runs `ramify measure --format
-json`, validates the `ramify.measure/1` document and answers its per-module
+json`, validates the `ramify.measure/2` document and answers its per-module
 buckets with the producer's own bytes beside them. A producer that cannot be
 run, a document of another version and a document the format rejects are each
 unavailable with that reason, never a zero.
@@ -102,8 +108,9 @@ unavailable with that reason, never a zero.
 `guarded-files.ts` holds `guardedFilesHash`: the SHA-256 of each file whose
 change could weaken a check, which is the test runner's and the compiler's
 configuration, the package manifests, `ramify-agent.json`, and whatever the
-caller names, such as the contract artifacts an assignment requires and the
-scenario harness's support files. It is one hash per file rather than one over the set, so a change
+caller names, such as the contract artifacts an assignment requires, the
+project's Cucumber configuration and its committed audit definition. It is
+one hash per file rather than one over the set, so a change
 names the file that changed, and a file that is not there is `null`. It
 compares nothing, and no identity of the working tree is taken anywhere.
 
@@ -111,7 +118,7 @@ compares nothing, and no identity of the working tree is taken anywhere.
 
 `project-configuration.ts` reads `ramify-agent.json` at the project root, the
 file in which a target project declares what the harness cannot derive, such
-as the commands of its acceptance modes. It answers the file's text and
+as its setup commands and its type check's output format. It answers the file's text and
 SHA-256, or that it is missing or unreadable, and never throws for either.
 What the file must say is the harness's: this module does not parse it.
 

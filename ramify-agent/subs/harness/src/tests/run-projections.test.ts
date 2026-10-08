@@ -45,9 +45,9 @@ describe('a gate attempt', () => {
       schema: 'ramify-agent.gate-attempt/3', id: 'ga-0001', checkpoint: 'final', subject: {}, proposedBy: null,
       repairRound: 0, infrastructureAttempt: 0, head: 'abc', commit: null, audited: 'abc', evidence: null, guardedChanges: [],
       commands: [{
-        kind: 'tests', command: { argv: ['npm', 'test'], cwd: '/p', env: ['PATH', 'SECRET_NAME'], envAdditions: { RAMIFY_ENDPOINT_DIR: '/not/for/the/client' }, timeoutMs: 1000 },
+        kind: 'type-check', command: { argv: ['npm', 'run', 'type-check'], cwd: '/p', env: ['PATH', 'SECRET_NAME'], envAdditions: { RAMIFY_ENDPOINT_DIR: '/not/for/the/client' }, timeoutMs: 1000 },
         startedAt: '2026-09-21T08:00:00.000Z', elapsedMs: 5, exitCode: 0, outcome: 'passed', runnerError: null,
-        output: { path: 'gates/ga-0001/tests.log', bytes: 40_000, truncated: false, tail },
+        output: { path: 'gates/ga-0001/type-check.log', bytes: 40_000, truncated: false, tail },
       }],
       verdict: 'passed', cause: null, next: 'accept',
     };
@@ -68,7 +68,7 @@ describe('a gate attempt', () => {
     // harness's own settings for it reach a client.
     expect(JSON.stringify(gate)).not.toContain('SECRET_NAME');
     expect(JSON.stringify(gate)).not.toContain('/not/for/the/client');
-    expect(gate.commands[0]!.output).toMatchObject({ path: 'gates/ga-0001/tests.log', bytes: 40_000, truncated: false });
+    expect(gate.commands[0]!.output).toMatchObject({ path: 'gates/ga-0001/type-check.log', bytes: 40_000, truncated: false });
     expect(boundedTail('short')).toBe('short');
   });
 

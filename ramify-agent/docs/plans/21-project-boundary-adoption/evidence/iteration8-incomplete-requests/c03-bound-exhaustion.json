@@ -1,0 +1,89 @@
+{
+  "case": "PB3-C03",
+  "test": "local-architect-submission.test.ts",
+  "failure": {
+    "reason": "invalid-submission",
+    "message": "The local architect of wi-001 ended without a result (invalid-submission); its last rejected completion request left sc-001 without a done report",
+    "evidence": [
+      "invocations/inv-0006/outcome.json"
+    ]
+  },
+  "outcome": {
+    "schema": "ramify-agent.invocation-outcome/1",
+    "invocation": "inv-0006",
+    "ended": "invalid-submission",
+    "rejectedSubmissions": 3,
+    "disposition": "incomplete",
+    "session": {
+      "ref": "scripted-4@3#1",
+      "mode": "continued"
+    },
+    "submission": null,
+    "settled": {
+      "confirmed": true,
+      "at": "2026-10-08T01:38:48.018Z",
+      "groupsKilled": 0,
+      "lateWrites": []
+    },
+    "outsideScope": [],
+    "usage": {
+      "unavailable": "the session reported no usage"
+    },
+    "elapsedMs": 4
+  },
+  "verdicts": [
+    {
+      "accepted": false,
+      "errors": [
+        {
+          "path": "reports",
+          "message": "This completion request leaves sc-001 without a done report. Report each one done in `reports` where, in your judgment, it is correctly implemented and passing; where work remains, assign it, or submit `unresolved` with what blocks it",
+          "expected": "a done report for each of sc-001"
+        }
+      ],
+      "remainingAttempts": 2
+    },
+    {
+      "accepted": false,
+      "errors": [
+        {
+          "path": "reports",
+          "message": "This completion request leaves sc-001 without a done report. Report each one done in `reports` where, in your judgment, it is correctly implemented and passing; where work remains, assign it, or submit `unresolved` with what blocks it",
+          "expected": "a done report for each of sc-001"
+        }
+      ],
+      "remainingAttempts": 1
+    },
+    {
+      "accepted": false,
+      "errors": [
+        {
+          "path": "reports",
+          "message": "This completion request leaves sc-001 without a done report. Report each one done in `reports` where, in your judgment, it is correctly implemented and passing; where work remains, assign it, or submit `unresolved` with what blocks it",
+          "expected": "a done report for each of sc-001"
+        }
+      ],
+      "remainingAttempts": 0
+    }
+  ],
+  "counts": {
+    "pending": 1,
+    "bound": 0,
+    "done": 0
+  },
+  "eventTypesAfterArchitect": [
+    "invocation-started",
+    "invocation-ended",
+    "work-orientation-recorded",
+    "session-opened",
+    "invocation-started",
+    "invocation-ended",
+    "context-selection-recorded",
+    "context-package-append-requested",
+    "context-package-appended",
+    "invocation-started",
+    "invocation-ended",
+    "session-finished",
+    "job-failed"
+  ]
+}

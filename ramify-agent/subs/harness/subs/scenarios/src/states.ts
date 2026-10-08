@@ -1,113 +1,80 @@
 import { z } from 'zod';
-import { scenarioIdSchema, type ScenarioId } from './records.js';
+import type { ScenarioId } from './records.js';
 
 /*
- * The four states of a tracked scenario and the pure reducer that derives
- * them from the run's scenario events. Every scenario starts `pending` when
- * the analysis is accepted. The reducer allows exactly the transitions of
- * the architecture's events table and rejects every other one with its
- * reason; which transition a gate or a declaration calls for is the
- * harness's to decide.
+ * The three states of a tracked scenario, which are its obligation status.
+ * Every scenario starts `pending` when the analysis is accepted. An
+ * engineer's accepted binding makes it `bound`; its responsible architect's
+ * accepted report makes it `done`, directly from `pending` too, and only
+ * that architect's explicit revision returns it to `bound`. A binding of a
+ * `done` scenario records the new fakes list and leaves it `done`.
+ *
+ * Each state is entered by one accepted submission. No gate, audit, repair
+ * exit or source change moves one: passing is the audit's evidence about a
+ * candidate commit, shown beside the state, never a state.
  */
 
-export const scenarioStateSchema = z.enum(['pending', 'bound', 'declared', 'implemented']);
+export const scenarioStateSchema = z.enum(['pending', 'bound', 'done']);
 export type ScenarioState = z.infer<typeof scenarioStateSchema>;
 
-const text = z.string().min(1);
-
-/** The data of each scenario event, as the run log carries it under `data`. */
-export const scenarioDeclaredDataSchema = z.object({
-  scenario: scenarioIdSchema,
-  /** The invocation whose submission declared it. */
-  by: text,
-  state: z.enum(['bound', 'declared']),
-}).strict();
-export const scenarioDueDataSchema = z.object({
-  scenario: scenarioIdSchema,
-  cause: z.literal('requirements-verified'),
-}).strict();
-export const scenarioImplementedDataSchema = z.object({
-  scenario: scenarioIdSchema,
-  /** The gate attempt that passed it. */
-  gate: text,
-}).strict();
-export const scenarioWithdrawnDataSchema = z.object({
-  scenario: scenarioIdSchema,
-  reason: text,
-  /** The commit that restored its pending tag. */
-  commit: text,
-}).strict();
-
-/** A scenario event as the reducer reads it: the run event's type and data. */
+/**
+ * The two accepted-submission events that move a state, as the reducer
+ * reads them: the run event's type and the part of its data the reducer
+ * needs. Both events name obligations of every kind; an ID that is no
+ * tracked scenario leaves the states as they are.
+ */
 export type ScenarioEvent =
-  | { readonly type: 'scenario-declared'; readonly data: z.infer<typeof scenarioDeclaredDataSchema> }
-  | { readonly type: 'scenario-due'; readonly data: z.infer<typeof scenarioDueDataSchema> }
-  | { readonly type: 'scenario-implemented'; readonly data: z.infer<typeof scenarioImplementedDataSchema> }
-  | { readonly type: 'scenario-withdrawn'; readonly data: z.infer<typeof scenarioWithdrawnDataSchema> };
+  | { readonly type: 'obligation-bound'; readonly data: { readonly id: string } }
+  | { readonly type: 'obligation-reported'; readonly data: { readonly id: string; readonly judgment: 'done' | 'bound' } };
 
-export const scenarioEventTypes: readonly ScenarioEvent['type'][] = ['scenario-declared', 'scenario-due', 'scenario-implemented', 'scenario-withdrawn'];
+export const scenarioEventTypes: readonly ScenarioEvent['type'][] = ['obligation-bound', 'obligation-reported'];
 
 export type ScenarioStates = ReadonlyMap<ScenarioId, ScenarioState>;
-
-export type ScenarioTransition =
-  | { readonly ok: true; readonly states: ScenarioStates }
-  | { readonly ok: false; readonly reason: string };
 
 /** Every tracked scenario `pending`, as `analysis-accepted` leaves them. */
 export function initialScenarioStates(ids: readonly ScenarioId[]): ScenarioStates {
   return new Map(ids.map((id) => [id, 'pending' as const]));
 }
 
-/** The states each event may leave from, and the state it leaves in. */
-function transitionOf(event: ScenarioEvent): { from: readonly ScenarioState[]; to: ScenarioState } {
-  switch (event.type) {
-    case 'scenario-declared': return { from: ['pending'], to: event.data.state };
-    case 'scenario-due': return { from: ['bound'], to: 'declared' };
-    case 'scenario-implemented': return { from: ['declared'], to: 'implemented' };
-    case 'scenario-withdrawn': return { from: ['bound', 'declared'], to: 'pending' };
-  }
+/** The state an accepted engineer binding leaves: `bound`, except that a `done` one stays `done`. */
+export function boundState(current: ScenarioState): ScenarioState {
+  return current === 'done' ? 'done' : 'bound';
 }
 
-/** Applies one event, or says why the events table does not allow it. The given states are never changed. */
-export function applyScenarioEvent(states: ScenarioStates, event: ScenarioEvent): ScenarioTransition {
-  const id = event.data.scenario;
-  const current = states.get(id);
-  if (current === undefined) return { ok: false, reason: `${event.type} names ${id}, which is no tracked scenario` };
-  const { from, to } = transitionOf(event);
-  if (!from.includes(current)) {
-    return { ok: false, reason: `${event.type} moves a scenario from ${from.join(' or ')}, but ${id} is ${current}` };
-  }
+/** The state an accepted architect report leaves: its judgment. */
+export function reportedState(judgment: 'done' | 'bound'): ScenarioState {
+  return judgment;
+}
+
+/** Applies one event. The given states are never changed, and an ID that is no tracked scenario changes nothing. */
+export function applyScenarioEvent(states: ScenarioStates, event: ScenarioEvent): ScenarioStates {
+  const current = states.get(event.data.id);
+  if (current === undefined) return states;
   const next = new Map(states);
-  next.set(id, to);
-  return { ok: true, states: next };
+  next.set(event.data.id, event.type === 'obligation-bound' ? boundState(current) : reportedState(event.data.judgment));
+  return next;
 }
 
-/**
- * The states after a sequence of events, from every scenario `pending`. The
- * first event the table does not allow ends the reduction with its reason
- * and position.
- */
-export function reduceScenarioStates(
-  ids: readonly ScenarioId[],
-  events: readonly ScenarioEvent[],
-): { readonly ok: true; readonly states: ScenarioStates } | { readonly ok: false; readonly reason: string; readonly event: number } {
+/** The states after a sequence of events, from every scenario `pending`. */
+export function reduceScenarioStates(ids: readonly ScenarioId[], events: readonly ScenarioEvent[]): ScenarioStates {
   let states = initialScenarioStates(ids);
-  for (const [index, event] of events.entries()) {
-    const applied = applyScenarioEvent(states, event);
-    if (!applied.ok) return { ok: false, reason: applied.reason, event: index };
-    states = applied.states;
-  }
-  return { ok: true, states };
+  for (const event of events) states = applyScenarioEvent(states, event);
+  return states;
 }
 
 /** How many scenarios are in each state. */
 export function countScenarioStates(states: ScenarioStates): Record<ScenarioState, number> {
-  const counts: Record<ScenarioState, number> = { pending: 0, bound: 0, declared: 0, implemented: 0 };
+  const counts: Record<ScenarioState, number> = { pending: 0, bound: 0, done: 0 };
   for (const state of states.values()) counts[state] += 1;
   return counts;
 }
 
-/** Whether a scenario in this state carries the pending tag. */
+/**
+ * Whether a scenario in this state carries the pending tag: only while
+ * nothing has bound it. It comes off at `bound`, fakes or not, and at a
+ * direct `done`, so the configured checks exercise it from the next
+ * candidate commit on.
+ */
 export function carriesPendingTag(state: ScenarioState): boolean {
-  return state === 'pending' || state === 'bound';
+  return state === 'pending';
 }

@@ -29,7 +29,8 @@ import { constructedRecord, constructedRun, runId, type Line } from './helpers/c
  */
 
 const reviewed = constructedRecord({ policy: { reviews: defaultReviewPolicy } as unknown as RunPolicy });
-const unreviewed = constructedRecord();
+const { reviews: _reviews, ...noReviews } = constructedRecord().policy;
+const unreviewed = constructedRecord({ policy: noReviews });
 
 /** CheckFinding lines decided by the child against the state the earlier ones left. */
 class Stream {

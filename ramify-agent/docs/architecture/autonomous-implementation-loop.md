@@ -28,9 +28,11 @@ remains a historical design boundary.
 in four places. The initial analysis also assigns the plan's Gherkin
 scenarios to entry capabilities and writes one for each entry that has none.
 A run started with the review stop waits for a person's approval after the
-analysis is accepted, the one human-review wait. Every committing gate runs
-a scenario check, and a work item completes only when its scenarios are
-implemented. The final gate runs every tracked scenario in full mode.
+analysis is accepted, the one human-review wait. Every committing gate asks
+for the project's committed audit, whose configured Cucumber check runs the
+scenarios without a pending tag, and a work item completes only when its
+local architect has reported its scenarios done. The final gate asks for a
+full audit, which runs every tracked scenario.
 
 The [metrics glossary](../metrics/glossary.md) distinguishes search space from
 its measurements. Here, an invocation's search space is its available source
@@ -479,13 +481,17 @@ For example, a brief could describe its scope as:
 
 ```yaml
 scope:
-  module: export
-  includedChildren: [formatting]
+  base:
+    module: export
+    included:
+      - directory: subs/formatting
+        reason: Implement the formatting behavior with its owner
+        instructions: Verify the whole assigned formatting subtree
 ```
 
 This includes `export`'s own contents and everything beneath
 `export/formatting`. Other children, such as `export/storage`, and all their
-descendants are excluded. An empty child list limits implementation to the
+descendants are excluded. An empty inclusion list limits implementation to the
 assigned module's own contents.
 
 The local architect records the scope choice and its rationale for each iteration.
@@ -617,16 +623,21 @@ continuing.
 
 Fakes can help an implementation, with explicit names and matching exposure,
 but no fake is mandatory and a fake pass is never handback. The capability
-architect coordinates provider and requesting-consumer tests, a combined
-current-source gate, semantic coverage review and checks of affected owners.
+architect decides the appropriate provider and requesting-consumer tests and
+coordinates them, a combined current-source gate, review and checks of
+affected owners.
 A provisional type or test failure stays visible until an owner-scoped repair
 and fresh gate settle it. Correcting a wrong expected value or adapting an API
 test requires an explicit plan reason and preserves the original behavioral
 requirement.
 
 A handback names the accepted plan revision, current source identity, checks,
-reviews, interface use and continuation brief. The harness verifies those
-references and the current candidate before accepting it. It resumes the
+reviews, interface use and continuation brief. It follows the capability
+architect's done report on the task's delegated outcome and on every
+obligation it registered; the original examples stay the request's context,
+with no per-example coverage state. The harness verifies those references and
+the current candidate before accepting it, never a cited test file or an
+executed-file inventory. It resumes the
 requesting engineer and parent coordinator once; their broader work remains
 open. A post-handback finding creates linked revision work without rewriting
 the earlier accepted source or evidence.
@@ -858,9 +869,10 @@ consumer's broader goal or a provider's independently queued entry.
 Plan 17 owns partial/full audit selection, locking and evidence reuse. The
 harness captures obligations and authorized scopes; ramify-audit executes checks
 and supplies complete runner results, executed file identities, failures and
-artifacts. A task handback checks real provider and consumer execution evidence
-from that public report. It does not run a supplemental scope probe or infer
-repair ownership from diagnostic paths. Required scenarios belong to the
+artifacts. A task handback reads no execution evidence from that public
+report: the capability architect assesses it and reports the outcome. The
+harness does not run a supplemental scope probe or infer repair ownership
+from diagnostic paths. Required scenarios belong to the
 bounded delegated goal; unrelated pending consumer scenarios stay pending.
 
 Capture the check commands, selection policy and required evidence obligations
@@ -925,8 +937,8 @@ Use a few explicit failure categories to select recovery:
 | Required change outside the assignment or to an established obligation | Return to the local architect for a scoped assignment or recorded obligation revision. |
 
 An invocation's idle bound measures the session's silence, not the harness's
-work. A command the harness runs for the session, such as a shell call or a
-scoped test run, holds the idle bound for the command's own timeout plus a
+work. A command the harness runs for the session, such as a shell call,
+holds the idle bound for the command's own timeout plus a
 margin, because that timeout already bounds it; the invocation's absolute
 bound is unchanged, so every command stays bounded.
 

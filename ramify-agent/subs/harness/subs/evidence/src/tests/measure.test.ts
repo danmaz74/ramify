@@ -1,9 +1,17 @@
-import { chmod, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { measureSchemaVersion, readMeasurement } from '../measure.js';
 import { RamifyCli } from '../ramify-cli.js';
 import { temporaryDirectory } from './helpers/temporary.js';
+
+const attempts = vi.hoisted(() => [] as string[]);
+vi.mock('node:child_process', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  const guarded = { ...actual };
+  for (const api of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork'] as const) {
+    Object.assign(guarded, { [api]: (...args: unknown[]) => { attempts.push(`${api} ${String(args[0])}`); throw new Error('Ordinary decoder starts no process'); } });
+  }
+  return { ...guarded, default: guarded };
+});
 
 /**
  * The measurement document's format stays in this module, and a producer that
@@ -14,18 +22,35 @@ describe('readMeasurement', () => {
   let directory: { path: string; remove: () => Promise<void> };
 
   beforeEach(async () => {
+    attempts.length = 0;
     directory = await temporaryDirectory();
   });
   afterEach(async () => {
-    await directory.remove();
+    try { await directory.remove(); } finally {
+      expect(attempts, 'decoder setup/flow/teardown process attempts').toEqual([]);
+      expect(failures, 'caught producer assertion failures').toEqual([]);
+      expect(answerCalls.length).toBe(expectedCalls);
+      answerCalls.length = 0; failures.length = 0; expectedCalls = 0;
+    }
   });
 
-  /** A stand-in for the CLI: it records the arguments it was given and prints what the test wants. */
+  const answerCalls: Array<{ argv: readonly string[]; cwd: string }> = [];
+  const failures: string[] = [];
+  let expectedCalls = 0;
+  /** Script the raw transport answer; the production reader still decodes and validates it. */
   const producer = async (body: string, exitCode = 0): Promise<RamifyCli> => {
-    const executable = join(directory.path, 'ramify-stub.sh');
-    await writeFile(executable, `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > ${join(directory.path, 'argv.txt')}\ncat <<'DOCUMENT'\n${body}\nDOCUMENT\nexit ${exitCode}\n`);
-    await chmod(executable, 0o755);
-    return new RamifyCli({ executable });
+    expectedCalls += 1;
+    return new class extends RamifyCli {
+      override async run(argv: readonly string[], cwd: string) {
+        try {
+          expect(argv).toEqual(['measure', '--root', directory.path, '--format', 'json']);
+          expect(cwd).toBe(directory.path);
+          expect(answerCalls.length).toBeLessThan(expectedCalls);
+          answerCalls.push({ argv: [...argv], cwd });
+          return { code: exitCode, stdout: `${body}\n`, stderr: '' };
+        } catch (error) { failures.push(String(error)); throw error; }
+      }
+    }({ executable: '/measurement-decoder-starts-no-producer' });
   };
 
   const document = {
@@ -34,6 +59,7 @@ describe('readMeasurement', () => {
     root: '/project',
     views: 'measured',
     ownershipRule: 'kept verbatim',
+    files: [],
     modules: [{
       id: 'project/harness',
       dir: 'subs/harness',
@@ -64,8 +90,24 @@ describe('readMeasurement', () => {
     expect(read.document.modules[0]?.exact.production.sourceBytes).toBe(144432);
     expect(read.document.modules[0]?.subtree.tests.sourceFiles).toBe(33);
     expect(JSON.parse(read.raw)).toEqual(document);
-    expect((await readFile(join(directory.path, 'argv.txt'), 'utf8')).trim().split('\n'))
+    expect(answerCalls[0]?.argv)
       .toEqual(['measure', '--root', directory.path, '--format', 'json']);
+  });
+
+  it('keeps unavailable API-view bytes unavailable in the current document', async () => {
+    const module = document.modules[0]!;
+    const exact = { production: module.exact.production, tests: module.exact.tests, documentation: module.exact.documentation };
+    const subtree = { production: module.subtree.production, tests: module.subtree.tests, documentation: module.subtree.documentation };
+    const ramify = await producer(JSON.stringify({
+      ...document,
+      views: { state: 'unavailable', reason: 'analysis-failed' },
+      modules: [{ ...module, exact, subtree }],
+    }));
+    const read = await readMeasurement(ramify, directory.path);
+    expect(read.available).toBe(true);
+    if (!read.available) return;
+    expect(read.document.views).toEqual({ state: 'unavailable', reason: 'analysis-failed' });
+    expect(read.document.modules[0]?.exact.views).toBeUndefined();
   });
 
   it('is unavailable with its reason when the producer cannot be run', async () => {
@@ -90,13 +132,13 @@ describe('readMeasurement', () => {
   });
 
   it('is unavailable when the document declares another version', async () => {
-    const ramify = await producer(JSON.stringify({ ...document, schema: 'ramify.measure/2' }));
+    const ramify = await producer(JSON.stringify({ ...document, schema: 'ramify.measure/1' }));
 
     const read = await readMeasurement(ramify, directory.path);
 
     expect(read.available).toBe(false);
     if (read.available) return;
-    expect(read.unavailable).toContain('ramify.measure/2');
+    expect(read.unavailable).toContain('ramify.measure/1');
     expect(read.unavailable).toContain(measureSchemaVersion);
   });
 

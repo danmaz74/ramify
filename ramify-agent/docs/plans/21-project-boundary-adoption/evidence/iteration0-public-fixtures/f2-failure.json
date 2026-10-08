@@ -1,0 +1,351 @@
+{
+  "status": "completed",
+  "requestId": "d432fac5-9e61-4fde-9bfb-1b0f213061d4",
+  "runId": "eb8d11ce-a4fc-40a9-92ab-6b05e9c80557",
+  "summary": {
+    "evidenceSchemaVersion": 4,
+    "execution": {
+      "requestId": "d432fac5-9e61-4fde-9bfb-1b0f213061d4",
+      "runId": "eb8d11ce-a4fc-40a9-92ab-6b05e9c80557"
+    },
+    "producer": {
+      "name": "ramify-audit",
+      "version": "0.7.1"
+    },
+    "undetectedConfigFilesForcingFullAudit": [],
+    "coverage": {
+      "status": "declared",
+      "selector": {
+        "id": "full",
+        "version": "1",
+        "config": {},
+        "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+      },
+      "universe": {
+        "id": "project:.",
+        "digest": "sha256:59b043de3cc8511b7fb912ab0a3b2d10999ffe6adef9771458eee419c41e398e",
+        "checkIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "testUnitIds": [
+          "aux",
+          "source"
+        ]
+      },
+      "selection": {
+        "kind": "full",
+        "selectedCheckIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "omittedCheckIds": [],
+        "selectedTestUnitIds": [
+          "aux",
+          "source"
+        ],
+        "omittedTestUnitIds": []
+      },
+      "claim": {
+        "configuration": {
+          "blob": "6ae6c4333141b1b124399eacc4b5dc5a77789f2d",
+          "path": "ramify-audit.json",
+          "sourceCommit": "82a4922364123b66df8cc1717987805a041642fa"
+        },
+        "scope": "repository"
+      },
+      "projectRoot": ".",
+      "ownershipAnswer": {
+        "ramifyVersion": "0.4.0",
+        "cliSchema": "ramify.affected-cli/4",
+        "selectionSchema": "ramify.affected/4",
+        "revision": {
+          "sequence": null,
+          "inputId": "input/1:ca2b4e7b6fd11ea2ac83cb5054dd7773e7453fb901ec6d5a2e996ae2392af7a9"
+        },
+        "binaryPath": "node_modules/.bin/ramify",
+        "modules": 4,
+        "exclusions": 4
+      },
+      "expectedFiles": {
+        "contract": "runner-configured-files/1",
+        "source": "ownership-answer",
+        "expected": null,
+        "run": 1,
+        "missing": [],
+        "status": "unavailable",
+        "reason": "expected-files-unavailable: discovery-failed (source-vitest/source: the reporter wrote no discovery; the discovery exited 9: node: bad option: --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js | Command failed: node ...)",
+        "runnerConfigFiles": [
+          "vitest.aux.config.mjs"
+        ]
+      }
+    },
+    "mode": {
+      "requestedMode": "ramify-partial",
+      "resolution": "defaulted",
+      "executedMode": "full",
+      "fallbackReason": "baseline-incompatible: baseline 9970c42913090bb1774110f40e2519a878155079 (report a67baa160aa0789234b685b8ea68d67ee09583e4) ran other check definitions (sha256:3af66430fd0f43e2aec4587adf595e614e4bb00f130aea85dbae4c77914e75dd, now sha256:0acffe675578dc6403b5dc79b4f7d0e6952f82137354445f8b057e248bb83355)"
+    },
+    "overall": "fail",
+    "sourceCommit": "82a4922364123b66df8cc1717987805a041642fa",
+    "sourceTree": "cc451de47c80be30475aa062aaeb93b55f87bd92",
+    "sourceBranch": "failure-witness",
+    "auditedAt": "2026-10-07T10:45:02.556Z",
+    "durationSeconds": 1.654,
+    "checks": {
+      "aux-vitest": {
+        "commands": {
+          "aux": {
+            "counts": {
+              "files": {
+                "failed": 0,
+                "passed": 1,
+                "skipped": 0,
+                "total": 1
+              },
+              "tests": {
+                "failed": 0,
+                "passed": 1,
+                "skipped": 0,
+                "total": 1
+              }
+            },
+            "durationSeconds": 0.522,
+            "invocationGroups": [
+              {
+                "appendedArguments": [],
+                "exitCode": 0,
+                "group": 1,
+                "lockWaitSeconds": 0,
+                "result": {
+                  "counts": {
+                    "files": {
+                      "failed": 0,
+                      "passed": 1,
+                      "skipped": 0,
+                      "total": 1
+                    },
+                    "tests": {
+                      "failed": 0,
+                      "passed": 1,
+                      "skipped": 0,
+                      "total": 1
+                    }
+                  },
+                  "durationSeconds": 0.522,
+                  "output": "> plan21-f2@0.0.0 test:aux\n> vitest run --config vitest.aux.config.mjs --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\n\n RUN  v4.1.11 /tmp/ramify-audit-worktree-SwdC07/source/checks\n\n ✓ aux.test.ts (1 test) 2ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:45:01\n   Duration  127ms (transform 13ms, setup 0ms, import 21ms, tests 2ms, environment 0ms)",
+                  "passed": true,
+                  "status": "pass",
+                  "summary": "files 1 passed, 0 failed, 0 skipped; tests 1 passed, 0 failed, 0 skipped",
+                  "vitest": {
+                    "files": [
+                      {
+                        "path": "checks/aux.test.ts",
+                        "project": "",
+                        "state": "passed"
+                      }
+                    ],
+                    "reason": "passed"
+                  }
+                },
+                "summary": {
+                  "artifactPath": "reports/audit/vitest/aux-vitest/commands/aux/group-1.json",
+                  "status": "read"
+                }
+              }
+            ],
+            "output": "> plan21-f2@0.0.0 test:aux\n> vitest run --config vitest.aux.config.mjs --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\n\n RUN  v4.1.11 /tmp/ramify-audit-worktree-SwdC07/source/checks\n\n ✓ aux.test.ts (1 test) 2ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:45:01\n   Duration  127ms (transform 13ms, setup 0ms, import 21ms, tests 2ms, environment 0ms)",
+            "passed": true,
+            "status": "pass",
+            "summary": "files 1 passed, 0 failed, 0 skipped; tests 1 passed, 0 failed, 0 skipped",
+            "vitest": {
+              "files": [
+                {
+                  "path": "checks/aux.test.ts",
+                  "project": "",
+                  "state": "passed"
+                }
+              ],
+              "reason": "passed"
+            }
+          }
+        },
+        "durationSeconds": 0.528,
+        "output": "### aux [PASS]\n> plan21-f2@0.0.0 test:aux\n> vitest run --config vitest.aux.config.mjs --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\n\n RUN  v4.1.11 /tmp/ramify-audit-worktree-SwdC07/source/checks\n\n ✓ aux.test.ts (1 test) 2ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:45:01\n   Duration  127ms (transform 13ms, setup 0ms, import 21ms, tests 2ms, environment 0ms)",
+        "passed": true,
+        "status": "pass",
+        "summary": "aux: PASS"
+      },
+      "source-vitest": {
+        "commands": {
+          "source": {
+            "durationSeconds": 0.004,
+            "invocationGroups": [
+              {
+                "appendedArguments": [],
+                "exitCode": 9,
+                "group": 1,
+                "lockWaitSeconds": 0,
+                "result": {
+                  "durationSeconds": 0.004,
+                  "output": "node: bad option: --reporter=default\nnode: bad option: --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\nCommand failed: node -e process.exit(7) --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js",
+                  "passed": false,
+                  "status": "fail",
+                  "summary": "Command failed: node -e process.exit(7) --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js"
+                },
+                "summary": {
+                  "artifactPath": "reports/audit/vitest/source-vitest/commands/source/group-1.json",
+                  "detail": "the reporter wrote no summary",
+                  "status": "missing"
+                }
+              }
+            ],
+            "output": "node: bad option: --reporter=default\nnode: bad option: --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\nCommand failed: node -e process.exit(7) --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js",
+            "passed": false,
+            "runnerError": {
+              "kind": "malformed-result",
+              "message": "A Vitest invocation group did not provide a complete summary and exit code."
+            },
+            "status": "fail",
+            "summary": "Command failed: node -e process.exit(7) --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js"
+          }
+        },
+        "durationSeconds": 0.011,
+        "output": "### source [FAIL]\nnode: bad option: --reporter=default\nnode: bad option: --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\nCommand failed: node -e process.exit(7) --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js",
+        "passed": false,
+        "runnerError": {
+          "kind": "malformed-result",
+          "message": "A Vitest invocation group did not provide a complete summary and exit code."
+        },
+        "status": "fail",
+        "summary": "source: FAIL"
+      }
+    },
+    "workspacePreparation": {
+      "preparationId": "nodejs"
+    },
+    "definitions": {
+      "digest": "sha256:0acffe675578dc6403b5dc79b4f7d0e6952f82137354445f8b057e248bb83355",
+      "manifest": {
+        "manifestVersion": 1,
+        "workingDirectory": ".",
+        "checks": [
+          {
+            "id": "aux-vitest",
+            "dependsOn": [],
+            "requiresPackageScripts": [],
+            "executor": {
+              "kind": "command",
+              "parallel": false,
+              "mutex": false,
+              "continueOnFailure": false,
+              "commands": [
+                {
+                  "name": "aux",
+                  "cmd": "npm",
+                  "args": [
+                    "run",
+                    "test:aux"
+                  ],
+                  "parser": "vitest",
+                  "contracts": {
+                    "selection": "ramify-module-ownership-groups/2",
+                    "failureIdentity": "vitest-test-identity/1",
+                    "completeness": "vitest-run-witness/1"
+                  },
+                  "timeoutMs": 120000,
+                  "env": {}
+                }
+              ]
+            }
+          },
+          {
+            "id": "source-vitest",
+            "dependsOn": [],
+            "requiresPackageScripts": [],
+            "executor": {
+              "kind": "command",
+              "parallel": false,
+              "mutex": false,
+              "continueOnFailure": false,
+              "commands": [
+                {
+                  "name": "source",
+                  "cmd": "node",
+                  "args": [
+                    "-e",
+                    "process.exit(7)"
+                  ],
+                  "parser": "vitest",
+                  "contracts": {
+                    "selection": "ramify-module-ownership-groups/2",
+                    "failureIdentity": "vitest-test-identity/1",
+                    "completeness": "vitest-run-witness/1"
+                  },
+                  "timeoutMs": 120000,
+                  "env": {}
+                }
+              ]
+            }
+          }
+        ],
+        "workspacePreparation": {
+          "preparationId": "nodejs",
+          "optionsDigest": "sha256:adbb2bf32776f44988c31873158ae0ff83c60643de5b7e209f0c188c12723a5c"
+        }
+      }
+    },
+    "failureLedger": {
+      "completeness": "indeterminate",
+      "reason": "source-vitest/source: group 1: source-vitest/source: the reporter wrote no summary; the reporter wrote no summary; expected-files-unavailable: discovery-failed (source-vitest/source: the reporter wrote no discovery; the discovery exited 9: node: bad option: --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js | Command failed: node ...)",
+      "witness": [
+        {
+          "checkId": "aux-vitest",
+          "command": "aux",
+          "requestedTargets": [
+            {
+              "kind": "suite"
+            }
+          ],
+          "summaryRead": true,
+          "endReason": "passed",
+          "exitCode": 0,
+          "unhandledErrorsWithoutFile": [],
+          "carriedFilesNotRun": []
+        },
+        {
+          "checkId": "source-vitest",
+          "command": "source",
+          "requestedTargets": [
+            {
+              "kind": "suite"
+            }
+          ],
+          "summaryRead": false,
+          "endReason": null,
+          "exitCode": 9,
+          "unhandledErrorsWithoutFile": [],
+          "carriedFilesNotRun": []
+        }
+      ],
+      "entries": []
+    }
+  },
+  "refs": {
+    "reportCommit": "1c6186db499f15910d0985669807c0ac07827da1",
+    "runRef": "refs/audited/runs/2026-10-07T10-45-02Z-82a492236",
+    "treeRef": "refs/audited/by-tree/cc451de47c80be30475aa062aaeb93b55f87bd92"
+  },
+  "retrievalCommands": [
+    "git notes --ref=audit show 82a4922364123b66df8cc1717987805a041642fa",
+    "git show refs/audited/runs/2026-10-07T10-45-02Z-82a492236:reports/audit/summary.json"
+  ],
+  "composition": {
+    "verdict": "fail",
+    "scoped": false,
+    "chainDepth": 0,
+    "reportCommit": "1c6186db499f15910d0985669807c0ac07827da1",
+    "outstandingFailures": 0,
+    "reason": "a check of the full audit failed"
+  }
+}

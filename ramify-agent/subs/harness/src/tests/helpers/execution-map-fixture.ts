@@ -38,9 +38,9 @@ export const executionMapFixtureNodes: ExecutionNode[] = [
     owner: 'project/theme', proposed: null, scenarios: { coverage: complete(0), passed: 0, failed: 0, other: 0, noRealRun: 0, unavailable: 0 },
     directRequirements: { coverage: complete(0), verified: 0, keys: [] } },
   { ...base('scenario:sc-status', 'Renders the status badge', 4, [moduleAt('project/ui', 'owner', 4)]), kind: 'scenario', scenarioKind: 'entry',
-    state: 'implemented', latestRealResult: 'passed', entry: 'capability:status-badge', detailAvailable: true },
+    state: 'done', latestRealResult: 'passed', entry: 'capability:status-badge', detailAvailable: true },
   { ...base('scenario:sc-accessible', 'Provides accessible tone', 5, [moduleAt('project/accessibility', 'owner', 5)]), kind: 'scenario', scenarioKind: 'entry',
-    state: 'implemented', latestRealResult: 'failed', entry: 'capability:accessible-tone', detailAvailable: true },
+    state: 'done', latestRealResult: 'failed', entry: 'capability:accessible-tone', detailAvailable: true },
   { ...base('scenario:sc-integration', 'Uses theme tokens across modules', 6, [moduleAt('project/ui', 'owner', 6)]), kind: 'scenario', scenarioKind: 'integration',
     state: 'pending', latestRealResult: 'no-real-run', entry: null, detailAvailable: true },
   { ...base('work-item:wi-status', 'Implement status badge', 7, [moduleAt('project/ui', 'owner', 7)]),
@@ -82,13 +82,13 @@ export const executionMapFixtureNodes: ExecutionNode[] = [
   { ...base('session:ses-engineer', 'Status engineer', 29, [moduleAt('project/ui', 'engineer', 29)]),
     kind: 'session', role: 'engineer', state: 'live', executor: 'scripted', workItem: 'work-item:wi-status', reach: { kind: 'work-item', workItem: 'wi-status', capability: 'status-badge', module: 'project/ui' }, invocations: ['inv-status'] },
   { ...base('gate:ga-005', 'Status iteration gate, failed', 27), kind: 'gate', checkpoint: 'iteration',
-    verdict: 'failed', audit: 'passed', repairRound: 0, commit: 'commit-failed', auditedCommit: 'commit-failed', active: false, subject: { workItem: 'wi-status', iteration: 'it-status-1' }, cause: 'in-scope', evidencePresent: true },
+    verdict: 'failed', audit: 'passed', repairRound: 0, commit: 'commit-failed', auditedCommit: 'commit-failed', active: false, subject: { workItem: 'wi-status', iteration: 'it-status-1' }, cause: 'check-failed', evidencePresent: true },
   { ...base('gate:ga-006', 'Status iteration gate, repaired', 34), kind: 'gate', checkpoint: 'iteration',
     verdict: 'passed', audit: 'incomplete', repairRound: 1, commit: 'commit-repair', auditedCommit: null, active: false, subject: { workItem: 'wi-status', iteration: 'it-status-2' }, cause: null, evidencePresent: false },
   { ...base('gate:ga-provider', 'Provider conformance gate', 24), kind: 'gate', checkpoint: 'contract',
     verdict: 'passed', audit: 'passed', repairRound: 0, commit: 'commit-provider', auditedCommit: 'commit-provider', active: false, subject: { workItem: 'wi-provider', iteration: 'it-provider-1' }, cause: null, evidencePresent: true },
   { ...base('gate:ga-readiness', 'Readiness gate', 15), kind: 'gate', checkpoint: 'readiness',
-    verdict: 'passed', audit: 'not-applicable', repairRound: 0, commit: null, auditedCommit: null, active: false, subject: { workItem: null, iteration: null }, cause: null, evidencePresent: false },
+    verdict: 'passed', audit: 'passed', repairRound: 0, commit: null, auditedCommit: 'commit-base', active: false, subject: { workItem: null, iteration: null }, cause: null, evidencePresent: true },
 ];
 executionMapFixtureNodes.sort((a, b) =>
   (a.sourceRefs[0]?.sequence ?? Number.MAX_SAFE_INTEGER) - (b.sourceRefs[0]?.sequence ?? Number.MAX_SAFE_INTEGER)

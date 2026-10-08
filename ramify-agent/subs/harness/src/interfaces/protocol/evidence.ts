@@ -57,8 +57,8 @@ export type ViewIdentity = z.infer<typeof viewIdentitySchema>;
  */
 export const inputManifestSchema = z.object({
   planHash: sha256Schema,
-  /** Present for Plan 13 runs; old single-plan runs intentionally omit it. */
-  documentManifest: z.object({ path: z.string().min(1), hash: sha256Schema }).strict().optional(),
+  /** The captured plan documents' manifest, which the run writes beside `job.json`. */
+  documentManifest: z.object({ path: z.string().min(1), hash: sha256Schema }).strict(),
   source: z.object({ commit: z.string().min(1), dirty: z.boolean() }).strict().nullable(),
   versions: z.object({
     architectPrompt: z.string().min(1).nullable(),
@@ -69,6 +69,8 @@ export const inputManifestSchema = z.object({
   architectView: viewIdentitySchema,
 }).strict();
 export type InputManifest = z.infer<typeof inputManifestSchema>;
+/** What the evidence capture answers, before the run adds its captured documents' manifest. */
+export type CapturedInputManifest = Omit<InputManifest, 'documentManifest'>;
 
 /** Whether `module` is `ancestor` or lies beneath it. */
 export function isWithin(module: string, ancestor: string): boolean {

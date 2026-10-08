@@ -3,10 +3,47 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { childEnvironment, environmentNames, outputTailBytes, runCommand } from '../run-command.js';
+import { childEnvironment, environmentNames, outputTailBytes, processGroupCleanupScript, runCommand } from '../run-command.js';
 import { temporaryDirectory } from './helpers/temporary.js';
 
 const exec = promisify(execFile);
+
+describe('command cleanup wrapper', () => {
+  // Run the complete wrapper, including wait and its original exit code. Shell
+  // functions control only signal delivery and the grace sleep; no wall-clock
+  // threshold decides whether the completed/no-target path is correct.
+  for (const mode of ['group', 'single'] as const) {
+    for (const targetRemains of [false, true]) {
+      it(`${mode}: ${targetRemains ? 'waits and escalates after delivered TERM' : 'does not sleep or escalate when TERM finds no target'}`, async () => {
+        const result = await exec('bash', ['-c', `
+command() {
+  if [ "$1" = -v ] && [ "$2" = setsid ]; then ${mode === 'group' ? 'return 0' : 'return 1'}; fi
+  builtin command "$@"
+}
+setsid() { "$@"; }
+kill() {
+  printf 'signal:%s\\n' "$*"
+  if [ "$1" = -TERM ]; then ${targetRemains ? 'return 0' : 'return 1'}; fi
+}
+sleep() { printf 'sleep:%s\\n' "$*"; }
+source "$1" bash -c 'exit 7' <<< start
+`, '_', processGroupCleanupScript]).then(result => ({ ...result, code: 0 }),
+          (error: { code: number; stdout: string; stderr: string }) => error);
+        const { stdout, stderr } = result;
+        expect(result.code).toBe(7);
+        const events = stdout.trim().split('\n');
+        const targetPattern = mode === 'group' ? '-- -\\d+' : '\\d+';
+        expect(events[0]).toMatch(new RegExp(`^signal:-TERM ${targetPattern}$`, 'u'));
+        if (targetRemains) {
+          expect(events).toHaveLength(3);
+          expect(events[1]).toBe('sleep:0.2');
+          expect(events[2]).toBe(events[0]!.replace('-TERM', '-KILL'));
+        } else expect(events).toHaveLength(1);
+        expect(stderr).toMatch(mode === 'group' ? /^RAMIFY_GROUP:\d+\n$/u : /^RAMIFY_GROUP:0\n$/u);
+      });
+    }
+  }
+});
 
 /**
  * A command runs in its own process group with an environment the harness
@@ -14,11 +51,34 @@ const exec = promisify(execFile);
  */
 describe('runCommand', () => {
   let directory: { path: string; remove: () => Promise<void> };
+  const groups = new Set<number>();
   beforeEach(async () => {
     directory = await temporaryDirectory();
   });
   afterEach(async () => {
-    await directory.remove();
+    try {
+      // Cancellation can answer while the wrapper is finishing its bounded
+      // cleanup. Observe settlement without mistaking a dead zombie for a leak.
+      for (const group of groups) {
+        let liveMembers: string[] = [];
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          const { stdout } = await exec('ps', ['-eo', 'pgid=,stat=']);
+          liveMembers = stdout.trim().split('\n').filter(line => {
+            const [pgid, state] = line.trim().split(/\s+/u);
+            return pgid === String(group) && !state?.startsWith('Z');
+          });
+          if (liveMembers.length === 0) break;
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        expect(liveMembers, `live owned group ${group}`).toEqual([]);
+      }
+    } finally {
+      for (const group of groups) {
+        try { process.kill(-group, 'SIGKILL'); } catch { /* Already settled. */ }
+      }
+      groups.clear();
+      await directory.remove();
+    }
   });
 
   const request = (script: string, overrides: Partial<Parameters<typeof runCommand>[0]> = {}) => ({
@@ -27,6 +87,7 @@ describe('runCommand', () => {
     env: childEnvironment(),
     timeoutMs: 30_000,
     outputFile: join(directory.path, 'output.log'),
+    registerProcessGroup: async (pid: number) => { groups.add(pid); },
     ...overrides,
   });
 
@@ -43,6 +104,13 @@ describe('runCommand', () => {
     expect(run.output.tail).toBe('out\nerr\n');
     expect(run.elapsedMs).toBeGreaterThanOrEqual(0);
     expect(Date.parse(run.startedAt)).not.toBeNaN();
+  });
+
+  it('passes exact stdin bytes through the process-group start barrier', async () => {
+    const input = 'src/tmp/\0subs/space name/src/tmp/\0';
+    const run = await runCommand(request('cat', { stdin: input }));
+    expect(run.outcome).toEqual({ kind: 'completed', exitCode: 0 });
+    expect(run.stdout).toBe(input);
   });
 
   it('holds the command behind durable group registration and reports its kernel identity', async () => {
@@ -137,6 +205,37 @@ describe('runCommand', () => {
     const { stdout } = await exec('bash', ['-c', `pgrep -g ${group} || true`], { cwd: directory.path });
     expect(stdout.trim()).toBe('');
     await expect(stat(marker)).rejects.toThrow();
+  });
+
+  it('escalates to KILL for a TERM-resistant descendant after its parent exits', async () => {
+    const ready = join(directory.path, 'ready');
+    const script = `
+bash -c 'trap "" TERM; echo ready > "$1"; exec sleep 30' _ "$1" &
+while [ ! -f "$1" ]; do sleep 0.01; done
+exit 7
+`;
+    let group: number | undefined;
+    try {
+      const run = await runCommand(request(script, {
+        argv: ['bash', '-c', script, '_', ready],
+        registerProcessGroup: async pid => { group = pid; },
+      }));
+      expect(run.outcome).toEqual({ kind: 'completed', exitCode: 7 });
+      expect(await readFile(ready, 'utf8')).toBe('ready\n');
+      expect(group).toBeGreaterThan(0);
+      const { stdout } = await exec('ps', ['-eo', 'pgid=,stat=']);
+      // An orphan can briefly remain a zombie until the host reaps it; it is
+      // no longer a live descendant and cannot run or keep a pipe open.
+      const liveMembers = stdout.trim().split('\n').filter(line => {
+        const [pgid, state] = line.trim().split(/\s+/u);
+        return pgid === String(group) && !state?.startsWith('Z');
+      });
+      expect(liveMembers).toEqual([]);
+    } finally {
+      if (group !== undefined) {
+        try { process.kill(-group, 'SIGKILL'); } catch { /* Already settled. */ }
+      }
+    }
   });
 });
 

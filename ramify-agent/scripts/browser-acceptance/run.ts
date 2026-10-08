@@ -11,7 +11,9 @@ import { executionCapabilityDetailSchema, executionMapPageSchema, executionScena
 
 const here = dirname(fileURLToPath(import.meta.url));
 const agent = resolve(here, '../..');
-const artifacts = resolve(agent, 'docs/plans/11-plan-execution-map/evidence');
+const fixtureRoot = resolve(agent, 'subs/web/src/tests/browser-acceptance');
+// BROWSER_ACCEPTANCE_ARTIFACTS keeps a later plan's rerun from overwriting Plan 11's recorded evidence.
+const artifacts = resolve(agent, process.env.BROWSER_ACCEPTANCE_ARTIFACTS ?? 'docs/plans/11-plan-execution-map/evidence');
 const checks: string[] = [];
 const check = (name: string, condition: unknown) => { assert.ok(condition, name); checks.push(name); };
 const browserPath = process.env.CHROMIUM_PATH ?? '/usr/bin/chromium';
@@ -20,6 +22,7 @@ const exec = promisify(execFile);
 await mkdir(artifacts, { recursive: true });
 const buildDir = resolve(agent, 'dist/browser-acceptance');
 const durablePath = resolve(agent, 'dist/browser-acceptance-durable.json');
+await mkdir(dirname(durablePath), { recursive: true });
 await exec(resolve(agent, 'node_modules/.bin/vitest'), ['run', 'subs/harness/src/tests/acceptance-trial.test.ts',
   '-t', 'passes the review stop', '--maxWorkers=1'], { cwd: agent, timeout: 120_000,
   env: { ...process.env, PLAN11_EXECUTION_EXPORT: durablePath } });
@@ -36,9 +39,9 @@ check('exported run has two roots, one lower provider and verified consumer requ
   durableNodes.filter(node => node.kind === 'capability' && node.level === 'entry').length === 2 &&
   durableNodes.some(node => node.key === 'capability:note-limit') &&
   durableNodes.some(node => node.key === 'requirement:rq-001' && node.kind === 'requirement' && node.state === 'verified'));
-await build({ configFile: false, root: here, plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] },
+await build({ configFile: false, root: fixtureRoot, plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] },
   base: './', build: { outDir: buildDir, emptyOutDir: true }, logLevel: 'error' });
-const server = await preview({ configFile: false, root: here, build: { outDir: buildDir },
+const server = await preview({ configFile: false, root: fixtureRoot, build: { outDir: buildDir },
   preview: { host: '127.0.0.1', port: 0, strictPort: false }, logLevel: 'error' });
 const address = server.httpServer?.address();
 if (!address || typeof address === 'string') throw new Error('Vite did not bind a TCP port');
@@ -50,7 +53,10 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${address.port}`, { waitUntil: 'networkidle' });
   const canvas = page.getByLabel('Zoomable execution canvas');
-  await canvas.waitFor();
+  try { await canvas.waitFor({ timeout: 5_000 }); }
+  catch (error) {
+    throw new Error(`Execution canvas did not render; page: ${(await page.content()).slice(0, 3000)}; page errors: ${errors.join('; ')}`, { cause: error });
+  }
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
   check('desktop 1440x900: two entry roots and one canonical provider',
     await canvas.getByRole('button', { name: /status-badge, capability/ }).count() === 1 &&
@@ -94,8 +100,8 @@ try {
   await canvas.getByRole('button', { name: /Renders the status badge, scenario/ }).click();
   await page.getByText(/Given a valid status/).waitFor();
   check('full frozen scenario opens', true);
-  check('scenario detail distinguishes dry, failed and repaired real results',
-    await page.getByText(/ga-001: passed \(dry run\)/).count() === 1 &&
+  check('scenario detail lists each result with the configured check that ran it',
+    await page.getByText(/ga-001: passed in scenarios; gate passed/).count() === 1 &&
     await page.getByText(/ga-005: failed/).count() === 1 && await page.getByText(/ga-006: passed/).count() === 1);
   await page.getByLabel('All gates').getByRole('button', { name: /Status iteration gate, failed/ }).click();
   check('failed verdict with passing audit remain distinct',
@@ -239,15 +245,14 @@ try {
   await durablePage.goto(`http://127.0.0.1:${address.port}`, { waitUntil: 'networkidle' });
   const durableCanvas = durablePage.getByLabel('Zoomable execution canvas');
   await durableCanvas.waitFor();
-  const durableGaps = durablePage.locator('.execution-coverage-gaps');
-  await durableGaps.waitFor();
-  check('historical audit gaps are counted and collapsed without losing detail',
-    !(await durableGaps.evaluate(el => (el as HTMLDetailsElement).open)) &&
-    (await durablePage.locator('.execution-area > p.muted').textContent())?.match(/Coverage gaps: \d+\./) &&
-    await durableGaps.locator('li').count() > 5);
-  await durableGaps.locator('summary').click();
-  check('the complete historical gap list expands', await durableGaps.evaluate(el => (el as HTMLDetailsElement).open));
-  await durableGaps.locator('summary').click();
+  // Every gate of the scripted run, the readiness baseline included, now
+  // keeps its configured audit outcome, so the run has none of Plan 11's
+  // historical audit gaps. The many-gap collapse and expansion are witnessed
+  // by execution-map.test.tsx's fourteen-gap fixture.
+  const exportedGaps = durablePages.reduce((total, value) => total + value.coverage.gaps.length, 0);
+  check('a run whose gates all retain their audit outcomes shows no coverage gap',
+    exportedGaps === 0 && await durablePage.locator('.execution-coverage-gaps').count() === 0 &&
+    !/Coverage gaps/u.test(await durablePage.locator('.execution-area > p.muted').first().textContent() ?? ''));
   check('the same disk-backed run renders in Chromium through its bounded pages',
     await durableCanvas.locator('.execution-capability').count() >= 3 &&
     await durablePage.getByLabel('All sessions').getByRole('listitem').count() > 0 &&

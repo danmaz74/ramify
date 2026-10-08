@@ -1,7 +1,8 @@
+import type { ProvisionalSourceGit } from '../../subs/evidence/src/provisional-git.js';
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
-import { mkdir, readFile, stat } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { lstat, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart, ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
 import { gitCandidateSource, gitService, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
@@ -9,13 +10,9 @@ import { projectConfigurationFile } from '../../subs/evidence/src/project-config
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { Checkpoint, GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
 import { acceptedCommit } from '../checks/accepted.js';
-import { inPlaceCheckExecution, type CheckExecutionPort, type GateCommandStarted } from '../checks/execution.js';
-import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
-import { resolveTestSelection, testArea } from '../checks/selection.js';
-import {
-  planScenarioFindings, scenarioGatesToRead, scenarioObservations,
-  type GateCheckFindingOutcome, type ScenarioFindingNote, type ScenarioGateInputs, type ScenarioObservation,
-} from '../checks/scenario-findings.js';
+import type { GateCommandStarted } from '../checks/execution.js';
+import type { ConfiguredAuditPort } from '../../subs/audit/src/check-execution.js';
+import { executeConfiguredGate, type ConfiguredGateAudit, type PreparedGate } from '../checks/gate.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { decideWrite } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
@@ -38,7 +35,8 @@ import {
   type ReconciliationBasis, type ReconciliationSubmission, type UnresolvedReason,
 } from '../reviews/reconciliation.js';
 import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } from '../reviews/reconciliation-message.js';
-import { recordSettledSnapshot } from './mutations.js';
+import { outsideScope, recordSettledSnapshot } from './mutations.js';
+import { placementPaths } from '../guard/write-guard.js';
 import { captureProvisionalSource } from '../capability/source.js';
 import { capabilityRequestId, capabilityTaskId, capabilityAssignmentId, identifyCapabilityNeed, capabilityLayout,
   type CapabilityNeedInput, type CapabilityRequest, type CapabilityTask, type CapabilityPlan, type CapabilityExchange,
@@ -47,7 +45,7 @@ import { capabilityRunPolicyVersion, captureCapabilityLimits } from '../capabili
 import { createCapabilityWorkflow } from '../capability/workflow.js';
 import { commitCapabilityTransition } from '../capability/ledger.js';
 import { qualificationActionSchema, capabilityActionSchema, capabilityPlanUpdateSchema, buildCapabilityPlanRevision,
-  validateCapabilityAction, validateCapabilityPlanUpdate, type QualificationAction, type CapabilityAction } from '../capability/submission.js';
+  unreportedByHandback, validateCapabilityAction, validateCapabilityPlanUpdate, type QualificationAction, type CapabilityAction } from '../capability/submission.js';
 import { capabilityCompletionBlockers, capabilityHandbackReadiness, replayCapabilityState } from '../capability/state.js';
 import type { CapabilityWorkflow } from '../capability/workflow.js';
 import { reportCommand, type BoundReport } from '../check-findings/report.js';
@@ -173,6 +171,7 @@ import { engineerWorkingDirectory, repairWorkingDirectory } from '../work/engine
 import { createGitInspectionTool } from '../work/git-inspection.js';
 import {
   capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerJsonSchema, engineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
+  type AssignedObligation,
   validateEngineer, type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
@@ -185,43 +184,48 @@ import {
   failureDigest, renderTranscript, validateFailureAnalysis,
   type AnalysisEvidence as FailureEvidence, type DigestShellCall, type FailureAnalysisSubmission,
 } from '../work/failure.js';
-import { resolveRealTarget } from '../guard/resolve-contained-path.js';
+import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
+  auditPreparationPaths, scopeConfigurationPaths, captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
   type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
+import {
+  bindingEventsToRecord, obligationBriefingLines, obligationEventsToRecord, obligationsOf, obligationsOwnedBy, reportSourceLines,
+  type ObligationActor, type ObligationBinding, type ObligationProjection, type ObligationRegistration, type ObligationReport,
+} from '../work/obligations.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
 import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
-import { capabilityLocalArchitectJsonSchema, localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
-import { gateDiagnostics, scenarioCheckLines, type GateAudience } from '../checks/diagnostics.js';
+import {
+  capabilityLocalArchitectJsonSchema, localArchitectJsonSchema, localArchitectToolName, unreportedByCompletion, validateLocalArchitect, type LocalArchitectSubmission,
+} from '../work/submission.js';
+import { gateDiagnostics, passedScenarioLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
 import type { RenderedFeatureFile } from '../../subs/scenarios/src/rendering.js';
-import { planScenarioCheck, type ScenarioCheckInputs } from '../checks/checkpoint.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import type { Transaction } from '../../subs/ledger/src/ledger.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder, type CallInFlight } from './port-events.js';
-import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages, engineerBoundsOf, withProjectTimeouts, type EngineerBounds } from './policy.js';
-import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
+import { contextPolicyOf, defaultRunPolicy, engineerBoundsOf, withProjectTimeouts, type EngineerBounds } from './policy.js';
+import { captureProjectConfig, moduleTestAreas, type TestArea } from './project-config.js';
 import {
   commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
-  incompleteScenarios, rewordedTrailerValue, rewordingMessage, scenarioNameOf, trackedScenarios, withdrawalMessage, withdrawnTrailerValue,
-  withStates, writtenScenarios, type FeatureRerendering,
+  incompleteScenarios, rewordedTrailerValue, rewordingMessage, scenarioNameOf, trackedScenarios,
+  writtenScenarios, type FeatureRerendering,
 } from './feature-files.js';
 import type { ScenarioState } from '../../subs/scenarios/src/states.js';
 import { scenarioRecordSchema, scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
-import { scenariosToDeclare, type DeclarationContext } from '../work/declarations.js';
 import { dueIntegrations, integrationBriefing, integrationWorkItem, type IntegrationBriefing } from '../work/integration.js';
 import { briefed, entryScenariosOf, type EngineerScenarios } from '../work/scenario-briefing.js';
-import { bridgingGivens, compositionFailures } from '../../subs/scenarios/src/composition.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
+import { declaredModuleDirectories } from './project-config.js';
+import { assertScratchSafe, ensureScratchRule, releasableScratchModules, removeScratchDirectories, scratchSafetyRule, ScratchIgnoreConflictError } from '../work/scratch.js';
 import {
   gateAttemptId, gateAttemptSchema, invocationId, invocationOutcomeSchema, invocationSchema, lineEventSummarySchema,
-  measurementSnapshotSchema, recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
+  measurementSnapshotSchema, readinessAttemptSchema, recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
   type GateOperation, type Invocation, type InvocationOutcome, type LineEventSummary, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
   type ArchitectRef, type ReviewKind, type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
   type RequestRelation, type SessionFinishReason, type SessionId,
@@ -275,6 +279,10 @@ export type RunWrite =
   | 'context-package-append-requested'
   | 'context-package-appended'
   | 'readiness-attempted'
+  | 'scratch-setting-up'
+  | 'scratch-rule-appended'
+  | 'scratch-committed'
+  | 'scratch-setup-complete'
   | 'scenarios-materializing'
   | 'scenarios-committed'
   | 'scenarios-materialized'
@@ -288,6 +296,7 @@ export type RunWrite =
   | 'brief-appended'
   | 'decision-delivered'
   | 'outline-revised'
+  | 'obligation-reported'
   | 'iteration-assigned'
   | 'writer-acquired'
   | 'writer-process-registered'
@@ -296,14 +305,12 @@ export type RunWrite =
   | 'nonfunctional-repair-assigned'
   | 'nonfunctional-repair-committed'
   | 'nonfunctional-assessed'
-  | 'capability-assignment-interrupted'
   | 'capability-coordinator-resumed'
   | 'capability-verification-started'
   | 'capability-source-captured'
   | 'capability-exchange-opened'
   | 'capability-exchange-answered'
   | 'capability-gate-recorded'
-  | 'capability-review-recorded'
   | 'capability-handed-back'
   | 'capability-assignment-settled'
   | 'capability-assigned'
@@ -333,17 +340,15 @@ export interface RunServiceOptions {
   readonly git?: GitService | undefined;
   /** Where a review reads its frozen candidate from: Git's objects by default; tests script it like Git. */
   readonly candidates?: CandidateSource | undefined;
-  /** How committing checkpoint commands run. */
-  readonly checkExecution: CheckExecutionPort;
+  /** External index/blob reads for provisional capability snapshots. */
+  readonly provisionalSourceGit?: ProvisionalSourceGit | undefined;
   /**
-   * How readiness commands run: in place by default, which is what a run
-   * over a real project does. A lifecycle test whose subject is the run's
-   * state machine, and which must start no process, supplies a direct port;
-   * readiness discovery, classification and recovery are unaffected.
+   * The provider's committed audit: its configuration, read at a commit, and
+   * the configured audit every committing gate and readiness request.
    */
-  readonly readinessExecution?: CheckExecutionPort | undefined;
+  readonly configuredAudit: ConfiguredAuditPort;
   /** The policy the run captures. Without one it is the hardcoded default over this project. */
-  readonly policy?: ((projectRoot: string, nested: Awaited<ReturnType<typeof discoverNestedPackages>>) => RunPolicy) | undefined;
+  readonly policy?: ((projectRoot: string) => RunPolicy) | undefined;
   /** The module the baseline is frozen over; the architect view's root by default. */
   readonly rootModule?: string | undefined;
   /** How long a stop waits for the session before the run is marked stopped anyway. */
@@ -608,6 +613,13 @@ interface LiveInvocation {
   readonly done: Promise<void>;
 }
 
+class ScratchSetupRefusal extends Error {
+  constructor(detail: string) {
+    super(detail);
+    this.name = 'ScratchSetupRefusal';
+  }
+}
+
 class Run {
   readonly mutex = new Mutex();
   /**
@@ -632,6 +644,8 @@ class Run {
   readonly orienting = new Map<string, Promise<ReviewOrientation>>();
   /** The commit-and-audit effect in flight, which the run's terminal event waits for. */
   gating: Promise<unknown> | undefined;
+  /** Owned readiness work: stopping aborts it and awaits process settlement before a terminal event. */
+  readiness: { controller: AbortController; settled: Promise<void> } | undefined;
   /** The writer of the run; one at a time, and the log says which. */
   readonly writer: WriterOwnership;
   index: ArchitectIndex | null = null;
@@ -717,8 +731,8 @@ export class RunService {
     return { service, recovery };
   }
 
-  /** Historical workflow tests remain executable without exposing their path to new production runs. */
-  static async openForHistoricalTests(options: RunServiceOptions): Promise<{ service: RunService; recovery: RunRecoveryReport }> {
+  /** Current-policy scripted lifecycle controls exercise the ordinary and narrow contract paths without launching capability coordination. */
+  static async openForScriptedLifecycleTests(options: RunServiceOptions): Promise<{ service: RunService; recovery: RunRecoveryReport }> {
     const service = new RunService(options, null);
     const recovery = await service.load();
     return { service, recovery };
@@ -735,6 +749,12 @@ export class RunService {
 
   get projectRoot(): string {
     return this.options.projectRoot;
+  }
+
+  /** No candidate is read while Git could include scratch in its tree. */
+  private async previewCandidateTree(): ReturnType<GitService['previewCandidateTree']> {
+    await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+    return this.git.previewCandidateTree(this.projectRoot);
   }
 
   private warn(message: string): void {
@@ -780,7 +800,7 @@ export class RunService {
     // committed before anything ends the run, as when the mutex held it.
     await run.gating?.catch(() => undefined);
     return run.mutex.run(async () => {
-      if (run.log.terminal) return 'ended';
+      if (run.log.terminal || this.closed || (run.stopRequested && terminal.type !== 'job-stopped' && terminal.type !== 'job-interrupted')) return 'ended';
       const sessions = this.sessionsOf(run);
       for (const session of sessions?.values() ?? []) {
         const reason = session.state === 'suspended' ? 'run-ended' : session.state === 'live' && session.awaiting === null ? opening : null;
@@ -1686,6 +1706,7 @@ export class RunService {
 
   /** The run's review requests and coverage, from its log; undefined for an unknown run. */
   reviews(planId: string, runId: string, workItem?: string): { readonly coverage: ReviewCoverage; readonly requests: ReturnType<typeof unsettledRequests> } | undefined {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     if (run === undefined) return undefined;
     const requests = [...reviewStateOf(run.log.events).values()].filter(request => workItem === undefined || request.workItem === workItem);
@@ -2333,9 +2354,8 @@ export class RunService {
     const requested = new Set([...records.capabilityRequests.values()].map(request => request.invocation));
     for (const started of run.log.all('invocation-started')) {
       const iteration = started.data.work.iteration;
-      const capabilityAssignment = started.data.work.capabilityAssignment;
-      if (started.data.role !== 'engineer' || (iteration === undefined && capabilityAssignment === undefined) ||
-        requested.has(started.data.invocation) || (iteration !== undefined && records.results.has(iteration))) continue;
+      if (started.data.role !== 'engineer' || iteration === undefined ||
+        requested.has(started.data.invocation) || records.results.has(iteration)) continue;
       const ended = run.log.all('invocation-ended').find(event => event.data.invocation === started.data.invocation);
       const outcome = records.outcomes.get(started.data.invocation);
       if (ended?.data.ended !== 'submitted' || ended.data.submission === null || !ended.data.kept ||
@@ -2348,33 +2368,30 @@ export class RunService {
       const { schema: _schema, ...body } = raw;
       const parsed = engineerSubmissionSchema.safeParse(body);
       if (raw.schema !== 'ramify-agent.engineer-submission/1' || !parsed.success || parsed.data.kind !== 'capability-needed') continue;
-      const assignment = iteration === undefined ? undefined : records.assignments.get(iteration);
+      const assignment = records.assignments.get(iteration);
       const item = assignment === undefined ? undefined : records.workItems.find(entry => entry.id === assignment.workItem);
-      const nestedAssignment = capabilityAssignment === undefined ? undefined : records.capabilityAssignments.get(capabilityAssignment);
-      const taskId = assignment?.coordination?.kind === 'capability-task'
-        ? assignment.coordination.id : nestedAssignment?.task;
+      const taskId = assignment?.coordination?.kind === 'capability-task' ? assignment.coordination.id : undefined;
       const parentTask = taskId === undefined ? undefined : records.capabilityTasks.get(taskId);
       const parentPlan = parentTask === undefined ? undefined : records.capabilityPlans.get(parentTask.id)?.at(-1);
-      if ((iteration !== undefined && (assignment === undefined || item === undefined)) ||
-        (assignment?.coordination?.kind === 'capability-task' && (parentTask === undefined || parentPlan === undefined)) ||
-        (capabilityAssignment !== undefined && (nestedAssignment === undefined || parentTask === undefined || parentPlan === undefined))) {
+      if (assignment === undefined || item === undefined ||
+        (assignment.coordination?.kind === 'capability-task' && (parentTask === undefined || parentPlan === undefined))) {
         throw new Error(`Suspended engineer ${started.data.invocation} lacks its original assignment`);
       }
       const release = run.log.all('writer-released').filter(event => event.data.invocation === started.data.invocation);
       if (release.length !== 1 || release[0]!.data.confirmed !== true) throw new Error(`Suspended engineer ${started.data.invocation} has no confirmed writer release`);
       const requestId = capabilityRequestId(records.capabilityRequests.size + 1);
-      const source = await captureProvisionalSource({ projectRoot: this.projectRoot, runDirectory: run.directory,
+      const source = await captureProvisionalSource({ git: this.git, sourceGit: this.options.provisionalSourceGit, projectRoot: this.projectRoot, runDirectory: run.directory,
         request: requestId, acceptedBase: this.accepted(run), writerSettledBy: started.data.invocation,
         changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)) });
-      const captured = assignment === undefined ? undefined : await readFile(run.path(runLayout.capturedPlan));
+      const captured = await readFile(run.path(runLayout.capturedPlan));
       const request: CapabilityRequest = { schema: 'ramify-agent.capability-request/1', id: requestId,
-        parent: parentTask === undefined ? { kind: 'work-item', id: item!.id } : { kind: 'capability-task', id: parentTask.id },
-        assignment: assignment?.id ?? nestedAssignment!.id,
-        invocation: started.data.invocation, consumer: assignment?.coordination?.kind === 'capability-task'
+        parent: parentTask === undefined ? { kind: 'work-item', id: item.id } : { kind: 'capability-task', id: parentTask.id },
+        assignment: assignment.id,
+        invocation: started.data.invocation, consumer: assignment.coordination?.kind === 'capability-task'
           ? 'module' in assignment.scope.base ? assignment.scope.base.module : parentTask!.consumer
-          : item?.module ?? nestedAssignment!.owner,
+          : item.module,
         requirementPackage: parentTask === undefined
-          ? { id: runLayout.capturedPlan, revision: 1, hash: sha256(captured!) }
+          ? { id: runLayout.capturedPlan, revision: 1, hash: sha256(captured) }
           : refOf(parentTask.id, parentPlan!.revision, parentPlan!),
         continuation: { session: started.data.session, point: outcome.session.ref }, source,
         summary: parsed.data.summary, original: identifyCapabilityNeed(requestId, parsed.data.request) };
@@ -2384,6 +2401,13 @@ export class RunService {
       requested.add(started.data.invocation);
       break;
     }
+  }
+
+  private readonly refusedPolicies = new Map<string, string>();
+
+  private refuseEarlierPolicy(planId: string, runId: string): void {
+    const recorded = this.refusedPolicies.get(key(planId, runId));
+    if (recorded !== undefined) throw new CommandRejection('unsupported-version', `Run policy ${recorded} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`, undefined, [`plans/${planId}/.harness/jobs/${runId}/${runLayout.record}`]);
   }
 
   private async load(): Promise<RunRecoveryReport> {
@@ -2397,17 +2421,23 @@ export class RunService {
         if (document === undefined) continue;
         const parsed: unknown = JSON.parse(document.toString('utf8'));
         if ((parsed as { kind?: unknown } | null)?.kind !== 'implementation') continue;
+        const policy = (parsed as { policy?: { version?: unknown } }).policy?.version;
+        if (policy !== capabilityRunPolicyVersion) {
+          const recorded = typeof policy === 'string' ? policy : '(missing policy)';
+          this.refusedPolicies.set(key(planId, jobId), recorded);
+          report.skipped.push(key(planId, jobId));
+          this.warn(`Run policy ${recorded} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
+          continue;
+        }
         const record = runRecordSchema.parse(parsed);
         if (record.jobId !== jobId || record.planId !== planId) throw new Error('job.json names another run');
         const log = await RunLog.open(join(directory, runLayout.events), jobId);
-        if (record.manifest.documentManifest) {
-          const captured = await readCapturedDocuments(directory, record.manifest);
-          if (!log.find('job-started')) throw new Error('Document capture stopped before the run was published');
-          if (!log.find('document-manifest-committed')) await log.append({ type: 'document-manifest-committed', data: {
-            manifest: record.manifest.documentManifest.path, hash: record.manifest.documentManifest.hash,
-            documents: captured.manifest.documents.length,
-          } });
-        }
+        const captured = await readCapturedDocuments(directory, record.manifest);
+        if (!log.find('job-started')) throw new Error('Document capture stopped before the run was published');
+        if (!log.find('document-manifest-committed')) await log.append({ type: 'document-manifest-committed', data: {
+          manifest: record.manifest.documentManifest.path, hash: record.manifest.documentManifest.hash,
+          documents: captured.manifest.documents.length,
+        } });
         const base = await this.runBase(record, log);
         let loaded!: Run;
         loaded = new Run(record, directory, log, base, this.newWriter(record.policy, () => this.accepted(loaded)));
@@ -2421,6 +2451,14 @@ export class RunService {
 
       const rewritten = await recoverCommits(run.log.ledger);
       if (rewritten.rewritten.length > 0) report.rematerialized.push(`${run.key}: ${rewritten.rewritten.length} record file(s)`);
+      // A crash can land after the durable close event and before its
+      // filesystem cleanup. Repeat the idempotent cleanup on every load.
+      try {
+        await this.cleanupClosedScratch(run);
+      } catch (error) {
+        if (!run.log.terminal) await this.fail(run, 'recovery-exhausted', `Closed iteration scratch could not be cleaned: ${message(error)}`);
+        else this.warn(`Run ${run.record.jobId}: closed iteration scratch could not be cleaned: ${message(error)}`);
+      }
 
       if (!run.log.terminal && this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion) {
         try {
@@ -2431,12 +2469,6 @@ export class RunService {
         }
       }
 
-      if (!run.log.terminal && run.record.policy.version !== capabilityRunPolicyVersion && this.workflow !== null) {
-        await this.endRun(run, { type: 'job-interrupted', data: {
-          message: `Unsupported historical workflow ${run.record.policy.version}; its records remain readable. Resume it with the original harness revision that captured its prompt packages, or start a new capability-coordination run.`,
-        } }, 'interrupted');
-        report.interrupted.push(run.key);
-      }
 
       if (!run.log.terminal) {
         if (this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion &&
@@ -2499,7 +2531,6 @@ export class RunService {
           }
         } else {
         for (const effect of await this.completeEffects(run)) report.effects.push(`${run.key}: ${effect}`);
-        for (const scenario of await this.completeWithdrawals(run)) report.effects.push(`${run.key}: the withdrawal of ${scenario}`);
         for (const decision of await this.completeDeliveries(run)) report.effects.push(`${run.key}: the delivery of decision ${decision}`);
         for (const invocation of await this.closeInterruptedInvocations(run)) report.invocations.push(`${run.key}: ${invocation}`);
         // A request an accepted iteration is owed is recorded once, and
@@ -2554,13 +2585,13 @@ export class RunService {
     if (marker.data.maxRounds !== (run.record.policy.limits.nonfunctionalRoundsPerPlan ?? 3)) {
       return 'phase marker round bound differs from captured policy';
     }
-    const source = run.log.find('analysis-accepted')?.data.evidence?.catalog.hash;
+    const source = run.log.find('analysis-accepted')?.data.evidence.catalog.hash;
     if (source !== marker.data.catalogHash) return 'phase marker names another catalog';
     const nfrIds = assessedElements(accepted.catalog);
     const replay = replayNonfunctionalPhase(run.log.ledger.replay(), nfrIds, marker.data.maxRounds);
     if (!replay.ok) return `phase ledger prefix is invalid: ${replay.reason}`;
     if (replay.value.final !== null) {
-      const preview = await this.git.previewCandidateTree(this.projectRoot);
+      const preview = await this.previewCandidateTree();
       if (preview.tree !== replay.value.final.candidate.tree) return 'source tree changed after the final assessment';
     }
     const { packages } = await loadPromptPackages({
@@ -2664,13 +2695,6 @@ export class RunService {
         performed.push(`the parent append of reconciliation ${id}`);
         continue;
       }
-      if (event.type === 'scenarios-withdrawing') {
-        // The files are re-rendered with the intent's scenarios pending, and
-        // the commit is found by its trailers where the attempt made it.
-        await this.performWithdrawal(run, event.data, true);
-        performed.push(`the withdrawal commit of ${event.data.scenarios.join(', ')}`);
-        continue;
-      }
       if (event.type === 'scenarios-rewording') {
         // The revised records are in the intent; the files are rendered from
         // the ledger again, and the commit is found by its trailers.
@@ -2683,6 +2707,11 @@ export class RunService {
         // by its trailers where the interrupted attempt made it.
         await this.performMaterialization(run, true);
         performed.push('the materialization of the feature files');
+        continue;
+      }
+      if (event.type === 'scratch-setting-up') {
+        await this.performScratchSetup(run, true);
+        performed.push('the scratch ignore rule setup');
         continue;
       }
       if (event.type !== 'gate-committing') {
@@ -2794,17 +2823,20 @@ export class RunService {
   }
 
   getRun(planId: string, runId: string): RunSnapshot | undefined {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     return run && runSnapshot(run.record, run.log.events);
   }
 
   /** The run's events, exactly as its log holds them. */
   events(planId: string, runId: string) {
+    this.refuseEarlierPolicy(planId, runId);
     return this.runs.get(key(planId, runId))?.log.events;
   }
 
   /** The record of one run, for a caller that reads what it was started with. */
   recordOf(planId: string, runId: string): RunRecord | undefined {
+    this.refuseEarlierPolicy(planId, runId);
     return this.runs.get(key(planId, runId))?.record;
   }
 
@@ -2814,6 +2846,7 @@ export class RunService {
    * caller receives the replay, and nothing it does with it reaches the log.
    */
   committed(planId: string, runId: string) {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     return run && { record: run.record, directory: run.directory, entries: run.log.ledger.replay() };
   }
@@ -2829,6 +2862,7 @@ export class RunService {
     runId: string,
     change: { readonly cause: CheckFindingCause; readonly commands: readonly CheckFindingCommand[] },
   ): Promise<CheckFindingCommit | undefined> {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     if (run === undefined) return undefined;
     const committed = await this.commitCheckFindings(run, () => ({
@@ -2846,6 +2880,7 @@ export class RunService {
    * unknown run.
    */
   checkFindings(planId: string, runId: string, query: CheckFindingQueryInput): CheckFindingSelection | undefined {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     return run && selectCheckFindings(checkFindingStateOf(run.log.ledger), query);
   }
@@ -2884,6 +2919,7 @@ export class RunService {
 
   /** Settles when the run's driver has nothing left to do. For tests and shutdown. */
   async settled(planId: string, runId: string): Promise<void> {
+    this.refuseEarlierPolicy(planId, runId);
     const run = this.runs.get(key(planId, runId));
     if (run) await run.idle();
   }
@@ -2924,6 +2960,10 @@ export class RunService {
 
   private async start(command: Extract<RunCommand, { type: 'start-run' }>, contentHash: string): Promise<Receipt> {
     const { planId, agent: requested, reviewStop } = command.payload;
+    if (this.options.policy !== undefined) {
+      const policy = this.options.policy(this.projectRoot);
+      if (policy.version !== capabilityRunPolicyVersion) throw new CommandRejection('conflict', `Run policy ${policy.version} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
+    }
     this.commands.requireVersion(command, 0, 'A start creates a run, whose version is 0');
     const agent = this.options.agent;
     if (!agent) throw new CommandRejection('unavailable', 'No agent is configured, so no run can start');
@@ -2981,6 +3021,10 @@ export class RunService {
     // with its reason; readiness reports it, and the start is not refused.
     // The gate command timeouts it declares replace the policy's own.
     const projectConfig = await captureProjectConfig(this.projectRoot);
+    const sourceCommit = await this.git.currentHead(this.projectRoot);
+    const auditConfiguration = sourceCommit === '' ? { invalid: 'No committed HEAD is available for audit configuration' }
+      : await this.options.configuredAudit.read(this.projectRoot, sourceCommit)
+        .then(config => ({ config }), error => ({ invalid: `Committed audit configuration at ${sourceCommit}: ${message(error)}` }));
     const record = runRecordSchema.parse({
       schema: jobSchemaVersion,
       jobId: runId,
@@ -2992,6 +3036,7 @@ export class RunService {
       prompts: Object.fromEntries([...packages].map(([role, loaded]) => [role, { package: loaded.package, hash: loaded.hash }])),
       policy: withProjectTimeouts(policy, projectConfig),
       projectConfig,
+      auditConfiguration,
       baseline: baseline.reference,
       // The plan's own scenarios, extracted once from the captured bytes. A
       // block that does not parse is a limitation, never a refusal.
@@ -3035,13 +3080,9 @@ export class RunService {
       if (error instanceof EvidenceUnavailableError) throw new CommandRejection('unavailable', error.message);
       throw error;
     }
-    const nested = await discoverNestedPackages(this.projectRoot);
-    const policy = (this.options.policy ?? ((root, found) => defaultRunPolicy({ projectRoot: root, nested: found })))(this.projectRoot, nested);
-    if (policy.version === capabilityRunPolicyVersion && this.workflow === null) {
-      throw new CommandRejection('conflict', 'The historical test workflow cannot create a capability-coordination run');
-    }
-    if (this.workflow !== null && policy.version !== capabilityRunPolicyVersion) {
-      throw new CommandRejection('conflict', `New runs require ${capabilityRunPolicyVersion}; policy ${policy.version} is historical`);
+    const policy = (this.options.policy ?? ((root: string) => defaultRunPolicy({ projectRoot: root })))(this.projectRoot);
+    if (policy.version !== capabilityRunPolicyVersion) {
+      throw new CommandRejection('conflict', `Run policy ${policy.version} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
     }
     return { manifest, packages, promptManifest, policy };
   }
@@ -3085,6 +3126,7 @@ export class RunService {
 
   private async stop(command: Extract<RunCommand, { type: 'stop-job' }>, contentHash: string): Promise<Receipt> {
     const { planId, jobId } = command.payload;
+    this.refuseEarlierPolicy(planId, jobId);
     const run = this.runs.get(key(planId, jobId));
     if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
     const receipt = await run.mutex.run(async () => {
@@ -3100,6 +3142,7 @@ export class RunService {
     });
     // A driver waiting at the review stop has no session to stop; it reads
     // the stop and returns, and the run is stopped with nothing written.
+    run.readiness?.controller.abort();
     run.notify();
     const driving = run.done;
     const stopping = this.endStopped(run).catch(error => this.warn(`Run ${jobId}: ${message(error)}`));
@@ -3116,6 +3159,16 @@ export class RunService {
   private async endStopped(run: Run): Promise<void> {
     const grace = this.options.stopGraceMs ?? run.record.policy.limits.stopSettleMs;
     const settled = await this.stopReaders(run, 'stopped', grace, true);
+    const readiness = run.readiness;
+    if (readiness !== undefined) {
+      let timer: NodeJS.Timeout | undefined;
+      const finished = await Promise.race([
+        readiness.settled.then(() => true),
+        new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), grace); }),
+      ]);
+      clearTimeout(timer);
+      if (!finished) throw new Error(`Readiness did not settle within ${grace} ms; refusing to publish job-stopped`);
+    }
     if (this.closed) return;
     await this.endRun(run, { type: 'job-stopped', data: { settled } });
   }
@@ -3165,6 +3218,7 @@ export class RunService {
    */
   private async approve(command: Extract<RunCommand, { type: 'approve-analysis' }>, contentHash: string): Promise<Receipt> {
     const { planId, jobId, reviewer, note } = command.payload;
+    this.refuseEarlierPolicy(planId, jobId);
     const run = this.runs.get(key(planId, jobId));
     if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
     const receipt = await run.mutex.run(async () => {
@@ -3204,6 +3258,7 @@ export class RunService {
    */
   private async checkFindingCommand(command: CheckFindingUserCommand, contentHash: string): Promise<Receipt> {
     const { planId, jobId } = command.payload;
+    this.refuseEarlierPolicy(planId, jobId);
     const run = this.runs.get(key(planId, jobId));
     if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
     const at = this.now();
@@ -3253,6 +3308,7 @@ export class RunService {
     // of the run itself has happened yet.
     if (!recovering) await this.afterWrite('job-created', run.record.jobId);
     if (this.ignoring(run)) return;
+    if (recovering) await this.cleanupClosedScratch(run);
     this.startReviews(run, agent, packages);
     const accepted = await this.analyse(run, agent, packages, baseline);
     if (!accepted || this.ignoring(run)) return;
@@ -3262,6 +3318,9 @@ export class RunService {
 
     const ready = await this.reachReadiness(run);
     if (!ready || this.ignoring(run)) return;
+
+    await this.setupScratch(run);
+    if (this.ignoring(run)) return;
 
     await this.materializeScenarios(run);
     if (this.ignoring(run)) return;
@@ -3289,7 +3348,7 @@ export class RunService {
       return null;
     }
     await this.rerenderScenarios(run);
-    const preview = await this.git.previewCandidateTree(this.projectRoot);
+    const preview = await this.previewCandidateTree();
     const id = `cand-${String(run.log.count('candidate-prepared') + 1).padStart(3, '0')}`;
     const candidate = { tree: preview.tree, head: preview.head, preparedAt: this.now().toISOString() };
     const body = preparedCandidateSchema.parse({
@@ -3313,7 +3372,7 @@ export class RunService {
       return null;
     }
     const accepted = run.log.find('analysis-accepted');
-    const catalogHash = accepted?.data.evidence?.catalog.hash;
+    const catalogHash = accepted?.data.evidence.catalog.hash;
     if (catalogHash === undefined) {
       await this.fail(run, 'analysis-invalid', 'The fixed non-functional catalog has no accepted hash');
       return null;
@@ -3453,7 +3512,7 @@ export class RunService {
       || action.deviations.some(choice => choice.proposedAlternative === null && choice.uncertainty.trim() === '')) {
       return unavailable('The accepted close action does not dispose each unresolved NFR exactly once');
     }
-    const preview = await this.git.previewCandidateTree(this.projectRoot);
+    const preview = await this.previewCandidateTree();
     if (preview.tree !== binding.assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed before non-functional deviations were recorded');
       return false;
@@ -3562,7 +3621,7 @@ export class RunService {
       await this.fail(run, 'agent-failed', `Non-functional coordinator action ended ${result.ended}`);
       return null;
     }
-    const late = await this.git.previewCandidateTree(this.projectRoot);
+    const late = await this.previewCandidateTree();
     if (late.tree !== candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed during the non-functional coordinator action');
       return null;
@@ -3595,7 +3654,7 @@ export class RunService {
       await this.fail(run, 'agent-failed', `Non-functional investigation ended ${result.ended}`);
       return false;
     }
-    const late = await this.git.previewCandidateTree(this.projectRoot);
+    const late = await this.previewCandidateTree();
     if (late.tree !== assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed during non-functional investigation');
       return false;
@@ -3611,11 +3670,17 @@ export class RunService {
     assessment: Assessment, candidateId: string, action: Extract<CoordinatorAction, { kind: 'repair' }>,
   ): Promise<boolean> {
     const id = `nfr-repair-${String(run.log.count('nonfunctional-repair-assigned') + 1).padStart(3, '0')}`;
+    const answer = await this.options.ramify.queryOwnership(this.projectRoot, ['.']);
+    const scope = await resolveWriteScope({ projectRoot: this.projectRoot, ramify: this.options.ramify, index: await this.refreshIndex(run),
+      view: run.record.manifest.architectView, revision: assessment.round,
+      base: { modules: answer.selection.scope.ownership.modules.map(module => module.id), rationale: 'The recorded coordinator authorized one project-wide non-functional repair batch' },
+      extra: [], read: [], bootstrap: [], rationale: action.task });
     const assignment = nonfunctionalRepairAssignmentSchema.parse({
       schema: 'ramify-agent.nonfunctional-repair-assignment/1', id, round: assessment.round,
       assessment: assessment.id, candidate: candidateId, nfrs: action.nfrs,
       startingModule: action.startingModule, task: action.task,
-      evidence: action.evidence, uncertainty: action.uncertainty,
+      evidence: action.evidence, uncertainty: action.uncertainty, scope,
+      guarded: await captureGuardedFiles(this.projectRoot, [], await this.guardedScenarioFiles(run), [...await this.auditPreparationPaths(run), ...scopeConfigurationPaths(scope)]),
     });
     await this.write(run, { type: 'nonfunctional-repair-assigned', data: {
       round: assignment.round, assignment: id, assessment: assessment.id, candidate: candidateId,
@@ -3633,12 +3698,10 @@ export class RunService {
     if (loaded === undefined) throw new Error('Non-functional repair package is unavailable');
     const index = await this.refreshIndex(run);
     const workingDirectory = await repairWorkingDirectory(this.projectRoot, assignment.startingModule, index);
-    const root = await resolveRealTarget(this.projectRoot, '.');
-    if (!root.ok) throw new Error(`Project root cannot be resolved for repair: ${root.reason}`);
-    const guarded: GuardedScope = { revision: 1, roots: [root.resolved], files: [], denied: await this.deniedFiles(run) };
+    const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot,
+      [...await this.deniedFiles(run), ...assignment.guarded.map(file => file.path)]), this.options.ramify);
     const commandTimeoutMs = engineerBoundsOf(run.record.policy.limits).defaults.commandTimeoutMs;
-    const tools = this.implementationTools(run, { workingDirectory, scopeRevision: 1, guarded,
-      tests: { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites: [] }, commandTimeoutMs });
+    const tools = this.implementationTools(run, { workingDirectory, scopeRevision: 1, guarded, commandTimeoutMs });
     const result = await this.runInvocation<NonfunctionalRepairSubmission>(run, agent, {
       role: 'nonfunctional-repair-engineer', work: { nonfunctionalRepair: assignment.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-repair-engineer').length + 1,
@@ -3663,11 +3726,34 @@ export class RunService {
       await this.fail(run, 'inputs-changed', `Captured plan evidence changed during repair: ${changed.join('; ')}`);
       return false;
     }
+    if (!await this.repairScopeAllowed(run, assignment)) return false;
     await this.write(run, { type: 'nonfunctional-repair-committed', data: {
       round: assignment.round, invocation: result.id, assignment: assignment.id,
     } });
     await this.afterWrite('nonfunctional-repair-committed', run.record.jobId);
     return true;
+  }
+
+  /** Check the exact captured repair boundary after shell writes and again on restart. */
+  private async repairScopeAllowed(run: Run, assignment: import('./nonfunctional-records.js').NonfunctionalRepairAssignment): Promise<boolean> {
+    try {
+      const guard = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot,
+        [...await this.deniedFiles(run), ...assignment.guarded.map(file => file.path)]), this.options.ramify);
+      const changed = await this.git.changedPaths(this.projectRoot, this.accepted(run));
+      const candidate = [];
+      for (const path of changed) {
+        const captured = assignment.guarded.find(file => file.path === path);
+        const hash = captured === undefined ? undefined : await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(error => {
+          if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+          throw error;
+        });
+        if (captured === undefined || hash !== captured.hash) candidate.push(path);
+      }
+      const outside = await outsideScope(this.projectRoot, guard, candidate);
+      if (outside.length === 0) return true;
+      await this.fail(run, 'inputs-changed', `Repair changed files outside captured and current authority: ${outside.join('; ')}`);
+    } catch (error) { await this.fail(run, 'inputs-changed', `Repair ownership cannot be verified: ${message(error)}`); }
+    return false;
   }
 
   /** A durable assignment may precede the child; a settled submitted child may precede its repair event. */
@@ -3683,7 +3769,7 @@ export class RunService {
     }
     if (started.length === 0) {
       const prepared = await this.readPreparedCandidate(run, assignment.candidate);
-      const observed = await this.git.previewCandidateTree(this.projectRoot);
+      const observed = await this.previewCandidateTree();
       if (observed.tree !== prepared.candidate.tree) {
         await this.fail(run, 'inputs-changed', `Source changed before assigned repair ${assignment.id} could start`);
         return false;
@@ -3720,6 +3806,7 @@ export class RunService {
       await this.fail(run, 'inputs-changed', `Captured plan evidence changed during repair recovery: ${changed.join('; ')}`);
       return false;
     }
+    if (!await this.repairScopeAllowed(run, assignment)) return false;
     await this.write(run, { type: 'nonfunctional-repair-committed', data: {
       round: assignment.round, invocation, assignment: assignment.id,
     } });
@@ -3774,7 +3861,7 @@ export class RunService {
         await this.fail(run, 'agent-failed', `The non-functional coordinator ended ${result.ended} without a complete assessment`);
         return null;
       }
-      const late = await this.git.previewCandidateTree(this.projectRoot);
+      const late = await this.previewCandidateTree();
       const bound = bindCoordinatorAssessment(result.value, { catalog: catalog.catalog, candidate: prepared.candidate,
         observedTree: late.tree, id, round, phase, coordinatorInvocation: result.id });
       if (!bound.ok) {
@@ -4107,6 +4194,9 @@ export class RunService {
 
     const ended = interruption !== undefined ? 'failed' : request.endedAs?.() ?? endedOf(outcome.kind, judge.boundReached);
     const keptAs = keeping(ended, ended === 'submitted' ? value : undefined);
+    const scratchAtSettlement = request.candidateBefore === undefined ? null
+      : await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+    const candidateAfter = scratchAtSettlement?.outcome === 'passed' ? (await this.previewCandidateTree()).tree : undefined;
     const error = interruption === 'idle-timeout'
       ? `No port event for ${limits.invocationIdleMs} ms`
       : interruption === 'absolute-timeout'
@@ -4129,7 +4219,7 @@ export class RunService {
       ...(budget === undefined ? {} : { budget }),
       settled,
       outsideScope,
-      ...(request.candidateBefore === undefined ? {} : { candidateAfter: (await this.git.previewCandidateTree(this.projectRoot)).tree }),
+      ...(candidateAfter === undefined ? {} : { candidateAfter }),
       usage: recorder.outcomeUsage(agent),
       elapsedMs,
       ...(outcome.kind === 'failed' && interruption === undefined ? { error: outcome.error } : {}),
@@ -4170,10 +4260,6 @@ export class RunService {
       return false;
     }
     const manifestRef = run.record.manifest.documentManifest;
-    if (manifestRef === undefined) {
-      await this.fail(run, 'analysis-invalid', 'This run has no captured documents to extract a catalog from', []);
-      return false;
-    }
     const documents = await readCapturedDocuments(run.directory, run.record.manifest);
     const inputs: ExtractionInputs = { planId: run.record.planId, manifest: documents.manifest, bytes: documents.bytes, runDirectory: run.directory };
     let catalog = openElementCatalog(manifestRef.hash, documents.manifest);
@@ -4450,6 +4536,7 @@ export class RunService {
       const action: Extract<CapabilityAction, { kind: 'consult-consumer' }> = {
         kind: 'consult-consumer', task: task.id, planRevision: exchange.planRevision, invocation: opened.data.invocation,
         question: exchange.question, references: [...exchange.references], sections: ['Recovered pending consultation'],
+        registrations: [], reports: [],
       };
       return await this.consultCapabilityConsumer(run, agent, packages, task, request, plan, action,
         opened.data.invocation, { point: request.continuation.point, session: request.continuation.session }, exchange) !== null;
@@ -4463,6 +4550,7 @@ export class RunService {
       }
       const action: Extract<CapabilityAction, { kind: 'assign' }> = {
         kind: 'assign', task: task.id, planRevision: plan.revision, invocation: assigned.data.invocation,
+        registrations: [], reports: [],
         assignment: assignmentBodySchema.parse({ stage: assignment.stage, kind: assignment.kind,
           goal: assignment.goal, approach: assignment.approach,
           scope: { base: assignment.scope.base, extra: assignment.scope.extra,
@@ -4471,7 +4559,7 @@ export class RunService {
           externalCapabilities: assignment.externalCapabilities.map(({ capability, owner, role }) => ({ capability, owner, role })),
           completionEvidence: assignment.completionEvidence,
           authorizations: assignment.authorizations.map(({ path, rationale }) => ({ path, rationale })),
-          ...(assignment.scenarios === undefined ? {} : { scenarios: assignment.scenarios }),
+          ...(assignment.obligations === undefined ? {} : { obligations: assignment.obligations }),
           ...(assignment.bounds === undefined ? {} : { bounds: assignment.bounds }),
         }),
       };
@@ -4558,9 +4646,7 @@ export class RunService {
     const attempt = run.log.all('invocation-started').filter(event => event.data.role === 'capability-architect' &&
       event.data.work.capabilityTask === activeId && event.data.work.request === request.id).length + (replay === undefined ? 1 : 0);
     const progress = JSON.stringify({ status: active.status, planRevision: active.planRevision,
-      assignments: [...active.assignments], exchanges: [...records.capabilityExchanges.values()].filter(entries => entries[0]?.task === activeId),
-      reviews: run.log.all('capability-review-recorded').filter(event => event.data.task === activeId).map(event => event.data),
-      pending: run.log.all('capability-assignment-interrupted').filter(event => event.data.task === activeId).map(event => event.data) });
+      assignments: [...active.assignments], exchanges: [...records.capabilityExchanges.values()].filter(entries => entries[0]?.task === activeId) });
     const result = await this.runCapabilityCoordinator(run, agent, packages, baseline, item, task, request, plan,
       delegated.data.invocation, selected, providerItems, providerDecisions,
       { basis: active.coordinatorInvocation, point, session, progress, attempt,
@@ -4598,9 +4684,7 @@ export class RunService {
   private async orientAndSelectWorkContext(
     run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>,
     item: WorkItem, local: LoadedPackage, briefing: string, workingDirectory: string,
-  ): Promise<{ readonly kind: 'skip' | 'failed' } | { readonly kind: 'ready'; readonly package: WorkPackage; readonly session: SessionId | undefined; readonly ref: string | undefined }> {
-    const accepted = run.log.find('analysis-accepted');
-    if (!accepted?.data.evidence && !run.record.manifest.documentManifest) return { kind: 'skip' }; // old single-plan run
+  ): Promise<{ readonly kind: 'failed' } | { readonly kind: 'ready'; readonly package: WorkPackage; readonly session: SessionId | undefined; readonly ref: string | undefined }> {
     const sourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
     if (sourceChanges.length > 0) {
       await this.fail(run, 'inputs-changed', `The captured plan evidence changed before context selection: ${sourceChanges.join('; ')}`, [runLayout.documentManifest]);
@@ -5170,6 +5254,7 @@ export class RunService {
         this.projectRoot,
         this.requiredArtifacts(current).map(artifact => artifact.path),
         scenarioFiles,
+        await this.auditPreparationPaths(run),
       )).map(file => file.path).filter(path => !harnessOnly.has(path)));
       const conformed = new Set(run.log.all('provider-conformed').map(event => conformanceKey(event.data.obligation, event.data.revision)));
       // A provider's report reaches this architect once, here, even while
@@ -5267,6 +5352,8 @@ export class RunService {
         return null;
       }
       if (packageInPrompt) prompt = `${prompt}\n\n# Your work-item package\n\n${contextPackage!.text}`;
+      const owned = this.obligationBriefing(run, { kind: 'work-item', id: item.id });
+      if (owned.length > 0) prompt = `${prompt}\n\n${owned.join('\n')}`;
       if (attempt === 1 && this.workflow !== null) {
         const intervening = [...current.capabilityHandbacks.values()].flatMap(handback => {
           const task = current.capabilityTasks.get(handback.task);
@@ -5292,6 +5379,11 @@ export class RunService {
       returned = undefined;
       undelivered.length = 0;
 
+      // A completion request that leaves an obligation of this architect
+      // without a done report is rejected in this same turn, under the
+      // per-turn bound, before any outline, commit or gate.
+      const localObligations = () => ({ actor: { kind: 'work-item' as const, id: item.id }, projection: this.obligationProjection(run) });
+      let unreported: string[] = [];
       const result = await this.runInvocation<LocalArchitectSubmission>(run, agent, {
         role: 'local-architect',
         work: { workItem: item.id },
@@ -5321,27 +5413,33 @@ export class RunService {
             invocation, session: destination,
           } });
         } }),
-        validate: input => this.workflow !== null && typeof input === 'object' && input !== null && (
-          (input as { kind?: unknown }).kind === 'yield-for-providers' ||
-          (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.kind === 'contract' ||
-          (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.revisesContract !== undefined
-        ) ? { ok: false, errors: [{ path: 'kind', message: 'The contract and provider-yield workflow is historical; use capability requests and scoped assignments' }] }
-          : validateLocalArchitect(input, {
-          index,
-          registry,
-          outline: outlines.at(-1) ?? null,
-          hypotheses: new Map(current.hypotheses.map(hypothesis => [hypothesis.id, hypothesis])),
-          decisions: current.decisions,
-          workItems: new Set(current.workItems.map(entry => entry.id)),
-          openRequirements: new Set(open.map(requirement => requirement.id)),
-          contracts: this.contractsConsumedBy(run, current, item.id),
-          guardedPaths: guarded,
-          harnessOnly,
-          scenarios: this.declarationContext(run, item),
-          ...(integration === undefined ? {} : { integration: integration.scope }),
-          bounds: engineerBoundsOf(run.record.policy.limits),
-          ...(contextPackage === undefined ? {} : { package: new Set(contextPackage.citation.elements) }),
-        }),
+        validate: input => {
+          const verdict = this.workflow !== null && typeof input === 'object' && input !== null && (
+            (input as { kind?: unknown }).kind === 'yield-for-providers' ||
+            (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.kind === 'contract' ||
+            (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.revisesContract !== undefined
+          ) ? { ok: false as const, errors: [{ path: 'kind', message: 'The contract and provider-yield workflow is historical; use capability requests and scoped assignments' }] }
+            : validateLocalArchitect(input, {
+              index,
+              registry,
+              outline: outlines.at(-1) ?? null,
+              hypotheses: new Map(current.hypotheses.map(hypothesis => [hypothesis.id, hypothesis])),
+              decisions: current.decisions,
+              workItems: new Set(current.workItems.map(entry => entry.id)),
+              openRequirements: new Set(open.map(requirement => requirement.id)),
+              contracts: this.contractsConsumedBy(run, current, item.id),
+              guardedPaths: guarded,
+              harnessOnly,
+              ...(integration === undefined ? {} : { integration: integration.scope }),
+              bounds: engineerBoundsOf(run.record.policy.limits),
+              ...(contextPackage === undefined ? {} : { package: new Set(contextPackage.citation.elements) }),
+              obligations: localObligations(),
+            });
+          // What the last rejected request left unreported, which an
+          // exhausted turn's failure names.
+          if (!verdict.ok) unreported = unreportedByCompletion(input, localObligations());
+          return verdict;
+        },
         scope: {
           write: null,
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
@@ -5353,23 +5451,31 @@ export class RunService {
 
       if (this.ignoring(run)) return null;
       if (result.ended !== 'submitted' || result.value === undefined) {
+        // An exhausted rejection bound is a rejected-submissions result: it
+        // names what the last rejected completion request left unreported,
+        // and says nothing about the code.
+        const owed = result.ended === 'invalid-submission' && unreported.length > 0
+          ? `; its last rejected completion request left ${unreported.join(', ')} without a done report` : '';
         await this.fail(
           run,
           result.ended === 'invalid-submission' ? 'invalid-submission' : result.ended === 'failed' ? 'agent-failed' : 'internal',
-          `The local architect of ${item.id} ended without a result (${result.ended})`,
+          `The local architect of ${item.id} ended without a result (${result.ended})${owed}`,
           [runLayout.outcome(result.id)],
         );
         return null;
       }
 
+      // The architect's registrations and reports apply on acceptance, before
+      // its action and whatever the action leads to: reporting continues
+      // alongside coordination, and no gate or audit outcome edits them.
+      if (result.value.kind !== 'yield-for-providers'
+        && !await this.recordObligations(run, { kind: 'work-item', id: item.id }, result.id, result.value)) return null;
+
       if (result.value.kind === 'unresolved') {
         // The request cannot be met as stated. The global architect answers
         // it: a placement fix, a plan deviation this work item goes on
         // under, an environment problem the run holds for until the
-        // operator resumes it, or nothing possible, which ends the run. What
-        // the work item declared and never passed is pending again first,
-        // as for a placement question.
-        if (!await this.withdrawScenarios(run, item, 'unresolved-requested')) return null;
+        // operator resumes it, or nothing possible, which ends the run.
         const resolution = await this.resolveUnresolved(run, agent, packages, baseline, item, {
           invocation: result.id, conflict: result.value.conflict, evidence: result.value.evidence,
         });
@@ -5388,9 +5494,8 @@ export class RunService {
       }
 
       if (result.value.kind === 'request-placement') {
-        // The work item leaves its repair path for a placement question, so
-        // what it declared and never passed is pending again first.
-        if (!await this.withdrawScenarios(run, item, 'placement-requested')) return null;
+        // The work item leaves its repair path for a placement question;
+        // what it bound or reported stays as it is.
         const resolution = await this.requestPlacement(run, agent, packages, baseline, item, result.value.request);
         if (resolution === null) return null;
         unresolvedRequest = resolution.kind === 'unresolved'
@@ -5412,9 +5517,7 @@ export class RunService {
       }
 
       if (result.value.kind === 'yield-for-providers') {
-        // A bound scenario that passed against the fakes stays bound; one
-        // that never passed a gate since its declaration is pending again.
-        if (!await this.withdrawScenarios(run, item, 'yielded')) return null;
+        // A yield moves no obligation: what was bound stays bound.
         await this.write(run, {
           type: 'work-item-yielded',
           data: { workItem: item.id, requirements: [...result.value.requirements], invocation: result.id },
@@ -5434,7 +5537,6 @@ export class RunService {
           const revised = await this.reviseContract(run, agent, packages, baseline, item, assigned);
           if (revised === null) return null;
           if (revised.result !== undefined) lastResult = revised.result;
-          if (revised.result?.outcome === 'exhausted' && !await this.withdrawScenarios(run, item, 'repair-exhausted')) return null;
           lastIterationGate = undefined;
           failedGate = undefined;
           if (revised.cycle !== undefined) cycleFinding = revised.cycle;
@@ -5454,10 +5556,8 @@ export class RunService {
           if (outcome === null) return null;
         }
         lastResult = outcome.result;
-        // The iteration spent its repair rounds without a pass: what it
-        // declared is pending again, so no untagged failing scenario stays
-        // in the tree for the next gate that runs its owner.
-        if (outcome.result.outcome === 'exhausted' && !await this.withdrawScenarios(run, item, 'repair-exhausted')) return null;
+        // An iteration that spent its repair rounds moves no obligation:
+        // a binding or a done report stays until a submission changes it.
         lastIterationGate = outcome.returnedGate;
         failedGate = undefined;
         // The provider reported that the agreement cannot be met. This work
@@ -5474,7 +5574,6 @@ export class RunService {
             requestedBy: assigned.id,
           });
           if (contract === null) return null;
-          if (contract.result?.outcome === 'exhausted' && !await this.withdrawScenarios(run, item, 'repair-exhausted')) return null;
           const reported = outcome.result;
           // A contract engineer that ended without a result is reported
           // with its digest and analysis, in place of the need's.
@@ -5489,20 +5588,15 @@ export class RunService {
         continue;
       }
 
-      // The request's own declarations apply first, so a request that
-      // declares the last scenario is not refused for it.
-      if (!await this.declareScenarios(run, item, result.id, result.value.scenarios)) return null;
-
       // Completion is refused while a requirement of this work item is open,
       // and while the obligation it exists for is not conformed: a
       // fake-backed pass never completes a capability, and the gate's verdict
-      // on the tests says nothing about which provider ran. It is refused
-      // too while a scenario of its entry is pending or bound.
+      // on the tests says nothing about which provider ran. Missing done
+      // reports never reach here: validation rejected such a request.
       const owing = this.obligationOwedBy(run, item, current);
       const owed = owing !== null && !conformed.has(conformanceKey(owing.id, owing.revision)) ? owing : null;
-      const unbound = this.unfinishedScenarios(run, item, ['pending', 'bound']);
       const capabilityBlockers = this.workflow === null ? [] : this.capabilityBlockers(run, item.id);
-      if ((this.workflow === null && (open.length > 0 || owed !== null)) || capabilityBlockers.length > 0 || unbound.length > 0) {
+      if ((this.workflow === null && (open.length > 0 || owed !== null)) || capabilityBlockers.length > 0) {
         refusals += 1;
         blocked = [
           ...(this.workflow === null ? open : []).map(requirement => {
@@ -5511,10 +5605,9 @@ export class RunService {
           }),
           ...(this.workflow !== null || owed === null ? [] : [`${owed.id} is owed: the agreed conformance suite has not passed against the real provider yet`]),
           ...capabilityBlockers,
-          ...unbound.map(scenario => scenarioRefusal(scenario)),
         ];
         if (refusals > bound) {
-          await this.refuseCompletion(run, item, refusals, blocked, { open: this.workflow === null ? open : [], owed: this.workflow === null && owed !== null, scenarios: unbound });
+          await this.refuseCompletion(run, item, refusals, blocked, { open: this.workflow === null ? open : [], owed: this.workflow === null && owed !== null });
           return null;
         }
         continuing = 'completion-refused';
@@ -5559,23 +5652,10 @@ export class RunService {
           continue turns;
         }
         if (undelivered.length > 0) returned = this.latestBasis(run, item.id)?.id;
-        gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary, lastAssignment);
+        gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary);
         gateRound += 1;
         if (gate === null) return null;
         if (gate.verdict !== 'passed') break;
-        // A declared scenario the gate did not pass stays declared, and the
-        // work item cannot complete around it.
-        const unverified = this.unfinishedScenarios(run, item, ['pending', 'bound', 'declared']);
-        if (unverified.length > 0) {
-          refusals += 1;
-          const refusingGate = gate.id;
-          blocked = unverified.map(entry => scenarioRefusal(entry, refusingGate));
-          if (refusals > bound) {
-            await this.refuseCompletion(run, item, refusals, blocked, { open: [], owed: false, scenarios: unverified });
-            return null;
-          }
-          continue turns;
-        }
         const completed = await this.completeWorkItem(run, item, gate, reconciled.basis);
         if (completed === 'ended' || this.ignoring(run)) return null;
         if (completed === 'completed') {
@@ -6454,9 +6534,10 @@ export class RunService {
       intent: { event: run.log.next({ type: 'scenarios-rewording', data }), records: [...records] },
       perform: async () => {
         const tracked = trackedScenarios(run.log.ledger.replay());
-        await rerenderFeatureFiles(this.projectRoot, expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }));
+        const expected = expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId });
         const message = rewordingMessage({ runId: run.record.jobId, rewording: data.rewording, deviation: data.deviation, scenarios: data.scenarios, files: data.files });
-        const commit = await commitForScenarios(this.projectRoot, run.record.jobId, rewordedTrailerValue(data.rewording), message, recovering, this.git);
+        await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+        const commit = await commitForScenarios(this.projectRoot, run.record.jobId, rewordedTrailerValue(data.rewording), message, recovering, this.git, commit => this.verifyProducerCommit(expected, commit), () => this.renderProducerFeatures(run, expected));
         return { commit: commit ?? await this.git.currentHead(this.projectRoot) };
       },
       complete: result => ({ event: run.log.next({ type: 'scenarios-reworded', data: { deviation: data.deviation, commit: result.commit } }), records: [] }),
@@ -6624,11 +6705,11 @@ export class RunService {
       ...(source === undefined ? {} : { source }),
       externalCapabilities: externalCapabilities ?? body.externalCapabilities,
       completionEvidence: body.completionEvidence, evidenceObligations,
-      gate: { checkpoint: checkpointOf(body.kind), tests: testPolicyOf(body.kind, scope.base, evidenceObligations, scope.extra) },
-      guarded: await captureGuardedFiles(this.projectRoot, guardedPaths, await this.guardedScenarioFiles(run)),
+      gate: { checkpoint: checkpointOf(body.kind), tests: testPolicyOf(body.kind, scope.base, evidenceObligations, scope.extra, scope.resolved.included) },
+      guarded: await captureGuardedFiles(this.projectRoot, guardedPaths, await this.guardedScenarioFiles(run), [...await this.auditPreparationPaths(run), ...scopeConfigurationPaths(scope)]),
       authorizations,
       ...(revisesContract === undefined ? {} : { revisesContract }),
-      ...(body.scenarios === undefined || body.scenarios.length === 0 ? {} : { scenarios: [...body.scenarios] }),
+      ...(body.obligations === undefined || body.obligations.length === 0 ? {} : { obligations: [...body.obligations] }),
       ...(body.bounds === undefined || Object.keys(body.bounds).length === 0 ? {} : { bounds: body.bounds }),
     });
   }
@@ -6716,7 +6797,7 @@ export class RunService {
       : creationAuthority(localRegistry, owner);
     const bootstrap = authority?.proposed === undefined
       ? []
-      : [{ capability: refOf(authority.capability, authority.revision, authority), directory: authority.proposed.directory }];
+      : [{ capability: refOf(authority.capability, authority.revision, authority), owner: authority.owner, parent: authority.proposed.parent, directory: authority.proposed.directory }];
 
     // A direct revision is a contract iteration, and its scope, gate and
     // revision number are the harness's, not the architect's: the agreement
@@ -6747,7 +6828,7 @@ export class RunService {
           .flatMap(requirement => requirement.evidence.fakeInjections),
         rationale: `The revision of ${revised.id}: the contract, its conformance suite, its fake, the files that hold it and this consumer's integration. ${body.scope.rationale}`,
       })
-      : await resolveWriteScope({
+      : await resolveWriteScope({ ramify: this.options.ramify,
         projectRoot: this.projectRoot,
         index,
         view: run.record.manifest.architectView,
@@ -6810,7 +6891,7 @@ export class RunService {
     }
     const assignment = await this.buildIterationAssignment(run, {
       id, item, basis: outlineRef, coordination: { kind: 'work-item', id: item.id },
-      body: revised === undefined ? body : { ...body, scenarios: [] }, scope, source,
+      body: revised === undefined ? body : { ...body, obligations: [] }, scope, source,
       evidenceObligations, authorizations, guardedPaths: artifacts.map(artifact => artifact.path),
       ...(revised === undefined ? {} : {
         externalCapabilities: [{ capability: revised.capability.id, owner: revised.provider, role: 'request' }],
@@ -6853,6 +6934,17 @@ export class RunService {
   }
 
   /**
+   * The test areas of the modules whose tests an assignment owns, for its
+   * briefing: each exact owner's, and every module's beneath a subtree. It
+   * selects nothing for a gate, whose audit selects its own checks.
+   */
+  private async ownedTestAreas(run: Run, tests: TestSelectionPolicy): Promise<TestArea[]> {
+    const areas = await moduleTestAreas(this.projectRoot, run.index);
+    return areas.filter(area => tests.exactOwners.includes(area.module)
+      || tests.subtrees.some(subtree => area.module === subtree || area.module.startsWith(`${subtree}/`)));
+  }
+
+  /**
    * The equipment of one implementation session, over this run: its paths
    * hold the shell output and the hook logs, and its policy supplies the
    * commands and the bounds.
@@ -6861,8 +6953,6 @@ export class RunService {
     readonly workingDirectory?: string;
     readonly scopeRevision: number;
     readonly guarded: GuardedScope;
-    readonly tests: TestSelectionPolicy;
-    readonly scenarios?: EngineerEquipmentInputs['scenarios'];
     readonly commandTimeoutMs: number;
   }): EngineerEquipment {
     return engineerEquipment({
@@ -6882,7 +6972,7 @@ export class RunService {
       ...options,
       outputPath: (kind, invocation, number) => run.path(kind === 'shell'
         ? runLayout.shellOutput(invocation, number)
-        : kind === 'hook' ? runLayout.hookOutput(invocation, number) : runLayout.scopeScenarios(invocation, number)),
+        : runLayout.hookOutput(invocation, number)),
     });
   }
 
@@ -6978,7 +7068,7 @@ export class RunService {
     }
     run.writer.requireSettled('A capability request cannot suspend an unsettled writer');
     const requestId = existingRequest?.id ?? capabilityRequestId(committedRecords(run.log.ledger.replay()).capabilityRequests.size + 1);
-    const source = existingRequest?.source ?? await captureProvisionalSource({
+    const source = existingRequest?.source ?? await captureProvisionalSource({ git: this.git, sourceGit: this.options.provisionalSourceGit,
       projectRoot: this.projectRoot, runDirectory: run.directory, request: requestId,
       acceptedBase: this.accepted(run), writerSettledBy: suspended.invocation,
       changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)),
@@ -7131,8 +7221,7 @@ export class RunService {
       schema: 'ramify-agent.capability-plan/1', task: task.id, revision: 1, basedOn: 0,
       updatedBy: qualification.id, revisionReason: 'Initial qualified request',
       need: request.original.need, proposedInterface: 'Undecided; the capability architect examines actual source and use',
-      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title,
-        derivedFrom: [example.id], coverage: { state: 'unresolved' as const, reason: 'Implementation and real use pending' } })),
+      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title, derivedFrom: [example.id] })),
       compatibility: [...request.original.constraints],
       outline: ['Review existing behavior and affected owners', 'Coordinate provider and consumer work', 'Verify real use and hand back'],
       decisions: [{ decision: `Coordinate in ${decision.provider}`, reason: decision.placementReason, evidence: [...decision.requirementRefs] }],
@@ -7222,11 +7311,14 @@ export class RunService {
     let consumerPoint = answerOutcome?.session?.ref ?? request.continuation.point;
     let consumerSession: SessionId | undefined = answerStart?.data.session ?? request.continuation.session;
     for (let attempt = resume?.attempt ?? 1; attempt <= task.limits.maxInvocations; attempt += 1) {
+    // The task's architect may register a case of its current plan revision.
+    const capabilityActor = (): ObligationActor => ({ kind: 'capability-task', id: task.id, useCases: new Set(plan.useCases.map(useCase => useCase.id)) });
     const currentBasis = () => {
       const state = replayCapabilityState(run.log.events).tasks.get(task.id);
       return state === undefined ? null : { task: task.id, planRevision: state.planRevision,
         coordinatorInvocation: state.coordinatorInvocation, state: state.status,
-        openAssignment: state.activeAssignment, openChild: state.activeChild };
+        openAssignment: state.activeAssignment, openChild: state.activeChild,
+        obligations: { actor: capabilityActor(), projection: this.obligationProjection(run) } };
     };
     const validateActionInput = (input: unknown) => {
       const basis = currentBasis();
@@ -7238,7 +7330,7 @@ export class RunService {
         outline: null, capabilityCompatibility: plan.compatibility,
         guardedPaths: new Set(this.requiredArtifacts(records).map(entry => entry.path)),
         revising: true, bounds: engineerBoundsOf(run.record.policy.limits),
-        scenarios: this.capabilityScenarioContext(run, checked.value.assignment.scope.base),
+        obligations: { actor: capabilityActor(), projection: this.obligationProjection(run), registrations: checked.value.registrations },
       });
       return problems.length === 0 ? checked : { valid: false as const, issues: problems.map(problem => ({
         path: problem.path.split('.'), message: problem.message, kind: 'state' as const,
@@ -7272,6 +7364,7 @@ export class RunService {
         } },
       createGitInspectionTool(this.projectRoot),
     ];
+    let unreported: string[] = [];
     const action = pendingAction ?? await this.runInvocation<CapabilityAction>(run, agent, {
       role: 'capability-architect', work: { capabilityTask: task.id, request: request.id }, attempt,
       loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
@@ -7287,7 +7380,8 @@ export class RunService {
           ...(progress === '' ? [] : [`Progress from the last turn: ${progress}`]),
         ] : [`Selected plan package ${selectedHash} was delivered in full in the earlier turn; it is unchanged.`,
           `Current plan: ${JSON.stringify(plan)}`, `Progress from the last turn: ${progress}`]),
-        `Inspect current source and Git directly. The latest task assignment results are ${[...records.results.values()].filter(result => result.coordination?.kind === 'capability-task' && result.coordination.id === task.id).map(result => `${result.iteration}: ${result.outcome}, gate ${result.gate ?? '(none)'}, commit ${result.commit ?? '(none)'}, findings ${result.findings.join('; ')}`).join(' | ') || '(none)'}. Gate reports are under ${runLayout.gateOutput('ga-0001').replace(/ga-0001.*/, '')}; inspect the named gate and review artifacts when needed. Request handback only after the bounded provider and consumer behavior is verified.`,
+        ...[this.obligationBriefing(run, { kind: 'capability-task', id: task.id }).join('\n')].filter(section => section !== ''),
+        `Inspect current source and Git directly. The latest task assignment results are ${[...records.results.values()].filter(result => result.coordination?.kind === 'capability-task' && result.coordination.id === task.id).map(result => `${result.iteration}: ${result.outcome}, gate ${result.gate ?? '(none)'}, commit ${result.commit ?? '(none)'}, findings ${result.findings.join('; ')}`).join(' | ') || '(none)'}. Gate reports are under ${runLayout.gateOutput('ga-0001').replace(/ga-0001.*/, '')}; inspect the named gate and review artifacts when needed. Request handback when, in your judgment, the real provider and requesting consumer meet the original need: report ${task.id} and every obligation you registered done in the same or an earlier action; a request that leaves one unreported is rejected naming it. The original examples are the request's context; say what you concluded about one in your summary.`,
       ].join('\n\n'),
       start: coordinatorPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: coordinatorPoint },
       ...(coordinatorPoint === undefined || coordinatorSession === undefined
@@ -7301,6 +7395,9 @@ export class RunService {
       submissionSchema: 'ramify-agent.capability-action/1',
       validate: input => {
         const checked = validateActionInput(input);
+        // What the last rejected handback request left unreported, which an
+        // exhausted turn's failure names.
+        if (!checked.valid) unreported = unreportedByHandback(input, currentBasis()?.obligations);
         return checked.valid ? { ok: true, value: checked.value }
           : { ok: false, errors: checked.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message,
             expected: issue.kind === 'state' ? 'current task authority' : 'the action schema' })) };
@@ -7334,7 +7431,11 @@ export class RunService {
       continue;
     }
     if (action.ended !== 'submitted') {
-      await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} did not submit an action`);
+      // An exhausted rejection bound names what the last rejected handback
+      // request left unreported; it is no verdict on the code.
+      const owed = action.ended === 'invalid-submission' && unreported.length > 0
+        ? `; its last rejected handback request left ${unreported.join(', ')} without a done report` : '';
+      await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} did not submit an action${owed}`);
       return null;
     }
     if (action.value === undefined) {
@@ -7342,6 +7443,9 @@ export class RunService {
       return null;
     }
     const chosen = action.value;
+    // Registrations and reports apply on acceptance, before the action; a
+    // replayed accepted action finds them recorded and applies nothing again.
+    if (!await this.recordObligations(run, capabilityActor(), action.id, chosen)) return null;
     if (chosen.kind === 'partial') {
       progress = `${chosen.progress}; unfinished: ${chosen.unfinished.join('; ')}`;
       coordinatorPoint = action.ref || undefined;
@@ -7520,7 +7624,11 @@ export class RunService {
 
   /** A task completion request uses the ordinary project gate and the
    * reviews already requested for its accepted iterations. Its result returns
-   * to this architect; failed iteration gates already returned to engineers. */
+   * to this architect; failed iteration gates already returned to engineers.
+   * The handback is the architect's done reports on the task's obligations,
+   * which validation required of the accepted request; the harness checks
+   * the non-test workflow boundaries, never a cited file, an executed test
+   * or a per-example state. */
   private async verifyCapabilityHandback(
     run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, item: WorkItem, task: CapabilityTask,
     request: CapabilityRequest, plan: CapabilityPlan,
@@ -7535,6 +7643,9 @@ export class RunService {
     if (state === undefined || state.status !== 'coordinating' || state.planRevision !== plan.revision || state.activeChild !== null) {
       return { handedBack: false, guidance: 'The task, plan or child dependency is not ready for completion' };
     }
+    // Every obligation this architect is responsible for was reported done
+    // by the time the request was accepted: validation rejects one that
+    // leaves an ID unreported, in the same turn and before any gate.
     const records = committedRecords(run.log.ledger.replay());
     const assignments = [...records.assignments.values()].filter(entry =>
       entry.coordination?.kind === 'capability-task' && entry.coordination.id === task.id)
@@ -7550,22 +7661,13 @@ export class RunService {
         results.some(result => result === undefined) ? 'An assignment has no ordinary result' : ''].filter(Boolean).join('; ') || 'An assignment is unfinished' };
     }
     const latestResult = records.results.get(latestAccepted.id)!;
-    const candidate = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    const candidate = (await this.previewCandidateTree()).tree;
     const acceptedGate = latestResult.gate === null ? null
       : gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(latestResult.gate)));
     if (acceptedGate?.success !== true || acceptedGate.data.audited === null ||
       await this.candidates.commitTree(this.projectRoot, acceptedGate.data.audited) !== candidate) {
       return { handedBack: false, guidance: `Current source differs from the latest accepted iteration ${latestAccepted.id}; assign a repair and gate it` };
     }
-    const unresolved = request.original.examples.flatMap(example => {
-      const useCase = plan.useCases.find(entry => entry.id === example.id);
-      const reported = action.coverage.find(entry => entry.case === example.id);
-      if (useCase === undefined || useCase.coverage.state === 'unresolved' || reported === undefined) return [`Example ${example.id} lacks resolved coverage`];
-      const coverage = useCase.coverage;
-      return reported.evidence.some(evidence => !coverage.tests.includes(evidence))
-        ? [`Example ${example.id} cites evidence outside the current plan`] : [];
-    });
-    if (unresolved.length > 0) return { handedBack: false, guidance: unresolved.join('; ') };
     const correction = this.pendingCorrection(run, task.id);
     if (correction !== undefined) return { handedBack: false,
       guidance: `Reconciliation ${correction} requires an accepted correction assignment before another handback request` };
@@ -7597,7 +7699,7 @@ export class RunService {
       return null;
     }
     const gate = await this.workItemGate(run, item, invocation, failedTaskGates.length,
-      `Capability ${task.id}: ${action.summary}`, latestAccepted, task.id, replayed);
+      `Capability ${task.id}: ${action.summary}`, task.id, replayed);
     if (gate === null) return null;
     if (gate.verdict !== 'passed' || gate.audited === null) {
       if (failedTaskGates.length + 1 > gateLimit) {
@@ -7608,7 +7710,7 @@ export class RunService {
       }
       return { handedBack: false, guidance: `Task completion gate ${gate.id} ${gate.verdict}: ${gate.cause ?? 'incomplete evidence'}; report ${runLayout.gate(gate.id)}`, coordinator };
     }
-    const currentTree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    const currentTree = (await this.previewCandidateTree()).tree;
     const auditedTree = await this.candidates.commitTree(this.projectRoot, gate.audited);
     if (auditedTree !== currentTree) return { handedBack: false, guidance: `Source changed after gate ${gate.id}; verify again`, coordinator };
     const basisRefusal = await this.completionBasisRefusal(run, task.id, gate, reconciled.basis);
@@ -7617,50 +7719,11 @@ export class RunService {
         reconciliation: this.latestBasis(run, task.id)?.id ?? null, stage: 'completion', reason: basisRefusal } });
       return { handedBack: false, guidance: `Completion basis changed: ${basisRefusal}`, coordinator };
     }
-    const index = await this.refreshIndex(run);
-    const selected = this.executedTestFiles(gate);
-    const executedFor = (owner: string) => {
-      const module = index === null ? undefined : findModule(index, owner);
-      return module !== undefined && [...selected].some(path => path.startsWith(`${testArea(module).replace(/\/$/u, '')}/`));
-    };
-    const evidenceGaps = [task.provider, task.consumer].filter(owner => !executedFor(owner)).map(owner => `No selected passing test for ${owner}`);
-    for (const useCase of plan.useCases) {
-      if (useCase.coverage.state === 'unresolved') continue;
-      for (const test of useCase.coverage.tests) if (!selected.has(test)) evidenceGaps.push(`Case ${useCase.id} cites unexecuted test ${test}`);
-    }
-    if (evidenceGaps.length > 0) return { handedBack: false, guidance: evidenceGaps.join('; '), coordinator };
     await this.write(run, { type: 'capability-verification-started', data: { task: task.id, invocation, gate: gate.id } });
     await this.afterWrite('capability-verification-started', run.record.jobId);
     if (this.ignoring(run)) return null;
     await this.finishCapabilityHandback(run, task, request, plan, action, invocation, gate, currentTree, reviewStates);
     return { handedBack: true, guidance: `Capability ${task.id} accepted at ${currentTree}. ${action.summary}. Use ${action.interfaces.map(entry => `${entry.symbols.join(', ')} at ${entry.path}: ${entry.use}`).join('; ')}. Continue the original assignment from the current candidate; its remaining goal stays open.` };
-  }
-
-  /** Files the existing passing test command actually ran, as the audit
-   * provider's complete public Vitest result reports them. */
-  private executedTestFiles(gate: GateAttempt): Set<string> {
-    const files = new Set<string>();
-    const published = z.record(z.string(), z.unknown()).safeParse(gate.provider?.checks);
-    const check = z.object({ passed: z.literal(true),
-      vitest: z.object({ reason: z.literal('passed'), files: z.array(z.object({ path: z.string().min(1),
-        state: z.string() }).passthrough()) }).passthrough().optional(),
-      commands: z.record(z.string(), z.unknown()).optional(),
-    }).passthrough();
-    const include = (raw: unknown) => {
-      const parsed = check.safeParse(raw);
-      if (!parsed.success || parsed.data.vitest === undefined) return;
-      for (const file of parsed.data.vitest.files) if (file.state === 'passed') files.add(file.path.replaceAll('\\', '/').replace(/^\.\//u, ''));
-    };
-    for (const command of gate.commands) {
-      if (command.kind !== 'tests' || command.outcome !== 'passed') continue;
-      const raw = command.providerCheckId === undefined || !published.success
-        ? undefined : published.data[command.providerCheckId];
-      const parent = check.safeParse(raw);
-      if (!parent.success) continue;
-      include(raw);
-      for (const nested of Object.values(parent.data.commands ?? {})) include(nested);
-    }
-    return files;
   }
 
   private async finishCapabilityHandback(run: Run, task: CapabilityTask, request: CapabilityRequest,
@@ -7714,7 +7777,7 @@ export class RunService {
     const { schema: _schema, ...body } = raw;
     const parsed = capabilityActionSchema.safeParse(body);
     const gate = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(started.data.gate)));
-    const tree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    const tree = (await this.previewCandidateTree()).tree;
     if (raw.schema !== 'ramify-agent.capability-action/1' || !parsed.success || parsed.data.kind !== 'request-handback' ||
       parsed.data.task !== task.id || parsed.data.planRevision !== plan.revision || !gate.success ||
       gate.data.verdict !== 'passed' || gate.data.audited === null || await this.candidates.commitTree(this.projectRoot, gate.data.audited) !== tree) {
@@ -7751,7 +7814,7 @@ export class RunService {
     const assignmentOwner = 'module' in assignment.scope.base ? assignment.scope.base.module : parentTask.consumer;
     run.writer.requireSettled(`Nested request from ${assignment.id} cannot suspend an unsettled writer`);
     const requestId = existingRequest?.id ?? capabilityRequestId(committedRecords(run.log.ledger.replay()).capabilityRequests.size + 1);
-    const source = existingRequest?.source ?? await captureProvisionalSource({ projectRoot: this.projectRoot, runDirectory: run.directory,
+    const source = existingRequest?.source ?? await captureProvisionalSource({ git: this.git, sourceGit: this.options.provisionalSourceGit, projectRoot: this.projectRoot, runDirectory: run.directory,
       request: requestId, acceptedBase: this.accepted(run), writerSettledBy: suspended.id,
       changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)) });
     if (existingRequest === undefined) {
@@ -7866,8 +7929,7 @@ export class RunService {
     const plan: CapabilityPlan = { schema: 'ramify-agent.capability-plan/1', task: child.id, revision: 1, basedOn: 0,
       updatedBy: qualification.id, revisionReason: 'Initial nested request', need: request.original.need,
       proposedInterface: 'Undecided; inspect actual source and consumer use',
-      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title,
-        derivedFrom: [example.id], coverage: { state: 'unresolved' as const, reason: 'Implementation and real use pending' } })),
+      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title, derivedFrom: [example.id] })),
       compatibility: [...request.original.constraints],
       outline: ['Review existing behavior and affected owners', 'Coordinate provider and requesting engineer', 'Verify use and hand back'],
       decisions: [{ decision: `Coordinate in ${decision.provider}`, reason: decision.placementReason,
@@ -7921,13 +7983,17 @@ export class RunService {
         outline: null, capabilityCompatibility: plan.compatibility,
         guardedPaths: new Set(this.requiredArtifacts(records).map(entry => entry.path)),
         revising: true, bounds: engineerBoundsOf(run.record.policy.limits),
-        scenarios: this.capabilityScenarioContext(run, body.scope.base),
+        // The action's registrations were recorded on acceptance, before it.
+        obligations: {
+          actor: { kind: 'capability-task', id: task.id, useCases: new Set(plan.useCases.map(useCase => useCase.id)) },
+          projection: this.obligationProjection(run),
+        },
       });
       if (problems.length > 0) {
         await this.fail(run, 'invalid-submission', `Capability assignment ${id} is invalid: ${problems.map(entry => `${entry.path}: ${entry.message}`).join('; ')}`);
         return null;
       }
-      const scope = await resolveWriteScope({ projectRoot: this.projectRoot, index,
+      const scope = await resolveWriteScope({ ramify: this.options.ramify, projectRoot: this.projectRoot, index,
         view: run.record.manifest.architectView, revision: sequence,
         base: body.scope.base, extra: body.scope.extra, read: body.scope.read, bootstrap: [],
         rationale: body.scope.rationale });
@@ -7946,9 +8012,12 @@ export class RunService {
         await this.fail(run, 'inputs-changed', `Capability assignment ${id} package is unavailable: ${message(error)}`);
         return null;
       }
-      const startingTree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+      const startingTree = (await this.previewCandidateTree()).tree;
       const startingPaths = await Promise.all((await this.git.changedPaths(this.projectRoot, this.accepted(run)))
-        .map(async path => ({ path, hash: await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(() => null) })));
+        .map(async path => ({ path, hash: await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(error => {
+          if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+          throw error;
+        }) })));
       assignment = await this.buildIterationAssignment(run, {
         id, item, basis: planRef,
         coordination: { kind: 'capability-task', id: task.id, sequence, plan: planRef, startingTree, startingPaths },
@@ -8041,7 +8110,7 @@ export class RunService {
       }
       await this.write(run, { type: 'capability-assignment-settled', data: {
         task: task.id, assignment: id, outcome: stateOutcome, mutated: [...mutated].sort(), outsideScope: [...outside].sort(),
-        endingTree: (await this.git.previewCandidateTree(this.projectRoot)).tree,
+        endingTree: (await this.previewCandidateTree()).tree,
       } });
       await this.afterWrite('capability-assignment-settled', run.record.jobId);
     }
@@ -8071,11 +8140,11 @@ export class RunService {
     // runs under the bounds its assignment raised, and its prompt states the
     // longest a command may run.
     const bounds = this.engineerBounds(run, assignment);
-    const workingDirectory = await engineerWorkingDirectory(this.projectRoot, assignment.scope, run.index);
+    const workingDirectory = await engineerWorkingDirectory(this.projectRoot, assignment.scope, run.index, this.git);
     const systemPrompt = renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs, workingDirectory);
     const measurementScope = {
       exactOwners: 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules,
-      subtrees: 'module' in assignment.scope.base ? assignment.scope.base.includedChildren : [],
+      subtrees: 'module' in assignment.scope.base ? assignment.scope.resolved.included.filter(entry => entry.kind === 'child-subtree').map(entry => entry.owner) : [],
       apiViews: true,
       architectView: false,
       supportDocuments: baseline.supplementary.map(entry => entry.path),
@@ -8189,11 +8258,14 @@ export class RunService {
 
       attempt += 1;
       const beforeTree = assignment.coordination?.kind === 'capability-task'
-        ? (await this.git.previewCandidateTree(this.projectRoot)).tree : undefined;
+        ? (await this.previewCandidateTree()).tree : undefined;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
+      const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot, [...await this.deniedFiles(run), ...assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify);
+      // A capability-task iteration is told only the obligations its
+      // assignment names; a work item's iteration also sees its scenarios.
       const briefedScenarios = assignment.coordination?.kind === 'capability-task'
-        ? this.capabilityEngineerScenarios(run, assignment) : await this.engineerScenarios(run, item);
+        ? undefined : await this.engineerScenarios(run, item);
+      const assignedObligations = this.assignedObligations(run, assignment.obligations ?? []);
       // The assignment package reaches a session once: a continued session
       // holds it from its first prompt.
       let assignmentPackage: string | undefined;
@@ -8203,15 +8275,10 @@ export class RunService {
         await this.fail(run, 'inputs-changed', `The assignment package of ${assignment.id} cannot be delivered: ${message(error)}`);
         return null;
       }
-      // The engineer's own test run is a diagnosis over the modules it was
-      // given. Where the gate is the whole project, the tool still resolves
-      // this iteration's own modules, with the suites its evidence requires.
       const tools = this.implementationTools(run, {
         workingDirectory,
         scopeRevision: assignment.scope.revision,
         guarded,
-        tests: assignment.gate.tests,
-        scenarios: this.scopeScenarioCheck(run, item, assignment.gate.tests, assignment),
         commandTimeoutMs: bounds.commandTimeoutMs,
       });
 
@@ -8228,9 +8295,11 @@ export class RunService {
           workingDirectory,
           base: this.accepted(run),
           views: await this.iterationViews(run, assignment),
+          testAreas: await this.ownedTestAreas(run, assignment.gate.tests),
           ...(failedGate === undefined ? {} : { failedGate }),
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
           ...(briefedScenarios === undefined ? {} : { scenarios: briefedScenarios }),
+          ...(assignedObligations.length === 0 ? {} : { obligations: assignedObligations }),
           ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
         })}${guidancePending === undefined ? '' : `\n\n# Qualified existing behavior\n\n${guidancePending}`}`,
         start,
@@ -8261,20 +8330,31 @@ export class RunService {
         // A claimed completion is checked afresh over the write scope
         // before it is judged, because the hook checks saw only the
         // mutations they covered.
-        validate: async input => validateEngineer(input, {
+        validate: async input => {
+          const validated = validateEngineer(input, {
           capabilityWorkflow: this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion,
           obligation: assignment.evidenceObligations
             .find(evidence => evidence.obligation !== undefined && evidence.against === 'real')?.obligation ?? null,
           kind: assignment.kind,
           openFindings: await tools.findingsAtCompletion(input),
-          scenarios: assignment.coordination?.kind === 'capability-task'
-            ? this.capabilityScenarioContext(run, assignment.scope.base) : this.declarationContext(run, item),
+          assigned: assignment.obligations ?? [],
           seams: {
             index: run.index,
             consumer: item.module,
             providerOf: capability => committedRecords(run.log.ledger.replay()).registry.find(entry => entry.capability === capability)?.owner,
           },
-        }),
+          });
+          // A capability-needed submission captures a provisional candidate
+          // immediately after this invocation. Refuse unsafe scratch here so
+          // the same engineer session can repair it before a tree is read.
+          if (validated.ok && validated.value.kind === 'capability-needed') {
+            const safety = await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+            if (safety.outcome === 'failed') return { ok: false, errors: safety.violations.map(violation => ({
+              path: 'scratch', message: `${violation.path}: ${violation.detail}`,
+            })) };
+          }
+          return validated;
+        },
         acceptedText: value => {
           const check = tools.completionCheck();
           return iterationAcceptance(value.kind, check?.kind === 'not-checked' ? check.reason : null);
@@ -8401,9 +8481,10 @@ export class RunService {
       }
 
       const proposal = result.value;
-      // The proposal's declarations apply at its acceptance, before the gate
-      // that verifies them: that gate selects them by identity.
-      if (!await this.declareScenarios(run, item, result.id, proposal.scenarios, assignment)) return null;
+      // The proposal's bindings apply at its acceptance, before the gate:
+      // that gate's commit drops a bound scenario's pending tag, and the gate
+      // selects it by identity. No gate outcome undoes a binding.
+      if (!await this.recordBindings(run, result.id, proposal.bindings)) return null;
       let infrastructureAttempt = 0;
       for (;;) {
         const gate = await this.iterationGate(run, item, assignment, result.id, repairRound, infrastructureAttempt, proposal.summary);
@@ -8655,7 +8736,7 @@ export class RunService {
       return null;
     }
 
-    const base = { module: item.module, includedChildren: [] as string[] };
+    const base = { module: item.module, included: [] as { directory: string; reason: string; instructions: string }[] };
     const scope = await this.contractScope(run, index, {
       revision: number,
       consumer: item.module,
@@ -8690,7 +8771,7 @@ export class RunService {
       completionEvidence: `${item.module}'s own tests pass against the fake, and the fake passes the conformance suite.`,
       evidenceObligations: [],
       gate: { checkpoint: 'contract', tests: testPolicyOf('contract', base, []) },
-      guarded: await captureGuardedFiles(this.projectRoot, subArtifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run)),
+      guarded: await captureGuardedFiles(this.projectRoot, subArtifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run), [...await this.auditPreparationPaths(run), ...scopeConfigurationPaths(scope)]),
       authorizations: subArtifacts.map(artifact => ({
         path: artifact.path,
         rationale: `The agreement ${artifact.contract.id} is this iteration's to write.`,
@@ -8749,12 +8830,12 @@ export class RunService {
       readonly rationale: string;
     },
   ) {
-    return resolveWriteScope({
+    return resolveWriteScope({ ramify: this.options.ramify,
       projectRoot: this.projectRoot,
       index,
       view: run.record.manifest.architectView,
       revision: subject.revision,
-      base: { module: subject.consumer, includedChildren: [] },
+      base: { module: subject.consumer, included: [] },
       extra: [
         { path: `${subject.providerDirectory}/src/interfaces`, purpose: 'contract', kind: 'directory' },
         { path: `${subject.providerDirectory}/src/tests`, purpose: 'conformance', kind: 'directory' },
@@ -8812,11 +8893,10 @@ export class RunService {
       if (this.ignoring(run)) return null;
       attempt += 1;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
+      const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot, [...await this.deniedFiles(run), ...assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify);
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
         guarded,
-        tests: assignment.gate.tests,
         commandTimeoutMs: bounds.commandTimeoutMs,
       });
       const index = await this.refreshIndex(run);
@@ -8979,10 +9059,10 @@ export class RunService {
   }
 
   /**
-   * The contract gate: the consumer's own tests and the conformance suite the
-   * agreement names, resolved anew from the tree, the project's type check, a
-   * complete Ramify check, and the fake-naming rule the harness verifies
-   * itself over the files this iteration wrote.
+   * The contract gate: the project's committed audit of the candidate,
+   * whose configured checks run the consumer's tests and the agreement's
+   * conformance suite among the project's own, and the fake-naming rule the
+   * harness verifies itself over the files this iteration wrote.
    */
   private async contractGate(
     run: Run,
@@ -8994,17 +9074,7 @@ export class RunService {
   ): Promise<GateAttempt | null> {
     run.writer.requireSettled(`The ${assignment.id} gate cannot run`);
     const gateId = gateAttemptId(this.gateCount(run) + 1);
-    // The conformance suite is the agreement's own evidence, so the gate
-    // requires it beside the consumer's tests. The suite did not exist when
-    // the assignment was made; it exists now, and a selection that cannot
-    // reach it is not verified.
-    const policy: TestSelectionPolicy = {
-      ...assignment.gate.tests,
-      extraSuites: [...new Set([...assignment.gate.tests.extraSuites, ...submission.artifacts.conformance.map(entry => entry.path)])].sort(),
-    };
     const index = await this.refreshIndex(run);
-    const tests = await resolveTestSelection({ projectRoot: this.projectRoot, index, policy });
-    await this.recordRunnerGaps(run, invocation);
 
     const writeScope = writeScopePaths(this.projectRoot, assignment);
     // The agreement's own fakes are this gate's to answer; another
@@ -9032,9 +9102,7 @@ export class RunService {
       repairRound,
       infrastructureAttempt: 0,
       subject: { workItem: item.id, iteration: assignment.id },
-      tests,
       guarded: this.guardedAtGate(run, assignment.guarded),
-      writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
       rules,
     }, submission.summary, modules, assignment.goal);
@@ -9044,7 +9112,6 @@ export class RunService {
     }
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return null;
-    if (!await this.recordScenarioPasses(run, attempt)) return null;
     return attempt;
   }
 
@@ -9171,7 +9238,7 @@ export class RunService {
       workItem: mine?.workItem ?? item.id,
       module: item.module,
       forCapability,
-      tests: mine?.evidence.tests ?? testPolicyOf('ordinary', { module: item.module, includedChildren: [] }, []),
+      tests: mine?.evidence.tests ?? testPolicyOf('ordinary', { module: item.module, included: [] }, []),
       fakeInjections: submission.fakeInjections,
     };
     // Every consumer of the agreement is reopened at the new revision; each
@@ -9372,6 +9439,7 @@ export class RunService {
       },
     }, [...registration.records, ...reopening.records]);
     await this.afterWrite('evidence-reopened', run.record.jobId);
+    await this.cleanupClosedScratch(run);
     if (this.ignoring(run)) return null;
 
     const findings: string[] = [];
@@ -9458,7 +9526,6 @@ export class RunService {
     }
 
     const verified = this.verifiedRequirements(run);
-    let closed = false;
     for (const evidence of assignment.evidenceObligations) {
       if (evidence.requirement === undefined) continue;
       if (verified.has(verificationKey(evidence.requirement.id, evidence.requirement.revision))) continue;
@@ -9484,25 +9551,15 @@ export class RunService {
       });
       await this.afterWrite('requirement-verified', run.record.jobId);
       if (this.ignoring(run)) return false;
-      closed = true;
-    }
-    // The last open requirement is verified and no conformance is owed: a
-    // bound scenario of this work item would now run without fakes, so it
-    // is due, and the next commit removes its pending tag.
-    if (closed && !this.holdsFakes(run, item)) {
-      for (const scenario of this.unfinishedScenarios(run, item, ['bound'])) {
-        await this.write(run, { type: 'scenario-due', data: { scenario: scenario.id, cause: 'requirements-verified' } });
-        if (this.ignoring(run)) return false;
-      }
     }
     return true;
   }
 
   /**
-   * The iteration's gate: the tests its scope owns, resolved anew from the
-   * current tree, the project's type check and a complete Ramify check. Once
-   * verified, the attempt's tree is committed before either passing or
-   * failing audit evidence is produced.
+   * The iteration's gate: the project's committed audit of the candidate the
+   * gate commits, in the project's default mode, and the harness's own rules
+   * over the tree. The provider selects the configured checks; the harness
+   * names no test.
    */
   private async iterationGate(
     run: Run,
@@ -9515,11 +9572,7 @@ export class RunService {
   ): Promise<GateAttempt | null> {
     run.writer.requireSettled(`The ${assignment.id} gate cannot run`);
     const gateId = gateAttemptId(this.gateCount(run) + 1);
-    // A breaking iteration is judged at an all-project boundary.
-    const allProject = assignment.gate.tests.policy === 'all-project';
     const index = await this.refreshIndex(run);
-    const tests = allProject ? undefined : await this.resolveTests(run, assignment, index);
-    await this.recordRunnerGaps(run, invocation);
 
     // While an agreement's fake is registered, a write of this iteration
     // that makes it more or less importable than its real export fails the
@@ -9539,9 +9592,7 @@ export class RunService {
       repairRound,
       infrastructureAttempt,
       subject: { workItem: item.id, iteration: assignment.id },
-      ...(tests === undefined ? {} : { tests }),
       guarded: this.guardedAtGate(run, assignment.guarded),
-      writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
       ...(parity === null ? {} : { rules: [parity] }),
     }, summary, modules, assignment.goal);
@@ -9551,42 +9602,7 @@ export class RunService {
     }
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return null;
-    if (!await this.recordScenarioPasses(run, attempt)) return null;
     return attempt;
-  }
-
-  /**
-   * Resolves the assignment's captured policy against the tree as it stands
-   * now, on `refreshed` where the caller has just refreshed the view.
-   */
-  private async resolveTests(run: Run, assignment: IterationAssignment, refreshed?: ArchitectIndex | null) {
-    const index = refreshed === undefined ? await this.refreshIndex(run) : refreshed;
-    return resolveTestSelection({ projectRoot: this.projectRoot, index, policy: assignment.gate.tests });
-  }
-
-  /**
-   * Suites of the project the MVP's one supported runner does not select.
-   * They are a coverage gap on every attempt, never an absence of tests, and
-   * they are read from the project's own manifest. A Cucumber script is none
-   * once the captured configuration names the acceptance modes, which run
-   * the project's scenarios in the harness's own profile.
-   */
-  private async recordRunnerGaps(run: Run, invocation: string): Promise<void> {
-    const manifest = await readJson(join(this.projectRoot, 'package.json')) as { scripts?: Record<string, unknown> } | null;
-    const declared = manifest?.scripts ?? {};
-    const acceptance = 'config' in run.record.projectConfig;
-    const scripts = Object.keys(declared)
-      .filter(name => name.startsWith('test:'))
-      .filter(name => !(acceptance && typeof declared[name] === 'string' && /\bcucumber-js\b/u.test(declared[name])))
-      .sort();
-    if (scripts.length === 0) return;
-    const observations = await ObservationLog.open(run.path(runLayout.observations(invocation)));
-    for (const script of scripts) {
-      await observations.record({
-        type: 'coverage-gap',
-        data: { kind: 'unsupported-runner', detail: `the project's "${script}" script is outside the one runner this MVP selects` },
-      });
-    }
   }
 
   /**
@@ -9724,7 +9740,43 @@ export class RunService {
       await this.write(run, { type: 'iteration-closed', data }, [record]);
     }
     await this.afterWrite('iteration-closed', run.record.jobId);
+    await this.cleanupClosedScratch(run);
     return result;
+  }
+
+  /** A closed assignment releases scratch only when no other assignment in its module remains open. */
+  private async cleanupClosedScratch(run: Run): Promise<void> {
+    const records = committedRecords(run.log.ledger.replay());
+    // Contract revision can supersede an assignment by committing its result
+    // with evidence-reopened, without a separate iteration-closed event.
+    const closed = new Set(records.results.keys());
+    const engineerAssignments = new Set([
+      ...run.log.all('iteration-assigned').map(event => event.data.iteration),
+      ...run.log.all('capability-assigned').map(event => event.data.assignment),
+    ]);
+    const declared = await declaredModuleDirectories(this.projectRoot);
+    const directoriesOf = (scope: WriteScope): string[] => {
+      const captured = scope.resolved.roots.flatMap(root => {
+        const path = relative(this.projectRoot, root).replaceAll('\\', '/');
+        return path === 'src' ? [''] : path.endsWith('/src') ? [path.slice(0, -'/src'.length)] : [];
+      });
+      return [...new Set([...declared, ...captured].filter(directory => {
+        const src = join(this.projectRoot, directory, 'src');
+        return scope.resolved.roots.some(root => root === src || isContained(root, src));
+      }))];
+    };
+    const assignments = [...records.assignments.values()]
+      .filter(assignment => engineerAssignments.has(assignment.id))
+      .map(assignment => ({ id: assignment.id, modules: directoriesOf(assignment.scope) }));
+    for (const iteration of closed) {
+      const removable = releasableScratchModules(iteration, assignments, closed);
+      if (removable.length === 0) continue;
+      const removed = await removeScratchDirectories(this.projectRoot, removable, this.git);
+      if (removed.preservedTracked.length > 0 && !run.log.all('scratch-preserved').some(entry =>
+        entry.data.iteration === iteration && entry.data.paths.join('\0') === removed.preservedTracked.join('\0'))) {
+        await this.write(run, { type: 'scratch-preserved', data: { iteration, paths: [...removed.preservedTracked] } });
+      }
+    }
   }
 
   /**
@@ -10036,7 +10088,6 @@ export class RunService {
     invocation: string,
     repairRound: number,
     summary: string,
-    lastAssignment: IterationAssignment | undefined,
     taskOwner?: string,
     replayed = false,
   ): Promise<GateAttempt | null> {
@@ -10052,20 +10103,12 @@ export class RunService {
         if (!recorded.success || recorded.data.checkpoint !== 'work-item' ||
           recorded.data.subject?.workItem !== owner || recorded.data.proposedBy !== invocation ||
           recorded.data.verdict !== 'passed' || recorded.data.audited === null) continue;
-        candidate ??= (await this.git.previewCandidateTree(this.projectRoot)).tree;
+        candidate ??= (await this.previewCandidateTree()).tree;
         if (await this.candidates.commitTree(this.projectRoot, recorded.data.audited) !== candidate) continue;
-        if (!await this.recordScenarioPasses(run, recorded.data)) return null;
         return recorded.data;
       }
     }
     const gateId = gateAttemptId(this.gateCount(run) + 1);
-    const taskScenarios = taskOwner === undefined ? undefined : await this.scenarioInputs(run);
-    const relevant = taskOwner === undefined ? undefined : new Set(
-      [...committedRecords(run.log.ledger.replay()).assignments.values()]
-        .filter(assignment => assignment.coordination?.kind === 'capability-task' && assignment.coordination.id === taskOwner)
-        .flatMap(assignment => assignment.scenarios ?? []));
-    const scenarioOwners = relevant === undefined || taskScenarios === undefined ? [] :
-      [...new Set(taskScenarios.scenarios.filter(scenario => relevant.has(scenario.id)).map(scenario => scenario.owner))];
     const attempt = await this.committingCheckpoint(run, {
       id: gateId,
       runId: run.record.jobId,
@@ -10077,11 +10120,6 @@ export class RunService {
       proposedBy: invocation,
       repairRound,
       subject: { workItem: taskOwner ?? item.id },
-      ...(taskScenarios === undefined || relevant === undefined ? {} : {
-        scenarios: { ...taskScenarios, scenarios: taskScenarios.scenarios.filter(scenario => relevant.has(scenario.id)) },
-        scenarioScope: { exactOwners: scenarioOwners, include: [...relevant] },
-      }),
-      ...(lastAssignment === undefined ? {} : { writeScope: writeScopePaths(this.projectRoot, lastAssignment) }),
     }, summary);
     const subject = attempt;
 
@@ -10090,8 +10128,7 @@ export class RunService {
     }
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return null;
-    // Every declared scenario it ran untagged and passed is implemented.
-    if (!await this.recordScenarioPasses(run, subject)) return null;
+    // A pass moves no obligation: only an accepted submission does.
     return subject;
   }
 
@@ -10171,6 +10208,19 @@ export class RunService {
    * none and ends the run at once with the step that failed.
    */
   private async reachReadiness(run: Run): Promise<boolean> {
+    const controller = new AbortController();
+    let markSettled!: () => void;
+    const settled = new Promise<void>(resolve => { markSettled = resolve; });
+    run.readiness = { controller, settled };
+    try {
+      return await this.reachReadinessOwned(run, controller.signal);
+    } finally {
+      markSettled();
+      if (run.readiness?.controller === controller) run.readiness = undefined;
+    }
+  }
+
+  private async reachReadinessOwned(run: Run, signal: AbortSignal): Promise<boolean> {
     if (run.log.find('readiness-passed')) return true;
     const bound = run.record.policy.limits.readinessRecoveries;
 
@@ -10185,7 +10235,7 @@ export class RunService {
       // baseline passed; a branch git refuses fails readiness there.
       const head = await this.git.currentHead(this.projectRoot);
       await this.write(run, { type: 'gate-started', data: { gate: gateId, checkpoint: 'readiness' } });
-      const result = await runReadiness(this.options.readinessExecution ?? inPlaceCheckExecution, {
+      let result = await runReadiness(this.options.configuredAudit, {
         runId: run.record.jobId,
         attempt: attemptNumber,
         projectRoot: this.projectRoot,
@@ -10193,17 +10243,32 @@ export class RunService {
         gateId,
         policy: run.record.policy,
         projectConfig: run.record.projectConfig,
+        auditConfiguration: run.record.auditConfiguration,
         index: run.index,
         ramify: this.options.ramify,
         git: this.git,
         head,
+        signal,
+        commandExecution: this.options.commandExecution,
         started: this.commandStarted(run, gateId, 'readiness'),
         waiting: this.commandWaiting(run, gateId, 'readiness'),
       });
 
-      if (result.attempt.verdict === 'passed' && result.gate !== null) {
+      // A stop can be accepted between the last readiness step and this
+      // record. Keep the attempt, but never publish a readiness pass then.
+      if ((signal.aborted || this.ignoring(run)) && result.attempt.verdict === 'passed') {
+        result = { ...result, attempt: readinessAttemptSchema.parse({ ...result.attempt,
+          steps: result.attempt.steps.map(step => step.step === 'run-branch'
+            ? { ...step, outcome: 'not-verified', detail: 'readiness was cancelled before publication' } : step),
+          verdict: 'failed',
+        }) };
+      }
+      if (this.closed) return false;
+
+      if (result.attempt.verdict === 'passed' && result.gate !== null && !signal.aborted && !this.ignoring(run)) {
         await this.write(run, { type: 'readiness-passed', data: { attempt: attemptNumber, gate: gateId } }, [
           { path: runLayout.gate(gateId), id: gateId, revision: 1, body: result.gate },
+          ...readinessAuditOutcome(result.gate),
           { path: runLayout.readiness(attemptNumber), id: String(attemptNumber), revision: 1, body: result.attempt },
         ]);
         await this.afterWrite('readiness-attempted', run.record.jobId);
@@ -10211,9 +10276,9 @@ export class RunService {
       }
 
       const step = failingStep(result.attempt);
-      const plan = recoveryFor(result.attempt, result.gate, run.record.policy);
+      const plan = signal.aborted || this.ignoring(run) ? null : recoveryFor(result.attempt, result.gate, run.record.policy);
       const spent = run.log.all('readiness-failed').filter(event => event.data.recovery !== null).length;
-      const recoverable = plan !== null && spent < bound;
+      const recoverable = plan !== null && spent < bound && !signal.aborted && !this.ignoring(run);
 
       let recovery = null;
       if (recoverable) {
@@ -10223,16 +10288,18 @@ export class RunService {
           plan,
           projectRoot: this.projectRoot,
           policy: run.record.policy,
+          auditConfiguration: run.record.auditConfiguration,
           ramify: this.options.ramify,
           commandExecution: this.options.commandExecution,
           count: spent + 1,
           directory: run.path('recoveries'),
+          signal,
         });
       }
 
       const attempt = withRecovery(result.attempt, recovery?.id ?? null);
       const records = [
-        ...(result.gate === null ? [] : [{ path: runLayout.gate(gateId), id: gateId, revision: 1, body: result.gate }]),
+        ...(result.gate === null ? [] : [{ path: runLayout.gate(gateId), id: gateId, revision: 1, body: result.gate }, ...readinessAuditOutcome(result.gate)]),
         { path: runLayout.readiness(attemptNumber), id: String(attemptNumber), revision: 1, body: attempt },
         ...(recovery === null ? [] : [{ path: runLayout.recovery(recovery.id), id: recovery.id, revision: 1, body: recovery }]),
       ];
@@ -10242,6 +10309,8 @@ export class RunService {
         data: { attempt: attemptNumber, gate: gateId, step: step?.step ?? 'unknown', detail: step?.detail ?? '', recovery: recovery?.id ?? null, final },
       }, records);
       await this.afterWrite('readiness-attempted', run.record.jobId);
+
+      if (signal.aborted || this.ignoring(run)) return false;
 
       if (final) {
         await this.fail(run, readinessFailureReason(step?.step), `Readiness failed at ${step?.step ?? 'an unknown step'} after ${attemptNumber} attempt${attemptNumber === 1 ? '' : 's'}: ${step?.detail ?? ''}`,
@@ -10288,9 +10357,7 @@ export class RunService {
         incomplete.map(scenario => scenario.evidence));
       return;
     }
-    // Every tracked scenario, integration scenarios included.
-    const required = tracked.records;
-    const beforeGate = await this.git.previewCandidateTree(this.projectRoot);
+    const beforeGate = await this.previewCandidateTree();
     if (beforeGate.tree !== binding.assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed after non-functional assessment', [runLayout.assessment(binding.assessment.id)]);
       return;
@@ -10358,20 +10425,12 @@ export class RunService {
 
     if (previousFinal === undefined) await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return;
-    // The final attempt's scenario check ran every tracked scenario in full
-    // mode and passed each one; a pass that did not run one proves nothing
-    // about it.
-    const unproven = finalScenarioGaps(attempt, required.map(record => record.id));
-    if (unproven !== null) {
-      await this.fail(run, 'acceptance-incomplete', `The final gate passed, and its scenario check does not prove the plan's scenarios: ${unproven}`, [runLayout.gate(gateId)]);
-      return;
-    }
     const lateSourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
     if (lateSourceChanges.length > 0) {
       await this.fail(run, 'inputs-changed', `The captured plan evidence changed during final verification: ${lateSourceChanges.join('; ')}`, [runLayout.documentManifest, runLayout.gate(gateId)]);
       return;
     }
-    const afterGate = await this.git.previewCandidateTree(this.projectRoot);
+    const afterGate = await this.previewCandidateTree();
     if (afterGate.tree !== binding.assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed during final verification', [runLayout.assessment(binding.assessment.id), runLayout.gate(gateId)]);
       return;
@@ -10409,15 +10468,11 @@ export class RunService {
     goal?: string,
     binding?: { candidateId: string; assessment: Assessment },
   ): Promise<GateAttempt> {
-    const scenarios = request.scenarios ?? await this.scenarioInputs(run);
-    const captured = run.record.projectConfig;
-    const typeCheckOutput = 'config' in captured ? captured.config.typeCheck?.output : undefined;
-    const setup = 'config' in captured ? captured.config.setup : undefined;
+    const scratch = await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+    const { rules: scopeRules, ownership } = await this.candidateAuthority(run, request);
     const prepared = await prepareCheckpoint({
       ...request,
-      ...(scenarios === undefined ? {} : { scenarios }),
-      ...(typeCheckOutput === undefined ? {} : { typeCheckOutput }),
-      ...(setup === undefined ? {} : { setup }),
+      rules: [...(request.rules ?? []), scratch, ...scopeRules],
     });
     if ('schema' in prepared) {
       await this.write(run, {
@@ -10427,7 +10482,148 @@ export class RunService {
       await this.afterWrite('gate-committed', run.record.jobId);
       return prepared;
     }
-    return this.commitGate(run, prepared, summary, modules, goal, undefined, binding);
+    return this.commitGate(run, prepared, summary, modules, goal, undefined, binding, ownership);
+  }
+
+  /** The same captured/current origin authority guards live and restarted candidate commits. */
+  private async candidateAuthority(run: Run, request: Pick<CheckpointRequest, 'checkpoint' | 'subject'>) {
+    const ledger = run.log.ledger.replay();
+    const committed = committedRecords(ledger);
+    const assignments = request.subject?.iteration !== undefined
+      ? [committed.assignments.get(request.subject.iteration)].filter((entry): entry is IterationAssignment => entry !== undefined)
+      : [...committed.assignments.values()].filter(entry => request.subject?.workItem === undefined || entry.workItem === request.subject.workItem || (entry.coordination?.kind === 'capability-task' && entry.coordination.id === request.subject.workItem));
+    const capabilityAssigned = run.log.all('capability-assigned');
+    const assignmentOrder = new Map([
+      ...run.log.all('iteration-assigned').map(event => [event.data.iteration, event.sequence] as const),
+      ...capabilityAssigned.map(event => [event.data.assignment, event.sequence] as const),
+    ]);
+    // Only authority co-committed with actual run assignments can cover a
+    // later checkpoint. A rejected iteration's dirty files get no shortcut.
+    const origins: Array<{ scope: WriteScope; guarded: readonly { path: string; hash: string | null }[];
+      authorizations: readonly { path: string }[]; inherited: readonly { path: string; hash: string | null }[];
+      predecessors: readonly { assignment: IterationAssignment; paths?: readonly string[];
+        continuity: readonly (readonly { path: string; hash: string | null }[])[] }[] }> = assignments.map(assignment => {
+        const predecessors: Array<{ assignment: IterationAssignment; paths?: readonly string[];
+          continuity: readonly (readonly { path: string; hash: string | null }[])[] }> = [];
+        const continuity: Array<readonly { path: string; hash: string | null }[]> = [];
+        const visited = new Set<string>();
+        let ancestor = assignment;
+        while (ancestor.coordination?.kind === 'capability-task' && !visited.has(ancestor.id)) {
+          visited.add(ancestor.id);
+          const coordination = ancestor.coordination;
+          if (ancestor !== assignment) continuity.push(coordination.startingPaths);
+          const assigned = capabilityAssigned.find(event => event.data.assignment === ancestor.id
+            && event.data.task === coordination.id && event.data.sequence === coordination.sequence);
+          if (assigned === undefined) { predecessors.length = 0; break; }
+          // A settled partial writer of this exact task owns its unchanged
+          // inherited effects. Failed or unavailable settlement is no proof.
+          for (const event of run.log.all('capability-assignment-settled')) {
+            if (event.data.task !== coordination.id || event.sequence >= assigned.sequence || !['accepted', 'partial'].includes(event.data.outcome)
+              || event.data.mutated === undefined || event.data.outsideScope === undefined) continue;
+            const prior = committed.assignments.get(event.data.assignment);
+            if (prior?.coordination?.kind !== 'capability-task' || prior.coordination.id !== coordination.id
+              || prior.coordination.sequence >= coordination.sequence) continue;
+            const priorCoordination = prior.coordination;
+            const priorAssigned = capabilityAssigned.find(entry => entry.data.assignment === prior.id && entry.data.task === coordination.id
+              && entry.data.sequence === priorCoordination.sequence);
+            if (priorAssigned === undefined || priorAssigned.sequence >= event.sequence) continue;
+            predecessors.push({ assignment: prior, paths: event.data.mutated.filter(path => !event.data.outsideScope!.includes(path)), continuity: [...continuity] });
+          }
+          const task = committed.capabilityTasks.get(coordination.id);
+          const parent = task === undefined ? undefined : committed.assignments.get(task.originatingAssignment);
+          const related = task !== undefined && parent !== undefined && (task.parent.kind === 'work-item'
+            ? parent.workItem === task.parent.id && parent.coordination?.kind !== 'capability-task'
+            : parent.coordination?.kind === 'capability-task' && parent.coordination.id === task.parent.id);
+          if (!related || parent === undefined || (assignmentOrder.get(parent.id) ?? Infinity) >= assigned.sequence
+            || visited.has(parent.id)) { predecessors.length = 0; break; }
+          predecessors.push({ assignment: parent, continuity: [...continuity] });
+          ancestor = parent;
+        }
+        return ({
+        scope: assignment.scope, guarded: assignment.guarded, authorizations: assignment.authorizations,
+        inherited: assignment.coordination?.kind === 'capability-task' ? assignment.coordination.startingPaths : [],
+        predecessors,
+      }); });
+    if (request.checkpoint === 'final') {
+      for (const entry of ledger) {
+        if (entry.transaction.event.type !== 'nonfunctional-repair-assigned') continue;
+        const event = entry.transaction.event;
+        const records = entry.transaction.records.filter(record => record.path === runLayout.nonfunctionalRepairAssignment(event.data.assignment)
+          && record.id === event.data.assignment && record.revision === 1);
+        if (records.length !== 1) throw new Error('Final checkpoint has an unavailable committed repair authority');
+        const repair = nonfunctionalRepairAssignmentSchema.parse(records[0]!.body);
+        origins.push({ scope: repair.scope, guarded: repair.guarded, authorizations: [], inherited: [], predecessors: [] });
+      }
+    }
+    const scopeRules: GateRuleRecord[] = [];
+    let ownership: Awaited<ReturnType<RamifyCli['queryOwnership']>> | undefined;
+    try {
+      const changed = await this.git.changedPaths(this.projectRoot, this.accepted(run));
+      const paths = await placementPaths(this.projectRoot, [...changed, ...this.expectedFeatures(run).map(file => file.path)]);
+      // One decoded answer and input identity for the entire gate, including
+      // logical aliases and their real targets across every captured origin.
+      const current = paths.length === 0 ? undefined : await this.options.ramify.queryOwnership(this.projectRoot, paths);
+      ownership = current;
+      await this.validateFeatureTargets(this.expectedFeatures(run), current);
+      const permitted = new Set<string>();
+      // Only exact regular canonical bytes from the ledger's last producer
+      // rendering are harness effects; arbitrary feature edits remain denied.
+      const rendered = new Map(expectedFeatureHashes(this.writtenFeatures(run)).map(file => [file.path, file.hash]));
+      for (const path of changed) {
+        const expected = rendered.get(path);
+        if (expected !== undefined && await this.renderedFeatureAllowed(path, expected, current)) permitted.add(path);
+      }
+      const harnessDenied = await this.deniedFiles(run);
+      for (const origin of origins) {
+        const guard = guardedScopeOf(origin.scope, await deniedFiles(this.projectRoot,
+          [...harnessDenied, ...origin.guarded.filter(file => !origin.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify, current);
+        const candidate: string[] = [];
+        for (const path of changed) {
+          const prior = origin.inherited.find(entry => entry.path === path);
+          const capturedFile = origin.guarded.find(entry => entry.path === path);
+          const hash = prior === undefined && capturedFile === undefined ? undefined : await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(error => {
+            if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+            throw error;
+          });
+          // Exact unchanged captured harness effects and related inherited bytes
+          // are not this writer's changes; null means actual absence only.
+          const unchangedBytes = (prior !== undefined && hash === prior.hash) || (capturedFile !== undefined && hash === capturedFile.hash);
+          const physical = unchangedBytes ? await resolveRealTarget(this.projectRoot, path) : undefined;
+          const info = unchangedBytes ? await lstat(join(this.projectRoot, path)).catch(error => {
+            if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+            throw error;
+          }) : undefined;
+          const unchangedIdentity = unchangedBytes && physical?.ok && physical.resolved === resolve(this.projectRoot, path)
+            && (hash === null ? info === null : info?.isFile() === true);
+          let unchangedAuthority = false;
+          if (unchangedIdentity && capturedFile !== undefined && hash === capturedFile.hash) {
+            // The exact captured input is a harness effect, while current
+            // nested/excluded topology still narrows that file's permission.
+            const input = { ...origin.scope, resolved: { ...origin.scope.resolved, files: [...origin.scope.resolved.files, resolve(this.projectRoot, path)] } };
+            unchangedAuthority = (await outsideScope(this.projectRoot, guardedScopeOf(input, [], this.options.ramify, current), [path])).length === 0;
+          }
+          if (unchangedIdentity && !unchangedAuthority && prior !== undefined && hash === prior.hash) {
+            for (const predecessor of origin.predecessors) {
+              if (predecessor.paths !== undefined && !predecessor.paths.includes(path)) continue;
+              if (!predecessor.continuity.every(snapshot => snapshot.some(entry => entry.path === path && entry.hash === hash))) continue;
+              const parent = predecessor.assignment;
+              const parentGuard = guardedScopeOf(parent.scope, await deniedFiles(this.projectRoot, [...harnessDenied, ...parent.guarded.filter(file => !parent.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify, current);
+              if ((await outsideScope(this.projectRoot, parentGuard, [path])).length === 0) { unchangedAuthority = true; break; }
+            }
+          }
+          if (unchangedAuthority) permitted.add(path);
+          else candidate.push(path);
+        }
+        const outside = new Set(await outsideScope(this.projectRoot, guard, candidate));
+        for (const path of candidate) if (!outside.has(path)) permitted.add(path);
+      }
+      const outside = changed.filter(path => !permitted.has(path));
+      scopeRules.push({ rule: 'write-scope', outcome: outside.length === 0 ? 'passed' : 'failed',
+        violations: outside.map(path => ({ rule: 'write-scope', path, detail: 'Candidate change has no originating captured and current write authority' })) });
+    } catch (error) {
+      scopeRules.push({ rule: 'write-scope', outcome: 'failed', violations: [{ rule: 'write-scope', path: '.', detail: `Candidate ownership is unavailable: ${message(error)}` }] });
+    }
+    return { rules: scopeRules, ownership };
   }
 
   /**
@@ -10453,6 +10649,7 @@ export class RunService {
     goal?: string,
     recordedMessage?: string,
     binding?: { candidateId: string; assessment: Assessment },
+    ownership?: Awaited<ReturnType<RamifyCli['queryOwnership']>>,
   ): Promise<GateAttempt> {
     const identity = prepared.request;
     // A reader, a reviewer or a failure analyst, contributed nothing to the
@@ -10473,7 +10670,7 @@ export class RunService {
       ...(earlierAttempts(run, identity.id, identity.subject ?? {}).length === 0 ? {} : { earlier: earlierAttempts(run, identity.id, identity.subject ?? {}) }),
     });
     const operation = gateOperation(prepared, message);
-    const effect = run.log.ledger.effect<{ readonly attempt: GateAttempt; readonly findings: ScenarioGateFindings }>({
+    const effect = run.log.ledger.effect<{ readonly attempt: GateAttempt }>({
       key: `gate-commit:${identity.id}`,
       serialize: work => run.mutex.run(work),
       intent: () => ({
@@ -10485,16 +10682,25 @@ export class RunService {
         // The feature files go into the gate's commit as the states now
         // render them; the guarded comparison before this effect judged the
         // tree against the rendering the assignment captured.
-        const rendering = await this.rerenderScenarios(run);
-        if (binding !== undefined) {
-          if (rendering.written.length > 0) throw new CandidateDriftError('Final gate rendering changed the assessed candidate');
-          const current = await this.git.previewCandidateTree(this.projectRoot);
-          if (current.tree !== binding.assessment.candidate.tree) throw new CandidateDriftError('Final gate source changed after assessment');
-        }
-        const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git);
+        const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git, async () => {
+          let currentOwnership = ownership;
+          if (recordedMessage !== undefined) {
+            const candidate = await this.candidateAuthority(run, { checkpoint: prepared.checkpoint, subject: identity.subject });
+            const refusal = candidate.rules.find(rule => rule.outcome !== 'passed');
+            if (refusal !== undefined) throw new Error(`Recovered gate candidate has no current captured authority: ${refusal.violations.map(entry => `${entry.path}: ${entry.detail}`).join('; ')}`);
+            currentOwnership = candidate.ownership;
+          }
+          const rendering = await this.rerenderScenarios(run, currentOwnership);
+          if (binding !== undefined) {
+            if (rendering.written.length > 0) throw new CandidateDriftError('Final gate rendering changed the assessed candidate');
+            const current = await this.previewCandidateTree();
+            if (current.tree !== binding.assessment.candidate.tree) throw new CandidateDriftError('Final gate source changed after assessment');
+          }
+          await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+        });
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;
-        const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit,
+        const attempt = await executeConfiguredGate(this.configuredGateAudit(run), prepared, sourceCommit, commit,
           this.commandStarted(run, identity.id, prepared.checkpoint), this.commandWaiting(run, identity.id, prepared.checkpoint));
         if (attempt.audited !== null && attempt.audited !== sourceCommit) {
           throw new Error(`Gate ${attempt.id} audited ${attempt.audited}, expected ${sourceCommit}`);
@@ -10505,16 +10711,14 @@ export class RunService {
         if (attempt.verdict === 'passed' && (attempt.audited !== sourceCommit || attempt.evidence === null)) {
           throw new Error(`Gate ${attempt.id} passed without published evidence for ${sourceCommit}`);
         }
-        // What the scenario check means for the work item's CheckFindings
-        // is read here, outside the mutex; the completion decides it.
-        return { attempt, findings: await this.scenarioGateFindings(run, attempt) };
+        return { attempt };
       },
-      complete: ({ attempt, findings }) => {
+      complete: ({ attempt }) => {
         const { auditOverall, ...durableAttempt } = attempt;
         if (auditOverall != null && (attempt.audited === null || attempt.evidence === null)) {
           throw new Error(`Gate ${attempt.id} has an audit outcome without its published commit`);
         }
-        return this.gateAttempted(run, attempt, findings, [
+        return this.gateAttempted(run, attempt, [
           { path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: durableAttempt },
           ...(auditOverall == null ? [] : [{ path: runLayout.gateAuditOutcome(attempt.id), id: attempt.id, revision: 1,
             body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: attempt.id, overall: auditOverall, audited: attempt.audited } }]),
@@ -10530,116 +10734,42 @@ export class RunService {
   }
 
   /**
-   * What a committing gate's scenario check means for its work item's
-   * CheckFindings, read before its completion takes the mutex (Plan 12
-   * iteration 6): the tracked scenarios it observed, every earlier attempt
-   * of the work item, and the audited tree of each attempt a promotion or a
-   * witness needs. Null when there is nothing to promote or witness, which
-   * reads no tree; unavailable when a tree cannot be read, which the
-   * completion records and the attempt survives.
+   * The committed configured audit a committing gate asks for: the
+   * provider's definition as the run captured it, at the gate's candidate
+   * commit, under the request identity of the run and the attempt. A run
+   * whose captured definition is invalid has none to carry, and its gate is
+   * not verified.
    */
-  private async scenarioGateFindings(run: Run, attempt: GateAttempt): Promise<ScenarioGateFindings> {
-    const workItem = attempt.subject.workItem;
-    if (workItem === undefined || attempt.audited === null) return null;
-    try {
-      const tracked = trackedScenarios(run.log.ledger.replay()).records.map(record => ({ id: record.id, owner: record.owner, file: record.file }));
-      const observations = scenarioObservations(attempt, tracked);
-      if (observations.length === 0) return null;
-      const earlier = run.log.all('gate-attempted').flatMap(event => {
-        const body = event.data.gate === attempt.id ? undefined : gateBodyOf(run, event.data.gate);
-        return body === undefined || body.subject.workItem !== workItem ? [] : [{ body, observations: scenarioObservations(body, tracked) }];
+  private configuredGateAudit(run: Run): ConfiguredGateAudit {
+    return async request => {
+      const captured = run.record.auditConfiguration;
+      if (captured === undefined || 'invalid' in captured) {
+        throw new Error(`The run carries no committed audit definition: ${captured === undefined ? 'none was captured' : captured.invalid}`);
+      }
+      return this.options.configuredAudit.run({
+        projectRoot: request.projectRoot,
+        sourceCommit: request.sourceCommit,
+        configuration: captured.config,
+        mode: request.mode,
+        nested: request.nested,
+        runId: request.runId,
+        attemptId: request.attemptId,
+        signal: request.signal,
+        ...(request.started === undefined ? {} : { started: request.started }),
+        ...(request.waiting === undefined ? {} : { waiting: request.waiting }),
+        ...(request.lockAcquired === undefined ? {} : { lockAcquired: request.lockAcquired }),
       });
-      const needed = scenarioGatesToRead(checkFindingStateOf(run.log.ledger), workItem, attempt.verdict, observations,
-        earlier.map(entry => ({ gate: entry.body.id, observations: entry.observations })));
-      if (needed === null) return null;
-      const trees = new Map<string, string>();
-      const treeOf = async (commit: string): Promise<string> => {
-        const known = trees.get(commit);
-        if (known !== undefined) return known;
-        const tree = await this.candidates.commitTree(this.projectRoot, commit);
-        trees.set(commit, tree);
-        return tree;
-      };
-      const observed = async (body: GateAttempt, entries: readonly ScenarioObservation[], read: boolean) => ({
-        gate: body.id,
-        tree: read && body.audited !== null ? await treeOf(body.audited) : null,
-        observations: entries,
-        record: runLayout.gate(body.id),
-        output: runLayout.gateOutput(body.id),
-      });
-      const current = await observed(attempt, observations, true);
-      return {
-        workItem,
-        verdict: attempt.verdict,
-        changedFiles: attempt.guardedChanges.map(change => change.path),
-        current: { ...current, tree: current.tree! },
-        earlier: await Promise.all(earlier.map(entry => observed(entry.body, entry.observations, needed.includes(entry.body.id)))),
-        tracked,
-      };
-    } catch (error) {
-      return { unavailable: `The audited tree a scenario CheckFinding of gate ${attempt.id} needs could not be read: ${message(error)}` };
-    }
+    };
   }
 
   /**
-   * The `gate-attempted` line of a committing gate: its attempt and records,
-   * and the CheckFinding part its scenario check decides under the mutex.
-   * The attempt and its verdict are committed whatever that part does; a
-   * part refused as a whole is recorded on the event with its reason, and a
-   * scenario left out as a note.
+   * The `gate-attempted` line of a committing gate: its attempt and records.
+   * Its per-scenario results are display only and decide no CheckFinding.
    */
-  private gateAttempted(run: Run, attempt: GateAttempt, findings: ScenarioGateFindings, records: CommitRecord[]): Transaction<RunEvent> {
-    const data = { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next };
-    const plain = (outcome?: GateCheckFindingOutcome): Transaction<RunEvent> => ({
-      event: run.log.next({ type: 'gate-attempted', data: { ...data, ...(outcome === undefined ? {} : { scenarioFindings: outcome }) } }),
-      records,
-    });
-    if (findings === null) return plain();
-    if ('unavailable' in findings) {
-      this.warn(`Run ${run.record.jobId}: ${findings.unavailable}; the gate is committed without its CheckFinding part`);
-      return plain({ refused: { reason: 'source-unavailable', message: findings.unavailable }, notes: [] });
-    }
-    let notes: ScenarioFindingNote[] = [];
-    const decided = decideCheckFindingTransaction(run.log, ({ state }) => {
-      const plan = planScenarioFindings(state, findings);
-      notes = [...plan.notes];
-      return {
-        commands: plan.commands,
-        compose: outcome => ({
-          event: {
-            type: 'gate-attempted',
-            data: {
-              ...data,
-              ...(outcome.events.length === 0 ? {} : { checkFindings: [...outcome.events] }),
-              ...(notes.length === 0 ? {} : { scenarioFindings: { refused: null, notes } }),
-            },
-          },
-          records,
-        }),
-      };
-    });
-    if (decided.kind === 'transaction') return decided.transaction;
-    if (decided.kind === 'replayed') return plain(notes.length === 0 ? undefined : { refused: null, notes });
-    const refusal = `${decided.refusal.reason}: ${decided.refusal.message}`;
-    this.warn(`Run ${run.record.jobId}: the CheckFinding part of gate ${attempt.id} was refused (${refusal}); the gate is committed without it`);
-    return plain({ refused: { reason: 'transition-refused', message: refusal }, notes });
-  }
-
-  /**
-   * What a checkpoint's scenario check is planned from: the captured scenario
-   * harness, the modules of the current view that have feature files, and
-   * every tracked scenario with its owner, file and state as the ledger and
-   * the log hold them. A run past readiness has a valid configuration; one
-   * without it plans no scenario check.
-   */
-  private async scenarioInputs(run: Run): Promise<ScenarioCheckInputs | undefined> {
-    const captured = run.record.projectConfig;
-    if ('invalid' in captured) return undefined;
-    const { records, states } = trackedScenarios(run.log.ledger.replay());
+  private gateAttempted(run: Run, attempt: GateAttempt, records: CommitRecord[]): Transaction<RunEvent> {
     return {
-      harness: captured.config.acceptance,
-      modules: await scenarioModules(this.projectRoot, run.index),
-      scenarios: records.map(record => ({ id: record.id, owner: record.owner, file: record.file, state: states.get(record.id) ?? 'pending' })),
+      event: run.log.next({ type: 'gate-attempted', data: { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next } }),
+      records,
     };
   }
 
@@ -10661,7 +10791,7 @@ export class RunService {
 
   private commandWaiting(run: Run, gate: string, checkpoint: Checkpoint): NonNullable<import('../checks/gate.js').GateRequest['waiting']> {
     return async (command, line) => {
-      if (command.kind !== 'tests' && command.kind !== 'scenarios') return;
+      if (command.kind !== 'configured') return;
       try {
         await this.write(run, { type: 'gate-command-waiting', data: {
           gate, checkpoint, kind: command.kind, position: command.position, total: command.total, line,
@@ -10675,6 +10805,87 @@ export class RunService {
   /** The count of committed gate attempts: every readiness and every checkpoint. */
   private gateCount(run: Run): number {
     return run.log.count('readiness-passed') + run.log.all('readiness-failed').length + run.log.count('gate-attempted');
+  }
+
+  /** A recoverable setup on the run branch, before feature or iteration files are written. */
+  private async setupScratch(run: Run): Promise<void> {
+    if (run.log.find('scratch-setup-complete') !== undefined) return;
+    run.writer.requireSettled('Scratch setup cannot run');
+    try {
+      await this.performScratchSetup(run, false);
+      await this.afterWrite('scratch-setup-complete', run.record.jobId);
+    } catch (error) {
+      if (!(error instanceof ScratchSetupRefusal)) throw error;
+      await this.fail(run, 'readiness-failed', `Scratch setup failed before work: ${message(error)}`);
+    }
+  }
+
+  private async performScratchSetup(run: Run, recovering: boolean): Promise<{ commit: string | null; appended: boolean }> {
+    const ignoreFile = join(this.projectRoot, '.gitignore');
+    const ignoreInfo = await lstat(ignoreFile).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    });
+    if (ignoreInfo?.isSymbolicLink()) throw new ScratchSetupRefusal(`project .gitignore is a symlink: ${ignoreFile}`);
+    if (ignoreInfo !== null && !ignoreInfo.isFile()) throw new ScratchSetupRefusal(`project .gitignore is not a file: ${ignoreFile}`);
+    const original = recovering
+      ? run.log.find('scratch-setting-up')?.data.originalIgnoreBase64
+      : await readFile(ignoreFile).then(bytes => bytes.toString('base64'), (error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      });
+    if (original === undefined) throw new Error('Scratch setup recovery has no original .gitignore');
+    return run.mutex.run(() => run.log.ledger.effect<{ commit: string | null; appended: boolean }>({
+      key: 'scratch-setup',
+      intent: { event: run.log.next({ type: 'scratch-setting-up', data: { originalIgnoreBase64: original } }), records: [] },
+      perform: async () => {
+        await this.afterWrite('scratch-setting-up', run.record.jobId);
+        if (recovering) {
+          const committed = await this.git.findCommitByTrailers(this.projectRoot, [
+            { key: 'Ramify-Run', value: run.record.jobId },
+            { key: 'Ramify-Scratch', value: 'setup' },
+          ]);
+          if (committed !== null) return { commit: committed, appended: true };
+        }
+        let committed: string | null = null;
+        let appended = false;
+        try {
+          const modules = await declaredModuleDirectories(this.projectRoot);
+          const prepared = await ensureScratchRule(this.projectRoot, modules, this.git);
+          if (prepared.appended) await this.afterWrite('scratch-rule-appended', run.record.jobId);
+          if (!prepared.appended && !recovering) return { commit: null, appended: false };
+          const changed = await this.git.changedPaths(this.projectRoot, this.accepted(run));
+          if (changed.some(path => path !== '.gitignore')) {
+            throw new ScratchSetupRefusal(`unexpected working-tree changes: ${changed.join(', ')}`);
+          }
+          appended = prepared.appended || changed.length > 0;
+          if (changed.length > 0) {
+            await assertScratchSafe(this.projectRoot, modules, this.git);
+            committed = await this.git.commitAccepted(this.projectRoot, [
+              'Prepare module scratch ignore rule', '',
+              `Ramify-Run: ${run.record.jobId}`,
+              'Ramify-Scratch: setup', '',
+            ].join('\n'));
+            if (committed === null) throw new ScratchSetupRefusal('the .gitignore change made no commit');
+          }
+        } catch (error) {
+          if (committed !== null) throw error;
+          const restoreInfo = await lstat(ignoreFile).catch((issue: unknown) => {
+            if ((issue as NodeJS.ErrnoException).code === 'ENOENT') return null;
+            throw issue;
+          });
+          if (restoreInfo?.isSymbolicLink()) throw new ScratchSetupRefusal(`project .gitignore became a symlink: ${ignoreFile}`);
+          if (original === null) await rm(ignoreFile, { force: true });
+          else await writeFile(ignoreFile, Buffer.from(original, 'base64'));
+          throw error instanceof ScratchIgnoreConflictError
+            ? new ScratchSetupRefusal(error.message)
+            : error;
+        }
+        if (committed !== null) await this.afterWrite('scratch-committed', run.record.jobId);
+        return { commit: committed, appended };
+      },
+      complete: result => ({ event: run.log.next({ type: 'scratch-setup-complete', data: result }), records: [] }),
+    }));
   }
 
   /**
@@ -10703,16 +10914,70 @@ export class RunService {
       intent: { event: run.log.next({ type: 'scenarios-materializing', data: { files } }), records: [] },
       perform: async () => {
         await this.afterWrite('scenarios-materializing', run.record.jobId);
-        await rerenderFeatureFiles(this.projectRoot, expected);
         const message = materializationMessage({
           planId: run.record.planId, runId: run.record.jobId, files, scenarios: trackedScenarios(run.log.ledger.replay()).records.length,
         });
-        const commit = await commitForMaterialization(this.projectRoot, run.record.jobId, message, recovering, this.git);
+        await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+        const commit = await commitForMaterialization(this.projectRoot, run.record.jobId, message, recovering, this.git, commit => this.verifyProducerCommit(expected, commit), () => this.renderProducerFeatures(run, expected));
         await this.afterWrite('scenarios-committed', run.record.jobId);
         return { commit, files };
       },
       complete: result => ({ event: run.log.next({ type: 'scenarios-materialized', data: result }), records: [] }),
     }));
+  }
+
+  /** Recovery proves producer content from Git objects, not merely matching trailers. */
+  private async verifyProducerCommit(files: readonly RenderedFeatureFile[], commit: string): Promise<void> {
+    const expected = new Map(files.map(file => [file.path, file.content]));
+    const changed = await this.git.commitNameStatus(this.projectRoot, commit, undefined, { requireSingleParent: true });
+    if (changed.some(change => !expected.has(change.path) || change.status === 'D')) throw new Error(`Recovered scenario producer commit ${commit} includes unrelated paths`);
+    const entries = await this.candidates.treeEntries(this.projectRoot, commit);
+    for (const [path, content] of expected) {
+      if (!entries.some(entry => entry.path === path && ['file', 'executable'].includes(entry.kind)) ||
+          await this.candidates.readBlob(this.projectRoot, commit, path) !== content) throw new Error(`Recovered scenario producer commit ${commit} does not contain exact rendered bytes: ${path}`);
+    }
+  }
+
+  /** Exact ledger-owned feature bytes cannot borrow authority through an alias. */
+  private async renderedFeatureAllowed(path: string, hash: string, answer?: Awaited<ReturnType<RamifyCli['queryOwnership']>>): Promise<boolean> {
+    const logical = resolve(this.projectRoot, path);
+    const target = await resolveRealTarget(this.projectRoot, path);
+    if (!target.ok || target.resolved !== logical || !(await lstat(logical).catch(() => null))?.isFile()) return false;
+    const seed = answer?.selection.paths.find(seed => seed.path === path);
+    if (seed?.status !== 'owned' || seed.exclusion !== null) return false;
+    return sha256(await readFile(logical)) === hash;
+  }
+
+  /** Every producer write uses canonical ordinary targets from one coherent public answer. */
+  private async validateFeatureTargets(expected: readonly RenderedFeatureFile[], ownership?: Awaited<ReturnType<RamifyCli['queryOwnership']>>) {
+    const paths = expected.map(file => file.path);
+    const answer = ownership ?? (paths.length === 0 ? undefined : await this.options.ramify.queryOwnership(this.projectRoot, await placementPaths(this.projectRoot, paths)));
+    for (const path of paths) {
+      const target = await resolveRealTarget(this.projectRoot, path);
+      const seed = answer?.selection.paths.find(seed => seed.path === path);
+      const info = await lstat(resolve(this.projectRoot, path)).catch(error => {
+        if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null;
+        throw error;
+      });
+      if (!target.ok || target.resolved !== resolve(this.projectRoot, path) || (info !== null && !info.isFile()) || seed?.status !== 'owned' || seed.exclusion !== null) {
+        throw new Error(`Scenario producer target is unavailable or outside ordinary ownership: ${path}`);
+      }
+    }
+    return answer;
+  }
+
+  /** Standalone producer effects refuse all dirt except their exact rendered files. */
+  private async renderProducerFeatures(run: Run, expected: readonly RenderedFeatureFile[]): Promise<void> {
+    const answer = await this.validateFeatureTargets(expected);
+    await rerenderFeatureFiles(this.projectRoot, [...expected]);
+    const changed = await this.git.changedPaths(this.projectRoot, await this.git.currentHead(this.projectRoot));
+    const hashes = new Map(expectedFeatureHashes(expected).map(file => [file.path, file.hash]));
+    const unrelated: string[] = [];
+    for (const path of changed) {
+      const hash = hashes.get(path);
+      if (hash === undefined || !await this.renderedFeatureAllowed(path, hash, answer)) unrelated.push(path);
+    }
+    if (unrelated.length > 0) throw new Error(`Scenario producer commit refuses unrelated candidate changes: ${unrelated.join('; ')}`);
   }
 
   /** Every tracked feature file's expected content under the states the ledger holds now. */
@@ -10725,22 +10990,21 @@ export class RunService {
    * those that differ from the states' rendering and reports whether a
    * commit is needed. Before materialization it writes nothing.
    */
-  private async rerenderScenarios(run: Run): Promise<FeatureRerendering> {
+  private async rerenderScenarios(run: Run, ownership?: Awaited<ReturnType<RamifyCli['queryOwnership']>>): Promise<FeatureRerendering> {
     if (run.log.find('scenarios-materialized') === undefined) return { files: [], written: [], commitNeeded: false };
-    return rerenderFeatureFiles(this.projectRoot, this.expectedFeatures(run));
+    const expected = this.expectedFeatures(run);
+    await this.validateFeatureTargets(expected, ownership);
+    return rerenderFeatureFiles(this.projectRoot, expected);
   }
 
   /**
-   * What an assignment guards of the scenarios: the support files the
-   * captured configuration names, and every tracked feature file with the
-   * hash of the rendering the harness last wrote, once the files are
-   * materialized.
+   * What an assignment guards of the scenarios: every tracked feature file
+   * with the hash of the rendering the harness last wrote, once the files
+   * are materialized.
    */
   private async guardedScenarioFiles(run: Run): Promise<GuardedScenarioFiles> {
-    const captured = run.record.projectConfig;
-    const support = 'invalid' in captured ? [] : await supportFiles(this.projectRoot, captured.config.acceptance.support);
     const expected = run.log.find('scenarios-materialized') === undefined ? [] : expectedFeatureHashes(this.writtenFeatures(run));
-    return { support, expected };
+    return { expected };
   }
 
   /** Every tracked feature file as the harness last rendered it into the tree. */
@@ -10763,61 +11027,115 @@ export class RunService {
   /** Every captured source document remains immutable for every writer of the run. */
   private async deniedFiles(run: Run): Promise<string[]> {
     const features = trackedScenarios(run.log.ledger.replay()).records.map(record => record.file);
-    const documents = run.record.manifest.documentManifest
-      ? (await readCapturedDocuments(run.directory, run.record.manifest)).manifest.documents.map(document => document.path)
-      : [];
+    const documents = (await readCapturedDocuments(run.directory, run.record.manifest)).manifest.documents.map(document => document.path);
     return deniedFiles(this.projectRoot, [...features, ...documents]);
+  }
+
+  /** Committed audit preparation inputs, converted to paths in this project. */
+  private async auditPreparationPaths(run: Run): Promise<string[]> {
+    const audit = run.record.auditConfiguration;
+    const answer = await this.options.ramify.queryOwnership(this.projectRoot, ['.']);
+    const configuration = relative(this.projectRoot, resolve(this.projectRoot, answer.selection.scope.configuration)).split(sep).join('/');
+    if (configuration === '' || configuration === '..' || configuration.startsWith('../')) throw new Error('Provider configuration is outside the captured project');
+    return [...new Set([configuration, ...(audit === undefined || !('config' in audit) ? [] : await auditPreparationPaths(audit.config, this.projectRoot))])];
   }
 
   // Scenario states, architecture §7 to §9
 
   /** The work item's entry or integration scenario and the run's tracked scenarios, which a declaration is judged against. */
-  private declarationContext(run: Run, item: WorkItem): DeclarationContext {
-    return {
-      entry: 'entry' in item.origin ? item.origin.entry : null,
-      integration: integrationScenarioOf(item),
-      records: trackedScenarios(run.log.ledger.replay()).records,
-    };
-  }
-
-  /** Real work-item entries within a capability assignment's owners. The
-   * suspended consumer's unrelated entry is never inherited by the task. */
-  private capabilityScenarioContext(run: Run, base: IterationAssignment['scope']['base']): DeclarationContext {
-    const modules = 'module' in base ? [base.module, ...base.includedChildren] : base.modules;
-    const entries = committedRecords(run.log.ledger.replay()).workItems
-      .filter(item => modules.includes(item.module) && 'entry' in item.origin)
-      .map(item => 'entry' in item.origin ? item.origin.entry : null)
-      .filter((entry): entry is string => entry !== null);
-    return { entry: null, entries: [...new Set(entries)], records: trackedScenarios(run.log.ledger.replay()).records };
-  }
-
-  private capabilityEngineerScenarios(run: Run, assignment: IterationAssignment): EngineerScenarios | undefined {
-    const assigned = new Set(assignment.scenarios ?? []);
-    if (assigned.size === 0) return undefined;
-    const tracked = trackedScenarios(run.log.ledger.replay());
-    return { kind: 'entry', scenarios: tracked.records.filter(record => assigned.has(record.id))
-      .map(record => briefed(record, tracked.states.get(record.id) ?? 'pending')) };
+  /** The one obligation projection: scenario records, delegated outcomes and the accepted registrations and reports. */
+  private obligationProjection(run: Run): ObligationProjection {
+    const lines = run.log.ledger.replay();
+    return obligationsOf({ scenarios: trackedScenarios(lines).records, workItems: committedRecords(lines).workItems, events: run.log.events });
   }
 
   /**
-   * Whether the work item still runs against fakes: a requirement it holds
-   * is open, or the conformance its obligation owes has not passed.
+   * What an architect's briefing says about the obligations it reports on:
+   * each with its status, binding and last report, and then, separately,
+   * the accepted source each report was made against where that source has
+   * moved on since. The second part is provenance the architect may inspect;
+   * the harness revises, resets or questions no report because of it.
    */
-  private holdsFakes(run: Run, item: WorkItem): boolean {
-    const records = committedRecords(run.log.ledger.replay());
-    if (this.openRequirementsOf(run, records, item.id).length > 0) return true;
-    const owing = this.obligationOwedBy(run, item, records);
-    if (owing === null) return false;
-    const conformed = new Set(run.log.all('provider-conformed').map(event => conformanceKey(event.data.obligation, event.data.revision)));
-    return !conformed.has(conformanceKey(owing.id, owing.revision));
+  private obligationBriefing(run: Run, actor: Pick<ObligationActor, 'kind' | 'id'>): string[] {
+    const owned = obligationsOwnedBy(this.obligationProjection(run), actor);
+    const lines = obligationBriefingLines(owned);
+    if (lines.length === 0) return lines;
+    const entries = run.log.ledger.replay();
+    const source = reportSourceLines(owned, sequence => acceptedCommit(entries.slice(0, sequence), run.base), acceptedCommit(entries, run.base));
+    return source.length === 0 ? lines : [...lines, '', ...source];
   }
 
   /**
-   * The work item's scenarios in the given states: its entry's, or an
-   * integration work item's one scenario. A provider or follow-up work item
-   * has none.
+   * Records an accepted architect submission's registrations and reports,
+   * each as its own event naming the invocation and the submission's hash.
+   * What the same accepted submission already recorded is not recorded
+   * again, so a replayed action applies each effect once.
    */
-  private unfinishedScenarios(run: Run, item: WorkItem, states: readonly ScenarioState[]): Array<{ id: string; state: ScenarioState }> {
+  private async recordObligations(run: Run, actor: ObligationActor, invocation: string,
+    submission: { readonly registrations: readonly ObligationRegistration[]; readonly reports: readonly ObligationReport[] }): Promise<boolean> {
+    if (submission.registrations.length === 0 && submission.reports.length === 0) return true;
+    const hash = run.log.all('invocation-ended').find(event => event.data.invocation === invocation)?.data.submission ?? null;
+    if (hash === null) {
+      await this.fail(run, 'internal', `Invocation ${invocation} reported obligations without a recorded accepted submission`, [runLayout.outcome(invocation)]);
+      return false;
+    }
+    for (const input of obligationEventsToRecord(submission, actor, { by: invocation, submission: hash }, this.obligationProjection(run), run.log.events)) {
+      // A done report that makes every sub-scenario of an integration
+      // scenario done commits that scenario's work item with it.
+      const due = input.type === 'obligation-reported' && input.data.judgment === 'done' ? this.integrationItemsDue(run, input.data.id) : [];
+      if (await this.write(run, input, due) === 'ended') return false;
+      // A crash between two reports of one submission leaves the rest to
+      // the replay, which records each once.
+      if (input.type === 'obligation-reported') await this.afterWrite('obligation-reported', run.record.jobId);
+      if (this.ignoring(run)) return false;
+    }
+    return !this.ignoring(run);
+  }
+
+  /**
+   * Records an accepted engineer proposal's bindings, each as its own
+   * `obligation-bound` event naming the invocation and the submission's hash.
+   * What the same accepted submission already recorded is not recorded
+   * again, so a replayed action applies each binding once.
+   */
+  private async recordBindings(run: Run, invocation: string, bindings: readonly ObligationBinding[]): Promise<boolean> {
+    if (bindings.length === 0) return true;
+    const hash = run.log.all('invocation-ended').find(event => event.data.invocation === invocation)?.data.submission ?? null;
+    if (hash === null) {
+      await this.fail(run, 'internal', `Invocation ${invocation} bound obligations without a recorded accepted submission`, [runLayout.outcome(invocation)]);
+      return false;
+    }
+    for (const input of bindingEventsToRecord(bindings, { by: invocation, submission: hash }, run.log.events)) {
+      if (await this.write(run, input) === 'ended') return false;
+    }
+    return !this.ignoring(run);
+  }
+
+  /**
+   * What each obligation an assignment names is, for the engineer's
+   * briefing: a scenario's name, a delegated outcome, a registered case or a
+   * registered test's description.
+   */
+  private assignedObligations(run: Run, ids: readonly string[]): AssignedObligation[] {
+    const { obligations } = this.obligationProjection(run);
+    const names = new Map(trackedScenarios(run.log.ledger.replay()).records.map(record => [record.id, record.name]));
+    return ids.map(id => {
+      const obligation = obligations.get(id);
+      if (obligation === undefined) return { id, text: null };
+      if (obligation.kind === 'scenario') {
+        const name = names.get(id);
+        return { id, text: name === undefined ? 'scenario' : `scenario "${name}"` };
+      }
+      if (obligation.kind === 'outcome') return { id, text: obligation.case === null ? 'delegated outcome' : `registered case ${obligation.case}` };
+      return { id, text: obligation.description === null ? 'registered test' : `registered test: ${obligation.description}` };
+    });
+  }
+
+  /**
+   * The work item's scenarios not yet `done`: its entry's, or an integration
+   * work item's one scenario. A provider or follow-up work item has none.
+   */
+  private unfinishedScenarios(run: Run, item: WorkItem): Array<{ id: string; state: ScenarioState }> {
     const entry = 'entry' in item.origin ? item.origin.entry : null;
     const integration = integrationScenarioOf(item);
     if (entry === null && integration === null) return [];
@@ -10825,7 +11143,7 @@ export class RunService {
     return tracked.records
       .filter(record => (integration === null ? record.kind === 'entry' && record.entry === entry : record.id === integration))
       .map(record => ({ id: record.id, state: tracked.states.get(record.id) ?? 'pending' }))
-      .filter(scenario => states.includes(scenario.state));
+      .filter(scenario => scenario.state !== 'done');
   }
 
   /**
@@ -10839,44 +11157,15 @@ export class RunService {
     const { records } = trackedScenarios(run.log.ledger.replay());
     const record = records.find(candidate => candidate.id === id);
     if (record === undefined) return undefined;
-    return integrationBriefing(this.projectRoot, record, records, sub => bridgingGivens(record, sub));
-  }
-
-  /**
-   * The scenario check an engineer's `run_scope_tests` runs beside its
-   * tests: quick mode, the scope's scenarios selected by identity as an
-   * iteration gate selects them, and this work item's pending ones too, so
-   * the engineer sees the scenarios it binds pass before it declares them.
-   * Planned anew on each call; nothing where the run tracks no scenario or
-   * has no scenario harness.
-   */
-  private scopeScenarioCheck(run: Run, item: WorkItem, scope: TestSelectionPolicy,
-    assignment?: IterationAssignment): EngineerEquipmentInputs['scenarios'] {
-    const { records } = trackedScenarios(run.log.ledger.replay());
-    if (records.length === 0) return undefined;
-    return {
-      names: new Map(records.map(record => [record.id, record.name])),
-      plan: async () => {
-        const inputs = await this.scenarioInputs(run);
-        if (inputs === undefined) return undefined;
-        const pending = assignment?.coordination?.kind === 'capability-task'
-          ? (assignment.scenarios ?? [])
-            .filter(id => trackedScenarios(run.log.ledger.replay()).states.get(id) === 'pending')
-          : this.unfinishedScenarios(run, item, ['pending']).map(scenario => scenario.id);
-        return planScenarioCheck('iteration', inputs, {
-          projectRoot: this.projectRoot,
-          scope: { exactOwners: scope.exactOwners, subtrees: scope.subtrees },
-          include: pending,
-        });
-      },
-    };
+    return integrationBriefing(this.projectRoot, record, records);
   }
 
   /**
    * What an engineer is told of its work item's scenarios: its entry's, or
    * an integration work item's one scenario with its sub-scenarios' step
-   * files. Undefined for a provider or follow-up work item, whose briefing
-   * says nothing about scenarios.
+   * files. Undefined for a provider, follow-up or capability-task
+   * iteration, whose briefing says nothing about scenarios beyond the
+   * obligations its assignment names.
    */
   private async engineerScenarios(run: Run, item: WorkItem): Promise<EngineerScenarios | undefined> {
     const tracked = trackedScenarios(run.log.ledger.replay());
@@ -10890,68 +11179,19 @@ export class RunService {
   }
 
   /**
-   * Applies an accepted declaration: each `pending` scenario it names
-   * becomes `bound` while the work item holds fakes, and `declared`
-   * otherwise. A `bound`, `declared` or `implemented` one is left as it is.
-   * The gate's commit re-renders the files, so a declared scenario loses
-   * its pending tag there.
-   */
-  private async declareScenarios(run: Run, item: WorkItem, invocation: string, ids: readonly string[],
-    assignment?: IterationAssignment): Promise<boolean> {
-    if (ids.length === 0) return true;
-    const moved = scenariosToDeclare(ids, trackedScenarios(run.log.ledger.replay()).states);
-    if (moved.length === 0) return true;
-    const records = committedRecords(run.log.ledger.replay());
-    const tracked = trackedScenarios(run.log.ledger.replay()).records;
-    for (const scenario of moved) {
-      const entry = tracked.find(record => record.id === scenario)?.entry;
-      const owner = assignment?.coordination?.kind === 'capability-task' && entry !== null && entry !== undefined
-        ? records.workItems.find(candidate => 'entry' in candidate.origin && candidate.origin.entry === entry) ?? item
-        : item;
-      const state = this.holdsFakes(run, owner) ? 'bound' : 'declared';
-      await this.write(run, { type: 'scenario-declared', data: { scenario, by: invocation, state } });
-      if (this.ignoring(run)) return false;
-    }
-    return true;
-  }
-
-  /**
-   * What a passing committing gate establishes of the scenarios it ran: a
-   * `declared` one it passed is `implemented`, and a `bound` one it passed
-   * has its fake-backed pass recorded and stays `bound`.
-   */
-  private async recordScenarioPasses(run: Run, attempt: GateAttempt): Promise<boolean> {
-    if (attempt.verdict !== 'passed') return true;
-    const passed = [...new Set(attempt.commands.flatMap(command => (command.kind !== 'scenarios' || command.outcome !== 'passed'
-      ? []
-      : (command.scenarios?.scenarios ?? []).filter(result => result.status === 'passed').map(result => result.id))))].sort();
-    if (passed.length === 0) return true;
-    const { states } = trackedScenarios(run.log.ledger.replay());
-    for (const scenario of passed) {
-      const state = states.get(scenario);
-      if (state === 'declared') await this.write(run, { type: 'scenario-implemented', data: { scenario, gate: attempt.id } }, this.integrationItemsDue(run, scenario));
-      else if (state === 'bound') {
-        if (run.log.all('scenario-bound-passed').some(event => event.data.scenario === scenario && event.data.gate === attempt.id)) continue;
-        await this.write(run, { type: 'scenario-bound-passed', data: { scenario, gate: attempt.id } });
-      }
-      else continue;
-      if (this.ignoring(run)) return false;
-    }
-    return true;
-  }
-
-  /**
-   * The integration work items the implementation of one scenario makes due,
-   * as the records its `scenario-implemented` commits: one per integration
-   * scenario whose last sub-scenario this is (architecture §10). Committed
-   * after every earlier work item, it queues behind the current one, since
-   * work items run one at a time.
+   * The integration work items a done report of one scenario makes due, as
+   * the records its `obligation-reported` commits: one per integration
+   * scenario whose last sub-scenario this is (architecture §10). Only done
+   * reports schedule one; no gate or audit result does. Committed after
+   * every earlier work item, it queues behind the current one, since work
+   * items run one at a time.
    */
   private integrationItemsDue(run: Run, scenario: string): CommitRecord[] {
     const lines = run.log.ledger.replay();
     const tracked = trackedScenarios(lines);
+    if (!tracked.states.has(scenario)) return [];
     const after = new Map(tracked.states);
-    after.set(scenario, 'implemented');
+    after.set(scenario, 'done');
     const items = [...committedRecords(lines).workItems];
     const records: CommitRecord[] = [];
     for (const integration of dueIntegrations(tracked.records, after, items)) {
@@ -10963,113 +11203,18 @@ export class RunService {
     return records;
   }
 
-  /** Whether a gate passed the scenario since its latest declaration: a fake-backed pass or its implementation. */
-  private passedSinceDeclaration(run: Run, scenario: string): boolean {
-    const declared = run.log.all('scenario-declared').filter(event => event.data.scenario === scenario).at(-1)?.sequence ?? 0;
-    return run.log.events.some(event => event.sequence > declared
-      && (event.type === 'scenario-bound-passed' || event.type === 'scenario-implemented')
-      && event.data.scenario === scenario);
-  }
-
-  /**
-   * Withdrawal: the work item leaves its repair path without a pass, by
-   * exhaustion, a placement request or a yield. Every `declared` or `bound`
-   * scenario of its entry that no gate passed since its declaration returns
-   * to `pending`, and the commit "Withdraw sc-NNN" restores its pending tag
-   * at once, so no untagged failing scenario waits for the next gate that
-   * runs its owner. A bound scenario never lost its tag, so a withdrawal of
-   * bound ones alone changes no file and commits nothing; its events name
-   * the accepted boundary, which carries the tag.
-   */
-  private async withdrawScenarios(run: Run, item: WorkItem, reason: string): Promise<boolean> {
-    const scenarios = this.unfinishedScenarios(run, item, ['bound', 'declared'])
-      .filter(scenario => !this.passedSinceDeclaration(run, scenario.id))
-      .map(scenario => scenario.id);
-    if (scenarios.length === 0) return true;
-    const tracked = trackedScenarios(run.log.ledger.replay());
-    const identity = { planId: run.record.planId, runId: run.record.jobId };
-    const now = expectedFeatureFiles(tracked, identity);
-    const withdrawn = expectedFeatureFiles(withStates(tracked, new Map(scenarios.map(id => [id, 'pending' as const]))), identity);
-    const changes = withdrawn.some((file, index) => file.path !== now[index]?.path || file.content !== now[index]?.content);
-    let commit = this.accepted(run);
-    if (changes) {
-      run.writer.requireSettled('The feature files cannot be written');
-      const performed = await this.performWithdrawal(run, {
-        withdrawal: run.log.count('scenarios-withdrawing') + 1, workItem: item.id, scenarios, reason,
-      }, false);
-      commit = performed.commit;
-    }
-    // The effect's completion withdrew the first; the rest follow with its commit.
-    const states = trackedScenarios(run.log.ledger.replay()).states;
-    for (const scenario of scenarios) {
-      if (states.get(scenario) === 'pending') continue;
-      await this.write(run, { type: 'scenario-withdrawn', data: { scenario, reason, commit } });
-      if (this.ignoring(run)) return false;
-    }
-    return !this.ignoring(run);
-  }
-
-  /**
-   * The withdrawal commit, as an external effect of the ledger:
-   * `scenarios-withdrawing` is its intent and the first scenario's
-   * `scenario-withdrawn` its completion. The files are rendered with the
-   * intent's scenarios pending, from the ledger, so a recovery renders the
-   * same; it finds the commit by its run and `withdrawn-<n>` trailers first.
-   */
-  private async performWithdrawal(
-    run: Run,
-    data: RunEventOf<'scenarios-withdrawing'>['data'],
-    recovering: boolean,
-  ): Promise<{ commit: string }> {
-    return run.mutex.run(() => run.log.ledger.effect<{ commit: string }>({
-      key: `scenarios-withdraw:${data.withdrawal}`,
-      intent: { event: run.log.next({ type: 'scenarios-withdrawing', data }), records: [] },
-      perform: async () => {
-        const tracked = withStates(trackedScenarios(run.log.ledger.replay()), new Map(data.scenarios.map(id => [id, 'pending' as const])));
-        await rerenderFeatureFiles(this.projectRoot, expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }));
-        const files = [...new Set(tracked.records.filter(record => data.scenarios.includes(record.id)).map(record => record.file))].sort();
-        const message = withdrawalMessage({ runId: run.record.jobId, withdrawal: data.withdrawal, workItem: data.workItem, scenarios: data.scenarios, reason: data.reason, files });
-        const commit = await commitForScenarios(this.projectRoot, run.record.jobId, withdrawnTrailerValue(data.withdrawal), message, recovering, this.git);
-        return { commit: commit ?? await this.git.currentHead(this.projectRoot) };
-      },
-      complete: result => ({
-        event: run.log.next({ type: 'scenario-withdrawn', data: { scenario: data.scenarios[0]!, reason: data.reason, commit: result.commit } }),
-        records: [],
-      }),
-    }));
-  }
-
-  /**
-   * A withdrawal whose commit is recorded and some of whose scenarios have no
-   * `scenario-withdrawn` yet: the harness stopped between them. Each is
-   * written with the recorded commit; nothing is committed again.
-   */
-  private async completeWithdrawals(run: Run): Promise<string[]> {
-    const completed: string[] = [];
-    for (const intent of run.log.all('scenarios-withdrawing')) {
-      const after = run.log.all('scenario-withdrawn').filter(event => event.sequence > intent.sequence);
-      const first = after.find(event => event.data.scenario === intent.data.scenarios[0]);
-      if (first === undefined) continue;
-      for (const scenario of intent.data.scenarios) {
-        if (after.some(event => event.data.scenario === scenario)) continue;
-        await this.write(run, { type: 'scenario-withdrawn', data: { scenario, reason: intent.data.reason, commit: first.data.commit } });
-        completed.push(scenario);
-      }
-    }
-    return completed;
-  }
-
   /**
    * The last refusal of a completion request the bound allows: the run fails
    * with the requirements as evidence where one is open or owed, and with
-   * the scenarios otherwise.
+   * the unresolved capability work otherwise. A missing done report is no
+   * refusal here: validation rejects that request in its own turn.
    */
   private async refuseCompletion(
     run: Run,
     item: WorkItem,
     refusals: number,
     blocked: readonly string[],
-    owing: { readonly open: readonly ConsumerRequirement[]; readonly owed: boolean; readonly scenarios: ReadonlyArray<{ readonly id: string }> },
+    owing: { readonly open: readonly ConsumerRequirement[]; readonly owed: boolean },
   ): Promise<void> {
     if (owing.open.length > 0 || owing.owed) {
       await this.fail(run, 'unresolvable-requirement',
@@ -11077,38 +11222,34 @@ export class RunService {
         owing.open.map(requirement => contractsLayout.requirement(requirement.id, requirement.revision)));
       return;
     }
-    await this.fail(run, 'acceptance-incomplete',
-      `${item.id} asked for completion ${refusals} times with ${integrationScenarioOf(item) === null ? 'scenarios of its entry' : 'its integration scenario'} not implemented: ${blocked.join('; ')}`,
-      owing.scenarios.map(scenario => runLayout.scenario(scenario.id)));
+    await this.fail(run, 'acceptance-incomplete', `${item.id} asked for completion ${refusals} times with capability work unresolved: ${blocked.join('; ')}`);
   }
 
   /**
    * What a failing gate tells its reader: every command that did not pass
-   * with what it reported, and a composition failure where the gate's
-   * scenario check shows one.
+   * with what it reported, raw. No cause is inferred and no repair owner is
+   * named: what a failure means is the reader's to judge.
    */
   private async diagnosticsOf(run: Run, gate: GateAttempt, audience: GateAudience = 'engineer'): Promise<{ id: string; cause: string | null; summary: string[] }> {
     const { records } = trackedScenarios(run.log.ledger.replay());
     const waiting = new Map(run.log.all('gate-command-waiting')
       .filter(event => event.data.gate === gate.id)
       .map(event => [event.data.position, event.data.line] as const));
-    const diagnostics = await gateDiagnostics(gate, audience, new Map(records.map(record => [record.id, record.name])), waiting);
-    const composition = compositionLines(gate, records);
-    return { ...diagnostics, summary: [...diagnostics.summary, ...composition] };
+    return gateDiagnostics(gate, audience, new Map(records.map(record => [record.id, record.name])), waiting);
   }
 
   /**
-   * The scenarios an accepted iteration's gate passed, each with the step
-   * definitions that bound it, for the local architect: binding is
-   * recorded, not policed, and this is where the architect sees it.
+   * The tracked scenarios an accepted iteration's gate audit passed, read
+   * from its raw runner output, each with the step definitions that bound
+   * it, for the local architect: binding is recorded, not policed, and this
+   * is where the architect sees it. Display only.
    */
   private async passedScenarioLines(run: Run, result: IterationResult): Promise<string[]> {
     if (result.outcome !== 'accepted' || result.gate === null) return [];
     const gate = await this.readGate(run, result.gate);
-    const summary = gate?.commands.find(command => command.kind === 'scenarios')?.scenarios;
-    if (summary === undefined) return [];
+    if (gate === null) return [];
     const { records } = trackedScenarios(run.log.ledger.replay());
-    return scenarioCheckLines(summary, new Map(records.map(record => [record.id, record.name])), { only: 'passed' });
+    return passedScenarioLines(gate, new Map(records.map(record => [record.id, record.name])));
   }
 
   private async readGate(run: Run, id: string): Promise<GateAttempt | null> {
@@ -11149,6 +11290,7 @@ export class RunService {
       const drivers = [...this.runs.values()];
       const active = drivers.filter(run => !run.log.terminal);
       for (const run of active) {
+        run.readiness?.controller.abort();
         run.reviews?.close();
         for (const session of run.sessions()) void session.stop().catch(() => undefined);
         run.notify();
@@ -11173,37 +11315,6 @@ export class RunService {
       await this.options.lock.release();
     });
   }
-}
-
-/** Why a completion request is refused for one scenario of its entry, by its state. */
-function scenarioRefusal(scenario: { readonly id: string; readonly state: ScenarioState }, gate?: string): string {
-  switch (scenario.state) {
-    case 'pending':
-      return `${scenario.id} is pending: nothing has declared it; declare it with the request where existing step definitions bind it, or assign an iteration that writes them`;
-    case 'bound':
-      return `${scenario.id} is bound: it passed only against a fake, and becomes due once this work item's requirements are verified`;
-    default:
-      return `${scenario.id} is ${scenario.state}, and the work-item gate${gate === undefined ? '' : ` ${gate}`} did not pass it: its owner's run did not execute it`;
-  }
-}
-
-/**
- * Why a passing final attempt does not prove the plan's scenarios: no
- * scenario check, one not in full mode, one that did not pass, or a tracked
- * scenario it did not pass. Null when it proves every one.
- */
-function finalScenarioGaps(attempt: GateAttempt, required: readonly string[]): string | null {
-  if (required.length === 0) return null;
-  const check = attempt.commands.find(command => command.kind === 'scenarios');
-  const summary = check?.scenarios;
-  if (check === undefined || summary === undefined) {
-    return `no scenario check ran${attempt.scenarios === 'none-selected' ? ', because no module has feature files' : ''}`;
-  }
-  if (summary.mode !== 'full' || summary.dryRun) return `its scenario check was a ${summary.dryRun ? 'dry run' : 'run'} in ${summary.mode} mode, not a full-mode run`;
-  if (check.outcome !== 'passed') return `its scenario check ${check.outcome === 'failed' ? 'failed' : 'was not verified'}`;
-  const passed = new Set(summary.scenarios.filter(result => result.status === 'passed').map(result => result.id));
-  const missing = required.filter(id => !passed.has(id));
-  return missing.length === 0 ? null : `${missing.join(', ')} did not pass in it`;
 }
 
 /**
@@ -11327,9 +11438,6 @@ function earlierAttempts(run: Run, attemptId: string, attemptSubject: GateAttemp
     });
 }
 
-/** What a committing gate's completion decides its CheckFinding part from; see `scenarioGateFindings`. */
-type ScenarioGateFindings = ScenarioGateInputs | { readonly unavailable: string } | null;
-
 /** One gate attempt as the log committed it, without reading the file again. */
 function gateBodyOf(run: Run, id: string): GateAttempt | undefined {
   for (const entry of run.log.ledger.replay()) {
@@ -11344,11 +11452,12 @@ function gateBodyOf(run: Run, id: string): GateAttempt | undefined {
 function gateOperation(prepared: PreparedGate, message: string): GateOperation {
   const request = prepared.request;
   if (request.runId === undefined) throw new Error('A committing gate requires its durable run ID');
-  if (prepared.decisive.length > 0 || request.checks.some(check => check.discovery !== undefined || check.kind === 'conformance')) {
-    throw new Error(`Gate ${request.id} was not completely verified before its operation was recorded`);
+  if (request.audit === undefined || request.checks.length > 0) {
+    throw new Error(`Gate ${request.id} is not a configured audit request; a committing gate plans no command of its own`);
   }
+  if (prepared.decisive.length > 0) throw new Error(`Gate ${request.id} was not completely verified before its operation was recorded`);
   return {
-    schema: 'ramify-agent.gate-operation/1',
+    schema: 'ramify-agent.gate-operation/2',
     checkpoint: prepared.checkpoint as GateOperation['checkpoint'],
     request: {
       id: request.id,
@@ -11356,27 +11465,15 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
       projectRoot: request.projectRoot,
       directory: request.directory,
       head: request.head,
-      checks: request.checks.map(({ discovery: _discovery, ...check }) => ({
-        ...check,
-        kind: check.kind as 'setup' | 'ramify-check' | 'type-check' | 'tests' | 'scenarios',
-      })),
-      ...(request.auditAllTests === undefined ? {} : { auditAllTests: request.auditAllTests }),
-      selection: {
-        policy: request.selection?.policy ?? 'all-project',
-        exactOwners: [...(request.selection?.exactOwners ?? [])],
-        subtrees: [...(request.selection?.subtrees ?? [])],
-      },
-      dependencyDirectories: [...(request.dependencyDirectories ?? [])],
+      audit: { mode: request.audit.mode, ...(request.audit.nested === true ? { nested: true } : {}), timeoutMs: request.audit.timeoutMs },
       subject: request.subject ?? {},
       proposedBy: request.proposedBy ?? null,
       repairRound: request.repairRound ?? 0,
       infrastructureAttempt: request.infrastructureAttempt ?? 0,
-      writeScope: [...(request.writeScope ?? [])],
       limits: {
         repairRounds: request.limits?.repairRounds ?? 1,
         infrastructureRetries: request.limits?.infrastructureRetries ?? 1,
       },
-      ...(request.scenarios === undefined ? {} : { scenarios: request.scenarios }),
     },
     guardedChanges: [...prepared.guardedChanges],
     rules: prepared.rules.map(({ limits, ...rule }) => ({
@@ -11396,9 +11493,7 @@ function preparedGate(operation: GateOperation): PreparedGate {
     checkpoint: operation.checkpoint,
     request: {
       ...operation.request,
-      checks: operation.request.checks,
-      dependencyDirectories: operation.request.dependencyDirectories,
-      writeScope: operation.request.writeScope,
+      checks: [],
     },
     guardedChanges: [...operation.guardedChanges],
     rules: [...operation.rules],
@@ -11407,27 +11502,6 @@ function preparedGate(operation: GateOperation): PreparedGate {
     decisive: [],
     timeoutMs: operation.timeoutMs,
   };
-}
-
-/**
- * What a failing gate tells the agent that receives it: its cause, each
- * command that did not pass, and what that command reported. A Ramify
- * check's findings are relayed as findings; anything else is quoted from the
- * end of its own output.
- */
-/**
- * The lines a composition failure adds to a failing gate's diagnostics: the
- * integration scenario that failed while its sub-scenarios passed, and the
- * sub-scenarios whose bridging Given is suspect (architecture §10).
- */
-function compositionLines(gate: GateAttempt, records: readonly ScenarioRecord[]): string[] {
-  const results = gate.commands.flatMap(command => (command.kind === 'scenarios' ? command.scenarios?.scenarios ?? [] : []));
-  return compositionFailures(records, results).flatMap(failure => [
-    `- composition failure: \`${failure.scenario}\` failed while its sub-scenarios ${failure.passed.map(id => `\`${id}\``).join(', ')} passed, so their step definitions work one by one and not together.`,
-    ...(failure.suspects.length === 0
-      ? ['  - No sub-scenario has a bridging Given; look at what the step definitions share between the steps.']
-      : failure.suspects.map(suspect => `  - The bridging Given of \`${suspect.scenario}\` is suspect: ${suspect.givens.map(given => `"${given}"`).join(', ')} assumes what the real behavior may not do.`)),
-  ]);
 }
 
 /** The write scope of one assignment, project-relative, as a gate attributes findings against it. */
@@ -11735,4 +11809,17 @@ function reviewOutcome(
     case 'stopped':
       return notVerified(stop ?? 'stopped', stop === 'deadline' ? 'The reviews\' settlement bound passed while this attempt ran' : 'The run stopped its readers while this attempt ran', false);
   }
+}
+
+/**
+ * The readiness baseline's audit outcome, beside its gate as a committing
+ * gate's is: recorded only for an answered request with its published
+ * record, so the execution map projects the baseline's outcome rather than a
+ * publication without one.
+ */
+function readinessAuditOutcome(gate: GateAttempt) {
+  const overall = gate.audit?.verdict ?? null;
+  if (overall === null || gate.audited === null || gate.evidence === null) return [];
+  return [{ path: runLayout.gateAuditOutcome(gate.id), id: gate.id, revision: 1,
+    body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: gate.id, overall, audited: gate.audited } }];
 }

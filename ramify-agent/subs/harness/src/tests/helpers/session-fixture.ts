@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import type { AgentPort } from '../../../subs/agent/src/interfaces/port.js';
 import { extractPlanScenarios } from '../../../subs/scenarios/src/extraction.js';
 import { createScriptedAgent, type ScriptedAgent, type ScriptStep } from '../../../subs/agent/src/scripted.js';
-import type { CheckExecutionPort } from '../../checks/execution.js';
 import { protocolPaths } from '../../interfaces/protocol/paths.js';
 import { commandResponseSchema } from '../../interfaces/protocol/jobs.js';
 import { runSessionsResponseSchema, type RunSessionView } from '../../interfaces/protocol/sessions.js';
@@ -11,16 +10,16 @@ import type { RunServiceOptions } from '../../run/service.js';
 import { runLayout } from '../../run/records.js';
 import { readTranscript } from '../../transcripts/writer.js';
 import { analysis, entry, hypothesis, requestCompletion } from './analysis.js';
-import { createPassingCheckExecution } from './direct-check-execution.js';
-import { directReadinessExecution, openRunsWithoutProcesses } from './external-tools.js';
+import { openRunsWithoutProcesses } from './external-tools.js';
 import { assign, byRole, completionProposed, outline, read, submit, treeInputs } from './iterations.js';
 import { forkDecision, registryChange, requestPlacement } from './placement.js';
 import { sharedUi, writeArchitectTreeFixture } from './progress-fixture.js';
-import { emptyAnalysis, runPath, startRun, stopRun, testPolicy, until } from './runs.js';
+import { emptyAnalysis, runPath, scriptedConfiguredAudit, startRun, stopRun, testPolicy, until } from './runs.js';
 import { declaringScenarios } from './declarations.js';
 import { scenariosCommit, scriptedGit, type ScriptedGit } from './scripted-git.js';
 import { runSessionScenario } from './session-scenario.js';
 import { finalCandidate } from './final-candidate.js';
+import { fixtureScratchGit } from './mock-git.js';
 
 /*
  * Sessions in every state, and every lineage relation, for the browser
@@ -270,7 +269,7 @@ export interface LiveRunSettings {
 }
 
 /** The agent and run settings the server that drives the live run is started with. */
-export function liveRunSettings(root: string, pacer: Pacer, checkExecution: CheckExecutionPort = createPassingCheckExecution()): LiveRunSettings {
+export function liveRunSettings(root: string, pacer: Pacer): LiveRunSettings {
   const planId = sessionPlans.live;
   const final = finalCandidate(root, `scenarios-of-${planId}`);
   const git = scriptedGit(root, {
@@ -289,10 +288,10 @@ export function liveRunSettings(root: string, pacer: Pacer, checkExecution: Chec
     git,
     runs: {
       inputs: treeInputs(),
-      git,
+      git: fixtureScratchGit(git),
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
-      checkExecution,
+
+      configuredAudit: scriptedConfiguredAudit(root, {}),
       policy: projectRoot => testPolicy(projectRoot),
       stopGraceMs: 500,
       warn: () => undefined,

@@ -4,11 +4,10 @@ import type { SessionSpec } from '../../../subs/agent/src/interfaces/port.js';
 import type { RunEvent } from '../../run/log.js';
 import type { ReviewPolicy, RunPolicy } from '../../run/records.js';
 import type { RunWrite } from '../../run/service.js';
-import type { CheckExecutionPort } from '../../checks/execution.js';
+import type { ConfiguredAuditPort } from '../../../subs/audit/src/check-execution.js';
 import { reviewLayout, type ReviewAttempt } from '../../reviews/records.js';
 import { analysis, entry, requestCompletion } from './analysis.js';
 import { scriptedCandidates, testReviewPolicy, type ScriptedCandidates, type ScriptedCommit } from './candidates.js';
-import { directReadinessExecution } from './external-tools.js';
 import { copyFixture } from './fixture.js';
 import { gateGit, scenariosCommit, type GateCommit } from './gate-git.js';
 import { addModule, assign, byRole, byWork, outline, submit, treeInputs } from './iterations.js';
@@ -86,7 +85,7 @@ export interface ReviewRun {
   /** Stop bound of the service, for a scenario whose reader ignores its stop. */
   readonly stopGraceMs?: number;
   /** How the gates' checks run; passing and immediate by default. */
-  readonly checkExecution?: CheckExecutionPort;
+  readonly configuredAudit?: ConfiguredAuditPort;
   /** The audited candidates Git answers for, in place of {@link candidates}. */
   readonly commits?: Record<string, ScriptedCommit>;
   /** What the scripted fake declares, such as a fork it lacks. */
@@ -184,14 +183,14 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
     inputs: treeInputs(),
     git: git.git,
     candidates: source,
-    readinessExecution: directReadinessExecution(),
+
     policy: projectRoot => {
       const policy = testPolicy(projectRoot, { reviews: testReviewPolicy(scenario.policy) });
       return { ...policy, limits: { ...policy.limits, ...scenario.limits } };
     },
     ...(scenario.afterWrite === undefined ? {} : { afterWrite: scenario.afterWrite }),
     ...(scenario.stopGraceMs === undefined ? {} : { stopGraceMs: scenario.stopGraceMs }),
-    ...(scenario.checkExecution === undefined ? {} : { checkExecution: scenario.checkExecution }),
+    ...(scenario.configuredAudit === undefined ? {} : { configuredAudit: scenario.configuredAudit }),
     ...(scenario.agentOptions === undefined ? {} : { agentOptions: scenario.agentOptions }),
     ...(scenario.now === undefined ? {} : { now: scenario.now }),
   });

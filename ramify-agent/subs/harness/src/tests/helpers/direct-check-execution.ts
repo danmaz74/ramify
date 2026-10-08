@@ -1,32 +1,77 @@
-import { readFileSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { GateEvidence, ScenarioCheckSummary } from '../../checks/records.js';
+import type { Checkpoint, GateEvidence } from '../../checks/records.js';
 import { checkOutputPath, commandStart, inPlaceCheckExecution, notRun, type CheckExecutionContext, type CheckExecutionPort } from '../../checks/execution.js';
 import type { PlannedCheck } from '../../checks/verify.js';
-import { outputTailBytes, type CommandOutcome, type CommandRun } from '../../../subs/evidence/src/run-command.js';
-import { scenarioRunName } from '../../../subs/scenarios/src/profiles.js';
-import { identityTagOf, pendingTag } from '../../../subs/scenarios/src/rendering.js';
+import { childEnvironment, outputTailBytes, runCommand, type CommandOutcome, type CommandRun } from '../../../subs/evidence/src/run-command.js';
+import { captureProjectConfig } from '../../run/project-config.js';
+import type {
+  CommittedAuditConfiguration, ConfiguredAuditInput, ConfiguredAuditMode, ConfiguredAuditPort, ConfiguredAuditResult,
+} from '../../../subs/audit/src/check-execution.js';
+import { sameAuditPolicy } from '../../../subs/audit/src/check-execution.js';
 
-/** One deterministic command result returned by the direct test executor. */
+/*
+ * Deterministic stand-ins for the two ways a gate's checks run.
+ *
+ * A committing gate asks the project's committed audit, so a run test gives
+ * the run service a scripted `ConfiguredAuditPort`: each request answers the
+ * fake configured checks `tests`, `type-check` and `ramify-check` (and the
+ * project's declared setup commands first, and in a mapped script a
+ * `scenarios` check last) from the test's script, and composes a provider-
+ * shaped result. A standalone diagnosis runs in place, so a gate-policy test
+ * gives `runGate` a scripted `CheckExecutionPort`. Neither spawns a provider,
+ * creates a worktree or publishes a Git ref; their evidence values are
+ * synthetic test records only.
+ */
+
+/** One scenario a scripted `scenarios` check reports, as Cucumber's parsed run gives it. */
+export interface ScriptedScenario {
+  readonly id: string;
+  readonly status?: 'passed' | 'failed' | 'undefined' | 'pending' | 'ambiguous' | 'skipped' | undefined;
+  readonly file?: string | undefined;
+  readonly line?: number | undefined;
+  readonly failure?: { readonly step: string; readonly message: string } | undefined;
+  readonly undefinedSteps?: readonly string[] | undefined;
+  /** Each step's text and the definition that bound it. */
+  readonly binding?: ReadonlyArray<{ readonly step: string; readonly uri: string; readonly line: number }> | undefined;
+}
+
+/** One deterministic command result returned by a scripted executor or audit. */
 export interface DirectCheckStep {
   readonly outcome?: CommandOutcome | undefined;
   readonly stdout?: string | undefined;
   readonly stderr?: string | undefined;
   readonly elapsedMs?: number | undefined;
   readonly truncated?: boolean | undefined;
-  /** For a `scenarios` check: what its streams said. Omitted, the check passed with every selected scenario. */
-  readonly scenarios?: ScenarioCheckSummary | undefined;
+  /** For a scripted audit's `scenarios` check: the tracked scenarios its run reported. */
+  readonly scenarios?: readonly ScriptedScenario[] | undefined;
+}
+
+/** A scripted check as a script sees it: its kind, and a setup command's declared name. */
+export interface ScriptedCheck {
+  readonly kind: 'setup' | 'tests' | 'type-check' | 'ramify-check' | 'scenarios';
+  readonly name?: string | undefined;
+}
+
+/** The request a scripted answer belongs to. */
+export interface ScriptedCheckContext {
+  readonly runId?: string | undefined;
+  readonly attemptId: string;
+  readonly checkpoint: Checkpoint;
+  readonly projectRoot: string;
+  readonly sourceCommit: string;
+  /** The mode a configured audit was asked for; absent for an in-place diagnosis. */
+  readonly mode?: ConfiguredAuditMode | undefined;
 }
 
 /** Facts available when a scripted result is selected. */
 export interface DirectCheckInvocation {
-  readonly check: PlannedCheck;
+  readonly check: ScriptedCheck;
   readonly checkIndex: number;
   /** Number of scripted commands already selected by this executor. */
   readonly invocationIndex: number;
-  readonly context: CheckExecutionContext;
+  readonly context: ScriptedCheckContext;
   readonly signal: AbortSignal;
 }
 
@@ -52,18 +97,16 @@ export interface ScriptedCheckExecution extends CheckExecutionPort {
   assertComplete(): void;
 }
 
+// In-place diagnosis executors, for `runGate` and `runCheckpoint`.
+
 /**
- * A direct execution port for state-machine and lifecycle tests.
+ * A direct in-place execution port for gate-policy tests.
  *
- * It writes the same output files as a real executor and delegates every
- * semantic decision to the production gate's `classify` callback. It does
- * not spawn commands, create worktrees, publish Git refs, or establish MCP
- * audit acceptance. Its evidence values are synthetic test records only.
+ * It writes the same output files as the real executor and delegates every
+ * semantic decision to the gate's `classify` callback.
  */
 export function createDirectCheckExecution(options: DirectCheckExecutionOptions): ScriptedCheckExecution {
-  // A sequential script names the commands a scenario states; a scenario
-  // check it does not name passes without consuming an entry.
-  const execution = directCheckExecution(invocation => scriptedStep(options.script, invocation), options.evidence, false);
+  const execution = directCheckExecution(invocation => scriptedStep(options.script, invocation), options.evidence);
   return {
     run: execution.port.run,
     assertComplete() {
@@ -74,44 +117,17 @@ export function createDirectCheckExecution(options: DirectCheckExecutionOptions)
   };
 }
 
-/**
- * A reusable direct executor whose callback explicitly answers every command.
- *
- * Unlike a sequential script, this mode has no fixture entries to exhaust;
- * each finite `run` request bounds the callback invocations for that gate.
- */
+/** A reusable in-place executor whose callback explicitly answers every command. */
 export function createMappedCheckExecution(options: MappedCheckExecutionOptions): CheckExecutionPort {
-  return directCheckExecution(options.script, options.evidence, true).port;
+  return directCheckExecution(options.script, options.evidence).port;
 }
 
-/**
- * The same executor, announcing each command before it answers them, as the
- * in-place and the audit executors announce each command as it starts. A
- * run given it records a `gate-command-started` line for every command.
- */
-export function announcingCheckExecution(port: CheckExecutionPort): CheckExecutionPort {
-  return {
-    async run(checks, request) {
-      for (const index of checks.keys()) await request.started?.(commandStart(checks, index));
-      return port.run(checks, request);
-    },
-  };
-}
-
-/**
- * The deliberately generic passing executor for scenarios that do not test
- * command outcomes. Each gate's finite check list bounds its answers.
- */
+/** The deliberately generic passing in-place executor. */
 export function createPassingCheckExecution(): CheckExecutionPort {
   return createMappedCheckExecution({ script: () => ({}) });
 }
 
-/**
- * Runs real local commands without audit worktrees or Git publication.
- *
- * Use this only where command output or process behavior is itself under
- * test. The attached identity and evidence remain synthetic test records.
- */
+/** Runs real local commands in place, for tests of command output or process behavior. */
 export function createLocalCommandCheckExecution(): CheckExecutionPort {
   return {
     async run(checks, request) {
@@ -138,7 +154,6 @@ function scriptedStep(script: readonly DirectCheckStep[], invocation: DirectChec
 function directCheckExecution(
   select: DirectCheckScript,
   evidence: ((context: CheckExecutionContext) => GateEvidence) | undefined,
-  scriptsScenarios: boolean,
 ): { readonly port: CheckExecutionPort; readonly consumed: () => number } {
   let invocationIndex = 0;
   const port: CheckExecutionPort = {
@@ -146,8 +161,6 @@ function directCheckExecution(
       const commands = [];
       let interrupted = false;
       let cancelled = false;
-      // As the real executors do, a setup command that did not pass keeps
-      // every later command from running, and none of them is scripted.
       let setupFailed = false;
       for (const [checkIndex, check] of checks.entries()) {
         const outputFile = checkOutputPath(request.directory, checkIndex, check);
@@ -158,21 +171,13 @@ function directCheckExecution(
         }
         if (interrupted || request.signal.aborted) {
           const run = await commandRun(outputFile, { outcome: { kind: 'cancelled' } }, invocationIndex);
-          const record = request.classify(check, run, outputFile);
-          commands.push(record);
+          commands.push(request.classify(check, run, outputFile));
           interrupted = true;
           cancelled = true;
           continue;
         }
-
-        if (check.kind === 'scenarios' && !scriptsScenarios) {
-          const run = await commandRun(outputFile, {}, invocationIndex);
-          commands.push(request.classify(check, run, outputFile, passingScenarioSummary(check)));
-          continue;
-        }
-
         const invocation: DirectCheckInvocation = {
-          check,
+          check: scriptedCheckOf(check),
           checkIndex,
           invocationIndex,
           context: request.context,
@@ -182,9 +187,7 @@ function directCheckExecution(
         invocationIndex += 1;
         const step = request.signal.aborted ? { outcome: { kind: 'cancelled' } as const } : scripted;
         const run = await commandRun(outputFile, step, invocation.invocationIndex);
-        const record = check.kind === 'scenarios'
-          ? request.classify(check, run, outputFile, ('scenarios' in step ? step.scenarios : undefined) ?? passingScenarioSummary(check))
-          : request.classify(check, run, outputFile);
+        const record = request.classify(check, run, outputFile);
         commands.push(record);
         if (record.notVerified === 'interrupted') {
           interrupted = true;
@@ -193,7 +196,6 @@ function directCheckExecution(
           setupFailed = true;
         }
       }
-      // A preparation that failed publishes nothing, as ramify-audit's does not.
       const published = !cancelled && !setupFailed;
       return {
         commands,
@@ -203,6 +205,11 @@ function directCheckExecution(
     },
   };
   return { port, consumed: () => invocationIndex };
+}
+
+function scriptedCheckOf(check: PlannedCheck): ScriptedCheck {
+  if (check.kind === 'configured') throw new Error('An in-place diagnosis runs no configured check');
+  return { kind: check.kind, ...(check.name === undefined ? {} : { name: check.name }) };
 }
 
 async function commandRun(outputFile: string, step: DirectCheckStep, invocationIndex: number): Promise<CommandRun> {
@@ -226,7 +233,7 @@ async function commandRun(outputFile: string, step: DirectCheckStep, invocationI
   };
 }
 
-function testEvidence(context: CheckExecutionContext): GateEvidence {
+function testEvidence(context: { readonly sourceCommit: string; readonly attemptId: string }): GateEvidence {
   const identity = `${context.sourceCommit}-${context.attemptId}`;
   return {
     runRef: `refs/test-only/audited-runs/${identity}`,
@@ -235,61 +242,288 @@ function testEvidence(context: CheckExecutionContext): GateEvidence {
   };
 }
 
+// Scripted configured audits, for the run service.
+
+/** The fake configured checks every scripted request answers, in order. */
+export const scriptedAuditChecks = ['tests', 'type-check', 'ramify-check'] as const;
+
+export interface ScriptedAuditOptions {
+  /** The answer for each fake check of each request. Omitted, every check passes. */
+  readonly script?: DirectCheckScript | undefined;
+  /** A sequential script consumed across requests; readiness consumes none. */
+  readonly steps?: readonly DirectCheckStep[] | undefined;
+  /** Whether the request also answers a `scenarios` check, last. A mapped script does by default. */
+  readonly scenarios?: boolean | undefined;
+  /** Announce each check as it starts, as the provider's progress does. */
+  readonly announce?: boolean | undefined;
+  /** Answer each configured check by running real commands in place; see {@link localCommandAudit}. */
+  readonly local?: LocalAuditCommands | undefined;
+}
+
+/** A scripted configured audit and what it was asked. */
+export interface ScriptedAudit extends ConfiguredAuditPort {
+  readonly requests: ConfiguredAuditInput[];
+  /** Verifies that a sequential script was consumed completely. */
+  assertComplete(): void;
+}
+
 /**
- * What a scenario check that passed says, for a direct executor that runs
- * nothing: every run exited 0, and every tracked scenario the selection
- * reaches passed. An identity selection reaches the scenarios it names; a
- * module's run without it reaches the tracked scenarios in that module's
- * feature files as they stand on disk, all of them for `all` and those
- * without the pending tag for `all-untagged`, as the runner itself would.
+ * The committed definition a scripted audit reads: the three fake checks,
+ * and the setup the project's `ramify-agent.json` declares, as readiness
+ * requires them to be equal.
  */
-export function passingScenarioSummary(check: PlannedCheck): ScenarioCheckSummary {
-  const plan = check.scenarios;
-  if (plan === undefined) throw new Error(`A ${check.kind} check carries no scenario plan`);
-  const files = new Map(plan.tracked.map(scenario => [scenario.id, scenario.file]));
-  const passed = (id: string, run: string) => ({
-    id, run, status: 'passed' as const, file: files.get(id) ?? '', line: 1, binding: [], undefined: [],
-  });
-  let excluded = 0;
-  const scenarios = plan.runs.flatMap(run => {
-    if (run.selection.kind === 'identity') return run.selection.scenarios.map(id => passed(id, run.module.module));
-    const area = `${run.module.dir === '' ? '' : `${run.module.dir}/`}${run.module.testing ? 'src/features' : 'src/tests/features'}/`;
-    return plan.tracked.filter(scenario => scenario.file.startsWith(area)).flatMap(scenario => {
-      const pending = tagLineOf(check.command.cwd, scenario.file, scenario.id)?.includes(pendingTag);
-      if (pending === undefined) return [];
-      if (pending && run.selection.kind === 'all-untagged') {
-        excluded += 1;
-        return [];
-      }
-      return [passed(scenario.id, run.module.module)];
-    });
-  });
+export async function scriptedAuditConfiguration(projectRoot: string, sourceCommit: string): Promise<CommittedAuditConfiguration> {
+  const agent = await captureProjectConfig(projectRoot);
+  const setup = 'config' in agent ? agent.config.setup ?? [] : [];
   return {
-    mode: plan.mode,
-    selection: plan.selection,
-    dryRun: plan.dryRun,
-    excluded,
-    setup: plan.setup === null ? null : { exit: 0 },
-    teardown: plan.teardown === null ? null : { exit: 0 },
-    runs: plan.runs.map(run => ({
-      module: run.module.module,
-      exit: 0,
-      profile: `scenarios/${scenarioRunName(run.module)}.profile.mjs`,
-      messages: `scenarios/${scenarioRunName(run.module)}.ndjson`,
-    })),
-    scenarios,
-    untracked: { passed: 0, skipped: 0, failed: 0 },
-    failures: [],
+    sourceCommit, path: 'ramify-audit.json', blob: 'scripted-lifecycle-configuration', projectRoot: '.',
+    checks: scriptedAuditChecks.map(id => ({ id })), ignorePaths: [], undetectedConfigFilesForcingFullAudit: [],
+    workspace: { preparationId: 'nodejs', packageDirectoriesDeclared: false,
+      linkNodeModules: true, packageDirectories: [''],
+      setupCommands: setup.map(command => ({ ...(command.name === undefined ? {} : { name: command.name }),
+        argv: [...command.command], cwd: command.cwd ?? '.', env: command.env ?? {}, timeoutMs: command.timeoutMs ?? 600_000 })) },
   };
 }
 
-/** The tag line of one tracked scenario in its feature file on disk, or undefined where the file does not hold it. */
-function tagLineOf(projectRoot: string, file: string, id: string): string | undefined {
-  let text: string;
+/**
+ * A scripted configured audit. Each request of a committing gate answers
+ * the project's setup commands, then each fake check, from the script; the
+ * composed verdict fails when one exits non-zero. A timeout or a spawn error
+ * fails the request as the provider's own error would, a cancellation
+ * cancels it, and a setup command that exits non-zero fails preparation.
+ * Readiness, whose request has no gate operation record, passes without
+ * consuming the script, as it did before gates asked the audit.
+ */
+export function scriptedAudit(options: ScriptedAuditOptions = {}): ScriptedAudit {
+  const requests: ConfiguredAuditInput[] = [];
+  let consumed = 0;
+  const steps = options.steps;
+  const passing: DirectCheckScript = () => ({});
+  const sequential: DirectCheckScript = invocation => scriptedStep(steps ?? [], invocation);
+  const select: DirectCheckScript = options.script ?? (steps === undefined ? passing : sequential);
+  const scenarios = options.scenarios ?? (options.script !== undefined && options.steps === undefined);
+  return {
+    requests,
+    async read(projectRoot, sourceCommit) {
+      return scriptedAuditConfiguration(projectRoot, sourceCommit);
+    },
+    async run(input) {
+      requests.push(input);
+      const current = await scriptedAuditConfiguration(input.projectRoot, input.sourceCommit);
+      if (!sameAuditPolicy(current, input.configuration)) throw new Error('Scripted configuration mismatch');
+      const checkpoint = await checkpointOf(input);
+      const context: ScriptedCheckContext = {
+        runId: input.runId, attemptId: input.attemptId, checkpoint, projectRoot: input.projectRoot,
+        sourceCommit: input.sourceCommit, mode: input.mode,
+      };
+      const signal = input.signal ?? new AbortController().signal;
+      if (checkpoint === 'readiness' && options.local === undefined) return composed(input, current, []);
+      const checks: ScriptedCheck[] = [
+        ...current.workspace.setupCommands.map(command => ({ kind: 'setup' as const, ...(command.name === undefined ? {} : { name: command.name }) })),
+        ...scriptedAuditChecks.map(kind => ({ kind })),
+        ...(scenarios ? [{ kind: 'scenarios' as const }] : []),
+      ];
+      const answered: Array<{ check: ScriptedCheck; step: DirectCheckStep }> = [];
+      for (const [checkIndex, check] of checks.entries()) {
+        if (signal.aborted) return cancelled(input, current);
+        if (options.announce === true && check.kind !== 'setup') {
+          await input.started?.({ kind: 'configured', name: check.kind, position: checkIndex + 1, total: checks.length });
+        }
+        const step = options.local !== undefined
+          ? await localStep(options.local, check, input, signal)
+          : await select({ check, checkIndex, invocationIndex: consumed, context, signal });
+        consumed += 1;
+        answered.push({ check, step });
+        const outcome = step.outcome ?? { kind: 'completed', exitCode: 0 };
+        if (outcome.kind === 'cancelled' || signal.aborted) return cancelled(input, current);
+        if (outcome.kind === 'timed-out') return failed(input, current, 'timeout', `${check.kind} timed out`, true);
+        if (check.kind === 'setup' && (outcome.kind !== 'completed' || outcome.exitCode !== 0)) {
+          return failed(input, current, 'setup-command-failed', `Setup command ${check.name ?? ''} exited with code ${outcome.kind === 'completed' ? outcome.exitCode : 'none'}. Output tail:\n${step.stdout ?? ''}${step.stderr ?? ''}`, false);
+        }
+      }
+      return composed(input, current, answered.filter(entry => entry.check.kind !== 'setup'));
+    },
+    assertComplete() {
+      if (options.steps !== undefined && consumed !== options.steps.length) {
+        throw new Error(`Scripted audit declared ${options.steps.length} results but consumed ${consumed}`);
+      }
+    },
+  };
+}
+
+/** The passing scripted audit: every request of every gate passes. */
+export function passingAudit(): ScriptedAudit {
+  return scriptedAudit();
+}
+
+/** A scripted audit whose callback answers each fake check of each request. */
+export function mappedAudit(script: DirectCheckScript, options: Omit<ScriptedAuditOptions, 'script' | 'steps'> = {}): ScriptedAudit {
+  return scriptedAudit({ ...options, script });
+}
+
+/** A scripted audit consuming one step per fake check, across requests. */
+export function sequentialAudit(steps: readonly DirectCheckStep[]): ScriptedAudit {
+  return scriptedAudit({ steps });
+}
+
+/** The same audit, announcing each configured check as it starts. */
+export function announcingAudit(options: Omit<ScriptedAuditOptions, 'announce'> = {}): ScriptedAudit {
+  return scriptedAudit({ ...options, announce: true });
+}
+
+/** The real commands a local audit runs in place for each fake check, by kind. */
+export interface LocalAuditCommands {
+  readonly tests?: readonly string[] | undefined;
+  readonly 'type-check'?: readonly string[] | undefined;
+  readonly 'ramify-check'?: readonly string[] | undefined;
+}
+
+/**
+ * A configured audit that runs real commands in the project's working tree
+ * for its fake checks: the project's own Vitest for `tests` by default.
+ * Use it only where what the project's tests really do is under test; its
+ * evidence is synthetic.
+ */
+export function localCommandAudit(commands: LocalAuditCommands = {}): ScriptedAudit {
+  return scriptedAudit({ local: commands });
+}
+
+async function localStep(commands: LocalAuditCommands, check: ScriptedCheck, input: ConfiguredAuditInput, signal: AbortSignal): Promise<DirectCheckStep> {
+  const argv = check.kind === 'tests' ? commands.tests ?? [join(input.projectRoot, 'node_modules', '.bin', 'vitest'), 'run']
+    : check.kind === 'type-check' || check.kind === 'ramify-check' ? commands[check.kind] : undefined;
+  if (argv === undefined || argv.length === 0) return {};
+  const run = await runCommand({ argv: [...argv], cwd: input.projectRoot, env: childEnvironment({}), timeoutMs: 300_000, signal });
+  return { outcome: run.outcome, stdout: run.stdout, stderr: run.stderr, elapsedMs: run.elapsedMs };
+}
+
+/** The checkpoint whose gate made the request: its gate operation record, or readiness, which records none. */
+async function checkpointOf(input: ConfiguredAuditInput): Promise<Checkpoint> {
+  const plans = join(input.projectRoot, 'plans');
+  let entries: string[];
   try {
-    text = readFileSync(join(projectRoot, file), 'utf8');
+    entries = await readdir(plans);
   } catch {
-    return undefined;
+    return 'readiness';
   }
-  return text.split('\n').find(line => line.trim().split(/\s+/u).includes(identityTagOf(id)));
+  for (const plan of entries) {
+    const operation = join(plans, plan, '.harness', 'jobs', input.runId, 'gates', input.attemptId, 'operation.json');
+    try {
+      const body = JSON.parse(await readFile(operation, 'utf8')) as { body?: { checkpoint?: Checkpoint }; checkpoint?: Checkpoint };
+      const checkpoint = body.checkpoint ?? body.body?.checkpoint;
+      if (checkpoint !== undefined) return checkpoint;
+    } catch {
+      // Not this plan's run.
+    }
+  }
+  return 'readiness';
+}
+
+function base(input: ConfiguredAuditInput, configuration: CommittedAuditConfiguration) {
+  return {
+    requestId: `${input.runId}:${input.attemptId}`, mode: input.mode, nested: input.nested === true, projects: null, discovery: null,
+    requestedSourceCommit: input.sourceCommit, reused: false, reuse: null, definition: { path: configuration.path, blob: configuration.blob },
+  } as const;
+}
+
+function cancelled(input: ConfiguredAuditInput, configuration: CommittedAuditConfiguration): ConfiguredAuditResult {
+  return {
+    ...base(input, configuration), status: 'cancelled', auditedSourceCommit: null, requestedMode: null, executedMode: null,
+    fallbackReason: null, verdict: null, reportCommit: null, runRef: null, treeRef: null,
+    detail: 'The scripted audit was cancelled', provider: { status: 'cancelled', reason: 'scripted' }, checks: {},
+  };
+}
+
+function failed(input: ConfiguredAuditInput, configuration: CommittedAuditConfiguration, code: string, message: string, retryable: boolean): ConfiguredAuditResult {
+  return {
+    ...base(input, configuration), status: 'failed', auditedSourceCommit: null, requestedMode: null, executedMode: null,
+    fallbackReason: null, verdict: null, reportCommit: null, runRef: null, treeRef: null,
+    detail: `${code}: ${message}`, provider: { status: 'failed', error: { code, message, retryable } }, checks: {},
+  };
+}
+
+/** A completed scripted request: each answered check as the provider publishes one, and the composed verdict. */
+function composed(
+  input: ConfiguredAuditInput,
+  configuration: CommittedAuditConfiguration,
+  answered: ReadonlyArray<{ check: ScriptedCheck; step: DirectCheckStep }>,
+): ConfiguredAuditResult {
+  const checks: Record<string, unknown> = {};
+  let failing = false;
+  let indeterminate = false;
+  for (const { check, step } of answered) {
+    const outcome = step.outcome ?? { kind: 'completed', exitCode: 0 };
+    const passed = outcome.kind === 'completed' && outcome.exitCode === 0
+      && (step.scenarios ?? []).every(scenario => (scenario.status ?? 'passed') === 'passed' || scenario.status === 'skipped');
+    const runnerError = outcome.kind === 'runner-error' ? { ...outcome.error } : null;
+    if (runnerError !== null) indeterminate = true;
+    else if (!passed) failing = true;
+    const output = `${step.stdout ?? ''}${step.stderr ?? ''}`;
+    checks[check.kind] = {
+      status: passed ? 'passed' : runnerError !== null ? 'error' : 'failed',
+      passed,
+      summary: passed ? `${check.kind} passed` : `${check.kind} ${runnerError !== null ? 'could not run' : 'failed'}`,
+      output,
+      ...(runnerError === null ? {} : { runnerError }),
+      ...(step.scenarios === undefined ? {} : { cucumberMessages: { status: 'read', run: { scenarios: step.scenarios.map(cucumberScenario) } } }),
+    };
+  }
+  const verdict = indeterminate ? 'indeterminate' as const : failing ? 'fail' as const : 'pass' as const;
+  const evidence = testEvidence({ sourceCommit: input.sourceCommit, attemptId: input.attemptId });
+  const mode = input.mode === 'full' ? 'full' as const : 'ramify-partial' as const;
+  return {
+    ...base(input, configuration), status: 'completed', auditedSourceCommit: input.sourceCommit,
+    requestedMode: mode, executedMode: mode, fallbackReason: null, verdict,
+    reportCommit: evidence.reportCommit, runRef: evidence.runRef, treeRef: evidence.treeRef,
+    detail: verdict === 'pass' ? 'Scripted audit passed; no provider ran' : `Scripted audit composed ${verdict}`,
+    // A nested request of a scripted project, which has no nested definition:
+    // the root is its only project and discovery skipped nothing.
+    ...(input.nested === true ? {
+      projects: [{
+        projectRoot: configuration.projectRoot, verdict, execution: 'ran' as const, status: 'completed' as const,
+        failures: verdict === 'pass' ? [] : [`Scripted audit composed ${verdict}`], requestId: `${input.runId}:${input.attemptId}`,
+        auditedSourceCommit: input.sourceCommit, requestedMode: mode, executedMode: mode, fallbackReason: null, reuse: null,
+        reportCommit: evidence.reportCommit, runRef: evidence.runRef, treeRef: evidence.treeRef, retrievalCommands: [],
+        durationSeconds: null, counts: null, detail: 'scripted',
+      }],
+      discovery: { status: 'complete' as const, skipped: [], unavailable: [] },
+    } : {}),
+    provider: {
+      status: 'completed', scripted: true,
+      summary: { overall: verdict, checks, coverage: { universe: { checkIds: Object.keys(checks) } } },
+      composition: { verdict, scoped: mode === 'ramify-partial', reason: 'scripted' },
+    },
+    checks,
+  };
+}
+
+/** One scripted scenario as the provider's parsed Cucumber run lists it, tagged with its identity. */
+function cucumberScenario(scenario: ScriptedScenario) {
+  const status = scenario.status ?? 'passed';
+  const outcome = status === 'passed' ? 'passed' : status === 'skipped' || status === 'pending' ? 'skipped' : 'failed';
+  const steps = [
+    ...(scenario.binding ?? []).map(binding => ({ text: binding.step, status: 'PASSED', definitionLocations: [{ uri: binding.uri, line: binding.line }] })),
+    ...(scenario.failure === undefined ? [] : [{ text: scenario.failure.step, status: 'FAILED', definitionLocations: [], errorMessage: scenario.failure.message }]),
+    ...(scenario.undefinedSteps ?? []).map(text => ({ text, status: 'UNDEFINED', definitionLocations: [] })),
+    ...(status === 'pending' ? [{ text: 'a pending step', status: 'PENDING', definitionLocations: [] }] : []),
+    ...(status === 'ambiguous' ? [{ text: 'an ambiguous step', status: 'AMBIGUOUS', definitionLocations: [] }] : []),
+  ];
+  return {
+    uri: scenario.file ?? `features/${scenario.id}.feature`,
+    line: scenario.line ?? 1,
+    name: scenario.id,
+    tags: [`@ramify-${scenario.id}`],
+    outcome,
+    steps,
+    messages: [],
+  };
+}
+
+/** Announces every planned in-place check before answering, as the real executor announces each. */
+export function announcingCheckExecution(port: CheckExecutionPort): CheckExecutionPort {
+  return {
+    async run(checks, request) {
+      for (const index of checks.keys()) await request.started?.(commandStart(checks, index));
+      return port.run(checks, request);
+    },
+  };
 }

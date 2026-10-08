@@ -10,7 +10,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, outline, read, submit, treeInputs, write } from './helpers/iterations.js';
 import { gateGit, scenariosCommit, type GateCommit } from './helpers/gate-git.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { installTestRunner, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
 
@@ -50,7 +50,14 @@ class RecoveringRamify extends FakeRamifyCli {
     if (this.apiFrom.length === 1) return { ok: false, message: failure };
     const directory = join(projectRoot, apiFrom, 'src', '.ramify');
     await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, '_meta.json'), JSON.stringify({ schema: 'ramify.api-view/1', module: notes, revision: 'rev/1:x:2' }));
+    const revision = 'rev/1:x:2';
+    const architectDirectory = join(projectRoot, '.ramify-architect');
+    await mkdir(architectDirectory, { recursive: true });
+    await writeFile(join(architectDirectory, '_meta.json'), JSON.stringify({
+      schema: 'ramify.architect-view/3', revision, input: 'input/1:test', modules: 1,
+      dependencies: 'measured', dependencyScope: 'production',
+    }));
+    await writeFile(join(directory, '_meta.json'), JSON.stringify({ schema: 'ramify.api-view/1', module: notes, area: 'ordinary', revision }));
     return { ok: true, output: '' };
   }
 }
@@ -75,7 +82,8 @@ describe('the API view of a local architect\'s continued turns', () => {
     const prompts = new Map<string, string[]>();
     const directories: string[] = [];
     const scripted = gateGit(fixture.root, { previews: finalCandidate(fixture.root, 'revision-01').previews, head: base, commits: [scenarios,
-      { commit: 'revision-01', changes: [{ status: 'A', path: `${notesDirectory}/src/store.ts` }] }, unchanged] });
+      // The iteration checkpoint commits the store; the work-item and final checkpoints find it unchanged.
+      { commit: 'revision-01', changes: [{ status: 'A', path: `${notesDirectory}/src/store.ts` }] }, unchanged, unchanged] });
     const opened = await openRuns(fixture.root, {
       script: recording(byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
@@ -88,7 +96,7 @@ describe('the API view of a local architect\'s continued turns', () => {
       inputs: treeInputs(),
       ramify,
       git: scripted.git, candidates: finalCandidate(fixture.root, 'revision-01').candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -101,7 +109,8 @@ describe('the API view of a local architect\'s continued turns', () => {
     expect(second).not.toContain(failure);
     const moduleSource = join(fixture.root, notesDirectory, 'src');
     expect(directories).toEqual([moduleSource, moduleSource]);
-    expect(second).toContain(`- API view (src): \`${moduleSource}/.ramify/\`, revision \`rev/1:x:2\``);
+    const architectMeta = JSON.parse(await readFile(join(fixture.root, '.ramify-architect', '_meta.json'), 'utf8')) as { revision: string };
+    expect(second).toContain(`- API view (src): \`${moduleSource}/.ramify/\`, revision \`${architectMeta.revision}\``);
     expect(first).toContain(`- Onboarding (\`${join(fixture.root, notesDirectory, 'README.md')}\`)`);
     expect(first).toContain(`- The architect view is at \`${fixture.root}/.ramify-architect/\``);
     expect(first).toContain(`- Working directory: \`${moduleSource}\``);

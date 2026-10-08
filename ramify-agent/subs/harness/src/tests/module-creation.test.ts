@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
@@ -11,7 +11,7 @@ import { architectureLayout, type PlacementDecision } from '../architecture/reco
 import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 vi.mock('node:child_process', async original =>
@@ -82,9 +82,10 @@ const created: GateCommit = {
 };
 
 /** A copy of the fixture whose runner answers, with Git's answers stated. */
-async function target(answers: Omit<GateGitOptions, 'head'> & { readonly finalHead: string }, options: { readonly miniRunner?: boolean } = {}) {
-  const fixture = await copyFixture();
+async function target(answers: Omit<GateGitOptions, 'head'> & { readonly finalHead: string }, options: { readonly miniRunner?: boolean; readonly rootOnlyScratch?: boolean } = {}) {
+  const fixture = await copyFixture({ scratchRule: options.rootOnlyScratch !== true });
   cleanups.push(fixture.remove);
+  if (options.rootOnlyScratch) await writeFile(join(fixture.root, '.gitignore'), '/src/tmp/\n');
   if (options.miniRunner === false) await installTestRunner(fixture.root);
   else await installMiniRunner(fixture.root);
   const { finalHead, ...gitAnswers } = answers;
@@ -124,7 +125,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
       inputs: treeInputs(),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -160,7 +161,11 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
 
 describe('G10: global placement authorizes a new owner without claiming it exists', () => {
   test('a create decision and its registry proposal lead to a bootstrap assignment that passes its gate', async () => {
-    const { root, scripted, final } = await target({ commits: [scenarios, created, unchanged, unchanged], finalHead: 'revision-01' });
+    const setup = { commit: 'scratch-setup-00', against: base, subject: 'Prepare module scratch ignore rule',
+      changes: [{ status: 'M', path: '.gitignore' }] };
+    const { root, scripted, final } = await target({ commits: [setup, scenariosCommit('review-notes', materialized, setup.commit), created, unchanged, unchanged],
+      finalHead: 'revision-01' }, { rootOnlyScratch: true });
+    const scratch = join(root, notesDirectory, 'src/tmp/draft.txt');
     const proposal = {
       parent: reviews,
       directory: notesDirectory,
@@ -202,13 +207,14 @@ describe('G10: global placement authorizes a new owner without claiming it exist
         }))],
         engineer: [submit(
           completionProposed('Created the notes module with its first behavior and the test that states it.'),
+          write('tmp/draft.txt', 'bootstrap scratch\n'),
           ...moduleWrites,
         )],
       }),
       inputs: treeInputs(),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -240,6 +246,8 @@ describe('G10: global placement authorizes a new owner without claiming it exist
     const result = await readResult(root, runId, 1);
     expect(result.outcome).toBe('accepted');
     expect(result.commit).toBe('revision-01');
+    expect(await readFile(join(root, '.gitignore'), 'utf8')).toBe('/src/tmp/\n**/src/tmp/\n');
+    await expect(readFile(scratch)).rejects.toMatchObject({ code: 'ENOENT' });
     // The module is in the refreshed inventory before its gate passes, and
     // the notice names the decision that proposed it.
     const closed = events.find(event => event.type === 'iteration-closed');

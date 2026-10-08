@@ -15,15 +15,15 @@ import { snapshotOf } from './snapshot.js';
 
 type Ref = { kind: RunEventRefKind; id: string };
 const ref = (kind: RunEventRefKind, id: string | null | undefined): Ref[] => (id === null || id === undefined ? [] : [{ kind, id }]);
+/** A scenario or a delegated outcome is a record of its own kind; a registered case or test is named in the sentence alone. */
+const obligationRef = (id: string): Ref[] => /^sc-\d{3,}$/.test(id) ? ref('scenario', id) : /^cap-\d{3,}$/.test(id) ? ref('capability-task', id) : [];
 
 /** Each kind of gate command, as a sentence names it. */
 const commandLabels: Record<RunEventOf<'gate-command-started'>['data']['kind'], string> = {
   setup: 'the setup command',
-  tests: 'the tests',
   'type-check': 'the type check',
   'ramify-check': 'the Ramify check',
-  conformance: 'the conformance check',
-  scenarios: 'the scenario check',
+  configured: 'the configured check',
 };
 
 /** One event, as a client reads it. Every internal event type has a projection here. */
@@ -219,21 +219,21 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`${featureFiles(event.data.files.length)} being written onto the run branch`, []];
     case 'scenarios-materialized':
       return [`${featureFiles(event.data.files.length)} on the run branch`, ref('commit', event.data.commit)];
-    case 'scenario-declared':
+    case 'obligation-registered':
       return [
-        `Scenario ${event.data.scenario} was declared and is ${event.data.state}${event.data.state === 'bound' ? ', keeping its pending tag while its work item holds fakes' : ''}`,
-        [...ref('scenario', event.data.scenario), ...ref('invocation', event.data.by)],
+        `${event.data.responsible.kind === 'work-item' ? 'The local architect of' : 'The capability architect of'} ${event.data.responsible.id} registered ${event.data.id}: ${event.data.kind === 'test' ? `required test "${event.data.description ?? ''}"` : `case ${event.data.case ?? ''}`}`,
+        [...ref(event.data.responsible.kind === 'work-item' ? 'work-item' : 'capability-task', event.data.responsible.id), ...ref('invocation', event.data.by)],
       ];
-    case 'scenario-due':
-      return [`Scenario ${event.data.scenario} is due: its work item's requirements are verified, so it runs without fakes`, ref('scenario', event.data.scenario)];
-    case 'scenario-implemented':
-      return [`Scenario ${event.data.scenario} is implemented`, [...ref('scenario', event.data.scenario), ...ref('gate', event.data.gate)]];
-    case 'scenario-bound-passed':
-      return [`Scenario ${event.data.scenario} passed against its work item's fakes and stays bound`, [...ref('scenario', event.data.scenario), ...ref('gate', event.data.gate)]];
-    case 'scenarios-withdrawing':
-      return [`${counted(event.data.scenarios.length, 'scenario is', 'scenarios are')} being withdrawn to pending: ${event.data.scenarios.join(', ')} (${event.data.reason})`, [...ref('work-item', event.data.workItem), ...event.data.scenarios.flatMap(scenario => ref('scenario', scenario))]];
-    case 'scenario-withdrawn':
-      return [`Scenario ${event.data.scenario} was withdrawn to pending (${event.data.reason})`, [...ref('scenario', event.data.scenario), ...ref('commit', event.data.commit)]];
+    case 'obligation-bound':
+      return [
+        `An engineer bound ${event.data.id}, relying on ${event.data.fakes.length === 0 ? 'no fakes' : `fakes ${event.data.fakes.join(', ')}`}`,
+        [...obligationRef(event.data.id), ...ref('invocation', event.data.by)],
+      ];
+    case 'obligation-reported':
+      return [
+        `The responsible architect reported ${event.data.id} ${event.data.judgment} at revision ${event.data.revision}${event.data.where === undefined ? '' : ` (where: ${event.data.where})`}`,
+        [...obligationRef(event.data.id), ...ref('invocation', event.data.by)],
+      ];
     case 'gate-started':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) started`, ref('gate', event.data.gate)];
     case 'gate-committing':
@@ -248,13 +248,8 @@ function describe(event: RunEvent): [string, Ref[]] {
         `Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.line}, command ${event.data.position} of ${event.data.total}`,
         ref('gate', event.data.gate),
       ];
-    case 'gate-attempted': {
-      const carried = event.data.checkFindings?.length ?? 0;
-      const refused = event.data.scenarioFindings?.refused;
-      const findings = carried > 0 ? `, with ${counted(carried, 'CheckFinding event', 'CheckFinding events')}`
-        : refused ? `; its CheckFinding part was refused (${refused.reason})` : '';
-      return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}${findings}`, ref('gate', event.data.gate)];
-    }
+    case 'gate-attempted':
+      return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}`, ref('gate', event.data.gate)];
     case 'check-findings-recorded': {
       // CheckFindings have no reference kind on the wire yet; the page names the count and the cause.
       const cause = event.data.cause;
@@ -337,24 +332,22 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Capability task ${event.data.task} received exchange ${event.data.exchange}`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-assigned':
       return [`Capability task ${event.data.task} assigned ${event.data.assignment}`, [...ref('capability-task', event.data.task), ...ref('capability-assignment', event.data.assignment), ...ref('invocation', event.data.invocation)]];
-    case 'capability-assignment-interrupted':
-      return [`Capability assignment ${event.data.assignment} remains unfinished: ${event.data.cause}`, [...ref('capability-task', event.data.task), ...ref('capability-assignment', event.data.assignment), ...ref('invocation', event.data.invocation)]];
     case 'capability-assignment-settled':
       return [`Capability assignment ${event.data.assignment} settled: ${event.data.outcome}`, [...ref('capability-task', event.data.task), ...ref('capability-assignment', event.data.assignment)]];
-    case 'capability-review-recorded':
-      return [`Capability task ${event.data.task} review ${event.data.outcome} at ${event.data.tree}`, [...ref('capability-task', event.data.task), ...ref('gate', event.data.gate)]];
-    case 'capability-candidate-accepted':
-      return [`Capability task ${event.data.task} accepted candidate ${event.data.tree}`, [...ref('capability-task', event.data.task), ...ref('gate', event.data.gate)]];
     case 'capability-verification-started':
       return [`Capability task ${event.data.task} verification started`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
-    case 'capability-verification-failed':
-      return [`Capability task ${event.data.task} verification failed`, ref('capability-task', event.data.task)];
     case 'capability-handed-back':
       return [`Capability task ${event.data.task} handed back`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-stopped':
       return [`Capability task ${event.data.task} stopped`, ref('capability-task', event.data.task)];
     case 'stop-requested':
       return ['A stop was requested', []];
+    case 'scratch-setting-up':
+      return ['The harness is preparing ignored module scratch', []];
+    case 'scratch-setup-complete':
+      return [event.data.commit === null ? 'Module scratch ignore rule verified' : 'Module scratch ignore rule committed', ref('commit', event.data.commit)];
+    case 'scratch-preserved':
+      return [`Indexed scratch preserved for ${event.data.iteration}: ${event.data.paths.join(', ')}`, ref('iteration', event.data.iteration)];
     case 'job-completed':
       return [
         `The run completed after ${counted(event.data.workItems, 'work item', 'work items')}${event.data.planDeviations === undefined ? '' : `, with ${counted(event.data.planDeviations, 'plan deviation', 'plan deviations')} to review`}`,
@@ -377,7 +370,7 @@ const counted = (count: number, one: string, many: string): string => `${count} 
 const workRefs = (work: RunEventOf<'session-opened'>['data']['work']): Ref[] => [
   ...ref('work-item', work.workItem), ...ref('iteration', work.iteration),
   ...ref(work.capabilityTask === undefined ? 'request' : 'capability-request', work.request),
-  ...ref('capability-task', work.capabilityTask), ...ref('capability-assignment', work.capabilityAssignment),
+  ...ref('capability-task', work.capabilityTask),
 ];
 
 /** The invocation a point names, where it names one. */

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type {
-  AnalysisScenario, RunReview, RunSnapshot, ScenarioCheckView, ScenarioGateResult, ScenarioOriginView, ScenarioView, ScenarioWarningView,
+  AnalysisScenario, ObligationView, RunReview, RunSnapshot, GateScenarioResultView, ScenarioGateResult, ScenarioOriginView, ScenarioView,
+  ScenarioWarningView,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, newCommandId, type ProtocolClient } from './client.js';
 
@@ -179,13 +180,13 @@ export function ScenarioReview({ entries, scenarios, warnings, total }: {
 
 function gateLine(gate: ScenarioGateResult): string {
   const subject = gate.subject.iteration ?? gate.subject.workItem;
-  return `${gate.checkpoint}${subject ? ` ${subject}` : ''}, ${gate.mode}${gate.dryRun ? ' dry run' : ''}: ${gate.status}`;
+  return `${gate.checkpoint}${subject ? ` ${subject}` : ''}, ${gate.check}${gate.command === null ? '' : `.${gate.command}`}: ${gate.status}`;
 }
 
 /** Every tracked scenario with its state, what it belongs to, where it lives and the gates that ran it. */
 export function ScenarioTable({ scenarios, total }: { readonly scenarios: readonly ScenarioView[]; readonly total: number }) {
   if (scenarios.length === 0) return <p className="muted">No scenario is tracked yet: the initial analysis has not been accepted.</p>;
-  const states = ['pending', 'bound', 'declared', 'implemented'] as const;
+  const states = ['pending', 'bound', 'done'] as const;
   return (
     <>
       <p className="muted" aria-label="Scenario states">
@@ -197,16 +198,16 @@ export function ScenarioTable({ scenarios, total }: { readonly scenarios: readon
         <tbody>
           {scenarios.map(scenario => (
             <tr key={scenario.id} data-scenario={scenario.id}>
-              <td><code>{scenario.id}</code><div>{scenario.name}</div></td>
-              <td><span className={`badge scenario-state-${scenario.state}`}>{scenario.state}</span>{scenario.implementedBy && <div className="muted">by {scenario.implementedBy}</div>}</td>
-              <td>{originText(scenario.origin)}</td>
-              <td>
+              <td data-label="Scenario"><code>{scenario.id}</code><div>{scenario.name}</div></td>
+              <td data-label="State"><span className={`badge scenario-state-${scenario.state}`}>{scenario.state}</span></td>
+              <td data-label="Origin">{originText(scenario.origin)}</td>
+              <td data-label="Belongs to">
                 {scenario.kind === 'integration'
-                  ? <>integration of {scenario.subScenarios.join(', ')}; {scenario.workItem ? <>work item {scenario.workItem}</> : 'no work item until its sub-scenarios are implemented'}</>
+                  ? <>integration of {scenario.subScenarios.join(', ')}; {scenario.workItem ? <>work item {scenario.workItem}</> : 'no work item until its sub-scenarios are reported done'}</>
                   : <>entry <code>{scenario.entry}</code>{scenario.workItem ? <>, work item {scenario.workItem}</> : ''}{scenario.partOf ? <>; sub-scenario of {scenario.partOf}</> : ''}</>}
               </td>
-              <td><code>{scenario.owner}</code><div className="muted"><code>{scenario.file}</code></div></td>
-              <td>
+              <td data-label="Owner and file"><code>{scenario.owner}</code><div className="muted"><code>{scenario.file}</code></div></td>
+              <td data-label="Gates">
                 {scenario.gates.length === 0 ? <span className="muted">not run yet</span> : (
                   <ul className="scenario-gates" aria-label={`Gates of ${scenario.id}`}>
                     {scenario.gates.map(gate => (
@@ -227,28 +228,61 @@ export function ScenarioTable({ scenarios, total }: { readonly scenarios: readon
   );
 }
 
-/** A `scenarios` command's summary in a gate attempt. */
-export function ScenarioCheckSummaryView({ summary }: { readonly summary: ScenarioCheckView }) {
-  const selection = summary.selection.kind === 'identity' ? `by identity: ${summary.selection.scenarios.join(', ')}` : summary.selection.kind;
+/** What an obligation is, in the words of the briefing that lists it. */
+function obligationSubject(obligation: ObligationView): string {
+  if (obligation.kind === 'test') return `registered test: ${obligation.description ?? ''}`;
+  if (obligation.kind === 'outcome') return 'delegated outcome';
+  return obligation.case === null ? 'scenario' : `registered case ${obligation.case}`;
+}
+
+/**
+ * Every registered obligation beside the scenarios: its status, the latest
+ * binding's fakes and its responsible architect's own report with the
+ * optional where hint, as recorded. The report is the architect's judgment;
+ * gate results stand beside it, in the Checks area, and never change one.
+ */
+export function ObligationList({ obligations }: { readonly obligations: readonly ObligationView[] }) {
+  if (obligations.length === 0) return null;
+  const owed = obligations.filter(obligation => obligation.status !== 'done');
   return (
-    <div className="scenario-check" aria-label="Scenario check">
-      <p className="muted">
-        Mode {summary.mode}{summary.dryRun ? ' (dry run)' : ''}, selection {selection}, {summary.excluded} excluded.
-        Runs: {summary.runs.map(run => `${run.module} exit ${run.exit ?? 'none'}`).join(', ') || 'none'}.
-        The project's own: {summary.untracked.passed} passed, {summary.untracked.skipped} skipped, {summary.untracked.failed} failed.
+    <section className="obligations" aria-label="Registered obligations">
+      <h3>Registered obligations</h3>
+      <p className="muted" aria-label="Outstanding reports">
+        {owed.length === 0 ? "Every obligation has its architect's done report."
+          : `A done report is outstanding on ${owed.map(obligation => obligation.id).join(', ')}.`}
       </p>
-      {summary.scenarios.length > 0 && (
-        <ul aria-label="Scenario results">
-          {summary.scenarios.map(result => (
-            <li key={result.id} className={`scenario-status-${result.status}`}>
-              <code>{result.id}</code> {result.status} in {result.run}, <code>{result.file}:{result.line}</code>
-              {result.failure && <div className="failure">{result.failure.step}: {result.failure.message}</div>}
-              {result.undefined.length > 0 && <div className="failure">Undefined: {result.undefined.join('; ')}</div>}
-            </li>
-          ))}
-        </ul>
-      )}
-      {summary.failures.length > 0 && <ul className="failure" aria-label="Why the scenario check did not pass">{summary.failures.map(line => <li key={line}>{line}</li>)}</ul>}
+      <ul>
+        {obligations.map(obligation => (
+          <li key={obligation.id} aria-label={`Obligation ${obligation.id}`}>
+            <code>{obligation.id}</code> · {obligationSubject(obligation)} · <span className={`badge scenario-state-${obligation.status}`}>{obligation.status}</span>
+            {' '}· reported on by {obligation.responsible.kind} <code>{obligation.responsible.id}</code>
+            {obligation.binding === null ? ' · not bound'
+              : <> · bound by <code>{obligation.binding.invocation}</code>{obligation.binding.fakes.length > 0 ? `, fakes: ${obligation.binding.fakes.join(', ')}` : ', no fakes'}</>}
+            {obligation.report === null ? ' · no architect report yet'
+              : <> · architect report <strong>{obligation.report.judgment}</strong> by <code>{obligation.report.invocation}</code> (revision {obligation.report.revision})
+                {obligation.report.where !== null && <span className="obligation-where">, where: {obligation.report.where}</span>}</>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The tracked scenarios a gate's audit ran, read from its raw runner output; display only. */
+export function GateScenarioResults({ scenarios }: { readonly scenarios: readonly GateScenarioResultView[] }) {
+  if (scenarios.length === 0) return null;
+  return (
+    <div className="scenario-check" aria-label="Scenarios the audit ran">
+      <p className="muted">The tracked scenarios this gate's audit ran, by its configured Cucumber checks.</p>
+      <ul aria-label="Scenario results">
+        {scenarios.map(result => (
+          <li key={`${result.check}:${result.command ?? ''}:${result.id}`} className={`scenario-status-${result.status}`}>
+            <code>{result.id}</code> {result.status} in <code>{result.command === null ? result.check : `${result.check}.${result.command}`}</code>, <code>{result.file}:{result.line}</code>
+            {result.failure && <div className="failure">{result.failure.step}: {result.failure.message}</div>}
+            {result.undefined.length > 0 && <div className="failure">Undefined: {result.undefined.join('; ')}</div>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

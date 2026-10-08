@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { RamifyCheckResult, RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
-import { guardedConfigurationFiles } from '../work/scope.js';
 
 /*
  * The post-write hook check.
@@ -11,32 +10,59 @@ import { guardedConfigurationFiles } from '../work/scope.js';
  * the adapter disables automatic extension discovery, so the harness
  * installs it itself and runs it after each settled mutation.
  *
- * Two rules decide the form. A changed check is the cheap one and covers
- * exactly the paths it is given; it is never a pass at exit 2, whose reason
- * permits continued editing and says why nothing was checked. Where the
- * changed set cannot be established, or where one of the changed paths is a
- * named configuration file that no changed check covers, the harness answers
- * that at once as not checked and runs a complete check instead of claiming
- * hook coverage. The gap is recorded either way.
+ * A changed check is the cheap form and is given every path the mutation
+ * named, configuration included: the provider classifies each one. Its exit
+ * code is the project verdict, and each named path keeps its own
+ * disposition: `checked` with its content or deletion identity,
+ * `not-analyzed` with its owner and exclusion, or `not-checked` with its
+ * reason. Exit 0 beside a not-analyzed path is no source check of that path,
+ * and exit 2 is never a pass; its reason permits continued editing. Only
+ * where the changed set cannot be established does the harness run a
+ * complete check, instead of claiming hook coverage, and record the gap.
  */
 
 /** Which form of check ran. */
 export type HookMode = 'changed' | 'complete';
 
+/**
+ * One named path's analysis status, as the provider stated it. It is apart
+ * from the check's project verdict: a path can be not analyzed under a
+ * passing check, and checked under a check that found violations elsewhere.
+ */
+export interface HookPathDisposition {
+  readonly path: string;
+  readonly disposition: 'checked' | 'not-analyzed' | 'not-checked';
+  /** `content` or `deleted` for a checked path; the exclusion or inert reason, or why it was not checked, otherwise. */
+  readonly reason: string;
+  readonly module: string | null;
+  readonly exclusion: { readonly kind: string; readonly directory: string; readonly owner: string | null } | null;
+  /** The analyzed content's SHA-256, for a checked path that exists; null otherwise. */
+  readonly sha256: string | null;
+}
+
 /** One `hook-check` observation, as the proposal's observation log holds it. */
 export interface HookCheck {
   readonly paths: readonly string[];
   readonly mode: HookMode;
+  /** The project verdict: exit 0, 1 or anything else. It says nothing about a path the provider did not analyze. */
   readonly outcome: 'passed' | 'findings' | 'not-checked';
   readonly reason: string | null;
   /** Findings this check reported that no earlier check of this invocation had. */
   readonly newFindings: number;
   /** The file holding what the check printed, or null where nothing was run. */
   readonly log: string | null;
+  /** The decoded provider document's schema and revision, or null where none was decoded. */
+  readonly provider: { readonly schema: string; readonly revision: string | null } | null;
+  /** Each named path's disposition, for a changed check whose document was decoded; empty otherwise. */
+  readonly dispositions: readonly HookPathDisposition[];
 }
 
 /** A check as the engineer is told about it: the record, with the findings themselves. */
 interface ReportedCheck extends HookCheck {
+  /** Whether a check that established no project result still reported findings it verified. */
+  readonly retained: boolean;
+  /** Why the printed result is not one the harness reads, or null. */
+  readonly unsupported: string | null;
   readonly added: readonly HookFinding[];
   readonly repeated: readonly HookFinding[];
   /** Findings that stood before this check and that it no longer reports. */
@@ -51,9 +77,12 @@ interface ReportedCheck extends HookCheck {
   readonly notices: readonly HookNotice[];
 }
 
-/** A coverage gap the hook check itself observed. */
+/**
+ * A coverage gap the hook check itself observed: a changed set it could not
+ * establish, or a check whose printed result is not one the harness reads.
+ */
 export interface HookGap {
-  readonly kind: 'changed-paths-unknown';
+  readonly kind: 'changed-paths-unknown' | 'unsupported-check-result';
   readonly detail: string;
 }
 
@@ -117,13 +146,17 @@ function awaitsEvaluation(finding: HookFinding): boolean {
  * The findings one invocation has been told about, and which of them still
  * stand. A finding reported again by a later check of the same invocation is
  * not newly introduced, so the engineer is not told about it twice. A
- * finding stands until a check that covered its file and evaluated imports
- * no longer reports it.
+ * finding stands until provider coverage establishes that it is gone: a
+ * check that evaluated imports and analyzed its file, or the deletion of
+ * that file, and no longer reports it, or a covering revision that lists it
+ * as removed. Naming a path is not coverage: a path not analyzed or not
+ * checked clears nothing.
  */
 export class FindingsSeen {
   private readonly seen = new Set<string>();
   private readonly standing = new Map<string, readonly HookFinding[]>();
   private readonly told = new Set<string>();
+  private readonly written = new Set<string>();
 
   /** The findings not seen before, adding them all to what has been seen. */
   admit(findings: readonly HookFinding[]): HookFinding[] {
@@ -137,27 +170,43 @@ export class FindingsSeen {
   }
 
   /**
-   * Records what one check that ran found. A changed check answers for the
-   * files it covered, so their standing findings are replaced; a complete
-   * check answers for the whole project. A check that did not evaluate
-   * imports answers for none of the findings only that evaluation reports:
-   * they stand as they were.
+   * Records what one check found. `covered` is the provider's coverage: the
+   * paths a changed check analyzed, whose standing findings are replaced by
+   * what it reported, or `all` for a complete check. `removed` names
+   * findings the covering revision established as gone. Every reported
+   * finding stands, covered or not. A check that did not evaluate imports
+   * answers for none of the findings only that evaluation reports: they
+   * stand as they were.
    */
-  settle(covered: readonly string[] | 'all', findings: readonly HookFinding[], importsEvaluated = true): void {
+  settle(
+    evidence: { readonly covered: readonly string[] | 'all'; readonly removed?: readonly string[] | undefined },
+    findings: readonly HookFinding[],
+    importsEvaluated = true,
+  ): void {
     const kept = importsEvaluated ? [] : this.open().filter(awaitsEvaluation);
-    if (covered === 'all') this.standing.clear();
-    else for (const file of covered) this.standing.delete(file);
-    const byFile = new Map<string, HookFinding[]>();
-    for (const finding of findings) {
-      const file = finding.file ?? '';
-      byFile.set(file, [...(byFile.get(file) ?? []), finding]);
+    if (evidence.covered === 'all') this.standing.clear();
+    else for (const file of evidence.covered) this.standing.delete(file);
+    const removed = new Set(evidence.removed ?? []);
+    for (const [file, standing] of [...this.standing]) {
+      const left = standing.filter(finding => !removed.has(finding.identity));
+      if (left.length === 0) this.standing.delete(file);
+      else this.standing.set(file, left);
     }
-    for (const [file, found] of byFile) this.standing.set(file, found);
-    for (const finding of kept) {
+    for (const finding of [...findings, ...kept]) {
       const file = finding.file ?? '';
       const standing = this.standing.get(file) ?? [];
       if (!standing.some(other => other.identity === finding.identity)) this.standing.set(file, [...standing, finding]);
     }
+  }
+
+  /** Records paths this invocation wrote, whose warnings and analysis limits are relayed when Ramify reports them. */
+  wrote(paths: readonly string[]): void {
+    for (const path of paths) this.written.add(path);
+  }
+
+  /** Every path this invocation has written. */
+  writtenPaths(): string[] {
+    return [...this.written];
   }
 
   /** The notices this invocation has not been told of, adding them to what it has. */
@@ -196,12 +245,6 @@ export interface HookCheckOptions {
   /** The number of checks this invocation has already run. */
   readonly ran: number;
   /**
-   * The project-relative paths the assignment names as extra scope with
-   * purpose `outside-modules`. A file beneath one lies outside every module
-   * by assignment, so Ramify's warning that it does is not relayed.
-   */
-  readonly outsideModules?: readonly string[] | undefined;
-  /**
    * Whether the warnings and analysis limits on the written files are
    * relayed. A check whose text reaches no one, such as the one at
    * `completion-proposed`, passes false, so that they are not taken as told.
@@ -236,11 +279,10 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
   let ran = options.ran;
 
   const paths = options.paths === null ? null : relativePaths(options.projectRoot, options.paths);
-  const configuration = paths === null ? [] : paths.filter(isGuardedConfiguration);
-
-  // What the mutation wrote, which the warnings and analysis limits relayed
-  // must concern; where it is unknown, none is relayed.
-  const written = { files: options.relayNotices === false ? [] : paths ?? [], outsideModules: options.outsideModules ?? [] };
+  // The warnings and analysis limits relayed concern what this invocation
+  // wrote. A check whose text reaches no one records no write and relays nothing.
+  const relay = options.relayNotices !== false;
+  if (relay) options.seen.wrote(paths ?? []);
 
   let completeNeeded = false;
   if (paths === null || paths.length === 0) {
@@ -251,25 +293,14 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
     });
     checks.push({
       paths: [], mode: 'changed', outcome: 'not-checked',
-      reason: 'the changed set could not be established', newFindings: 0, log: null, ...nothingReported,
-    });
-  } else if (configuration.length > 0) {
-    completeNeeded = true;
-    checks.push({
-      paths,
-      mode: 'changed',
-      outcome: 'not-checked',
-      reason: `a changed check covers no named configuration file (${configuration.join(', ')})`,
-      newFindings: 0,
-      log: null,
-      ...nothingReported,
+      reason: 'the changed set could not be established', newFindings: 0, log: null, provider: null, dispositions: [], ...nothingReported,
     });
   } else {
     ran += 1;
     const log = options.logFile(ran);
     const result = await options.ramify.checkChanged(paths, options.projectRoot, options.hookTimeoutMs, options.signal);
     await record(log, result);
-    checks.push(reported({ paths, mode: 'changed', outcome: outcomeOf(result), reason: result.reason, log }, result, paths, options.seen, written));
+    checks.push(reported({ paths, mode: 'changed', log }, result, options.seen, relay));
   }
 
   if (completeNeeded) {
@@ -277,34 +308,50 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
     const log = options.logFile(ran);
     const result = await options.ramify.checkComplete(options.projectRoot, options.signal);
     await record(log, result);
-    checks.push(reported({ paths: paths ?? [], mode: 'complete', outcome: outcomeOf(result), reason: result.reason, log }, result, 'all', options.seen, written));
+    checks.push(reported({ paths: paths ?? [], mode: 'complete', log }, result, options.seen, relay));
+  }
+
+  for (const check of checks) {
+    if (check.unsupported === null) continue;
+    gaps.push({ kind: 'unsupported-check-result', detail: `the ${check.mode} check printed a result the harness does not read (${check.unsupported}); it is not a pass` });
   }
 
   return {
-    checks: checks.map(({ added: _added, repeated: _repeated, cleared: _cleared, unevaluated: _unevaluated, notices: _notices, ...check }) => check),
+    checks: checks.map(({ added: _added, repeated: _repeated, cleared: _cleared, unevaluated: _unevaluated, notices: _notices, retained: _retained, unsupported: _unsupported, ...check }) => check),
     gaps,
     text: describe(checks),
   };
 }
 
 /** What a check that was not run reported: nothing. */
-const nothingReported = { added: [], repeated: [], cleared: [], unevaluated: null, notices: [] } as const;
+const nothingReported = { added: [], repeated: [], cleared: [], unevaluated: null, notices: [], retained: false, unsupported: null } as const;
 
-/** A check that ran: what it found, what was new, and what still stands. */
+/**
+ * A check that ran: what it found, what was new, and what still stands.
+ *
+ * Settlement follows the provider's coverage alone. A changed check covers
+ * the paths it gives `checked`, a deletion among them; a complete check
+ * covers every analyzed path. Either covers only where it established the
+ * project's result. A check that did not, at exit 2, still carries the
+ * findings it verified before it stopped: they are reported and stand, and
+ * it clears nothing. A result the adapter could not decode is read for
+ * nothing at all.
+ */
 function reported(
-  check: Omit<HookCheck, 'newFindings'>,
+  check: Pick<HookCheck, 'paths' | 'mode' | 'log'>,
   result: RamifyCheckResult,
-  covered: readonly string[] | 'all',
   seen: FindingsSeen,
-  written: { readonly files: readonly string[]; readonly outsideModules: readonly string[] },
+  relay: boolean,
 ): ReportedCheck {
-  const found = findingsOf(result.report);
-  const ran = check.outcome !== 'not-checked';
-  const execution = ran ? executionOf(result.report) : null;
-  const evaluated = execution === null || execution === 'completed';
+  const decoded = result.provider !== null;
+  const found = decoded ? findingsOf(result.report) : [];
+  const established = decoded && result.outcome !== 'not-checked';
+  const evaluated = result.execution === 'completed';
+  const covered: readonly string[] | 'all' = !established ? []
+    : result.form === 'complete' ? 'all'
+      : result.paths.filter(path => path.disposition === 'checked').map(path => path.path);
   const before = seen.open();
-  // A check that did not check answers for nothing: what stood still stands.
-  if (ran) seen.settle(covered, found, evaluated);
+  if (decoded) seen.settle({ covered, removed: established && evaluated ? result.removed : [] }, found, evaluated || !established);
   const standingNow = seen.open();
   const stands = new Set(standingNow.map(finding => finding.identity));
   const earlier = new Set(before.map(finding => finding.identity));
@@ -328,35 +375,32 @@ function reported(
   // was reported to the engineer when it arose, so its going is news too.
   const cleared = gone;
   const reportedNow = new Set(found.map(finding => finding.identity));
-  const unevaluated = evaluated ? null : {
-    execution: execution!,
+  const unevaluated = !established || evaluated ? null : {
+    execution: result.execution ?? 'not stated',
     standing: standingNow.filter(finding => awaitsEvaluation(finding) && !reportedNow.has(finding.identity)),
   };
-  // A module whose description is invalid owns no source, so Ramify warns
-  // that its files lie outside every module; that warning is the
-  // description error's, which the engineer is told of as a finding.
-  const notices = ran ? seen.tell(noticesOf(result.report, written.files, evaluated ? written.outsideModules : null)) : [];
-  return { ...check, newFindings: added.length, added, repeated, cleared, unevaluated, notices };
+  const notices = decoded && relay ? seen.tell(noticesOf(result.report, seen.writtenPaths())) : [];
+  return {
+    ...check,
+    outcome: outcomeOf(result),
+    reason: result.reason,
+    newFindings: added.length,
+    provider: result.provider === null ? null : { schema: result.provider.schema, revision: result.provider.revision },
+    dispositions: result.paths.map(path => ({
+      path: path.path, disposition: path.disposition, reason: path.reason, module: path.module,
+      exclusion: path.exclusion === null ? null : { kind: path.exclusion.kind, directory: path.exclusion.directory, owner: path.exclusion.owner },
+      sha256: path.disposition === 'checked' ? path.sha256 : null,
+    })),
+    added, repeated, cleared, unevaluated, notices,
+    retained: !established && found.length > 0,
+    unsupported: result.unsupported,
+  };
 }
 
 /** Whether two findings are one violation, wherever in its file it now lies. */
 function sameViolation(a: HookFinding, b: HookFinding): boolean {
   return a.code === b.code && a.message === b.message && a.file === b.file && a.importer === b.importer
     && a.original?.owner === b.original?.owner && a.original?.file === b.original?.file && a.original?.binding === b.original?.binding;
-}
-
-/**
- * The execution a report states, or null where it states none. A
- * `ramify.check/1` document states it at `execution`, and a
- * `ramify.analysis/1` report at `outcome.execution`. Only `completed`
- * evaluated imports: an invalid module description, layout or tag registry
- * makes it `invalid`, and Ramify then decides no import.
- */
-function executionOf(report: unknown): string | null {
-  if (typeof report !== 'object' || report === null) return null;
-  const document = report as Record<string, unknown>;
-  const outcome = typeof document['outcome'] === 'object' && document['outcome'] !== null ? document['outcome'] as Record<string, unknown> : {};
-  return stringOf(document['execution']) ?? stringOf(outcome['execution']);
 }
 
 /** Exit 0 is checked with nothing to report, 1 is findings, and anything else is not checked. */
@@ -366,8 +410,11 @@ function outcomeOf(result: RamifyCheckResult): HookCheck['outcome'] {
 
 /**
  * The findings a check reported, with what the engineer must be told of
- * each. `ramify.check/1` places a finding in `location`; an entry whose
- * shape this does not know keeps its own text rather than being dropped.
+ * each: `findings` of a `ramify.check/3` document and `diagnostics` of a
+ * `ramify.analysis/3` report, each located in `location`. The hook reads
+ * only documents its adapter decoded; a gate's report is read as it was
+ * printed, and an entry whose shape this does not know keeps its own text
+ * rather than being dropped.
  */
 export function findingsOf(report: unknown): HookFinding[] {
   const identities = findingIdentities(report);
@@ -412,7 +459,7 @@ function numberOf(value: unknown): number | null {
 
 /**
  * The identity of each finding the check reported: Ramify's own `id`, which
- * both `ramify.check/1` `findings` and `ramify.analysis/1` `diagnostics`
+ * both `ramify.check/3` `findings` and `ramify.analysis/3` `diagnostics`
  * carry, and which differs for two files that import the same symbol. Both
  * shapes are read. An entry with no `id` is outside either contract; it is
  * identified by itself, without the changed check's `new` flag, rather than
@@ -429,12 +476,12 @@ export function findingIdentities(report: unknown): string[] {
 /**
  * The warnings and analysis limits a report states on the written files.
  * Ramify reports them apart from its findings, in `warnings` and
- * `coverage`, and fails no check on them. A warning that a file lies outside
- * every module's source is left out for a file beneath one of the
- * assignment's `outside-modules` paths, which lies there by assignment, and
- * left out entirely where `outsideModules` is null.
+ * `coverage`, and fails no check on them. A warning concerns a written file
+ * it lists, or one inside the directory it is located at, such as the
+ * compiler-selected source of a scratch directory. Each is relayed with
+ * Ramify's own code and message: none is suppressed or reworded.
  */
-export function noticesOf(report: unknown, written: readonly string[], outsideModules: readonly string[] | null): HookNotice[] {
+export function noticesOf(report: unknown, written: readonly string[]): HookNotice[] {
   if (typeof report !== 'object' || report === null || written.length === 0) return [];
   const document = report as Record<string, unknown>;
   const files = new Set(written);
@@ -443,18 +490,14 @@ export function noticesOf(report: unknown, written: readonly string[], outsideMo
     if (typeof entry !== 'object' || entry === null) continue;
     const fields = entry as Record<string, unknown>;
     const code = stringOf(fields['code']) ?? 'warning';
-    const named = Array.isArray(fields['files']) ? (fields['files'] as unknown[]).flatMap(file => stringOf(file) ?? []) : [];
-    for (const file of named) {
-      if (!files.has(file)) continue;
-      if (code === 'outside-module-source') {
-        if (outsideModules === null || outsideModules.some(path => isBeneath(file, path))) continue;
-        notices.push({
-          identity: `warning:${code}:${file}`, kind: 'warning', code, file, line: null,
-          message: 'the compiler selects this file, but it lies outside every module\'s source, so no module owns it and Ramify decides no import of it',
-        });
-      } else {
-        notices.push({ identity: `warning:${code}:${file}`, kind: 'warning', code, file, line: null, message: stringOf(fields['message']) ?? code });
-      }
+    const directory = stringOf(fields['path']);
+    const listed = Array.isArray(fields['files']) ? (fields['files'] as unknown[]).flatMap(file => stringOf(file) ?? []) : [];
+    const concerned = [...new Set([
+      ...listed.filter(file => files.has(file)),
+      ...(directory === null ? [] : written.filter(file => file.startsWith(`${directory}/`))),
+    ])].sort();
+    for (const file of concerned) {
+      notices.push({ identity: `warning:${code}:${file}`, kind: 'warning', code, file, line: null, message: stringOf(fields['message']) ?? code });
     }
   }
   for (const entry of Array.isArray(document['coverage']) ? document['coverage'] as unknown[] : []) {
@@ -473,12 +516,6 @@ export function noticesOf(report: unknown, written: readonly string[], outsideMo
   return notices;
 }
 
-/** Whether a project-relative file is the path itself or lies beneath it. */
-function isBeneath(file: string, path: string): boolean {
-  const base = path.replace(/^\.\//, '').replace(/\/+$/, '');
-  return file === base || file.startsWith(`${base}/`);
-}
-
 /**
  * What the engineer is told, or null when no check produced news. A finding
  * is spelled out in full every time it is reported, new or still standing,
@@ -491,6 +528,9 @@ function isBeneath(file: string, path: string): boolean {
  * or it found nothing, or it could not run and says so. Reporting the
  * changed form's own gap beside it would say nothing was verified when
  * something was, and would say it twice when nothing was.
+ *
+ * A path the provider did not analyze is said to be not analyzed, whatever
+ * the project verdict: a passing check verified nothing about it.
  */
 function describe(checks: readonly ReportedCheck[]): string | null {
   const added = unique(checks.flatMap(check => check.added));
@@ -515,16 +555,38 @@ function describe(checks: readonly ReportedCheck[]): string | null {
   if (unevaluated.length > 0) lines.push(...unevaluatedLines(unevaluated));
   const notices = checks.flatMap(check => check.notices);
   if (notices.length > 0) lines.push(...noticeLines(notices));
+  const notAnalyzed = [...new Map(checks.flatMap(check => check.dispositions)
+    .filter(path => path.disposition === 'not-analyzed').map(path => [path.path, path])).values()];
+  if (notAnalyzed.length > 0) {
+    const one = notAnalyzed.length === 1;
+    lines.push(`Not analyzed by Ramify: no source check covers ${one ? 'this path' : 'these paths'}, so the check verified nothing about ${one ? 'it' : 'them'} and is no pass for ${one ? 'it' : 'them'}.`);
+    for (const path of notAnalyzed) lines.push(`- ${path.path}: ${notAnalyzedPhrase(path)} [not-analyzed ${path.reason}]`);
+  }
   if (unchecked.length > 0) {
     lines.push('Ramify hook check:');
     for (const check of unchecked) {
       const where = check.mode === 'complete' || check.paths.length === 0 ? 'the whole project' : check.paths.join(', ');
       const head = `- ${check.mode} check over ${where}: ${check.outcome}`;
       lines.push(check.reason === null ? head : `${head} (${check.reason})`);
-      lines.push('  Nothing was verified by this check. It is not a pass, and you may keep editing.');
+      // A path the provider checked, or did not check for its own reason,
+      // is named; one not checked for the request's reason is the head line.
+      const own = check.dispositions.filter(path => path.disposition === 'checked' || (path.disposition === 'not-checked' && path.reason !== check.reason));
+      lines.push(check.retained || own.some(path => path.disposition === 'checked')
+        ? '  It did not establish the project\'s result, and it is not a pass. Findings it verified before it stopped are reported above. You may keep editing.'
+        : '  Nothing was verified by this check. It is not a pass, and you may keep editing.');
+      for (const path of own) lines.push(`  - ${path.path}: ${path.disposition === 'checked' ? 'checked' : 'not checked'} (${path.reason})`);
     }
   }
   return lines.length === 0 ? null : lines.join('\n');
+}
+
+/** Where a not-analyzed path lies, in the provider's own terms. */
+function notAnalyzedPhrase(path: HookPathDisposition): string {
+  const of = (module: string | null) => module === null ? '' : ` of module \`${module}\``;
+  if (path.reason === 'owned-non-source') return `an owned file${of(path.module)} that is neither source nor an analysis input`;
+  if (path.exclusion === null) return `a ${path.reason} path${of(path.module)}`;
+  const kind = path.exclusion.kind === 'scratch' ? 'scratch directory' : `${path.exclusion.kind} tree`;
+  return `in the ${kind} \`${path.exclusion.directory}\`${of(path.exclusion.owner)}`;
 }
 
 /**
@@ -662,10 +724,4 @@ function relativePaths(projectRoot: string, paths: readonly string[]): string[] 
     return inside.split(sep).join('/');
   });
   return [...new Set(relatives.filter(path => path !== '' && !path.startsWith('../')))].sort();
-}
-
-/** Whether this path is one of the configuration files a changed check does not cover. */
-function isGuardedConfiguration(path: string): boolean {
-  const name = path.split('/').at(-1) ?? path;
-  return (guardedConfigurationFiles as readonly string[]).includes(name);
 }

@@ -1,0 +1,70 @@
+{
+  "description": "Selected fields from the read-only provider response; not a newly executed audit",
+  "command": "ramify-agent/node_modules/.bin/ramify-audit check-branch HEAD --project-root ramify-agent --cwd . --json",
+  "cwd": "/tmp/ramify-plan20-project-boundary-preparation",
+  "exitCode": 0,
+  "rawResponseSha256": "360138bef32bdaf392ff0f0ecf42565982110d3974483f4c51df6818a0df5a19",
+  "checkedAtDate": "2026-10-06",
+  "projectRoot": "ramify-agent",
+  "notesRef": "refs/notes/audit-projects/ramify-agent-f25e9a298228",
+  "headCommit": "d1497178f1e3733d92b2c4c0ab613e37961e5256",
+  "lastAuditedCommit": "a2a4ad7d35790598f8d0b069f3aa552bdc7d2788",
+  "auditKind": "exact-tree",
+  "auditStillApplies": true,
+  "auditPassed": true,
+  "composition": {
+    "verdict": "pass",
+    "scoped": false,
+    "chainDepth": 0,
+    "reportCommit": "7beb7e62d5c55b5066f2f3d40e81a02e362648ab",
+    "outstandingFailures": 0
+  },
+  "reason": "The last audit still applies and all recorded checks passed.",
+  "lastAudit": {
+    "auditedAt": "2026-10-04T11:29:28.450Z",
+    "evidenceSchemaVersion": 3,
+    "mode": {
+      "executedMode": "full",
+      "requestedMode": "full",
+      "resolution": "requested"
+    },
+    "overall": "pass",
+    "producer": {
+      "name": "ramify-audit",
+      "version": "0.3.2"
+    },
+    "sourceCommit": "a2a4ad7d35790598f8d0b069f3aa552bdc7d2788",
+    "sourceTree": "0e1dba2292951f96e9b31dd203574e41104ddb53",
+    "execution": {
+      "requestId": "c29bd9e3-1e2e-4611-9b68-ef99efc0f061",
+      "runId": "536767c8-ad91-4b73-9e13-1a5469df09ef"
+    },
+    "reportCommit": "7beb7e62d5c55b5066f2f3d40e81a02e362648ab",
+    "failureLedger": {
+      "completeness": "complete",
+      "entryCount": 0
+    },
+    "checks": {
+      "agent-structure": {
+        "status": "pass",
+        "passed": true
+      },
+      "agent-tests": {
+        "status": "pass",
+        "passed": true
+      },
+      "agent-typecheck": {
+        "status": "pass",
+        "passed": true
+      },
+      "agent-web-build": {
+        "status": "pass",
+        "passed": true
+      },
+      "patch-integrity": {
+        "status": "pass",
+        "passed": true
+      }
+    }
+  }
+}

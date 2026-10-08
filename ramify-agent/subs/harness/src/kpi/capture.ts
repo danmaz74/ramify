@@ -53,13 +53,13 @@ export interface SnapshotRequest {
 }
 
 /**
- * Captures one `ramify.measure/1` document verbatim, with its revision and
+ * Captures one `ramify.measure/2` document verbatim, with its revision and
  * the hash of the producer's own bytes. A producer that cannot be run leaves
  * the snapshot with the reason and no document, which is a coverage gap and
  * never a zero.
  *
  * The architect view's published bytes are measured from the published
- * directory and recorded as a supplementary entry: `ramify.measure/1` carries
+ * directory and recorded as a supplementary entry: `ramify.measure/2` carries
  * per-module API-view totals but no publication size for the architect view,
  * so this is where component 3 of the recipe comes from.
  */
@@ -98,7 +98,7 @@ export function scopeSize(snapshot: MeasurementSnapshot, scope: DeclaredScope): 
   } else {
     const { selected, unresolved } = selectModules(document.modules, scope);
     components.push(ownedSource(selected, unresolved));
-    components.push(apiViews(selected, scope));
+    components.push(apiViews(selected, scope, document.views));
   }
 
   components.push(architectView(snapshot, scope));
@@ -177,13 +177,25 @@ function ownedSource(
   return { component: 'owned-source', detail: named === '' ? 'nothing selected' : named, bytes, state: 'measured', buckets };
 }
 
-function apiViews(selected: ReadonlyArray<{ module: ModuleMeasurement; bucket: 'exact' | 'subtree' }>, scope: DeclaredScope): ScopeComponent {
+function apiViews(
+  selected: ReadonlyArray<{ module: ModuleMeasurement; bucket: 'exact' | 'subtree' }>,
+  scope: DeclaredScope,
+  views: MeasurementDocument['views'],
+): ScopeComponent {
   if (!scope.apiViews) {
     return { component: 'api-views', detail: 'no API-view area is declared', bytes: 0, state: 'measured', buckets: { ordinary: 0, tests: 0 } };
+  }
+  if (views !== 'measured') {
+    return { component: 'api-views', detail: 'declared ordinary and testing API-view areas', bytes: null,
+      state: 'unavailable', reason: `ramify measure reported API views unavailable: ${views.reason}` };
   }
   const buckets = { ordinary: 0, tests: 0 };
   for (const { module, bucket } of selected) {
     const measured = module[bucket];
+    if (measured.views === undefined) {
+      return { component: 'api-views', detail: 'declared ordinary and testing API-view areas', bytes: null,
+        state: 'unavailable', reason: `ramify measure omitted API-view bytes for ${module.id}` };
+    }
     buckets.ordinary += measured.views.ordinaryBytes;
     buckets.tests += measured.views.testsBytes;
   }

@@ -1,4 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createApp } from '../http/app.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
@@ -14,7 +16,7 @@ import { scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/sr
 import { requestCompletion } from './helpers/analysis.js';
 import { accepted, modified, unchanged } from './helpers/contracts-git.js';
 import { at as recordAt, constructedRun, item, registered, type Line } from './helpers/constructed.js';
-import { passingScenarioSummary, type DirectCheckScript } from './helpers/direct-check-execution.js';
+import type { DirectCheckScript, ScriptedScenario } from './helpers/direct-check-execution.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import {
   bindAtAncestor, bindCommit, bindTurn, entryCommits, entryTurns, finalSubject, integrationFeature, integrationProject, noteFeature, notes, plan, planScenario,
@@ -26,7 +28,8 @@ import { completionProposed, submit, write } from './helpers/iterations.js';
  * The scenarios a client reads, Plan 10 iteration 10: the scenario list with
  * each scenario's state and the gates that ran it, the review's frozen text
  * and warnings on the analysis, each entry's scenario count in the
- * capability progress, the compact summary on a gate attempt, and the
+ * capability progress, the per-scenario results on a gate attempt, read
+ * for display from its configured scenario check's raw output, and the
  * scenario references of projected events.
  *
  * The scripted run is the composition failure of
@@ -48,21 +51,33 @@ afterEach(async () => {
 
 const failure = { step: 'Then the outcome review-tags promises is shown', message: 'expected the tag on the note, got no note' };
 
+/**
+ * What the project's configured scenario check reports over the tree a
+ * gate's commit leaves: every tracked scenario without the pending tag, as
+ * its `not @ramify-pending` profile selects them, passing.
+ */
+function runnableScenarios(root: string): ScriptedScenario[] {
+  const files = (readdirSync(root, { recursive: true }) as string[])
+    .filter(path => path.endsWith('.feature') && !path.split('/').includes('node_modules')).sort();
+  return files.flatMap(file => readFileSync(join(root, file), 'utf8').split('\n').flatMap((text, index) => {
+    const tags = text.trim().split(/\s+/);
+    const identity = tags.find(tag => /^@ramify-sc-\d{3,}$/.test(tag));
+    if (identity === undefined || tags.includes('@ramify-pending')) return [];
+    return [{ id: identity.slice('@ramify-'.length), status: 'passed' as const, file, line: index + 1 }];
+  }));
+}
+
 /** The integration scenario's first iteration gate fails it while its sub-scenarios pass. */
-function failingOnce(): DirectCheckScript {
+function failingOnce(root: string): DirectCheckScript {
   let failed = false;
   return ({ check, context }) => {
-    if (check.kind !== 'scenarios' || context.checkpoint !== 'iteration' || failed) return {};
-    if (!(check.scenarios?.selection.kind === 'identity' && check.scenarios.selection.scenarios.includes('sc-003'))) return {};
+    if (check.kind !== 'scenarios') return {};
+    const runnable = runnableScenarios(root);
+    if (context.checkpoint !== 'iteration' || failed || !runnable.some(result => result.id === 'sc-003')) return { scenarios: runnable };
     failed = true;
-    const passing = passingScenarioSummary(check);
     return {
       outcome: { kind: 'completed', exitCode: 1 },
-      scenarios: {
-        ...passing,
-        scenarios: passing.scenarios.map(result => (result.id !== 'sc-003' ? result : { ...result, status: 'failed' as const, failure })),
-        failures: [`sc-003 failed at "${failure.step}": ${failure.message}`],
-      },
+      scenarios: runnable.map(result => (result.id !== 'sc-003' ? result : { ...result, status: 'failed' as const, failure })),
     };
   };
 }
@@ -74,15 +89,15 @@ async function composedRun() {
     'local-architect:wi-003': [submit(bindAtAncestor), submit(requestCompletion())],
     'engineer:wi-003': [
       bindTurn,
-      submit(completionProposed('The bridging Given now writes the note.', { scenarios: ['sc-003'] }),
+      submit(completionProposed('The tags\' Given now writes the note.', { bindings: [{ id: 'sc-003' }] }),
         write('tests/steps/review-tags.steps.ts', tagStepFile.replace("Given('a note was written with review-note', () => {});", "Given('a note was written with review-note', () => { /* as review-note does */ });"))),
     ],
   }, [...entryCommits, bindCommit, accepted('wi-003.i01', 'revision-04', modified(tagSteps)), unchanged('wi-003'), unchanged(finalSubject)],
-  failingOnce());
+  failingOnce(root));
   return { root, ...opened };
 }
 
-const where = (gate: ScenarioGateResult) => [gate.checkpoint, gate.subject.iteration ?? gate.subject.workItem ?? null, gate.mode, gate.status];
+const where = (gate: ScenarioGateResult) => [gate.checkpoint, gate.subject.iteration ?? gate.subject.workItem ?? null, gate.check, gate.status];
 
 describe('over a scripted run with an integration scenario', () => {
   test('the scenario list, the review, the progress counts, the gate summary and the event references agree with the run', async () => {
@@ -95,32 +110,30 @@ describe('over a scripted run with an integration scenario', () => {
     const list = scenarioListResponseSchema.parse(await queries.scenarios(plan, runId));
     expect(list.total).toBe(3);
     expect(list.scenarios.map(one => [one.id, one.kind, one.state, one.entry, one.partOf, one.subScenarios, one.workItem, one.owner, one.file])).toEqual([
-      ['sc-001', 'entry', 'implemented', 'review-note', 'sc-003', [], 'wi-001', notes, noteFeature],
-      ['sc-002', 'entry', 'implemented', 'review-tags', 'sc-003', [], 'wi-002', tags, tagFeature],
-      ['sc-003', 'integration', 'implemented', null, null, ['sc-001', 'sc-002'], 'wi-003', reviews, integrationFeature],
+      ['sc-001', 'entry', 'done', 'review-note', 'sc-003', [], 'wi-001', notes, noteFeature],
+      ['sc-002', 'entry', 'done', 'review-tags', 'sc-003', [], 'wi-002', tags, tagFeature],
+      ['sc-003', 'integration', 'done', null, null, ['sc-001', 'sc-002'], 'wi-003', reviews, integrationFeature],
     ]);
     expect(list.scenarios[0]!.origin).toEqual({ kind: 'architect', refs: ['fr-002'] });
     const [first, , integration] = list.scenarios;
     expect(integration!.origin).toMatchObject({ kind: 'plan', planScenario: 'ps-01' });
     expect(integration!.name).toBe('A written note is shown with its tag');
 
-    // The gates each ran in, with the status the attempt's summary gives
-    // the scenario there: the integration scenario failed at its first
-    // iteration gate while its sub-scenarios passed, and passed at the repair.
+    // The gates whose audit ran it, with the status its configured scenario
+    // check gave the scenario there: the integration scenario failed at its
+    // first iteration gate while its sub-scenarios passed, and passed at the repair.
     const bindGates = integration!.gates.filter(gate => gate.subject.iteration === 'wi-003.i01');
     expect(bindGates.map(gate => [gate.status, gate.verdict, gate.failure])).toEqual([['failed', 'failed', failure], ['passed', 'passed', null]]);
-    expect(integration!.implementedBy).toBe(bindGates[1]!.gate);
     expect(integration!.gates.map(where)).toEqual([
-      ['iteration', 'wi-003.i01', 'quick', 'failed'],
-      ['iteration', 'wi-003.i01', 'quick', 'passed'],
-      ['work-item', 'wi-003', 'quick', 'passed'],
-      ['final', null, 'full', 'passed'],
+      ['iteration', 'wi-003.i01', 'scenarios', 'failed'],
+      ['iteration', 'wi-003.i01', 'scenarios', 'passed'],
+      ['work-item', 'wi-003', 'scenarios', 'passed'],
+      ['final', null, 'scenarios', 'passed'],
     ]);
     const firstBind = bindGates[0]!.gate;
     expect(first!.gates.find(gate => gate.gate === firstBind)).toMatchObject({ status: 'passed', verdict: 'failed' });
-    expect(first!.gates.map(where)[0]).toEqual(['iteration', 'wi-001.i01', 'quick', 'passed']);
-    expect(first!.gates.at(-1)).toMatchObject({ checkpoint: 'final', mode: 'full', status: 'passed', dryRun: false });
-    expect(first!.implementedBy).toBe(first!.gates[0]!.gate);
+    expect(first!.gates.map(where)[0]).toEqual(['iteration', 'wi-001.i01', 'scenarios', 'passed']);
+    expect(first!.gates.at(-1)).toMatchObject({ checkpoint: 'final', check: 'scenarios', command: null, status: 'passed' });
 
     // The review: the frozen text of each scenario, the integration
     // scenario's being the plan's, beside its sub-scenarios.
@@ -136,32 +149,31 @@ describe('over a scripted run with an integration scenario', () => {
     expect(analysis.scenarios[2]!.source.map(line => line.trim())).toEqual(planScenario.map(line => line.trim()));
     expect(analysis.scenarios[1]!.source.map(line => line.trim())).toContain('Given a note was written with review-note');
 
-    // Each entry's scenarios, implemented of all it has.
+    // Each entry's scenarios, done of all it has.
     const capabilities = capabilityListResponseSchema.parse(await queries.capabilities(plan, runId)).capabilities;
     expect(capabilities.filter(row => row.entry).map(row => [row.capability, row.scenarios])).toEqual([
-      ['review-note', { implemented: 1, total: 1 }],
-      ['review-tags', { implemented: 1, total: 1 }],
+      ['review-note', { done: 1, total: 1 }],
+      ['review-tags', { done: 1, total: 1 }],
     ]);
     expect(capabilities.filter(row => !row.entry).every(row => row.scenarios === null)).toBe(true);
 
-    // The failing attempt carries its summary in compact form; the other commands carry none.
+    // The failing attempt asked the committed audit and planned no command;
+    // its view carries the per-scenario results of its configured scenario
+    // check, read from the raw runner output, beside the audit's answer.
     const gate = gateResponseSchema.parse(await queries.gate(plan, runId, firstBind)).gate;
-    const scenarioCommand = gate.commands.find(command => command.kind === 'scenarios')!;
-    expect(gate.commands.filter(command => command.kind !== 'scenarios').every(command => command.scenarios === null)).toBe(true);
-    expect(scenarioCommand.scenarios).toMatchObject({
-      mode: 'quick', dryRun: false, selection: { kind: 'identity', scenarios: ['sc-001', 'sc-002', 'sc-003'] },
-      failures: [`sc-003 failed at "${failure.step}": ${failure.message}`],
-    });
-    expect(scenarioCommand.scenarios!.runs.map(run => run.module).sort()).toEqual([reviews, notes, tags].sort());
-    expect(scenarioCommand.scenarios!.scenarios.map(result => [result.id, result.status, result.failure])).toEqual([
-      ['sc-001', 'passed', null], ['sc-002', 'passed', null], ['sc-003', 'failed', failure],
+    expect(gate.commands).toEqual([]);
+    expect(gate.audit).toMatchObject({ mode: 'project-default', status: 'completed', verdict: 'fail' });
+    expect(gate.scenarios.map(result => [result.id, result.check, result.status, result.failure]).sort()).toEqual([
+      ['sc-001', 'scenarios', 'passed', null], ['sc-002', 'scenarios', 'passed', null], ['sc-003', 'scenarios', 'failed', failure],
     ]);
+    expect(gate.scenarios.find(result => result.id === 'sc-003')!.file).toBe(integrationFeature);
 
     // The projected events refer to the scenarios they move.
     const events = runEventPageSchema.parse(await queries.events(plan, runId, 0)).events;
     const refsOf = (transition: string) => events.filter(event => event.transition === transition).map(event => event.refs.filter(ref => ref.kind === 'scenario').map(ref => ref.id));
-    expect(refsOf('scenario-declared')).toEqual([['sc-001'], ['sc-002'], ['sc-003']]);
-    expect(refsOf('scenario-implemented')).toEqual([['sc-001'], ['sc-002'], ['sc-003']]);
+    // The repair's proposal binds the integration scenario again.
+    expect(refsOf('obligation-bound')).toEqual([['sc-001'], ['sc-002'], ['sc-003'], ['sc-003']]);
+    expect(refsOf('obligation-reported')).toEqual([['sc-001'], ['sc-002'], ['sc-003']]);
     expect(refsOf('work-item-started')).toEqual([[], [], ['sc-003']]);
 
     // Over HTTP, the same answer.
@@ -216,25 +228,54 @@ describe('over constructed records', () => {
         ].map(body => ({ path: `scenarios/${body.id}.json`, body })),
       ],
     },
-    { type: 'scenario-declared', data: { scenario: 'sc-001', by: 'inv-0003', state: 'declared' } },
-    { type: 'scenario-implemented', data: { scenario: 'sc-001', gate: 'ga-0003' } },
-    { type: 'scenario-declared', data: { scenario: 'sc-002', by: 'inv-0005', state: 'bound' } },
-    { type: 'scenario-declared', data: { scenario: 'sc-003', by: 'inv-0005', state: 'declared' } },
+    { type: 'obligation-bound', data: { id: 'sc-001', fakes: [], by: 'inv-0003', submission: 'a'.repeat(64) } },
+    { type: 'obligation-reported', data: { id: 'sc-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0004', submission: 'b'.repeat(64) } },
+    { type: 'obligation-bound', data: { id: 'sc-002', fakes: ['FakeNoteStore'], by: 'inv-0005', submission: 'f'.repeat(64) } },
+    { type: 'obligation-bound', data: { id: 'sc-003', fakes: [], by: 'inv-0005', submission: 'f'.repeat(64) } },
   ];
 
   test('every state, the entry\'s work item, an integration scenario without its work item yet, and no gate that did not run it', () => {
     const list = scenarioListResponseSchema.parse(scenarioListOf(runView(constructedRun(lines))));
-    expect(list.scenarios.map(one => [one.id, one.state, one.workItem, one.implementedBy, one.gates])).toEqual([
-      ['sc-001', 'implemented', 'wi-001', 'ga-0003', []],
-      ['sc-002', 'bound', 'wi-002', null, []],
-      ['sc-003', 'declared', 'wi-002', null, []],
-      ['sc-004', 'pending', 'wi-002', null, []],
-      ['sc-005', 'pending', null, null, []],
+    expect(list.scenarios.map(one => [one.id, one.state, one.workItem, one.gates])).toEqual([
+      ['sc-001', 'done', 'wi-001', []],
+      ['sc-002', 'bound', 'wi-002', []],
+      ['sc-003', 'bound', 'wi-002', []],
+      ['sc-004', 'pending', 'wi-002', []],
+      ['sc-005', 'pending', null, []],
     ]);
     expect(list.scenarios[0]!.origin).toEqual({ kind: 'architect', refs: ['fr-002'] });
     expect(list.scenarios[4]!.origin).toEqual({ kind: 'plan', planScenario: 'ps-01', lines: [12, 16] });
     // Before the analysis is accepted there is nothing to list.
-    expect(scenarioListOf(runView(constructedRun(lines.slice(0, 1))))).toEqual({ scenarios: [], total: 0 });
+    expect(scenarioListOf(runView(constructedRun(lines.slice(0, 1))))).toEqual({ scenarios: [], total: 0, obligations: [] });
+  });
+
+  test('PB3-D04 the list carries each obligation with its responsible owner, its binding\'s fakes, its architect report and its where text, and the scenario states are its statuses', () => {
+    const hash = 'c'.repeat(64);
+    const where = 'subs/workspace/subs/reviews/src/notes.ts — writeNote';
+    const obligationLines: Line[] = [
+      ...lines,
+      { type: 'capability-delegated', data: { task: 'cap-001', request: 'need-001', parent: 'wi-002', invocation: 'inv-0006', planRevision: 1 } },
+      { type: 'obligation-registered', data: { id: 'test-001', kind: 'test', responsible: { kind: 'work-item', id: 'wi-001' }, by: 'inv-0007', submission: hash, description: 'A note written twice is kept once' } },
+      { type: 'obligation-reported', data: { id: 'sc-001', judgment: 'done', basedOnRevision: 1, revision: 2, where, by: 'inv-0007', submission: hash } },
+      { type: 'obligation-reported', data: { id: 'cap-001', judgment: 'done', basedOnRevision: 0, revision: 1, by: 'inv-0008', submission: 'd'.repeat(64) } },
+      { type: 'obligation-reported', data: { id: 'cap-001', judgment: 'bound', basedOnRevision: 1, revision: 2, by: 'inv-0009', submission: 'e'.repeat(64) } },
+    ];
+    const list = scenarioListResponseSchema.parse(scenarioListOf(runView(constructedRun(obligationLines))));
+    expect(list.obligations.map(one => [one.id, one.kind, one.responsible, one.status, one.revision, one.report?.judgment ?? null, one.report?.where ?? null])).toEqual([
+      ['sc-001', 'scenario', { kind: 'work-item', id: 'wi-001' }, 'done', 2, 'done', where],
+      ['sc-002', 'scenario', { kind: 'work-item', id: 'wi-002' }, 'bound', 0, null, null],
+      ['sc-003', 'scenario', { kind: 'work-item', id: 'wi-002' }, 'bound', 0, null, null],
+      ['sc-004', 'scenario', { kind: 'work-item', id: 'wi-002' }, 'pending', 0, null, null],
+      ['sc-005', 'scenario', { kind: 'integration-scenario', id: 'sc-005' }, 'pending', 0, null, null],
+      ['cap-001', 'outcome', { kind: 'capability-task', id: 'cap-001' }, 'bound', 2, 'bound', null],
+      ['test-001', 'test', { kind: 'work-item', id: 'wi-001' }, 'pending', 0, null, null],
+    ]);
+    expect(list.obligations.find(one => one.id === 'test-001')).toMatchObject({ description: 'A note written twice is kept once', registeredBy: { invocation: 'inv-0007', submission: hash } });
+    // PB3-D12: the binding's fakes, with the invocation that bound it.
+    expect(list.obligations.find(one => one.id === 'sc-002')!.binding).toMatchObject({ fakes: ['FakeNoteStore'], invocation: 'inv-0005', submission: 'f'.repeat(64) });
+    expect(list.obligations.find(one => one.id === 'sc-004')!.binding).toBeNull();
+    // The scenario states are the same statuses.
+    expect(list.scenarios.map(one => [one.id, one.state])).toEqual(list.obligations.filter(one => one.kind === 'scenario').map(one => [one.id, one.status]));
   });
 
   test('the review carries the warnings of the acceptance, and each entry counts its own scenarios only', () => {
@@ -243,8 +284,8 @@ describe('over constructed records', () => {
     expect(review.warnings).toEqual([warning]);
     expect(review.scenarios.map(one => one.id)).toEqual(['sc-001', 'sc-002', 'sc-003', 'sc-004', 'sc-005']);
     expect(capabilityProgressOf(view).map(row => [row.capability, row.scenarios])).toEqual([
-      ['write-note', { implemented: 1, total: 1 }],
-      ['show-note', { implemented: 0, total: 3 }],
+      ['write-note', { done: 1, total: 1 }],
+      ['show-note', { done: 0, total: 3 }],
       ['store-note', null],
     ]);
   });

@@ -1,0 +1,6 @@
+{
+  "schema": "ramify-agent.project/1",
+  "typeCheck": {
+    "output": "tsc"
+  }
+}

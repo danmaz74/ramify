@@ -9,6 +9,7 @@
     "type-check": "tsc --noEmit && tsc --noEmit -p subs/web/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p scripts/browser-acceptance/tsconfig.json",
     "test": "vitest run",
     "check:self": "ramify check --batch --root .",
+    "test:scenarios": "NODE_OPTIONS='--import tsx' cucumber-js",
     "build:web": "NODE_ENV=production vite build --config subs/web/vite.config.ts",
     "dev:web": "vite --config subs/web/vite.config.ts",
     "serve": "tsx src/main.ts serve",
@@ -16,7 +17,8 @@
     "session": "tsx src/main.ts session",
     "trial": "tsx scripts/live-trial.ts",
     "test:browser:execution-map": "tsx scripts/browser-acceptance/run.ts",
-    "test:browser:check-findings": "tsx scripts/browser-acceptance/check-findings.ts"
+    "test:browser:check-findings": "tsx scripts/browser-acceptance/check-findings.ts",
+    "test:browser:plan21-projections": "tsx scripts/browser-acceptance/plan21-projections.ts"
   },
   "dependencies": {
     "@cucumber/gherkin": "42.0.0",
@@ -24,8 +26,8 @@
     "@earendil-works/pi-coding-agent": "0.87.1",
     "@xyflow/react": "12.11.6",
     "express": "5.2.1",
-    "ramify-audit": "0.3.2",
-    "ramify.ts": "0.1.0",
+    "ramify-audit": "0.7.2",
+    "ramify.ts": "0.4.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "10.1.0",

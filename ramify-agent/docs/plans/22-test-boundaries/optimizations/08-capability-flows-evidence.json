@@ -1,0 +1,648 @@
+{
+  "base": "323bdc13460f8c003f7cf61e8fd7062a805bc55a",
+  "implementationCommit": "1ecaf0d7",
+  "adoptedTarget": "f2968d17fa2f0657112ef8edab474537473f964a",
+  "qualifiedRuntimeHead": "6d0dfd7f8f56cd834c5ee76d55b1d2193b254d93",
+  "mapping": [
+    {
+      "oldFile": "subs/harness/src/tests/capability-assignments.test.ts",
+      "title": "an explicit partial capability result returns its cross-owner blocker to the architect",
+      "acceptanceIds": [],
+      "destination": "subs/harness/src/tests/capability-assignments.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "an explicit partial capability result returns its cross-owner blocker to the architect",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-assignments.test.ts",
+      "title": "CA06\u2013CA10 CA28\u2013CA30: consultation stays read-only and B, D, P, A receive task-owned scopes",
+      "acceptanceIds": [
+        "CA06",
+        "CA10",
+        "CA28",
+        "CA30"
+      ],
+      "destination": "subs/harness/src/tests/capability-assignments.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "CA06\u2013CA10 CA28\u2013CA30: consultation stays read-only and B, D, P, A receive task-owned scopes",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-assignments.test.ts",
+      "title": "CA10: a wider boundary decision returns to the same capability architect",
+      "acceptanceIds": [
+        "CA10"
+      ],
+      "destination": "subs/harness/src/tests/capability-assignments.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "CA10: a wider boundary decision returns to the same capability architect",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-assignments.test.ts",
+      "title": "PB3: unreadable inherited directory bytes cannot be captured as absent authority",
+      "acceptanceIds": [],
+      "destination": "subs/harness/src/tests/capability-assignments.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "PB3: unreadable inherited directory bytes cannot be captured as absent authority",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-consultation.test.ts",
+      "title": "CA04 CA06 CA16: a pending question is durable and the retained A session answers without write equipment",
+      "acceptanceIds": [
+        "CA04",
+        "CA06",
+        "CA16"
+      ],
+      "destination": "subs/harness/src/tests/capability-consultation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "CA04 CA06 CA16: a pending question is durable and the retained A session answers without write equipment",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate",
+      "acceptanceIds": [
+        "CA01",
+        "CA03",
+        "CA04",
+        "CA28",
+        "CA30",
+        "CA32"
+      ],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "an unsafe scratch override refuses capability source capture until the same engineer repairs it",
+      "acceptanceIds": [],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "an unsafe scratch override refuses capability source capture until the same engineer repairs it",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "a capability architect budget return reconstructs a fresh session with the current task and plan",
+      "acceptanceIds": [],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "a capability architect budget return reconstructs a fresh session with the current task and plan",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "exhausted capability architect budget returns leave the task unfinished without handback",
+      "acceptanceIds": [],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "exhausted capability architect budget returns leave the task unfinished without handback",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "CA16 CA26: preview-then-correct respects the captured capability action rejection bound",
+      "acceptanceIds": [
+        "CA16",
+        "CA26"
+      ],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "CA16 CA26: preview-then-correct respects the captured capability action rejection bound",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "CA16 CA26: invalid-submissions respects the captured capability action rejection bound",
+      "acceptanceIds": [
+        "CA16",
+        "CA26"
+      ],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "CA16 CA26: invalid-submissions respects the captured capability action rejection bound",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "CA16 CA26: invalid-port-inputs respects the captured capability action rejection bound",
+      "acceptanceIds": [
+        "CA16",
+        "CA26"
+      ],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "CA16 CA26: invalid-port-inputs respects the captured capability action rejection bound",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "scripted current-engine composition refuses an earlier captured policy before creating a run",
+      "acceptanceIds": [],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "scripted current-engine composition refuses an earlier captured policy before creating a run",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "CA33: production composition captures policy/7 and delegates without contract dispatch",
+      "acceptanceIds": [
+        "CA33"
+      ],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "CA33: production composition captures policy/7 and delegates without contract dispatch",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "an unresolved qualification returns through the global architect and the same local architect",
+      "acceptanceIds": [],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "an unresolved qualification returns through the global architect and the same local architect",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "CA02: local architect finds an existing API and the same engineer verifies it",
+      "acceptanceIds": [
+        "CA02"
+      ],
+      "destination": "subs/harness/src/tests/capability-delegation.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "CA02: local architect finds an existing API and the same engineer verifies it",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-delegation.test.ts",
+      "title": "CA30: provisional snapshot keeps staged, worktree, untracked and deleted bytes separately",
+      "acceptanceIds": [
+        "CA30"
+      ],
+      "destination": "subs/harness/src/tests/capability-delegation.boundary.test.ts",
+      "treatment": "unchanged-actual-callback-moved",
+      "expectedBehavior": "CA30: provisional snapshot keeps staged, worktree, untracked and deleted bytes separately",
+      "boundary": "Actual Git objects, index/worktree/untracked/deleted byte identity",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "capability submission CA16 returns structural field errors and keeps preview pure",
+      "acceptanceIds": [
+        "CA16"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "capability submission CA16 returns structural field errors and keeps preview pure",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "capability submission CA16 final validation rejects a preview made before state and authority changed",
+      "acceptanceIds": [
+        "CA16"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "capability submission CA16 final validation rejects a preview made before state and authority changed",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "capability submission plan updates use the same basis check and do not judge semantic wording",
+      "acceptanceIds": [],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "capability submission plan updates use the same basis check and do not judge semantic wording",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "capability submission CA11 PB3-D09 builds a revision with stable case identity, keeps the original examples, and refuses silent case deletion",
+      "acceptanceIds": [
+        "CA11",
+        "PB3-D09"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "capability submission CA11 PB3-D09 builds a revision with stable case identity, keeps the original examples, and refuses silent case deletion",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "capability submission PB3-D08 a case carries no coverage and a handback cites no evidence: both old fields are refused by the schemas",
+      "acceptanceIds": [
+        "PB3-D08"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "capability submission PB3-D08 a case carries no coverage and a handback cites no evidence: both old fields are refused by the schemas",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports tracks the delegated outcome by default and registers a case or test only on the architect's explicit choice",
+      "acceptanceIds": [
+        "PB3-D01",
+        "PB3-D02",
+        "PB3-D04"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports tracks the delegated outcome by default and registers a case or test only on the architect's explicit choice",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports accepts the task architect's done report with or without where, during coordination, and refuses another owner's ID",
+      "acceptanceIds": [
+        "PB3-D01",
+        "PB3-D02",
+        "PB3-D04"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports accepts the task architect's done report with or without where, during coordination, and refuses another owner's ID",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports an engineer reports work only: its completion proposal has no report field, and its declaration moves no obligation",
+      "acceptanceIds": [
+        "PB3-D01",
+        "PB3-D02",
+        "PB3-D04"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports an engineer reports work only: its completion proposal has no report field, and its declaration moves no obligation",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports a replayed accepted submission records nothing twice; a resumed partial write records only what is missing",
+      "acceptanceIds": [
+        "PB3-D01",
+        "PB3-D02",
+        "PB3-D04"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports a replayed accepted submission records nothing twice; a resumed partial write records only what is missing",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports PB3-D08 PB3-D09 a handback owes a done report for each registered obligation of its task, outcome-only or separately tracked, and none for an example",
+      "acceptanceIds": [
+        "PB3-D01",
+        "PB3-D02",
+        "PB3-D04",
+        "PB3-D08",
+        "PB3-D09"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports PB3-D08 PB3-D09 a handback owes a done report for each registered obligation of its task, outcome-only or separately tracked, and none for an example",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports PB3-C01 a handback request missing a report is a rejected submission naming the IDs; the same request with the report, and no where, is accepted",
+      "acceptanceIds": [
+        "PB3-D01",
+        "PB3-D02",
+        "PB3-D04",
+        "PB3-C01"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "PB3-D01 PB3-D02 PB3-D04: capability registrations and reports PB3-C01 a handback request missing a report is a rejected submission naming the IDs; the same request with the report, and no where, is accepted",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    },
+    {
+      "oldFile": "subs/harness/src/tests/capability-submission.test.ts",
+      "title": "PB3-D01 PB3-D02 PB3-D04: a capability architect registers a case and a test and reports during coordination; the run records exactly that",
+      "acceptanceIds": [
+        "PB3-D01",
+        "PB3-D02",
+        "PB3-D04"
+      ],
+      "destination": "subs/harness/src/tests/capability-submission.test.ts",
+      "treatment": "guarded-ordinary",
+      "expectedBehavior": "PB3-D01 PB3-D02 PB3-D04: a capability architect registers a case and a test and reports during coordination; the run records exactly that",
+      "boundary": "Real harness/ledger/filesystem with declared external answers",
+      "afterStatus": "passed"
+    }
+  ],
+  "assertionPreservation": [
+    {
+      "file": "subs/harness/src/tests/capability-assignments.test.ts",
+      "originalLexicalExpectOccurrences": 46,
+      "adoptedLexicalExpectOccurrences": 44,
+      "originalAssertionLinesPresentAfterHeadPortNormalization": true
+    },
+    {
+      "file": "subs/harness/src/tests/capability-delegation.test.ts",
+      "originalLexicalExpectOccurrences": 97,
+      "adoptedLexicalExpectOccurrences": 97,
+      "originalAssertionLinesPresentAfterHeadPortNormalization": true
+    },
+    {
+      "file": "subs/harness/src/tests/capability-consultation.test.ts",
+      "originalLexicalExpectOccurrences": 14,
+      "adoptedLexicalExpectOccurrences": 14,
+      "originalAssertionLinesPresentAfterHeadPortNormalization": true
+    },
+    {
+      "file": "subs/harness/src/tests/capability-submission.test.ts",
+      "originalLexicalExpectOccurrences": 60,
+      "adoptedLexicalExpectOccurrences": 60,
+      "originalAssertionLinesPresentAfterHeadPortNormalization": true
+    }
+  ],
+  "actualCallbackSha256": "d66bb1d8f964b4e6d39b62bbfbb0d30877c4c07db8831a2dbbe5ed01356f00bf",
+  "actualCallbackByteIdentical": true,
+  "headAssertionReplacement": "Two exact HEAD assertions query the supplied Git port instead of spawning Git; their expected request acceptedBase remains unchanged.",
+  "adoptedPlan21Changes": "Plan21 removed two obsolete assignment assertions (capability-assignment-interrupted and scope-tests) and the retired capabilityAssignment selector. These removals belong to adopted target cc27f03c, not optimization.",
+  "processAttempts": {
+    "fourOrdinaryFiles": 0,
+    "helperControls": 0,
+    "basis": "Each test completes teardown then asserts the recorded process attempts are empty; caught boundary failures cannot erase guard attempts. Global automatic runner enforcement remains outstanding."
+  },
+  "runtimeSourceHashes": {
+    "subs/harness/src/tests/capability-assignments.test.ts": "17feb1895f35bcaef7a364f0eedfd918b12683e6f6eb5688097aebb1e264830d",
+    "subs/harness/src/tests/capability-delegation.test.ts": "6ffdda201cafb948e9642ac4a300add009384d2b9515e64bd6bbf2303c19a955",
+    "subs/harness/src/tests/capability-consultation.test.ts": "d91e6b2af7937e280c90fb2329093ef4e2b68662bf5780a4b9bcd5a36aba0f9c",
+    "subs/harness/src/tests/capability-submission.test.ts": "8656ceec030b00ba461648a2dbdf88f872adb402adf762f7145600ef40c21060",
+    "subs/harness/src/tests/capability-delegation.boundary.test.ts": "d1cd6d0cd2a44abf81cde855ec047905564a6c3d9973463acd4df8f962178ae3",
+    "subs/harness/src/tests/capability-flow-boundaries.test.ts": "e4cde01e4c1b680b7a8bfe1bdff8898f95317a65c559afaec3eebd807c3fcf21",
+    "subs/harness/src/tests/helpers/capability-flow-boundaries.ts": "7424aaef964ea20424956a1c3a0094a33b30da8f57215877b04a83f71cc9a2b8",
+    "subs/harness/src/run/service.ts": "e2f2d9cc075bea20f3f2d9f3f83d140fdb38333cde51b18e3b7a2d090802ba3f",
+    "subs/harness/src/tests/helpers/runs.ts": "c51f36345334e0c5c301a86ea2957a2e98a32ef3657c2f0f358bc6f969f229f9",
+    "subs/harness/src/tests/composition.test.ts": "fcbecda959bddbb597910ba5893d2914e31c6288205573fabb2f25bc042950cf",
+    "subs/harness/src/tests/run-recovery.test.ts": "661d0989fea97d3f30f3578f2484face5b278112b5a5c6172747841310aadb60",
+    "subs/harness/src/tests/run-event-reader.test.ts": "7562c172c3d300b2c77dfda3e75a2fcb336ed170feb8d686d3593d3104073eab",
+    "subs/harness/src/tests/protocol-contract.test.ts": "fed573d71264c24ed614b664ce917506bab0df92c35060ee3ab1540148c702da"
+  },
+  "configurationHashes": {
+    "package.json": "df8473368f6e34409bc6f7917ba183bda93db16cf2b75f8a561c42ab12c29551",
+    "package-lock.json": "9d0b5e4332475cfc10b20c6f8c3d2aff035703a25af88710bc2beeb361ea96d6",
+    "vitest.config.ts": "c0f54f605e468027bffb775b4847c487bb88fb59f1b06528dbacb09738f07e7e",
+    "ramify-audit.json": "9bfaaa5d6b95d590cf044ecab60faec812b2e39fd5a7752be28e7190afa80baa"
+  },
+  "baseline": {
+    "artifact": "/tmp/plan22-capability-flows-baseline.json",
+    "sha256": "fde59ec99b9a812ffcd7991592d6e9a5e03f1f5fa07dfd9bf5dce7ab0361855f",
+    "passed": 29,
+    "failed": 0,
+    "pending": 0,
+    "fileSeconds": {
+      "subs/harness/src/tests/capability-assignments.test.ts": 7.992,
+      "subs/harness/src/tests/capability-consultation.test.ts": 1.22,
+      "subs/harness/src/tests/capability-delegation.test.ts": 9.365,
+      "subs/harness/src/tests/capability-submission.test.ts": 1.434
+    }
+  },
+  "firstPassingQualification": {
+    "artifact": "/tmp/plan22-capability-flows-qualified.json",
+    "sha256": "cac9cceaca3d1fdb95a30cfa090d45cc43ed9f71a0c0523c91a3aadf6f970d48",
+    "passed": 47,
+    "failed": 0,
+    "pending": 0,
+    "fileSeconds": {
+      "subs/harness/src/tests/capability-assignments.test.ts": 2.724,
+      "subs/harness/src/tests/capability-consultation.test.ts": 0.687,
+      "subs/harness/src/tests/capability-delegation.boundary.test.ts": 0.254,
+      "subs/harness/src/tests/capability-delegation.test.ts": 4.135,
+      "subs/harness/src/tests/capability-flow-boundaries.test.ts": 0.021,
+      "subs/harness/src/tests/capability-submission.test.ts": 0.742,
+      "subs/harness/src/tests/composition.test.ts": 5.9
+    }
+  },
+  "finalReconciledQualification": {
+    "artifact": "/tmp/plan22-capability-flows-reconciled.json",
+    "sha256": "4d0b537ef8b69033f09244cd627dd1ea65189ffef70ccbda8376205017ad35bb",
+    "passed": 47,
+    "failed": 0,
+    "pending": 0,
+    "fileSeconds": {
+      "subs/harness/src/tests/capability-assignments.test.ts": 5.611,
+      "subs/harness/src/tests/capability-consultation.test.ts": 1.21,
+      "subs/harness/src/tests/capability-delegation.boundary.test.ts": 0.503,
+      "subs/harness/src/tests/capability-delegation.test.ts": 9.035,
+      "subs/harness/src/tests/capability-flow-boundaries.test.ts": 0.025,
+      "subs/harness/src/tests/capability-submission.test.ts": 1.489,
+      "subs/harness/src/tests/composition.test.ts": 12.128
+    }
+  },
+  "finalPreAdoptionOrdinary": {
+    "artifact": "/tmp/plan22-capability-flows-final-ordinary.json",
+    "sha256": "bd6b6c74a1c0bcc494a411132a0bf13842087e7531e2b0c02bd53138b922e5f9",
+    "passed": 35,
+    "failed": 0,
+    "pending": 0,
+    "fileSeconds": {
+      "subs/harness/src/tests/capability-assignments.test.ts": 4.183,
+      "subs/harness/src/tests/capability-consultation.test.ts": 0.92,
+      "subs/harness/src/tests/capability-delegation.test.ts": 6.173,
+      "subs/harness/src/tests/capability-flow-boundaries.test.ts": 0.027,
+      "subs/harness/src/tests/capability-submission.test.ts": 0.971
+    }
+  },
+  "retainedFailures": [
+    {
+      "artifact": "/tmp/plan22-capability-flows-first.json",
+      "sha256": "6dfe61670d7ea0caacc7c52ca46c0b190298998834c580d4624e536f93378076",
+      "passed": 0,
+      "failed": 0,
+      "fileFailures": 4,
+      "cause": "Hoisted mock factory used a top-level imported binding; fixed by dynamic factory import."
+    },
+    {
+      "artifact": "/tmp/plan22-capability-flows-second.json",
+      "sha256": "b52aae52fb02cc1063ad42886ef2549a2d3b3b5b94a6117f4ca7d20959b20367",
+      "passed": 13,
+      "failed": 15,
+      "fileFailures": 4,
+      "cause": "Missing literal richer-a-fact ownership answer rejected scenarios before flows; supplied exact declared path."
+    },
+    {
+      "artifact": "/tmp/plan22-capability-flows-third.json",
+      "sha256": "069848c77d0bb7cd794077497d8265cdf00a0a7e59a6458b6cb959fe2b1a19e6",
+      "passed": 24,
+      "failed": 4,
+      "fileFailures": 2,
+      "cause": "Missing literal source diff pairs, omitted injected ports in inherited-directory fixture, guessed scratch read ordinal; supplied states and explicit scratch transitions."
+    },
+    {
+      "artifact": "/tmp/plan22-capability-flows-fourth.json",
+      "sha256": "762a3187f89e162a7bc02ad9569a903d4ec0bb640f41ff2634ff2856090940dd",
+      "passed": 2,
+      "failed": 2,
+      "fileFailures": 1,
+      "cause": "Missing adjacent literal source-state diff pairs after accepted/partial assignments."
+    },
+    {
+      "artifact": "/tmp/plan22-capability-flows-fifth.json",
+      "sha256": "ba16a221111e45aa15b75c29bd2d11c8533f3b8dba09b55a09b2acf3918380f9",
+      "passed": 0,
+      "failed": 2,
+      "fileFailures": 1,
+      "cause": "Original assignment assertions passed; caught unstated assembly hook path failed teardown."
+    },
+    {
+      "artifact": "/tmp/plan22-capability-flows-sixth.json",
+      "sha256": "bca61129051e9dd4342f423ea6a7d8d8f58ab208198df31a7c4a4b9c4fcd09e3",
+      "passed": 27,
+      "failed": 1,
+      "fileFailures": 1,
+      "cause": "Required scratch source-read count overstated: unsafe precondition refuses before capture; declared one successful capture."
+    },
+    {
+      "artifact": "/tmp/plan22-capability-flows-final.json",
+      "sha256": "4c28cfb0e95f96bd162bcd31672a586f34b251c5184a981179c0242d4669d705",
+      "passed": 46,
+      "failed": 1,
+      "fileFailures": 1,
+      "cause": "Consultation received exchange-answered before durable revision 2 was published; bounded until now waits for independently asserted file, without fixed sleeps or changed assertions."
+    }
+  ],
+  "configuredDiscovery": {
+    "artifact": "/tmp/plan22-capability-flows-discovery.json",
+    "sha256": "5df75e9890e48f81a665ff7fdac3fc0c859f783e1656b843ff7e8cafa36a63da",
+    "files": 261,
+    "newFilesSelected": {
+      "subs/harness/src/tests/capability-delegation.boundary.test.ts": true,
+      "subs/harness/src/tests/capability-flow-boundaries.test.ts": true
+    },
+    "kind": "read-only installed Vitest discovery, not test acceptance"
+  },
+  "qualification": {
+    "focused": "86 passed, 0 failed, 0 skipped, including qualification prerequisite controls and original recovery table",
+    "typeCheck": "Four scopes passed; /tmp/plan22-capability-flows-prerequisite-types.log",
+    "moduleCheck": "0 errors, 0 warnings, 313 analysis limits; /tmp/plan22-capability-flows-prerequisite-self.log",
+    "preMergeFullNestedAudit": "Unrun by subagent; coordinator must execute before merge",
+    "noProductionConfigurationOrPinChangeByOptimization": true
+  },
+  "discoveryResource": {
+    "retained": "Shared /tmp/ramify-1000 daemon holds the materialized project compiler session; no public project-scoped stop exists. Shared daemon intentionally preserved.",
+    "observedSessionSupervisorPid": 2475721,
+    "observedCompilerPid": 2475942,
+    "sharedDaemonPid": 2225313,
+    "testFixtureProcesses": "Ordinary processes refused; retained actual CA30 Git commands returned normally. No owned long-lived fixture process introduced."
+  },
+  "performanceLimit": "Same host, evolving Plan21 source and concurrent type/module/workflow load. Focused file times vary: first passing ordinary sum 8.288 s; reconciled ordinary sum 17.345 s; baseline 20.011 s including 0.188 s actual CA30 case. No controlled full-audit speedup or timing gate claimed.",
+  "initialQualifiedRuntimeHead": "7a8acd3a182df62e860c28516e6f98a2164bb92f",
+  "qualificationPrerequisite": {
+    "commit": "6d0dfd7f8f56cd834c5ee76d55b1d2193b254d93",
+    "adoptedTarget": "f2968d17fa2f0657112ef8edab474537473f964a",
+    "failedBaseline": {
+      "artifact": "/tmp/plan22-opt08-adopted-baseline-failure.json",
+      "sha256": "4465f6a9b7b6068aa47f033cd0bf421669317aa78d48ef06a03a2570e47f14ae",
+      "sourceCommit": "cc27f03c80f8afe80010dd42cc9eae40d0dd5035",
+      "refs": {
+        "reportCommit": "e51b822e3688930f52245c1d9e4927a6c61839fa",
+        "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T07-15-03Z-cc27f03c8",
+        "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/ca0e4c808700ea36ba9031362178fdb7a4f6adcc"
+      },
+      "primaryFailures": [
+        "protocol-contract: absent required documentManifest",
+        "run-recovery: live polling parsed an incomplete trailing JSON line"
+      ],
+      "secondaryFailure": "Recovery fixture cleanup removed the directory before closing its active resumed service, racing writes and producing ENOTEMPTY.",
+      "protocolRepair": "Adopted only committed Plan21 repair0108a28d via targetf2968d17; did not copy unfinished edits."
+    },
+    "correction": {
+      "helper": "runEventsOnDisk reuses exposed readJsonLines after access preserves ENOENT; completed corrupt lines still fail and no file bytes are truncated.",
+      "cleanup": "run-recovery releases services before fixture removal and collects all cleanup/guard errors.",
+      "originalRecoveryCallbacksByteIdentical": true,
+      "tests": "Four new guarded controls: complete records, unfinished final append, corrupt completed record followed by valid records, missing-file refusal.",
+      "controlsFile": "subs/harness/src/tests/run-event-reader.test.ts",
+      "controlTitles": [
+        "the run event reader returns every complete written record without launching a process",
+        "the run event reader defers only the unfinished final append and leaves its bytes intact",
+        "the run event reader rejects a corrupt completed record even when valid records follow it",
+        "the run event reader preserves missing-file refusal instead of answering an empty run"
+      ],
+      "qualificationProseAmendment": "After the passing run, the control title and helper comment changed from durable/committed to written/complete; executable behavior is unchanged, per coordinator instruction."
+    },
+    "focused": {
+      "artifact": "/tmp/plan22-capability-flows-prerequisite.json",
+      "sha256": "36a63df560f6ec3ef347fa75c8026f57e6d83623cd01303530dd8aeab8dc6aaf",
+      "passed": 86,
+      "failed": 0,
+      "pending": 0,
+      "counts": {
+        "cut8AndComposition": 47,
+        "originalRecovery": 35,
+        "newReaderControls": 4
+      },
+      "fileSeconds": {
+        "subs/harness/src/tests/capability-assignments.test.ts": 3.617,
+        "subs/harness/src/tests/capability-consultation.test.ts": 0.837,
+        "subs/harness/src/tests/capability-delegation.boundary.test.ts": 0.283,
+        "subs/harness/src/tests/capability-delegation.test.ts": 5.436,
+        "subs/harness/src/tests/capability-flow-boundaries.test.ts": 0.025,
+        "subs/harness/src/tests/capability-submission.test.ts": 0.922,
+        "subs/harness/src/tests/composition.test.ts": 8.47,
+        "subs/harness/src/tests/run-event-reader.test.ts": 0.027,
+        "subs/harness/src/tests/run-recovery.test.ts": 15.858
+      }
+    },
+    "types": {
+      "passed": true,
+      "artifact": "/tmp/plan22-capability-flows-prerequisite-types.log",
+      "sha256": "cc20c8cd61ad65bc7bb1f956b6c3edae16121fe0425f7fd5894d9eb76fe49c3c"
+    },
+    "module": {
+      "passed": true,
+      "errors": 0,
+      "warnings": 0,
+      "analysisLimits": 313,
+      "artifact": "/tmp/plan22-capability-flows-prerequisite-self.log",
+      "sha256": "249aeff6f2a9e2b43caf23d7400fa017e2f9c69b9818590067c3e5b54471befe"
+    },
+    "configuredDiscovery": {
+      "artifact": "/tmp/plan22-capability-flows-prerequisite-discovery.json",
+      "sha256": "32dc4cd19c68be2fcc22e2fd2d5c2c5632ddb2d21dc45095ef2dec7348227e7f",
+      "files": 262,
+      "readerControlsSelected": true,
+      "kind": "read-only discovery"
+    },
+    "fullNestedPreMergeAudit": "Unrun by subagent; coordinator must audit this combined committed source before merging."
+  }
+}

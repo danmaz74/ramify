@@ -143,7 +143,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
       'built environment. The complete output is kept in a file; you receive the last 8 KiB of it.',
       'What this writes passes no write guard: it is observed afterwards, and a change outside your scope is',
       'reported rather than prevented. Stay inside your scope here as you do with `edit` and `write`.',
-      'Whole-suite Vitest and Cucumber runs are refused. Name test files or use `run_scope_tests`.',
+      'Whole-suite Vitest and Cucumber runs are refused: the gate\'s audit runs them. Name test files instead.',
       `A command runs for ${defaultTimeoutMs} ms unless \`timeoutMs\` asks for more, up to ${maxTimeoutMs} ms.`,
     ].join(' '),
     inputSchema: z.toJSONSchema(inputSchema) as JsonSchema,
@@ -174,7 +174,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
       }
       const testRun = classifyShellTestRun(request.command, { workingDirectory: options.workingDirectory, testScripts });
       if (testRun.kind === 'whole-suite') {
-        const explanation = `Refused, nothing ran: \`${testRun.segment}\` runs the project's whole test suite (${testRun.reason}). The whole suite is not run from \`shell\`: it runs through ramify-audit at the gates, a full run takes minutes and waits behind every other suite run on this machine, and it verifies far more than this iteration is judged on. Call \`run_scope_tests\` to run the tests this iteration is judged on. To run particular tests, name their files: \`npx vitest run <path/to/file.test.ts> …\` or \`npm test -- <path/to/file.test.ts>\`. Watch mode is refused for the same reason: it never ends on its own.`;
+        const explanation = `Refused, nothing ran: \`${testRun.segment}\` runs the project's whole test suite (${testRun.reason}). The whole suite is not run from \`shell\`: it runs through ramify-audit at the gates, a full run takes minutes and waits behind every other suite run on this machine, and it verifies far more than this iteration is judged on. To run particular tests, name their files: \`npx vitest run <path/to/file.test.ts> …\` or \`npm test -- <path/to/file.test.ts>\`. Watch mode is refused for the same reason: it never ends on its own.`;
         await options.refused?.(explanation);
         return { isError: true, text: explanation };
       }

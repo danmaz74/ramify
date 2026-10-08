@@ -1,6 +1,6 @@
 import { finalCandidate } from './helpers/final-candidate.js';
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,12 +23,14 @@ import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { copyFixture } from './helpers/fixture.js';
 import { byRole, submit, treeInputs } from './helpers/iterations.js';
 import {
-  approveRun, emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until,
+  approveRun, emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, scriptedConfiguredAudit, staleCrashLock, startRun, stopRun, testPolicy, until,
 } from './helpers/runs.js';
 import { unchangedGit } from './helpers/unchanged-run.js';
+import { fixtureScratchGit } from './helpers/mock-git.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
 import { withDefaultTurns } from './helpers/declarations.js';
 import { checkToolName, type CheckSubmission } from '../analysis/extraction.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 
 /*
  * The review stop, architecture §3. A run started with `reviewStop` waits
@@ -183,7 +185,8 @@ describe('a run started with the review stop', () => {
     const events = await runEventsOnDisk(root, plan, receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'document-manifest-committed', ...analysed, 'analysis-accepted', 'review-requested', 'analysis-approved',
-      'gate-started', 'readiness-passed', 'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
+      'gate-started', 'readiness-passed', 'scratch-setting-up', 'scratch-setup-complete',
+      'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
       'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-completed',
     ]);
     expect(events.find(event => event.type === 'analysis-approved')!.data).toMatchObject({
@@ -499,7 +502,8 @@ describe('over HTTP', () => {
       agent: createScriptedAgent(withDefaultTurns(script)),
       runs: {
         inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
-        git: unchangedGit(root, [finalVerification], 4), candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution(),
+        git: fixtureScratchGit(unchangedGit(root, [finalVerification], 4)), candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates,
+        configuredAudit: passingAudit(),
       },
     });
   }

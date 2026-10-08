@@ -11,15 +11,12 @@ import {
 import { moduleNoticeSchema } from '../work/iterations.js';
 import { catalogFindingSchema, scenarioWarningSchema } from '../analysis/records.js';
 import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
-import {
-  scenarioDeclaredDataSchema, scenarioDueDataSchema, scenarioImplementedDataSchema, scenarioWithdrawnDataSchema,
-} from '../../subs/scenarios/src/states.js';
+import { obligationBoundDataSchema, obligationRegisteredDataSchema, obligationReportedDataSchema } from '../work/obligations.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
 import type { LedgerFileSystem } from '../../subs/ledger/src/fs.js';
 import { replayCheckFindingEvents } from '../../subs/check-findings/src/replay.js';
 import type { CheckFindingEvent } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import { checkFindingCauseSchema, checkFindingEventsField } from '../check-findings/records.js';
-import { gateCheckFindingOutcomeSchema } from '../checks/scenario-findings.js';
 import {
   reviewAttemptFinishedFields, reviewAttemptStartedDataSchema, reviewOrientationRecordedDataSchema, reviewRequestRecordedDataSchema,
 } from '../reviews/records.js';
@@ -141,18 +138,18 @@ export const runEventSchema = z.discriminatedUnion('type', [
     workItems: z.int().nonnegative(),
     scenarios: z.int().nonnegative(),
     warnings: z.array(scenarioWarningSchema),
-    /** The frozen catalog's elements by kind, when the same transaction also commits catalog and incorporation. */
+    /** The frozen catalog's elements by kind. */
     catalog: z.object({
       context: z.int().nonnegative(), functional: z.int().nonnegative(), nonFunctional: z.int().nonnegative(),
       fixed: z.int().nonnegative(), recommendation: z.int().nonnegative(),
-    }).strict().optional(),
+    }).strict(),
     /** The checkers' corrections, shown at the review stop beside the corrected catalog. */
-    findings: z.array(catalogFindingSchema).optional(),
+    findings: z.array(catalogFindingSchema),
     /** Hashes bind external immutable evidence files without putting their bodies in a ledger line. */
     evidence: z.object({
       catalog: z.object({ path: text, hash: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
       incorporation: z.object({ path: text, hash: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
-    }).strict().optional(),
+    }).strict(),
   }).strict()),
   /** The manifest is committed only after every immutable document byte file is durable. */
   event('document-manifest-committed', z.object({ manifest: text, hash: z.string().regex(/^[0-9a-f]{64}$/), documents: z.int().positive() }).strict()),
@@ -190,7 +187,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('nonfunctional-repair-committed', z.object({ round: z.int().positive(), invocation: text, assignment: text }).strict()),
   event('nonfunctional-round-closed', z.object({ round: z.int().positive(), record: text,
     outcome: z.enum(['satisfied', 'continue', 'exhausted', 'unavailable']),
-    /** Accepted coordinator close submission for unresolved choices; absent on earlier runs. */
+    /** Accepted coordinator close submission for unresolved choices; absent where the round closed without one. */
     actionInvocation: text.optional(),
   }).strict()),
   event('nonfunctional-deviation-recorded', z.object({ deviation: text, nfr: text, assessment: text, checkFinding: text,
@@ -209,17 +206,9 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('capability-exchange-answered', z.object({ task: text, exchange: text, invocation: text }).strict()),
   event('capability-assigned', z.object({ task: text, assignment: text, sequence: z.int().positive(), invocation: text,
     architectRef: architectRefSchema.nullable().optional(), corrects: text.optional() }).strict()),
-  event('capability-assignment-interrupted', z.object({ task: text, assignment: text, invocation: text,
-    cause: text, candidateTree: text, attempt: z.int().positive() }).strict()),
   event('capability-assignment-settled', z.object({ task: text, assignment: text, outcome: z.enum(['accepted', 'partial', 'failed', 'interrupted']),
-    mutated: z.array(text).optional(), outsideScope: z.array(text).optional(), endingTree: text.optional(),
-    unfinished: z.array(text).optional() }).strict()),
-  event('capability-candidate-accepted', z.object({ task: text, gate: text, tree: text,
-    planRevision: z.int().positive(), assignments: z.array(text).min(1), review: text }).strict()),
-  event('capability-review-recorded', z.object({ task: text, gate: text, tree: text,
-    planRevision: z.int().positive(), outcome: z.enum(['passed', 'failed']), review: text }).strict()),
+    mutated: z.array(text).optional(), outsideScope: z.array(text).optional(), endingTree: text.optional() }).strict()),
   event('capability-verification-started', z.object({ task: text, invocation: text, gate: text.optional() }).strict()),
-  event('capability-verification-failed', z.object({ task: text, finding: text }).strict()),
   event('capability-handed-back', z.object({ task: text, handback: text, invocation: text }).strict()),
   event('capability-stopped', z.object({ task: text, reason: text }).strict()),
   /**
@@ -250,8 +239,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
    */
   event('readiness-failed', z.object({
     attempt: z.int().positive(),
-    /** Present on new runs; older logs pair by the most recent start. */
-    gate: text.optional(),
+    gate: text,
     step: text,
     detail: z.string(),
     recovery: z.string().nullable(),
@@ -263,6 +251,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * "Scenarios of <planId>". A crash before its completion is recovered by
    * re-rendering and by the commit's trailers.
    */
+  event('scratch-setting-up', z.object({ originalIgnoreBase64: z.string().nullable() }).strict()),
+  event('scratch-setup-complete', z.object({ commit: z.string().nullable(), appended: z.boolean() }).strict()),
   event('scenarios-materializing', z.object({ files: z.array(text) }).strict()),
   /**
    * The feature files are on the run branch: the commit that holds them, or
@@ -271,46 +261,26 @@ export const runEventSchema = z.discriminatedUnion('type', [
    */
   event('scenarios-materialized', z.object({ commit: z.string().nullable(), files: z.array(text) }).strict()),
   /**
-   * An engineer's completion proposal or a local architect's completion
-   * request declared a `pending` scenario of its work item's entry. It is
-   * `bound` while the work item has an open requirement or owes a
-   * conformance, and keeps its pending tag; otherwise `declared`, and the
-   * next commit removes the tag.
+   * A responsible architect's accepted registration of an obligation it
+   * chose to track independently: a capability-plan case or a required test.
+   * It enters `pending` at report revision 0. Ordinary tests never register.
    */
-  event('scenario-declared', scenarioDeclaredDataSchema),
+  event('obligation-registered', obligationRegisteredDataSchema),
   /**
-   * The last open requirement of the scenario's work item was verified and
-   * no conformance is owed: a `bound` scenario would now run without fakes,
-   * so it is `declared`.
+   * An engineer's accepted completion proposal bound an obligation its
+   * assignment named, relying on the fakes it lists, possibly none. A
+   * `pending` obligation is `bound` from here and loses its pending tag at
+   * the next commit; a `done` one records the new list and stays `done`.
+   * It never increments the report revision.
    */
-  event('scenario-due', scenarioDueDataSchema),
-  /** A passing gate ran a `declared` scenario, which is now `implemented` for good. */
-  event('scenario-implemented', scenarioImplementedDataSchema),
+  event('obligation-bound', obligationBoundDataSchema),
   /**
-   * A passing gate ran a `bound` scenario: its pass is against the fakes its
-   * work item still holds, so the state stays `bound`, and the attempt is
-   * recorded as its fake-backed pass. A scenario with one since its
-   * declaration is not withdrawn.
+   * A responsible architect's accepted report: its judgment that the
+   * obligation is `done`, or an explicit revision of a `done` back to
+   * `bound`. Only an accepted architect submission appends one; no gate,
+   * audit or source change does.
    */
-  event('scenario-bound-passed', z.object({ scenario: scenarioIdSchema, gate: text }).strict()),
-  /**
-   * The durable intent of a withdrawal commit: the scenarios about to return
-   * to `pending`, why, and the withdrawal's ordinal in the run, which is its
-   * commit's `Ramify-Scenarios: withdrawn-<n>` trailer. The first
-   * `scenario-withdrawn` is its completion.
-   */
-  event('scenarios-withdrawing', z.object({
-    withdrawal: z.int().positive(),
-    workItem: text,
-    scenarios: z.array(scenarioIdSchema).min(1),
-    reason: text,
-  }).strict()),
-  /**
-   * A `declared` or `bound` scenario with no pass since its declaration
-   * returned to `pending` when its work item left the repair path without
-   * one, with the commit that restored its pending tag.
-   */
-  event('scenario-withdrawn', scenarioWithdrawnDataSchema),
+  event('obligation-reported', obligationReportedDataSchema),
   /**
    * The work item's turn begins; it licenses its local architect. It names
    * the item's origin, and an integration work item's scenario.
@@ -449,6 +419,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
     notices: z.array(moduleNoticeSchema),
     checkFindings: checkFindingEventsField.optional(),
   }).strict()),
+  /** Cleanup follows durable closure; recovery repeats it if interrupted. */
+  event('scratch-preserved', z.object({ iteration: text, paths: z.array(text) }).strict()),
   /**
    * Commits the `contract` `IterationAssignment` of one sub-session, and
    * licenses the contract engineer. `requestedBy` names the engineer
@@ -587,32 +559,29 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('gate-command-started', z.object({
     gate: text,
     checkpoint: text,
-    kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
-    /** A setup command's declared name, such as `build`. */
+    /** `configured` is one check of the committed audit definition, which the provider starts. */
+    kind: z.enum(['setup', 'ramify-check', 'type-check', 'configured']),
+    /** A setup command's declared name, such as `build`, or a configured check's ID. */
     name: text.optional(),
     position: z.int().positive(),
     total: z.int().positive(),
   }).strict()),
-  /** A test command is queued for the machine lock. Its line is the provider's own wording. */
+  /** A provider test/check is queued for the machine lock; readiness projects native check progress here. */
   event('gate-command-waiting', z.object({
     gate: text, checkpoint: text,
-    kind: z.enum(['tests', 'scenarios']),
+    kind: z.enum(['configured']),
     position: z.int().positive(), total: z.int().positive(), line: text,
   }).strict()),
   /**
-   * A gate finished and commits its one complete `GateAttempt`. A committing
-   * gate of a work item also carries what its scenario check means for the
-   * work item's CheckFindings: a repeated failure promoted, a witness that
-   * fixes one, and what was left out. The verdict never depends on them.
+   * A gate finished and commits its one complete `GateAttempt`. It carries
+   * no CheckFinding events: the configured audit's per-scenario results are
+   * display only.
    */
   event('gate-attempted', z.object({
     gate: text,
     checkpoint: text,
     verdict: z.enum(['passed', 'failed', 'not-verified']),
     next: text,
-    committing: z.boolean().optional(),
-    checkFindings: checkFindingEventsField.optional(),
-    scenarioFindings: gateCheckFindingOutcomeSchema.optional(),
   }).strict()),
   /**
    * CheckFinding events committed by a path with no run event of its own:

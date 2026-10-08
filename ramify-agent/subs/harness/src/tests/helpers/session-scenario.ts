@@ -12,7 +12,6 @@ import { addModule, assign, byRole, completionProposed, installMiniRunner, outli
 import { openRuns, runEventsOnDisk, runPath, startRun } from './runs.js';
 import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged } from './contracts-git.js';
 import { declaringScenarios } from './declarations.js';
-import { directReadinessExecution } from './external-tools.js';
 import { finalCandidate } from './final-candidate.js';
 
 /*
@@ -237,7 +236,7 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
     git,
     candidates: final.candidates,
     inputs: treeInputs(),
-    readinessExecution: directReadinessExecution(),
+
     model: 'provider/model-7',
     agent: options.port?.(scripted) ?? scripted,
     checkScript: ({ check, context }) => {

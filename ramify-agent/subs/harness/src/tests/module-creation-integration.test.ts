@@ -12,7 +12,6 @@ import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
 import { localArchitectToolName } from '../work/submission.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
@@ -120,7 +119,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
       inputs: viewedInputs(daemon.ramify, message => unavailable.push(message)),
       git: scripted.git,
       candidates: final.candidates,
-      readinessExecution: directReadinessExecution(),
+
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -136,12 +135,12 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
     // harness could not obtain.
     expect(unavailable).toEqual([]);
     const assignment = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.assignment('wi-001', 1)), 'utf8')) as {
-      scope: { bootstrap: Array<{ directory: string }>; resolved: { roots: string[]; files: string[] } };
+      scope: { bootstrap: Array<{ directory: string }>; resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: string[]; files: string[] } };
     };
     // The bootstrap authority came from the accepted registry entry, and it
     // reaches a directory that did not exist.
     expect(assignment.scope.bootstrap.map(entry => entry.directory)).toEqual([notesDirectory]);
-    expect(assignment.scope.resolved.roots.some(path => path.endsWith(`${notesDirectory}/src`))).toBe(true);
+    expect(assignment.scope.resolved.roots.some(path => path.endsWith(notesDirectory))).toBe(true);
 
     const result = await readResult(root, runId, 1);
     expect(result.outcome).toBe('accepted');

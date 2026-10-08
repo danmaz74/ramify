@@ -1,7 +1,7 @@
 import { expect, type Mocked } from 'vitest';
 import type { GitService } from '../../../subs/evidence/src/git.js';
 import type { CandidateTreePreview } from '../../../subs/evidence/src/candidate-tree.js';
-import { mockGit } from './mock-git.js';
+import { mockGit, scriptedScratchGit, type ScratchGitScript } from './mock-git.js';
 
 /*
  * The Git answers one contract or verification scenario gives.
@@ -31,6 +31,7 @@ export interface CommitResponse {
 }
 
 export interface GitAnswers {
+  readonly scratch?: ScratchGitScript | undefined;
   /** The revision the fixture is on before the run commits anything. */
   readonly head: string;
   /** Exact ordered candidate tree answers; omitted means no preview may be requested. */
@@ -74,6 +75,7 @@ const runBranchPrefix = 'ramify-agent-run/';
 
 /** A scripted external Git for one scenario. */
 export function answeredGit(root: string, answers: GitAnswers): AnsweredGit {
+  const scratch = scriptedScratchGit(root, answers.scratch);
   let index = 0;
   let previewIndex = 0;
   let head = answers.head;
@@ -95,6 +97,7 @@ export function answeredGit(root: string, answers: GitAnswers): AnsweredGit {
   const pending = (): readonly GitChange[] => answers.commits[index]?.changes ?? [];
 
   const git = mockGit({
+    ...scratch.answers,
     async previewCandidateTree(project) {
       const answer = answers.previews?.[previewIndex];
       check('previewCandidateTree', () => {
@@ -194,6 +197,7 @@ export function answeredGit(root: string, answers: GitAnswers): AnsweredGit {
     head: () => head,
     branch: () => branch,
     assertAnswered() {
+      scratch.assertComplete();
       expect(failures).toEqual([]);
       expect(git.unexpected).toEqual([]);
       expect(index).toBe(answers.commits.length);
@@ -218,14 +222,6 @@ export function accepted(subject: string, commit: string, changes: readonly GitC
  */
 export function scenariosCommitted(planId: string, commit = `scenarios-of-${planId}`, files: readonly string[] = []): CommitResponse {
   return accepted(`Scenarios of ${planId}`, commit, added(...files));
-}
-
-/**
- * The harness's own commit of a withdrawal, "Withdraw sc-001" or "Withdraw
- * sc-001, sc-002", which restores the pending tag in each file it names.
- */
-export function withdrawn(scenarios: readonly string[], commit: string, files: readonly string[]): CommitResponse {
-  return accepted(`Withdraw ${scenarios.join(', ')}`, commit, modified(...files));
 }
 
 /** A commit attempt Git reports as an unchanged tree. */

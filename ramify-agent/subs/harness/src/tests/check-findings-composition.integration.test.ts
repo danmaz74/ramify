@@ -10,7 +10,6 @@ import { snapshotToolNames } from '../reviews/snapshot.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { testReviewPolicy } from './helpers/candidates.js';
 import { afterFinished, concern, disposition, reconcile, review, submission } from './helpers/check-findings-composition.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { assign, completionProposed, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { eventsOf, limit, notes, notesDirectory, plan, reviewScript, reviewTarget, store } from './helpers/reviews.js';
 import { git, initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
@@ -95,7 +94,7 @@ describe('the composed CheckFinding path over a real repository', () => {
       script,
       git: gitService,
       inputs: treeInputs(),
-      readinessExecution: directReadinessExecution(),
+
       // Settlement outlasts one attempt, so a design reader still waiting at the completion request runs.
       policy: projectRoot => testPolicy(projectRoot, { reviews: testReviewPolicy({ kinds: ['code', 'scope', 'design'], concurrency: 2, settleMs: 120_000 }) }),
     });

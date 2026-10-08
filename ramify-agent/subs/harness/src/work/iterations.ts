@@ -1,10 +1,11 @@
 import { join } from 'node:path';
 import { z } from 'zod';
-import { modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
+import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { failureAnalysisSchema, roleSchema } from '../interfaces/protocol/runs.js';
 import { invocationOutcomeSchema, recordRefSchema } from '../run/records.js';
 import { packageCitationSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { slugSchema } from '../analysis/records.js';
+import { writeScopeSchema } from './scope.js';
 import type { WorkItemId } from './records.js';
 
 /*
@@ -31,59 +32,10 @@ export function workItemOfIteration(id: IterationId): WorkItemId | null {
   return workItem !== undefined && workItem !== '' && tail !== undefined ? workItem : null;
 }
 
-/**
- * What a location beyond the base was assigned for. `fake-injection` is a
- * file the agreement names as holding the fake, in the consumer or on the
- * provider side, which a contract iteration may write. `outside-modules` is
- * a path outside every module's own contents, such as a project script,
- * where only a change meets a plan requirement; it carries that requirement
- * as its reason.
- */
-export const extraPurposeSchema = z.enum(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'fake-injection', 'outside-modules']);
+export { extraPurposeSchema, writeScopeSchema } from './scope.js';
+export type { WriteScope } from './scope.js';
 
-/**
- * What one iteration may write. `base` is the assigned module's own contents
- * plus the complete subtrees of the immediate children it names: each child
- * subtree is wholly included or excluded, and no descendant is selected on
- * its own.
- *
- * `resolved` is what the guard compares against: canonical paths, captured
- * when the assignment was accepted, with the view they were resolved from.
- * A later refresh never widens them.
- */
-export const writeScopeSchema = z.object({
-  /** Per work item; only an assignment raises it. */
-  revision: z.int().nonnegative(),
-  base: z.union([
-    z.object({ module: modulePathSchema, includedChildren: z.array(modulePathSchema) }).strict(),
-    z.object({ modules: z.array(modulePathSchema).min(1), rationale: text }).strict(),
-  ]),
-  /**
-   * Locations assigned beyond the base. A contract iteration is given
-   * directories, because the files it will write do not exist yet and their
-   * names are the agreement's to choose; an architect's own extra location
-   * is one file, which is the default, or a directory outside every module.
-   */
-  extra: z.array(z.object({
-    path: text,
-    purpose: extraPurposeSchema,
-    kind: z.enum(['file', 'directory']).optional(),
-    /** For `outside-modules`: the plan requirement the change serves. */
-    reason: text.optional(),
-  }).strict()),
-  /** The declared read scope beyond the base; soft. */
-  read: z.array(modulePathSchema),
-  /** Creation authority captured from accepted registry entries, never from hypotheses. */
-  bootstrap: z.array(z.object({ capability: recordRefSchema, directory: text }).strict()),
-  rationale: text,
-  /** Captured canonical paths, including validated absent bootstrap paths under a real ancestor. */
-  resolved: z.object({
-    roots: z.array(text),
-    files: z.array(text),
-    view: viewIdentitySchema,
-  }).strict(),
-}).strict();
-export type WriteScope = z.infer<typeof writeScopeSchema>;
+
 
 /** Which tests a checkpoint requires, as a policy and never as a file list. */
 export const testSelectionPolicySchema = z.object({
@@ -92,11 +44,6 @@ export const testSelectionPolicySchema = z.object({
   subtrees: z.array(modulePathSchema),
   /** Suites a registered evidence obligation requires; each must be selected. */
   extraSuites: z.array(text),
-  /**
-   * The assignment's `outside-modules` paths. Each attempt resolves the test
-   * files beneath them anew, and they join `extraSuites`.
-   */
-  outsideModules: z.array(text).optional(),
 }).strict();
 
 export const checkpointSchema = z.enum(['readiness', 'iteration', 'contract', 'breaking-iteration', 'work-item', 'final']);
@@ -162,7 +109,7 @@ export const iterationAssignmentSchema = z.object({
   /** Derived by the policy from `kind` and `scope`; no submission carries it. */
   gate: z.object({ checkpoint: checkpointSchema, tests: testSelectionPolicySchema }).strict(),
   /** Guarded files as captured; a gate compares the tree with them. */
-  guarded: z.array(z.object({ path: text, hash: text }).strict()),
+  guarded: z.array(z.object({ path: text, hash: text.nullable() }).strict()),
   /**
    * Guarded paths this iteration may change, each with the record that
    * authorized it and the reason the request establishes. It is captured
@@ -175,11 +122,11 @@ export const iterationAssignmentSchema = z.object({
   /** A local architect may assign a contract revision directly. */
   revisesContract: recordRefSchema.optional(),
   /**
-   * The scenarios the architect expects this iteration to bind, shown to the
-   * engineer under "Scenarios to bind". Informative: the engineer declares
-   * what its step definitions bind, and nothing requires exactly these.
+   * The registered obligations the architect delegated to this iteration's
+   * engineer, as the assignment named them. Its completion proposal binds
+   * every one; absent, none was named.
    */
-  scenarios: z.array(text).optional(),
+  obligations: z.array(text).optional(),
   /** The bounds the local architect raised for this iteration's engineers; absent, the policy's. */
   bounds: assignedBoundsSchema.optional(),
 }).strict();

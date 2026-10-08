@@ -1,3 +1,4 @@
+import { defaultRunPolicy } from '../run/policy.js';
 import { describe, expect, it } from 'vitest';
 import { runEvent, type RunEventInput } from '../run/log.js';
 import {
@@ -43,9 +44,10 @@ describe('capability state and authority', () => {
   it('CA29 captures distinct task and global limits under the new policy version', () => {
     const previous = { version: 'run-policy/4', limits: {
       maxIterationsPerWorkItem: 12, maxWorkItems: 64, maxInvocationsPerRun: 400,
-    } } as RunPolicy;
-    expect(() => captureCapabilityLimits(previous)).toThrow('run-policy/6');
-    const policy = capabilityPolicyFrom(previous);
+    } } as unknown as RunPolicy;
+    expect(() => captureCapabilityLimits(previous)).toThrow('run-policy/7');
+    expect(() => capabilityPolicyFrom(previous)).toThrow('fresh run');
+    const policy = capabilityPolicyFrom(defaultRunPolicy({ projectRoot: '/fixture' }));
     const limits = captureCapabilityLimits(policy);
     expect(limits).toEqual({ maxAssignments: 12, maxWorkUnits: 64, maxInvocations: 400 });
     expect(canStartInvocation(399, limits)).toBe(true);
@@ -102,18 +104,18 @@ describe('capability state and authority', () => {
     } }))).toThrow('stale plan revision');
   });
 
-  it('CA11 and CA34 require original-case coverage without inferring an entry association from a similar name', () => {
+  it('CA34 PB3-D08 handback readiness is structural: no per-example coverage, and no entry association inferred from a similar name', () => {
     const request = fixtureRequest();
     const task = fixtureTask(request);
     const plan = fixturePlan(request, task);
+    const coordinating = replayCapabilityState(begin()).tasks.get(task.id)!;
+    expect(capabilityHandbackReadiness(task, request, plan, coordinating)).toEqual(['Task is not verifying']);
     const state = replayCapabilityState([...begin(), event(3, { type: 'capability-verification-started', data: {
       task: task.id, invocation: 'inv-0002',
     } })]).tasks.get(task.id)!;
-    expect(capabilityHandbackReadiness(task, request, plan, state)).toContain(`Example ${request.original.examples[0]!.id} lacks resolved coverage`);
-    const covered = { ...plan, useCases: [{ ...plan.useCases[0]!, coverage: {
-      state: 'exercised' as const, tests: ['a-format'], candidate: 'tree-1', configuration: 'config-1',
-    } }] };
-    expect(capabilityHandbackReadiness(task, request, covered, state)).toEqual([]);
+    // The original example's case carries no coverage state, and none is asked for.
+    expect(capabilityHandbackReadiness(task, request, plan, state)).toEqual([]);
+    expect(capabilityHandbackReadiness(task, request, { ...plan, revision: 2, basedOn: 1 }, state)).toEqual(['Plan revision is stale']);
     expect(task.relatedEntries).toEqual([]);
     expect({ ...task, relatedEntries: [{ entry: task.id, reason: 'Architect explicitly related an entry' }] }.relatedEntries).toHaveLength(1);
   });

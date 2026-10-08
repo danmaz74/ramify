@@ -8,7 +8,6 @@ import { reviewLayout } from '../reviews/records.js';
 import { snapshotToolNames } from '../reviews/snapshot.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { testReviewPolicy } from './helpers/candidates.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import { addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { gate, notes, notesDirectory, plan, reviewTarget, store, tool } from './helpers/reviews.js';
 import { git, initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
@@ -81,7 +80,7 @@ describe('a review snapshot over a real repository', () => {
       script,
       git: gitService,
       inputs: treeInputs(),
-      readinessExecution: directReadinessExecution(),
+
       policy: projectRoot => testPolicy(projectRoot, { reviews: testReviewPolicy() }),
     });
     cleanups.push(() => opened.service.close());

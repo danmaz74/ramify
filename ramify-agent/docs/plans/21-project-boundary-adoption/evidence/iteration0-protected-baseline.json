@@ -1,0 +1,21 @@
+{
+  "head": "1c8764a85ed605893b1fde908d905e4d5aa3383c",
+  "files": {
+    "docs/model/cross-module-importability.principles.md": "c3b6539448902130822c183f6d3613f49c4686cb91eef17d5f73cfe546b441ea",
+    "docs/model/typescript-source-interpretation.spec.md": "c1fd4d6551d130bbcd723c8b1a56075e858c06e2a6eaacb50fb147ea0e3a1a95",
+    "docs/model/cross-module-importability.spec.md": "4aba3df0be6ff7356e7107f8d7c2786ff45ab35c9ede0b319454547b5029d789",
+    "docs/model/module-description.spec.md": "19e292a9bc44bff47d60398b7cc1a507523e1aa73e11cc4b2c56e0988c10b07c",
+    "docs/agents/module-architect.principles.md": "3858898770ab5f2a54fd375ba5aa6a4c3f72a5ac00f04f974405ac95aa580d25",
+    "docs/architecture/cli-invocation.spec.md": "7386295542372967c25040735d89e8e9e5230323d4320e57490bf2c031f32e6a",
+    "docs/architecture/architect-view-diff.spec.md": "da621110a5557ae955e2c39f4abb718b3d4c3f74396114e05d66d3a1fc19b573",
+    "docs/architecture/architect-view.spec.md": "f8989ad661566eaf668ad6c213994e345988a4f31d7d733e175302225a826794",
+    "docs/architecture/quick-testing.spec.md": "b04db2008bacef3146dbfc211206187ac28abb41866f91b07568f56d1d271002",
+    "docs/architecture/materialized-api-view.spec.md": "abf24295d49ff32ad1202c8c8209d76e68ed4c18a2aa0ab758811b0527a92bb5",
+    "docs/architecture/modularity-report.spec.md": "00fc9dba0b42145267e9e83a9b454d2d332deecc845adeadf14cfcf60472c1b4",
+    "ramify-agent/docs/check-findings.principles.md": "6c72c2175de7ecbe3e0746cba469fac7a9051a47c529b3769d11f6b7107bbfea",
+    "ramify-agent/docs/harness.spec.md": "f3635d7e25b8b6d175e543197be9c7d12356048f92266fbf1c5df6431ff948bc",
+    "ramify-agent/docs/harness.principles.md": "263cbe26589c9501f6a1bac37ccb2c7dc8b93d83a7cc182cf3f4d25e8b082695",
+    "ramify-agent/docs/check-findings.spec.md": "ad0c9df605cd60385775c676a7920fbd7865857f84fe02b721b475e2c3c132df",
+    "ramify-agent/docs/architecture/plan-context-catalog.spec.md": "0ce605884b1f2996401040d5ba4d2a49e59906c7a12fb223c28d3c0c1ef4fa14"
+  }
+}

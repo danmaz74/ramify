@@ -1,0 +1,361 @@
+{
+  "payloads": {
+    "path": "ramify-agent/subs/harness/src/tests/helpers/ramify-check-payloads.json",
+    "bytes": 25783,
+    "sha256": "0957952dbf3a7d391bfccb7218faeb43185159d6c0aeffc0d2f687da02a9b3bd"
+  },
+  "provider": {
+    "ramifyVersion": "0.4.1",
+    "capturedBy": "ramify-agent/subs/harness/subs/evidence/src/tests/project-boundary.test.ts \u203a installed Ramify hook dispositions, PLAN21_HOOK_PAYLOADS=<file>",
+    "normalization": "temporary root replaced by <root>; top-level timings dropped; nothing else changed"
+  },
+  "fixture": {
+    "module.ramify": "ramify 1\\nroot module app\\nowned-unwired \"docs\"\\nowned-nested-project \"fixture\"\\nexternal \"vendor\"\\n",
+    "children": [
+      "subs/web (module web)"
+    ],
+    "tsconfig.include": [
+      "src/**/*.ts",
+      "scripts/**/*.ts",
+      "subs/**/src/**/*.ts"
+    ]
+  },
+  "cases": [
+    {
+      "case": "cold",
+      "schema": "ramify.check/3",
+      "named": [
+        "src/index.ts",
+        "docs/readme.md"
+      ],
+      "exitCode": 2,
+      "outcome": "not-checked",
+      "reason": "cold",
+      "execution": null,
+      "dispositions": [
+        [
+          "src/index.ts",
+          "not-checked",
+          "cold",
+          null,
+          null
+        ],
+        [
+          "docs/readme.md",
+          "not-checked",
+          "cold",
+          null,
+          null
+        ]
+      ],
+      "findings": [],
+      "removed": 0,
+      "warnings": []
+    },
+    {
+      "case": "excluded-only-pass",
+      "schema": "ramify.check/3",
+      "named": [
+        "docs/readme.md",
+        "fixture/src/f.ts",
+        "vendor/lib.ts",
+        "notes.txt"
+      ],
+      "exitCode": 0,
+      "outcome": "checked",
+      "reason": null,
+      "execution": "completed",
+      "dispositions": [
+        [
+          "docs/readme.md",
+          "not-analyzed",
+          "owned-unwired",
+          "app",
+          "owned-unwired"
+        ],
+        [
+          "fixture/src/f.ts",
+          "not-analyzed",
+          "owned-nested-project",
+          "app",
+          "owned-nested-project"
+        ],
+        [
+          "vendor/lib.ts",
+          "not-analyzed",
+          "external",
+          null,
+          "external"
+        ],
+        [
+          "notes.txt",
+          "not-analyzed",
+          "owned-non-source",
+          "app",
+          null
+        ]
+      ],
+      "findings": [],
+      "removed": 0,
+      "warnings": []
+    },
+    {
+      "case": "auxiliary-boundary-violation",
+      "schema": "ramify.check/3",
+      "named": [
+        "scripts/probe.ts"
+      ],
+      "exitCode": 1,
+      "outcome": "checked",
+      "reason": null,
+      "execution": "completed",
+      "dispositions": [
+        [
+          "scripts/probe.ts",
+          "checked",
+          "content",
+          "app",
+          null,
+          true
+        ]
+      ],
+      "findings": [
+        [
+          "project-boundary-import",
+          "scripts/probe.ts",
+          true
+        ]
+      ],
+      "removed": 0,
+      "warnings": []
+    },
+    {
+      "case": "excluded-only-findings",
+      "schema": "ramify.check/3",
+      "named": [
+        "docs/readme.md"
+      ],
+      "exitCode": 1,
+      "outcome": "checked",
+      "reason": null,
+      "execution": "completed",
+      "dispositions": [
+        [
+          "docs/readme.md",
+          "not-analyzed",
+          "owned-unwired",
+          "app",
+          "owned-unwired"
+        ]
+      ],
+      "findings": [
+        [
+          "project-boundary-import",
+          "scripts/probe.ts",
+          true
+        ]
+      ],
+      "removed": 0,
+      "warnings": []
+    },
+    {
+      "case": "complete-excluded-only-findings",
+      "schema": "ramify.analysis/3",
+      "named": [],
+      "exitCode": 1,
+      "outcome": {
+        "execution": "completed",
+        "check": "failed",
+        "coverage": "complete"
+      },
+      "diagnostics": [
+        [
+          "project-boundary-import",
+          "scripts/probe.ts"
+        ]
+      ],
+      "warnings": []
+    },
+    {
+      "case": "mixed-pass-findings",
+      "schema": "ramify.check/3",
+      "named": [
+        "src/index.ts",
+        "docs/readme.md",
+        "fixture/src/f.ts"
+      ],
+      "exitCode": 1,
+      "outcome": "checked",
+      "reason": null,
+      "execution": "completed",
+      "dispositions": [
+        [
+          "src/index.ts",
+          "checked",
+          "content",
+          "app",
+          null,
+          true
+        ],
+        [
+          "docs/readme.md",
+          "not-analyzed",
+          "owned-unwired",
+          "app",
+          "owned-unwired"
+        ],
+        [
+          "fixture/src/f.ts",
+          "not-analyzed",
+          "owned-nested-project",
+          "app",
+          "owned-nested-project"
+        ]
+      ],
+      "findings": [
+        [
+          "project-boundary-import",
+          "scripts/probe.ts",
+          false
+        ]
+      ],
+      "removed": 0,
+      "warnings": []
+    },
+    {
+      "case": "mixed-deadline",
+      "schema": "ramify.check/3",
+      "named": [
+        "src/index.ts",
+        "docs/readme.md",
+        "scripts/probe.ts"
+      ],
+      "exitCode": 2,
+      "outcome": "not-checked",
+      "reason": "deadline-exceeded",
+      "execution": null,
+      "dispositions": [
+        [
+          "src/index.ts",
+          "not-checked",
+          "deadline-exceeded",
+          "app",
+          null
+        ],
+        [
+          "docs/readme.md",
+          "not-analyzed",
+          "owned-unwired",
+          "app",
+          "owned-unwired"
+        ],
+        [
+          "scripts/probe.ts",
+          "not-checked",
+          "deadline-exceeded",
+          "app",
+          null
+        ]
+      ],
+      "findings": [],
+      "removed": 0,
+      "warnings": []
+    },
+    {
+      "case": "source-deletion",
+      "schema": "ramify.check/3",
+      "named": [
+        "scripts/probe.ts"
+      ],
+      "exitCode": 0,
+      "outcome": "checked",
+      "reason": null,
+      "execution": "completed",
+      "dispositions": [
+        [
+          "scripts/probe.ts",
+          "checked",
+          "deleted",
+          "app",
+          null,
+          false
+        ]
+      ],
+      "findings": [],
+      "removed": 1,
+      "warnings": []
+    },
+    {
+      "case": "compiler-selected-scratch",
+      "schema": "ramify.check/3",
+      "named": [
+        "src/tmp/scratch.ts",
+        "src/index.ts"
+      ],
+      "exitCode": 0,
+      "outcome": "checked",
+      "reason": null,
+      "execution": "completed",
+      "dispositions": [
+        [
+          "src/tmp/scratch.ts",
+          "not-analyzed",
+          "scratch",
+          "app",
+          "scratch"
+        ],
+        [
+          "src/index.ts",
+          "checked",
+          "content",
+          "app",
+          null,
+          true
+        ]
+      ],
+      "findings": [],
+      "removed": 0,
+      "warnings": [
+        [
+          "compiler-selected-scratch",
+          "src/tmp",
+          [
+            "src/tmp/scratch.ts"
+          ]
+        ]
+      ]
+    },
+    {
+      "case": "configuration",
+      "schema": "ramify.check/3",
+      "named": [
+        "tsconfig.json"
+      ],
+      "exitCode": 0,
+      "outcome": "checked",
+      "reason": null,
+      "execution": "completed",
+      "dispositions": [
+        [
+          "tsconfig.json",
+          "checked",
+          "content",
+          "app",
+          null,
+          true
+        ]
+      ],
+      "findings": [],
+      "removed": 0,
+      "warnings": [
+        [
+          "compiler-selected-scratch",
+          "src/tmp",
+          [
+            "src/tmp/scratch.ts"
+          ]
+        ]
+      ]
+    }
+  ]
+}

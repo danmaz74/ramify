@@ -1,0 +1,9 @@
+./node_modules/.bin/vitest run --project node subs/harness/src/tests/local-architect-submission.test.ts subs/harness/src/tests/capability-submission.test.ts subs/harness/src/tests/capability-records.test.ts subs/harness/src/tests/scenario-states.test.ts subs/harness/src/tests/union-values.test.ts subs/harness/src/tests/scenario-projections.test.ts subs/harness/src/tests/protocol-contract.test.ts subs/harness/src/tests/composition.test.ts subs/harness/src/tests/execution-map-projection.test.ts subs/harness/src/tests/acceptance-trial.test.ts subs/harness/src/tests/analysis-submission.test.ts subs/harness/src/tests/assignment-source-evidence.test.ts subs/harness/src/tests/contract-submission.test.ts subs/harness/src/tests/engineer-failures.test.ts subs/harness/src/tests/fork-submission.test.ts subs/harness/src/tests/projections-pure.test.ts subs/harness/src/tests/scenario-briefings.test.ts subs/harness/src/tests/capability-delegation.test.ts subs/harness/src/tests/capability-historical-resume.test.ts subs/harness/src/tests/run-protocol.test.ts subs/harness/src/tests/capability-assignments.test.ts subs/harness/src/tests/engineer-submission.test.ts subs/harness/src/tests/hook-checks.test.ts
+
+ RUN  v4.1.11 /home/app/ramify-plan21-project-boundary-adoption/ramify-agent
+
+
+ Test Files  23 passed (23)
+      Tests  324 passed | 2 skipped (326)
+   Start at  21:58:07
+   Duration  115.35s (transform 12.66s, setup 351ms, import 32.21s, tests 311.29s, environment 3ms)

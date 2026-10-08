@@ -1,0 +1,182 @@
+{
+  "sourceCommit": "1c8764a85ed605893b1fde908d905e4d5aa3383c",
+  "disposableWorktree": "/tmp/plan21-iteration0-actual-agent",
+  "packagePinsProbeOnly": {
+    "ramify.ts": "0.4.0",
+    "ramify-audit": "0.7.0"
+  },
+  "candidateChanges": [
+    "mark agent root and three fixture roots",
+    "declare root docs owned-unwired",
+    "declare three fixture roots owned-nested-project at harness",
+    "remove enclosingProject and ignore docs/** in audit definition"
+  ],
+  "command": "ramify check --batch --root . --format json",
+  "exitCode": 1,
+  "outcome": {
+    "execution": "completed",
+    "check": "failed",
+    "coverage": "partial"
+  },
+  "summary": {
+    "complete": true,
+    "owners": 12,
+    "sourceFiles": 580,
+    "resources": 52,
+    "originals": 2863,
+    "accesses": 11551,
+    "allowed": 8644,
+    "denied": 15,
+    "errors": 15,
+    "warnings": 0,
+    "coverageNotes": 319,
+    "external": 2892
+  },
+  "diagnosticCounts": {
+    "not-visible": 7,
+    "testing-origin": 8
+  },
+  "coverageNoteCounts": {
+    "shared-global": 3,
+    "signature-inferred": 316
+  },
+  "diagnostics": [
+    {
+      "code": "not-visible",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 4,
+      "message": "ramify-agent/web:execution-map.tsx#ExecutionMapArea: not-visible"
+    },
+    {
+      "code": "not-visible",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 5,
+      "message": "ramify-agent/web:execution-map-client.ts#loadExecutionMapPages: not-visible"
+    },
+    {
+      "code": "not-visible",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 5,
+      "message": "ramify-agent/web:execution-map-client.ts#ExecutionMapSnapshot: not-visible"
+    },
+    {
+      "code": "not-visible",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 6,
+      "message": "ramify-agent/web:client.ts#ProtocolClient: not-visible"
+    },
+    {
+      "code": "testing-origin",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 8,
+      "message": "ramify-agent/web:tests/helpers/execution-map-canvas.ts#canvasMap: testing-origin via subs/web/src/tests/helpers/execution-map-canvas.ts, subs/web/src/tests/helpers/execution-map-canvas.ts"
+    },
+    {
+      "code": "testing-origin",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 8,
+      "message": "ramify-agent/web:tests/helpers/execution-map-canvas.ts#capabilityDetail: testing-origin via subs/web/src/tests/helpers/execution-map-canvas.ts, subs/web/src/tests/helpers/execution-map-canvas.ts"
+    },
+    {
+      "code": "testing-origin",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 8,
+      "message": "ramify-agent/web:tests/helpers/execution-map-canvas.ts#scenarioDetail: testing-origin via subs/web/src/tests/helpers/execution-map-canvas.ts, subs/web/src/tests/helpers/execution-map-canvas.ts"
+    },
+    {
+      "code": "testing-origin",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 9,
+      "message": "ramify-agent/web:tests/helpers/sessions.ts#page: testing-origin via subs/web/src/tests/helpers/sessions.ts, subs/web/src/tests/helpers/sessions.ts"
+    },
+    {
+      "code": "testing-origin",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 9,
+      "message": "ramify-agent/web:tests/helpers/sessions.ts#reply: testing-origin via subs/web/src/tests/helpers/sessions.ts, subs/web/src/tests/helpers/sessions.ts"
+    },
+    {
+      "code": "testing-origin",
+      "file": "scripts/browser-acceptance/main.tsx",
+      "line": 9,
+      "message": "ramify-agent/web:tests/helpers/sessions.ts#sessionView: testing-origin via subs/web/src/tests/helpers/sessions.ts, subs/web/src/tests/helpers/sessions.ts"
+    },
+    {
+      "code": "not-visible",
+      "file": "scripts/browser-acceptance/plan13-readiness-main.tsx",
+      "line": 5,
+      "message": "ramify-agent/web:run-page.tsx#RunPage: not-visible"
+    },
+    {
+      "code": "testing-origin",
+      "file": "scripts/browser-acceptance/plan13-readiness-main.tsx",
+      "line": 6,
+      "message": "ramify-agent/web:tests/helpers/stub-client.ts#checkFindingKey: testing-origin via subs/web/src/tests/helpers/stub-client.ts, subs/web/src/tests/helpers/stub-client.ts"
+    },
+    {
+      "code": "testing-origin",
+      "file": "scripts/browser-acceptance/plan13-readiness-main.tsx",
+      "line": 6,
+      "message": "ramify-agent/web:tests/helpers/stub-client.ts#StubClient: testing-origin via subs/web/src/tests/helpers/stub-client.ts, subs/web/src/tests/helpers/stub-client.ts"
+    },
+    {
+      "code": "not-visible",
+      "file": "scripts/browser-acceptance/plan14-catalog-review-main.tsx",
+      "line": 4,
+      "message": "ramify-agent/web:client.ts#ProtocolClient: not-visible"
+    },
+    {
+      "code": "not-visible",
+      "file": "scripts/browser-acceptance/plan14-catalog-review-main.tsx",
+      "line": 5,
+      "message": "ramify-agent/web:run-page.tsx#PlanAndEntries: not-visible"
+    }
+  ],
+  "declaredExclusions": [
+    {
+      "kind": "owned-unwired",
+      "directory": "docs",
+      "owner": "ramify-agent"
+    },
+    {
+      "kind": "owned-nested-project",
+      "directory": "subs/harness/fixtures/capability-coordination",
+      "owner": "ramify-agent/harness"
+    },
+    {
+      "kind": "owned-nested-project",
+      "directory": "subs/harness/fixtures/capability-coordination-nested",
+      "owner": "ramify-agent/harness"
+    },
+    {
+      "kind": "owned-nested-project",
+      "directory": "subs/harness/fixtures/collection-review",
+      "owner": "ramify-agent/harness"
+    }
+  ],
+  "affectedDocs": {
+    "path": "docs/plans/21-project-boundary-adoption/main-plan.md",
+    "status": "owned",
+    "module": "ramify-agent",
+    "basis": "containment",
+    "exclusion": {
+      "kind": "owned-unwired",
+      "directory": "docs",
+      "owner": "ramify-agent"
+    },
+    "kind": "ignored",
+    "selects": []
+  },
+  "affectedScript": {
+    "path": "scripts/browser-acceptance/main.tsx",
+    "status": "owned",
+    "module": "ramify-agent",
+    "basis": "inventory",
+    "exclusion": null,
+    "kind": "auxiliary-source",
+    "selects": [
+      "ramify-agent"
+    ]
+  },
+  "repairDirection": "Move three browser-acceptance TSX fixture entrypoints (and Vite HTML entry resources) into existing web owner testing source; leave scripts drivers as auxiliary tooling and update their Vite input/root resource paths. Keep ordinary web API exposure only for genuinely public ordinary imports. Verify focused browser fixture build/runtime and released Ramify check. Do not expose testing-origin helpers to ordinary root source."
+}

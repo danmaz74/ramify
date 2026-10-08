@@ -16,20 +16,18 @@ import {
 } from './contracts.js';
 import { copyFixture } from './fixture.js';
 import {
-  addModule, assign, byRole, byWork, completionProposed, installMiniRunner, outline, read, runScopeTests, shell, submit, treeInputs,
+  addModule, assign, byRole, byWork, completionProposed, installMiniRunner, outline, read, shell, submit, treeInputs,
   write, type Turn,
 } from './iterations.js';
 import { decision as decisionBody, forkDecision, forkPartial, localDecision, registryChange, requestPlacement } from './placement.js';
 import { commandResult } from './command-result.js';
-import { scriptedScenarioRun } from './project-config.js';
-import { directReadinessExecution } from './external-tools.js';
-import { announcingCheckExecution, createPassingCheckExecution } from './direct-check-execution.js';
 import { deleted, modified, scenarioGit, untracked, type GitResponses, type ScenarioGit } from './recovery-git.js';
-import { scriptedCandidates } from './candidates.js';
+import { scriptedCandidates, type ScriptedCommit } from './candidates.js';
 import {
   staleCrashLock, freeze, installTestRunner, openRuns, shapeOnlyInputs, startRun, stopRun, testPolicy,
   type OpenRunsOptions,
 } from './runs.js';
+import { announcingAudit } from './direct-check-execution.js';
 
 /*
  * The composition of the loop, as iteration 12's suite runs it: the
@@ -127,12 +125,6 @@ export interface StatedCommand {
   readonly stdout?: string | undefined;
   /** What the command is stated to leave in the project. */
   readonly leaves?: ((root: string) => Promise<void>) | undefined;
-  /**
-   * A scenario run: `argv` is the mode's command, which `--config` and the
-   * profile the harness wrote follow, and the scripted runner answers it
-   * from that profile.
-   */
-  readonly scenarios?: boolean | undefined;
 }
 
 /**
@@ -153,9 +145,7 @@ export function statedCommands(root: string, commands: readonly StatedCommand[])
     const stated = commands[cursor];
     const expectedArgv = stated?.argv(root);
     const expectedCwd = stated?.cwd?.(root) ?? root;
-    const received = stated?.scenarios === true && request.argv.length === (expectedArgv?.length ?? 0) + 2 && request.argv.at(-2) === '--config'
-      ? request.argv.slice(0, -2)
-      : request.argv;
+    const received = request.argv;
     if (stated === undefined || expectedArgv === undefined
       || JSON.stringify(received) !== JSON.stringify(expectedArgv) || request.cwd !== expectedCwd) {
       const expected = stated === undefined
@@ -167,7 +157,6 @@ export function statedCommands(root: string, commands: readonly StatedCommand[])
     }
     cursor += 1;
     await stated.leaves?.(root);
-    if (stated.scenarios === true) return (await scriptedScenarioRun(request))!;
     return commandResult(request, {
       outcome: { kind: 'completed', exitCode: stated.exitCode ?? 0 },
       ...(stated.stdout === undefined ? {} : { stdout: stated.stdout }),
@@ -250,20 +239,8 @@ const featureOf = (ownerDirectory: string, capability: string) => `${ownerDirect
 /** The materialization commit over the tree readiness found: every feature file is new. */
 const materialize = (...files: string[]) => ({ commit: materialized, against: base, changes: untracked(...files) });
 
-/**
- * The engineer's own test run. The policy these scenarios capture answers it
- * with a cheap command of the run's own, and the scenarios stating it here
- * run no process for it.
- */
-const scopeTestRun = (...files: string[]): StatedCommand => ({
-  argv: root => [join(root, 'node_modules', '.bin', 'vitest'), 'run', ...files],
-});
-
-/** The quick scenario run `run_scope_tests` makes beside the tests, with the fixture's configured command. */
-const scopeScenarioRun: StatedCommand = { argv: () => ['npm', 'run', 'acceptance:quick', '--'], scenarios: true };
-
 /** The command the iteration's engineer runs through the unguarded shell. */
-const shellCommand = (root: string) => `rm -r '${join(root, draftsDirectory)}' && printf "left by the shell\\n" > '${join(root, 'shell-note.txt')}'`;
+const shellCommand = (root: string) => `rm -r '${join(root, draftsDirectory)}' && printf "left by the shell\\n" > '${join(root, notesDirectory, 'shell-note.txt')}'`;
 
 const notesModule = { directory: notesDirectory, name: 'notes', files: { 'src/notes.ts': consumerStub, 'src/tests/notes.test.ts': consumerTest('notes.ts') } };
 const limitsModule = { directory: limitsDirectory, name: 'limits', files: {} };
@@ -279,20 +256,14 @@ const limitsModule = { directory: limitsDirectory, name: 'limits', files: {} };
 const iteration: Scenario = {
   name: 'iteration',
   commands: [
-    // Each call of the engineer's test tool runs the tests, then the scope's
-    // scenarios: the work item's pending one, selected by its identity.
-    { ...scopeTestRun(`${notesDirectory}/src/tests/notes.test.ts`), exitCode: 1 },
-    scopeScenarioRun,
-    scopeTestRun(`${notesDirectory}/src/tests/notes.test.ts`),
-    scopeScenarioRun,
     {
-      // What the shell leaves: the child module gone, and a note outside
-      // every module. It is stated here and written directly; no shell runs.
+      // What the shell leaves: the assigned included child removed and an
+      // ordinary documentation file under the assigned owner. It is stated here and written directly; no shell runs.
       argv: root => ['bash', '-c', shellCommand(root)],
       cwd: root => join(root, notesDirectory, 'src'),
       async leaves(root) {
         await rm(join(root, draftsDirectory), { recursive: true });
-        await writeFile(join(root, 'shell-note.txt'), 'left by the shell\n');
+        await writeFile(join(root, notesDirectory, 'shell-note.txt'), 'left by the shell\n');
       },
     },
   ],
@@ -302,20 +273,19 @@ const iteration: Scenario = {
     recovered: [{ gate: 'ga-0002', answers: [null, source(1)] }],
     commits: [
       materialize(featureOf(notesDirectory, 'review-note')),
-      // The one committing iteration: the limit the engineer raised, the
-      // child module its shell removed, and the note that shell left outside
-      // every module.
+      // The iteration checkpoint commits the authorized source, included-child
+      // removal and owner documentation.
       {
         commit: source(1),
         against: materialized,
         changes: [
           ...modified(`${notesDirectory}/src/notes.ts`),
           ...deleted(`${draftsDirectory}/README.md`, `${draftsDirectory}/module.ramify`),
-          ...untracked('shell-note.txt'),
+          ...untracked(`${notesDirectory}/shell-note.txt`),
         ],
       },
       // The repair iteration reports partial work and reaches no checkpoint;
-      // the work-item and final checkpoints find the committed tree unchanged.
+      // the work-item and final checkpoints find it unchanged.
       unchanged(source(1)),
       unchanged(source(1)),
     ],
@@ -336,7 +306,7 @@ const iteration: Scenario = {
         ].join('\n'),
       },
     },
-    // A child module nobody assigns, which the engineer's shell removes.
+    // An explicitly included child module, which the engineer's shell removes.
     { directory: draftsDirectory, name: 'drafts', files: {} },
   ]),
   script: root => byRole({
@@ -352,7 +322,7 @@ const iteration: Scenario = {
     'local-architect': [
       submit(assign(notes, {
         scope: {
-          base: { module: notes, includedChildren: [] },
+          base: { module: notes, included: [{ directory: draftsDirectory, reason: 'Remove the obsolete drafts child', instructions: 'Remove the assigned child and verify the notes owner' }] },
           extra: [{ path: 'subs/workspace/subs/reviews/module.ramify', purpose: 'exposure-declaration' }],
           read: [reviews],
           rationale: 'The limit is the notes module\'s own; its parent\'s declaration may need to say so.',
@@ -374,13 +344,11 @@ const iteration: Scenario = {
       [
         read(join(root, 'subs/workspace/subs/shared-ui/src/status-badge.tsx')),
         { kind: 'tool', tool: 'grep', input: { pattern: 'noteLimit', path: join(root, notesDirectory) } },
-        runScopeTests(),
         { kind: 'submit', input: { kind: 'completion-proposed' } },
         // One write outside the scope, and one whose target cannot be resolved: both refused.
         write(join(root, 'subs/workspace/subs/shared-ui/src/status-badge.tsx'), 'export {};\n'),
         write(join(root, notesDirectory, 'src/notes.ts/inside-a-file.ts'), 'export {};\n'),
         write(join(root, notesDirectory, 'src/notes.ts'), 'export const noteLimit = 500;\n'),
-        runScopeTests(),
         shell(shellCommand(root)),
         { kind: 'submit', input: completionProposed('Raised the note limit to the 500 characters the plan asks for.') },
       ],
@@ -734,23 +702,18 @@ const repair: Scenario = {
 };
 
 /**
- * An owner with no test at all: its iteration gate is not verified with an
- * empty selection, which returns to the architect, and the work-item gate
- * over the whole project then passes.
+ * An owner with no test at all: the configured audit alone judges each of
+ * its checkpoints, and no harness selection makes one fail for want of a test.
  */
 const testless: Scenario = {
   name: 'testless',
-  // The engineer's test tool finds no test to run, and still runs the work
-  // item's pending scenario.
-  commands: [scopeScenarioRun],
-  // The owner has no test of its own: its iteration checkpoint is not
-  // verified and commits nothing, and neither checkpoint that follows has
-  // anything to commit after the feature files.
+  // The owner has no test of its own: the audit alone judges each
+  // checkpoint, and none has anything to commit after the feature files.
   git: {
     head: base, after: materialized,
-    commits: [materialize(featureOf(limitsDirectory, 'note-limits')), unchanged(materialized), unchanged(materialized)],
+    commits: [materialize(featureOf(limitsDirectory, 'note-limits')), unchanged(materialized), unchanged(materialized), unchanged(materialized)],
   },
-  exercises: 'an engineer that reports the goal outside its scope, and an empty required selection: not verified, never a pass, and back to the architect',
+  exercises: 'an engineer that reports the goal outside its scope, and an owner with no test of its own judged by the audit alone',
   ends: 'completed',
   finalCandidate: { head: materialized, tree: '6'.repeat(40) },
   target: () => fixtureWith([{ directory: limitsDirectory, name: 'limits', files: { 'src/limits.ts': 'export const limits = [];\n' } }]),
@@ -763,7 +726,7 @@ const testless: Scenario = {
     ],
     engineer: [
       submit({ kind: 'unsuitable', reason: 'scope', detail: 'The limits the goal names are the notes module\'s to define, not this one\'s.' }),
-      submit(completionProposed('The limits are declared.'), runScopeTests()),
+      submit(completionProposed('The limits are declared.')),
     ],
   }),
   inputs: treeInputs,
@@ -952,11 +915,11 @@ export function compositionGit(root: string, scenario: Scenario): ScenarioGit {
 }
 
 /** Only the revision audited by a completed scenario has a scripted candidate tree. */
-export function compositionCandidates(root: string, scenario: Scenario) {
+export function compositionCandidates(root: string, scenario: Scenario, producers: Readonly<Record<string, ScriptedCommit>> = {}) {
   const final = scenario.finalCandidate;
-  return scriptedCandidates(root, final === undefined ? {} : {
+  return scriptedCandidates(root, { ...(final === undefined ? {} : {
     [final.head]: { tree: final.tree, files: {}, base: scenario.git.head, changes: [] },
-  });
+  }), ...producers });
 }
 
 /**
@@ -975,8 +938,8 @@ export async function runToEnd(scenario: Scenario, watch?: (service: RunService,
     git,
     candidates: compositionCandidates(target.root, scenario),
     // Every gate announces its commands, as the real executors do.
-    readinessExecution: announcingCheckExecution(directReadinessExecution()),
-    checkExecution: announcingCheckExecution(createPassingCheckExecution()),
+
+    configuredAudit: announcingAudit(),
     commandExecution: commands,
     inputs: scenario.inputs(),
     ...(scenario.policy === undefined ? {} : { policy: scenario.policy }),
@@ -1040,8 +1003,8 @@ export async function crashAt(scenario: Scenario, point: CrashPoint) {
     git,
     candidates: compositionCandidates(target.root, scenario),
     // Every gate announces its commands, as the real executors do.
-    readinessExecution: announcingCheckExecution(directReadinessExecution()),
-    checkExecution: announcingCheckExecution(createPassingCheckExecution()),
+
+    configuredAudit: announcingAudit(),
     commandExecution: commands,
     inputs: scenario.inputs(),
     // A stop waits for the invocation the driver has open before it writes
@@ -1189,6 +1152,8 @@ export function identityOf(event: RunEvent): string | null {
     case 'iteration-assigned': case 'iteration-closed': return `${event.type}:${String(data.iteration)}`;
     case 'contract-requested': return `${event.type}:${String(data.iteration)}`;
     case 'outline-revised': return `${event.type}:${String(data.workItem)}@${String(data.revision)}`;
+    case 'obligation-registered': return `${event.type}:${String(data.id)}`;
+    case 'obligation-reported': return `${event.type}:${String(data.id)}@${String(data.revision)}`;
     case 'gate-committing': case 'gate-attempted': return `${event.type}:${String(data.gate)}`;
     case 'placement-requested': return `${event.type}:${String(data.request)}`;
     case 'decision-accepted': case 'brief-appended': return `${event.type}:${String(data.decision)}`;

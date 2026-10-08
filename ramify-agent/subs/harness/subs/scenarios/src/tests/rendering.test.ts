@@ -99,7 +99,7 @@ function parse(content: string) {
 
 describe('rendering feature files', () => {
   const { records, run } = exampleRun();
-  const states = new Map<string, ScenarioState>([['sc-001', 'declared'], ['sc-002', 'bound'], ['sc-003', 'implemented'], ['sc-004', 'pending'], ['sc-005', 'pending']]);
+  const states = new Map<string, ScenarioState>([['sc-001', 'bound'], ['sc-002', 'pending'], ['sc-003', 'done'], ['sc-004', 'pending'], ['sc-005', 'pending']]);
   const files = renderFeatureFiles(records, states, run);
 
   test('one file per entry in its owner\'s test area, and one per common ancestor for integration scenarios', () => {
@@ -118,7 +118,7 @@ describe('rendering feature files', () => {
     expectGolden('email-history.feature', files[3]!.content);
   });
 
-  test('every file parses, with the identity tag on each scenario and the pending tag exactly for pending and bound', () => {
+  test('every file parses, with the identity tag on each scenario and the pending tag exactly while it is pending', () => {
     const tags = files.flatMap((file) => parse(file.content).pickles.map((pickle) => [pickle.name, pickle.tags.map((tag) => tag.name)]));
     expect(tags).toEqual([
       ['A sent email is listed', ['@ramify-sc-005', '@ramify-pending']],
@@ -151,7 +151,7 @@ describe('rendering feature files', () => {
   });
 
   test('a state change changes only the tags of that scenario', () => {
-    const next = renderFeatureFiles(records, new Map(states).set('sc-002', 'declared'), run);
+    const next = renderFeatureFiles(records, new Map(states).set('sc-002', 'bound'), run);
     expect(next[3]!.content).toBe(files[3]!.content.replace('@ramify-sc-002 @ramify-pending', '@ramify-sc-002'));
     expect(next.filter((file, index) => file.content !== files[index]!.content)).toHaveLength(1);
   });
@@ -183,7 +183,7 @@ describe('the sample project\'s tracked file', () => {
       '    | 2     | 3      |',
     ]));
     records.push(record(7, path, ['Scenario: A bound scenario runs when its identity selects it', '  Given an empty shelf', '  Then the shelf lists 0 books']));
-    const states = new Map<string, ScenarioState>(records.map((entry) => [entry.id, entry.id === 'sc-007' ? 'bound' : 'declared']));
+    const states = new Map<string, ScenarioState>(records.map((entry) => [entry.id, entry.id === 'sc-007' ? 'pending' : 'bound']));
     const [file] = renderFeatureFiles(records, states, {
       planId: 'demo-plan',
       runId: '20260923T1200Z-000000',

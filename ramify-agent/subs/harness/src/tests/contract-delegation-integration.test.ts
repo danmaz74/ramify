@@ -10,7 +10,6 @@ import {
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
-import { directReadinessExecution } from './helpers/external-tools.js';
 import type { RunEvent } from '../run/log.js';
 import { contractsLayout, type ConsumerRequirement, type ContractRecord, type ProviderObligation } from '../contracts/records.js';
 import { workLayout, type WorkItem } from '../work/records.js';
@@ -18,6 +17,8 @@ import { iterationLayout, type IterationAssignment } from '../work/iterations.js
 import { runLayout } from '../run/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import { createLocalCommandCheckExecution } from './helpers/direct-check-execution.js';
+import { localCommandAudit, passingAudit } from './helpers/direct-check-execution.js';
+import type { ConfiguredAuditPort } from '../../subs/audit/src/check-execution.js';
 
 /*
  * One delegation, end to end on the review-notes fixture: a consumer that
@@ -162,6 +163,23 @@ async function target() {
 }
 
 /**
+ * The project's configured audit answered in place: its test check runs
+ * every test file of the two owners, as they stand when the audit runs,
+ * with the stand-in runner. The definition names the owners; the harness
+ * selects no test of its own.
+ */
+function ownersAudit(root: string): ConfiguredAuditPort {
+  const local = localCommandAudit({ tests: ['sh', '-c',
+    `exec '${join(root, 'node_modules/.bin/vitest')}' run $(find ${consumerDirectory} ${providerDirectory} -path '*/src/tests/*.test.ts' | sort)`] });
+  // The consumer starts on a stub its own tests refuse, which is what the
+  // delegation is for; readiness, the first request, is answered as passing
+  // so that the gates this scenario is about are reached.
+  const readiness = passingAudit();
+  let requests = 0;
+  return { read: local.read, run: input => (++requests === 1 ? readiness : local).run(input) };
+}
+
+/**
  * A run over this fixture whose Git answers are the scenario's own data:
  * the revision Git reports for each commit the harness attempts, or that
  * the tree was unchanged.
@@ -177,7 +195,7 @@ async function run(
   const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits], previews: final.previews });
   const opened = await openRuns(root, {
     script: byRole(plan), inputs: treeInputs(), git, candidates: final.candidates,
-    readinessExecution: directReadinessExecution(), ...options,
+     ...options,
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
@@ -310,7 +328,7 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
       // A retained real boundary: this scenario is about what the gate's
       // own commands ran and printed, so the project's test runner really
       // runs. Git and the command line remain answered.
-    }, delegationCommits('wi-001.i03'), 'revision-03', { checkExecution: createLocalCommandCheckExecution() });
+    }, delegationCommits('wi-001.i03'), 'revision-03', { configuredAudit: ownersAudit(root) });
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
 
     const log = await events(root, runId);
@@ -318,18 +336,21 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
     const attempts = await Promise.all(gateIds.map(id => readJson<GateAttempt>(root, runId, runLayout.gate(id))));
     const suite = `${providerDirectory}/src/tests/note-limit.conformance.test.ts`;
 
-    // The contract gate required the suite it had just been given, and ran
-    // it while the fake was its only subject.
+    // The contract gate's audit ran the suite it had just been given, while
+    // the fake was its only subject. The harness listed no test for it.
+    const testsOutput = (attempt: GateAttempt) => (attempt.provider!.checks as Record<string, { output: string }>)['tests']!.output;
     const contractGate = attempts.find(attempt => attempt.checkpoint === 'contract')!;
     expect(contractGate.verdict).toBe('passed');
-    const contractSelection = contractGate.commands.find(command => command.selection !== undefined)!.selection!;
-    expect(contractSelection.extraSuites).toEqual([suite]);
-    expect(contractSelection.resolved).toEqual(expect.arrayContaining([suite, `${consumerDirectory}/src/tests/notes.test.ts`]));
+    expect(contractGate.commands).toEqual([]);
+    expect(testsOutput(contractGate)).toContain(`ok ${suite}`);
+    expect(testsOutput(contractGate)).toContain(`ok ${consumerDirectory}/src/tests/notes.test.ts`);
     // The fixture's declared module tree records no originals, so the
     // parity rule says it compared nothing rather than passing silently.
     expect(contractGate.rules).toEqual([
       { rule: 'fake-naming', outcome: 'passed', violations: [] },
       { rule: 'fake-exposure-parity', outcome: 'passed', violations: [], limits: [expect.stringContaining('the architect view records no such original')] },
+      { rule: 'scratch-safety', outcome: 'passed', violations: [] },
+      { rule: 'write-scope', outcome: 'passed', violations: [] },
     ]);
 
     // The provider's gate ran the same suite, and its assignment carried the
@@ -345,14 +366,14 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
     const providerGate = attempts.find(attempt =>
       attempt.subject.iteration === 'wi-002.i01' && attempt.checkpoint === 'iteration')!;
     expect(providerGate.verdict).toBe('passed');
-    expect(providerGate.commands.find(command => command.selection !== undefined)!.selection!.resolved).toContain(suite);
+    expect(testsOutput(providerGate)).toContain(`ok ${suite}`);
     // The same file, and a different subject: the real provider was in the
     // suite's subjects when the provider's gate ran it, and was not when the
     // contract gate did.
     const subjects = await readFile(`${root}/${providerDirectory}/src/tests/note-limit.subjects.ts`, 'utf8');
     expect(subjects).toContain('the real provider');
-    expect(providerGate.commands[0]!.output.tail).toContain('the real provider');
-    expect(contractGate.commands[0]!.output.tail).not.toContain('the real provider');
+    expect(testsOutput(providerGate)).toContain('the real provider');
+    expect(testsOutput(contractGate)).not.toContain('the real provider');
 
     // Neither substitutes for the other: the verification gate runs it again
     // with the consumer's own tests and the fake gone.

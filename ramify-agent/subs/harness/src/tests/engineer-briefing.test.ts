@@ -11,9 +11,9 @@ function assignment(): IterationAssignment {
     approach: 'Extend mcp.ts.',
     completionEvidence: 'A test calls the tool.',
     scope: {
-      base: { module: 'app/reviews', includedChildren: [] },
+      base: { module: 'app/reviews', included: [] },
       bootstrap: [],
-      resolved: { roots: ['/p/subs/reviews'], files: [] },
+      resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: ['/p/subs/reviews'], files: [] },
     },
     gate: { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['app/reviews'], subtrees: [], extraSuites: [] } },
     externalCapabilities: [],
@@ -60,5 +60,33 @@ describe('what an engineer is told about the Ramify project it works in', () => 
       views: [{ module: 'app/reviews', views: [], unavailable: 'the API view could not be materialized: daemon down' }],
     });
     expect(text).toContain('no API view, because the API view could not be materialized: daemon down. Absence of a view is not permission');
+  });
+
+  test('the iteration message names the owners\' test areas as text and leaves every test run to the gate\'s audit', () => {
+    const text = iterationMessage({
+      assignment: assignment(), projectRoot: '/p', base: 'abc',
+      testAreas: [{ module: 'app/reviews', area: 'subs/reviews/src/tests' }],
+    });
+    expect(text).toContain('The gate commits a candidate and asks for the project\'s committed audit of it at the `iteration` checkpoint:');
+    expect(text).toContain('The tests this assignment owns are those of app/reviews, in:\n- `subs/reviews/src/tests/` (`app/reviews`)');
+    expect(text).toContain('A whole-suite run is refused there: the gate\'s audit runs it.');
+    expect(text).not.toContain('run_scope_tests');
+    // Without assigned scenarios, the audit's description names none.
+    expect(text).toContain('its tests among them');
+    expect(text).not.toContain('tests and scenarios among them');
+  });
+
+  test('no role\'s prompt package offers a scoped test tool or a harness scenario run', async () => {
+    for (const capabilityWorkflow of [true, false]) {
+      const { packages } = await loadPromptPackages({ capabilityWorkflow });
+      for (const [role, loaded] of packages) {
+        const texts = [loaded.system, loaded.procedure, loaded.skill, loaded.extraSkill, loaded.submissionSchema,
+          ...Object.values(loaded.reviewer?.procedures ?? {}), loaded.reconciliation?.procedure ?? '', loaded.workOrientation?.procedure ?? ''];
+        for (const text of texts) {
+          expect(text, role).not.toContain('run_scope_tests');
+          expect(text, role).not.toMatch(/acceptance:quick|quick mode|scenario check mode/u);
+        }
+      }
+    }
   });
 });

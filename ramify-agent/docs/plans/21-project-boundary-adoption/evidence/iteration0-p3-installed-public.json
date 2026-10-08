@@ -1,0 +1,25 @@
+{
+  "installedVersion": "0.7.1",
+  "sourceCommit": "91171a132b47b9f0fd53d5d42a088463854a2301",
+  "head": "9970c42913090bb1774110f40e2519a878155079",
+  "workingConfigChecks": 0,
+  "requestChecks": [
+    "source-vitest",
+    "aux-vitest"
+  ],
+  "coverageClaim": {
+    "scope": "repository",
+    "configuration": {
+      "path": "ramify-audit.json",
+      "sourceCommit": "91171a132b47b9f0fd53d5d42a088463854a2301",
+      "blob": "35bda1067c8a3518e94e555e1a0f2bf6822e3294"
+    }
+  },
+  "mode": "full",
+  "force": false,
+  "workspacePreparation": {
+    "preparationId": "nodejs",
+    "options": {}
+  },
+  "refsUnchanged": true
+}

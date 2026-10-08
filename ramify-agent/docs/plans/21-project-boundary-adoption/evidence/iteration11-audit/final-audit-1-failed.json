@@ -1,0 +1,352 @@
+{
+  "command": "ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent --cwd . --full --nested --json",
+  "raw": {
+    "path": "/home/app/pb3-it11-scratch/final-audit-1-cc27f03c.json",
+    "sha256": "4465f6a9b7b6068aa47f033cd0bf421669317aa78d48ef06a03a2570e47f14ae",
+    "bytes": 1162528
+  },
+  "status": "completed",
+  "invocationVerdict": "fail",
+  "overall": "fail",
+  "requestId": "e4eeab91-2c83-4fe8-8c8c-fbdae461ed53",
+  "runId": "629bb86a-bb56-4f5e-a08b-7687284418d5",
+  "refs": {
+    "reportCommit": "e51b822e3688930f52245c1d9e4927a6c61839fa",
+    "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T07-15-03Z-cc27f03c8",
+    "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/ca0e4c808700ea36ba9031362178fdb7a4f6adcc"
+  },
+  "retrievalCommands": [
+    "git notes --ref=audit-projects/ramify-agent-f25e9a298228 show cc27f03c80f8afe80010dd42cc9eae40d0dd5035",
+    "git show refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T07-15-03Z-cc27f03c8:reports/audit/summary.json"
+  ],
+  "sourceCommit": "cc27f03c80f8afe80010dd42cc9eae40d0dd5035",
+  "sourceTree": "ca0e4c808700ea36ba9031362178fdb7a4f6adcc",
+  "sourceBranch": "feat/plan21-project-boundary-adoption",
+  "auditedAt": "2026-10-08T07:15:03.542Z",
+  "durationSeconds": 454.671,
+  "mode": {
+    "requestedMode": "full",
+    "resolution": "requested",
+    "executedMode": "full"
+  },
+  "producer": {
+    "name": "ramify-audit",
+    "version": "0.7.2"
+  },
+  "definitions": {
+    "digest": "sha256:5cfeaba8ac88984ab1452922da869afcd5046371a7935af6995e43d5d43007f3",
+    "manifest": {
+      "manifestVersion": 1,
+      "workingDirectory": "ramify-agent",
+      "checks": [
+        {
+          "id": "agent-scenarios",
+          "dependsOn": [
+            "agent-typecheck"
+          ],
+          "requiresPackageScripts": [],
+          "executor": {
+            "kind": "command",
+            "parallel": false,
+            "mutex": false,
+            "continueOnFailure": true,
+            "commands": [
+              {
+                "name": "agent-cucumber",
+                "cmd": "npm",
+                "args": [
+                  "run",
+                  "test:scenarios"
+                ],
+                "parser": "cucumber",
+                "contracts": {
+                  "selection": "cucumber-module-ownership-filter/2",
+                  "failureIdentity": "cucumber-scenario-identity/1",
+                  "completeness": "cucumber-message-witness/1"
+                },
+                "timeoutMs": 600000,
+                "env": {}
+              }
+            ]
+          }
+        },
+        {
+          "id": "agent-structure",
+          "dependsOn": [
+            "agent-typecheck"
+          ],
+          "requiresPackageScripts": [],
+          "executor": {
+            "kind": "command",
+            "parallel": false,
+            "mutex": false,
+            "continueOnFailure": true,
+            "commands": [
+              {
+                "name": "agent-check-self",
+                "cmd": "npm",
+                "args": [
+                  "run",
+                  "check:self"
+                ],
+                "parser": "none",
+                "contracts": null,
+                "timeoutMs": 180000,
+                "env": {}
+              }
+            ]
+          }
+        },
+        {
+          "id": "agent-tests",
+          "dependsOn": [
+            "agent-typecheck"
+          ],
+          "requiresPackageScripts": [],
+          "executor": {
+            "kind": "command",
+            "parallel": false,
+            "mutex": false,
+            "continueOnFailure": true,
+            "commands": [
+              {
+                "name": "agent-vitest",
+                "cmd": "npm",
+                "args": [
+                  "test",
+                  "--",
+                  "--maxWorkers=4"
+                ],
+                "parser": "vitest",
+                "contracts": {
+                  "selection": "ramify-module-ownership-groups/2",
+                  "failureIdentity": "vitest-test-identity/1",
+                  "completeness": "vitest-run-witness/1"
+                },
+                "timeoutMs": 1200000,
+                "env": {}
+              }
+            ]
+          }
+        },
+        {
+          "id": "agent-typecheck",
+          "dependsOn": [
+            "patch-integrity"
+          ],
+          "requiresPackageScripts": [],
+          "executor": {
+            "kind": "command",
+            "parallel": false,
+            "mutex": false,
+            "continueOnFailure": true,
+            "commands": [
+              {
+                "name": "agent-typecheck",
+                "cmd": "npm",
+                "args": [
+                  "run",
+                  "type-check"
+                ],
+                "parser": "none",
+                "contracts": null,
+                "timeoutMs": 180000,
+                "env": {}
+              }
+            ]
+          }
+        },
+        {
+          "id": "agent-web-build",
+          "dependsOn": [
+            "agent-typecheck"
+          ],
+          "requiresPackageScripts": [],
+          "executor": {
+            "kind": "command",
+            "parallel": false,
+            "mutex": false,
+            "continueOnFailure": true,
+            "commands": [
+              {
+                "name": "agent-web-build",
+                "cmd": "npm",
+                "args": [
+                  "run",
+                  "build:web"
+                ],
+                "parser": "none",
+                "contracts": null,
+                "timeoutMs": 180000,
+                "env": {}
+              }
+            ]
+          }
+        },
+        {
+          "id": "patch-integrity",
+          "dependsOn": [],
+          "requiresPackageScripts": [],
+          "executor": {
+            "kind": "command",
+            "parallel": false,
+            "mutex": false,
+            "continueOnFailure": true,
+            "commands": [
+              {
+                "name": "git-diff-check",
+                "cmd": "git",
+                "args": [
+                  "diff",
+                  "--check",
+                  "HEAD^",
+                  "HEAD"
+                ],
+                "parser": "none",
+                "contracts": null,
+                "timeoutMs": 30000,
+                "env": {}
+              }
+            ]
+          }
+        }
+      ],
+      "workspacePreparation": {
+        "preparationId": "nodejs",
+        "optionsDigest": "sha256:adbb2bf32776f44988c31873158ae0ff83c60643de5b7e209f0c188c12723a5c"
+      }
+    }
+  },
+  "expectedFiles": {
+    "contract": "runner-configured-files/1",
+    "source": "ownership-answer",
+    "expected": 259,
+    "run": 259,
+    "missing": [],
+    "status": "complete",
+    "runnerConfigFiles": [
+      "vitest.config.ts"
+    ]
+  },
+  "selection": {
+    "kind": "full",
+    "selectedCheckIds": [
+      "agent-scenarios",
+      "agent-structure",
+      "agent-tests",
+      "agent-typecheck",
+      "agent-web-build",
+      "patch-integrity"
+    ],
+    "omittedCheckIds": [],
+    "selectedTestUnitIds": [
+      "agent-check-self",
+      "agent-cucumber",
+      "agent-typecheck",
+      "agent-vitest",
+      "agent-web-build",
+      "git-diff-check"
+    ],
+    "omittedTestUnitIds": []
+  },
+  "discovery": {
+    "status": "complete",
+    "skipped": [],
+    "unavailable": []
+  },
+  "projects": [
+    {
+      "projectRoot": "ramify-agent",
+      "verdict": "fail",
+      "execution": "ran",
+      "failures": [
+        "agent-tests: agent-vitest: FAIL"
+      ]
+    }
+  ],
+  "checks": {
+    "agent-scenarios": {
+      "status": "pass",
+      "durationSeconds": 0.566,
+      "summary": "agent-cucumber: PASS"
+    },
+    "agent-structure": {
+      "status": "pass",
+      "durationSeconds": 17.211,
+      "summary": "agent-check-self: PASS"
+    },
+    "agent-tests": {
+      "status": "fail",
+      "durationSeconds": 408.067,
+      "summary": "agent-vitest: FAIL"
+    },
+    "agent-typecheck": {
+      "status": "pass",
+      "durationSeconds": 9.895,
+      "summary": "agent-typecheck: PASS"
+    },
+    "agent-web-build": {
+      "status": "pass",
+      "durationSeconds": 0.58,
+      "summary": "agent-web-build: PASS"
+    },
+    "patch-integrity": {
+      "status": "pass",
+      "durationSeconds": 0.006,
+      "summary": "git-diff-check: PASS"
+    }
+  },
+  "failureLedger": {
+    "completeness": "complete",
+    "witness": [
+      {
+        "checkId": "agent-scenarios",
+        "command": "agent-cucumber",
+        "requestedTargets": [
+          {
+            "kind": "suite"
+          }
+        ],
+        "summaryRead": true,
+        "endReason": "passed",
+        "exitCode": 0,
+        "unhandledErrorsWithoutFile": [],
+        "carriedFilesNotRun": []
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "requestedTargets": [
+          {
+            "kind": "suite"
+          }
+        ],
+        "summaryRead": true,
+        "endReason": "failed",
+        "exitCode": 1,
+        "unhandledErrorsWithoutFile": [],
+        "carriedFilesNotRun": []
+      }
+    ],
+    "entries": [
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/protocol-contract.test.ts",
+        "kind": "test",
+        "testId": "the evidence a run works from > an input manifest carries the plan hash, the checkout and the view"
+      },
+      {
+        "checkId": "agent-tests",
+        "command": "agent-vitest",
+        "runner": "vitest",
+        "project": "node",
+        "path": "ramify-agent/subs/harness/src/tests/run-recovery.test.ts",
+        "kind": "test",
+        "testId": "the recovery table > a crash after immutable analysis evidence is staged leaves no accepted analysis and a fresh run can use changed evidence"
+      }
+    ]
+  }
+}

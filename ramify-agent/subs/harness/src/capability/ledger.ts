@@ -3,8 +3,7 @@ import { RunLog, type RunEvent, type RunEventInput } from '../run/log.js';
 import { committedRecords, recordHash } from '../work/committed.js';
 import type { RecordBody } from '../../subs/ledger/src/ledger.js';
 import {
-  capabilityAssignmentSchema, capabilityExchangeSchema, capabilityHandbackSchema, capabilityReviewSchema,
-  capabilityLayout, capabilityPlanSchema, capabilityRequestSchema, capabilityTaskSchema,
+  capabilityExchangeSchema, capabilityHandbackSchema, capabilityLayout, capabilityPlanSchema, capabilityRequestSchema, capabilityTaskSchema,
 } from './records.js';
 import { capabilityCompletionBlockers, capabilityDependencyCycle, capabilityHandbackReadiness, isCapabilityEvent, replayCapabilityState, transitionCapabilityState } from './state.js';
 
@@ -83,21 +82,6 @@ export async function commitCapabilityTransition(
       throw new Error('Exchange answer must preserve its recorded question and task');
     }
   }
-  if (event.type === 'capability-assigned') {
-    const assignment = capabilityAssignmentSchema.parse(records[0]!.body);
-    const task = committed.capabilityTasks.get(assignment.task);
-    if (!task || assignment.id !== event.data.assignment || assignment.sequence !== event.data.sequence ||
-      assignment.sequence > task.limits.maxAssignments || assignment.plan.revision !== prior.tasks.get(task.id)?.planRevision) {
-      throw new Error('Assignment is not within the task\'s captured limit');
-    }
-  }
-  if (event.type === 'capability-review-recorded') {
-    const review = capabilityReviewSchema.parse(records[0]!.body);
-    if (review.task !== event.data.task || review.planRevision !== event.data.planRevision ||
-      review.tree !== event.data.tree || review.gate !== event.data.gate || review.outcome !== event.data.outcome) {
-      throw new Error('Capability review event and record differ');
-    }
-  }
   if (event.type === 'capability-handed-back') {
     const handback = capabilityHandbackSchema.parse(records[0]!.body);
     const task = committed.capabilityTasks.get(handback.task);
@@ -126,8 +110,6 @@ function specifications(event: Extract<RunEvent, { type: `capability-${string}` 
     case 'capability-plan-revised': return [{ path: capabilityLayout.plan(event.data.task, event.data.revision), schema: capabilityPlanSchema, id: event.data.task, revision: event.data.revision }];
     case 'capability-exchange-opened': return [{ path: capabilityLayout.exchange(event.data.task, event.data.exchange, 1), schema: capabilityExchangeSchema, id: event.data.exchange, revision: 1 }];
     case 'capability-exchange-answered': return [{ path: capabilityLayout.exchange(event.data.task, event.data.exchange, 2), schema: capabilityExchangeSchema, id: event.data.exchange, revision: 2 }];
-    case 'capability-assigned': return [{ path: capabilityLayout.assignment(event.data.task, event.data.assignment), schema: capabilityAssignmentSchema, id: event.data.assignment, revision: 1 }];
-    case 'capability-review-recorded': return [{ path: capabilityLayout.review(event.data.task, event.data.gate, event.data.planRevision), schema: capabilityReviewSchema, id: event.data.review, revision: 1 }];
     case 'capability-handed-back': return [{ path: capabilityLayout.handback(event.data.task), schema: capabilityHandbackSchema, id: event.data.task, revision: 1 }];
     default: return [];
   }

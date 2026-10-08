@@ -1,0 +1,140 @@
+{
+  "schema": "plan21.iteration10.nested-restart/1",
+  "commit": "5218986901109a94511c4db44f3bbf4d35c7ee63",
+  "receipt": {
+    "schema": "ramify-agent.audit-invocation/1",
+    "runId": "20260921T000000Z-aabbcc",
+    "attemptId": "ga-0001",
+    "requestId": "20260921T000000Z-aabbcc:ga-0001",
+    "projectRoot": ".",
+    "sourceCommit": "5218986901109a94511c4db44f3bbf4d35c7ee63",
+    "projects": [
+      {
+        "projectRoot": ".",
+        "verdict": "pass",
+        "execution": "ran",
+        "failures": [],
+        "requestId": "20260921T000000Z-aabbcc:ga-0001",
+        "runId": "b0f779be-d2ca-42e2-8222-ee37a5918aa2",
+        "record": {
+          "requestId": "20260921T000000Z-aabbcc:ga-0001",
+          "sourceCommit": "5218986901109a94511c4db44f3bbf4d35c7ee63",
+          "reportCommit": "449581cddd39fcbbf605f43c68764b06f2e0f53e",
+          "runRef": "refs/audited/runs/2026-10-08T05-20-10Z-521898690",
+          "treeRef": "refs/audited/by-tree/62e10227f0a7ac69474598ce33590212c62c0952"
+        },
+        "reused": null,
+        "unpublished": null
+      },
+      {
+        "projectRoot": "nested",
+        "verdict": "pass",
+        "execution": "ran",
+        "failures": [],
+        "requestId": "421db4ba-a7c8-4881-b56b-c356c2717c37",
+        "runId": "23c47362-555f-4a0f-9781-f52010529b6c",
+        "record": {
+          "requestId": "421db4ba-a7c8-4881-b56b-c356c2717c37",
+          "sourceCommit": "5218986901109a94511c4db44f3bbf4d35c7ee63",
+          "reportCommit": "0f964d2b540cee613499a76b0c423b9a9f08559b",
+          "runRef": "refs/audited/projects/nested-233562de1a02/runs/2026-10-08T05-20-10Z-521898690",
+          "treeRef": "refs/audited/projects/nested-233562de1a02/by-tree/62e10227f0a7ac69474598ce33590212c62c0952"
+        },
+        "reused": null,
+        "unpublished": null
+      }
+    ],
+    "discovery": {
+      "status": "complete",
+      "skipped": [],
+      "unavailable": []
+    },
+    "invocationVerdict": "pass",
+    "recordedAt": "2026-10-08T05:20:10.603Z"
+  },
+  "first": {
+    "status": "completed",
+    "auditedSourceCommit": "5218986901109a94511c4db44f3bbf4d35c7ee63",
+    "reportCommit": "449581cddd39fcbbf605f43c68764b06f2e0f53e",
+    "detail": "invocation pass over 2 projects",
+    "verdict": "pass",
+    "discovery": {
+      "status": "complete",
+      "skipped": [],
+      "unavailable": []
+    },
+    "projects": [
+      {
+        "projectRoot": ".",
+        "verdict": "pass",
+        "execution": "ran",
+        "reportCommit": "449581cddd39fcbbf605f43c68764b06f2e0f53e",
+        "runRef": "refs/audited/runs/2026-10-08T05-20-10Z-521898690"
+      },
+      {
+        "projectRoot": "nested",
+        "verdict": "pass",
+        "execution": "ran",
+        "reportCommit": "0f964d2b540cee613499a76b0c423b9a9f08559b",
+        "runRef": "refs/audited/projects/nested-233562de1a02/runs/2026-10-08T05-20-10Z-521898690"
+      }
+    ]
+  },
+  "recovered": {
+    "status": "completed",
+    "auditedSourceCommit": "5218986901109a94511c4db44f3bbf4d35c7ee63",
+    "reportCommit": "449581cddd39fcbbf605f43c68764b06f2e0f53e",
+    "detail": "invocation pass over 2 projects",
+    "verdict": "pass",
+    "discovery": {
+      "status": "complete",
+      "skipped": [],
+      "unavailable": []
+    },
+    "projects": [
+      {
+        "projectRoot": ".",
+        "verdict": "pass",
+        "execution": "ran",
+        "reportCommit": "449581cddd39fcbbf605f43c68764b06f2e0f53e",
+        "runRef": "refs/audited/runs/2026-10-08T05-20-10Z-521898690"
+      },
+      {
+        "projectRoot": "nested",
+        "verdict": "pass",
+        "execution": "ran",
+        "reportCommit": "0f964d2b540cee613499a76b0c423b9a9f08559b",
+        "runRef": "refs/audited/projects/nested-233562de1a02/runs/2026-10-08T05-20-10Z-521898690"
+      }
+    ]
+  },
+  "reasked": {
+    "status": "completed",
+    "auditedSourceCommit": "5218986901109a94511c4db44f3bbf4d35c7ee63",
+    "reportCommit": "449581cddd39fcbbf605f43c68764b06f2e0f53e",
+    "detail": "invocation pass over 2 projects",
+    "verdict": "pass",
+    "discovery": {
+      "status": "complete",
+      "skipped": [],
+      "unavailable": []
+    },
+    "projects": [
+      {
+        "projectRoot": ".",
+        "verdict": "pass",
+        "execution": "reused",
+        "reportCommit": "449581cddd39fcbbf605f43c68764b06f2e0f53e",
+        "runRef": "refs/audited/runs/2026-10-08T05-20-10Z-521898690"
+      },
+      {
+        "projectRoot": "nested",
+        "verdict": "pass",
+        "execution": "reused",
+        "reportCommit": "0f964d2b540cee613499a76b0c423b9a9f08559b",
+        "runRef": "refs/audited/projects/nested-233562de1a02/runs/2026-10-08T05-20-10Z-521898690"
+      }
+    ]
+  },
+  "nestedExecutions": 1
+}

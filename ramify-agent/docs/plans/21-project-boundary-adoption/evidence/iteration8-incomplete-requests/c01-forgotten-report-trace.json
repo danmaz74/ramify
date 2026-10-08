@@ -1,0 +1,171 @@
+{
+  "case": "PB3-C01",
+  "test": "local-architect-submission.test.ts",
+  "verdicts": [
+    {
+      "accepted": false,
+      "errors": [
+        {
+          "path": "reports",
+          "message": "This completion request leaves sc-001 without a done report. Report each one done in `reports` where, in your judgment, it is correctly implemented and passing; where work remains, assign it, or submit `unresolved` with what blocks it",
+          "expected": "a done report for each of sc-001"
+        }
+      ],
+      "remainingAttempts": 2
+    },
+    {
+      "accepted": true
+    }
+  ],
+  "rejectionObservations": [
+    [
+      {
+        "path": "reports",
+        "message": "This completion request leaves sc-001 without a done report. Report each one done in `reports` where, in your judgment, it is correctly implemented and passing; where work remains, assign it, or submit `unresolved` with what blocks it"
+      }
+    ]
+  ],
+  "state": "completed",
+  "events": [
+    {
+      "sequence": 22,
+      "type": "invocation-started",
+      "invocation": "inv-0004",
+      "role": "local-architect"
+    },
+    {
+      "sequence": 23,
+      "type": "invocation-ended",
+      "invocation": "inv-0004",
+      "ended": "submitted"
+    },
+    {
+      "sequence": 24,
+      "type": "work-orientation-recorded",
+      "workItem": "wi-001",
+      "invocation": "inv-0004"
+    },
+    {
+      "sequence": 25,
+      "type": "session-opened",
+      "role": "context-selector"
+    },
+    {
+      "sequence": 26,
+      "type": "invocation-started",
+      "invocation": "inv-0005",
+      "role": "context-selector"
+    },
+    {
+      "sequence": 27,
+      "type": "invocation-ended",
+      "invocation": "inv-0005",
+      "ended": "submitted"
+    },
+    {
+      "sequence": 28,
+      "type": "context-selection-recorded",
+      "workItem": "wi-001"
+    },
+    {
+      "sequence": 29,
+      "type": "context-package-append-requested",
+      "workItem": "wi-001"
+    },
+    {
+      "sequence": 30,
+      "type": "context-package-appended",
+      "workItem": "wi-001",
+      "reason": null
+    },
+    {
+      "sequence": 31,
+      "type": "invocation-started",
+      "invocation": "inv-0006",
+      "role": "local-architect"
+    },
+    {
+      "sequence": 32,
+      "type": "invocation-ended",
+      "invocation": "inv-0006",
+      "ended": "submitted"
+    },
+    {
+      "sequence": 33,
+      "type": "obligation-reported",
+      "id": "sc-001",
+      "judgment": "done",
+      "basedOnRevision": 0,
+      "revision": 1,
+      "by": "inv-0006"
+    },
+    {
+      "sequence": 34,
+      "type": "outline-revised",
+      "workItem": "wi-001",
+      "revision": 1,
+      "invocation": "inv-0006"
+    },
+    {
+      "sequence": 35,
+      "type": "gate-committing",
+      "checkpoint": "work-item"
+    },
+    {
+      "sequence": 36,
+      "type": "gate-attempted",
+      "checkpoint": "work-item",
+      "verdict": "passed"
+    },
+    {
+      "sequence": 37,
+      "type": "work-item-completed",
+      "workItem": "wi-001"
+    },
+    {
+      "sequence": 38,
+      "type": "session-finished",
+      "reason": "work-closed"
+    },
+    {
+      "sequence": 39,
+      "type": "nonfunctional-phase-started"
+    },
+    {
+      "sequence": 40,
+      "type": "candidate-prepared"
+    },
+    {
+      "sequence": 41,
+      "type": "nonfunctional-assessed"
+    },
+    {
+      "sequence": 42,
+      "type": "nonfunctional-round-closed"
+    },
+    {
+      "sequence": 43,
+      "type": "gate-committing",
+      "checkpoint": "final"
+    },
+    {
+      "sequence": 44,
+      "type": "gate-attempted",
+      "checkpoint": "final",
+      "verdict": "passed"
+    },
+    {
+      "sequence": 45,
+      "type": "candidate-bound-to-gate"
+    },
+    {
+      "sequence": 46,
+      "type": "session-finished",
+      "reason": "run-ended"
+    },
+    {
+      "sequence": 47,
+      "type": "job-completed"
+    }
+  ]
+}

@@ -27,10 +27,8 @@ export const notes = 'collection-review/workspace/reviews/notes';
 export const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 export const drafts = `${notes}/drafts`;
 export const draftsDirectory = `${notesDirectory}/subs/drafts`;
+export const reviews = 'collection-review/workspace/reviews';
 export const outsidePath = 'subs/workspace/subs/reviews/src/outside-the-scope.ts';
-
-/** How long the final gate's test command prints, in bytes: longer than the 8 KiB tail. */
-export const longOutputBytes = 20_000;
 
 /** A fixture copy with the notes module, the runner that really runs test files, and one commit. */
 export async function protocolTarget(realGit = true): Promise<{ root: string; remove: () => Promise<void> }> {
@@ -50,20 +48,13 @@ export async function protocolTarget(realGit = true): Promise<{ root: string; re
   return fixture;
 }
 
-/** The policy of the run: cheap real commands, and a project test command whose output exceeds the tail. */
+/**
+ * The policy of the run: cheap real commands. A gate's tests run as the
+ * configured audit's check, which the test scripts; its long output is the
+ * scripted check's, not a policy command's.
+ */
 export function protocolPolicy(projectRoot: string): RunPolicy {
-  const base = testPolicy(projectRoot);
-  return {
-    ...base,
-    commands: {
-      ...base.commands,
-      allTests: checkCommand({
-        argv: [process.execPath, '-e', `process.stdout.write('x'.repeat(${longOutputBytes - 12}) + '\\nall passed\\n')`],
-        cwd: projectRoot,
-        timeoutMs: 30_000,
-      }),
-    },
-  };
+  return testPolicy(projectRoot);
 }
 
 /** The script: two work items, one of which creates a module, each declaring its scenario with its completion request. */
@@ -78,14 +69,17 @@ export function protocolScript(root: string) {
       ],
       [hypothesis('note-search', { change: 'create', suggestedOwner: notes, rationale: 'Notes may need to be searched later.' })],
     ))],
-    'local-architect:wi-001': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
+    'local-architect:wi-001': [submit(assign(notes, {}, outline())),
+      submit(assign(reviews, { goal: 'Account for and remove the foreign shell artifact before accepting the note change.',
+        scope: { base: { module: reviews, included: [{ directory: notesDirectory, reason: 'The previous notes patch remains dirty.', instructions: 'Retain the permitted note limit while removing the reviews-owned shell artifact.' }] }, extra: [], read: [], rationale: 'Both captured owners account for this candidate.' } })), submit(requestCompletion())],
     'local-architect:wi-002': [submit(assign(drafts, {}, outline())), submit(requestCompletion())],
     'engineer:wi-001': [submit(
       completionProposed('Raised the note limit where the test asks for it.'),
       read(join(root, 'subs/workspace/subs/reviews/src/router.ts')),
       edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
       shell(`printf 'export const outside = true;\\n' > '${join(root, outsidePath)}'`),
-    )],
+    ), submit(completionProposed('Removed the reviews-owned foreign artifact and retained the note change.'),
+      shell(`rm '${join(root, outsidePath)}'`))],
     'engineer:wi-002': [submit(
       completionProposed('Created the drafts module with its first behavior and the test that states it.'),
       write('../module.ramify', 'ramify 1\nmodule drafts\n'),

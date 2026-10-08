@@ -12,7 +12,7 @@ import {
   addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write,
 } from './helpers/iterations.js';
 import { gateGit, scenariosCommit, operationsOf, type GateCommit } from './helpers/gate-git.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
@@ -98,7 +98,7 @@ async function run(root: string, plan: Parameters<typeof byRole>[0], commits: re
     inputs: treeInputs(),
     git: scripted.git,
     candidates: scriptedCandidates(root, { [after]: { tree, base: before, files: {}, changes: [] } }),
-    readinessExecution: directReadinessExecution(),
+
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
@@ -204,18 +204,18 @@ describe('G8: a work item revised across several iterations keeps every obligati
   }, 120_000);
 });
 
-describe('K3: exact-owner and included-subtree selections at gate time', () => {
-  test('two assignments over one owner differ by exactly the included subtree\'s test files', async () => {
+describe('K3: exact-owner and included-subtree test areas in the engineer\'s briefing', () => {
+  test('two assignments over one owner differ by exactly the included subtree\'s test areas, and neither gate lists a test', async () => {
     const root = await target({ notes: false });
     // No engineer turn writes anything, so every boundary is an unchanged tree.
-    const { service, runId, scripted } = await run(root, {
+    const { service, runId, scripted, agent } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', reviews)]))],
       'local-architect': [
         submit(assign(reviews, {}, outline())),
         submit(assign(reviews, {
           goal: 'Carry the change into the core beneath it.',
           scope: {
-            base: { module: reviews, includedChildren: [`${reviews}/core`] },
+            base: { module: reviews, included: [`${reviews}/core`].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) },
             extra: [], read: [], rationale: 'The core changes with it.',
           },
         })),
@@ -232,20 +232,23 @@ describe('K3: exact-owner and included-subtree selections at gate time', () => {
 
     const firstGate = await readGate(root, runId, (await readResult(root, runId, 'wi-001', 1)).gate!);
     const secondGate = await readGate(root, runId, (await readResult(root, runId, 'wi-001', 2)).gate!);
-    const exact = firstGate.commands[0]!.selection!.resolved;
-    const withSubtree = secondGate.commands[0]!.selection!.resolved;
-
-    expect(exact).toEqual([
-      'subs/workspace/subs/reviews/src/tests/router.test.ts',
-      'subs/workspace/subs/reviews/src/tests/sessions.test.ts',
-      'subs/workspace/subs/reviews/src/tests/typing.test.ts',
+    // The engineer is briefed, as text, with the test areas of the owners it
+    // is assigned; the second briefing adds exactly the included core's.
+    const briefings = agent!.sessions.filter(session => session.spec.role === 'engineer').map(session => session.spec.prompt);
+    expect(briefings).toHaveLength(2);
+    const areas = (prompt: string) => prompt.split('\n').filter(line => /^- `[^`]+\/` \(`[^`]+`\)$/u.test(line));
+    const exact = areas(briefings[0]!);
+    const withSubtree = areas(briefings[1]!);
+    expect(exact).toEqual(['- `subs/workspace/subs/reviews/src/tests/` (`collection-review/workspace/reviews`)']);
+    expect(withSubtree.filter(line => !exact.includes(line))).toEqual([
+      '- `subs/workspace/subs/reviews/subs/core/src/tests/` (`collection-review/workspace/reviews/core`)',
+      '- `subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/` (`collection-review/workspace/reviews/core/controller`)',
+      '- `subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/` (`collection-review/workspace/reviews/core/tasks`)',
     ]);
-    expect(withSubtree.filter(file => !exact.includes(file))).toEqual([
-      'subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts',
-      'subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/controller.test.ts',
-      'subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/inspection-task.test.ts',
-      'subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/result.test.ts',
-    ]);
+    // Neither gate lists a test: each asks the committed audit, which selects.
+    expect(firstGate.commands).toEqual([]);
+    expect(secondGate.commands).toEqual([]);
+    expect([firstGate.audit?.mode, secondGate.audit?.mode]).toEqual(['project-default', 'project-default']);
     // The scope the engineer could write differs the same way.
     expect(first.scope.resolved.roots.some(path => path.includes('subs/reviews/subs/core'))).toBe(false);
     expect(second.scope.resolved.roots.some(path => path.endsWith('subs/workspace/subs/reviews/subs/core'))).toBe(true);

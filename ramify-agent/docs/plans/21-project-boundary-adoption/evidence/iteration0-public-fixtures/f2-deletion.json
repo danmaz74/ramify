@@ -1,0 +1,478 @@
+{
+  "status": "completed",
+  "requestId": "7eaa45f7-c7e2-4900-b97f-cc34a08dd92f",
+  "runId": "6b266e9b-2ee5-43fb-9ae4-d84b85cd3435",
+  "summary": {
+    "evidenceSchemaVersion": 4,
+    "execution": {
+      "requestId": "7eaa45f7-c7e2-4900-b97f-cc34a08dd92f",
+      "runId": "6b266e9b-2ee5-43fb-9ae4-d84b85cd3435"
+    },
+    "producer": {
+      "name": "ramify-audit",
+      "version": "0.7.1"
+    },
+    "undetectedConfigFilesForcingFullAudit": [],
+    "coverage": {
+      "status": "declared",
+      "selector": {
+        "id": "ramify-partial",
+        "version": "2",
+        "config": {
+          "chainCap": 25,
+          "failureThreshold": {
+            "minimum": 3,
+            "percentOfRootTests": 10
+          }
+        },
+        "configDigest": "sha256:d5a7603cfc87a91ed6b47831ffe580558eb2ac63619b9228b32aba593219dfc9"
+      },
+      "universe": {
+        "id": "project:.",
+        "digest": "sha256:59b043de3cc8511b7fb912ab0a3b2d10999ffe6adef9771458eee419c41e398e",
+        "checkIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "testUnitIds": [
+          "aux",
+          "source"
+        ]
+      },
+      "selection": {
+        "kind": "scoped",
+        "selectedCheckIds": [
+          "aux-vitest",
+          "source-vitest"
+        ],
+        "omittedCheckIds": [],
+        "selectedTestUnitIds": [
+          "aux",
+          "source"
+        ],
+        "omittedTestUnitIds": []
+      },
+      "claim": {
+        "configuration": {
+          "blob": "35bda1067c8a3518e94e555e1a0f2bf6822e3294",
+          "path": "ramify-audit.json",
+          "sourceCommit": "e5ddbc3e267141238d90bb345968796799ad278c"
+        },
+        "scope": "repository",
+        "strategy": "ramify-partial-link"
+      },
+      "projectRoot": ".",
+      "selectedModules": [
+        {
+          "id": "f2",
+          "directory": "."
+        }
+      ],
+      "selectedPaths": [
+        "src/tests/new-root.check.ts"
+      ],
+      "ramifyAnswer": {
+        "ramifyVersion": "0.4.0",
+        "cliSchema": "ramify.affected-cli/4",
+        "selectionSchema": "ramify.affected/4",
+        "binaryPath": "node_modules/.bin/ramify"
+      },
+      "baseline": {
+        "sourceCommit": "9970c42913090bb1774110f40e2519a878155079",
+        "sourceTree": "f6f6f374e6de0bbba47a957cac165139c49077fb",
+        "reportCommit": "a67baa160aa0789234b685b8ea68d67ee09583e4",
+        "runRef": "refs/audited/runs/2026-10-07T10-44-12Z-9970c4291",
+        "chainDepth": 2
+      },
+      "carriedFailures": [],
+      "expectedFiles": {
+        "contract": "runner-configured-files/1",
+        "source": "partial-answer",
+        "expected": 2,
+        "run": 2,
+        "missing": [],
+        "status": "complete",
+        "runnerConfigFiles": [
+          "vitest.aux.config.mjs",
+          "vitest.source.config.mjs"
+        ]
+      }
+    },
+    "mode": {
+      "requestedMode": "ramify-partial",
+      "resolution": "defaulted",
+      "executedMode": "ramify-partial"
+    },
+    "overall": "pass",
+    "sourceCommit": "e5ddbc3e267141238d90bb345968796799ad278c",
+    "sourceTree": "697420cb448d89f1185fd0e2d0db22ccd46fd04a",
+    "sourceBranch": "deletion-witness",
+    "auditedAt": "2026-10-07T10:48:35.771Z",
+    "durationSeconds": 2.6,
+    "checks": {
+      "aux-vitest": {
+        "commands": {
+          "aux": {
+            "counts": {
+              "files": {
+                "failed": 0,
+                "passed": 1,
+                "skipped": 0,
+                "total": 1
+              },
+              "tests": {
+                "failed": 0,
+                "passed": 1,
+                "skipped": 0,
+                "total": 1
+              }
+            },
+            "durationSeconds": 0.553,
+            "invocationGroups": [
+              {
+                "appendedArguments": [
+                  "--exclude",
+                  "**/.git/**",
+                  "--exclude",
+                  "**/.ramify-architect.old-?*/**",
+                  "--exclude",
+                  "**/.ramify-architect.tmp-?*/**",
+                  "--exclude",
+                  "**/.ramify-architect/**",
+                  "--exclude",
+                  "**/.ramify.old-?*/**",
+                  "--exclude",
+                  "**/.ramify.tmp-?*/**",
+                  "--exclude",
+                  "**/.ramify/**",
+                  "--exclude",
+                  "**/bower_components/**",
+                  "--exclude",
+                  "**/jspm_packages/**",
+                  "--exclude",
+                  "**/node_modules/**",
+                  "--exclude",
+                  "src/tmp/**",
+                  "--exclude",
+                  "subs/a-extra/**",
+                  "--exclude",
+                  "subs/a-extra/src/tmp/**",
+                  "--exclude",
+                  "subs/a/**",
+                  "--exclude",
+                  "subs/a/src/tmp/**",
+                  "--exclude",
+                  "subs/a/subs/grand/src/tmp/**",
+                  "--passWithNoTests"
+                ],
+                "exitCode": 0,
+                "group": 1,
+                "lockWaitSeconds": 0,
+                "result": {
+                  "counts": {
+                    "files": {
+                      "failed": 0,
+                      "passed": 1,
+                      "skipped": 0,
+                      "total": 1
+                    },
+                    "tests": {
+                      "failed": 0,
+                      "passed": 1,
+                      "skipped": 0,
+                      "total": 1
+                    }
+                  },
+                  "durationSeconds": 0.553,
+                  "output": "> plan21-f2@0.0.0 test:aux\n> vitest run --config vitest.aux.config.mjs --exclude **/.git/** --exclude **/.ramify-architect.old-?*/** --exclude **/.ramify-architect.tmp-?*/** --exclude **/.ramify-architect/** --exclude **/.ramify.old-?*/** --exclude **/.ramify.tmp-?*/** --exclude **/.ramify/** --exclude **/bower_components/** --exclude **/jspm_packages/** --exclude **/node_modules/** --exclude src/tmp/** --exclude subs/a-extra/** --exclude subs/a-extra/src/tmp/** --exclude subs/a/** --exclude subs/a/src/tmp/** --exclude subs/a/subs/grand/src/tmp/** --passWithNoTests --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\n\n RUN  v4.1.11 /tmp/ramify-audit-worktree-GfmcN6/source/checks\n\n ✓ aux.test.ts (1 test) 2ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:48:34\n   Duration  129ms (transform 13ms, setup 0ms, import 21ms, tests 2ms, environment 0ms)",
+                  "passed": true,
+                  "status": "pass",
+                  "summary": "files 1 passed, 0 failed, 0 skipped; tests 1 passed, 0 failed, 0 skipped",
+                  "vitest": {
+                    "files": [
+                      {
+                        "path": "checks/aux.test.ts",
+                        "project": "",
+                        "state": "passed"
+                      }
+                    ],
+                    "reason": "passed"
+                  }
+                },
+                "summary": {
+                  "artifactPath": "reports/audit/vitest/aux-vitest/commands/aux/group-1.json",
+                  "status": "read"
+                }
+              }
+            ],
+            "output": "> plan21-f2@0.0.0 test:aux\n> vitest run --config vitest.aux.config.mjs --exclude **/.git/** --exclude **/.ramify-architect.old-?*/** --exclude **/.ramify-architect.tmp-?*/** --exclude **/.ramify-architect/** --exclude **/.ramify.old-?*/** --exclude **/.ramify.tmp-?*/** --exclude **/.ramify/** --exclude **/bower_components/** --exclude **/jspm_packages/** --exclude **/node_modules/** --exclude src/tmp/** --exclude subs/a-extra/** --exclude subs/a-extra/src/tmp/** --exclude subs/a/** --exclude subs/a/src/tmp/** --exclude subs/a/subs/grand/src/tmp/** --passWithNoTests --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\n\n RUN  v4.1.11 /tmp/ramify-audit-worktree-GfmcN6/source/checks\n\n ✓ aux.test.ts (1 test) 2ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:48:34\n   Duration  129ms (transform 13ms, setup 0ms, import 21ms, tests 2ms, environment 0ms)",
+            "passed": true,
+            "status": "pass",
+            "summary": "files 1 passed, 0 failed, 0 skipped; tests 1 passed, 0 failed, 0 skipped",
+            "vitest": {
+              "files": [
+                {
+                  "path": "checks/aux.test.ts",
+                  "project": "",
+                  "state": "passed"
+                }
+              ],
+              "reason": "passed"
+            }
+          }
+        },
+        "durationSeconds": 0.559,
+        "output": "### aux [PASS]\n> plan21-f2@0.0.0 test:aux\n> vitest run --config vitest.aux.config.mjs --exclude **/.git/** --exclude **/.ramify-architect.old-?*/** --exclude **/.ramify-architect.tmp-?*/** --exclude **/.ramify-architect/** --exclude **/.ramify.old-?*/** --exclude **/.ramify.tmp-?*/** --exclude **/.ramify/** --exclude **/bower_components/** --exclude **/jspm_packages/** --exclude **/node_modules/** --exclude src/tmp/** --exclude subs/a-extra/** --exclude subs/a-extra/src/tmp/** --exclude subs/a/** --exclude subs/a/src/tmp/** --exclude subs/a/subs/grand/src/tmp/** --passWithNoTests --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\n\n RUN  v4.1.11 /tmp/ramify-audit-worktree-GfmcN6/source/checks\n\n ✓ aux.test.ts (1 test) 2ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:48:34\n   Duration  129ms (transform 13ms, setup 0ms, import 21ms, tests 2ms, environment 0ms)",
+        "passed": true,
+        "status": "pass",
+        "summary": "aux: PASS"
+      },
+      "source-vitest": {
+        "commands": {
+          "source": {
+            "counts": {
+              "files": {
+                "failed": 0,
+                "passed": 1,
+                "skipped": 0,
+                "total": 1
+              },
+              "tests": {
+                "failed": 0,
+                "passed": 1,
+                "skipped": 0,
+                "total": 1
+              }
+            },
+            "durationSeconds": 0.534,
+            "invocationGroups": [
+              {
+                "appendedArguments": [
+                  "--exclude",
+                  "**/.git/**",
+                  "--exclude",
+                  "**/.ramify-architect.old-?*/**",
+                  "--exclude",
+                  "**/.ramify-architect.tmp-?*/**",
+                  "--exclude",
+                  "**/.ramify-architect/**",
+                  "--exclude",
+                  "**/.ramify.old-?*/**",
+                  "--exclude",
+                  "**/.ramify.tmp-?*/**",
+                  "--exclude",
+                  "**/.ramify/**",
+                  "--exclude",
+                  "**/bower_components/**",
+                  "--exclude",
+                  "**/jspm_packages/**",
+                  "--exclude",
+                  "**/node_modules/**",
+                  "--exclude",
+                  "src/tmp/**",
+                  "--exclude",
+                  "subs/a-extra/**",
+                  "--exclude",
+                  "subs/a-extra/src/tmp/**",
+                  "--exclude",
+                  "subs/a/**",
+                  "--exclude",
+                  "subs/a/src/tmp/**",
+                  "--exclude",
+                  "subs/a/subs/grand/src/tmp/**",
+                  "--passWithNoTests"
+                ],
+                "exitCode": 0,
+                "group": 1,
+                "lockWaitSeconds": 0,
+                "result": {
+                  "counts": {
+                    "files": {
+                      "failed": 0,
+                      "passed": 1,
+                      "skipped": 0,
+                      "total": 1
+                    },
+                    "tests": {
+                      "failed": 0,
+                      "passed": 1,
+                      "skipped": 0,
+                      "total": 1
+                    }
+                  },
+                  "durationSeconds": 0.534,
+                  "output": "> plan21-f2@0.0.0 test:source\n> vitest run --config vitest.source.config.mjs --exclude **/.git/** --exclude **/.ramify-architect.old-?*/** --exclude **/.ramify-architect.tmp-?*/** --exclude **/.ramify-architect/** --exclude **/.ramify.old-?*/** --exclude **/.ramify.tmp-?*/** --exclude **/.ramify/** --exclude **/bower_components/** --exclude **/jspm_packages/** --exclude **/node_modules/** --exclude src/tmp/** --exclude subs/a-extra/** --exclude subs/a-extra/src/tmp/** --exclude subs/a/** --exclude subs/a/src/tmp/** --exclude subs/a/subs/grand/src/tmp/** --passWithNoTests --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\n\n RUN  v4.1.11 /tmp/ramify-audit-worktree-GfmcN6/source\n\n ✓ src/tests/root.check.ts (1 test) 2ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:48:34\n   Duration  129ms (transform 16ms, setup 0ms, import 25ms, tests 2ms, environment 0ms)",
+                  "passed": true,
+                  "status": "pass",
+                  "summary": "files 1 passed, 0 failed, 0 skipped; tests 1 passed, 0 failed, 0 skipped",
+                  "vitest": {
+                    "files": [
+                      {
+                        "path": "src/tests/root.check.ts",
+                        "project": "",
+                        "state": "passed"
+                      }
+                    ],
+                    "reason": "passed"
+                  }
+                },
+                "summary": {
+                  "artifactPath": "reports/audit/vitest/source-vitest/commands/source/group-1.json",
+                  "status": "read"
+                }
+              }
+            ],
+            "output": "> plan21-f2@0.0.0 test:source\n> vitest run --config vitest.source.config.mjs --exclude **/.git/** --exclude **/.ramify-architect.old-?*/** --exclude **/.ramify-architect.tmp-?*/** --exclude **/.ramify-architect/** --exclude **/.ramify.old-?*/** --exclude **/.ramify.tmp-?*/** --exclude **/.ramify/** --exclude **/bower_components/** --exclude **/jspm_packages/** --exclude **/node_modules/** --exclude src/tmp/** --exclude subs/a-extra/** --exclude subs/a-extra/src/tmp/** --exclude subs/a/** --exclude subs/a/src/tmp/** --exclude subs/a/subs/grand/src/tmp/** --passWithNoTests --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\n\n RUN  v4.1.11 /tmp/ramify-audit-worktree-GfmcN6/source\n\n ✓ src/tests/root.check.ts (1 test) 2ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:48:34\n   Duration  129ms (transform 16ms, setup 0ms, import 25ms, tests 2ms, environment 0ms)",
+            "passed": true,
+            "status": "pass",
+            "summary": "files 1 passed, 0 failed, 0 skipped; tests 1 passed, 0 failed, 0 skipped",
+            "vitest": {
+              "files": [
+                {
+                  "path": "src/tests/root.check.ts",
+                  "project": "",
+                  "state": "passed"
+                }
+              ],
+              "reason": "passed"
+            }
+          }
+        },
+        "durationSeconds": 0.543,
+        "output": "### source [PASS]\n> plan21-f2@0.0.0 test:source\n> vitest run --config vitest.source.config.mjs --exclude **/.git/** --exclude **/.ramify-architect.old-?*/** --exclude **/.ramify-architect.tmp-?*/** --exclude **/.ramify-architect/** --exclude **/.ramify.old-?*/** --exclude **/.ramify.tmp-?*/** --exclude **/.ramify/** --exclude **/bower_components/** --exclude **/jspm_packages/** --exclude **/node_modules/** --exclude src/tmp/** --exclude subs/a-extra/** --exclude subs/a-extra/src/tmp/** --exclude subs/a/** --exclude subs/a/src/tmp/** --exclude subs/a/subs/grand/src/tmp/** --passWithNoTests --reporter=default --reporter=/tmp/plan21-iteration0-provider-probe/node_modules/ramify-audit/dist/vitest-reporter.js\n\n\n RUN  v4.1.11 /tmp/ramify-audit-worktree-GfmcN6/source\n\n ✓ src/tests/root.check.ts (1 test) 2ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:48:34\n   Duration  129ms (transform 16ms, setup 0ms, import 25ms, tests 2ms, environment 0ms)",
+        "passed": true,
+        "status": "pass",
+        "summary": "source: PASS"
+      }
+    },
+    "workspacePreparation": {
+      "preparationId": "nodejs"
+    },
+    "definitions": {
+      "digest": "sha256:3af66430fd0f43e2aec4587adf595e614e4bb00f130aea85dbae4c77914e75dd",
+      "manifest": {
+        "manifestVersion": 1,
+        "workingDirectory": ".",
+        "checks": [
+          {
+            "id": "aux-vitest",
+            "dependsOn": [],
+            "requiresPackageScripts": [],
+            "executor": {
+              "kind": "command",
+              "parallel": false,
+              "mutex": false,
+              "continueOnFailure": false,
+              "commands": [
+                {
+                  "name": "aux",
+                  "cmd": "npm",
+                  "args": [
+                    "run",
+                    "test:aux"
+                  ],
+                  "parser": "vitest",
+                  "contracts": {
+                    "selection": "ramify-module-ownership-groups/2",
+                    "failureIdentity": "vitest-test-identity/1",
+                    "completeness": "vitest-run-witness/1"
+                  },
+                  "timeoutMs": 120000,
+                  "env": {}
+                }
+              ]
+            }
+          },
+          {
+            "id": "source-vitest",
+            "dependsOn": [],
+            "requiresPackageScripts": [],
+            "executor": {
+              "kind": "command",
+              "parallel": false,
+              "mutex": false,
+              "continueOnFailure": false,
+              "commands": [
+                {
+                  "name": "source",
+                  "cmd": "npm",
+                  "args": [
+                    "run",
+                    "test:source"
+                  ],
+                  "parser": "vitest",
+                  "contracts": {
+                    "selection": "ramify-module-ownership-groups/2",
+                    "failureIdentity": "vitest-test-identity/1",
+                    "completeness": "vitest-run-witness/1"
+                  },
+                  "timeoutMs": 120000,
+                  "env": {}
+                }
+              ]
+            }
+          }
+        ],
+        "workspacePreparation": {
+          "preparationId": "nodejs",
+          "optionsDigest": "sha256:adbb2bf32776f44988c31873158ae0ff83c60643de5b7e209f0c188c12723a5c"
+        }
+      }
+    },
+    "failureLedger": {
+      "completeness": "complete",
+      "witness": [
+        {
+          "checkId": "aux-vitest",
+          "command": "aux",
+          "requestedTargets": [
+            {
+              "kind": "module",
+              "moduleId": "f2",
+              "path": "."
+            }
+          ],
+          "summaryRead": true,
+          "endReason": "passed",
+          "exitCode": 0,
+          "unhandledErrorsWithoutFile": [],
+          "carriedFilesNotRun": []
+        },
+        {
+          "checkId": "source-vitest",
+          "command": "source",
+          "requestedTargets": [
+            {
+              "kind": "module",
+              "moduleId": "f2",
+              "path": "."
+            }
+          ],
+          "summaryRead": true,
+          "endReason": "passed",
+          "exitCode": 0,
+          "unhandledErrorsWithoutFile": [],
+          "carriedFilesNotRun": []
+        }
+      ],
+      "entries": []
+    }
+  },
+  "refs": {
+    "reportCommit": "0b940bab71689dff36be521cd12576c3952b1875",
+    "runRef": "refs/audited/runs/2026-10-07T10-48-35Z-e5ddbc3e2",
+    "treeRef": "refs/audited/by-tree/697420cb448d89f1185fd0e2d0db22ccd46fd04a"
+  },
+  "retrievalCommands": [
+    "git notes --ref=audit show e5ddbc3e267141238d90bb345968796799ad278c",
+    "git show refs/audited/runs/2026-10-07T10-48-35Z-e5ddbc3e2:reports/audit/summary.json"
+  ],
+  "composition": {
+    "scoped": true,
+    "chainDepth": 2,
+    "reportCommit": "0b940bab71689dff36be521cd12576c3952b1875",
+    "rootReportCommit": "940badd75b0600dca08b346d4de6e1d6a1ac5551",
+    "outstandingFailures": 0,
+    "verdict": "pass"
+  }
+}

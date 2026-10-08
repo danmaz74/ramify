@@ -5,7 +5,7 @@ import {
 } from '../../../harness/src/interfaces/protocol/sessions.js';
 import { SessionPage } from '../session-page.js';
 import {
-  architect, at, engineerEntries, entries, evaluation, globalFork, inline, liveEngineer, page, planId, reply, runId, sessionView, update,
+  architect, at, engineerEntries, entries, evaluation, globalFork, inline, liveEngineer, page, planId, postWriteCheckEntry, reply, runId, sessionView, update,
 } from './helpers/sessions.js';
 import { StubClient } from './helpers/stub-client.js';
 
@@ -371,3 +371,21 @@ test('the blocks are operated from the keyboard: each header is a button with it
   expect(within(body).getByText('I should read the app first.')).toBeTruthy();
   expect(screen.getByRole('region', { name: 'Transcript of ses-0002' }).tabIndex).toBe(0);
 });
+
+test('PB3-E07: a post-write check shows each path\'s disposition, and a not-analyzed path carries no passing label', async () => {
+  const transcript = page([...engineerEntries.slice(0, 6), postWriteCheckEntry(7)]);
+  render(<SessionPage client={clientWith(finishedEngineer(), transcript)} session={ses2} anchor={null} interval={60_000} />);
+  const list = await screen.findByRole('list', { name: 'Path dispositions' });
+  const rows = within(list).getAllByRole('listitem').map(item => item.textContent);
+  expect(rows).toEqual([
+    'checked src/app.ts · module shop',
+    'not-analyzed docs/guide.md · module shop · in the owned-unwired tree docs of shop: owned-unwired',
+    'not-analyzed fixture/src/f.ts · module shop · in the owned-nested-project tree fixture of shop: owned-nested-project',
+  ]);
+  for (const row of rows.slice(1)) expect(row).not.toMatch(/pass/u);
+  // The check's own badge is the project's verdict, never a path's.
+  expect(screen.getByText('project passed').className).toContain('check-passed');
+  expect(screen.queryByText('passed')).toBeNull();
+  expect(document.body.textContent).toContain('ramify.check/1');
+});
+

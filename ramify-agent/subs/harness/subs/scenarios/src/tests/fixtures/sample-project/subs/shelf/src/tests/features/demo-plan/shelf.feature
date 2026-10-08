@@ -1,7 +1,7 @@
 # Written by ramify-agent for plan demo-plan, run 20260923T1200Z-000000.
 # The scenarios are the plan's requirements. Agents never edit this file;
 # step definitions bind it from src/tests/steps/. @ramify-pending marks a
-# scenario the harness has not yet declared due.
+# scenario that nothing has bound or reported done yet.
 
 Feature: shelf-books
   A user shelves books, and the shelf lists them.

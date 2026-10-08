@@ -1,5 +1,6 @@
-import { readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { copyFile, lstat, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { runCommand, childEnvironment } from './run-command.js';
 import type { CommandOutcome } from './run-command.js';
 import type { previewCandidateTree } from './candidate-tree.js';
@@ -24,20 +25,14 @@ import type { previewCandidateTree } from './candidate-tree.js';
  */
 export const runBranchPrefix = 'ramify-agent-run/';
 
-/**
- * The prefix of run branches created before `ramify-agent-run/`. A run that
- * recorded one is still resumed on it, and the harness still commits there.
- */
-export const legacyRunBranchPrefix = 'ramify-agent/run-';
-
 /** The branch of one run: `ramify-agent-run/<run-id>`. */
 export function runBranchName(runId: string): string {
   return `${runBranchPrefix}${runId}`;
 }
 
-/** Whether a branch is a run's own, by the current prefix or the earlier one. */
+/** Whether a branch is a run's own. */
 export function isRunBranch(branch: string): boolean {
-  return branch.startsWith(runBranchPrefix) || branch.startsWith(legacyRunBranchPrefix);
+  return branch.startsWith(runBranchPrefix);
 }
 
 /** The identity the harness commits under, so that no person's configuration is needed. */
@@ -62,13 +57,14 @@ interface GitRun {
   readonly stderr: string;
 }
 
-async function git(root: string, args: readonly string[], signal?: AbortSignal): Promise<GitRun> {
+async function git(root: string, args: readonly string[], signal?: AbortSignal, stdin?: string): Promise<GitRun> {
   const argv = ['git', ...args];
   const run = await runCommand({
     argv,
     cwd: root,
     env: childEnvironment({ GIT_TERMINAL_PROMPT: '0' }),
     timeoutMs: gitTimeoutMs,
+    ...(stdin === undefined ? {} : { stdin }),
     ...(signal === undefined ? {} : { signal }),
   });
   if (run.outcome.kind !== 'completed') {
@@ -96,22 +92,145 @@ export async function isCleanRepository(root: string, signal?: AbortSignal): Pro
   return run.stdout.trim() === '';
 }
 
+/** Paths in Git's index beneath the supplied project-relative directories, including unchanged files. */
+export async function trackedPaths(root: string, directories: readonly string[], signal?: AbortSignal): Promise<string[]> {
+  if (directories.length === 0) return [];
+  const paths = directories.map(directory => {
+    validateProjectPath(directory);
+    return directory.endsWith('/') ? directory : `${directory}/`;
+  });
+  const run = await gitOk(root, ['--literal-pathspecs', 'ls-files', '--cached', '-z', '--', ...paths], signal);
+  return [...new Set(run.stdout.split('\0').filter(Boolean))].sort();
+}
+
+/** Git's deciding ignore rule, including a negating rule when it makes a path unignored. */
+export interface IgnoreRule {
+  readonly source: string;
+  readonly line: number;
+  readonly pattern: string;
+}
+
+/** One exact project-relative path and Git's answer about its ignore status. */
+export interface IgnoreStatus {
+  readonly path: string;
+  readonly ignored: boolean;
+  readonly rule: IgnoreRule | null;
+}
+
+/** Ask Git about paths as directories, even when a directory has not been created yet. */
+export async function ignoreStatus(root: string, paths: readonly string[], signal?: AbortSignal): Promise<IgnoreStatus[]> {
+  for (const path of paths) validateProjectPath(path);
+  const primary = await decidingIgnoreRules(root, paths, signal);
+  const answers: IgnoreStatus[] = [];
+  for (const [index, path] of paths.entries()) {
+    let rule = primary[index] ?? null;
+    // Git describes a negated directory pattern on the path without its
+    // trailing slash, although the slash is needed to check an absent directory.
+    if (rule === null && path.endsWith('/')) {
+      const bare = path.slice(0, -1);
+      rule = await decidingIgnoreRule(root, bare, signal);
+      if (rule === null) {
+        const isolated = await absentDirectoryRule(root, bare, signal);
+        // The real worktree alone decides ignored status. The isolated view
+        // can only identify a negation behind an actual nonmatch.
+        if (isolated?.pattern.startsWith('!')) rule = isolated;
+      }
+    }
+    answers.push({ path, ignored: rule !== null && !rule.pattern.startsWith('!'), rule });
+  }
+  return answers;
+}
+
+/**
+ * Git cannot name a negating directory rule while that directory is absent.
+ * Recreate only the ancestor ignore files and an empty directory in an
+ * isolated worktree view, keeping the real worktree untouched. Git still uses
+ * the repository's own info/exclude and configured global rules.
+ */
+async function absentDirectoryRule(root: string, path: string, signal?: AbortSignal): Promise<IgnoreRule | null> {
+  try {
+    if ((await lstat(join(root, path))).isDirectory()) return null;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  const gitDir = (await gitOk(root, ['rev-parse', '--absolute-git-dir'], signal)).stdout.trim();
+  const topLevel = (await gitOk(root, ['rev-parse', '--show-toplevel'], signal)).stdout.trim();
+  const prefix = (await gitOk(root, ['rev-parse', '--show-prefix'], signal)).stdout.trim();
+  const fullPath = join(prefix, path);
+  const worktree = await mkdtemp(join(tmpdir(), 'ramify-ignore-'));
+  try {
+    const components = fullPath.split('/');
+    let ancestor = '';
+    for (const component of components) {
+      const source = join(topLevel, ancestor, '.gitignore');
+      const info = await lstat(source).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      });
+      if (info?.isFile()) {
+        const destination = join(worktree, ancestor, '.gitignore');
+        await mkdir(dirname(destination), { recursive: true });
+        await copyFile(source, destination);
+      }
+      ancestor = join(ancestor, component);
+    }
+    await mkdir(join(worktree, fullPath), { recursive: true });
+    return await decidingIgnoreRule(join(worktree, prefix), path, signal, [`--git-dir=${gitDir}`, `--work-tree=${worktree}`]);
+  } finally {
+    await rm(worktree, { recursive: true, force: true });
+  }
+}
+
+async function decidingIgnoreRule(root: string, path: string, signal?: AbortSignal, prefix: readonly string[] = []): Promise<IgnoreRule | null> {
+  return (await decidingIgnoreRules(root, [path], signal, prefix))[0] ?? null;
+}
+
+/** One NUL-delimited Git query keeps paths, spaces and response order exact. */
+async function decidingIgnoreRules(root: string, paths: readonly string[], signal?: AbortSignal, prefix: readonly string[] = []): Promise<Array<IgnoreRule | null>> {
+  if (paths.length === 0) return [];
+  const args = ['check-ignore', '--no-index', '--verbose', '--non-matching', '-z', '--stdin'];
+  const run = await git(root, [...prefix, ...args], signal, `${paths.join('\0')}\0`);
+  if (run.exitCode !== 0 && run.exitCode !== 1) {
+    throw new GitError(`\`git check-ignore\` exited with ${run.exitCode}: ${run.stderr.trim()}`, {
+      argv: ['git', ...prefix, ...args],
+      outcome: { kind: 'completed', exitCode: run.exitCode },
+      output: `${run.stdout}${run.stderr}`.trim().slice(-2000),
+    });
+  }
+  const fields = run.stdout.split('\0');
+  if (fields.length !== paths.length * 4 + 1 || fields.at(-1) !== '') {
+    throw new Error(`Git gave ${fields.length - 1} ignore fields for ${paths.length} paths`);
+  }
+  return paths.map((path, index) => {
+    const [source, line, pattern, answeredPath] = fields.slice(index * 4, index * 4 + 4);
+    if (answeredPath !== path) throw new Error(`Git gave an ignore answer for ${answeredPath ?? '<missing>'} instead of ${path}`);
+    if (source === '' && line === '' && pattern === '') return null;
+    const number = Number.parseInt(line!, 10);
+    if (!Number.isInteger(number) || number < 1) throw new Error(`Git gave an invalid ignore rule line for ${path}`);
+    return { source: source!, line: number, pattern: pattern! };
+  });
+}
+
+function validateProjectPath(path: string): void {
+  if (path === '' || path.startsWith('/') || path.includes('\\') || path.includes('\0') || path.split('/').some(part => part === '..' || part === '.')) {
+    throw new Error(`Git path must be project-relative without parent traversal: ${path}`);
+  }
+}
+
 /**
  * The run's branch, `ramify-agent-run/<run-id>`, checked out. A run repeated
  * after a crash finds its branch and stays on it; the branch is never reset,
- * so the commits of the earlier attempt are kept. A run whose branch was
- * created under the earlier prefix, `ramify-agent/run-<run-id>`, is found
- * there. Git refusing the branch, as it refuses one beneath an existing
- * branch's name, is a `GitError` that carries git's own message.
+ * so the commits of the earlier attempt are kept. Git refusing the branch,
+ * as it refuses one beneath an existing branch's name, is a `GitError` that
+ * carries git's own message.
  */
 export async function createRunBranch(root: string, runId: string, signal?: AbortSignal): Promise<{ readonly branch: string; readonly created: boolean }> {
-  for (const existing of [runBranchName(runId), `${legacyRunBranchPrefix}${runId}`]) {
-    const found = await git(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${existing}`], signal);
-    if (found.exitCode !== 0) continue;
-    await gitOk(root, ['switch', existing], signal);
-    return { branch: existing, created: false };
-  }
   const branch = runBranchName(runId);
+  const found = await git(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], signal);
+  if (found.exitCode === 0) {
+    await gitOk(root, ['switch', branch], signal);
+    return { branch, created: false };
+  }
   await gitOk(root, ['switch', '--create', branch], signal);
   return { branch, created: true };
 }
@@ -310,7 +429,12 @@ export async function commitNameStatus(
   root: string,
   commit: string,
   signal?: AbortSignal,
+  options?: { readonly requireSingleParent?: boolean },
 ): Promise<Array<{ readonly status: string; readonly path: string }>> {
+  if (options?.requireSingleParent === true) {
+    const ancestry = await gitOk(root, ['rev-list', '--parents', '--max-count=1', commit], signal);
+    if (ancestry.stdout.trim().split(/\s+/u).length !== 2) throw new Error(`Commit ${commit} is not a single-parent producer commit`);
+  }
   const run = await gitOk(root, ['show', '--name-status', '--format=', '-z', '--no-renames', commit], signal);
   const fields = run.stdout.split('\0');
   const changes: Array<{ status: string; path: string }> = [];
@@ -550,6 +674,8 @@ export async function inspectGit(root: string, request: GitInspection, signal?: 
  * the project's root explicit, just as the command adapter does.
  */
 export interface GitService {
+  readonly trackedPaths: typeof trackedPaths;
+  readonly ignoreStatus: typeof ignoreStatus;
   readonly previewCandidateTree: typeof previewCandidateTree;
   readonly currentHead: typeof currentHead;
   readonly isCleanRepository: typeof isCleanRepository;
@@ -568,6 +694,7 @@ export interface GitService {
 
 /** The process-backed adapter. Consumer tests should supply a scripted GitService. */
 export const gitService: GitService = {
+  trackedPaths, ignoreStatus,
   previewCandidateTree: async (projectRoot, signal) => (await import('./candidate-tree.js')).previewCandidateTree(projectRoot, signal),
   currentHead, isCleanRepository, createRunBranch, commitAccepted,
   findCommitByTrailer, findCommitByTrailers, changedPaths, changedEntries,

@@ -1,0 +1,431 @@
+{
+  "schema": "plan21.iteration9.f2/1",
+  "providerVersion": "ramify-audit@0.7.2",
+  "ramifyVersion": "ramify.ts@0.4.1",
+  "commits": {
+    "baseline": "0de74fca42e6473f6ecd206b207877f23455bef6",
+    "grandChange": "be18ae056cccc048ce478f56feefd20458709d31",
+    "ambiguous": "003fefad01148b1919ae8bb31b42cb0f40334e32",
+    "readme": "986a150ae51b03bb57cfcf8d4ea0a4db396b576f",
+    "repaired": "60200604efed883b67c2e7c23cd891c44e4134de",
+    "rootAndGrand": "2a93984235574d0d981e27177b195e7eff913715",
+    "sibling": "a24fc2e90ce879874688dca85de28369e9630330",
+    "runner": "4d5f88d73688fd900d4e46202340523c2550bef2",
+    "restored": "af5c83986bdd645653cf8897567982bd2a142da4",
+    "policy": "2975142290fc7fbd06eaf48be80aaa79059b7287"
+  },
+  "gates": {
+    "baseline": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0001",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "b34be7b30a3a4af698decaacb32c4dcf4b6fa284"
+        },
+        "requestedSourceCommit": "0de74fca42e6473f6ecd206b207877f23455bef6",
+        "auditedSourceCommit": "0de74fca42e6473f6ecd206b207877f23455bef6",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "no-baseline: no audit record of project . on the first-parent history",
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "723dbecfc0391f6e1db3d293a8c3e826d244c56e",
+        "runRef": "refs/audited/runs/2026-10-08T02-44-59Z-0de74fca4",
+        "treeRef": "refs/audited/by-tree/36f9d5b64b07ecb49d4a4e998c4dbba53a95eeba"
+      },
+      "selectedModules": null,
+      "carriedFailures": 0,
+      "checks": {
+        "aux-vitest": "pass",
+        "scenarios": "pass",
+        "source-vitest": "pass"
+      },
+      "scenarios": [
+        "sc-001 passed",
+        "sc-003 passed"
+      ]
+    },
+    "partial": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0002",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "b34be7b30a3a4af698decaacb32c4dcf4b6fa284"
+        },
+        "requestedSourceCommit": "be18ae056cccc048ce478f56feefd20458709d31",
+        "auditedSourceCommit": "be18ae056cccc048ce478f56feefd20458709d31",
+        "requestedMode": "ramify-partial",
+        "executedMode": "ramify-partial",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "1b0d6722ba8c2e433479b9cf1b14ef4edc9af943",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-03Z-be18ae056",
+        "treeRef": "refs/audited/by-tree/ee27b57880f82a5bdc2401473a9baee9d54739d9"
+      },
+      "selectedModules": [
+        "subs/a/subs/grand"
+      ],
+      "carriedFailures": 0,
+      "checks": {
+        "aux-vitest": "pass",
+        "scenarios": "pass",
+        "source-vitest": "pass"
+      },
+      "scenarios": [
+        "sc-003 passed"
+      ]
+    },
+    "failing": {
+      "verdict": "failed",
+      "cause": "check-failed",
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0003",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "b34be7b30a3a4af698decaacb32c4dcf4b6fa284"
+        },
+        "requestedSourceCommit": "003fefad01148b1919ae8bb31b42cb0f40334e32",
+        "auditedSourceCommit": "003fefad01148b1919ae8bb31b42cb0f40334e32",
+        "requestedMode": "ramify-partial",
+        "executedMode": "ramify-partial",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "fail",
+        "detail": "1 outstanding failure in its ledger; failed check scenarios"
+      },
+      "evidence": {
+        "reportCommit": "e52ad580b1b93495d38d952d1b3eae73ca4ca97e",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-07Z-003fefad0",
+        "treeRef": "refs/audited/by-tree/8d9ae6c0a65803934c255a54c52dbe92b50ae999"
+      },
+      "selectedModules": [
+        "subs/a/subs/grand"
+      ],
+      "carriedFailures": 0,
+      "checks": {
+        "aux-vitest": "pass",
+        "scenarios": "fail",
+        "source-vitest": "pass"
+      },
+      "scenarios": [
+        "sc-003 ambiguous"
+      ]
+    },
+    "zero": {
+      "verdict": "failed",
+      "cause": "check-failed",
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0004",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "b34be7b30a3a4af698decaacb32c4dcf4b6fa284"
+        },
+        "requestedSourceCommit": "986a150ae51b03bb57cfcf8d4ea0a4db396b576f",
+        "auditedSourceCommit": "986a150ae51b03bb57cfcf8d4ea0a4db396b576f",
+        "requestedMode": "ramify-partial",
+        "executedMode": "ramify-partial",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "fail",
+        "detail": "1 outstanding failure in its ledger; failed check scenarios"
+      },
+      "evidence": {
+        "reportCommit": "157ddd5aca400e8413f2cacb2bc6133d106eb771",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-09Z-986a150ae",
+        "treeRef": "refs/audited/by-tree/60170c4a2dc52665834674294ea177e877b36252"
+      },
+      "selectedModules": [],
+      "carriedFailures": 1,
+      "checks": {
+        "scenarios": "fail"
+      },
+      "scenarios": [
+        "sc-003 ambiguous"
+      ]
+    },
+    "fixed": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0005",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "b34be7b30a3a4af698decaacb32c4dcf4b6fa284"
+        },
+        "requestedSourceCommit": "60200604efed883b67c2e7c23cd891c44e4134de",
+        "auditedSourceCommit": "60200604efed883b67c2e7c23cd891c44e4134de",
+        "requestedMode": "ramify-partial",
+        "executedMode": "ramify-partial",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "539fd08249273e5641ee4c1056e3cfa1149bc755",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-12Z-60200604e",
+        "treeRef": "refs/audited/by-tree/e73cc5259f169decc9cb99180a1f8eaf3a7e9da1"
+      },
+      "selectedModules": [
+        "subs/a/subs/grand"
+      ],
+      "carriedFailures": 1,
+      "checks": {
+        "aux-vitest": "pass",
+        "scenarios": "pass",
+        "source-vitest": "pass"
+      },
+      "scenarios": [
+        "sc-003 passed"
+      ]
+    },
+    "outer": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0006",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "b34be7b30a3a4af698decaacb32c4dcf4b6fa284"
+        },
+        "requestedSourceCommit": "2a93984235574d0d981e27177b195e7eff913715",
+        "auditedSourceCommit": "2a93984235574d0d981e27177b195e7eff913715",
+        "requestedMode": "ramify-partial",
+        "executedMode": "ramify-partial",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "2b3bf25501efeda51162d981b4464e23745e3f98",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-17Z-2a9398423",
+        "treeRef": "refs/audited/by-tree/e8f367bbb30ac8258b3eb4857935a8e1d91acc43"
+      },
+      "selectedModules": [
+        ".",
+        "subs/a/subs/grand"
+      ],
+      "carriedFailures": 0,
+      "checks": {
+        "aux-vitest": "pass",
+        "scenarios": "pass",
+        "source-vitest": "pass"
+      },
+      "scenarios": [
+        "sc-003 passed"
+      ]
+    },
+    "collision": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0007",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "b34be7b30a3a4af698decaacb32c4dcf4b6fa284"
+        },
+        "requestedSourceCommit": "a24fc2e90ce879874688dca85de28369e9630330",
+        "auditedSourceCommit": "a24fc2e90ce879874688dca85de28369e9630330",
+        "requestedMode": "ramify-partial",
+        "executedMode": "ramify-partial",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "788ebfeb9ce71a5c40f7b5b1366c7c299f364836",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-21Z-a24fc2e90",
+        "treeRef": "refs/audited/by-tree/e46b0223fa5d9a9db4a1cd37fac6587fb06c3084"
+      },
+      "selectedModules": [
+        "subs/ab"
+      ],
+      "carriedFailures": 0,
+      "checks": {
+        "aux-vitest": "pass",
+        "scenarios": "pass",
+        "source-vitest": "pass"
+      },
+      "scenarios": []
+    },
+    "widened": {
+      "verdict": "failed",
+      "cause": "check-failed",
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0008",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "b34be7b30a3a4af698decaacb32c4dcf4b6fa284"
+        },
+        "requestedSourceCommit": "4d5f88d73688fd900d4e46202340523c2550bef2",
+        "auditedSourceCommit": "4d5f88d73688fd900d4e46202340523c2550bef2",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "runner-configuration: vitest.aux.config.mjs is the runner configuration of the baseline",
+        "reuse": null,
+        "verdict": "fail",
+        "detail": "a check of the full audit failed"
+      },
+      "evidence": {
+        "reportCommit": "1be5647c116452f3ca6498c10034e38f3694fb5f",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-25Z-4d5f88d73",
+        "treeRef": "refs/audited/by-tree/0cae579ae04b35d62194a5e96143aa9effaf7d46"
+      },
+      "selectedModules": null,
+      "carriedFailures": 0,
+      "checks": {
+        "aux-vitest": "fail",
+        "scenarios": "pass",
+        "source-vitest": "pass"
+      },
+      "scenarios": [
+        "sc-001 passed",
+        "sc-003 passed"
+      ]
+    },
+    "healed": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0009",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "b34be7b30a3a4af698decaacb32c4dcf4b6fa284"
+        },
+        "requestedSourceCommit": "af5c83986bdd645653cf8897567982bd2a142da4",
+        "auditedSourceCommit": "a24fc2e90ce879874688dca85de28369e9630330",
+        "requestedMode": "ramify-partial",
+        "executedMode": "ramify-partial",
+        "fallbackReason": null,
+        "reuse": {
+          "auditedCommit": "a24fc2e90ce879874688dca85de28369e9630330",
+          "ignoredChangedPaths": [],
+          "requestedMode": "ramify-partial",
+          "resolution": "defaulted"
+        },
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "788ebfeb9ce71a5c40f7b5b1366c7c299f364836",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-21Z-a24fc2e90",
+        "treeRef": "refs/audited/by-tree/e46b0223fa5d9a9db4a1cd37fac6587fb06c3084"
+      },
+      "selectedModules": [
+        "subs/ab"
+      ],
+      "carriedFailures": 0,
+      "checks": {
+        "aux-vitest": "pass",
+        "scenarios": "pass",
+        "source-vitest": "pass"
+      },
+      "scenarios": []
+    },
+    "refused": {
+      "verdict": "not-verified",
+      "cause": "infrastructure",
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0010",
+        "mode": "project-default",
+        "status": "failed",
+        "definition": {
+          "path": "",
+          "blob": ""
+        },
+        "requestedSourceCommit": "2975142290fc7fbd06eaf48be80aaa79059b7287",
+        "auditedSourceCommit": null,
+        "requestedMode": null,
+        "executedMode": null,
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": null,
+        "detail": "Captured audit policy conflicts with ramify-audit.json at 2975142290fc7fbd06eaf48be80aaa79059b7287; start a new run after reconciling the configuration"
+      },
+      "evidence": null,
+      "selectedModules": null,
+      "carriedFailures": 0,
+      "checks": {},
+      "scenarios": []
+    },
+    "rebased": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0011",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "327bda0b70465fd5b644668650a54783429485bd"
+        },
+        "requestedSourceCommit": "2975142290fc7fbd06eaf48be80aaa79059b7287",
+        "auditedSourceCommit": "2975142290fc7fbd06eaf48be80aaa79059b7287",
+        "requestedMode": "ramify-partial",
+        "executedMode": "full",
+        "fallbackReason": "baseline-incompatible: baseline a24fc2e90ce879874688dca85de28369e9630330 (report 788ebfeb9ce71a5c40f7b5b1366c7c299f364836) ignored other paths ([\"docs/**\"], now [\"docs/**\",\"notes/**\"])",
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "e7ab36a39e73e88dfde220fbb082ac4d4f2aebd0",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-29Z-297514229",
+        "treeRef": "refs/audited/by-tree/4f41345df473afdf8afc59cd31dcec9913750285"
+      },
+      "selectedModules": null,
+      "carriedFailures": 0,
+      "checks": {
+        "aux-vitest": "pass",
+        "scenarios": "pass",
+        "source-vitest": "pass"
+      },
+      "scenarios": [
+        "sc-001 passed",
+        "sc-003 passed"
+      ]
+    }
+  }
+}

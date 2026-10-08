@@ -1,32 +1,29 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
-import { testLockedRunner, type TestLockHooks, type TestLockOverride } from '../../subs/audit/src/test-lock.js';
 import { dispatchHarnessCommand } from '../../subs/audit/src/focused-check.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { checkCommandEnvironment } from './records.js';
-import type { CheckCommand, CheckCommandKind, Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, ScenarioCheckSummary, TestSelectionPolicy } from './records.js';
-import { runScenarioCheck } from './scenario-check.js';
+import type { CheckCommandKind, Checkpoint, GateCommandRecord, GateEvidence } from './records.js';
 import type { PlannedCheck } from './verify.js';
 
 /*
- * Execution of a gate's already verified commands. The gate owns whether a
- * plan is verified and what the resulting records mean; an implementation of
- * this port runs the plans in order and answers one command record for each.
+ * Execution of a standalone session's in-place diagnosis: its already
+ * verified commands, run in the project's working directory. The gate owns
+ * whether a plan is verified and what the resulting records mean; an
+ * implementation of this port runs the plans in order and answers one
+ * command record for each. A committing run gate runs none of this: it asks
+ * the project's committed audit (`subs/audit`), which owns its checks.
  */
 
 export interface CheckExecutionRequest {
   /** Where complete command output is written, beside the attempt record. */
   readonly directory: string;
-  /**
-   * The gate's policy for turning one harness command run into its record.
-   * A `scenarios` check passes its summary too, since its outcome is read
-   * from the message streams and not from the exit codes alone.
-   */
-  readonly classify: (check: PlannedCheck, run: CommandRun, outputFile: string, scenarios?: ScenarioCheckSummary) => GateCommandRecord;
-  /** The revision and gate-specific facts an isolated executor must bind. */
+  /** The gate's policy for turning one harness command run into its record. */
+  readonly classify: (check: PlannedCheck, run: CommandRun, outputFile: string) => GateCommandRecord;
+  /** The revision and gate-specific facts the executor binds. */
   readonly context: CheckExecutionContext;
-  /** Every gate execution is bounded, including time spent waiting for an audit lease. */
+  /** Every gate execution is bounded. */
   readonly signal: AbortSignal;
   /**
    * Called as each command starts, before it runs, so that a reader can see
@@ -34,16 +31,16 @@ export interface CheckExecutionRequest {
    * an earlier one was interrupted, is not announced.
    */
   readonly started?: GateCommandStarted | undefined;
-  /** One lock wait, before a command starts. */
-  readonly waiting?: ((command: GateCommandStart, line: string) => Promise<void>) | undefined;
-  /** Pauses the caller's bound; release is called on every wait exit. */
-  readonly pauseForTestLock?: (() => () => void) | undefined;
 }
 
-/** One command of a gate as it starts: its kind and its place among the gate's commands, counted from one. */
+/**
+ * One command of a gate as it starts: its kind and its place among the
+ * gate's commands, counted from one. For a committing gate it is one check
+ * of the committed audit definition, as the provider starts it.
+ */
 export interface GateCommandStart {
   readonly kind: CheckCommandKind;
-  /** A setup command's declared name, such as `build`. */
+  /** A setup command's declared name, such as `build`, or a configured check's name. */
   readonly name?: string;
   readonly position: number;
   readonly total: number;
@@ -58,45 +55,20 @@ export function commandStart(checks: readonly PlannedCheck[], index: number): Ga
   return { kind: check.kind, ...(check.name === undefined ? {} : { name: check.name }), position: index + 1, total: checks.length };
 }
 
-/**
- * Facts that vary for every gate. They travel with the execution request,
- * rather than being frozen into the service-level port, because an audit is
- * bound to one commit, attempt, checkpoint and resolved selection.
- */
+/** Facts that vary for every in-place diagnosis. */
 export interface CheckExecutionContext {
   /** The durable run that owns the attempt. In-place standalone gates have none. */
   readonly runId?: string | undefined;
   readonly attemptId: string;
   readonly checkpoint: Checkpoint;
   readonly projectRoot: string;
-  /** The already-made commit an isolated implementation must execute over. */
+  /** The head the working tree stood on. */
   readonly sourceCommit: string;
-  readonly selection: {
-    readonly policy: TestSelectionPolicy['policy'];
-    readonly exactOwners: readonly string[];
-    readonly subtrees: readonly string[];
-  };
-  /** Project-relative package directories whose installed dependencies are linked. */
-  readonly dependencyDirectories: readonly string[];
-  readonly auditAllTests?: CheckCommand | undefined;
-  /** Harness-owned findings included beside command checks in external evidence. */
-  readonly harness: {
-    readonly guardedChanges: readonly CheckHarnessGuardedChange[];
-    readonly rules: readonly GateRuleRecord[];
-  };
-  /** The aggregate bound for the gate, including lease acquisition and preparation. */
+  /** The aggregate bound for the diagnosis. */
   readonly timeoutMs: number;
 }
 
-/** The guarded-file comparison an executor may include in external evidence. */
-export interface CheckHarnessGuardedChange {
-  readonly path: string;
-  readonly before: string;
-  readonly after: string | null;
-  readonly authorizedBy: { readonly id: string; readonly revision: number; readonly hash: string } | null;
-}
-
-/** The replaceable execution side of a gate. */
+/** The replaceable execution side of an in-place diagnosis. */
 export interface CheckExecutionPort {
   run(checks: readonly PlannedCheck[], request: CheckExecutionRequest): Promise<CheckExecutionResult>;
 }
@@ -104,101 +76,58 @@ export interface CheckExecutionPort {
 /** What execution adds to the gate policy's final attempt. */
 export interface CheckExecutionResult {
   readonly commands: readonly GateCommandRecord[];
-  /** Null for the in-place runner; an isolated audit names its exact source commit. */
+  /** Null for the in-place runner. */
   readonly audited: string | null;
-  /** Null unless an external audit published evidence. */
+  /** Null: an in-place diagnosis publishes nothing. */
   readonly evidence: GateEvidence | null;
-  /** The external audit's exact overall result, when it published a report. */
-  readonly auditOverall?: 'pass' | 'fail' | 'indeterminate' | null;
-  /** Complete provider result and published per-check records, retained without a competing harness schema. */
+  /** The provider's parsed diagnostic of each command, retained without a competing harness schema. */
   readonly provider?: { readonly result: unknown; readonly checks: unknown };
 }
 
 /**
- * Today's runner: execute the verified commands in the project's working
- * directory. The project's setup commands come first; once one of them has
- * not passed, no later command runs, and each is recorded as not run
- * because of it.
+ * Today's in-place runner: execute the verified commands in the project's
+ * working directory. The project's setup commands come first; once one of
+ * them has not passed, no later command runs, and each is recorded as not
+ * run because of it.
  */
-export function createInPlaceCheckExecution(testLock?: TestLockOverride): CheckExecutionPort {
+export function createInPlaceCheckExecution(): CheckExecutionPort {
   return {
-  async run(checks, request) {
-    const commands: GateCommandRecord[] = [];
-    const providerChecks: Record<string, unknown> = {};
-    const startedAt = new Date().toISOString();
-    let interrupted = false;
-    let setupFailed = false;
-    for (const [index, check] of checks.entries()) {
-      const outputFile = outputPath(request.directory, index, check);
-      if (interrupted || setupFailed) {
-        await writeFile(outputFile, '');
-        commands.push(notRun(check, outputFile, startedAt, interrupted ? 'interrupted' : 'setup-failed'));
-        continue;
-      }
-
-      const suite = check.kind === 'tests' || check.kind === 'scenarios';
-      const owner = { repositoryPath: request.context.projectRoot, runId: request.context.runId, checkId: `${check.kind}-${index + 1}`, command: check.command.argv.join(' ') };
-      let announced = false;
-      const start = async () => {
-        if (announced) return;
-        announced = true;
+    async run(checks, request) {
+      const commands: GateCommandRecord[] = [];
+      const providerChecks: Record<string, unknown> = {};
+      const startedAt = new Date().toISOString();
+      let interrupted = false;
+      let setupFailed = false;
+      for (const [index, check] of checks.entries()) {
+        const outputFile = outputPath(request.directory, index, check);
+        if (interrupted || setupFailed) {
+          await writeFile(outputFile, '');
+          commands.push(notRun(check, outputFile, startedAt, interrupted ? 'interrupted' : 'setup-failed'));
+          continue;
+        }
         await request.started?.(commandStart(checks, index));
-      };
-      let releaseWait: (() => void) | undefined;
-      let announcedWait = false;
-      const hooks: TestLockHooks = {
-        waiting: async line => {
-          releaseWait ??= request.pauseForTestLock?.();
-          if (!announcedWait) {
-            announcedWait = true;
-            await request.waiting?.(commandStart(checks, index), line);
-          }
-        },
-        acquired: () => { releaseWait?.(); releaseWait = undefined; },
-        settled: () => { releaseWait?.(); releaseWait = undefined; },
-      };
-      const runner = suite ? testLockedRunner(async input => { await start(); return runCommand(input); }, owner, hooks, testLock) : runCommand;
-      if (!suite) await start();
-      if (check.scenarios !== undefined) {
-        const outcome = await runScenarioCheck({
-          command: check.command,
-          plan: check.scenarios,
-          projectRoot: check.command.cwd,
-          attemptDirectory: request.directory,
-          outputFile,
-          signal: request.signal,
-          runner: suite ? runner : undefined,
-        });
+        if (check.kind === 'setup') {
+          const run = await runCommand({ argv: check.command.argv, cwd: check.command.cwd,
+            env: checkCommandEnvironment(check.command), timeoutMs: check.command.timeoutMs, outputFile, signal: request.signal });
+          const record = request.classify(check, run, outputFile);
+          commands.push(record);
+          if (record.notVerified === 'interrupted') interrupted = true;
+          else if (record.outcome !== 'passed') setupFailed = true;
+          continue;
+        }
         const id = `check-${String(index + 1).padStart(2, '0')}-${check.kind}`;
-        const record = request.classify(check, outcome.run, outputFile, outcome.summary);
-        commands.push({ ...record, providerCheckId: id });
-        providerChecks[id] = outcome.provider;
-        if (record.notVerified === 'interrupted') interrupted = true;
-        continue;
+        const executed = await dispatchHarnessCommand({ command: check.command, signal: request.signal, outputFile, checkId: id });
+        const record = request.classify(check, executed.run, outputFile);
+        const decided: GateCommandRecord = executed.passed || record.outcome !== 'passed' ? record
+          : executed.runnerError === null ? { ...record, outcome: 'failed' }
+            : { ...record, outcome: 'not-verified', notVerified: 'runner-error', runnerError: executed.runnerError };
+        commands.push({ ...decided, providerCheckId: id });
+        providerChecks[id] = executed.provider;
+        if (decided.notVerified === 'interrupted') interrupted = true;
       }
-
-      if (check.kind === 'setup') {
-        const run = await runner({ argv: check.command.argv, cwd: check.command.cwd,
-          env: checkCommandEnvironment(check.command), timeoutMs: check.command.timeoutMs, outputFile, signal: request.signal });
-        const record = request.classify(check, run, outputFile);
-        commands.push(record);
-        if (record.notVerified === 'interrupted') interrupted = true;
-        else if (record.outcome !== 'passed') setupFailed = true;
-        continue;
-      }
-      const id = `check-${String(index + 1).padStart(2, '0')}-${check.kind}`;
-      const executed = await dispatchHarnessCommand({ command: check.command, signal: request.signal, runner, outputFile, checkId: id });
-      const record = request.classify(check, executed.run, outputFile);
-      const decided: GateCommandRecord = executed.passed || record.outcome !== 'passed' ? record
-        : executed.runnerError === null ? { ...record, outcome: 'failed' }
-          : { ...record, outcome: 'not-verified', notVerified: 'runner-error', runnerError: executed.runnerError };
-      commands.push({ ...decided, providerCheckId: id });
-      providerChecks[id] = executed.provider;
-      if (decided.notVerified === 'interrupted') interrupted = true;
-    }
-    return { commands, audited: null, evidence: null,
-      ...(Object.keys(providerChecks).length === 0 ? {} : { provider: { result: { source: 'working-tree', published: false }, checks: providerChecks } }) };
-  },
+      return { commands, audited: null, evidence: null,
+        ...(Object.keys(providerChecks).length === 0 ? {} : { provider: { result: { source: 'working-tree', published: false }, checks: providerChecks } }) };
+    },
   };
 }
 
@@ -221,14 +150,13 @@ export function notRun(
   check: PlannedCheck,
   outputFile: string,
   startedAt: string,
-  reason: 'interrupted' | 'setup-failed' | 'audit-unselected',
+  reason: 'interrupted' | 'setup-failed',
   tail = '',
 ): GateCommandRecord {
   return {
     kind: check.kind,
     ...(check.name === undefined ? {} : { name: check.name }),
     command: check.command,
-    ...(check.selection === undefined ? {} : { selection: check.selection }),
     startedAt,
     elapsedMs: 0,
     exitCode: null,

@@ -87,9 +87,9 @@ describe('execution module relations and captured writer changes', () => {
   it('keeps scope-only and ancestor nodes neutral while session reach and started work mark direct modules', async () => {
     const assignment = iterationAssignmentSchema.parse({ schema: 'ramify-agent.iteration-assignment/1', id: 'wi-001.i01', workItem: 'wi-001',
       outline: { id: 'wi-001', revision: 1, hash }, stage: 0, kind: 'ordinary', goal: 'Do work.', approach: 'Implement.',
-      scope: { revision: 1, base: { module: reviews, includedChildren: [] },
+      scope: { revision: 1, base: { module: reviews, included: [] },
         extra: [{ path: 'subs/workspace/subs/other/src/allowed.ts', purpose: 'contract' }], read: [], bootstrap: [], rationale: 'Allowed.',
-        resolved: { roots: [], files: [], view: { status: 'placeholder' } } },
+        resolved: { excluded: [], included: [], ownership: { provider: 'ramify.affected-cli/4', ramifyVersion: 'scripted-lifecycle-only', inputId: 'scripted-scope', configuration: 'tsconfig.json', root: '/p', modules: [{ id: 'app', parent: null, directory: '.' }], exclusions: [] }, roots: [], files: [], view: { status: 'placeholder' } } },
       externalCapabilities: [], completionEvidence: 'Check.', evidenceObligations: [],
       gate: { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: [], subtrees: [], extraSuites: [] } },
       guarded: [], authorizations: [] });

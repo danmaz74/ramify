@@ -13,9 +13,10 @@ import {
 } from './helpers/progress-fixture.js';
 import { runEventsOnDisk, testPolicy } from './helpers/runs.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
-import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
 import { scriptedGit, type ScriptedGit } from './helpers/scripted-git.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -43,8 +44,8 @@ beforeAll(async () => {
     runs: {
       inputs: treeInputs(),
       git: serverGit,
-      readinessExecution: directReadinessExecution(),
-      checkExecution: createPassingCheckExecution(),
+
+      configuredAudit: passingAudit(),
       policy: projectRoot => testPolicy(projectRoot),
       stopGraceMs: 500,
       warn: () => undefined,

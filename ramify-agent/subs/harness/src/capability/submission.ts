@@ -3,11 +3,17 @@ import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { capabilityPlanContentSchema, capabilityPlanSchema, type CapabilityPlan } from './records.js';
 import { assignmentBodySchema } from '../work/assignment.js';
+import {
+  incompleteRequestError, obligationSubmissionErrors, obligationSubmissionFields, outstandingReports, type ObligationContext,
+} from '../work/obligations.js';
 
 /** Agent judgments are explicit values. Validation checks form and current
- * authority; it never infers whether prose, code or an expected result is true. */
+ * authority; it never infers whether prose, code or an expected result is true.
+ * Every action may carry the architect's `registrations` and `reports`, which
+ * apply when it is accepted, before the action, so reporting continues
+ * alongside coordination. */
 const text = z.string().min(1).refine(value => value.trim().length > 0, 'Must contain non-whitespace text');
-const basis = { task: text, planRevision: z.int().positive(), invocation: text };
+const basis = { task: text, planRevision: z.int().positive(), invocation: text, ...obligationSubmissionFields };
 const action = <T extends string, S extends z.ZodRawShape>(kind: T, fields: S) =>
   z.object({ ...basis, kind: z.literal(kind), ...fields }).strict();
 
@@ -19,15 +25,21 @@ export const capabilityActionSchema = z.discriminatedUnion('kind', [
   action('delegate-capability', { request: text, provider: modulePathSchema, placementReason: text, constraints: z.array(text) }),
   action('request-placement', { problem: text, evidence: z.array(text).min(1) }),
   action('unresolved', { problem: text, evidence: z.array(text).min(1) }),
+  /** The architect's done reports on the task's obligations, in `reports`,
+   * are the handback; anything it says about an original example is free
+   * text in `summary` or a report's `where`. No cited file or test is checked.
+   * A request that leaves one of them without a `done` report is rejected,
+   * naming the IDs, like any other invalid action. */
   action('request-handback', {
     summary: text,
-    coverage: z.array(z.object({ case: text, evidence: z.array(text).min(1) }).strict()).min(1),
     interfaces: z.array(z.object({ path: text, symbols: z.array(text).min(1), use: text }).strict()).min(1),
     limitations: z.array(text),
   }),
   action('partial', { progress: text, unfinished: z.array(text).min(1) }),
 ]);
 export type CapabilityAction = z.infer<typeof capabilityActionSchema>;
+/** An action as an agent writes it, before the defaults apply. */
+export type CapabilityActionInput = z.input<typeof capabilityActionSchema>;
 
 export const qualificationActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('satisfy-with-existing'), request: text, invocation: text,
@@ -58,6 +70,8 @@ export interface CapabilityActionBasis {
   readonly state: 'coordinating' | 'awaiting-consumer' | 'implementing' | 'awaiting-dependency' | 'verifying' | 'handed-back' | 'stopped';
   readonly openAssignment: string | null;
   readonly openChild: string | null;
+  /** The task's architect and the run's obligations; without them an action registers and reports nothing. */
+  readonly obligations?: ObligationContext | undefined;
 }
 
 export interface ValidationIssue {
@@ -84,7 +98,34 @@ export function validateCapabilityAction(input: unknown, current: CapabilityActi
   if (current.state !== 'coordinating') issues.push({ kind: 'state', path: ['kind'], message: `The task is ${current.state}` });
   if (current.openAssignment !== null) issues.push({ kind: 'state', path: ['kind'], message: 'An assignment is unfinished' });
   if (current.openChild !== null) issues.push({ kind: 'state', path: ['kind'], message: 'A child task is unfinished' });
+  if (value.registrations.length > 0 || value.reports.length > 0) {
+    if (current.obligations === undefined) {
+      issues.push({ kind: 'state', path: ['reports'], message: 'This turn has no obligation context, so it registers and reports nothing' });
+    } else {
+      for (const error of obligationSubmissionErrors(value, current.obligations)) {
+        issues.push({ kind: 'state', path: error.path.split('.').map(part => /^\d+$/.test(part) ? Number(part) : part), message: error.message });
+      }
+    }
+  }
+  const outstanding = issues.some(issue => issue.path[0] === 'registrations' || issue.path[0] === 'reports') ? [] : unreportedBy(value, current.obligations);
+  if (outstanding.length > 0) issues.push({ kind: 'state', path: ['reports'], message: incompleteRequestError(outstanding, 'handback').message });
   return issues.length === 0 ? { valid: true, value, issues: [] } : { valid: false, issues };
+}
+
+/**
+ * The registered IDs a handback request would leave without a `done`
+ * report, once its own reports apply; none for any other action, for one
+ * whose reports are themselves invalid, or without obligation context. The
+ * rejection and the exhausted turn's failure both name these.
+ */
+export function unreportedByHandback(input: unknown, obligations: ObligationContext | undefined): string[] {
+  const parsed = capabilityActionSchema.safeParse(input);
+  if (!parsed.success || obligations === undefined || obligationSubmissionErrors(parsed.data, obligations).length > 0) return [];
+  return unreportedBy(parsed.data, obligations);
+}
+
+function unreportedBy(value: CapabilityAction, obligations: ObligationContext | undefined): string[] {
+  return value.kind === 'request-handback' && obligations !== undefined ? outstandingReports(value, obligations) : [];
 }
 
 /** Plan tools use the same captured basis rule without comparing prose. */

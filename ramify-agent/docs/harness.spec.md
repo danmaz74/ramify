@@ -23,15 +23,16 @@ their own work. Considering them does not by itself coordinate their execution.
 ### Every Agent Scope Is a Cut on the Module Tree
 
 A module assignment covers its owned contents, including configuration,
-documentation, scratch and owned-unwired trees, except its owned-nested-project
-trees. Child subtrees and owned nested projects require explicit inclusion,
-each as a whole. External trees are never writable in the enclosing run. Guarded configuration remains
+documentation, scratch and owned-unwired trees, except its
+owned-nested-project trees. Child subtrees and owned-nested-project trees
+require explicit inclusion, each as a whole. External trees are never
+writable in the enclosing run. Guarded configuration remains
 an authorization restriction within ownership; owning a file does not waive
 that restriction.
 
-The issuing architect names each included project tree with a reason and
-instructions for its meaning. The tree is excluded from Ramify source checks;
-its own instructions and commands apply from its root. Substantial work on that project belongs in
+The issuing architect names each included tree with a reason and instructions
+for its meaning. An included owned-nested-project tree is excluded from Ramify
+source checks; its own instructions and commands apply from its root. Substantial work on that project belongs in
 a run rooted there. An engineer needing a scope expansion asks its architect;
 excluded analysis never creates write authority.
 
@@ -50,18 +51,23 @@ not substitute the module root or a child module for either source location.
 
 ### Verification Follows Scope And Audit Policy
 
-An iteration's scoped verification selects its module and explicitly included
-child subtrees using ramify-audit's ownership-based test-selection policy.
-Owned non-source changes follow their owner's impact; project-wide inputs
-follow the audit's declared full-audit policy. Ownership, source classification
-and the tests selected by a runner are distinct. Excluded source receives a
-not-analyzed answer, never a passing source-check claim.
-
-The harness consumes ramify-audit's combined evidence across required commands
-and configurations. It cannot accept missing required tests or incomplete
-execution as passing. An included project tree is verified by its owner's
-tests during ordinary iterations; a project's own nested audit is required
-at the plan's final gate. Preserve each project's audit result separately.
+Verification executes the project's configured checks through ramify-audit.
+For committed partial audits, impact selection comes from Ramify and the
+project's audit policy; inert and excluded paths need not select their owner.
+Detected shared inputs and explicitly listed undetected configuration files
+follow the provider's full-audit policy. The harness records complete audit
+results and preserves producer verdicts. The responsible architect evaluates
+implementation, tests and relevant audit diagnostics and declares whether a
+registered requirement is correctly implemented and passing. The harness
+trusts that declaration and asks the architect about missing reports; it does
+not match declarations or references to test files or execution results.
+Final verification is a full audit of the configured suite, including required
+nested projects. Architect declarations and that audit result remain separate.
+An owned-unwired tree is verified by its owner's tests; an included
+owned-nested-project tree needs its own nested audit at the plan's final
+gate, and each project's audit result is preserved separately.
+Ownership, source classification and configured test execution are distinct.
+A not-analyzed path is never presented as passing source analysis.
 
 ### Scratch Has The Iteration's Lifetime
 
@@ -71,11 +77,16 @@ and avoiding duplicates, including when new modules are introduced. This is
 harness setup responsibility, independent of an engineer's module write scope.
 
 The harness creates the assigned module's scratch directory within its scope.
-Scratch survives repairs and interrupted-iteration resumption, and every module's
-scratch directory is removed when the iteration closes, whatever its outcome.
-Readiness removes scratch left by an earlier run. Evidence that must survive
-belongs in durable results or evidence records, not scratch. The project remains
-responsible for compiler exclusions that keep scratch out of builds.
+Scratch survives for as long as the iteration that generated it remains open,
+including repairs, suspension for nested capability work and interrupted-iteration
+resumption. Closing another iteration never removes that scratch. At closure,
+the harness removes scratch from modules with no iteration still open, whatever
+the closing outcome. It preserves and reports any paths in Git's index instead
+of deleting them. Readiness first checks all scratch for tracked paths and stops
+without deleting anything if any exist; otherwise it removes scratch left by an
+earlier run. Evidence that must survive belongs in durable results or evidence
+records, not scratch. The project remains responsible for compiler exclusions
+that keep scratch out of builds.
 
 ### A Module Carries Its Own Onboarding
 
@@ -100,8 +111,12 @@ Each role submits from a closed action union. A requesting engineer can
 propose completion, report partial work or request a capability. The local
 architect qualifies reuse or delegates. The capability architect consults,
 revises its plan, assigns scoped work, delegates a nested need, records a
-placement conflict or requests handback. An accepted submission changes the
-orchestration; it does not claim that implementation is accepted. Read,
+placement conflict or requests handback. An accepted engineer completion
+proposal advances orchestration to verification; it does not establish correct
+implementation. An authorized architect's accepted done report records that
+architect's judgment that its registered obligation is correctly implemented
+and passing. The harness trusts the report and does not infer that judgment
+from gate results. Read,
 plan-update and prevalidation tools have explicit recorded effects but do not
 complete work. The harness applies only accepted actions and current gates.
 

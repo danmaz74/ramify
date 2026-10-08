@@ -5,6 +5,7 @@ import type {
 import { gateCheckpointSchema } from '../interfaces/protocol/runs.js';
 import type { ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import type { GateAttempt } from '../checks/records.js';
+import { scenarioResultsOf } from '../checks/scenario-results.js';
 import { capabilityProgressOf } from './progress.js';
 import { gatesByScenario, scenariosOf } from './scenarios.js';
 import { runSessionViews } from './sessions.js';
@@ -73,18 +74,18 @@ function scenarioSources(view: RunView): Map<string, ExecutionSourceRef> {
 function scenarioResults(view: RunView): Map<string, ExecutionScenarioResult> {
   const latest = new Map<string, ExecutionScenarioResult>();
   // Gate attempts retain their first-commit order even if the body is later revised.
-  for (const { body: gate } of view.gates.values()) for (const command of gate.commands) {
-    if (command.kind !== 'scenarios' || command.scenarios === undefined || command.scenarios.dryRun) continue;
-    for (const result of command.scenarios.scenarios) latest.set(result.id, result.status);
+  for (const { body: gate } of view.gates.values()) {
+    for (const result of scenarioResultsOf(gate)) latest.set(result.id, result.status);
   }
   return latest;
 }
 
 function auditOf(view: RunView, gate: GateAttempt) {
-  if (gate.checkpoint === 'readiness') return 'not-applicable' as const;
   const outcome = view.gateAuditOutcomes.get(gate.id)?.body;
   if (outcome !== undefined && outcome.audited === gate.audited && gate.evidence !== null) {
-    return outcome.overall === 'pass' ? 'passed' as const : 'failed' as const;
+    // A nested request's overall is its invocation verdict: indeterminate
+    // discovery or an unrun project is neither a pass nor a failure.
+    return outcome.overall === 'pass' ? 'passed' as const : outcome.overall === 'fail' ? 'failed' as const : 'indeterminate' as const;
   }
   // Evidence refs certify publication, not the report's overall outcome.
   if (gate.evidence !== null) return 'unavailable' as const;
@@ -134,7 +135,7 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
       const result = latestResult.get(scenario.id) ?? 'no-real-run';
       if (result === 'unavailable') bucket.unavailable++;
       else if (result === 'no-real-run') bucket.noRealRun++;
-      else if (scenarioState(tracked.states.get(scenario.id)) !== 'implemented') bucket.other++;
+      else if (scenarioState(tracked.states.get(scenario.id)) !== 'done') bucket.other++;
       else if (result === 'passed') bucket.passed++;
       else if (result === 'failed') bucket.failed++;
       else bucket.other++;
@@ -244,11 +245,7 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
   for (const event of view.events) {
     if (event.type === 'gate-started' || event.type === 'gate-committing') activeStarts.set(event.data.gate, event);
     if (event.type === 'gate-attempted' || event.type === 'readiness-passed') activeStarts.delete(event.data.gate);
-    if (event.type === 'readiness-failed') {
-      if (event.data.gate !== undefined) { activeStarts.delete(event.data.gate); continue; }
-      const previous = [...activeStarts.values()].reverse().find(start => start.type === 'gate-started' && start.data.checkpoint === 'readiness');
-      if (previous?.type === 'gate-started') activeStarts.delete(previous.data.gate);
-    }
+    if (event.type === 'readiness-failed') activeStarts.delete(event.data.gate);
   }
   for (const event of activeStarts.values()) if (!settled.has(event.type === 'gate-started' || event.type === 'gate-committing' ? event.data.gate : '')) {
     if (event.type !== 'gate-started' && event.type !== 'gate-committing') continue;
@@ -256,7 +253,7 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
     const source = eventSource(view, event.sequence);
     add({ ...base(key('gate', event.data.gate), `${label(event.data.checkpoint)} gate ${event.data.gate}`, source),
       kind: 'gate', checkpoint: gateCheckpointSchema.parse(event.data.checkpoint),
-      verdict: null, audit: event.data.checkpoint === 'readiness' ? 'not-applicable' : 'not-started', repairRound: 0,
+      verdict: null, audit: 'not-started', repairRound: 0,
       commit: null, auditedCommit: null, active: true,
       subject: { workItem: null, iteration: null }, cause: null, evidencePresent: false });
   }
