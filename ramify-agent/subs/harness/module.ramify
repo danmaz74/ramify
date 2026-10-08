@@ -78,3 +78,6 @@ expose-src HarnessLineIdentities from "kpi/delivered.ts" to parent
 // Only the store contract and its signature companions cross this boundary.
 expose-src openSessionStore, LedgerSessionStoreOptions, LedgerSessionStore from "run/session-store.ts" to descendants
 expose-sub SessionStore, SessionStoreRecord, SessionStoreCommit, SessionStoreExpected, TranscriptPayloadId from agent to descendants
+
+// Fixed live qualification owns its runtime; root receives plain options/results.
+expose-src runPlan23LiveSession, Plan23LiveSessionOptions, Plan23LiveSessionResult from "qualification/live-session.ts" to parent
