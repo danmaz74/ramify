@@ -289,6 +289,10 @@
     "session-store-cache": [
       "subs/harness/src/run/session-store.ts",
       "subs/harness/src/tests/plan23-session-store-cache.test.ts"
+    ],
+    "cucumber-config-path": [
+      "subs/harness/src/work/focused-scenarios.ts",
+      "subs/harness/src/tests/plan23-focused-scenarios.test.ts"
     ]
   }
 }
