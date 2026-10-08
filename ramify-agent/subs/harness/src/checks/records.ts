@@ -241,8 +241,65 @@ export interface GateAuditRecord {
     readonly requestedMode: 'full' | 'ramify-partial';
     readonly resolution: 'requested' | 'defaulted';
   } | null;
-  /** The provider's composed verdict; null when the audit did not complete or was refused. */
+  /**
+   * The provider's composed verdict; null when the audit did not complete or
+   * was refused. A nested request's is the invocation's verdict over every
+   * project and its discovery, never the root's alone.
+   */
   readonly verdict: 'pass' | 'fail' | 'indeterminate' | null;
+  readonly detail: string;
+  /** Whether the request audited the tracked nested definitions too. */
+  readonly nested: boolean;
+  /** Every project of a nested request, the root first; null for a request of the root alone. */
+  readonly projects: readonly GateAuditProjectRecord[] | null;
+  /** What nested discovery skipped, with reasons, and what it could not decide; null for a request of the root alone. */
+  readonly discovery: {
+    readonly status: 'complete' | 'indeterminate';
+    readonly skipped: readonly {
+      readonly projectRoot: string;
+      readonly enclosingProject: string;
+      readonly reason: 'external' | 'output' | 'repository' | 'packages' | 'generated';
+      readonly directory: string;
+    }[];
+    readonly unavailable: readonly { readonly enclosingProject: string; readonly reason: string; readonly definitions: readonly string[] }[];
+  } | null;
+}
+
+/** A count of one kind over a project record's checks. */
+export interface GateAuditCountBucket {
+  readonly total: number;
+  readonly passed: number;
+  readonly failed: number;
+  readonly skipped: number;
+}
+
+/**
+ * One project of a nested audit: the provider's verdict and failures for
+ * it, whether this request ran it, reused an applicable earlier record or
+ * did not run it, and the record that answers it with its counts and
+ * duration. A project record's `refused` status is a completed record that
+ * does not answer the request.
+ */
+export interface GateAuditProjectRecord {
+  readonly projectRoot: string;
+  readonly verdict: 'pass' | 'fail' | 'indeterminate';
+  readonly execution: 'ran' | 'reused' | 'not-run';
+  readonly status: 'completed' | 'failed' | 'cancelled' | 'refused';
+  readonly failures: readonly string[];
+  readonly requestId: string;
+  readonly auditedSourceCommit: string | null;
+  readonly requestedMode: 'full' | 'ramify-partial' | null;
+  readonly executedMode: 'full' | 'ramify-partial' | null;
+  readonly fallbackReason: string | null;
+  readonly reuse: GateAuditRecord['reuse'];
+  readonly evidence: GateEvidence | null;
+  readonly retrievalCommands: readonly string[];
+  readonly durationSeconds: number | null;
+  readonly counts: {
+    readonly checks: GateAuditCountBucket;
+    readonly tests: GateAuditCountBucket | null;
+    readonly scenarios: GateAuditCountBucket | null;
+  } | null;
   readonly detail: string;
 }
 

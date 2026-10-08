@@ -149,7 +149,7 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
       lockAcquired: () => { releaseWait?.(); releaseWait = undefined; },
     });
   } catch (error) {
-    audit = { status: 'failed', requestId: `${request.runId}:${request.gateId}`, mode: 'full',
+    audit = { status: 'failed', requestId: `${request.runId}:${request.gateId}`, mode: 'full', nested: false, projects: null, discovery: null,
       requestedSourceCommit: request.head, auditedSourceCommit: null, reused: false, reuse: null,
       requestedMode: null, executedMode: null, fallbackReason: null,
       verdict: null, reportCommit: null, runRef: null, treeRef: null, definition: { path: config!.path, blob: config!.blob },
@@ -254,6 +254,7 @@ function configuredGate(request: ReadinessRequest, audit: ConfiguredFullAuditRes
       requestedMode: audit.requestedMode, executedMode: audit.executedMode, fallbackReason: audit.fallbackReason,
       reuse: audit.reuse === null ? null : { ...audit.reuse, ignoredChangedPaths: [...audit.reuse.ignoredChangedPaths] },
       verdict: audit.status === 'completed' ? audit.verdict : null, detail: audit.detail,
+      nested: false, projects: null, discovery: null,
     },
     guardedChanges: [], commands: [], verdict,
     cause: verdict === 'passed' ? null : audit.status === 'completed' ? 'check-failed' : 'infrastructure',

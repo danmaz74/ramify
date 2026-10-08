@@ -154,3 +154,27 @@ export function page(values: readonly TranscriptEntry[], extra: Partial<Transcri
 export function update(version: number, sessions: readonly RunSessionView[], session: string, values: readonly TranscriptEntry[], after: number): SessionUpdatesResponse {
   return sessionUpdatesResponseSchema.parse({ version, sessions, transcripts: [{ session, page: page(values, { cursor: values.at(-1)?.n ?? after }) }] });
 }
+
+/**
+ * A post-write check of inv-0002 after call-2, as iteration 4's hook records
+ * it: the project's verdict passed, while each named path keeps its own
+ * disposition, two of them in declared trees Ramify does not analyze.
+ */
+export function postWriteCheckEntry(n: number): TranscriptEntry {
+  return transcriptEntrySchema.parse({
+    n, at: at(8), type: 'harness', invocation: 'inv-0002', decision: {
+      kind: 'post-write-check', callId: 'call-2', atCompletion: false, text: inline('Ramify checked src/app.ts; docs/guide.md and fixture/src/f.ts are not analyzed.'),
+      checks: [{
+        paths: ['src/app.ts', 'docs/guide.md', 'fixture/src/f.ts'], mode: 'changed', outcome: 'passed', reason: null, newFindings: 0, log: null,
+        provider: { schema: 'ramify.check/1', revision: null },
+        dispositions: [
+          { path: 'src/app.ts', disposition: 'checked', reason: 'content', module: 'shop', exclusion: null, sha256: 'c'.repeat(64) },
+          { path: 'docs/guide.md', disposition: 'not-analyzed', reason: 'owned-unwired', module: 'shop',
+            exclusion: { kind: 'owned-unwired', directory: 'docs', owner: 'shop' }, sha256: null },
+          { path: 'fixture/src/f.ts', disposition: 'not-analyzed', reason: 'owned-nested-project', module: 'shop',
+            exclusion: { kind: 'owned-nested-project', directory: 'fixture', owner: 'shop' }, sha256: null },
+        ],
+      }],
+    },
+  });
+}

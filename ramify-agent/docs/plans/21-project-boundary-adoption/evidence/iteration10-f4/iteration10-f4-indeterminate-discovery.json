@@ -1,0 +1,90 @@
+{
+  "schema": "plan21.iteration10.f4-indeterminate/1",
+  "commit": "0860213e69fe1b043b23cd367d01683d809bbf6b",
+  "gate": {
+    "verdict": "not-verified",
+    "cause": "infrastructure",
+    "audited": "0860213e69fe1b043b23cd367d01683d809bbf6b",
+    "evidence": {
+      "reportCommit": "bb4bfba56d9ce96e6192e036f1b1bd1be8332bea",
+      "runRef": "refs/audited/runs/2026-10-08T05-20-09Z-0860213e6",
+      "treeRef": "refs/audited/by-tree/adb4b2e100c631f83125ef245f3e3c66a260cd9c"
+    },
+    "audit": {
+      "requestId": "run-configured-witness:ga-0001",
+      "mode": "full",
+      "nested": true,
+      "status": "completed",
+      "definition": {
+        "path": "ramify-audit.json",
+        "blob": "fa6a480a55dc835941bac6cba35402d30e30ad86"
+      },
+      "requestedSourceCommit": "0860213e69fe1b043b23cd367d01683d809bbf6b",
+      "auditedSourceCommit": "0860213e69fe1b043b23cd367d01683d809bbf6b",
+      "requestedMode": "full",
+      "executedMode": "full",
+      "fallbackReason": null,
+      "reuse": null,
+      "verdict": "indeterminate",
+      "detail": "invocation indeterminate over 1 project; discovery indeterminate beneath .",
+      "projects": [
+        {
+          "projectRoot": ".",
+          "verdict": "pass",
+          "execution": "ran",
+          "status": "completed",
+          "failures": [],
+          "requestId": "run-configured-witness:ga-0001",
+          "auditedSourceCommit": "0860213e69fe1b043b23cd367d01683d809bbf6b",
+          "requestedMode": "full",
+          "executedMode": "full",
+          "fallbackReason": null,
+          "reuse": null,
+          "evidence": {
+            "reportCommit": "bb4bfba56d9ce96e6192e036f1b1bd1be8332bea",
+            "runRef": "refs/audited/runs/2026-10-08T05-20-09Z-0860213e6",
+            "treeRef": "refs/audited/by-tree/adb4b2e100c631f83125ef245f3e3c66a260cd9c"
+          },
+          "retrievalCommands": [
+            "git notes --ref=audit show 0860213e69fe1b043b23cd367d01683d809bbf6b",
+            "git show refs/audited/runs/2026-10-08T05-20-09Z-0860213e6:reports/audit/summary.json"
+          ],
+          "durationSeconds": 0.078,
+          "counts": {
+            "checks": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "skipped": 0
+            },
+            "tests": null,
+            "scenarios": null
+          },
+          "detail": "composed pass"
+        }
+      ],
+      "discovery": {
+        "status": "indeterminate",
+        "skipped": [],
+        "unavailable": [
+          {
+            "enclosingProject": ".",
+            "reason": "ownership-unavailable: invalid-project: ramify affected exited 1: Invalid module boundary: undeclared-project-boundary: a directory with a package manifest must be a module's own directory or lie in a declared nested tree; declare owned-nested-project \"engine\" or external \"engine\" in its nearest enclosing module description",
+            "definitions": [
+              "engine",
+              "engine/tools",
+              "vendor/lib"
+            ]
+          }
+        ]
+      }
+    },
+    "invocation": "indeterminate"
+  },
+  "executions": {
+    "root": 1,
+    "engine": 0,
+    "engine/tools": 0,
+    "vendor/lib": 0
+  }
+}

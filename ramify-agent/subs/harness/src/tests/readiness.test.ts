@@ -40,7 +40,7 @@ function configuration(head: string, options: Partial<CommittedAuditConfiguratio
 /** A scripted provider answer to one readiness request: a completed full pass unless `answer` says otherwise. */
 function resultOf(input: ConfiguredAuditInput, answer: Partial<ConfiguredFullAuditResult> = {}): ConfiguredFullAuditResult {
   return {
-    status: 'completed', requestId: `${input.runId}:${input.attemptId}`, mode: input.mode,
+    status: 'completed', requestId: `${input.runId}:${input.attemptId}`, mode: input.mode, nested: false, projects: null, discovery: null,
     requestedSourceCommit: input.sourceCommit, auditedSourceCommit: input.sourceCommit, reused: false, reuse: null,
     requestedMode: 'full', executedMode: 'full', fallbackReason: null, verdict: 'pass',
     reportCommit: 'report', runRef: 'ref', treeRef: 'tree',
@@ -128,7 +128,8 @@ describe('declared preparation and configured full readiness', () => {
     const output = join(fixture.root, deep, '.cache/generated');
     const evidenceDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-native-readiness-'));
     cleanups.push(() => rm(evidenceDirectory, { recursive: true, force: true }));
-    const ownership = { async recordIntendedWorkspace() {}, async recoverAbandonedWorkspaces() {}, async recordWorkspaceCleaned() {} };
+    const ownership = { async recordIntendedWorkspace() {}, async recoverAbandonedWorkspaces() {}, async recordWorkspaceCleaned() {},
+      async recordAuditInvocation() {}, async auditInvocation() { return null; } };
     const configured = createConfiguredAudit({ workspaceOwnership: ownership,
       testLock: { lockPath: join(evidenceDirectory, 'machine-test.lock') } });
     const captured = await configured.read(fixture.root, fixture.head);
@@ -180,6 +181,7 @@ describe('declared preparation and configured full readiness', () => {
       async recordIntendedWorkspace(workspace) { intended.push(workspace.worktreePath); },
       async recoverAbandonedWorkspaces() {},
       async recordWorkspaceCleaned(workspace) { cleaned.push(workspace.worktreePath); },
+      async recordAuditInvocation() {}, async auditInvocation() { return null; },
     }, testLock: { lockPath: join(evidenceDirectory, 'machine-test.lock') } });
     const captured = await configured.read(fixture.root, fixture.head);
     const controller = new AbortController();
@@ -213,7 +215,8 @@ describe('declared preparation and configured full readiness', () => {
     });
     const evidenceDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-config-successor-'));
     cleanups.push(() => rm(evidenceDirectory, { recursive: true, force: true }));
-    const ownership = { async recordIntendedWorkspace() {}, async recoverAbandonedWorkspaces() {}, async recordWorkspaceCleaned() {} };
+    const ownership = { async recordIntendedWorkspace() {}, async recoverAbandonedWorkspaces() {}, async recordWorkspaceCleaned() {},
+      async recordAuditInvocation() {}, async auditInvocation() { return null; } };
     const configured = createConfiguredAudit({ workspaceOwnership: ownership,
       testLock: { lockPath: join(evidenceDirectory, 'machine-test.lock') } });
     const captured = await configured.read(fixture.root, fixture.head);

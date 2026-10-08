@@ -1127,8 +1127,15 @@ pi actually made and what the snapshot tools answered.
   of the integration scenario reaches the repair round as the raw failure
   with every result; no composition diagnosis is generated.
 - **The work-item and final gates.** The project's committed audit of the
-  candidate commit: its default mode at `work-item`, a full audit at
-  `final`. A
+  candidate commit: its default mode at `work-item`, a full nested audit at
+  `final`. The final attempt keeps every project's verdict, execution,
+  failures, counts, duration and record, and every definition discovery
+  skipped with its reason; its verdict is the invocation's, so a passing
+  root never hides a nested failure, and an unrun project or indeterminate
+  discovery leaves the gate not verified. Merge readiness requires that the
+  final gate's audit was a completed full nested request that executed full
+  with every project passing and discovery complete; a composed failure is
+  `gate-failed`, and any lesser answer leaves readiness `unavailable`. A
   completion request applies its own reports first. One that leaves a
   registered obligation of its architect not reported `done` (a scenario of
   its entry, an integration item's scenario or a test it registered) is a
@@ -1155,9 +1162,11 @@ pi actually made and what the snapshot tools answered.
   has no completion is performed again under its key, an invocation whose
   start has no end is closed as `failed` with `session-lost`, and the run is
   marked interrupted. None of it calls an agent and none of it makes a
-  duplicate. The tree is outside every transaction and is never restored: an
-  engineer interrupted mid-edit leaves a dirty tree, and `git diff` shows the
-  work that is not yet accepted.
+  duplicate. A gate whose audit completed is answered from the provider's
+  published records, a nested one through its recorded invocation receipt,
+  and nothing runs again. The tree is outside every transaction and is never
+  restored: an engineer interrupted mid-edit leaves a dirty tree, and
+  `git diff` shows the work that is not yet accepted.
 - **Measurement.** The baseline `B` is frozen from the run's first snapshot,
   before `job.json` is written, because `job.json` names it. Every invocation
   records the snapshot it was measured against and the components of its own
@@ -1216,6 +1225,19 @@ executes nothing, and a changed ignore list that refuses the active run;
 a failing configured command, a failing harness rule, a setup command that
 fails or does not finish, cancellation and the gate's own bound; and a
 standalone session's in-place diagnosis, which publishes nothing.
+
+`project-boundary-audit.integration.test.ts` asks the final gate's full
+nested audit of a Ramify root with an owned nested project, its own nested
+grandchild and an external tree: every eligible project audited under its
+own definition, the external definition skipped with its reason, a failing
+grandchild failing the gate under a passing root, a documentation change of
+the nested project reusing its full evidence, and indeterminate discovery
+leaving the gate not verified. It recovers a completed invocation from its
+receipt, and one without a receipt from the provider's published records,
+running nothing again, and settles a cancelled nested project's process and
+workspace before a replacement runs only that project.
+`audit-workspace-recovery.test.ts` restarts the audit process after a
+nested invocation completed, with and without its receipt.
 
 `gate-not-verified.test.ts` and `tree-identity.test.ts` cover the check
 engine on commands of their own: every reason a check can record for not

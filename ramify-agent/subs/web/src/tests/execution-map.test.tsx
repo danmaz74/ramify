@@ -494,3 +494,36 @@ describe('the initial view', () => {
     } finally { restore(); }
   });
 });
+
+test('PB3-E07: a final gate shows its invocation verdict as indeterminate, and its detail each nested project\'s verdict, execution and record, and each skipped definition', async () => {
+  const final = { ...readiness, key: 'gate:ga-0009', label: 'Final gate ga-0009', checkpoint: 'final' as const, verdict: 'not-verified' as const,
+    audit: 'indeterminate' as const, active: false, cause: 'infrastructure', commit: 'c'.repeat(40), auditedCommit: 'c'.repeat(40), evidencePresent: true };
+  const project = (projectRoot: string, verdict: 'pass' | 'fail' | 'indeterminate', execution: 'ran' | 'reused' | 'not-run', report: string | null, failures: string[] = []) => ({
+    projectRoot, verdict, execution, failures, status: report === null ? 'cancelled' : 'completed',
+    evidence: report === null ? null : { reportCommit: report.repeat(40), runRef: `refs/audited/runs/${projectRoot}`, treeRef: 'refs/audited/by-tree/t' },
+  });
+  const nested = {
+    commit: final.commit, audited: final.auditedCommit, evidence: { reportCommit: 'a'.repeat(40), runRef: 'refs/audited/runs/root', treeRef: 'refs/audited/by-tree/t' },
+    commands: [],
+    audit: {
+      nested: true, verdict: 'indeterminate',
+      projects: [project('.', 'pass', 'reused', 'a'), project('engine', 'fail', 'ran', 'b', ['engine-check: FAIL']), project('engine/tools', 'indeterminate', 'not-run', null)],
+      discovery: { status: 'complete', skipped: [{ projectRoot: 'vendor/lib', enclosingProject: '.', reason: 'external', directory: 'vendor' }], unavailable: [] },
+    },
+  };
+  const c = { ...client(), getExecutionMap: async () => ({ ...map, nodes: [...map.nodes, final] }), getGate: async () => nested } as unknown as ProtocolClient;
+  render(<ExecutionMapArea client={c} planId="nested-provider-map" runId="run-scripted-map" version={42} events={[]} onOpenGate={vi.fn()} />);
+  const canvas = await screen.findByLabelText('Zoomable execution canvas');
+  const card = within(canvas).getByRole('button', { name: /^Final gate ga-0009, gate/ });
+  expect(card.textContent).toContain('Audit indeterminate');
+  expect(card.textContent).not.toContain('Audit failed');
+  fireEvent.click(card);
+  const projects = await screen.findByRole('list', { name: 'Audited projects' });
+  expect(within(projects).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+    `.: pass, reused; report ${'a'.repeat(12)}`,
+    `engine: fail, ran; engine-check: FAIL; report ${'b'.repeat(12)}`,
+    'engine/tools: indeterminate, not-run; no published record',
+  ]);
+  expect(screen.getByText(/Invocation indeterminate over 3 projects; discovery complete/)).toBeTruthy();
+  expect(within(screen.getByRole('list', { name: 'Skipped projects' })).getByRole('listitem').textContent).toBe('Not audited: vendor/lib (external vendor)');
+});

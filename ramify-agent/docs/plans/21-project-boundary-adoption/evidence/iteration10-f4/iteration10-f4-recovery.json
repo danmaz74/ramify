@@ -1,0 +1,243 @@
+{
+  "schema": "plan21.iteration10.f4-recovery/1",
+  "commit": "896b3c045ca63a147d6a1bc3ed21495fa8d8f7c3",
+  "receipt": {
+    "schema": "ramify-agent.audit-invocation/1",
+    "runId": "run-f4",
+    "attemptId": "ga-0001",
+    "requestId": "run-f4:ga-0001",
+    "projectRoot": ".",
+    "sourceCommit": "896b3c045ca63a147d6a1bc3ed21495fa8d8f7c3",
+    "projects": [
+      {
+        "projectRoot": ".",
+        "verdict": "pass",
+        "execution": "ran",
+        "failures": [],
+        "requestId": "run-f4:ga-0001",
+        "runId": "b66908cb-1e56-4ae5-9241-9fd5c63b2def",
+        "record": {
+          "requestId": "run-f4:ga-0001",
+          "sourceCommit": "896b3c045ca63a147d6a1bc3ed21495fa8d8f7c3",
+          "reportCommit": "eec6ca94f2d018b1d27da141676de26be271ce16",
+          "runRef": "refs/audited/runs/2026-10-08T05-20-10Z-896b3c045",
+          "treeRef": "refs/audited/by-tree/aa5516ee114bc7e1df8cf3dde4e4716b2e62fc57"
+        },
+        "reused": null,
+        "unpublished": null
+      },
+      {
+        "projectRoot": "engine",
+        "verdict": "pass",
+        "execution": "ran",
+        "failures": [],
+        "requestId": "20587fb0-80c7-4f53-9472-edc35c9a7d1f",
+        "runId": "22e70f63-e46e-496b-a028-2e909521a8fb",
+        "record": {
+          "requestId": "20587fb0-80c7-4f53-9472-edc35c9a7d1f",
+          "sourceCommit": "896b3c045ca63a147d6a1bc3ed21495fa8d8f7c3",
+          "reportCommit": "0c27e82774fe34465c9f088eaa6645d1c0544f0a",
+          "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-11Z-896b3c045",
+          "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/aa5516ee114bc7e1df8cf3dde4e4716b2e62fc57"
+        },
+        "reused": null,
+        "unpublished": null
+      },
+      {
+        "projectRoot": "engine/tools",
+        "verdict": "fail",
+        "execution": "ran",
+        "failures": [
+          "engine-tools-check: engine-tools: FAIL"
+        ],
+        "requestId": "f00048b8-3796-4495-a700-2c9a9c1aa1f1",
+        "runId": "4a95e2fe-ef64-41bc-b922-a3e4b7f423b6",
+        "record": {
+          "requestId": "f00048b8-3796-4495-a700-2c9a9c1aa1f1",
+          "sourceCommit": "896b3c045ca63a147d6a1bc3ed21495fa8d8f7c3",
+          "reportCommit": "80393e81902ff4bdb9efa648b4d55e6a4ddff264",
+          "runRef": "refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-11Z-896b3c045",
+          "treeRef": "refs/audited/projects/tools-ae58fc96b90f/by-tree/aa5516ee114bc7e1df8cf3dde4e4716b2e62fc57"
+        },
+        "reused": null,
+        "unpublished": null
+      }
+    ],
+    "discovery": {
+      "status": "complete",
+      "skipped": [
+        {
+          "projectRoot": "vendor/lib",
+          "enclosingProject": ".",
+          "reason": "external",
+          "directory": "vendor"
+        }
+      ],
+      "unavailable": []
+    },
+    "invocationVerdict": "fail"
+  },
+  "first": [
+    {
+      "projectRoot": ".",
+      "verdict": "pass",
+      "execution": "ran",
+      "failures": [],
+      "reportCommit": "eec6ca94f2d018b1d27da141676de26be271ce16",
+      "runRef": "refs/audited/runs/2026-10-08T05-20-10Z-896b3c045",
+      "treeRef": "refs/audited/by-tree/aa5516ee114bc7e1df8cf3dde4e4716b2e62fc57",
+      "counts": {
+        "checks": {
+          "total": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "tests": null,
+        "scenarios": null
+      }
+    },
+    {
+      "projectRoot": "engine",
+      "verdict": "pass",
+      "execution": "ran",
+      "failures": [],
+      "reportCommit": "0c27e82774fe34465c9f088eaa6645d1c0544f0a",
+      "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-11Z-896b3c045",
+      "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/aa5516ee114bc7e1df8cf3dde4e4716b2e62fc57",
+      "counts": {
+        "checks": {
+          "total": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "tests": null,
+        "scenarios": null
+      }
+    },
+    {
+      "projectRoot": "engine/tools",
+      "verdict": "fail",
+      "execution": "ran",
+      "failures": [
+        "engine-tools-check: engine-tools: FAIL"
+      ],
+      "reportCommit": "80393e81902ff4bdb9efa648b4d55e6a4ddff264",
+      "runRef": "refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-11Z-896b3c045",
+      "treeRef": "refs/audited/projects/tools-ae58fc96b90f/by-tree/aa5516ee114bc7e1df8cf3dde4e4716b2e62fc57",
+      "counts": {
+        "checks": {
+          "total": 1,
+          "passed": 0,
+          "failed": 1,
+          "skipped": 0
+        },
+        "tests": null,
+        "scenarios": null
+      }
+    }
+  ],
+  "recovered": [
+    {
+      "projectRoot": ".",
+      "verdict": "pass",
+      "execution": "ran",
+      "failures": [],
+      "reportCommit": "eec6ca94f2d018b1d27da141676de26be271ce16",
+      "runRef": "refs/audited/runs/2026-10-08T05-20-10Z-896b3c045",
+      "treeRef": "refs/audited/by-tree/aa5516ee114bc7e1df8cf3dde4e4716b2e62fc57",
+      "counts": {
+        "checks": {
+          "total": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "tests": null,
+        "scenarios": null
+      }
+    },
+    {
+      "projectRoot": "engine",
+      "verdict": "pass",
+      "execution": "ran",
+      "failures": [],
+      "reportCommit": "0c27e82774fe34465c9f088eaa6645d1c0544f0a",
+      "runRef": "refs/audited/projects/engine-ed9f6f250686/runs/2026-10-08T05-20-11Z-896b3c045",
+      "treeRef": "refs/audited/projects/engine-ed9f6f250686/by-tree/aa5516ee114bc7e1df8cf3dde4e4716b2e62fc57",
+      "counts": {
+        "checks": {
+          "total": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "tests": null,
+        "scenarios": null
+      }
+    },
+    {
+      "projectRoot": "engine/tools",
+      "verdict": "fail",
+      "execution": "ran",
+      "failures": [
+        "engine-tools-check: engine-tools: FAIL"
+      ],
+      "reportCommit": "80393e81902ff4bdb9efa648b4d55e6a4ddff264",
+      "runRef": "refs/audited/projects/tools-ae58fc96b90f/runs/2026-10-08T05-20-11Z-896b3c045",
+      "treeRef": "refs/audited/projects/tools-ae58fc96b90f/by-tree/aa5516ee114bc7e1df8cf3dde4e4716b2e62fc57",
+      "counts": {
+        "checks": {
+          "total": 1,
+          "passed": 0,
+          "failed": 1,
+          "skipped": 0
+        },
+        "tests": null,
+        "scenarios": null
+      }
+    }
+  ],
+  "reasked": [
+    {
+      "projectRoot": ".",
+      "execution": "reused",
+      "reportCommit": "eec6ca94f2d018b1d27da141676de26be271ce16",
+      "reuse": {
+        "auditedCommit": "896b3c045ca63a147d6a1bc3ed21495fa8d8f7c3",
+        "ignoredChangedPaths": [],
+        "requestedMode": "full",
+        "resolution": "requested"
+      }
+    },
+    {
+      "projectRoot": "engine",
+      "execution": "reused",
+      "reportCommit": "0c27e82774fe34465c9f088eaa6645d1c0544f0a",
+      "reuse": {
+        "auditedCommit": "896b3c045ca63a147d6a1bc3ed21495fa8d8f7c3",
+        "ignoredChangedPaths": [],
+        "requestedMode": "full",
+        "resolution": "requested"
+      }
+    },
+    {
+      "projectRoot": "engine/tools",
+      "execution": "reused",
+      "reportCommit": "80393e81902ff4bdb9efa648b4d55e6a4ddff264",
+      "reuse": {
+        "auditedCommit": "896b3c045ca63a147d6a1bc3ed21495fa8d8f7c3",
+        "ignoredChangedPaths": [],
+        "requestedMode": "full",
+        "resolution": "requested"
+      }
+    }
+  ],
+  "executions": {
+    "root": 1,
+    "engine": 1,
+    "engine/tools": 1,
+    "vendor/lib": 0
+  }
+}

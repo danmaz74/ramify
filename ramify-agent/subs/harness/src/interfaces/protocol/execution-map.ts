@@ -114,7 +114,7 @@ export const executionProviderStageSchema = z.enum([
   'not-started', 'working', 'conformed', 'access-established', 'unavailable',
 ]);
 export const executionAuditLifecycleSchema = z.enum([
-  'not-applicable', 'not-started', 'passed', 'failed', 'incomplete', 'unavailable',
+  'not-applicable', 'not-started', 'passed', 'failed', 'indeterminate', 'incomplete', 'unavailable',
 ]);
 export type ExecutionAuditLifecycle = z.infer<typeof executionAuditLifecycleSchema>;
 

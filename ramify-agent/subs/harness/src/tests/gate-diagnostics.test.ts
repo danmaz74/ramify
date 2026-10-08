@@ -74,7 +74,7 @@ function configuredAudit(overrides: Partial<GateAuditRecord> = {}): GateAuditRec
     definition: { path: 'ramify-audit.json', blob: 'definition-blob' },
     requestedSourceCommit: 'candidate', auditedSourceCommit: 'candidate',
     requestedMode: 'ramify-partial', executedMode: 'ramify-partial', fallbackReason: null,
-    reuse: null, verdict: 'pass', detail: 'composed pass', ...overrides,
+    reuse: null, verdict: 'pass', detail: 'composed pass', nested: false, projects: null, discovery: null, ...overrides,
   };
 }
 
@@ -202,6 +202,37 @@ describe('a Ramify check that failed at a gate', () => {
       '- audit `run-diagnostics:ga-0001`, the project\'s default audit of `candidate` under `ramify-audit.json`: requested ramify-partial, executed ramify-partial; composed verdict `pass`',
       '  - it reused the record of `audited`, which applies to this commit: its policy ignores `docs/notes.md`',
       '- `agent-tests`: passed; counts: {"passed":3}',
+    ]);
+  });
+
+  test('a nested final audit names each project\'s verdict, execution, counts and failures, and every skipped tree', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-cwd-'));
+    cleanups.push(() => rm(directory, { recursive: true, force: true }));
+    const base = await attempt([{ kind: 'type-check', command: prints('', 0, directory) }]);
+    const bucket = (total: number, failed: number) => ({ total, passed: total - failed, failed, skipped: 0 });
+    const project = { requestedMode: 'full' as const, executedMode: 'full' as const, fallbackReason: null, reuse: null, evidence: null,
+      status: 'completed' as const, detail: 'completed', auditedSourceCommit: 'candidate' };
+    const gate: GateAttempt = {
+      ...base, commands: [], verdict: 'failed', cause: 'check-failed',
+      audit: configuredAudit({ mode: 'full', nested: true, requestedMode: 'full', executedMode: 'full', verdict: 'fail', detail: 'invocation fail over 2 projects; failed: packages/engine',
+        projects: [
+          { ...project, projectRoot: '.', verdict: 'pass', execution: 'reused', failures: [], requestId: 'root-request',
+            retrievalCommands: ['git show root-report:report.json'], durationSeconds: 12, counts: { checks: bucket(2, 0), tests: bucket(40, 0), scenarios: null } },
+          { ...project, projectRoot: 'packages/engine', verdict: 'fail', execution: 'ran', failures: ['engine-tests failed'], requestId: 'engine-request',
+            retrievalCommands: ['git show engine-report:report.json'], durationSeconds: 3, counts: { checks: bucket(1, 1), tests: bucket(5, 1), scenarios: null } },
+        ],
+        discovery: { status: 'complete', unavailable: [],
+          skipped: [{ projectRoot: 'vendor/lib', enclosingProject: '.', reason: 'external', directory: 'vendor' }] } }),
+    };
+    const summary = (await gateDiagnostics(gate, 'engineer')).summary;
+    expect(summary).toEqual([
+      '- audit `run-diagnostics:ga-0001`, a full audit of `candidate` under `ramify-audit.json`: requested full, executed full; composed verdict `fail`, invocation fail over 2 projects; failed: packages/engine',
+      '- the nested request answered 2 projects:',
+      '  - `.`: `pass`, reused, executed full; checks 2/2 passed, tests 40/40 passed; 12s',
+      '  - `packages/engine`: `fail`, ran, executed full; checks 0/1 passed, 1 failed, tests 4/5 passed, 1 failed; 3s',
+      '    - engine-tests failed',
+      '    - retrieve: `git show engine-report:report.json`',
+      '- not audited: `vendor/lib` inside `.`, skipped as external (`vendor`)',
     ]);
   });
 

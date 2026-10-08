@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { z } from 'zod';
 import { childEnvironment } from '../../subs/evidence/src/run-command.js';
 import type {
+  AuditInvocationReceipt,
   AuditWorkspaceOwnershipRecorder,
   IntendedAuditWorkspace,
 } from '../../subs/audit/src/check-execution.js';
@@ -31,6 +32,44 @@ const workspaceSchema = z.object({
 }).strict();
 type WorkspaceRecord = z.infer<typeof workspaceSchema>;
 
+const verdict = z.enum(['pass', 'fail', 'indeterminate']);
+/** The receipt of one completed nested audit invocation: its projects' identities, discovery and verdict. */
+const invocationSchema = z.object({
+  schema: z.literal('ramify-agent.audit-invocation/1'),
+  runId: z.string().min(1),
+  attemptId: z.string().min(1),
+  requestId: z.string().min(1),
+  projectRoot: z.string().min(1),
+  sourceCommit: z.string().min(1),
+  projects: z.array(z.object({
+    projectRoot: z.string().min(1),
+    verdict,
+    execution: z.enum(['ran', 'reused', 'not-run']),
+    failures: z.array(z.string()),
+    requestId: z.string().min(1),
+    runId: z.string().min(1).nullable(),
+    record: z.object({
+      requestId: z.string().min(1), sourceCommit: z.string().min(1), reportCommit: z.string().min(1),
+      runRef: z.string().min(1), treeRef: z.string().min(1),
+    }).strict().nullable(),
+    reused: z.object({
+      sourceCommit: z.string().min(1), auditedCommit: z.string().min(1), ignoredChangedPaths: z.array(z.string()),
+      requestedMode: z.enum(['full', 'ramify-partial']), resolution: z.enum(['requested', 'defaulted']),
+    }).strict().nullable(),
+    unpublished: z.unknown(),
+  }).strict()).min(1),
+  discovery: z.object({
+    status: z.enum(['complete', 'indeterminate']),
+    skipped: z.array(z.object({
+      projectRoot: z.string().min(1), enclosingProject: z.string().min(1),
+      reason: z.enum(['external', 'output', 'repository', 'packages', 'generated']), directory: z.string().min(1),
+    }).strict()),
+    unavailable: z.array(z.object({ enclosingProject: z.string().min(1), reason: z.string(), definitions: z.array(z.string()) }).strict()),
+  }).strict(),
+  invocationVerdict: verdict,
+  recordedAt: z.iso.datetime(),
+}).strict();
+
 /** Harness-owned persistence and conservative cleanup for audit worktrees. */
 export function createAuditWorkspaceOwnership(projectRoot: string): AuditWorkspaceOwnershipRecorder {
   return {
@@ -45,6 +84,25 @@ export function createAuditWorkspaceOwnership(projectRoot: string): AuditWorkspa
       const current = await readRecord(path);
       if (current === null || !sameWorkspace(current, workspace)) return;
       await writeRecord(path, { ...current, state: 'cleaned', cleanedAt: new Date().toISOString() });
+    },
+
+    async recordAuditInvocation(receipt) {
+      const path = join(dirname(await recordPath(projectRoot, receipt.runId, receipt.attemptId)), 'audit-invocation.json');
+      await mkdir(dirname(path), { recursive: true });
+      await writeFileAtomic(path, `${JSON.stringify(invocationSchema.parse({ ...receipt, recordedAt: new Date().toISOString() }), null, 2)}\n`);
+    },
+
+    async auditInvocation(runId, attemptId) {
+      const path = join(dirname(await recordPath(projectRoot, runId, attemptId)), 'audit-invocation.json');
+      let text: string;
+      try {
+        text = await readFile(path, 'utf8');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      }
+      const { recordedAt: _recordedAt, ...receipt } = invocationSchema.parse(JSON.parse(text) as unknown);
+      return receipt as AuditInvocationReceipt;
     },
 
     async recoverAbandonedWorkspaces(repository) {

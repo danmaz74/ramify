@@ -32,12 +32,21 @@ afterEach(async () => {
   for (const path of cleanups.splice(0)) await rm(path, { recursive: true, force: true });
 });
 
-async function fixture() {
+async function fixture(options: { readonly nested?: boolean } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'ramify-agent-workspace-owner-'));
   cleanups.push(root);
-  await writeFile(join(root, 'module.ramify'), rootDescription('fixture'));
+  // A nested fixture's root is not a Ramify project, so discovery needs no
+  // ownership query (this fixture installs no `ramify`) and excludes nothing.
+  if (options.nested !== true) await writeFile(join(root, 'module.ramify'), rootDescription('fixture'));
   cleanups.push(`${root}.killed-audit.json`);
   await writeFile(join(root, 'ramify-audit.json'), auditDefinition([commandCheck('killable', [{ name: 'killable', cmd: 'node', args: ['-e', killableCheck(`${root}.killed-audit.json`)] }])]));
+  if (options.nested === true) {
+    // A nested project whose check counts its executions outside the repository.
+    cleanups.push(`${root}.nested-runs`);
+    await mkdir(join(root, 'nested'), { recursive: true });
+    await writeFile(join(root, 'nested', 'ramify-audit.json'), auditDefinition([commandCheck('nested', [{ name: 'nested', cmd: 'node',
+      args: ['-e', `require("fs").appendFileSync(${JSON.stringify(`${root}.nested-runs`)}, "ran\\n")`] }])], { packageDirectories: [] }));
+  }
   await mkdir(join(root, 'plans', 'plan', '.harness', 'jobs', '20260921T000000Z-aabbcc', 'gates', 'ga-0001'), { recursive: true });
   const commit = await initRepository(root);
   await mkdir(join(root, 'node_modules'), { recursive: true });
@@ -81,8 +90,8 @@ async function marker(pid: number): Promise<string> {
   return `linux:${boot.trim()}:${ticks}`;
 }
 
-function auditProcess(mode: 'after-creation' | 'during-execution' | 'pass', root: string, commit: string, signal: string): ChildProcessWithoutNullStreams {
-  return spawn(process.execPath, ['--import', 'tsx', killedAudit, mode, root, commit, signal], {
+function auditProcess(mode: 'after-creation' | 'during-execution' | 'pass', root: string, commit: string, signal: string, scope: 'root' | 'nested' = 'root'): ChildProcessWithoutNullStreams {
+  return spawn(process.execPath, ['--import', 'tsx', killedAudit, mode, root, commit, signal, scope], {
     cwd: process.cwd(),
     env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -220,4 +229,45 @@ describe('durable audit workspace ownership', () => {
       expect(list).toContain(unrelated);
     }, 45_000);
   }
+
+  test('a restarted nested audit retrieves its recorded root and nested records, and an unrecorded one is answered from published evidence; nothing runs again', async () => {
+    const f = await fixture({ nested: true });
+    const signal = join(await mkdtemp(join(tmpdir(), 'ramify-killed-audit-signal-')), 'running');
+    cleanups.push(resolve(signal, '..'));
+    const receiptPath = join(f.root, 'plans/plan/.harness/jobs/20260921T000000Z-aabbcc/gates/ga-0001/audit-invocation.json');
+    const nestedRuns = async () => (await readFile(`${f.root}.nested-runs`, 'utf8').catch(() => '')).split('\n').filter(Boolean).length;
+    type Answer = { status: string; verdict: string | null; detail: string; reportCommit: string | null;
+      discovery: unknown; projects: Array<{ projectRoot: string; verdict: string; execution: string; reportCommit: string | null; runRef: string | null }> | null };
+    const ask = async () => JSON.parse((await output(auditProcess('pass', f.root, f.commit, signal, 'nested'))).trim()) as Answer;
+
+    const first = await ask();
+    expect([first.status, first.verdict], first.detail).toEqual(['completed', 'pass']);
+    expect(first.projects?.map(project => [project.projectRoot, project.execution])).toEqual([['.', 'ran'], ['nested', 'ran']]);
+    expect(await nestedRuns()).toBe(1);
+    const receipt = JSON.parse(await readFile(receiptPath, 'utf8')) as { schema: string; requestId: string; projects: Array<{ projectRoot: string; record: { reportCommit: string } | null }> };
+    expect(receipt.schema).toBe('ramify-agent.audit-invocation/1');
+    expect(receipt.projects.map(project => [project.projectRoot, project.record?.reportCommit]))
+      .toEqual(first.projects!.map(project => [project.projectRoot, project.reportCommit]));
+
+    // Restart after the provider answered: the receipt's records, exactly.
+    const recovered = await ask();
+    expect(recovered).toEqual(first);
+    expect(await nestedRuns()).toBe(1);
+
+    // Interrupted between the provider's answer and the receipt: asked
+    // again, the provider answers each project from its published record.
+    await (await import('node:fs/promises')).rm(receiptPath);
+    const reasked = await ask();
+    expect(reasked.projects?.map(project => [project.projectRoot, project.execution, project.reportCommit]))
+      .toEqual(first.projects!.map(project => [project.projectRoot, 'reused', project.reportCommit]));
+    expect(reasked.verdict).toBe('pass');
+    expect(await nestedRuns()).toBe(1);
+    expect(await exists(receiptPath)).toBe(true);
+    const evidenceDirectory = process.env['PLAN21_ITERATION10_EVIDENCE'];
+    if (evidenceDirectory !== undefined) {
+      await writeFile(join(evidenceDirectory, 'iteration10-nested-restart.json'), `${JSON.stringify({
+        schema: 'plan21.iteration10.nested-restart/1', commit: f.commit, receipt, first, recovered, reasked, nestedExecutions: await nestedRuns(),
+      }, null, 2)}\n`);
+    }
+  }, 90_000);
 });

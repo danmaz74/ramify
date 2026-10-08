@@ -21,6 +21,33 @@ the project's own. The harness plans no command, walks no test file and adds
 no check: the provider owns discovery, selection by ownership, completeness,
 reuse and the verdict.
 
+The final gate's request is nested: the provider also audits every tracked
+nested definition beneath the project that an enclosing Ramify project does
+not exclude, each under its own definition, change set, reuse and evidence
+refs, in the same worktree. The result keeps every project's verdict,
+execution (`ran`, `reused` or `not-run`), failures, counts, duration, record
+identities and retrieval commands, and the discovery outcome with each
+skipped definition's reason and each enclosing project whose ownership was
+unavailable. Its verdict is the provider's invocation verdict, never the
+root's alone: a nested failure fails it, and an unrun project or
+indeterminate discovery leaves it indeterminate. A nested answer without its
+projects, discovery or verdict, without the root first, with a project
+twice, or with a nested record that does not answer the request (another
+project or commit, or a partial chain for a full request) is `refused`. A
+nested project's command is matched against that project's own committed
+definition, so its declared environment is preserved.
+
+A completed root-only request is recovered by its request identity and
+never run again. A nested invocation is recovered from the receipt the
+harness records as soon as the provider answers it
+(`ramify-agent.audit-invocation/1`, beside the attempt's workspace record):
+each project's exact record is found again by its request and source commit
+and checked against the receipt's report commit, run ref and verdict, and
+the receipt supplies the discovery outcome and invocation verdict, which no
+project record holds. Without a receipt (an invocation interrupted before it
+was recorded, or cancelled) the provider is asked again and answers every
+project it already published from that evidence, running only the rest.
+
 `sameAuditPolicy` compares two reads of the definition by everything except
 the commit they were read at. A run captures the policy at `start-run`, and a
 commit whose definition no longer has it is refused: the run never audits
@@ -85,6 +112,7 @@ a failure, execution leases and cancellation, cleanup after a killed audit,
 same-second replacement, the default mode, reuse of already audited code
 unless forced, and evidence recorded under another ignore list never reused.
 `src/tests/completed-audit.test.ts` covers which completed results answer a
-gate and which are refused, and the captured audit policy.
+gate and which are refused, nested invocations included, and the captured
+audit policy.
 `src/tests/workspace-preparation.test.ts` reads committed definitions without
 executing anything, and `src/tests/test-lock.test.ts` covers the test lock.

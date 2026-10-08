@@ -1046,11 +1046,57 @@ const tailBytes = (tail: string): number => new TextEncoder().encode(tail).byteL
 /** A failing scenario's first failing step and its message. */
 const scenarioFailureView = z.object({ step: z.string(), message: z.string() }).strict();
 
+const auditCountView = z.object({ total: count, passed: count, failed: count, skipped: count }).strict();
+const auditReuseView = z.object({
+  auditedCommit: text,
+  ignoredChangedPaths: z.array(z.string()),
+  requestedMode: z.enum(['full', 'ramify-partial']),
+  resolution: z.enum(['requested', 'defaulted']),
+}).strict();
+
+/**
+ * One project of a nested audit, as the harness recorded the provider's
+ * answer: its verdict and failures, whether the request ran it, reused an
+ * applicable earlier record or did not run it, and the record that answers
+ * it, with that record's counts, duration and retrieval commands.
+ */
+export const gateAuditProjectViewSchema = z.object({
+  projectRoot: text,
+  verdict: z.enum(['pass', 'fail', 'indeterminate']),
+  execution: z.enum(['ran', 'reused', 'not-run']),
+  status: z.enum(['completed', 'failed', 'cancelled', 'refused']),
+  failures: z.array(z.string()),
+  requestId: text,
+  auditedSourceCommit: text.nullable(),
+  requestedMode: z.enum(['full', 'ramify-partial']).nullable(),
+  executedMode: z.enum(['full', 'ramify-partial']).nullable(),
+  fallbackReason: z.string().nullable(),
+  reuse: auditReuseView.nullable(),
+  evidence: z.object({ runRef: text, reportCommit: text, treeRef: text }).strict().nullable(),
+  retrievalCommands: z.array(z.string()),
+  durationSeconds: z.number().nonnegative().nullable(),
+  counts: z.object({ checks: auditCountView, tests: auditCountView.nullable(), scenarios: auditCountView.nullable() }).strict().nullable(),
+  detail: z.string(),
+}).strict();
+export type GateAuditProjectView = z.infer<typeof gateAuditProjectViewSchema>;
+
+/** What a nested audit's discovery skipped, each with its reason, and what it could not decide. */
+export const gateAuditDiscoveryViewSchema = z.object({
+  status: z.enum(['complete', 'indeterminate']),
+  skipped: z.array(z.object({
+    projectRoot: text, enclosingProject: text,
+    reason: z.enum(['external', 'output', 'repository', 'packages', 'generated']), directory: text,
+  }).strict()),
+  unavailable: z.array(z.object({ enclosingProject: text, reason: z.string(), definitions: z.array(z.string()) }).strict()),
+}).strict();
+export type GateAuditDiscoveryView = z.infer<typeof gateAuditDiscoveryViewSchema>;
+
 /**
  * A committing gate's configured audit: what the gate requested of the
  * project's committed definition and what answered it, the source commit it
  * asked about and the one whose record answered, which differ only when an
- * applicable record was reused.
+ * applicable record was reused. A nested request's verdict is the
+ * invocation's, over every project and its discovery.
  */
 export const gateAuditViewSchema = z.object({
   requestId: text,
@@ -1070,6 +1116,11 @@ export const gateAuditViewSchema = z.object({
   }).strict().nullable(),
   verdict: z.enum(['pass', 'fail', 'indeterminate']).nullable(),
   detail: z.string(),
+  /** Whether the request audited the tracked nested definitions too. */
+  nested: z.boolean(),
+  /** Every project of a nested request, the root first; null for a request of the root alone. */
+  projects: z.array(gateAuditProjectViewSchema).nullable(),
+  discovery: gateAuditDiscoveryViewSchema.nullable(),
 }).strict();
 export type GateAuditView = z.infer<typeof gateAuditViewSchema>;
 

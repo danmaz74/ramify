@@ -579,7 +579,7 @@ describe('the message the harness writes', () => {
         requestId: '20260920T101500Z-3f9a1c:ga-0012', mode: 'project-default', status: 'completed',
         definition: { path: 'ramify-audit.json', blob: 'b'.repeat(40) },
         requestedSourceCommit: 'abc', auditedSourceCommit: 'abc', requestedMode: 'ramify-partial', executedMode: 'ramify-partial',
-        fallbackReason: null, reuse: null, verdict: 'pass', detail: 'composed pass',
+        fallbackReason: null, reuse: null, verdict: 'pass', detail: 'composed pass', nested: false, projects: null, discovery: null,
       },
       verdict: 'passed', cause: null, next: 'accept',
     };

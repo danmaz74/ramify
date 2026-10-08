@@ -12,7 +12,8 @@ import { executionCapabilityDetailSchema, executionMapPageSchema, executionScena
 const here = dirname(fileURLToPath(import.meta.url));
 const agent = resolve(here, '../..');
 const fixtureRoot = resolve(agent, 'subs/web/src/tests/browser-acceptance');
-const artifacts = resolve(agent, 'docs/plans/11-plan-execution-map/evidence');
+// BROWSER_ACCEPTANCE_ARTIFACTS keeps a later plan's rerun from overwriting Plan 11's recorded evidence.
+const artifacts = resolve(agent, process.env.BROWSER_ACCEPTANCE_ARTIFACTS ?? 'docs/plans/11-plan-execution-map/evidence');
 const checks: string[] = [];
 const check = (name: string, condition: unknown) => { assert.ok(condition, name); checks.push(name); };
 const browserPath = process.env.CHROMIUM_PATH ?? '/usr/bin/chromium';
@@ -244,14 +245,20 @@ try {
   await durablePage.goto(`http://127.0.0.1:${address.port}`, { waitUntil: 'networkidle' });
   const durableCanvas = durablePage.getByLabel('Zoomable execution canvas');
   await durableCanvas.waitFor();
+  // Gates delivered through the configured audit retain their outcomes, so
+  // the scripted run no longer carries Plan 11's many historical audit gaps.
+  // Its one remaining gap is the readiness gate's publication without a
+  // retained outcome (recorded as an open item in Plan 21 iteration 10); the
+  // many-gap collapse is witnessed by execution-map.test.tsx's fourteen gaps.
   const durableGaps = durablePage.locator('.execution-coverage-gaps');
   await durableGaps.waitFor();
-  check('historical audit gaps are counted and collapsed without losing detail',
+  const shownGaps = await durableGaps.locator('li').allTextContents();
+  check('the run\'s remaining audit gap is counted and collapsed without losing detail',
+    shownGaps.length === 1 && /^Audit result for gate ga-0001 is unavailable/u.test(shownGaps[0] ?? '') &&
     !(await durableGaps.evaluate(el => (el as HTMLDetailsElement).open)) &&
-    (await durablePage.locator('.execution-area > p.muted').textContent())?.match(/Coverage gaps: \d+\./) &&
-    await durableGaps.locator('li').count() > 5);
+    /Coverage gaps: 1\./u.test(await durablePage.locator('.execution-area > p.muted').first().textContent() ?? ''));
   await durableGaps.locator('summary').click();
-  check('the complete historical gap list expands', await durableGaps.evaluate(el => (el as HTMLDetailsElement).open));
+  check('the gap list expands', await durableGaps.evaluate(el => (el as HTMLDetailsElement).open));
   await durableGaps.locator('summary').click();
   check('the same disk-backed run renders in Chromium through its bounded pages',
     await durableCanvas.locator('.execution-capability').count() >= 3 &&

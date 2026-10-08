@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Assessment, Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
-import { projectMergeReadiness, type MergeReadinessInput, type ReadinessDeviation } from '../run/merge-readiness.js';
+import { projectMergeReadiness, type FinalAuditFacts, type MergeReadinessInput, type ReadinessDeviation } from '../run/merge-readiness.js';
 
 const tree = 'a'.repeat(40);
 const otherTree = 'b'.repeat(40);
@@ -31,10 +31,18 @@ function workItemDeviation(decision: ReadinessDeviation['decision'] = null): Rea
   };
 }
 
+const fullNestedPass: FinalAuditFacts = {
+  mode: 'full', nested: true, status: 'completed', executedMode: 'full', verdict: 'pass', discovery: 'complete',
+  projects: [
+    { projectRoot: '.', verdict: 'pass', status: 'completed', executedMode: 'full' },
+    { projectRoot: 'packages/engine', verdict: 'pass', status: 'completed', executedMode: 'full' },
+  ],
+};
+
 function input(overrides: Partial<MergeReadinessInput> = {}): MergeReadinessInput {
   return {
     completed: true, candidate,
-    finalGate: { id: 'gate-1', tree, assessment: 'nfa-001', passed: true },
+    finalGate: { id: 'gate-1', tree, assessment: 'nfa-001', passed: true, audit: fullNestedPass },
     nfrIds: ['nfr-001'], assessment: assessment([assessed('nfr-001', 'satisfied')]), deviations: [],
     ...overrides,
   };
@@ -79,11 +87,48 @@ describe('projectMergeReadiness', () => {
     expect(projectMergeReadiness({ ...base, completed: false, finalGate: { ...base.finalGate!, passed: false } }).status).toBe('gate-failed');
   });
 
+  // PB3-E08: readiness rests on the composed full nested answer, never on a
+  // partial, root-only or summary-only pass.
+  it('accepts only a completed full nested audit whose every project passed', () => {
+    const gate = (audit: FinalAuditFacts | null) => input({ finalGate: { id: 'gate-1', tree, assessment: 'nfa-001', passed: true, audit } });
+    const [root, nested] = fullNestedPass.projects!;
+    expect(projectMergeReadiness(gate(fullNestedPass)).status).toBe('ready');
+    const unavailableCases: (FinalAuditFacts | null)[] = [
+      null,
+      { ...fullNestedPass, mode: 'project-default' },
+      { ...fullNestedPass, nested: false },
+      { ...fullNestedPass, executedMode: 'ramify-partial' },
+      { ...fullNestedPass, status: 'refused', verdict: null },
+      { ...fullNestedPass, verdict: 'indeterminate' },
+      { ...fullNestedPass, discovery: 'indeterminate' },
+      { ...fullNestedPass, discovery: null },
+      { ...fullNestedPass, projects: null },
+      { ...fullNestedPass, projects: [] },
+      { ...fullNestedPass, projects: [root!, { ...nested!, verdict: 'indeterminate' }] },
+      { ...fullNestedPass, projects: [root!, { ...nested!, executedMode: 'ramify-partial' }] },
+    ];
+    for (const audit of unavailableCases) {
+      const readiness = projectMergeReadiness(gate(audit));
+      expect(readiness.status, JSON.stringify(audit)).toBe('unavailable');
+      expect(readiness.reason).toMatch(/no applicable full nested audit pass/);
+    }
+  });
+
+  it('a composed failure fails the final gate even when its run-local verdict passed', () => {
+    const [root, nested] = fullNestedPass.projects!;
+    const composedFail = { ...fullNestedPass, verdict: 'fail' as const, projects: [root!, { ...nested!, verdict: 'fail' as const }] };
+    const readiness = projectMergeReadiness(input({ finalGate: { id: 'gate-1', tree, assessment: 'nfa-001', passed: true, audit: composedFail } }));
+    expect(readiness).toMatchObject({ status: 'gate-failed', finalGate: 'gate-1' });
+    expect(readiness.reason).toContain('packages/engine');
+    expect(projectMergeReadiness(input({ finalGate: { id: 'gate-1', tree, assessment: 'nfa-001', passed: true,
+      audit: { ...fullNestedPass, verdict: 'fail' } } })).status).toBe('gate-failed');
+  });
+
   it('requires a completed run and exact assessment and candidate bindings', () => {
     expect(projectMergeReadiness(input({ completed: false })).status).toBe('unavailable');
     expect(projectMergeReadiness(input({ finalGate: null })).status).toBe('unavailable');
-    expect(projectMergeReadiness(input({ finalGate: { id: 'gate-1', tree, assessment: 'nfa-002', passed: true } })).status).toBe('unavailable');
-    expect(projectMergeReadiness(input({ finalGate: { id: 'gate-1', tree: otherTree, assessment: 'nfa-001', passed: true } })).status).toBe('unavailable');
+    expect(projectMergeReadiness(input({ finalGate: { id: 'gate-1', tree, assessment: 'nfa-002', passed: true, audit: fullNestedPass } })).status).toBe('unavailable');
+    expect(projectMergeReadiness(input({ finalGate: { id: 'gate-1', tree: otherTree, assessment: 'nfa-001', passed: true, audit: fullNestedPass } })).status).toBe('unavailable');
     expect(projectMergeReadiness(input({ candidate: { ...candidate, tree: otherTree } })).status).toBe('unavailable');
   });
 

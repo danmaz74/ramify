@@ -86,7 +86,7 @@ export async function prepareCheckpoint(request: CheckpointRequest): Promise<Pre
   return prepareGate(request.checkpoint, {
     ...gateRequest(request),
     checks: [],
-    audit: { mode: policy.audit, timeoutMs: request.policy.limits.runAbsoluteMs },
+    audit: { mode: policy.audit, ...(policy.nested ? { nested: true } : {}), timeoutMs: request.policy.limits.runAbsoluteMs },
   });
 }
 

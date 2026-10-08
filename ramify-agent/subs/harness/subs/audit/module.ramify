@@ -2,10 +2,14 @@ ramify 1
 module audit
 
 // The audit library and its evidence model stay behind this boundary. The
-// parent receives the committed configured audit, its harness result and the
-// durable workspace-ownership callback contract. No ramify-audit type crosses.
+// parent receives the committed configured audit, its harness result with
+// each nested project and the discovery outcome, and the durable
+// workspace-ownership callback contract with its nested invocation receipt.
+// No ramify-audit type crosses.
 expose-src AuditCheckExecutionOptions, AuditWorkspaceOwnershipRecorder, IntendedAuditWorkspace from "check-execution.ts" to parent
+expose-src AuditInvocationReceipt, AuditInvocationProject from "check-execution.ts" to parent
 expose-src createConfiguredAudit, ConfiguredAuditPort, ConfiguredAuditInput, ConfiguredAuditMode, ConfiguredAuditReuse from "check-execution.ts" to parent
+expose-src ConfiguredProjectResult, ConfiguredCountBucket, ConfiguredNestedDiscovery from "check-execution.ts" to parent
 expose-src CommittedAuditConfiguration, ConfiguredAuditResult, ConfiguredFullAuditResult, configuredFullRecovery, readCommittedAuditConfiguration, sameAuditPolicy from "check-execution.ts" to parent
 expose-src testLockedRunner, TestLockOwner, TestLockHooks, TestLockOverride from "test-lock.ts" to parent
 expose-src dispatchHarnessCommand from "focused-check.ts" to parent

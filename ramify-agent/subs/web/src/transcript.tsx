@@ -420,8 +420,23 @@ function HarnessDecision({ decision }: { readonly decision: TranscriptHarnessDec
           <ul className="checks">
             {decision.checks.map((check, index) => (
               <li key={index}>
-                <span className={`badge check-${check.outcome}`}>{check.outcome}</span> {check.mode} check of {check.paths.length === 0 ? 'the scope' : check.paths.join(', ')}
+                {/* The outcome is the project's verdict; whether each path was analyzed is its own disposition below. */}
+                <span className={`badge check-${check.outcome}`}>{check.outcome === 'passed' ? 'project passed' : check.outcome}</span> {check.mode} check of {check.paths.length === 0 ? 'the scope' : check.paths.join(', ')}
                 {check.newFindings > 0 && <> · {check.newFindings} new findings</>}{check.reason && <span className="muted"> · {check.reason}</span>}
+                {check.provider !== null && <span className="muted"> · {check.provider.schema}{check.provider.revision === null ? '' : ` revision ${check.provider.revision}`}</span>}
+                {check.dispositions.length > 0 && (
+                  <ul className="dispositions" aria-label="Path dispositions">
+                    {check.dispositions.map(item => (
+                      <li key={item.path}>
+                        <span className={`badge disposition-${item.disposition}`}>{item.disposition}</span> <code>{item.path}</code>
+                        {item.module !== null && <span className="muted"> · module {item.module}</span>}
+                        {item.exclusion !== null
+                          ? <span className="muted"> · in the {item.exclusion.kind} tree <code>{item.exclusion.directory}</code>{item.exclusion.owner === null ? '' : ` of ${item.exclusion.owner}`}: {item.reason}</span>
+                          : item.disposition !== 'checked' && <span className="muted"> · {item.reason}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {check.log !== null && <BodyBlock label="Check log" body={check.log} />}
               </li>
             ))}

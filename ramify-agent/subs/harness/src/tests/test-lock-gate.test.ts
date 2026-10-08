@@ -48,7 +48,7 @@ async function configuredGate(root: string, audit: ConfiguredGateAudit, options:
 
 function answered(status: ConfiguredAuditResult['status'], verdict: ConfiguredAuditResult['verdict']): ConfiguredAuditResult {
   return {
-    status, requestId: 'run-lock:ga-0001', mode: 'project-default', requestedSourceCommit: 'candidate',
+    status, requestId: 'run-lock:ga-0001', mode: 'project-default', nested: false, projects: null, discovery: null, requestedSourceCommit: 'candidate',
     auditedSourceCommit: status === 'completed' ? 'candidate' : null, reused: false, reuse: null,
     requestedMode: status === 'completed' ? 'ramify-partial' : null, executedMode: status === 'completed' ? 'ramify-partial' : null,
     fallbackReason: null, verdict, reportCommit: status === 'completed' ? 'report' : null,

@@ -106,6 +106,18 @@ describe('execution core from committed run records', () => {
     expect(index.nodes.find(node => node.key === 'gate:ga-old')).toMatchObject({ verdict: 'failed', audit: 'unavailable' });
     expect(index.nodes.find(node => node.key === 'gate:ga-audit-failed')).toMatchObject({ verdict: 'failed', audit: 'failed', evidencePresent: true });
   });
+  it('projects an indeterminate invocation verdict as indeterminate, never as a failed audit', () => {
+    const run = recordedRun([
+      { type: 'gate-attempted', data: { gate: 'ga-audit-open', checkpoint: 'final', verdict: 'not-verified', next: 'retry-infrastructure' },
+        records: [
+          { path: 'gates/ga-audit-open/attempt.json', body: gate('ga-audit-open', 'failed', false, 'final') },
+          { path: 'gates/ga-audit-open/audit-outcome.json', body: gateAuditOutcomeSchema.parse({
+            schema: 'ramify-agent.gate-audit-outcome/1', gate: 'ga-audit-open', overall: 'indeterminate', audited: 'audited-commit',
+          }) },
+        ] },
+    ]);
+    expect(executionCoreOf(runView(run)).nodes.find(node => node.key === 'gate:ga-audit-open')).toMatchObject({ audit: 'indeterminate', evidencePresent: true });
+  });
   it('keeps full descriptions, latest real scenario status, every gate and every session', () => {
     const run = recordedRun([
       { type: 'session-opened', data: { session: 'ses-initial', role: 'initial-architect', work: {}, executor: 'scripted', model: null } },

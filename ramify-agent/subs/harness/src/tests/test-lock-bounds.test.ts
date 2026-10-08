@@ -52,7 +52,7 @@ test('a configured gate finishes after a lock wait longer than its bound, and on
       await vi.advanceTimersByTimeAsync(20);
       expect(request.signal.aborted).toBe(false);
       const result = {
-        status: 'completed' as const, requestId: 'run-pause:ga-0001', mode: 'project-default' as const, requestedSourceCommit: 'candidate',
+        status: 'completed' as const, requestId: 'run-pause:ga-0001', mode: 'project-default' as const, nested: false, projects: null, discovery: null, requestedSourceCommit: 'candidate',
         auditedSourceCommit: 'candidate', reused: false, reuse: null, requestedMode: 'ramify-partial' as const,
         executedMode: 'ramify-partial' as const, fallbackReason: null, verdict: 'pass' as const,
         reportCommit: 'report', runRef: 'refs/run', treeRef: 'refs/tree', definition: { path: 'ramify-audit.json', blob: 'blob' },
