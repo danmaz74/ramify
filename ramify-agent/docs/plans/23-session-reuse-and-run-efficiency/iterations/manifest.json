@@ -303,8 +303,29 @@
         "M07",
         "M08"
       ],
-      "status": "in progress in isolated worktree after accepted iteration10",
-      "writeBoundary": "Harness run/service.ts, run/observations.ts, run/records.ts, interfaces/protocol and projections; agent event enrichment if required by frozen contract. Serial runtime owner; no web/trial edits."
+      "status": "accepted ordinary capture and plain projections; presentation/final qualification remain12/14",
+      "writeBoundary": "Harness run/service.ts, run/observations.ts, run/records.ts, interfaces/protocol and projections; agent event enrichment if required by frozen contract. Serial runtime owner; no web/trial edits.",
+      "receipt": "11-results.md",
+      "providerHead": "1a0627e82a27f4d2178de9d571f000973ef96413",
+      "followupHeads": [
+        "00804463240a3f8c10835d8e2810b7716b228558",
+        "16a2319b58e90a6dbadee0eb9edfacafb887ad73"
+      ],
+      "receiptHead": "647f3985e97010880f109d026a373d2369d2a510",
+      "integratedHead": "6a1580a3",
+      "integrationVerification": {
+        "initialOrdinaryFiles": 12,
+        "initialOrdinaryTests": 146,
+        "correctedFollowupFiles": 3,
+        "correctedFollowupTests": 63,
+        "typeCheck": "passed all four configured scopes on final source",
+        "structure": "passed;678sources;0errors/0warnings;326 analysis limits/partial coverage",
+        "logs": [
+          "/tmp/ramify-plan23-integrated-observations-*.log",
+          "/tmp/ramify-plan23-integrated-observation-identity-corrected-*.log"
+        ],
+        "limit": "Initial followup31pass1timeout retained; independent role cases corrected with original5sec limits. Final corrected3-file gate passed; no native/live/full audit claim."
+      }
     },
     {
       "id": "12",
@@ -316,7 +337,7 @@
         "V01",
         "V02"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree after accepted iteration11",
       "writeBoundary": "Web run/session/metrics presentation and web tests only. Harness projection changes require coordination, not independent formula edits."
     },
     {
