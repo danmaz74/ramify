@@ -66,3 +66,7 @@ expose-sub runCommand, childEnvironment, outputTailBytes, CommandRequest, Comman
 
 // Temporary local guards forward to root enforcement in Plan 22 iteration 6.
 expose-test guardedChildProcess, spawnAttempts from "helpers/process-guard.ts" to descendants
+
+// Native request evidence is projected by its Pi owner. Root qualification
+// reads validated plain artifacts; opaque continuation encoding stays in Pi.
+expose-sub readPiNativeRequestArtifact, PiNativeRequestArtifact from agent to parent

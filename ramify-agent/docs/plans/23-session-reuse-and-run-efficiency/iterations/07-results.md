@@ -232,3 +232,34 @@ while observing a prompt fenced receipt and delayed actual Stop/settled barrier.
 Joined engine/Pi/store/scripted checks passed 5 files/78 tests, all type scopes
 and structural checking (317 explicit limits). Q02 live/process evidence remains
 iteration 14; this refinement supplies no live claim.
+
+## Accepted native request evidence accessor
+
+Provider amendment `ac0a5026d41e22d79eca23cb446a64711f641810`, integrated at
+`ab739fb85df262669fd7d3a329e9e272218ed75a`, adds the Pi-owned pure
+`readPiNativeRequestArtifact(bytes)` and plain `PiNativeRequestArtifact` companion.
+Pi exposes both to its parent; the coordinator's named harness relay exposes
+them to root qualification. The declaration and source were verified together.
+No SDK types or continuation codecs enter this signature.
+
+The reader validates the supported request schema, package, SSE transport,
+model and complete original body against its ordered native snapshot. It
+preserves unknown request fields and opaque input JSON. Other JSON artifacts
+return null without exposing or validating their transcript messages. Corrupt
+claimed request data is unavailable. Consumers retain original hash-checked
+payload bytes alongside the typed projection; they never rebuild provider
+history from display events. No persistence or dispatch ordering changed.
+
+Joined verification covered the new artifact reader, preservation controls,
+legacy session-mode controls and generic session operations: **4 files,
+86 tests passed**. All four configured type checks passed. Structural validation
+passed with zero errors, zero warnings and 317 explicit analysis limits, after
+completing every configured stage with partial analysis coverage. Logs are
+`/tmp/ramify-plan23-integrated-native-artifact-{focused,types,structure}.log`.
+
+The artifact precedes the final liveness fence. Its presence or count proves
+neither an HTTP dispatch nor a live result. Q02 remains open until iteration 14
+runs the supported live Continue/Fork/tool-addition/process-restoration witness
+using production storage. `/tmp/plan23-live-exposure-inventory.md` records the
+remaining legitimate factory/store exposures; their exact signature companions
+must be refreshed after iteration 9 removes the transitional invocation API.

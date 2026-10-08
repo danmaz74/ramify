@@ -347,6 +347,16 @@
       "typeCheck": "passed",
       "structure": "passed; partial analysis coverage; 317 analysis limits",
       "logs": "/tmp/ramify-plan23-integrated-cucumber-path-*.log"
+    },
+    "piNativeRequestArtifact": {
+      "providerHead": "ac0a5026d41e22d79eca23cb446a64711f641810",
+      "integratedHead": "ab739fb85df262669fd7d3a329e9e272218ed75a",
+      "rootExposure": "Named accessor and plain signature companion relayed by coordinator in subs/harness/module.ramify; verified with joined source",
+      "ordinaryFiles": 4,
+      "ordinaryTests": 86,
+      "typeCheck": "passed",
+      "structure": "passed; partial analysis coverage; 317 analysis limits",
+      "logs": "/tmp/ramify-plan23-integrated-native-artifact-*.log"
     }
   }
 }
