@@ -329,8 +329,20 @@
         "T01",
         "T02"
       ],
-      "status": "in progress in isolated worktree after accepted iteration10",
-      "writeBoundary": "Root scripts/live-trial.ts, trial fixtures/README, fixture-trials.test.ts and dedicated trial-verifier tests. Excludes runtime service, metrics, protocol and web."
+      "status": "accepted ordinary trial corrections; installed native/live/full qualification remains iteration14",
+      "writeBoundary": "Root scripts/live-trial.ts, trial fixtures/README, fixture-trials.test.ts and dedicated trial-verifier tests. Excludes runtime service, metrics, protocol and web.",
+      "receipt": "13-results.md",
+      "providerHead": "49a5aa2eb528c4528153541d55ba0133505bc0c8",
+      "receiptHead": "7797d13270ee151b93874da72d32983c9ef9b2f3",
+      "integratedHead": "65b1d77f",
+      "integrationVerification": {
+        "ordinaryFiles": 5,
+        "ordinaryTests": 101,
+        "typeCheck": "passed all four configured scopes",
+        "structure": "passed; partial analysis coverage; 317 retained analysis limits",
+        "logs": "/tmp/ramify-plan23-integrated-trial-corrections-*.log",
+        "limit": "No installed Git/CLI, opt-in fixture trial, live provider or full configured audit claim."
+      }
     },
     {
       "id": "14",

@@ -276,7 +276,8 @@
       "subs/harness/src/sessions/records.ts",
       "subs/harness/src/tests/single-session.test.ts",
       "subs/harness/src/run/log.ts",
-      "subs/harness/src/projections/events.ts"
+      "subs/harness/src/projections/events.ts",
+      "subs/harness/src/tests/helpers/iterations.ts"
     ],
     "12": [
       "subs/web/src/run-page.tsx",
