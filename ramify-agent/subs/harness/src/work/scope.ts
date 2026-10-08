@@ -14,6 +14,7 @@ import { modulePathSchema, viewIdentitySchema, sha256Schema } from '../interface
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import { resolveRealTarget } from '../guard/resolve-contained-path.js';
 import type { GuardedScope } from '../guard/write-guard.js';
+import type { SubmissionError } from '../run/submissions.js';
 import type { IterationKind } from './iterations.js';
 
 /*
@@ -204,6 +205,67 @@ export function ownContentsWithin(dir: string, directory: string): boolean {
   return [ownArea(dir), ownFile(dir, 'module.ramify'), ownFile(dir, 'README.md')].some(path => within(path, directory));
 }
 
+/**
+ * What an assignment based on one owner gives its engineer by default, for
+ * an architect's briefing: the owner's directory, the directories `included`
+ * may name, and the guarded files the base would otherwise reach.
+ */
+export interface DefaultWriteScope {
+  readonly module: string;
+  /** Project-relative; `''` for the root module. */
+  readonly directory: string;
+  /** Its immediate child modules, each excluded unless `included` names its directory. */
+  readonly children: ReadonlyArray<{ readonly module: string; readonly directory: string }>;
+  /** Its own owned nested-project roots, or null where the provider gave no answer. */
+  readonly nestedProjects: readonly string[] | null;
+  /** Existing guarded files in its own contents, writable only with an authorization. */
+  readonly guarded: readonly string[];
+}
+
+/**
+ * The default write scope of one owner, for an architect's briefing. The
+ * provider's topology decides it, as it decides the submission rules; where
+ * the provider gave no answer the architect view supplies the owner and its
+ * children, and the nested-project roots are unknown. Undefined for an owner
+ * neither knows yet.
+ */
+export function defaultWriteScopeOf(
+  index: ArchitectIndex | null,
+  module: string,
+  topology: AffectedDocument['selection']['scope']['ownership'] | null,
+  guarded: readonly string[],
+): DefaultWriteScope | undefined {
+  const relativeDirectory = (directory: string) => (directory === '.' ? '' : directory);
+  let directory: string;
+  let children: Array<{ module: string; directory: string }>;
+  if (topology !== null) {
+    const entry = topology.modules.find(candidate => candidate.id === module);
+    if (entry === undefined) return undefined;
+    directory = relativeDirectory(entry.directory);
+    children = topology.modules.filter(candidate => candidate.parent === module)
+      .map(child => ({ module: child.id, directory: relativeDirectory(child.directory) }));
+  } else {
+    const entry = index === null ? undefined : findModule(index, module);
+    if (entry === undefined) return undefined;
+    directory = entry.dir;
+    children = entry.children.flatMap(child => {
+      const found = findModule(index!, child);
+      return found === undefined ? [] : [{ module: found.module, directory: found.dir }];
+    });
+  }
+  children.sort((a, b) => (a.directory < b.directory ? -1 : a.directory > b.directory ? 1 : 0));
+  const nestedProjects = topology === null ? null : topology.exclusions
+    .filter(exclusion => exclusion.kind === 'owned-nested-project' && exclusion.owner === module).map(exclusion => exclusion.directory).sort();
+  const closed = [...children.map(child => child.directory), ...(nestedProjects ?? [])];
+  return {
+    module,
+    directory,
+    children,
+    nestedProjects,
+    guarded: [...new Set(guarded)].filter(path => within(path, directory) && !closed.some(child => within(path, child))).sort(),
+  };
+}
+
 /** What a scope resolution was asked for, once the harness has validated it. */
 export interface ScopeCapture {
   readonly projectRoot: string;
@@ -224,13 +286,83 @@ export function directoryOf(index: ArchitectIndex | null, module: string): strin
   return entry === undefined ? null : entry.dir;
 }
 
+/** The paths one ownership query answers for a scope: the root, each included tree, each extra and each bootstrap directory. */
+export function ownershipQueryPaths(capture: Pick<ScopeCapture, 'base' | 'extra' | 'bootstrap'>): string[] {
+  return [...new Set(['.', ...('module' in capture.base ? capture.base.included.map(entry => entry.directory) : []),
+    ...capture.extra.map(entry => entry.path), ...capture.bootstrap.map(entry => entry.directory)])];
+}
+
+/** The directories an ordinary base may name in `included`: its immediate child modules and its own nested-project roots. */
+export function includedChoices(module: string, topology: AffectedDocument['selection']['scope']['ownership']): string[] {
+  return [...topology.modules.filter(entry => entry.parent === module).map(entry => entry.directory),
+    ...topology.exclusions.filter(exclusion => exclusion.kind === 'owned-nested-project' && exclusion.owner === module).map(exclusion => exclusion.directory)].sort();
+}
+
+/**
+ * The rules of an ordinary base's `included` list against one ownership
+ * answer, each error at its entry's path. An entry names exactly one
+ * immediate child module directory or one owned nested-project root, once,
+ * with a reason and instructions; a nested project's owner is assigned or
+ * lies in an included child. A directory inside the owner is already part of
+ * the base. Submission validation reports these; `resolveWriteScope` keeps
+ * them as its backstop.
+ */
+export function includedTreeErrors(
+  base: Extract<WriteScope['base'], { readonly module: string }>,
+  answer: AffectedDocument,
+): SubmissionError[] {
+  const topology = answer.selection.scope.ownership;
+  const errors: SubmissionError[] = [];
+  const choices = includedChoices(base.module, topology);
+  const expected = choices.length === 0
+    ? `no entry: "${base.module}" has no immediate child module and no owned nested project`
+    : `one of ${choices.map(directory => `"${directory}"`).join(', ')}, or no entry`;
+  const seen = new Set<string>();
+  base.included.forEach((entry, position) => {
+    const at = `assignment.scope.base.included.${position}`;
+    if (seen.has(entry.directory)) {
+      errors.push({ path: `${at}.directory`, message: `"${entry.directory}" is already named by an earlier entry`, expected: 'each directory once' });
+      return;
+    }
+    seen.add(entry.directory);
+    if (entry.reason.trim() === '') errors.push({ path: `${at}.reason`, message: 'An included tree states why the engineer needs it, and this reason is blank' });
+    if (entry.instructions.trim() === '') errors.push({ path: `${at}.instructions`, message: 'An included tree carries instructions for the engineer, and these are blank' });
+    const child = topology.modules.find(module => module.directory === entry.directory && module.parent === base.module);
+    const project = topology.exclusions.find(exclusion => exclusion.directory === entry.directory && exclusion.kind === 'owned-nested-project');
+    if (child === undefined && project === undefined) {
+      const seed = answer.selection.paths.find(candidate => candidate.path === entry.directory);
+      errors.push({
+        path: `${at}.directory`,
+        message: seed?.status === 'owned' && seed.module === base.module
+          ? `"${entry.directory}" lies inside the own contents of "${base.module}", which the base already gives the engineer whole; remove this entry`
+          : `"${entry.directory}" is neither an immediate child module directory of "${base.module}" nor an owned nested-project root`,
+        expected,
+      });
+      return;
+    }
+    const owner = child?.id ?? project!.owner!;
+    if (project !== undefined && owner !== base.module && !base.included.some(candidate => {
+      const ancestor = topology.modules.find(module => module.directory === candidate.directory && module.parent === base.module);
+      return ancestor !== undefined && (owner === ancestor.id || owner.startsWith(`${ancestor.id}/`));
+    })) {
+      errors.push({
+        path: `${at}.directory`,
+        message: `The nested project "${entry.directory}" belongs to "${owner}", which is neither the assigned owner nor inside an included child`,
+        expected: `the child of "${base.module}" that holds "${owner}" in \`included\` as well, or no entry`,
+      });
+    }
+  });
+  return errors;
+}
+
 /**
  * Resolves the write scope's real paths. Each is canonical: an existing path
  * is its own real path, and one that does not exist yet — a bootstrap
  * module's declaration, README or source area — is resolved through its
  * nearest existing ancestor, so an absent directory is not a scope failure.
+ * An ownership answer already obtained for the same paths may be given.
  */
-export async function resolveWriteScope(capture: ScopeCapture): Promise<WriteScope> {
+export async function resolveWriteScope(capture: ScopeCapture, ownership?: AffectedDocument): Promise<WriteScope> {
   const roots: string[] = [];
   const files: string[] = [];
 
@@ -244,7 +376,7 @@ export async function resolveWriteScope(capture: ScopeCapture): Promise<WriteSco
   };
 
   const ramify = capture.ramify ?? new RamifyCli();
-  const answer = await ramify.queryOwnership(capture.projectRoot, [...new Set(['.', ...('module' in capture.base ? capture.base.included.map(entry => entry.directory) : []), ...capture.extra.map(entry => entry.path), ...capture.bootstrap.map(entry => entry.directory)])]);
+  const answer = ownership ?? await ramify.queryOwnership(capture.projectRoot, ownershipQueryPaths(capture));
   const configuration = toPosix(relative(capture.projectRoot, resolve(capture.projectRoot, answer.selection.scope.configuration)));
   if (configuration === '' || configuration === '..' || configuration.startsWith('../')) throw new Error('Provider configuration is outside the captured project');
   const topology = answer.selection.scope.ownership;
@@ -259,18 +391,14 @@ export async function resolveWriteScope(capture: ScopeCapture): Promise<WriteSco
     await addRoot(module?.directory ?? bootstrap!);
   }
   if ('module' in capture.base) {
-    if (new Set(capture.base.included.map(entry => entry.directory)).size !== capture.base.included.length) throw new Error('Duplicate included tree');
+    // The submission rules, kept here as the backstop of every capture.
+    const problems = includedTreeErrors(capture.base, answer);
+    if (problems.length > 0) throw new Error(problems.map(problem => problem.message).join('; '));
     const base = capture.base;
     for (const entry of capture.base.included) {
-      if (entry.reason.trim() === '' || entry.instructions.trim() === '') throw new Error('An included tree requires reason and instructions');
       const child = topology.modules.find(module => module.directory === entry.directory && module.parent === base.module);
       const project = topology.exclusions.find(exclusion => exclusion.directory === entry.directory && exclusion.kind === 'owned-nested-project');
-      if (child === undefined && project === undefined) throw new Error(`Included directory ${entry.directory} must be one whole immediate child subtree or declared owned-nested-project root`);
       const owner = child?.id ?? project!.owner!;
-      if (project !== undefined && !baseModules.includes(owner) && !capture.base.included.some(candidate => {
-        const ancestor = topology.modules.find(module => module.directory === candidate.directory && module.parent === base.module);
-        return ancestor !== undefined && (owner === ancestor.id || owner.startsWith(`${ancestor.id}/`));
-      })) throw new Error(`Included project ${entry.directory} has owner ${owner} outside the assigned owners`);
       const projectInstructions: Array<{ path: string; text: string }> = [];
       if (project !== undefined) for (const name of ['AGENTS.md', 'CLAUDE.md']) {
         const path = posix.join(entry.directory, name);
@@ -341,19 +469,25 @@ export function guardedScopeOf(scope: WriteScope, denied: readonly string[] = []
 
 /** Current placement narrows captured owner and tree authority; it cannot add an owner or remove an exclusion. */
 function permittedPlacement(scope: WriteScope, answer: AffectedDocument, seed: AffectedDocument['selection']['paths'][number]): boolean {
-  if (seed.status !== 'owned') return false;
+  return placementRefusal(scope, answer, seed) === null;
+}
+
+/** Why one path is not writable under a captured scope and a current ownership answer, or null where it is. */
+function placementRefusal(scope: WriteScope, answer: AffectedDocument, seed: AffectedDocument['selection']['paths'][number]): string | null {
+  if (seed.status === 'outside-project') return 'lies outside the project';
+  if (seed.status !== 'owned') return `lies in the ${seed.exclusion.kind} region "${seed.exclusion.directory}", which no assignment opens`;
   const captured = scope.resolved.ownership;
   const withinPath = (path: string, directory: string) => within(path === '.' ? '' : path, directory === '.' ? '' : directory);
   const segments = seed.path.split('/');
-  if (segments[0] === plansDirectory && segments[1] !== undefined && within(seed.path, toPosix(relative(captured.root, planStateDirectory(captured.root, segments[1]))))) return false;
+  if (segments[0] === plansDirectory && segments[1] !== undefined && within(seed.path, toPosix(relative(captured.root, planStateDirectory(captured.root, segments[1]))))) return 'is plan state the harness alone writes';
   const current = answer.selection.scope.ownership.modules.find(module => module.id === seed.module);
   const previous = captured.modules.find(module => module.id === seed.module);
   const bootstrapped = scope.bootstrap.some(entry => withinPath(seed.path, entry.directory) &&
     ((seed.module === entry.parent && previous?.id === entry.parent) ||
       (seed.module === entry.owner && current?.directory === entry.directory && current.parent === entry.parent && previous === undefined)));
-  if (current === undefined || (previous === undefined ? !bootstrapped : previous.directory !== current.directory || previous.parent !== current.parent)) return false;
+  if (current === undefined || (previous === undefined ? !bootstrapped : previous.directory !== current.directory || previous.parent !== current.parent)) return `belongs to "${seed.module}", whose identity differs from the captured one`;
   // Creating a module description needs the accepted registry creation entry, beyond ordinary inert ownership.
-  if (seed.exclusion === null && seed.path.endsWith('/module.ramify') && !captured.modules.some(module => seed.path === posix.join(module.directory === '.' ? '' : module.directory, 'module.ramify')) && !scope.bootstrap.some(entry => seed.path === posix.join(entry.directory, 'module.ramify'))) return false;
+  if (seed.exclusion === null && seed.path.endsWith('/module.ramify') && !captured.modules.some(module => seed.path === posix.join(module.directory === '.' ? '' : module.directory, 'module.ramify')) && !scope.bootstrap.some(entry => seed.path === posix.join(entry.directory, 'module.ramify'))) return 'would create a module description, which only an accepted proposal authorizes';
   // Exact extras keep their narrow authority, but cannot open nested projects or hard exclusions.
   const explicit = scope.extra.some(entry => entry.kind === 'directory' ? withinPath(seed.path, entry.path) : seed.path === entry.path)
     || scope.resolved.files.includes(join(captured.root, seed.path));
@@ -361,15 +495,69 @@ function permittedPlacement(scope: WriteScope, answer: AffectedDocument, seed: A
   const owners = new Set([...modules, ...scope.resolved.included.filter(entry => entry.kind === 'child-subtree').flatMap(entry =>
     captured.modules.filter(module => withinPath(module.directory, entry.directory)).map(module => module.id))]);
   const capturedExclusions = captured.exclusions.filter(exclusion => withinPath(seed.path, exclusion.directory));
-  if (capturedExclusions.some(exclusion => exclusion.owner === null)) return false;
+  const unowned = capturedExclusions.find(exclusion => exclusion.owner === null);
+  if (unowned !== undefined) return `lies in the ${unowned.kind} region "${unowned.directory}", which no assignment opens`;
   const nested = [...capturedExclusions.filter(exclusion => exclusion.kind === 'owned-nested-project'),
     ...(seed.exclusion?.kind === 'owned-nested-project' ? [seed.exclusion] : [])];
-  if (nested.some(exclusion => !scope.resolved.included.some(entry => entry.kind === 'owned-nested-project' && entry.directory === exclusion.directory && entry.owner === exclusion.owner))) return false;
+  const closed = nested.find(exclusion => !scope.resolved.included.some(entry => entry.kind === 'owned-nested-project' && entry.directory === exclusion.directory && entry.owner === exclusion.owner));
+  if (closed !== undefined) return `lies in the owned nested project "${closed.directory}", which this scope does not include`;
   const capturedOwner = captured.modules.filter(module => withinPath(seed.path, module.directory)).sort((a, b) => b.directory.length - a.directory.length)[0];
   const capturedPermission = (capturedOwner !== undefined && owners.has(capturedOwner.id)) || bootstrapped || explicit;
-  if (!capturedPermission) return false;
-  if (nested.length > 0) return true;
-  return owners.has(seed.module) || bootstrapped || explicit;
+  if (!capturedPermission) return 'lies outside the write scope';
+  if (nested.length > 0) return null;
+  return owners.has(seed.module) || bootstrapped || explicit ? null : 'lies outside the write scope';
+}
+
+/**
+ * The placement rules of each architect `extra` file against the resolved
+ * scope and the ownership answer it was resolved from: the file is owned,
+ * outside every unowned exclusion and harness-held region, and outside any
+ * owned nested project the scope does not include. These are the rules the
+ * guard applies at write time, judged at submission instead.
+ */
+export function extraPlacementErrors(scope: WriteScope, answer: AffectedDocument): SubmissionError[] {
+  const errors: SubmissionError[] = [];
+  const root = scope.resolved.ownership.root;
+  scope.extra.forEach((entry, position) => {
+    if (entry.kind === 'directory') return;
+    const seed = answer.selection.paths.find(candidate => candidate.path === entry.path);
+    if (seed === undefined) return;
+    const held = scope.resolved.excluded.find(region => within(entry.path, toPosix(relative(root, region))));
+    const refusal = placementRefusal(scope, answer, seed)
+      ?? (held === undefined ? null : `lies in "${toPosix(relative(root, held))}", which this scope excludes`);
+    if (refusal === null) return;
+    errors.push({
+      path: `assignment.scope.extra.${position}.path`,
+      message: `"${entry.path}" ${refusal}, so no engineer could write it`,
+      expected: 'a file an owner holds outside every excluded region, or inside an owned nested project this scope includes',
+    });
+  });
+  return errors;
+}
+
+/**
+ * A submitted scope judged by one ownership query: the `included` rules,
+ * then the capture itself, then the placement of each `extra`. A capture
+ * that throws is a rejection of the scope rather than a failure of the run.
+ * The query's own failure is the provider's, and propagates.
+ */
+export async function checkWriteScope(capture: ScopeCapture): Promise<{ readonly scope: WriteScope; readonly errors: readonly [] } | { readonly scope: null; readonly errors: readonly SubmissionError[] }> {
+  const ramify = capture.ramify ?? new RamifyCli();
+  const answer = await ramify.queryOwnership(capture.projectRoot, ownershipQueryPaths(capture));
+  const included = 'module' in capture.base ? includedTreeErrors(capture.base, answer) : [];
+  if (included.length > 0) return { scope: null, errors: included };
+  let scope: WriteScope;
+  try {
+    scope = await resolveWriteScope(capture, answer);
+  } catch (error) {
+    return { scope: null, errors: [{
+      path: 'assignment.scope',
+      message: `The write scope cannot be captured: ${error instanceof Error ? error.message : String(error)}`,
+      expected: 'a scope the installed provider can capture',
+    }] };
+  }
+  const extra = extraPlacementErrors(scope, answer);
+  return extra.length > 0 ? { scope: null, errors: extra } : { scope, errors: [] };
 }
 
 /**

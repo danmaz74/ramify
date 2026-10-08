@@ -14,6 +14,7 @@ import { localArchitectJsonSchema, localArchitectToolName, unreportedByCompletio
 import { assign, outline } from './helpers/iterations.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
+import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { analysis, entry, requestCompletion, unresolved } from './helpers/analysis.js';
 import { forkNothingPossible } from './helpers/placement.js';
 import { installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
@@ -246,7 +247,11 @@ describe('the rules an assignment must satisfy', () => {
     expect(validateLocalArchitect(over('shop/billing'), { index, registry: proposing }).ok).toBe(true);
   });
 
-  test('included directories carry instructions; provider capture decides child and nested-project identity', () => {
+  test('included directories are normalized paths; provider ownership decides child and nested-project identity in the same submission', () => {
+    // The schema rules hold a well-formed directory; whether it is an
+    // immediate child or an owned nested-project root needs the provider's
+    // answer, which the run applies to the same submission (below, and
+    // write-scope-submission.test.ts).
     expect(validateLocalArchitect(over('shop/orders', { scope: { base: { module: 'shop/orders', included: [
       { directory: 'subs/orders/subs/physical', reason: 'Implement the whole child', instructions: 'Verify it at its root' },
     ] }, extra: [], read: [], rationale: 'r' } }), evidence).ok).toBe(true);
@@ -495,13 +500,14 @@ describe('a rejected submission in a run', () => {
   const reviews = 'collection-review/workspace/reviews';
 
   async function run(inputs: readonly unknown[], unchangedCheckpoints: ReadonlyArray<string | GitCheckpoint> = [],
-    roles: Readonly<Record<string, readonly unknown[]>> = {}) {
+    roles: Readonly<Record<string, readonly unknown[]>> = {}, ramify?: FakeRamifyCli) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
     const submitted = analysis([entry('reviewer-note', reviews)]);
     const { service, agent } = await openRuns(fixture.root, {
       unchangedCheckpoints,
+      ...(ramify === undefined ? {} : { ramify }),
       script: (spec: SessionSpec) => (spec.role === 'catalog-extractor' ? [] : spec.role === 'initial-architect'
         ? [{ kind: 'submit' as const, input: submitted }]
         : (roles[spec.role] ?? inputs).map(input => ({ kind: 'submit' as const, input }))),
@@ -700,6 +706,79 @@ describe('a rejected submission in a run', () => {
     // The blocker reported nothing: the scenario stays pending, and nothing was gated.
     expect(events.some(event => event.type === 'obligation-reported' || event.type === 'gate-committing')).toBe(false);
     expect(snapshot.counts.scenarios).toEqual({ pending: 1, bound: 0, done: 0 });
+  }, 300_000);
+
+  const reviewsDirectory = 'subs/workspace/subs/reviews';
+  const scoped = (scope: { included?: Array<{ directory: string; reason: string; instructions: string }>; extra?: Array<{ path: string; purpose: 'consumer' }> }) =>
+    assign(reviews, { scope: { base: { module: reviews, included: scope.included ?? [] }, extra: scope.extra ?? [], read: [], rationale: 'r' } }, outline());
+
+  test('the briefing states the default write scope: the owner directory and the only directories included may name', async () => {
+    const { agent } = await run([requestCompletion()], [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"']);
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
+    expect(local.spec.prompt).toContain('## Default write scope');
+    expect(local.spec.prompt).toContain(`- \`${reviews}\`: the base gives its engineer \`${reviewsDirectory}/\` whole`);
+    expect(local.spec.prompt).toContain(`  - Immediate child modules: \`${reviewsDirectory}/subs/core\` (\`${reviews}/core\`), \`${reviewsDirectory}/subs/ui\` (\`${reviews}/ui\`), \`${reviewsDirectory}/subs/validation\` (\`${reviews}/validation\`).`);
+    expect(local.spec.prompt).toContain('  - Owned nested-project roots: none.');
+  }, 300_000);
+
+  test('an included directory inside the owner is rejected at submission with its path, and the same turn resubmits', async () => {
+    const own = scoped({ included: [{ directory: `${reviewsDirectory}/src/tests`, reason: 'The owner\'s tests are part of this work item', instructions: 'Keep them with the source' }] });
+    const { root, runId, service, agent } = await run([own, requestCompletion()],
+      [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"']);
+
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
+    const answer = answerOf(local.verdicts[0]);
+    expect(answer.errors).toEqual([{
+      path: 'assignment.scope.base.included.0.directory',
+      message: `"${reviewsDirectory}/src/tests" lies inside the own contents of "${reviews}", which the base already gives the engineer whole; remove this entry`,
+      expected: `one of "${reviewsDirectory}/subs/core", "${reviewsDirectory}/subs/ui", "${reviewsDirectory}/subs/validation", or no entry`,
+    }]);
+    expect(answer.remainingAttempts).toBe(2);
+    expect(local.verdicts[1]).toEqual({ accepted: true });
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+
+    // Nothing of the refused assignment was committed: the one outline is the completion's.
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    expect(events.some(event => event.type === 'iteration-assigned')).toBe(false);
+    expect(events.filter(event => event.type === 'outline-revised')).toHaveLength(1);
+    expect(existsSync(runPath(root, 'review-notes', runId, workLayout.outline('wi-001', 2)))).toBe(false);
+  }, 300_000);
+
+  test('a directory that is not an immediate child is rejected the same way', async () => {
+    const grandchild = scoped({ included: [{ directory: `${reviewsDirectory}/subs/core/subs/tasks`, reason: 'r', instructions: 'i' }] });
+    const { service, agent } = await run([grandchild, requestCompletion()],
+      [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"']);
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
+    expect(answerOf(local.verdicts[0]).errors).toEqual([expect.objectContaining({ path: 'assignment.scope.base.included.0.directory',
+      message: `"${reviewsDirectory}/subs/core/subs/tasks" is neither an immediate child module directory of "${reviews}" nor an owned nested-project root` })]);
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+  }, 300_000);
+
+  test('a scope whose capture throws is rejected with the turn\'s remaining attempts, and the run does not fail', async () => {
+    const marker = `${reviewsDirectory}/src/router.ts`;
+    // The provider's answer for this scope leaves the assigned owner out, so
+    // the capture itself throws after every submission rule has passed.
+    class OwnerlessAnswer extends FakeRamifyCli {
+      override async queryOwnership(projectRoot: string, paths: readonly string[] = ['.']) {
+        const answer = await super.queryOwnership(projectRoot, paths);
+        if (!paths.includes(marker)) return answer;
+        const ownership = answer.selection.scope.ownership;
+        return { ...answer, selection: { ...answer.selection, scope: { ...answer.selection.scope,
+          ownership: { ...ownership, modules: ownership.modules.filter(module => module.id !== reviews) } } } };
+      }
+    }
+    const { root, runId, service, agent } = await run([scoped({ extra: [{ path: marker, purpose: 'consumer' }] }), requestCompletion()],
+      [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"'], {}, new OwnerlessAnswer());
+
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
+    const answer = answerOf(local.verdicts[0]);
+    expect(answer.errors).toEqual([expect.objectContaining({ path: 'assignment.scope',
+      message: `The write scope cannot be captured: Ownership answer has no assigned owner ${reviews}` })]);
+    expect(answer.remainingAttempts).toBe(2);
+    expect(local.verdicts[1]).toEqual({ accepted: true });
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    expect(events.some(event => event.type === 'job-failed' || event.type === 'iteration-assigned')).toBe(false);
   }, 300_000);
 
   test('a first assignment without an outline is rejected before scheduling and can be corrected in the same session', async () => {

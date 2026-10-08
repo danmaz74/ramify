@@ -10,7 +10,9 @@ import { isContained, resolveRealTarget } from './resolve-contained-path.js';
  *
  * A few files are refused outright, whatever the scope contains: the tracked
  * feature files and the project's configuration for the harness. Only the
- * harness writes them, so no scope and no authorization reaches them.
+ * harness writes them, so no scope and no authorization reaches them. A
+ * guarded file no authorization names is refused outright too, but its
+ * explanation says that an architect's authorization would open it.
  *
  * A block makes no mutation, does not end the session, does not request
  * approval and does not widen the scope. Only a recorded assignment changes
@@ -32,6 +34,11 @@ export interface GuardedScope {
   readonly files: readonly string[];
   /** Canonical files refused outright, whatever the roots and files contain. */
   readonly denied?: readonly string[] | undefined;
+  /**
+   * The canonical guarded files among `denied`: an architect's authorization
+   * would make them writable, unlike the files only the harness writes.
+   */
+  readonly guarded?: readonly string[] | undefined;
 }
 
 /** What the guard decided about one call. */
@@ -45,8 +52,10 @@ export interface GuardDecisionRecord {
   /** What it resolved to, or null when it could not be resolved. */
   readonly resolved: string | null;
   readonly reason: string;
-  /** Set when the target is one of the files only the harness writes. */
+  /** Set when the target is refused outright: a file only the harness writes, or a guarded file no authorization opened. */
   readonly denied?: true | undefined;
+  /** Set when the refused target is a guarded file an authorization would make writable. */
+  readonly guarded?: true | undefined;
 }
 
 /**
@@ -83,13 +92,22 @@ export async function decideWrite(
     return { verdict: 'blocked-unresolved', requested, resolved: null, reason: target.reason };
   }
   if (scope.denied?.includes(target.resolved) === true) {
-    return {
-      verdict: 'blocked-scope',
-      requested,
-      resolved: target.resolved,
-      reason: `${target.resolved} is written by the harness alone; no agent edits it`,
-      denied: true,
-    };
+    return scope.guarded?.includes(target.resolved) === true
+      ? {
+        verdict: 'blocked-scope',
+        requested,
+        resolved: target.resolved,
+        reason: `${target.resolved} is a guarded file, and no authorization of this assignment names it`,
+        denied: true,
+        guarded: true,
+      }
+      : {
+        verdict: 'blocked-scope',
+        requested,
+        resolved: target.resolved,
+        reason: `${target.resolved} is written by the harness alone; no agent edits it`,
+        denied: true,
+      };
   }
   const boundary = await placementDecisions(scope, workingDirectory, [requested]);
   if (boundary[0] !== true) return { verdict: 'blocked-scope', requested, resolved: target.resolved,
@@ -142,6 +160,15 @@ export function blockExplanation(decision: GuardDecisionRecord, scope: GuardedSc
     ...scope.files.map(file => file),
   ];
   const where = locations.length === 0 ? '  (this assignment may write nothing)' : locations.map(line => `  ${line}`).join('\n');
+  if (decision.guarded === true) {
+    return [
+      `The target "${decision.requested}" resolves to ${decision.resolved ?? 'nothing'}, a guarded file this assignment does not authorize. Nothing was written.`,
+      '',
+      'Guarded files decide what the checks discover and run: package manifests and lockfiles, compiler, test-runner and audit configuration, and contract artifacts.',
+      'One becomes writable only when the architect names it in an authorization of an assignment. If the work needs the change, report it in your submission, naming the file and why, so the architect can authorize it.',
+      'Do not retry the same target, and do not write it another way: an unauthorized change to it fails the gate as a guarded change.',
+    ].join('\n');
+  }
   if (decision.denied === true) {
     return [
       `The target "${decision.requested}" resolves to ${decision.resolved ?? 'nothing'}, which only the harness writes. Nothing was written.`,

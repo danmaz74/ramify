@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 9. -->
+<!-- ramify-agent local architect procedure, version 10. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -47,22 +47,8 @@ write.
   described where they arise.
 - `assignment.scope.base.module` is the module the engineer works in. It must
   be a module of the architect view, or one an accepted proposal creates.
-- `assignment.scope.base.included` is the one list of whole included trees.
-  Each entry supplies `directory`, `reason` and `instructions`. Name either a
-  whole immediate child subtree or a declared owned nested project root. The
-  installed provider derives the entry's kind and owner. A nested project
-  inside an included child still needs its own entry. Preserve its project
-  instructions and verify from that project's root where applicable.
-- The assigned owner's ordinary documentation, auxiliary source, scratch and
-  owned unwired trees are part of its scope. Captured configuration inputs
-  still require recorded guarded-file authorization. External, repository,
-  package, generated and configured output exclusions always win, including
-  inside an included tree and against extra or bootstrap allowances.
-- `assignment.scope.extra` preserves narrow contract, conformance, fake and
-  exposure locations beyond the base. An extra cannot bypass provider
-  exclusions or files and durable state reserved to the harness.
-- `assignment.scope.read` is the reading you expect beyond the base. It is
-  advice, not a boundary.
+- `assignment.scope` is the iteration's write scope, under "Write scope"
+  below.
 - `assignment.externalCapabilities` names behavior other modules own that
   this iteration uses or requests. Each must be in the registry, with the
   owner the registry gives it.
@@ -91,6 +77,10 @@ write.
   They apply to every engineer invocation of the iteration. Raise one when
   the work needs it, such as a test suite longer than the command maximum,
   not to wait out a session that is stuck.
+
+### Write scope
+
+{{writeScope}}
 
 You do not choose the gate, the tests it runs or the files it guards: the
 harness derives them from the kind, the scope and the evidence required, and

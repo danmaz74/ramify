@@ -198,6 +198,31 @@ describe('the files only the harness writes', () => {
   });
 });
 
+describe('a guarded file no authorization names', () => {
+  test('is refused outright, and its explanation asks for an authorization rather than calling it the harness\'s', async () => {
+    const { root, index } = await project([["."]]);
+    await writeFile(join(root, 'subs/orders/package.json'), '{"name":"orders"}\n');
+    await writeFile(join(root, 'ramify-agent.json'), '{}\n');
+    const resolved = await scopeOf(root, index);
+    const harness = await deniedFiles(root, []);
+    const guarded = await deniedFiles(root, ['subs/orders/package.json']);
+    const scope: GuardedScope = { ...resolved, denied: [...new Set([...harness, ...guarded])], guarded: guarded.filter(path => !harness.includes(path)) };
+
+    const authorizable = await decideWrite(scope, root, writing('subs/orders/package.json'));
+    expect(authorizable).toMatchObject({ verdict: 'blocked-scope', denied: true, guarded: true,
+      reason: expect.stringContaining('is a guarded file, and no authorization of this assignment names it') });
+    const explained = blockExplanation(authorizable, scope);
+    expect(explained).toContain('a guarded file this assignment does not authorize. Nothing was written.');
+    expect(explained).toContain('so the architect can authorize it');
+    expect(explained).not.toContain('only the harness writes');
+
+    const reserved = await decideWrite(scope, root, writing('ramify-agent.json'));
+    expect(reserved.guarded).toBeUndefined();
+    expect(blockExplanation(reserved, scope)).toContain('which only the harness writes. Nothing was written.');
+    expect(await readFile(join(root, 'subs/orders/package.json'), 'utf8')).toBe('{"name":"orders"}\n');
+  });
+});
+
 describe('X5: a resolution failure is not a scope violation', () => {
   test('blocked-unresolved and blocked-scope are distinct verdicts with distinct reasons', async () => {
     const { root, index } = await project([["."], ["subs/billing/src/billing.ts"]]);

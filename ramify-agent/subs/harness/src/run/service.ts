@@ -186,8 +186,8 @@ import {
 } from '../work/failure.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  auditPreparationPaths, scopeConfigurationPaths, captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
-  type GuardedScenarioFiles,
+  auditPreparationPaths, scopeConfigurationPaths, captureGuardedFiles, checkWriteScope, checkpointOf, defaultWriteScopeOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
+  type DefaultWriteScope, type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
 import {
@@ -196,7 +196,7 @@ import {
 } from '../work/obligations.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
-import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
+import { apiViewsOf, defaultWriteScopeSection, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
 import {
   capabilityLocalArchitectJsonSchema, localArchitectJsonSchema, localArchitectToolName, unreportedByCompletion, validateLocalArchitect, type LocalArchitectSubmission,
 } from '../work/submission.js';
@@ -703,6 +703,12 @@ class Run {
 
 export class RunService {
   private readonly runs = new Map<string, Run>();
+  /**
+   * Write scopes captured while an assignment was judged, by the accepted
+   * body they were captured for, so the assignment applies the scope its
+   * submission was accepted with instead of capturing it a second time.
+   */
+  private readonly preparedScopes = new WeakMap<AssignmentBody, WriteScope>();
   private readonly commands = new CommandLedger();
   private readonly commandMutex = new Mutex();
   private closed = false;
@@ -5255,12 +5261,13 @@ export class RunService {
       // authorization names them.
       const scenarioFiles = await this.guardedScenarioFiles(run);
       const harnessOnly = new Set([projectConfigurationFile, ...(scenarioFiles.expected ?? []).map(file => file.path)]);
-      const guarded = new Set((await captureGuardedFiles(
+      const guardedFiles = (await captureGuardedFiles(
         this.projectRoot,
         this.requiredArtifacts(current).map(artifact => artifact.path),
         scenarioFiles,
         await this.auditPreparationPaths(run),
-      )).map(file => file.path).filter(path => !harnessOnly.has(path)));
+      )).filter(file => !harnessOnly.has(file.path));
+      const guarded = new Set(guardedFiles.map(file => file.path));
       const conformed = new Set(run.log.all('provider-conformed').map(event => conformanceKey(event.data.obligation, event.data.revision)));
       // A provider's report reaches this architect once, here, even while
       // this work item is yielded: what blocks it is the agreement.
@@ -5280,6 +5287,7 @@ export class RunService {
         item,
         onboarding,
         views,
+        defaultWriteScope: await this.defaultWriteScopes(index, [item.module], guardedFiles.filter(file => file.hash !== null).map(file => file.path)),
         hypotheses,
         registry: current.registry,
         // The decisions this work item is party to: the ones made for it,
@@ -5418,7 +5426,7 @@ export class RunService {
             invocation, session: destination,
           } });
         } }),
-        validate: input => {
+        validate: async input => {
           const verdict = this.workflow !== null && typeof input === 'object' && input !== null && (
             (input as { kind?: unknown }).kind === 'yield-for-providers' ||
             (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.kind === 'contract' ||
@@ -5443,6 +5451,18 @@ export class RunService {
           // What the last rejected request left unreported, which an
           // exhausted turn's failure names.
           if (!verdict.ok) unreported = unreportedByCompletion(input, localObligations());
+          // The scope is captured before the submission is accepted, so a
+          // scope the provider refuses is answered here with its path and the
+          // turn's remaining attempts, and nothing of it is committed.
+          if (verdict.ok && verdict.value.kind === 'assign' && verdict.value.assignment.revisesContract === undefined) {
+            const body = verdict.value.assignment;
+            const checked = await checkWriteScope({ ramify: this.options.ramify, projectRoot: this.projectRoot, index,
+              view: run.record.manifest.architectView, revision: this.assignedCount(run, item.id) + 1,
+              base: body.scope.base, extra: body.scope.extra, read: body.scope.read,
+              bootstrap: this.bootstrapOf(index, registry, body), rationale: body.scope.rationale });
+            if (checked.scope === null) return { ok: false as const, errors: checked.errors };
+            this.preparedScopes.set(body, checked.scope);
+          }
           return verdict;
         },
         scope: {
@@ -6719,6 +6739,65 @@ export class RunService {
     });
   }
 
+  /** The guarded paths that exist now and that an authorization can open, for an architect's briefing. */
+  private async presentGuardedPaths(run: Run, records: ReturnType<typeof committedRecords>): Promise<string[]> {
+    const scenarioFiles = await this.guardedScenarioFiles(run);
+    const harnessOnly = new Set([projectConfigurationFile, ...(scenarioFiles.expected ?? []).map(file => file.path)]);
+    return (await captureGuardedFiles(this.projectRoot, this.requiredArtifacts(records).map(artifact => artifact.path),
+      scenarioFiles, await this.auditPreparationPaths(run)))
+      .filter(file => file.hash !== null && !harnessOnly.has(file.path)).map(file => file.path);
+  }
+
+  /**
+   * What an assignment based on each owner gives its engineer, for an
+   * architect's briefing, from the provider's topology. Where the provider
+   * gives no answer the architect view names the owner and its children, and
+   * the briefing says the nested-project roots are unavailable.
+   */
+  private async defaultWriteScopes(index: ArchitectIndex | null, modules: readonly string[], guarded: readonly string[]): Promise<DefaultWriteScope[]> {
+    const topology = await this.options.ramify.queryOwnership(this.projectRoot, ['.'])
+      .then(answer => answer.selection.scope.ownership, () => null);
+    return [...new Set(modules)].flatMap(module => defaultWriteScopeOf(index, module, topology, guarded) ?? []);
+  }
+
+  /**
+   * The creation authority an ordinary base is captured with: the accepted
+   * registry entry that proposes an owner the view does not have yet. A
+   * broad base names existing modules only: nothing is bootstrapped into
+   * being by the exception that isolates a break.
+   */
+  private bootstrapOf(index: ArchitectIndex | null, registry: ReadonlyMap<string, RegistryEntry>, body: AssignmentBody): WriteScope['bootstrap'] {
+    const owner = 'module' in body.scope.base ? body.scope.base.module : null;
+    const authority = owner === null || (index !== null && findModule(index, owner) !== undefined)
+      ? undefined
+      : creationAuthority(registry, owner);
+    return authority?.proposed === undefined
+      ? []
+      : [{ capability: refOf(authority.capability, authority.revision, authority), owner: authority.owner, parent: authority.proposed.parent, directory: authority.proposed.directory }];
+  }
+
+  /**
+   * The scope an accepted assignment applies: the one captured while its
+   * submission was judged, where the revision and creation authority are the
+   * same, or a fresh capture. A fresh capture the provider refuses is an
+   * invalid submission that leaves nothing committed, never an internal
+   * failure.
+   */
+  private async preparedScope(
+    run: Run, body: AssignmentBody, revision: number, bootstrap: WriteScope['bootstrap'],
+    capture: () => Promise<WriteScope>, subject: string,
+  ): Promise<WriteScope | null> {
+    const prepared = this.preparedScopes.get(body);
+    this.preparedScopes.delete(body);
+    if (prepared !== undefined && prepared.revision === revision && JSON.stringify(prepared.bootstrap) === JSON.stringify(bootstrap)) return prepared;
+    try {
+      return await capture();
+    } catch (error) {
+      await this.fail(run, 'invalid-submission', `${subject} names a write scope that cannot be captured: ${message(error)}`);
+      return null;
+    }
+  }
+
   private async assignIteration(
     run: Run,
     item: WorkItem,
@@ -6731,30 +6810,6 @@ export class RunService {
     const committed = committedRecords(run.log.ledger.replay());
     let outlines = committed.outlines.get(item.id) ?? [];
     const delivery = run.log.all('hypotheses-delivered').filter(event => event.data.workItem === item.id).at(-1);
-
-    if (submission.outline !== undefined) {
-      const revision = outlines.length + 1;
-      const outline = workItemOutlineSchema.parse({
-        schema: 'ramify-agent.work-item-outline/1',
-        workItem: item.id,
-        revision,
-        invocation,
-        ...submission.outline,
-        hypothesesSeen: (delivery?.data.refs ?? []).map(ref => ({ ...ref })),
-      } satisfies WorkItemOutline);
-      await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation } }, [
-        { path: workLayout.outline(item.id, revision), id: item.id, revision, body: outline },
-      ]);
-      await this.afterWrite('outline-revised', run.record.jobId);
-      if (this.ignoring(run)) return null;
-      outlines = [...outlines, outline];
-    }
-
-    const outline = outlines.at(-1);
-    if (outline === undefined) {
-      await this.fail(run, 'internal', `The assignment of ${item.id} has no outline to work from`);
-      return null;
-    }
 
     // Contract sub-sessions are iterations of this work item too, so they
     // count: two assignments must never derive the same identifier.
@@ -6794,15 +6849,7 @@ export class RunService {
     }
 
     const body = submission.assignment;
-    // A broad base names existing modules only: nothing is bootstrapped into
-    // being by the exception that isolates a break.
-    const owner = 'module' in body.scope.base ? body.scope.base.module : null;
-    const authority = owner === null || (index !== null && findModule(index, owner) !== undefined)
-      ? undefined
-      : creationAuthority(localRegistry, owner);
-    const bootstrap = authority?.proposed === undefined
-      ? []
-      : [{ capability: refOf(authority.capability, authority.revision, authority), owner: authority.owner, parent: authority.proposed.parent, directory: authority.proposed.directory }];
+    const bootstrap = this.bootstrapOf(index, localRegistry, body);
 
     // A direct revision is a contract iteration, and its scope, gate and
     // revision number are the harness's, not the architect's: the agreement
@@ -6833,7 +6880,7 @@ export class RunService {
           .flatMap(requirement => requirement.evidence.fakeInjections),
         rationale: `The revision of ${revised.id}: the contract, its conformance suite, its fake, the files that hold it and this consumer's integration. ${body.scope.rationale}`,
       })
-      : await resolveWriteScope({ ramify: this.options.ramify,
+      : await this.preparedScope(run, body, number, bootstrap, () => resolveWriteScope({ ramify: this.options.ramify,
         projectRoot: this.projectRoot,
         index,
         view: run.record.manifest.architectView,
@@ -6843,7 +6890,34 @@ export class RunService {
         read: body.scope.read,
         bootstrap,
         rationale: body.scope.rationale,
-      });
+      }), `The assignment of ${item.id}`);
+    if (scope === null) return null;
+
+    // The outline revision is committed only once the scope it plans is
+    // captured, so a scope the provider refuses leaves no revision behind.
+    if (submission.outline !== undefined) {
+      const revision = outlines.length + 1;
+      const outline = workItemOutlineSchema.parse({
+        schema: 'ramify-agent.work-item-outline/1',
+        workItem: item.id,
+        revision,
+        invocation,
+        ...submission.outline,
+        hypothesesSeen: (delivery?.data.refs ?? []).map(ref => ({ ...ref })),
+      } satisfies WorkItemOutline);
+      await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation } }, [
+        { path: workLayout.outline(item.id, revision), id: item.id, revision, body: outline },
+      ]);
+      await this.afterWrite('outline-revised', run.record.jobId);
+      if (this.ignoring(run)) return null;
+      outlines = [...outlines, outline];
+    }
+
+    const outline = outlines.at(-1);
+    if (outline === undefined) {
+      await this.fail(run, 'internal', `The assignment of ${item.id} has no outline to work from`);
+      return null;
+    }
 
     // A guarded path this architect authorized is one the engineer may write
     // through the guarded tools: the authorization is the permission, and
@@ -7325,19 +7399,28 @@ export class RunService {
         openAssignment: state.activeAssignment, openChild: state.activeChild,
         obligations: { actor: capabilityActor(), projection: this.obligationProjection(run) } };
     };
-    const validateActionInput = (input: unknown) => {
+    const validateActionInput = async (input: unknown) => {
       const basis = currentBasis();
       if (basis === null) return { valid: false as const, issues: [{ path: ['task'], message: 'Task is absent', kind: 'state' as const }] };
       const checked = validateCapabilityAction(input, basis);
       if (!checked.valid || checked.value.kind !== 'assign') return checked;
-      const problems = assignmentErrors(checked.value.assignment, {
+      const body = checked.value.assignment;
+      const problems = assignmentErrors(body, {
         index: run.index, registry: new Map(records.registry.map(entry => [entry.capability, entry])),
         outline: null, capabilityCompatibility: plan.compatibility,
         guardedPaths: new Set(this.requiredArtifacts(records).map(entry => entry.path)),
         revising: true, bounds: engineerBoundsOf(run.record.policy.limits),
         obligations: { actor: capabilityActor(), projection: this.obligationProjection(run), registrations: checked.value.registrations },
       });
-      return problems.length === 0 ? checked : { valid: false as const, issues: problems.map(problem => ({
+      // The scope is captured before the action is accepted, so a scope the
+      // provider refuses is answered here with its path, under the turn's bound.
+      const scoped = problems.length > 0 ? null : await checkWriteScope({ ramify: this.options.ramify, projectRoot: this.projectRoot,
+        index: run.index, view: run.record.manifest.architectView,
+        revision: replayCapabilityState(run.log.events).tasks.get(task.id)?.nextAssignmentSequence ?? 1,
+        base: body.scope.base, extra: body.scope.extra, read: body.scope.read, bootstrap: [], rationale: body.scope.rationale });
+      if (scoped?.scope != null) this.preparedScopes.set(body, scoped.scope);
+      const errors = [...problems, ...(scoped?.errors ?? [])];
+      return errors.length === 0 ? checked : { valid: false as const, issues: errors.map(problem => ({
         path: problem.path.split('.'), message: problem.message, kind: 'state' as const,
       })) };
     };
@@ -7345,7 +7428,7 @@ export class RunService {
       { name: 'validate_capability_action', description: 'Check an action against the current task without submitting it.',
         inputSchema: z.toJSONSchema(capabilityActionSchema) as JsonSchema,
         execute: async input => {
-          const checked = validateActionInput(input);
+          const checked = await validateActionInput(input);
           return { text: JSON.stringify(checked), isError: !checked.valid };
         } },
       { name: 'update_capability_plan', description: 'Commit a new plan revision from the current one.',
@@ -7381,6 +7464,9 @@ export class RunService {
           `Provider entry decisions: ${JSON.stringify(providerDecisions, null, 2)}`,
           `Provider entry outlines: ${JSON.stringify(providerItems.map(entry => ({ item: entry.id, outline: records.outlines.get(entry.id) ?? [] })), null, 2)}`,
           `Read the live source at ${request.original.usage.map(use => use.path).join(', ')} and its tests. The snapshot at ${request.source.snapshot} records the suspension tree.`,
+          ...[defaultWriteScopeSection(await this.defaultWriteScopes(run.index,
+            [task.provider, task.consumer, ...task.authority.map(entry => entry.owner)], await this.presentGuardedPaths(run, records))).join('\n').trim()]
+            .filter(section => section !== ''),
           `# Selected plan package ${selectedHash}\n\n${selected}`,
           ...(progress === '' ? [] : [`Progress from the last turn: ${progress}`]),
         ] : [`Selected plan package ${selectedHash} was delivered in full in the earlier turn; it is unchanged.`,
@@ -7398,8 +7484,8 @@ export class RunService {
       toolName: 'submit_capability_action', description: 'Record the next action for this capability task.',
       inputSchema: z.toJSONSchema(capabilityActionSchema) as JsonSchema,
       submissionSchema: 'ramify-agent.capability-action/1',
-      validate: input => {
-        const checked = validateActionInput(input);
+      validate: async input => {
+        const checked = await validateActionInput(input);
         // What the last rejected handback request left unreported, which an
         // exhausted turn's failure names.
         if (!checked.valid) unreported = unreportedByHandback(input, currentBasis()?.obligations);
@@ -7998,10 +8084,11 @@ export class RunService {
         await this.fail(run, 'invalid-submission', `Capability assignment ${id} is invalid: ${problems.map(entry => `${entry.path}: ${entry.message}`).join('; ')}`);
         return null;
       }
-      const scope = await resolveWriteScope({ ramify: this.options.ramify, projectRoot: this.projectRoot, index,
+      const scope = await this.preparedScope(run, body, sequence, [], () => resolveWriteScope({ ramify: this.options.ramify, projectRoot: this.projectRoot, index,
         view: run.record.manifest.architectView, revision: sequence,
         base: body.scope.base, extra: body.scope.extra, read: body.scope.read, bootstrap: [],
-        rationale: body.scope.rationale });
+        rationale: body.scope.rationale }), `Capability assignment ${id}`);
+      if (scope === null) return null;
       const planRef = refOf(task.id, plan.revision, plan);
       for (const authorization of body.authorizations ?? []) {
         const target = await resolveRealTarget(this.projectRoot, authorization.path);
@@ -8265,7 +8352,7 @@ export class RunService {
       const beforeTree = assignment.coordination?.kind === 'capability-task'
         ? (await this.previewCandidateTree()).tree : undefined;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot, [...await this.deniedFiles(run), ...assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify);
+      const guarded = await this.engineerGuard(run, assignment);
       // A capability-task iteration is told only the obligations its
       // assignment names; a work item's iteration also sees its scenarios.
       const briefedScenarios = assignment.coordination?.kind === 'capability-task'
@@ -8898,7 +8985,7 @@ export class RunService {
       if (this.ignoring(run)) return null;
       attempt += 1;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const guarded = guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot, [...await this.deniedFiles(run), ...assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path)]), this.options.ramify);
+      const guarded = await this.engineerGuard(run, assignment);
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
         guarded,
@@ -11030,6 +11117,19 @@ export class RunService {
   }
 
   /** Every captured source document remains immutable for every writer of the run. */
+  /**
+   * The guard of one engineer invocation over its assignment's scope. The
+   * files only the harness writes and the guarded files no authorization
+   * names are refused outright; the latter are marked, so the refusal says
+   * that an architect's authorization would open them.
+   */
+  private async engineerGuard(run: Run, assignment: IterationAssignment) {
+    const harness = await this.deniedFiles(run);
+    const unauthorized = assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path);
+    const guarded = (await deniedFiles(this.projectRoot, unauthorized)).filter(path => !harness.includes(path));
+    return { ...guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot, [...harness, ...unauthorized]), this.options.ramify), guarded };
+  }
+
   private async deniedFiles(run: Run): Promise<string[]> {
     const features = trackedScenarios(run.log.ledger.replay()).records.map(record => record.file);
     const documents = (await readCapturedDocuments(run.directory, run.record.manifest)).manifest.documents.map(document => document.path);

@@ -44,6 +44,8 @@ const localSystemFile = fileURLToPath(new URL('./local-architect.system.md', imp
 const localProcedureFile = fileURLToPath(new URL('./local-architect.procedure.md', import.meta.url));
 const capabilityLocalProcedureFile = fileURLToPath(new URL('./local-architect-capability.procedure.md', import.meta.url));
 const reconciliationProcedureFile = fileURLToPath(new URL('./reconciliation.procedure.md', import.meta.url));
+/** The write-scope section every architect procedure that assigns a scope includes as `{{writeScope}}`. */
+const writeScopeSectionFile = fileURLToPath(new URL('./write-scope.procedure.md', import.meta.url));
 const engineerSystemFile = fileURLToPath(new URL('./engineer.system.md', import.meta.url));
 const engineerProcedureFile = fileURLToPath(new URL('./engineer.procedure.md', import.meta.url));
 const capabilityEngineerSystemFile = fileURLToPath(new URL('./engineer-capability.system.md', import.meta.url));
@@ -151,11 +153,11 @@ export interface PromptPackageOptions {
 export const initialArchitectPackage = 'initial-architect/3';
 export const catalogExtractorPackage = 'catalog-extractor/1';
 export const globalForkPackage = 'global-fork/4';
-export const localArchitectPackage = 'local-architect/9';
+export const localArchitectPackage = 'local-architect/10';
 export const contextSelectorPackage = 'context-selector/2';
 export const engineerPackage = 'engineer/4';
-export const capabilityEngineerPackage = 'engineer/6';
-export const capabilityArchitectPackage = 'capability-architect/1';
+export const capabilityEngineerPackage = 'engineer/7';
+export const capabilityArchitectPackage = 'capability-architect/2';
 export const contractEngineerPackage = 'contract-engineer/3';
 export const reviewerPackage = 'reviewer/4';
 export const failureAnalystPackage = 'failure-analyst/1';
@@ -289,6 +291,7 @@ async function loadLocalArchitect(options: PromptPackageOptions): Promise<Loaded
       describe(workOrientationProcedureFile, workOrientation, 'procedure'),
       { path: 'work-orientation.schema.json', hash: sha256(workOrientationSchema), kind: 'submission-schema', bytes: Buffer.byteLength(workOrientationSchema) },
     ],
+    sections: { writeScope: writeScopeSectionFile },
     options,
   });
   return { ...loaded, reconciliation: { procedure: withoutVersionComment(reconciliation).trim(), submissionSchema: reconciliationSchema },
@@ -329,6 +332,7 @@ async function loadCapabilityArchitect(options: PromptPackageOptions): Promise<L
     submissionKinds: [...capabilityActionSchema.options.map(option => option.shape.kind.value), 'reconciliation'],
     extraFiles: [describe(reconciliationProcedureFile, reconciliation, 'procedure'),
       { path: 'reconciliation.schema.json', hash: sha256(reconciliationSchema), kind: 'submission-schema', bytes: Buffer.byteLength(reconciliationSchema) }],
+    sections: { writeScope: writeScopeSectionFile },
     options,
   });
   return { ...loaded, reconciliation: { procedure: withoutVersionComment(reconciliation).trim(), submissionSchema: reconciliationSchema } };
@@ -418,10 +422,16 @@ async function loadPackage(request: {
   readonly extraSkillFile?: string | undefined;
   /** Further files of the package, already read, which its hash covers. */
   readonly extraFiles?: readonly PackageFile[] | undefined;
+  /**
+   * Shared procedure sections by placeholder: each file's text fills its
+   * `{{name}}` in the procedure, and is a procedure file the hash covers.
+   */
+  readonly sections?: Readonly<Record<string, string>> | undefined;
   readonly options: PromptPackageOptions;
 }): Promise<LoadedPackage> {
   const skillDirectory = request.options.skillDirectory ?? defaultSkillDirectory;
   const [system, procedure] = await Promise.all([readFile(request.systemFile, 'utf8'), readFile(request.procedureFile, 'utf8')]);
+  const sections = await Promise.all(Object.entries(request.sections ?? {}).map(async ([name, file]) => ({ name, file, text: await readFile(file, 'utf8') })));
   const skillFiles = (await listFiles(skillDirectory)).sort();
   const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8');
   const extraSkill = request.extraSkillFile === undefined ? '' : await readFile(request.extraSkillFile, 'utf8');
@@ -435,6 +445,7 @@ async function loadPackage(request: {
     ...(request.extraSkillFile === undefined ? [] : [describe(request.extraSkillFile, extraSkill, 'skill')]),
     { path: schemaName, hash: sha256(submissionSchema), kind: 'submission-schema', bytes: Buffer.byteLength(submissionSchema) },
     ...(request.extraFiles ?? []),
+    ...sections.map(section => describe(section.file, section.text, 'procedure')),
   ];
 
   return {
@@ -444,7 +455,8 @@ async function loadPackage(request: {
     files,
     submissionKinds: request.submissionKinds,
     system: withoutVersionComment(system),
-    procedure: withoutVersionComment(procedure).trim(),
+    procedure: fill(withoutVersionComment(procedure).trim(),
+      Object.fromEntries(sections.map(section => [section.name, withoutVersionComment(section.text).trim()]))),
     skill: skill.trim(),
     skillDirectory,
     extraSkill: withoutVersionComment(extraSkill).trim(),

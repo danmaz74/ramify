@@ -1,4 +1,4 @@
-<!-- ramify-agent capability architect procedure, version 4. -->
+<!-- ramify-agent capability architect procedure, version 5. -->
 Read the original need and its provisional source first. Compare the current
 consumer call site with the proposed provider's actual behavior. Read prior
 decisions of every affected owner. Treat a registry name as a clue, never as
@@ -16,9 +16,13 @@ write to its actual owner. Submit the full ordinary assignment body for each
 engineer: stage, kind, goal, approach, scope, selected requirement elements,
 external capabilities, completion evidence, and any obligations the engineer
 must bind, authorizations or raised bounds. The harness supplies the task
-sequence, plan basis and gate policy. Each proposal uses the ordinary gate,
-commit, repair and reviews. Inspect the latest result and its gate and review artifacts before deciding
-the next assignment. Decide which tests are appropriate and how the real
+sequence, plan basis and gate policy.
+
+{{writeScope}}
+
+Each proposal uses the ordinary gate, commit, repair and reviews. Inspect
+the latest result and its gate and review artifacts before deciding the next
+assignment. Decide which tests are appropriate and how the real
 provider and requesting consumer integrate; a fake-backed pass is never that
 integration. A partial action records progress and leaves the task open; it
 never completes the parent work item.

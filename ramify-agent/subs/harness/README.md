@@ -432,12 +432,17 @@ hiding or measured complexity justifies it.
     requirements this work item waits for; and `unresolved`, which states a
     conflict rather than weakening the request, for the global architect to
     answer.
-  - `assignment.ts`: the assignment body an architect submits and the rules
-    the schema cannot hold: the module is one the refreshed view has or one
-    an accepted proposal creates, an included child is a direct child and
-    never a descendant, an extra location lies under a module, a named
-    capability is one the registry holds, and the stage is one the outline in
-    force names. It carries no gate, no test selection and no guarded
+  - `assignment.ts`: the assignment body an architect submits, with JSON
+    schema descriptions of `included`, `extra`, `read` and `authorizations`,
+    and the rules the schema cannot hold without the provider: the module is
+    one the refreshed view has or one an accepted proposal creates, an
+    included directory is a normalized project-relative path, an extra is one
+    project-relative file that the harness does not write alone and that is
+    authorized where it is guarded, a named capability is one the registry
+    holds, and the stage is one the outline in force names. The same
+    submission is then judged by `scope.ts` against one ownership query, and
+    a scope that fails there is rejected with the turn's remaining attempts,
+    before any outline or assignment is committed. It carries no gate, no test selection and no guarded
     hashes: the harness derives those. A `breaking` assignment works a
     guarantee the outline records as broken, and only it may state the
     explicitly broad base `{ modules, rationale }`, whose rationale may not
@@ -474,6 +479,17 @@ hiding or measured complexity justifies it.
     including absent targets, are checked against captured and current facts.
     Configuration creation, changes and deletion need recorded authorization.
     Captured authority survives current-policy recovery; refresh only narrows.
+    `checkWriteScope` judges a submitted scope with one ownership query: each
+    `included` entry is exactly an immediate child module directory or an
+    owned nested-project root, named once with a reason and instructions,
+    and a directory inside the owner is refused as already part of the base;
+    each `extra` file passes the placement rules the guard applies at write
+    time; and a capture that throws is a rejection at `assignment.scope`. The
+    scope it captures is the one the accepted assignment applies, and
+    `resolveWriteScope` keeps the `included` rules as its backstop.
+    `defaultWriteScopeOf` states, for an architect's briefing, an owner's
+    directory, its immediate child modules, its owned nested-project roots
+    and the guarded files beneath it.
   - `engineer.ts`: what an engineer submits and the briefing it starts
     from. An engineer has no test tool of its own: the briefing says, as
     text, that the gate commits a candidate and asks the project's committed
@@ -498,7 +514,9 @@ hiding or measured complexity justifies it.
     goal, its requirement and acceptance references, its module's onboarding
     and API view, the hypotheses it received with their rationales, the
     registry, and the placement decided for it — its own, and the
-    consequences of a decision that names it. Where a view cannot be materialized the message says so, so
+    consequences of a decision that names it. Its "Default write scope"
+    block names the owner's directory, the only directories `included` may
+    name and the guarded files beneath it. Where a view cannot be materialized the message says so, so
     that absence is never read as a refusal. It states an engineer's bounds
     and their ceilings, and after an engineer that ended without a result,
     the digest, then the analysis, then the architect's options: a fresh
@@ -609,7 +627,9 @@ hiding or measured complexity justifies it.
 - `prompts/`: one prompt package per role, versioned and hashed into the
   run's `prompts/manifest.json`. `submissionKinds` names the union members a
   package offers its role; a member a package does not offer is one no run
-  can produce. The rendered prompt is never stored: it may hold file
+  can produce. `write-scope.procedure.md` is the one write-scope section of
+  every architect procedure that assigns a scope, filled into its
+  `{{writeScope}}` and hashed with the package. The rendered prompt is never stored: it may hold file
   contents. The contract package is an engineer's with the contract skill
   beside the module architect's: the role is an engineer, and the skill is
   what makes the invocation a contract iteration. An engineer's prompt
@@ -624,7 +644,10 @@ hiding or measured complexity justifies it.
   assignment recorded. A block makes no mutation, does not end the session,
   does not request approval and does not widen the scope; a target that
   cannot be resolved at all is its own verdict, distinct from a proven scope
-  violation. Nothing here stores what a call proposed to write.
+  violation. A file only the harness writes and a guarded file no
+  authorization names are both refused outright, and their explanations
+  differ: the first is never writable, the second asks for an architect's
+  authorization. Nothing here stores what a call proposed to write.
 
   A call that names no path, or several, cannot be judged and is blocked as
   unresolved.

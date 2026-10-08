@@ -57,8 +57,14 @@ export const assignableKindSchema = z.enum(['ordinary', 'breaking', 'verificatio
 export const scopeBaseBodySchema = z.union([
   z.object({
     module: modulePathSchema,
-    /** Direct children whose complete subtree is included. */
-    included: z.array(z.object({ directory: text, reason: text, instructions: text }).strict()),
+    /** Direct children whose complete subtree is included, and owned nested-project roots. */
+    included: z.array(z.object({ directory: text, reason: text, instructions: text }).strict()).describe(
+      'Whole trees beyond the base, normally []. The base already gives the engineer the owner\'s whole own contents: '
+      + 'module.ramify, README.md and all of src/, including src/tests/ and src/interfaces/. Each entry names exactly one '
+      + 'immediate child module directory or one owned nested-project root, with a reason and instructions. An included '
+      + 'child brings its whole subtree, every descendant module included, so a descendant never needs its own entry. '
+      + 'A directory inside the owner, such as its src/tests, is already part of the base and is refused.',
+    ),
   }).strict(),
   z.object({
     /** Every module the break runs through, the one that breaks included. */
@@ -88,9 +94,14 @@ export const extraLocationSchema = z.object({
 export const scopeBodySchema = z.object({
   base: scopeBaseBodySchema,
   /** Locations beyond the base: a contract, a conformance suite, a fake, an exposure declaration, a consumer, a path outside modules. */
-  extra: z.array(extraLocationSchema),
-  /** The declared read scope beyond the base; soft. */
-  read: z.array(modulePathSchema),
+  extra: z.array(extraLocationSchema).describe(
+    'Single files outside the base, each with its purpose; never a directory. A file in an excluded region, in a nested '
+    + 'project the scope does not include, or written by the harness alone is refused, and a guarded file needs an authorization.',
+  ),
+  /** The declared read scope beyond the base: recorded with the assignment, and nothing more. */
+  read: z.array(modulePathSchema).describe(
+    'Modules you expect the engineer to read beyond the base. Recorded only: it limits nothing, widens nothing, and the engineer does not see it.',
+  ),
   rationale: text,
 }).strict();
 
@@ -120,7 +131,12 @@ export const assignmentBodySchema = z.object({
    * each one; a submission never does, and an engineer never authorizes
    * anything. An authorization stands for this iteration alone.
    */
-  authorizations: z.array(z.object({ path: text, rationale: text }).strict()).optional(),
+  authorizations: z.array(z.object({ path: text, rationale: text }).strict()).optional().describe(
+    'Guarded files this iteration may change, each with its rationale: package manifests and lockfiles, .gitignore, '
+    + 'tsconfig.json, test-runner and Cucumber configuration, the audit definition and its inputs, and contract artifacts. '
+    + 'A local architect\'s submission carries an outline revision that records them. One iteration only. Feature files, '
+    + 'ramify-agent.json and captured plan documents are never writable.',
+  ),
   /**
    * The agreement this assignment revises, by its identifier. The harness
    * fills the revision: a submission never chooses one.
@@ -303,8 +319,9 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
     });
   }
 
-  // Narrow extras still require explicit guarded authorization. Provider
-  // capture validates topology and hard exclusions before accepting authority.
+  // Narrow extras still require explicit guarded authorization. The
+  // ownership rules of `included` and `extra` need the provider's answer, so
+  // `checkWriteScope` judges them in the same submission.
   const authorized = new Set(authorizations.map(authorization => toPosix(authorization.path)));
   const harnessOnly = evidence.harnessOnly ?? new Set<string>();
   body.scope.extra.forEach((entry, position) => {

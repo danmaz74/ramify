@@ -577,11 +577,28 @@ describe('the prompt package', () => {
   test('new runs offer capability coordination without the retired contract package', async () => {
     const { manifest } = await loadPromptPackages();
     expect(manifest.packages['contract-engineer']).toBeUndefined();
-    expect(manifest.packages['capability-architect']?.package).toBe('capability-architect/1');
+    expect(manifest.packages['capability-architect']?.package).toBe('capability-architect/2');
     expect(manifest.packages['engineer']?.submissionKinds).toEqual(['completion-proposed', 'partial', 'unsuitable', 'capability-needed']);
     expect(manifest.packages['local-architect']?.submissionKinds).toEqual([
       'assign', 'request-placement', 'request-completion', 'unresolved', 'reconciliation', 'work-orientation',
     ]);
+  });
+
+  test('every architect procedure that assigns a scope carries the one write-scope section, hashed with its package', async () => {
+    const current = await loadPromptPackages();
+    const legacy = await loadPromptPackages({ capabilityWorkflow: false });
+    const section = (await readFile(new URL('../prompts/write-scope.procedure.md', import.meta.url), 'utf8')).split('\n').slice(1).join('\n').trim();
+    for (const loaded of [current.packages.get('local-architect')!, current.packages.get('capability-architect')!, legacy.packages.get('local-architect')!]) {
+      expect(loaded.procedure).toContain(section);
+      expect(loaded.procedure).not.toContain('{{writeScope}}');
+      expect(loaded.files.some(file => file.kind === 'procedure' && file.path.endsWith('prompts/write-scope.procedure.md'))).toBe(true);
+    }
+    expect(current.packages.get('local-architect')!.procedure).not.toContain('Keep source and tests with their owners');
+    expect(section).toContain('A directory inside the owner, such as its `src/tests`, is already part of\n  the base and is refused');
+    expect(section).toContain('An included child module brings its whole subtree:');
+    expect(current.packages.get('local-architect')!.package).toBe('local-architect/10');
+    expect(current.packages.get('engineer')!.package).toBe('engineer/7');
+    expect(current.packages.get('engineer')!.procedure).toContain('`edit` and `write` refuse those files unless your');
   });
 
   test('asks for the entry assignments, which become the work items', async () => {

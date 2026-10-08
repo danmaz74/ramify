@@ -13,6 +13,7 @@ import type { WorkItem, WorkItemOutline } from './records.js';
 import type { EngineerBounds } from '../run/policy.js';
 import { analysisLines, boundOf, digestLines } from './failure.js';
 import type { IterationResult, WriteScope } from './iterations.js';
+import type { DefaultWriteScope } from './scope.js';
 
 /*
  * What a local architect is given for one work item: the goal, its
@@ -144,6 +145,8 @@ export interface WorkItemBriefing {
   readonly moduleDirectory?: string | undefined;
   readonly onboarding: Onboarding;
   readonly views: ApiViewResult;
+  /** What an assignment based on this work item's module gives its engineer, where the provider or the view knows the module. */
+  readonly defaultWriteScope?: readonly DefaultWriteScope[] | undefined;
   readonly hypotheses: readonly Hypothesis[];
   readonly registry: readonly RegistryEntry[];
   /** The placement decisions delivered to this work item, its own local ones included. */
@@ -257,6 +260,25 @@ export interface DelegationBriefing {
   }> | undefined;
 }
 
+/**
+ * The "Default write scope" block of an architect's briefing: for each owner,
+ * the directory its base gives an engineer, the only directories `included`
+ * may name, and the guarded files beneath it. Empty where no owner is known.
+ */
+export function defaultWriteScopeSection(scopes: readonly DefaultWriteScope[]): string[] {
+  if (scopes.length === 0) return [];
+  const code = (paths: readonly string[]) => paths.length === 0 ? 'none' : paths.map(path => `\`${path}\``).join(', ');
+  const lines = ['## Default write scope', ''];
+  for (const scope of scopes) {
+    lines.push(`- \`${scope.module}\`: the base gives its engineer \`${scope.directory === '' ? '.' : scope.directory}/\` whole — \`module.ramify\`, \`README.md\`, all of \`src/\` with \`src/tests/\` and \`src/interfaces/\`, other documentation and auxiliary source — except the directories below.`);
+    lines.push(`  - Immediate child modules: ${scope.children.length === 0 ? 'none' : scope.children.map(child => `\`${child.directory}\` (\`${child.module}\`)`).join(', ')}.`);
+    lines.push(`  - Owned nested-project roots: ${scope.nestedProjects === null ? 'unavailable, because the ownership query gave no answer' : code(scope.nestedProjects)}.`);
+    lines.push(`  - Guarded files, writable only with an authorization: ${code(scope.guarded)}.`);
+  }
+  lines.push('', 'Those child and nested-project directories are the only valid `included` values, and `included` is `[]` unless the iteration needs one of them whole. An included child brings its whole subtree, every module beneath it included.', '');
+  return lines;
+}
+
 /** The first user message of one local architect invocation. */
 export function workItemMessage(briefing: WorkItemBriefing): string {
   const { item } = briefing;
@@ -315,6 +337,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     }
   }
   lines.push(`- The architect view is at \`${rooted(architectViewDirectory)}/\`.`, '');
+  lines.push(...defaultWriteScopeSection(briefing.defaultWriteScope ?? []));
 
   lines.push('## Hypotheses you received', '');
   if (briefing.hypotheses.length === 0) {

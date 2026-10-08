@@ -370,7 +370,7 @@ export function iterationMessage(briefing: IterationBriefing): string {
     ...paths.roots.map(root => `- \`${root}/\` and everything beneath it`),
     ...paths.files.map(file => `- \`${file}\``),
     '',
-    'Nothing else. A write outside this scope is refused before it happens; report the need instead of working around it.',
+    'Nothing else. Beneath these roots, child modules, nested projects and guarded files stay excluded unless this list names them. A write outside this scope is refused before it happens; report the need instead of working around it.',
     '',
   ];
 

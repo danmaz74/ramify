@@ -475,7 +475,10 @@ For non-breaking iterations, the local architect assigns scope as **the assigned
 contents, plus the complete subtrees of selected immediate children**. For
 each child, it evaluates the search space of the whole subtree and either
 includes all of it or excludes all of it. It does not select individual
-descendants or make exclusions within an included child subtree.
+descendants or make exclusions within an included child subtree. An owned
+nested project is included the same way, by its root. The harness rejects any
+other included directory at submission, including one inside the assigned
+module, whose own contents the base already holds.
 
 For example, a brief could describe its scope as:
 
@@ -560,8 +563,10 @@ can change write authority; a retry or successful read does not expand it.
 Read and search boundaries are soft. Default exploration to the assigned
 module, included subtrees, onboarding and requester API views. Allow explicit
 exploration elsewhere, record the excursion, and provide a concise reminder
-on first entering another module rather than repeated warnings. Contract
-sessions use their broader declared read scope. Distinguish agent exploration
+on first entering another module rather than repeated warnings. An
+assignment's declared read scope is recorded with it and nothing more: no
+session receives it, and every session's excursions, a contract session's
+included, are measured against its write scope. Distinguish agent exploration
 from files read internally by a compiler or test runner; the latter are not
 read-scope excursions. Observation through arbitrary commands may be
 incomplete and must be labeled accordingly.

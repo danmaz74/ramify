@@ -86,7 +86,7 @@ test('PB3-S01–S05 S09: F1 whole owners, named physical children, independent t
   expect(await outsideScope(root, guardedScopeOf(broad, [], ramify), hard)).toEqual(hard);
   const both = await capture([inclusion(child), inclusion(`${child}/project`)]);
   expect(await placementDecisions(guardedScopeOf(both, [], ramify), root, [`${child}/project/new.txt`])).toEqual([true]);
-  for (const invalid of ['subs/group', `${child}/subs/other`, `${child}/project/README.md`, 'cache', 'missing']) await expect(capture([inclusion(invalid)])).rejects.toThrow(/whole immediate child subtree|owned-nested-project/u);
+  for (const invalid of ['subs/group', `${child}/subs/other`, `${child}/project/README.md`, 'cache', 'missing']) await expect(capture([inclusion(invalid)])).rejects.toThrow(/is neither an immediate child module directory|lies inside the own contents/u);
   expect(scopeBodySchema.safeParse({ base: { module: 'app', included: [{ ...inclusion(child), owner: 'app/a' }] }, extra: [], read: [], rationale: 'r' }).success).toBe(false);
   expect(scopeBodySchema.safeParse({ base: { module: 'app', included: [] }, extra: [{ path: 'scripts/new.ts', purpose: 'outside-modules', reason: 'r' }], read: [], rationale: 'r' }).success).toBe(false);
 }, 60_000);
