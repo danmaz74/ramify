@@ -1,0 +1,2743 @@
+{
+  "optimization": 11,
+  "scope": "writer settlement, shell tools and single-session mixed files",
+  "baseCommit": "7eda41ad266a0f0c9a0d14b528c231620b515caa",
+  "implementationCommit": "325c233bba6cd8e0d1f5ea2990f88b871c8a05ad",
+  "implementationTree": "94e39e27a1b1784ded1b80489533272b8e439aa8",
+  "branch": "perf/plan22-settlement",
+  "integrationTarget": {
+    "path": "/ramify",
+    "branch": "ramify-agent",
+    "observedCommit": "7eda41ad266a0f0c9a0d14b528c231620b515caa",
+    "unfinishedWork": "not copied, staged or modified"
+  },
+  "sourceFiles": {
+    "ramify-agent/subs/harness/src/tests/helpers/settlement-boundaries.ts": "d5252d96c248fc0c174a7356b29545f68a6e35082474d0d535d60337ecc68181",
+    "ramify-agent/subs/harness/src/tests/settlement-boundaries.test.ts": "92d3b9ffed3762a19426d92893aad07e2dfdd2525eeeb4c0a91fdfb18e8c0b62",
+    "ramify-agent/subs/harness/src/tests/shell-tool.boundary.test.ts": "ad0a2a84074306160dc94d1d87d2a9065a18b5865b6f8617f9bcfd3d447fdf7a",
+    "ramify-agent/subs/harness/src/tests/shell-tool.test.ts": "aa49cc3f97d8cb9fd40393d0d8be16a904eb6742e840deee16552bc66b95192a",
+    "ramify-agent/subs/harness/src/tests/single-session-fixture.ts": "6ab87ca787dda8135004c7f69b9da637c7a5b01cf20eebe024fb6dadce529eb1",
+    "ramify-agent/subs/harness/src/tests/single-session.boundary.test.ts": "6c4692e989a46ba679c08c0c6c08af2ed00be786410cca24672433c8b7e6aaf6",
+    "ramify-agent/subs/harness/src/tests/single-session.test.ts": "b68246f43d7393a20a0d6bfed4438a6aa8d49f632d151ab51bf5e51262bb3baa",
+    "ramify-agent/subs/harness/src/tests/writer-settlement.boundary.test.ts": "543019180d6be230eedf9e518f4cf45a6315c611abef4bd8a74aade7e36dbdb2",
+    "ramify-agent/subs/harness/src/tests/writer-settlement.test.ts": "9f88c03db4325b9fc940a26d1e18e4e57c3cca0db0edce8159c5fa8887afc722"
+  },
+  "originalCaseCount": 30,
+  "originalAssertions": 200,
+  "originalOrdinaryCases": 21,
+  "nativeCases": 9,
+  "byteIdenticalNativeRegistrations": 8,
+  "caseMap": [
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "title": "a session that says it is idle while its process group runs is not settled",
+      "expects": 4,
+      "native": true,
+      "destination": "subs/harness/src/tests/writer-settlement.boundary.test.ts",
+      "originalSha256": "d66794588152270f8809c5e64aaaac0d3a5e3cd88493de3d0e6ee95c99165008",
+      "destinationSha256": "d66794588152270f8809c5e64aaaac0d3a5e3cd88493de3d0e6ee95c99165008",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "title": "a group that cannot be confirmed gone leaves the release unconfirmed, and blocks what follows",
+      "expects": 6,
+      "native": false,
+      "destination": "subs/harness/src/tests/writer-settlement.test.ts",
+      "originalSha256": "b73d1009cedf0e6d836b5f30465b9dbe6bd0980323de36daea49978a4b54d7a1",
+      "destinationSha256": "b73d1009cedf0e6d836b5f30465b9dbe6bd0980323de36daea49978a4b54d7a1",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "title": "a session that never becomes idle is not settled, although nothing is left running",
+      "expects": 2,
+      "native": false,
+      "destination": "subs/harness/src/tests/writer-settlement.test.ts",
+      "originalSha256": "07a89834dc241db491b302725e4a11f7b4a81383cfc59165e6767525bfa520a4",
+      "destinationSha256": "07a89834dc241db491b302725e4a11f7b4a81383cfc59165e6767525bfa520a4",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "title": "a write that still arrives while the group is being killed is recorded, not lost",
+      "expects": 2,
+      "native": true,
+      "destination": "subs/harness/src/tests/writer-settlement.boundary.test.ts",
+      "originalSha256": "e5ac00037ceab1a9e8eba04d87576840399cbff8c182ca7418c44a95d2c9df1b",
+      "destinationSha256": "e5ac00037ceab1a9e8eba04d87576840399cbff8c182ca7418c44a95d2c9df1b",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "title": "a second writer without an intervening release is a fault of the harness",
+      "expects": 2,
+      "native": false,
+      "destination": "subs/harness/src/tests/writer-settlement.test.ts",
+      "originalSha256": "2f3d0d36babf6c543e4ff80285f52fd7240d07bcec561808bc0c362ad260b342",
+      "destinationSha256": "2f3d0d36babf6c543e4ff80285f52fd7240d07bcec561808bc0c362ad260b342",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "title": "a group nobody registers is a group nothing waits for",
+      "expects": 2,
+      "native": true,
+      "destination": "subs/harness/src/tests/writer-settlement.boundary.test.ts",
+      "originalSha256": "3482afe64a720e7d52f695451c16094e14b07c0d938e8ade3a6d32a367ef7888",
+      "destinationSha256": "3482afe64a720e7d52f695451c16094e14b07c0d938e8ade3a6d32a367ef7888",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "title": "fails as writer-unsettled, and runs no gate against that tree",
+      "expects": 5,
+      "native": false,
+      "destination": "subs/harness/src/tests/writer-settlement.test.ts",
+      "originalSha256": "ed363d8f530953a56bf0a803a492abbb54f019c120a8f830a94795e0f06b3ac2",
+      "destinationSha256": "a3e7f2007bce26e84f34ee12dfb6c5b548d1e580ebf3ae56f8baa69035744e22",
+      "registrationByteIdentical": false,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "title": "a tree the run never checked is left exactly as it was",
+      "expects": 1,
+      "native": false,
+      "destination": "subs/harness/src/tests/writer-settlement.test.ts",
+      "originalSha256": "9e639f1f487d805cd1332ac93ca1a8e383d8b0b06abc5e6fab8cdd7156150557",
+      "destinationSha256": "f72b123f764cedf32ffde6d1744a24721cdb11b7fcbb45d2c620658e07afde8f",
+      "registrationByteIdentical": false,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/writer-settlement.test.ts",
+      "title": "close retains the project lock when session settlement was not confirmed",
+      "expects": 4,
+      "native": false,
+      "destination": "subs/harness/src/tests/writer-settlement.test.ts",
+      "originalSha256": "af4fbd1c2437a9887c46ea8ccccd30f007eaf16143a2c4db42fa2fd2bbf0c553",
+      "destinationSha256": "f469b40d6367dc9f5ad2a39b93059709f2d544ee9cd0bb26c39df7fd198e0ed2",
+      "registrationByteIdentical": false,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.test.ts",
+      "title": "refuses a whole suite before counting or spawning any chained command",
+      "expects": 9,
+      "native": false,
+      "destination": "subs/harness/src/tests/shell-tool.test.ts",
+      "originalSha256": "49e469cba9a8877a3728d85ceb776ca64c81bb4653c927188af042b12d5ac7d8",
+      "destinationSha256": "49e469cba9a8877a3728d85ceb776ca64c81bb4653c927188af042b12d5ac7d8",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.test.ts",
+      "title": "runs the command it is given and answers its exit code, its tail and its output file",
+      "expects": 11,
+      "native": true,
+      "destination": "subs/harness/src/tests/shell-tool.boundary.test.ts",
+      "originalSha256": "3f8bc9bf890f7e4b73319c59fc11b8fc862fabd96d5331abac3704c51f57cc70",
+      "destinationSha256": "3f8bc9bf890f7e4b73319c59fc11b8fc862fabd96d5331abac3704c51f57cc70",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.test.ts",
+      "title": "bounds the tail it answers while the file keeps everything",
+      "expects": 2,
+      "native": true,
+      "destination": "subs/harness/src/tests/shell-tool.boundary.test.ts",
+      "originalSha256": "6055a77be2562cf0d89c8e595949bfe59b731c27fa9196cbe26aa34e4f034443",
+      "destinationSha256": "6055a77be2562cf0d89c8e595949bfe59b731c27fa9196cbe26aa34e4f034443",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.test.ts",
+      "title": "a schema violation returns its errors and runs nothing",
+      "expects": 11,
+      "native": false,
+      "destination": "subs/harness/src/tests/shell-tool.test.ts",
+      "originalSha256": "10d53cf40a338941b1053ba8e9ca3f4d9b9a814e68130af85ccd582c7b22097c",
+      "destinationSha256": "e8bb03f1928ccd89941400541a4993b8a1008a1ec476568f25ce44929e821c01",
+      "registrationByteIdentical": false,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.test.ts",
+      "title": "the schema the agent is shown is the one that validates",
+      "expects": 3,
+      "native": false,
+      "destination": "subs/harness/src/tests/shell-tool.test.ts",
+      "originalSha256": "3aea23411e2c860e39c0e66a614ac2291b59897a3f6b1d3bc661c41dbe1aee7a",
+      "destinationSha256": "3aea23411e2c860e39c0e66a614ac2291b59897a3f6b1d3bc661c41dbe1aee7a",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.test.ts",
+      "title": "a command that outlives its timeout is a timeout, not a failure",
+      "expects": 3,
+      "native": true,
+      "destination": "subs/harness/src/tests/shell-tool.boundary.test.ts",
+      "originalSha256": "c03051c74f2c82578e98821bbf682f48e6fa94204cb7c3210763069688b1b6b8",
+      "destinationSha256": "c03051c74f2c82578e98821bbf682f48e6fa94204cb7c3210763069688b1b6b8",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.test.ts",
+      "title": "a command that leaves a descendant is settled by its process group",
+      "expects": 5,
+      "native": true,
+      "destination": "subs/harness/src/tests/shell-tool.boundary.test.ts",
+      "originalSha256": "87734fd81f7e49a6452df603f3b46921f000d1bba45d8bc216e6a9d392aa2505",
+      "destinationSha256": "87734fd81f7e49a6452df603f3b46921f000d1bba45d8bc216e6a9d392aa2505",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/shell-tool.test.ts",
+      "title": "settlement ends a command that is still running, with its group",
+      "expects": 3,
+      "native": true,
+      "destination": "subs/harness/src/tests/shell-tool.boundary.test.ts",
+      "originalSha256": "06d1c36771f841078d6412c4996b113d6e2ad4d22a58d80dc42387cc96007546",
+      "destinationSha256": "06d1c36771f841078d6412c4996b113d6e2ad4d22a58d80dc42387cc96007546",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "relative reads, writes, and shell start in module src while observations remain project-relative",
+      "expects": 11,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "945448793888462acd3ec86b1da539608068195bb98430285f446eef0d35a294",
+      "destinationSha256": "bd38b6a0e6c84ca6d2e5d6dc92e58526b5eac895a794c05d6cea640034f78672",
+      "registrationByteIdentical": false,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "a completed change is in the tree, recorded as submitted, answered with what follows, and not committed",
+      "expects": 18,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "8db81131a0d2f6974abf7ecd2ddd69971ab9a22222c3e6ff803ded5778467a39",
+      "destinationSha256": "8db81131a0d2f6974abf7ecd2ddd69971ab9a22222c3e6ff803ded5778467a39",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "a write outside the module is refused by the guard, writes nothing, and is observed; an extra write path is allowed",
+      "expects": 6,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "1157641b99a8e0b60fa35e04563b5b614f1ac94f4b6d9f27253387ba063c9b45",
+      "destinationSha256": "1157641b99a8e0b60fa35e04563b5b614f1ac94f4b6d9f27253387ba063c9b45",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "a module violation is told in the edit's result, refuses completion while it stands, and completion is accepted after the fix",
+      "expects": 12,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "c751eb0afd90377cff4f4b30f97b1c89b288301fec4be20c740fb1b001efb4fb",
+      "destinationSha256": "c751eb0afd90377cff4f4b30f97b1c89b288301fec4be20c740fb1b001efb4fb",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "unsuitable and capability-needed are recorded and answered, and no further session starts",
+      "expects": 9,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "faa62b8195c9ce056777e83fa4a07acce26444e123caa24de98d33aa524348b5",
+      "destinationSha256": "faa62b8195c9ce056777e83fa4a07acce26444e123caa24de98d33aa524348b5",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "an unknown module is refused before the agent starts, as a session that could not start, with the lock released",
+      "expects": 5,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "18ac15963d6978cb603cfa4a79b664d049d3a9729246b854320552ea6790d02d",
+      "destinationSha256": "18ac15963d6978cb603cfa4a79b664d049d3a9729246b854320552ea6790d02d",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "a declared module with missing src is refused before the agent starts",
+      "expects": 3,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "8092fee59e7ad8e321a1b831bf008e0cc9488c746e1ae693603b310d35cf4b85",
+      "destinationSha256": "8092fee59e7ad8e321a1b831bf008e0cc9488c746e1ae693603b310d35cf4b85",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "a held project lock is refused before the agent starts, and the lock is left untouched",
+      "expects": 5,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "ea06364444a0444caf2167036364043c79eb356ce4870b7857b7ac615c9dcef7",
+      "destinationSha256": "ea06364444a0444caf2167036364043c79eb356ce4870b7857b7ac615c9dcef7",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+      "expects": 10,
+      "native": true,
+      "destination": "subs/harness/src/tests/single-session.boundary.test.ts",
+      "originalSha256": "121ae5f9d7c556f93b57d97c990eab17654ea27166fd30d09540652d17cd96ef",
+      "destinationSha256": "43362bd855e1869a656b06e17f1dd4fbd62dee558cd725d3174173047d5095cc",
+      "registrationByteIdentical": false,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed",
+      "expects": 9,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "7024e507ef8fb38e14da748834df343aa78778b1fff82f1cd3a1805139f95de1",
+      "destinationSha256": "7024e507ef8fb38e14da748834df343aa78778b1fff82f1cd3a1805139f95de1",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "failing work: the checkpoint fails, its attempt is under gate/, the exit status is 1, and nothing is committed",
+      "expects": 6,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "32bc9c6b05281af4bf4781c306232d70afd4329dcacd4f00213f3bcc5a1f25fa",
+      "destinationSha256": "32bc9c6b05281af4bf4781c306232d70afd4329dcacd4f00213f3bcc5a1f25fa",
+      "registrationByteIdentical": true,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "every record exists and validates against its schema, and git sees nothing under plans/.harness/",
+      "expects": 16,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "803da344bf7bb6242a0a741916d71ea404813ddad0373365183a43326bf63e77",
+      "destinationSha256": "10bfac7ea8ee22a5e01fe521f712834f4621d67d9dd4638f49eafce0e083d1fd",
+      "registrationByteIdentical": false,
+      "originalAssertionLinesPreserved": true
+    },
+    {
+      "file": "subs/harness/src/tests/single-session.test.ts",
+      "title": "its transcript is transcript.jsonl: the start before the model call, the harness's decisions, and the shell's log by reference",
+      "expects": 15,
+      "native": false,
+      "destination": "subs/harness/src/tests/single-session.test.ts",
+      "originalSha256": "359270eb8d0541a4b23fa019131afc44e5d2ef1d364e62c6337b39f36c03bdee",
+      "destinationSha256": "05765a725adbf60d43821ec02c8787b10604bcbf987fee40ee2d924dd538b12b",
+      "registrationByteIdentical": false,
+      "originalAssertionLinesPreserved": true
+    }
+  ],
+  "baseline": {
+    "command": "node_modules/.bin/vitest run subs/harness/src/tests/writer-settlement.test.ts subs/harness/src/tests/shell-tool.test.ts subs/harness/src/tests/single-session.test.ts --reporter=json --outputFile=/tmp/plan22-settlement-baseline.json",
+    "raw": "/tmp/plan22-settlement-baseline.json",
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0,
+    "files": [
+      {
+        "file": "subs/harness/src/tests/shell-tool.test.ts",
+        "passed": 8,
+        "durationMs": 1228.072998046875,
+        "cases": [
+          {
+            "title": "refuses a whole suite before counting or spawning any chained command",
+            "status": "passed",
+            "durationMs": 8.888889999999947
+          },
+          {
+            "title": "runs the command it is given and answers its exit code, its tail and its output file",
+            "status": "passed",
+            "durationMs": 12.790136000000075
+          },
+          {
+            "title": "bounds the tail it answers while the file keeps everything",
+            "status": "passed",
+            "durationMs": 9.931611999999973
+          },
+          {
+            "title": "a schema violation returns its errors and runs nothing",
+            "status": "passed",
+            "durationMs": 19.852280999999948
+          },
+          {
+            "title": "the schema the agent is shown is the one that validates",
+            "status": "passed",
+            "durationMs": 0.39895799999999326
+          },
+          {
+            "title": "a command that outlives its timeout is a timeout, not a failure",
+            "status": "passed",
+            "durationMs": 607.9970680000001
+          },
+          {
+            "title": "a command that leaves a descendant is settled by its process group",
+            "status": "passed",
+            "durationMs": 255.39094599999999
+          },
+          {
+            "title": "settlement ends a command that is still running, with its group",
+            "status": "passed",
+            "durationMs": 313.07310099999995
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/single-session.test.ts",
+        "passed": 13,
+        "durationMs": 1717.89306640625,
+        "cases": [
+          {
+            "title": "relative reads, writes, and shell start in module src while observations remain project-relative",
+            "status": "passed",
+            "durationMs": 236.25106800000003
+          },
+          {
+            "title": "a completed change is in the tree, recorded as submitted, answered with what follows, and not committed",
+            "status": "passed",
+            "durationMs": 122.50616500000001
+          },
+          {
+            "title": "a write outside the module is refused by the guard, writes nothing, and is observed; an extra write path is allowed",
+            "status": "passed",
+            "durationMs": 124.16586800000005
+          },
+          {
+            "title": "a module violation is told in the edit's result, refuses completion while it stands, and completion is accepted after the fix",
+            "status": "passed",
+            "durationMs": 140.5007969999997
+          },
+          {
+            "title": "unsuitable and capability-needed are recorded and answered, and no further session starts",
+            "status": "passed",
+            "durationMs": 173.4542389999997
+          },
+          {
+            "title": "an unknown module is refused before the agent starts, as a session that could not start, with the lock released",
+            "status": "passed",
+            "durationMs": 59.516651999999794
+          },
+          {
+            "title": "a declared module with missing src is refused before the agent starts",
+            "status": "passed",
+            "durationMs": 71.97647300000017
+          },
+          {
+            "title": "a held project lock is refused before the agent starts, and the lock is left untouched",
+            "status": "passed",
+            "durationMs": 52.09786500000018
+          },
+          {
+            "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+            "status": "passed",
+            "durationMs": 263.0477350000001
+          },
+          {
+            "title": "passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed",
+            "status": "passed",
+            "durationMs": 120.75416799999994
+          },
+          {
+            "title": "failing work: the checkpoint fails, its attempt is under gate/, the exit status is 1, and nothing is committed",
+            "status": "passed",
+            "durationMs": 95.07235600000013
+          },
+          {
+            "title": "every record exists and validates against its schema, and git sees nothing under plans/.harness/",
+            "status": "passed",
+            "durationMs": 125.80797100000018
+          },
+          {
+            "title": "its transcript is transcript.jsonl: the start before the model call, the harness's decisions, and the shell's log by reference",
+            "status": "passed",
+            "durationMs": 131.89301100000012
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/writer-settlement.test.ts",
+        "passed": 9,
+        "durationMs": 1001.632568359375,
+        "cases": [
+          {
+            "title": "a session that says it is idle while its process group runs is not settled",
+            "status": "passed",
+            "durationMs": 75.56961999999999
+          },
+          {
+            "title": "a group that cannot be confirmed gone leaves the release unconfirmed, and blocks what follows",
+            "status": "passed",
+            "durationMs": 102.337804
+          },
+          {
+            "title": "a session that never becomes idle is not settled, although nothing is left running",
+            "status": "passed",
+            "durationMs": 0.2888550000000123
+          },
+          {
+            "title": "a write that still arrives while the group is being killed is recorded, not lost",
+            "status": "passed",
+            "durationMs": 63.42067999999995
+          },
+          {
+            "title": "a second writer without an intervening release is a fault of the harness",
+            "status": "passed",
+            "durationMs": 0.352292000000034
+          },
+          {
+            "title": "a group nobody registers is a group nothing waits for",
+            "status": "passed",
+            "durationMs": 52.563625999999886
+          },
+          {
+            "title": "fails as writer-unsettled, and runs no gate against that tree",
+            "status": "passed",
+            "durationMs": 303.97932500000024
+          },
+          {
+            "title": "a tree the run never checked is left exactly as it was",
+            "status": "passed",
+            "durationMs": 199.506488
+          },
+          {
+            "title": "close retains the project lock when session settlement was not confirmed",
+            "status": "passed",
+            "durationMs": 202.63264500000014
+          }
+        ]
+      }
+    ]
+  },
+  "focused": {
+    "command": "node_modules/.bin/vitest run subs/harness/src/tests/composition.test.ts subs/harness/src/tests/settlement-boundaries.test.ts subs/harness/src/tests/shell-tool.boundary.test.ts subs/harness/src/tests/shell-tool.test.ts subs/harness/src/tests/single-session.boundary.test.ts subs/harness/src/tests/single-session.test.ts subs/harness/src/tests/writer-settlement.boundary.test.ts subs/harness/src/tests/writer-settlement.test.ts --reporter=json --outputFile=/tmp/plan22-settlement-qualified-final.json",
+    "cwd": "/home/app/ramify-plan22-settlement/ramify-agent",
+    "raw": "/tmp/plan22-settlement-qualified-final.json",
+    "passed": 53,
+    "failed": 0,
+    "skipped": 0,
+    "files": [
+      {
+        "file": "subs/harness/src/tests/composition.test.ts",
+        "passed": 11,
+        "durationMs": 5173.487060546875,
+        "cases": [
+          {
+            "title": "removed included child keeps scope authority: the iteration gate audits and commits the removal, and the work-item gate finds it unchanged",
+            "status": "passed",
+            "durationMs": 2.538348000000042
+          },
+          {
+            "title": "a rejected iteration cannot send its unauthorized dirty file through a later work-item or final committing checkpoint",
+            "status": "passed",
+            "durationMs": 946.0786509999998
+          },
+          {
+            "title": "PB3: equal captured bytes, feature tampering and later render aliases cannot bypass the actual committing gate",
+            "status": "passed",
+            "durationMs": 672.6879680000002
+          },
+          {
+            "title": "PB3: scripted nested predecessors require every intermediate inherited hash to match",
+            "status": "passed",
+            "durationMs": 542.2104479999998
+          },
+          {
+            "title": "each scenario runs to the end it is written for, and asks Git exactly what it states",
+            "status": "passed",
+            "durationMs": 2.398644000000786
+          },
+          {
+            "title": "every invocation belongs to a session the log derives, and no final run holds a live or suspended session",
+            "status": "passed",
+            "durationMs": 1.7657230000004347
+          },
+          {
+            "title": "a yielded revision resumes its architect fresh with one recorded orientation and selection",
+            "status": "passed",
+            "durationMs": 0.6521900000007008
+          },
+          {
+            "title": "there is a row for every durable boundary, every machine has rows, and the three recovery files run all of them",
+            "status": "passed",
+            "durationMs": 1.3858899999995629
+          },
+          {
+            "title": "every query, over every completed and failed composed run, leaves its log, its files and its project as they were",
+            "status": "passed",
+            "durationMs": 2367.251102
+          },
+          {
+            "title": "the union list is complete, and every value is produced by a composed run, by a named test, or is named with the reason it has none",
+            "status": "passed",
+            "durationMs": 619.5196720000004
+          },
+          {
+            "title": "every case has exactly one owning iteration, and its owning tests are present by name and belong to that iteration",
+            "status": "passed",
+            "durationMs": 15.486983999999211
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/settlement-boundaries.test.ts",
+        "passed": 12,
+        "durationMs": 33.751708984375,
+        "cases": [
+          {
+            "title": "a caught undeclared Git operation remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 7.213554999999815
+          },
+          {
+            "title": "a caught candidate read remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 0.998037999999724
+          },
+          {
+            "title": "a caught provisional read remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 1.283704000000398
+          },
+          {
+            "title": "a caught audit execution remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 1.4655799999995907
+          },
+          {
+            "title": "a caught command execution remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 0.9531300000003284
+          },
+          {
+            "title": "declared literal ownership is independent of an absent filesystem",
+            "status": "passed",
+            "durationMs": 1.816747999999734
+          },
+          {
+            "title": "a caught unknown ownership path remains a script failure",
+            "status": "passed",
+            "durationMs": 0.9528959999997824
+          },
+          {
+            "title": "a caught undeclared Ramify operation remains a script failure",
+            "status": "passed",
+            "durationMs": 0.6762159999998403
+          },
+          {
+            "title": "a required marker response cannot remain unused",
+            "status": "passed",
+            "durationMs": 0.8469999999997526
+          },
+          {
+            "title": "a caught marker argument mismatch remains a script failure",
+            "status": "passed",
+            "durationMs": 1.2227139999999963
+          },
+          {
+            "title": "a declared command persists its output and cannot be reused after consumption",
+            "status": "passed",
+            "durationMs": 14.558620999999675
+          },
+          {
+            "title": "a caught callback assertion remains visible to the isolated response recorder",
+            "status": "passed",
+            "durationMs": 0.7517429999998058
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/shell-tool.boundary.test.ts",
+        "passed": 5,
+        "durationMs": 1258.80322265625,
+        "cases": [
+          {
+            "title": "runs the command it is given and answers its exit code, its tail and its output file",
+            "status": "passed",
+            "durationMs": 21.38069299999995
+          },
+          {
+            "title": "bounds the tail it answers while the file keeps everything",
+            "status": "passed",
+            "durationMs": 10.581491000000028
+          },
+          {
+            "title": "a command that outlives its timeout is a timeout, not a failure",
+            "status": "passed",
+            "durationMs": 621.8338660000001
+          },
+          {
+            "title": "a command that leaves a descendant is settled by its process group",
+            "status": "passed",
+            "durationMs": 288.76947900000005
+          },
+          {
+            "title": "settlement ends a command that is still running, with its group",
+            "status": "passed",
+            "durationMs": 315.80325500000004
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/shell-tool.test.ts",
+        "passed": 3,
+        "durationMs": 35.722412109375,
+        "cases": [
+          {
+            "title": "refuses a whole suite before counting or spawning any chained command",
+            "status": "passed",
+            "durationMs": 12.838644999999815
+          },
+          {
+            "title": "a schema violation returns its errors and runs nothing",
+            "status": "passed",
+            "durationMs": 22.328571999999895
+          },
+          {
+            "title": "the schema the agent is shown is the one that validates",
+            "status": "passed",
+            "durationMs": 0.7224080000000868
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/single-session.boundary.test.ts",
+        "passed": 1,
+        "durationMs": 511.899658203125,
+        "cases": [
+          {
+            "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+            "status": "passed",
+            "durationMs": 511.89975700000014
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/single-session.test.ts",
+        "passed": 12,
+        "durationMs": 1966.07080078125,
+        "cases": [
+          {
+            "title": "relative reads, writes, and shell start in module src while observations remain project-relative",
+            "status": "passed",
+            "durationMs": 281.4703049999998
+          },
+          {
+            "title": "a completed change is in the tree, recorded as submitted, answered with what follows, and not committed",
+            "status": "passed",
+            "durationMs": 192.23812700000008
+          },
+          {
+            "title": "a write outside the module is refused by the guard, writes nothing, and is observed; an extra write path is allowed",
+            "status": "passed",
+            "durationMs": 301.65842799999973
+          },
+          {
+            "title": "a module violation is told in the edit's result, refuses completion while it stands, and completion is accepted after the fix",
+            "status": "passed",
+            "durationMs": 188.57519900000034
+          },
+          {
+            "title": "unsuitable and capability-needed are recorded and answered, and no further session starts",
+            "status": "passed",
+            "durationMs": 179.57427000000007
+          },
+          {
+            "title": "an unknown module is refused before the agent starts, as a session that could not start, with the lock released",
+            "status": "passed",
+            "durationMs": 63.34498200000007
+          },
+          {
+            "title": "a declared module with missing src is refused before the agent starts",
+            "status": "passed",
+            "durationMs": 76.71136200000001
+          },
+          {
+            "title": "a held project lock is refused before the agent starts, and the lock is left untouched",
+            "status": "passed",
+            "durationMs": 79.45814799999971
+          },
+          {
+            "title": "passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed",
+            "status": "passed",
+            "durationMs": 148.38463300000012
+          },
+          {
+            "title": "failing work: the checkpoint fails, its attempt is under gate/, the exit status is 1, and nothing is committed",
+            "status": "passed",
+            "durationMs": 132.2619279999999
+          },
+          {
+            "title": "every record exists and validates against its schema, and git sees nothing under plans/.harness/",
+            "status": "passed",
+            "durationMs": 163.2852710000002
+          },
+          {
+            "title": "its transcript is transcript.jsonl: the start before the model call, the harness's decisions, and the shell's log by reference",
+            "status": "passed",
+            "durationMs": 158.0707510000002
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/writer-settlement.boundary.test.ts",
+        "passed": 3,
+        "durationMs": 206.0908203125,
+        "cases": [
+          {
+            "title": "a session that says it is idle while its process group runs is not settled",
+            "status": "passed",
+            "durationMs": 76.01376099999999
+          },
+          {
+            "title": "a write that still arrives while the group is being killed is recorded, not lost",
+            "status": "passed",
+            "durationMs": 66.46583400000003
+          },
+          {
+            "title": "a group nobody registers is a group nothing waits for",
+            "status": "passed",
+            "durationMs": 64.09084599999994
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/writer-settlement.test.ts",
+        "passed": 6,
+        "durationMs": 938.01025390625,
+        "cases": [
+          {
+            "title": "a group that cannot be confirmed gone leaves the release unconfirmed, and blocks what follows",
+            "status": "passed",
+            "durationMs": 107.62676300000021
+          },
+          {
+            "title": "a session that never becomes idle is not settled, although nothing is left running",
+            "status": "passed",
+            "durationMs": 0.6976039999999557
+          },
+          {
+            "title": "a second writer without an intervening release is a fault of the harness",
+            "status": "passed",
+            "durationMs": 0.4427730000002157
+          },
+          {
+            "title": "fails as writer-unsettled, and runs no gate against that tree",
+            "status": "passed",
+            "durationMs": 327.1546699999999
+          },
+          {
+            "title": "a tree the run never checked is left exactly as it was",
+            "status": "passed",
+            "durationMs": 294.58667700000024
+          },
+          {
+            "title": "close retains the project lock when session settlement was not confirmed",
+            "status": "passed",
+            "durationMs": 207.01034200000004
+          }
+        ]
+      }
+    ]
+  },
+  "earlierPassingSameBehavior": {
+    "raw": "/tmp/plan22-settlement-final.json",
+    "passed": 53,
+    "failed": 0,
+    "skipped": 0,
+    "files": [
+      {
+        "file": "subs/harness/src/tests/composition.test.ts",
+        "passed": 11,
+        "durationMs": 4435.103271484375,
+        "cases": [
+          {
+            "title": "removed included child keeps scope authority: the iteration gate audits and commits the removal, and the work-item gate finds it unchanged",
+            "status": "passed",
+            "durationMs": 2.232762999999977
+          },
+          {
+            "title": "a rejected iteration cannot send its unauthorized dirty file through a later work-item or final committing checkpoint",
+            "status": "passed",
+            "durationMs": 607.7099529999996
+          },
+          {
+            "title": "PB3: equal captured bytes, feature tampering and later render aliases cannot bypass the actual committing gate",
+            "status": "passed",
+            "durationMs": 562.385636
+          },
+          {
+            "title": "PB3: scripted nested predecessors require every intermediate inherited hash to match",
+            "status": "passed",
+            "durationMs": 567.3561030000001
+          },
+          {
+            "title": "each scenario runs to the end it is written for, and asks Git exactly what it states",
+            "status": "passed",
+            "durationMs": 2.209095999998681
+          },
+          {
+            "title": "every invocation belongs to a session the log derives, and no final run holds a live or suspended session",
+            "status": "passed",
+            "durationMs": 1.7517920000009326
+          },
+          {
+            "title": "a yielded revision resumes its architect fresh with one recorded orientation and selection",
+            "status": "passed",
+            "durationMs": 0.6104410000007192
+          },
+          {
+            "title": "there is a row for every durable boundary, every machine has rows, and the three recovery files run all of them",
+            "status": "passed",
+            "durationMs": 1.3727789999993547
+          },
+          {
+            "title": "every query, over every completed and failed composed run, leaves its log, its files and its project as they were",
+            "status": "passed",
+            "durationMs": 2024.9995120000003
+          },
+          {
+            "title": "the union list is complete, and every value is produced by a composed run, by a named test, or is named with the reason it has none",
+            "status": "passed",
+            "durationMs": 643.817927
+          },
+          {
+            "title": "every case has exactly one owning iteration, and its owning tests are present by name and belong to that iteration",
+            "status": "passed",
+            "durationMs": 19.103386999999202
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/settlement-boundaries.test.ts",
+        "passed": 12,
+        "durationMs": 27.650146484375,
+        "cases": [
+          {
+            "title": "a caught undeclared Git operation remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 6.811562999999978
+          },
+          {
+            "title": "a caught candidate read remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 1.5952890000000934
+          },
+          {
+            "title": "a caught provisional read remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 1.4552340000000186
+          },
+          {
+            "title": "a caught audit execution remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 1.7449759999999515
+          },
+          {
+            "title": "a caught command execution remains a settlement script failure",
+            "status": "passed",
+            "durationMs": 1.3554520000000139
+          },
+          {
+            "title": "declared literal ownership is independent of an absent filesystem",
+            "status": "passed",
+            "durationMs": 2.457580000000007
+          },
+          {
+            "title": "a caught unknown ownership path remains a script failure",
+            "status": "passed",
+            "durationMs": 0.886737999999923
+          },
+          {
+            "title": "a caught undeclared Ramify operation remains a script failure",
+            "status": "passed",
+            "durationMs": 0.7807129999998779
+          },
+          {
+            "title": "a required marker response cannot remain unused",
+            "status": "passed",
+            "durationMs": 1.0500170000000253
+          },
+          {
+            "title": "a caught marker argument mismatch remains a script failure",
+            "status": "passed",
+            "durationMs": 1.526444999999967
+          },
+          {
+            "title": "a declared command persists its output and cannot be reused after consumption",
+            "status": "passed",
+            "durationMs": 6.202373999999963
+          },
+          {
+            "title": "a caught callback assertion remains visible to the isolated response recorder",
+            "status": "passed",
+            "durationMs": 0.6502659999998741
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/shell-tool.boundary.test.ts",
+        "passed": 5,
+        "durationMs": 1221.31982421875,
+        "cases": [
+          {
+            "title": "runs the command it is given and answers its exit code, its tail and its output file",
+            "status": "passed",
+            "durationMs": 26.162318000000027
+          },
+          {
+            "title": "bounds the tail it answers while the file keeps everything",
+            "status": "passed",
+            "durationMs": 12.306578000000059
+          },
+          {
+            "title": "a command that outlives its timeout is a timeout, not a failure",
+            "status": "passed",
+            "durationMs": 608.6464
+          },
+          {
+            "title": "a command that leaves a descendant is settled by its process group",
+            "status": "passed",
+            "durationMs": 261.20423099999994
+          },
+          {
+            "title": "settlement ends a command that is still running, with its group",
+            "status": "passed",
+            "durationMs": 313.319835
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/shell-tool.test.ts",
+        "passed": 3,
+        "durationMs": 25.442138671875,
+        "cases": [
+          {
+            "title": "refuses a whole suite before counting or spawning any chained command",
+            "status": "passed",
+            "durationMs": 12.409189999999853
+          },
+          {
+            "title": "a schema violation returns its errors and runs nothing",
+            "status": "passed",
+            "durationMs": 12.257164999999986
+          },
+          {
+            "title": "the schema the agent is shown is the one that validates",
+            "status": "passed",
+            "durationMs": 0.44222000000013395
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/single-session.boundary.test.ts",
+        "passed": 1,
+        "durationMs": 332.8671875,
+        "cases": [
+          {
+            "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+            "status": "passed",
+            "durationMs": 332.86722699999996
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/single-session.test.ts",
+        "passed": 12,
+        "durationMs": 1350.26171875,
+        "cases": [
+          {
+            "title": "relative reads, writes, and shell start in module src while observations remain project-relative",
+            "status": "passed",
+            "durationMs": 211.01126099999988
+          },
+          {
+            "title": "a completed change is in the tree, recorded as submitted, answered with what follows, and not committed",
+            "status": "passed",
+            "durationMs": 128.7264050000001
+          },
+          {
+            "title": "a write outside the module is refused by the guard, writes nothing, and is observed; an extra write path is allowed",
+            "status": "passed",
+            "durationMs": 116.3095800000001
+          },
+          {
+            "title": "a module violation is told in the edit's result, refuses completion while it stands, and completion is accepted after the fix",
+            "status": "passed",
+            "durationMs": 127.07968900000014
+          },
+          {
+            "title": "unsuitable and capability-needed are recorded and answered, and no further session starts",
+            "status": "passed",
+            "durationMs": 152.58670900000016
+          },
+          {
+            "title": "an unknown module is refused before the agent starts, as a session that could not start, with the lock released",
+            "status": "passed",
+            "durationMs": 55.16696600000023
+          },
+          {
+            "title": "a declared module with missing src is refused before the agent starts",
+            "status": "passed",
+            "durationMs": 63.6762490000001
+          },
+          {
+            "title": "a held project lock is refused before the agent starts, and the lock is left untouched",
+            "status": "passed",
+            "durationMs": 56.505525000000034
+          },
+          {
+            "title": "passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed",
+            "status": "passed",
+            "durationMs": 107.81574799999999
+          },
+          {
+            "title": "failing work: the checkpoint fails, its attempt is under gate/, the exit status is 1, and nothing is committed",
+            "status": "passed",
+            "durationMs": 107.19567899999993
+          },
+          {
+            "title": "every record exists and validates against its schema, and git sees nothing under plans/.harness/",
+            "status": "passed",
+            "durationMs": 109.79111000000012
+          },
+          {
+            "title": "its transcript is transcript.jsonl: the start before the model call, the harness's decisions, and the shell's log by reference",
+            "status": "passed",
+            "durationMs": 113.26164500000004
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/writer-settlement.boundary.test.ts",
+        "passed": 3,
+        "durationMs": 204.352294921875,
+        "cases": [
+          {
+            "title": "a session that says it is idle while its process group runs is not settled",
+            "status": "passed",
+            "durationMs": 75.56673
+          },
+          {
+            "title": "a write that still arrives while the group is being killed is recorded, not lost",
+            "status": "passed",
+            "durationMs": 65.54692
+          },
+          {
+            "title": "a group nobody registers is a group nothing waits for",
+            "status": "passed",
+            "durationMs": 62.35235
+          }
+        ]
+      },
+      {
+        "file": "subs/harness/src/tests/writer-settlement.test.ts",
+        "passed": 6,
+        "durationMs": 634.752685546875,
+        "cases": [
+          {
+            "title": "a group that cannot be confirmed gone leaves the release unconfirmed, and blocks what follows",
+            "status": "passed",
+            "durationMs": 106.11261100000002
+          },
+          {
+            "title": "a session that never becomes idle is not settled, although nothing is left running",
+            "status": "passed",
+            "durationMs": 0.5887719999998353
+          },
+          {
+            "title": "a second writer without an intervening release is a fault of the harness",
+            "status": "passed",
+            "durationMs": 0.4654649999999947
+          },
+          {
+            "title": "fails as writer-unsettled, and runs no gate against that tree",
+            "status": "passed",
+            "durationMs": 258.559076
+          },
+          {
+            "title": "a tree the run never checked is left exactly as it was",
+            "status": "passed",
+            "durationMs": 131.52802599999973
+          },
+          {
+            "title": "close retains the project lock when session settlement was not confirmed",
+            "status": "passed",
+            "durationMs": 136.75264400000015
+          }
+        ]
+      }
+    ]
+  },
+  "checks": {
+    "fourCompilerScopes": {
+      "command": "npm run type-check",
+      "status": "passed",
+      "raw": "/tmp/plan22-settlement-type-check-final-2.log"
+    },
+    "moduleCheck": {
+      "command": "npm run check:self",
+      "status": "passed",
+      "errors": 0,
+      "warnings": 0,
+      "analysisLimits": 313,
+      "raw": "/tmp/plan22-settlement-check-self-final-2.log"
+    },
+    "configuredDiscovery": {
+      "command": "node_modules/.bin/vitest list --filesOnly --json",
+      "status": "passed",
+      "count": 271,
+      "projects": {
+        "web": 17,
+        "node": 254
+      },
+      "files": [
+        {
+          "file": "subs/web/src/tests/app.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/capability-graph.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/capability-module-tree.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/capability-tasks.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/check-findings.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/client.test.ts",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/execution-map-client.test.ts",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/execution-map.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/execution-modules.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/plan-page.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/plans-page.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/run-page.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/session-marks.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/session-page.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/session-timeline.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/sessions-page.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "subs/web/src/tests/transcript-workspace.test.tsx",
+          "projectName": "web"
+        },
+        {
+          "file": "src/tests/cli.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "src/tests/session-command.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/acceptance-boundaries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/acceptance-trial.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/accepted-boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/accepted-commit.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/analysis-plan-evidence.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/analysis-scenarios.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/analysis-submission.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/assignment-source-evidence.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/audit-check-execution.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/audit-workspace-recovery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/breaking-work.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-assignments.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-consultation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-delegation.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-delegation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-dependencies.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-dependencies.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-flow-boundaries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-historical-resume.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-records.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-recovery.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-recovery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-state.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-submission.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/capability-tasks-projection.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/catalog-extraction.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/check-findings-authority.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/check-findings-commands.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/check-findings-composition.integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/check-findings-composition.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/check-findings-ledger.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/check-findings-projection.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/check-findings-run.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/commit-recovery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/commit.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/compaction.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/composition-recovery-chains.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/composition-recovery-delegation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/composition-recovery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/composition.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/context-selection-delivery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/context-selection-runtime.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/context-selection-submissions.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/context-selection.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/contract-delegation-integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/contract-delegation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/contract-injection-scope.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/contract-revision-scripted.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/contract-revision.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/contract-scheduling.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/contract-submission.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/dependency-boundaries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/direct-check-execution.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/engineer-api-preparation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/engineer-briefing.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/engineer-directory.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/engineer-failures.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/engineer-submission.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/environment-problems.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/execution-map-causal.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/execution-map-contract.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/execution-map-durable.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/execution-map-http.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/execution-map-modules.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/execution-map-pages.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/execution-map-projection.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/external-boundaries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/fake-exposure-parity.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/fixture-check.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/fixture-trials.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/fork-submission.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/gate-diagnostics.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/gate-not-verified.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/gate-progress.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/gate-repair-routing.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/hook-checks.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/hook-run-boundaries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/http.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/integration-scenarios-integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/integration-scenarios.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/iteration-gate-integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/iteration-gate.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/iteration-source-delivery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/iterations-integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/iterations.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/kpi-metrics.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/late-writes.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/line-events.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/lineage-metrics.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/local-architect-submission.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/local-authority.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/lock.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/materialization.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/measurement.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/measurement.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/merge-readiness.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/module-creation-integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/module-creation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/module-header.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/neutral-actions.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/no-rewind.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/nonfunctional-boundaries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/nonfunctional-deviation-runtime.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/nonfunctional-deviation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/nonfunctional-phase.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/nonfunctional-recovery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/nonfunctional-repair.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/nonfunctional-run.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/nonfunctional-run.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/nonfunctional-submissions.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/observation-log.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/placement.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/plan-deviations.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/plan-evidence-compatibility.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/plan-evidence-required-runtime.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/plan-evidence-review-unavailable.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/plan13-composed-functional.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/plan21-workflows.integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/plans.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/progress-fixture.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/progress.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/project-boundary-audit.integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/project-config.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/projections-pure.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/protocol-contract.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/provisional-source.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/read-excursions.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/readiness-boundaries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/readiness-decision.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/readiness-direct-recovery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/readiness.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/readiness.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/reconciliation-submission.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/reconciliation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/record-reader.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/recorded-environment.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/recovery-boundaries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/requirement-architect-view.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/requirement-verification.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/review-attempts.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/review-lifecycle.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/review-questions.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/review-scheduling.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/review-signals.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/review-snapshot.integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/review-stop.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/review-tools.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-bounds.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-closing-order.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-commands.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-event-reader.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-git.integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-policy.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-projections.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-protocol-materialization.integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-protocol.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run-recovery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/run.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/scenario-briefings.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/scenario-projections.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/scenario-states.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/scratch-setup.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/scratch.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/session-fixture.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/session-lifecycle.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/session-queries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/session-reducer.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/settlement-boundaries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/setup-attribution.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/shell-tests.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/shell-tool.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/shell-tool.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/single-session-integration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/single-session.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/single-session.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/stop-before-start.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/test-lock-bounds.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/test-lock-gate.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/transcript-pages.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/transcript-run.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/transcript-writer.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/tree-identity.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/unguarded-write.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/union-values.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/work-item-api-views.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/work-items.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/write-guard-ownership.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/write-guard.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/write-guard.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/writer-settlement.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/writer-settlement.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/src/tests/helpers/preview-git.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/src/tests/port-additions.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/src/tests/port-observations.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/src/tests/scripted.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/src/tests/tool-actions.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/src/tests/transcript-content.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/audit/src/tests/audit-conformance.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/audit/src/tests/completed-audit.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/audit/src/tests/test-lock.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/audit/src/tests/workspace-preparation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/check-findings/src/tests/decide.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/check-findings/src/tests/deviations.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/check-findings/src/tests/identity.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/check-findings/src/tests/purity.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/check-findings/src/tests/queries.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/check-findings/src/tests/relations.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/check-findings/src/tests/stream.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/candidate-tree.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/git.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/guarded-files.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/measure.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/project-boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/project-configuration.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/provisional-git.boundary.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/run-command.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/scratch-git.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/scripted-cli.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/views.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/ledger/src/tests/corrupt-log.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/ledger/src/tests/effects.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/ledger/src/tests/fault-injection.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/ledger/src/tests/killed-writer.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/ledger/src/tests/ledger.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/ledger/src/tests/materialize.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/ledger/src/tests/record-read.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/ledger/src/tests/store.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/ledger/src/tests/torn-line.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/nonfunctional/src/tests/contracts.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/nonfunctional/src/tests/rounds.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/plan-evidence/src/tests/catalog.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/plan-evidence/src/tests/contracts.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/plan-evidence/src/tests/discovery.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/scenarios/src/tests/extraction.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/scenarios/src/tests/form.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/scenarios/src/tests/records.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/scenarios/src/tests/rendering.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/scenarios/src/tests/states.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/compaction-policy.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/context-budget.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/fork-isolation.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/guard-installed.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/guarded-writes.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/model-choice.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/pi-agent.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/session-modes.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/tool-actions.test.ts",
+          "projectName": "node"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/tests/transcript-content.test.ts",
+          "projectName": "node"
+        }
+      ],
+      "raw": "/tmp/plan22-settlement-configured-files.json"
+    }
+  },
+  "ordinaryProcessAttempts": {
+    "count": 0,
+    "scope": "21 migrated ordinary original cases, 12 strict controls, existing ordinary composition cases",
+    "mechanism": "file-local child_process guard installed before imports; teardown always verifies attempts after all cleanup; global runner guard is a later cut"
+  },
+  "strictResponses": {
+    "settlement": "required captured inputs, source head/configuration reads and one unavailable measurement; branch, candidate, provisional source, gate execution and commands forbidden; caught failures retained",
+    "session": "literal topology/ownership and source paths; materialization required once for starting sessions; finite hook/check/command responses, exact cwd/environment/deadline/output path, unknown operations and caught assertions retained",
+    "shell": "schema correction declares one exact command and real marker/output-file effect; no shell interpreter in the double"
+  },
+  "nativeGapCorrection": "PB3-S04 original protected-shell fixture supplied complete only, while completion requested changed too. Its old assertion error was caught as unavailable. The fixture now explicitly supplies changed/not-checked; every original assertion and inner actual execFile callback remain unchanged, while registration fixture arguments add strict command metadata. Its complete registration is not byte-identical.",
+  "negativeControls": 12,
+  "resources": {
+    "apiEndpoint": "/tmp/plan22-settlement-api-8lg2j_i_",
+    "daemonStoppedWithSupportedCommand": true,
+    "endpointRemoved": true,
+    "ownedDaemonOrCompilerProcesses": [],
+    "nativeGroupCleanup": "each spawned detached group registered for reverse cleanup; kill then bounded absence assertion, including failures",
+    "nativeShellCleanup": "real descendant pgrep absence, timeout/cancellation and missing late files retained"
+  },
+  "apiDiscovery": {
+    "materialize": "private RAMIFY_ENDPOINT_DIR; ramify materialize --from subs/harness --root .",
+    "status": "completed",
+    "revision": 1,
+    "entries": 832,
+    "raw": "/tmp/plan22-settlement-api.log",
+    "search": "/tmp/plan22-settlement-api-search.log",
+    "initialFailure": "external view directory absent; only children view exists. Initial stop incorrectly included unsupported --root, then supported ramify daemon stop succeeded; owned daemon/compiler absent and endpoint removed. No shared daemon changed."
+  },
+  "authoringResults": [
+    {
+      "raw": "/tmp/plan22-settlement-authoring-1.json",
+      "passed": 28,
+      "failed": 13,
+      "summary": "Overly narrow literal ownership paths and refused audit configuration capture; initial closure return type mismatch found by tsc.",
+      "rawSha256": "b8e8af54350bc2f5be7d5bcda641c31035f0b0796930bfae1313928dc9e55e16",
+      "failures": [
+        {
+          "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+          "diagnostics": [
+            "Error: Direct check script declared 2 results but consumed 0",
+            "AssertionError: caught ownership violations: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "relative reads, writes, and shell start in module src while observations remain project-relative",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T085354Z-9a84d2\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"unsuitable\",\"reason\":\"scope\",\"detail\":\"The sibling is outside this assignment.\"},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/new.ts\",\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[\"subs/workspace/subs/reviews/subs/notes/src/new.ts\",\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":33,\"records\":\"/tmp/ramify-agent-26WU8X/collection-review/plans/.harness/sessions/20261008T085354Z-9a84d2\",\"gate\":null},\"exitStatus\":0}: expected +0 to be 3 // Object.is equality",
+            "AssertionError: caught ownership violations: expected [ \u2026(4) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a completed change is in the tree, recorded as submitted, answered with what follows, and not committed",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T085355Z-c33c54\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":9,\"records\":\"/tmp/ramify-agent-Ik7f39/collection-review/plans/.harness/sessions/20261008T085355Z-c33c54\",\"gate\":null},\"exitStatus\":0}: expected 1 to be 2 // Object.is equality",
+            "AssertionError: caught ownership violations: expected [ \u2026(2) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a write outside the module is refused by the guard, writes nothing, and is observed; an extra write path is allowed",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T085355Z-6661f6\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"unsuitable\",\"reason\":\"scope\",\"detail\":\"The limit lives outside this module.\"},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"docs/notes.md\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[\"docs/notes.md\"],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":6,\"records\":\"/tmp/ramify-agent-C7AUpq/collection-review/plans/.harness/sessions/20261008T085355Z-6661f6\",\"gate\":null},\"exitStatus\":0}: expected +0 to be 1 // Object.is equality",
+            "AssertionError: caught ownership violations: expected [ \u2026(3) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a module violation is told in the edit's result, refuses completion while it stands, and completion is accepted after the fix",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T085355Z-3d5d04\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"ended\",\"submission\":null,\"rejectedSubmissions\":2,\"standingViolations\":[{\"identity\":\"{\\\"code\\\":\\\"not-visible\\\",\\\"category\\\":\\\"import\\\",\\\"message\\\":\\\"collection-review:interfaces/protocol.ts#ToolResult: not-visible\\\",\\\"location\\\":{\\\"file\\\":\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"line\\\":1,\\\"column\\\":1},\\\"importer\\\":{\\\"owner\\\":\\\"collection-review/workspace/reviews/notes\\\"},\\\"original\\\":{\\\"kind\\\":\\\"code\\\",\\\"owner\\\":\\\"collection-review\\\",\\\"file\\\":\\\"interfaces/protocol.ts\\\",\\\"binding\\\":\\\"ToolResult\\\"}}\",\"category\":\"import\",\"code\":\"not-visible\",\"message\":\"collection-review:interfaces/protocol.ts#ToolResult: not-visible\",\"file\":\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\",\"line\":1,\"importer\":\"collection-review/workspace/reviews/notes\",\"original\":{\"owner\":\"collection-review\",\"file\":\"interfaces/protocol.ts\",\"binding\":\"ToolResult\"}}],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":11,\"records\":\"/tmp/ramify-agent-m80dTg/collection-review/plans/.harness/sessions/20261008T085355Z-3d5d04\",\"gate\":null},\"exitStatus\":1}: expected 2 to be 4 // Object.is equality",
+            "AssertionError: caught ownership violations: expected [ \u2026(3) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "unsuitable and capability-needed are recorded and answered, and no further session starts",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T085355Z-2e9972\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":4,\"records\":\"/tmp/ramify-agent-soZeg0/collection-review/plans/.harness/sessions/20261008T085355Z-2e9972\",\"gate\":{\"ran\":true,\"verdict\":\"failed\",\"cause\":\"check-failed\",\"attempt\":\"/tmp/ramify-agent-soZeg0/collection-review/plans/.harness/sessions/20261008T085355Z-2e9972/gate/attempt.json\",\"commands\":[\"type-check: not verified (local-rule-failed)\",\"ramify-check: not verified (local-rule-failed)\"]}},\"exitStatus\":1}: expected 1 to be 2 // Object.is equality",
+            "AssertionError: caught ownership violations: expected [ \u2026(2) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "failing work: the checkpoint fails, its attempt is under gate/, the exit status is 1, and nothing is committed",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "every record exists and validates against its schema, and git sees nothing under plans/.harness/",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T085356Z-cad1c0\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":9,\"records\":\"/tmp/ramify-agent-T8JRQA/collection-review/plans/.harness/sessions/20261008T085356Z-cad1c0\",\"gate\":{\"ran\":true,\"verdict\":\"failed\",\"cause\":\"check-failed\",\"attempt\":\"/tmp/ramify-agent-T8JRQA/collection-review/plans/.harness/sessions/20261008T085356Z-cad1c0/gate/attempt.json\",\"commands\":[\"type-check: not verified (local-rule-failed)\",\"ramify-check: not verified (local-rule-failed)\"]}},\"exitStatus\":1}: expected 2 to be 3 // Object.is equality",
+            "AssertionError: caught ownership violations: expected [ \u2026(2) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "its transcript is transcript.jsonl: the start before the model call, the harness's decisions, and the shell's log by reference",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T085356Z-e06029\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":9,\"records\":\"/tmp/ramify-agent-Qa1JxU/collection-review/plans/.harness/sessions/20261008T085356Z-e06029\",\"gate\":null},\"exitStatus\":0}: expected 2 to be 3 // Object.is equality",
+            "AssertionError: caught ownership violations: expected [ \u2026(3) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "fails as writer-unsettled, and runs no gate against that tree",
+          "diagnostics": [
+            "AssertionError: caught external violations: expected [ 'Undeclared audit configuration' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a tree the run never checked is left exactly as it was",
+          "diagnostics": [
+            "AssertionError: caught external violations: expected [ 'Undeclared audit configuration' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "close retains the project lock when session settlement was not confirmed",
+          "diagnostics": [
+            "AssertionError: caught external violations: expected [ 'Undeclared audit configuration' ] to deeply equal []"
+          ]
+        }
+      ]
+    },
+    {
+      "raw": "/tmp/plan22-settlement-authoring-2.json",
+      "passed": 16,
+      "failed": 3,
+      "summary": "Declared branch response was incorrectly required even though settlement fails before readiness.",
+      "rawSha256": "0619b8b9a68385fbdcdc748334487bbc54eed18679562359aa7ca666142b7ab0",
+      "failures": [
+        {
+          "title": "fails as writer-unsettled, and runs no gate against that tree",
+          "diagnostics": [
+            "AssertionError: required branch: expected +0 to be 1 // Object.is equality"
+          ]
+        },
+        {
+          "title": "a tree the run never checked is left exactly as it was",
+          "diagnostics": [
+            "AssertionError: required branch: expected +0 to be 1 // Object.is equality"
+          ]
+        },
+        {
+          "title": "close retains the project lock when session settlement was not confirmed",
+          "diagnostics": [
+            "AssertionError: required branch: expected +0 to be 1 // Object.is equality"
+          ]
+        }
+      ]
+    },
+    {
+      "raw": "/tmp/plan22-settlement-authoring-3.json",
+      "passed": 6,
+      "failed": 0,
+      "summary": "Six writer cases passed after prohibiting unused branch/clean replies.",
+      "rawSha256": "054e68a2d269fa13894a0f74127449ba95f48d01c23f2cd90ba02d83f0ebba5e",
+      "failures": []
+    },
+    {
+      "raw": "/tmp/plan22-settlement-authoring-4.json",
+      "passed": 28,
+      "failed": 13,
+      "summary": "Needed lifecycle baseline measurement and single-session materialization had not yet been declared.",
+      "rawSha256": "6467e27b64b7e42037bcb60afea72b5a73ccd7dcf16b774bac2f5d6cb1388a84",
+      "failures": [
+        {
+          "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []",
+            "AssertionError: caught session boundary violations: expected [ Array(1) ] to deeply equal []",
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "relative reads, writes, and shell start in module src while observations remain project-relative",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a completed change is in the tree, recorded as submitted, answered with what follows, and not committed",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a write outside the module is refused by the guard, writes nothing, and is observed; an extra write path is allowed",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a module violation is told in the edit's result, refuses completion while it stands, and completion is accepted after the fix",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "unsuitable and capability-needed are recorded and answered, and no further session starts",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []",
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "failing work: the checkpoint fails, its attempt is under gate/, the exit status is 1, and nothing is committed",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "every record exists and validates against its schema, and git sees nothing under plans/.harness/",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "its transcript is transcript.jsonl: the start before the model call, the harness's decisions, and the shell's log by reference",
+          "diagnostics": [
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify materialize\"]: expected [ 'Undeclared Ramify materialize' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "fails as writer-unsettled, and runs no gate against that tree",
+          "diagnostics": [
+            "Error: Undeclared Ramify run",
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify run\"]: expected [ 'Undeclared Ramify run' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a tree the run never checked is left exactly as it was",
+          "diagnostics": [
+            "Error: Undeclared Ramify run",
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify run\"]: expected [ 'Undeclared Ramify run' ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "close retains the project lock when session settlement was not confirmed",
+          "diagnostics": [
+            "Error: Undeclared Ramify run",
+            "AssertionError: caught ownership violations: [\"Undeclared Ramify run\"]: expected [ 'Undeclared Ramify run' ] to deeply equal []"
+          ]
+        }
+      ]
+    },
+    {
+      "raw": "/tmp/plan22-settlement-authoring-5.json",
+      "passed": 18,
+      "failed": 1,
+      "summary": "Persistent recording exposed old swallowed missing changed hook reply in native PB3-S04.",
+      "rawSha256": "ddd0188f67bccd684f0f0f9e094df954e993c8f918d62c7680e9242496cb1847",
+      "failures": [
+        {
+          "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+          "diagnostics": [
+            "AssertionError: caught session boundary violations: expected [ Array(1) ] to deeply equal []"
+          ]
+        }
+      ]
+    },
+    {
+      "raw": "/tmp/plan22-settlement-authoring-6.json",
+      "passed": 12,
+      "failed": 7,
+      "summary": "Completion hook paths also include unchanged source files; declared expected path list was too narrow.",
+      "rawSha256": "e4b25897ee793072ba4be1d02fe3e13b5e06b797e514fe5404d6ea7751580cf3",
+      "failures": [
+        {
+          "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090033Z-801a31\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"Actual shell updated ordinary owned source\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":29,\"records\":\"/tmp/ramify-agent-mAHt1M/collection-review/plans/.harness/sessions/20261008T090033Z-801a31\",\"gate\":{\"ran\":true,\"verdict\":\"passed\",\"cause\":null,\"attempt\":\"/tmp/ramify-agent-mAHt1M/collection-review/plans/.harness/sessions/20261008T090033Z-801a31/gate/attempt.json\",\"commands\":[\"type-check: passed\",\"ramify-check: passed\"]}},\"exitStatus\":0}: expected 1 to be 2 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 1 to be 2 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a completed change is in the tree, recorded as submitted, answered with what follows, and not committed",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090033Z-3501c8\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":8,\"records\":\"/tmp/ramify-agent-DLt9li/collection-review/plans/.harness/sessions/20261008T090033Z-3501c8\",\"gate\":null},\"exitStatus\":0}: expected 1 to be 2 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 1 to be 2 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a module violation is told in the edit's result, refuses completion while it stands, and completion is accepted after the fix",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090033Z-861849\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"ended\",\"submission\":null,\"rejectedSubmissions\":2,\"standingViolations\":[{\"identity\":\"{\\\"code\\\":\\\"not-visible\\\",\\\"category\\\":\\\"import\\\",\\\"message\\\":\\\"collection-review:interfaces/protocol.ts#ToolResult: not-visible\\\",\\\"location\\\":{\\\"file\\\":\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"line\\\":1,\\\"column\\\":1},\\\"importer\\\":{\\\"owner\\\":\\\"collection-review/workspace/reviews/notes\\\"},\\\"original\\\":{\\\"kind\\\":\\\"code\\\",\\\"owner\\\":\\\"collection-review\\\",\\\"file\\\":\\\"interfaces/protocol.ts\\\",\\\"binding\\\":\\\"ToolResult\\\"}}\",\"category\":\"import\",\"code\":\"not-visible\",\"message\":\"collection-review:interfaces/protocol.ts#ToolResult: not-visible\",\"file\":\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\",\"line\":1,\"importer\":\"collection-review/workspace/reviews/notes\",\"original\":{\"owner\":\"collection-review\",\"file\":\"interfaces/protocol.ts\",\"binding\":\"ToolResult\"}}],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":14,\"records\":\"/tmp/ramify-agent-9NO2wo/collection-review/plans/.harness/sessions/20261008T090033Z-861849\",\"gate\":null},\"exitStatus\":1}: expected 2 to be 4 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 2 to be 4 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: expected false to be true // Object.is equality\",\"AssertionError: expected false to be true // Object.is equality\"]: expected [ \u2026(2) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090034Z-d7b81c\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":7,\"records\":\"/tmp/ramify-agent-s4c7zJ/collection-review/plans/.harness/sessions/20261008T090034Z-d7b81c\",\"gate\":{\"ran\":true,\"verdict\":\"passed\",\"cause\":null,\"attempt\":\"/tmp/ramify-agent-s4c7zJ/collection-review/plans/.harness/sessions/20261008T090034Z-d7b81c/gate/attempt.json\",\"commands\":[\"type-check: passed\",\"ramify-check: passed\"]}},\"exitStatus\":0}: expected 1 to be 2 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 1 to be 2 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "failing work: the checkpoint fails, its attempt is under gate/, the exit status is 1, and nothing is committed",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090034Z-719364\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is already right.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":3,\"records\":\"/tmp/ramify-agent-BZ7Lu7/collection-review/plans/.harness/sessions/20261008T090034Z-719364\",\"gate\":{\"ran\":true,\"verdict\":\"failed\",\"cause\":\"check-failed\",\"attempt\":\"/tmp/ramify-agent-BZ7Lu7/collection-review/plans/.harness/sessions/20261008T090034Z-719364/gate/attempt.json\",\"commands\":[\"type-check: failed\",\"ramify-check: passed\"]}},\"exitStatus\":1}: expected +0 to be 1 // Object.is equality",
+            "AssertionError: required Ramify replies: expected +0 to be 1 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "every record exists and validates against its schema, and git sees nothing under plans/.harness/",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090034Z-8bf801\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":9,\"records\":\"/tmp/ramify-agent-1DQLIv/collection-review/plans/.harness/sessions/20261008T090034Z-8bf801\",\"gate\":{\"ran\":true,\"verdict\":\"passed\",\"cause\":null,\"attempt\":\"/tmp/ramify-agent-1DQLIv/collection-review/plans/.harness/sessions/20261008T090034Z-8bf801/gate/attempt.json\",\"commands\":[\"type-check: passed\",\"ramify-check: passed\"]}},\"exitStatus\":0}: expected 2 to be 3 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 2 to be 3 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "its transcript is transcript.jsonl: the start before the model call, the harness's decisions, and the shell's log by reference",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090034Z-4f3168\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":12,\"records\":\"/tmp/ramify-agent-yrEHeM/collection-review/plans/.harness/sessions/20261008T090034Z-4f3168\",\"gate\":null},\"exitStatus\":0}: expected 2 to be 3 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 2 to be 3 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        }
+      ]
+    },
+    {
+      "raw": "/tmp/plan22-settlement-authoring-7.json",
+      "passed": 46,
+      "failed": 7,
+      "summary": "Completion asks for the added notes test file as well as edited source.",
+      "rawSha256": "002bef4302c9b2620fabc5b7748f4d448c2aa6040ba5147435a58ef2f8a886dd",
+      "failures": [
+        {
+          "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090140Z-c86e19\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"Actual shell updated ordinary owned source\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":34,\"records\":\"/tmp/ramify-agent-poZKPV/collection-review/plans/.harness/sessions/20261008T090140Z-c86e19\",\"gate\":{\"ran\":true,\"verdict\":\"passed\",\"cause\":null,\"attempt\":\"/tmp/ramify-agent-poZKPV/collection-review/plans/.harness/sessions/20261008T090140Z-c86e19/gate/attempt.json\",\"commands\":[\"type-check: passed\",\"ramify-check: passed\"]}},\"exitStatus\":0}: expected 1 to be 2 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 1 to be 2 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: unstated hook paths: [\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts\\\"]: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a completed change is in the tree, recorded as submitted, answered with what follows, and not committed",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090140Z-5942a3\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":10,\"records\":\"/tmp/ramify-agent-x3LdSn/collection-review/plans/.harness/sessions/20261008T090140Z-5942a3\",\"gate\":null},\"exitStatus\":0}: expected 1 to be 2 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 1 to be 2 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: unstated hook paths: [\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts\\\"]: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "a module violation is told in the edit's result, refuses completion while it stands, and completion is accepted after the fix",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090141Z-984604\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"ended\",\"submission\":null,\"rejectedSubmissions\":2,\"standingViolations\":[{\"identity\":\"{\\\"code\\\":\\\"not-visible\\\",\\\"category\\\":\\\"import\\\",\\\"message\\\":\\\"collection-review:interfaces/protocol.ts#ToolResult: not-visible\\\",\\\"location\\\":{\\\"file\\\":\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"line\\\":1,\\\"column\\\":1},\\\"importer\\\":{\\\"owner\\\":\\\"collection-review/workspace/reviews/notes\\\"},\\\"original\\\":{\\\"kind\\\":\\\"code\\\",\\\"owner\\\":\\\"collection-review\\\",\\\"file\\\":\\\"interfaces/protocol.ts\\\",\\\"binding\\\":\\\"ToolResult\\\"}}\",\"category\":\"import\",\"code\":\"not-visible\",\"message\":\"collection-review:interfaces/protocol.ts#ToolResult: not-visible\",\"file\":\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\",\"line\":1,\"importer\":\"collection-review/workspace/reviews/notes\",\"original\":{\"owner\":\"collection-review\",\"file\":\"interfaces/protocol.ts\",\"binding\":\"ToolResult\"}}],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":19,\"records\":\"/tmp/ramify-agent-W0lQx0/collection-review/plans/.harness/sessions/20261008T090141Z-984604\",\"gate\":null},\"exitStatus\":1}: expected 2 to be 4 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 2 to be 4 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: unstated hook paths: [\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts\\\"]: expected false to be true // Object.is equality\",\"AssertionError: unstated hook paths: [\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts\\\"]: expected false to be true // Object.is equality\"]: expected [ \u2026(2) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090141Z-8e4e69\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":6,\"records\":\"/tmp/ramify-agent-On40ZW/collection-review/plans/.harness/sessions/20261008T090141Z-8e4e69\",\"gate\":{\"ran\":true,\"verdict\":\"passed\",\"cause\":null,\"attempt\":\"/tmp/ramify-agent-On40ZW/collection-review/plans/.harness/sessions/20261008T090141Z-8e4e69/gate/attempt.json\",\"commands\":[\"type-check: passed\",\"ramify-check: passed\"]}},\"exitStatus\":0}: expected 1 to be 2 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 1 to be 2 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: unstated hook paths: [\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts\\\"]: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "failing work: the checkpoint fails, its attempt is under gate/, the exit status is 1, and nothing is committed",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090141Z-edde29\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is already right.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":3,\"records\":\"/tmp/ramify-agent-yAz5Vg/collection-review/plans/.harness/sessions/20261008T090141Z-edde29\",\"gate\":{\"ran\":true,\"verdict\":\"failed\",\"cause\":\"check-failed\",\"attempt\":\"/tmp/ramify-agent-yAz5Vg/collection-review/plans/.harness/sessions/20261008T090141Z-edde29/gate/attempt.json\",\"commands\":[\"type-check: failed\",\"ramify-check: passed\"]}},\"exitStatus\":1}: expected +0 to be 1 // Object.is equality",
+            "AssertionError: required Ramify replies: expected +0 to be 1 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: unstated hook paths: [\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts\\\"]: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "every record exists and validates against its schema, and git sees nothing under plans/.harness/",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090141Z-87543e\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":11,\"records\":\"/tmp/ramify-agent-PyUdEM/collection-review/plans/.harness/sessions/20261008T090141Z-87543e\",\"gate\":{\"ran\":true,\"verdict\":\"passed\",\"cause\":null,\"attempt\":\"/tmp/ramify-agent-PyUdEM/collection-review/plans/.harness/sessions/20261008T090141Z-87543e/gate/attempt.json\",\"commands\":[\"type-check: passed\",\"ramify-check: passed\"]}},\"exitStatus\":0}: expected 2 to be 3 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 2 to be 3 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: unstated hook paths: [\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts\\\"]: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        },
+        {
+          "title": "its transcript is transcript.jsonl: the start before the model call, the harness's decisions, and the shell's log by reference",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090141Z-429232\",\"module\":\"collection-review/workspace/reviews/notes\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"The limit is 500.\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":11,\"records\":\"/tmp/ramify-agent-n9kbHF/collection-review/plans/.harness/sessions/20261008T090141Z-429232\",\"gate\":null},\"exitStatus\":0}: expected 2 to be 3 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 2 to be 3 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: unstated hook paths: [\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts\\\"]: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        }
+      ]
+    },
+    {
+      "raw": "/tmp/plan22-settlement-authoring-8.json",
+      "passed": 52,
+      "failed": 1,
+      "summary": "Root completion also includes fixture TSX and auxiliary JS source; literal source list corrected.",
+      "rawSha256": "04752ca1eed3f47736258e40ee15a99bc361f020c16963c81a2f0f94596443f1",
+      "failures": [
+        {
+          "title": "PB3-S04: actual shell tool writes pass only permitted candidates; protected creation fails the checkpoint",
+          "diagnostics": [
+            "AssertionError: {\"status\":\"finished\",\"summary\":{\"session\":\"20261008T090253Z-e1c5da\",\"module\":\"collection-review\",\"ended\":\"submitted\",\"submission\":{\"kind\":\"completion-proposed\",\"summary\":\"Actual shell created protected audit configuration and durable job state\",\"findings\":[],\"bindings\":[]},\"rejectedSubmissions\":0,\"standingViolations\":[],\"changed\":[\"plans/plan/.harness/jobs/run/unsafe.json\",\"ramify-audit.json\"],\"harnessChanged\":[],\"preservedTracked\":[],\"outsideScope\":[\"plans/plan/.harness/jobs/run/unsafe.json\",\"ramify-audit.json\"],\"usage\":{\"unavailable\":\"the session reported no usage\"},\"elapsedMs\":20,\"records\":\"/tmp/ramify-agent-xcQkcT/collection-review/plans/.harness/sessions/20261008T090253Z-e1c5da\",\"gate\":{\"ran\":true,\"verdict\":\"failed\",\"cause\":\"guarded-change\",\"attempt\":\"/tmp/ramify-agent-xcQkcT/collection-review/plans/.harness/sessions/20261008T090253Z-e1c5da/gate/attempt.json\",\"commands\":[\"type-check: not verified (local-rule-failed)\",\"ramify-check: not verified (local-rule-failed)\"]}},\"exitStatus\":1}: expected 1 to be 2 // Object.is equality",
+            "AssertionError: required Ramify replies: expected 1 to be 2 // Object.is equality",
+            "AssertionError: caught session boundary violations: [\"AssertionError: unstated hook paths: [\\\"cucumber.js\\\",\\\"src/assembly.ts\\\",\\\"src/interfaces/protocol.ts\\\",\\\"src/main.ts\\\",\\\"src/protocol.ts\\\",\\\"src/root.ts\\\",\\\"src/server.ts\\\",\\\"src/tests/assembly.test.ts\\\",\\\"src/tests/http.test.ts\\\",\\\"src/tests/protocol-typing.test.ts\\\",\\\"src/tests/setup.ts\\\",\\\"subs/integration-tests/src/steps/collection-review.steps.ts\\\",\\\"subs/integration-tests/src/support/hooks.ts\\\",\\\"subs/integration-tests/src/support/initialization.ts\\\",\\\"subs/integration-tests/src/support/mode.ts\\\",\\\"subs/integration-tests/src/support/world.ts\\\",\\\"subs/workspace/src/app.tsx\\\",\\\"subs/workspace/src/client.ts\\\",\\\"subs/workspace/src/main.tsx\\\",\\\"subs/workspace/src/tests/shell.test.tsx\\\",\\\"subs/workspace/subs/catalog/src/mcp.ts\\\",\\\"subs/workspace/subs/catalog/src/router.ts\\\",\\\"subs/workspace/subs/catalog/src/tests/adapters.test.ts\\\",\\\"subs/workspace/subs/catalog/subs/core/src/catalog.ts\\\",\\\"subs/workspace/subs/catalog/subs/core/src/history.ts\\\",\\\"subs/workspace/subs/catalog/subs/core/src/records.ts\\\",\\\"subs/workspace/subs/catalog/subs/core/src/tests/catalog.test.ts\\\",\\\"subs/workspace/subs/catalog/subs/core/src/tests/fixture.ts\\\",\\\"subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx\\\",\\\"subs/workspace/subs/catalog/subs/ui/src/tests/catalog-card.test.tsx\\\",\\\"subs/workspace/subs/contracts/src/interfaces/vocabulary.ts\\\",\\\"subs/workspace/subs/contracts/src/tests/vocabulary.test.ts\\\",\\\"subs/workspace/subs/reviews/src/mcp.ts\\\",\\\"subs/workspace/subs/reviews/src/router.ts\\\",\\\"subs/workspace/subs/reviews/src/session.ts\\\",\\\"subs/workspace/subs/reviews/src/tests/router.test.ts\\\",\\\"subs/workspace/subs/reviews/src/tests/sessions.test.ts\\\",\\\"subs/workspace/subs/reviews/src/tests/typing.test.ts\\\",\\\"subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts\\\",\\\"subs/workspace/subs/reviews/subs/core/src/runtime.ts\\\",\\\"subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts\\\",\\\"subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts\\\",\\\"subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/controller.test.ts\\\",\\\"subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts\\\",\\\"subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts\\\",\\\"subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/inspection-task.test.ts\\\",\\\"subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/result.test.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/notes.ts\\\",\\\"subs/workspace/subs/reviews/subs/notes/src/tests/notes.test.ts\\\",\\\"subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx\\\",\\\"subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx\\\",\\\"subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/format.ts\\\",\\\"subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx\\\",\\\"subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/format.test.ts\\\",\\\"subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/review-result.test.tsx\\\",\\\"subs/workspace/subs/reviews/subs/validation/src/tests/validate.test.ts\\\",\\\"subs/workspace/subs/reviews/subs/validation/src/validate.ts\\\",\\\"subs/workspace/subs/shared-ui/src/status-badge.tsx\\\",\\\"subs/workspace/subs/shared-ui/src/tests/status-badge.test.tsx\\\",\\\"vite.config.ts\\\",\\\"vitest.config.ts\\\"]: expected false to be true // Object.is equality\"]: expected [ Array(1) ] to deeply equal []"
+          ]
+        }
+      ]
+    }
+  ],
+  "timingLimit": "Runs use an evolving shared host. The final run overlapped compiler and module checks; no controlled aggregate speedup or full-audit timing claim. Native process time remains in explicit witnesses.",
+  "fullNestedAudit": {
+    "status": "unrun",
+    "requiredBeforeMainMerge": true,
+    "owner": "coordinator",
+    "command": "ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent --cwd . --full --nested --json"
+  },
+  "semanticReview": "original assertions mechanically preserved; responsible architect reviews preservation independently of automated checks; no full-plan completion claimed",
+  "nativeExecutorCallback": {
+    "case": "PB3-S04",
+    "originalAndDestinationSha256": "cd60a47dc74bd5c9dbf186b9af61a4e165ce86582d92d9d80c1affe6c011a28c",
+    "byteIdentical": true,
+    "scope": "inner actual execFile callback only; complete registration fixture arguments changed"
+  }
+}
