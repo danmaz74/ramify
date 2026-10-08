@@ -483,5 +483,12 @@
       "logs": "/tmp/ramify-plan23-integrated-blob-object-facts-*.log",
       "limit": "Optional original blob IDs authenticate reencoded decoded text; missing metadata remains unknown. Native SHA1 repository verified; SHA256 parser-only controls."
     }
+  },
+  "qualificationRepairReservations": {
+    "auditSource": "637d8ff7eac6c010af8c3517ff42e1c5ef712ca6",
+    "failedReport": "41209da07bbf06539523dc31c40afb52faef3aab",
+    "writeSets": "../write-sets.json#qualificationRepairs.full-audit-637d8ff7",
+    "status": "focused repairs active; final full qualification remains failed/open",
+    "policy": "Keep exact original task, receipt and mutation authority; no new skips, timeout increases or blanket replay/fresh fallback."
   }
 }

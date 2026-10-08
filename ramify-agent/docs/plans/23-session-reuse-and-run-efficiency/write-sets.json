@@ -385,7 +385,8 @@
       "runtimeWorker": [
         "subs/harness/src/run/service.ts",
         "subs/harness/src/tests/check-findings-composition.test.ts",
-        "subs/harness/src/tests/review-questions.test.ts"
+        "subs/harness/src/tests/review-questions.test.ts",
+        "subs/harness/src/tests/helpers/acceptance-flow.ts"
       ],
       "agentTestWorker": [
         "subs/harness/subs/agent/src/tests/port-additions.test.ts",
@@ -393,6 +394,39 @@
         "subs/harness/subs/agent/src/tests/transcript-content.test.ts",
         "subs/harness/src/tests/lineage-metrics.test.ts",
         "subs/harness/src/tests/union-values.test.ts"
+      ],
+      "recoveryWorker": [
+        "subs/harness/src/tests/helpers/recovery-table.ts",
+        "subs/harness/src/tests/helpers/composition.ts",
+        "subs/harness/src/tests/helpers/runs.ts",
+        "subs/harness/src/tests/run-recovery.test.ts",
+        "subs/harness/src/tests/capability-recovery.test.ts",
+        "subs/harness/src/tests/review-lifecycle.test.ts",
+        "subs/harness/src/tests/check-findings-run.test.ts",
+        "subs/harness/src/tests/helpers/session-fixture.ts",
+        "subs/harness/src/tests/session-fixture.test.ts",
+        "subs/harness/src/tests/composition.test.ts",
+        "subs/harness/src/tests/composition-recovery.test.ts",
+        "subs/harness/src/tests/composition-recovery-chains.test.ts",
+        "subs/harness/src/tests/composition-recovery-delegation.test.ts"
+      ],
+      "workflowTestWorker": [
+        "subs/harness/src/tests/run.test.ts",
+        "subs/harness/src/tests/run-commands.test.ts",
+        "subs/harness/src/tests/review-stop.test.ts",
+        "subs/harness/src/tests/plan-deviations.test.ts",
+        "subs/harness/src/tests/session-queries.test.ts",
+        "subs/harness/src/tests/context-selection-runtime.test.ts",
+        "subs/harness/src/tests/local-architect-submission.test.ts",
+        "subs/harness/src/tests/engineer-failures.test.ts",
+        "subs/harness/src/tests/iteration-source-delivery.test.ts",
+        "subs/harness/src/tests/transcript-run.test.ts",
+        "subs/harness/src/tests/work-item-api-views.test.ts",
+        "subs/harness/src/tests/check-findings-commands.test.ts",
+        "subs/harness/src/tests/work-items.test.ts",
+        "subs/harness/src/tests/iterations.test.ts",
+        "subs/harness/src/tests/integration-scenarios.test.ts",
+        "subs/harness/src/tests/contract-revision-scripted.test.ts"
       ]
     }
   }
