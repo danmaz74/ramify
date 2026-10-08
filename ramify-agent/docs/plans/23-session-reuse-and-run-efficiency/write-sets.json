@@ -333,6 +333,11 @@
       "subs/harness/subs/agent/subs/pi/src/preservation.ts",
       "subs/harness/subs/agent/subs/pi/module.ramify",
       "subs/harness/subs/agent/subs/pi/src/tests/plan23-native-request-artifact.test.ts"
+    ],
+    "git-line-origin-facts": [
+      "subs/harness/subs/evidence/src/git.ts",
+      "subs/harness/subs/evidence/src/tests/git.test.ts",
+      "subs/harness/subs/evidence/src/tests/plan23-line-origin-facts.test.ts"
     ]
   }
 }
