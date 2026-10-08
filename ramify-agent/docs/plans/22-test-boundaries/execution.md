@@ -58,6 +58,9 @@ the minimum actual witnesses needed for the declared boundary claims.
   Preserve concurrent Plan 21 changes. If the target advances on touched paths,
   reconcile on the isolated branch and rerun affected checks before integration.
   Never stash/reset another plan's working changes or terminate its test run.
+- Before each further merge, run the installed released audit CLI on the clean
+  committed optimization branch using `--full --nested`. A failed, blocked or
+  incomplete audit prevents integration. Serialize with active Plan 21 audits.
 - Merge only the qualified optimization branch into the target. Verify its
   ancestry and integrated affected checks before creating the next worktree.
 
@@ -79,8 +82,12 @@ qualification and project-wide automatic enforcement remain outstanding.
 Focused Vitest runs are permitted for the optimization's cases. Full-suite
 verification runs through the installed committed audit CLI, serialized after
 any active Plan 21 audit. A running/locked audit is not a pass. The coordinator
-owns baseline/final audit scheduling and avoids duplicate full runs against
-identical inputs. The existing Plan 21 audit observed when execution began
+owns baseline, pre-merge and final audit scheduling and avoids duplicate full runs
+against identical inputs. On 2026-10-08, after the user asked about pre-merge
+audits, delivery was corrected: cuts 1–4 had focused/type/module qualification
+before merge, with the failed post-cleanup full baseline retained. Audit those
+four integrated cuts together, and require a passing released full nested audit
+on every subsequent committed optimization branch before merging. The existing Plan 21 audit observed when execution began
 provides evidence only for its own captured source.
 
 Each receipt records implementation commit, focused tests, expected failures,

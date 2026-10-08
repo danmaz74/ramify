@@ -1,0 +1,165 @@
+{
+  "schema": "plan21.iteration10.delivery-audit/1",
+  "command": "ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent --cwd . --json",
+  "raw": {
+    "path": "/tmp/pb3-it10-audit-1-failed.json (copy of the first /tmp/pb3-it10-audit.json)",
+    "sha256": "b13b824f4a2f45c8fa25b94609626ea496758b1d54c4e1e3a80a3704ac011c04"
+  },
+  "window": "05:20:25–05:25:55 UTC",
+  "status": "completed",
+  "requestId": "968199d1-2388-48b6-a549-976a3249bfc0",
+  "runId": "913fb0bb-d5c9-4575-b08d-dd4c2d533e03",
+  "producer": {
+    "name": "ramify-audit",
+    "version": "0.7.2"
+  },
+  "sourceCommit": "292154763c95d5338405fad41c27dd06caefb914",
+  "sourceTree": "2678959aec490040d60d3abdc6581c8498c4da40",
+  "auditedAt": "2026-10-08T05:25:54.819Z",
+  "durationSeconds": 329.615,
+  "mode": {
+    "requestedMode": "ramify-partial",
+    "resolution": "defaulted",
+    "executedMode": "full",
+    "fallbackReason": "preparation-input: package.json"
+  },
+  "overall": "fail",
+  "composition": {
+    "verdict": "fail",
+    "scoped": false,
+    "chainDepth": 0,
+    "reportCommit": "6c3360546fd9bcb3983601aa84ef3a06909d8199",
+    "outstandingFailures": 2,
+    "reason": "a check of the full audit failed"
+  },
+  "refs": {
+    "reportCommit": "6c3360546fd9bcb3983601aa84ef3a06909d8199",
+    "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T05-25-54Z-292154763",
+    "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/2678959aec490040d60d3abdc6581c8498c4da40"
+  },
+  "retrievalCommands": [
+    "git notes --ref=audit-projects/ramify-agent-f25e9a298228 show 292154763c95d5338405fad41c27dd06caefb914",
+    "git show refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-08T05-25-54Z-292154763:reports/audit/summary.json"
+  ],
+  "expectedFiles": {
+    "contract": "runner-configured-files/1",
+    "source": "ownership-answer",
+    "expected": 251,
+    "run": 251,
+    "missing": [],
+    "status": "complete",
+    "runnerConfigFiles": [
+      "vitest.config.ts"
+    ]
+  },
+  "selection": {
+    "kind": "full",
+    "selectedCheckIds": [
+      "agent-scenarios",
+      "agent-structure",
+      "agent-tests",
+      "agent-typecheck",
+      "agent-web-build",
+      "patch-integrity"
+    ],
+    "omittedCheckIds": [],
+    "selectedTestUnitIds": [
+      "agent-check-self",
+      "agent-cucumber",
+      "agent-typecheck",
+      "agent-vitest",
+      "agent-web-build",
+      "git-diff-check"
+    ],
+    "omittedTestUnitIds": []
+  },
+  "ledgerCompleteness": "complete",
+  "checks": {
+    "agent-scenarios": {
+      "status": "pass",
+      "durationSeconds": 0.81,
+      "counts": {
+        "agent-cucumber": {
+          "scenarios": {
+            "failed": 0,
+            "passed": 0,
+            "skipped": 0,
+            "total": 0
+          },
+          "steps": {
+            "failed": 0,
+            "passed": 0,
+            "skipped": 0,
+            "total": 0,
+            "undefined": 0
+          }
+        }
+      },
+      "failedTests": []
+    },
+    "agent-structure": {
+      "status": "pass",
+      "durationSeconds": 18.422,
+      "counts": {
+        "agent-check-self": null
+      },
+      "failedTests": []
+    },
+    "agent-tests": {
+      "status": "fail",
+      "durationSeconds": 291.352,
+      "counts": {
+        "agent-vitest": {
+          "files": {
+            "failed": 2,
+            "passed": 248,
+            "skipped": 1,
+            "total": 251
+          },
+          "tests": {
+            "failed": 2,
+            "passed": 1969,
+            "skipped": 2,
+            "total": 1973
+          }
+        }
+      },
+      "failedTests": [
+        {
+          "file": "ramify-agent/subs/harness/src/tests/protocol-contract.test.ts",
+          "name": "a gate carries its configured audit and the tracked scenarios it ran; a command carries no scenario summary",
+          "error": "ZodError: ["
+        },
+        {
+          "file": "ramify-agent/subs/harness/src/tests/run-policy.test.ts",
+          "name": "readiness and the final gate request the full audit; ordinary gates leave the mode to the provider; readiness alone commits nothing",
+          "error": "AssertionError: expected { readiness: { …(3) }, …(5) } to deeply equal { readiness: { …(2) }, …(5) }"
+        }
+      ]
+    },
+    "agent-typecheck": {
+      "status": "pass",
+      "durationSeconds": 5.838,
+      "counts": {
+        "agent-typecheck": null
+      },
+      "failedTests": []
+    },
+    "agent-web-build": {
+      "status": "pass",
+      "durationSeconds": 0.581,
+      "counts": {
+        "agent-web-build": null
+      },
+      "failedTests": []
+    },
+    "patch-integrity": {
+      "status": "pass",
+      "durationSeconds": 0.019,
+      "counts": {
+        "git-diff-check": null
+      },
+      "failedTests": []
+    }
+  }
+}
