@@ -393,7 +393,10 @@
         "subs/harness/subs/agent/src/interfaces/port.ts",
         "subs/harness/subs/agent/src/scripted.ts",
         "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
-        "subs/harness/src/projections/session-queries.ts"
+        "subs/harness/src/projections/session-queries.ts",
+        "subs/harness/src/tests/capability-assignments.test.ts",
+        "subs/harness/src/tests/capability-submission.test.ts",
+        "subs/harness/src/tests/helpers/capability-flow-boundaries.ts"
       ],
       "runtimeWorker": [
         "subs/harness/src/run/service.ts",
