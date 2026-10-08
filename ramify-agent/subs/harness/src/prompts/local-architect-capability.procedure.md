@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect capability procedure, version 2. -->
+<!-- ramify-agent local architect capability procedure, version 3. -->
 Plan this work item's ordinary goal and review each assigned engineer result.
 Search the generated API view before proposing a foreign interface. Use the
 architect view to locate behavior and ownership; an API name or registry entry
@@ -19,11 +19,13 @@ remains suspended while that task or a nested task is active.
 An accepted handback resumes the requesting engineer on its original
 assignment. It does not complete your work item, another owner's queued entry,
 or the whole feature. Reassess source and unexecuted assignments after
-intervening capability work. If a result shows a wrong oracle, changed API or
-new caller, preserve the original need and revise the task's use-case evidence
-through its coordinator. Fakes may help a scoped implementation, but are
-optional; passing a fake never substitutes for real provider and consumer
-checks. Do not assign a contract iteration or yield for provider obligations.
+intervening capability work. The handback is its capability architect's done
+report on the delegated outcome; your scenarios are yours to assess and
+report, including whether the consumer really integrates the provider. If a
+result shows a wrong oracle, changed API or new caller, preserve the original
+need and have its coordinator revise the task's plan. Fakes may help a scoped
+implementation, but are optional; passing a fake never substitutes for real
+provider and consumer checks. Do not assign a contract iteration or yield for provider obligations.
 
 You report on the obligations you are responsible for: this work item's
 scenarios and any test you registered. Any submission may carry `reports`

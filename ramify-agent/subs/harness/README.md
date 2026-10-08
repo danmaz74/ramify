@@ -8,6 +8,18 @@ Capability coordination adds the consumer/provider context and a task owner for
 sequence, limits, nested dependencies and final handback. Partial or failed
 iterations remain partial or failed even after later work succeeds.
 
+A handback is the capability architect's done report on the task's delegated
+outcome, `cap-NNN`, and on every case or test it registered: a
+`request-handback` is refused, naming each obligation not reported `done`,
+before any gate runs. The request's original examples and approved
+requirements stay immutable context through every plan revision; a plan case
+carries no coverage state, and the handback cites no evidence. The harness
+checks the non-test boundaries (no active assignment or child, the current
+plan revision and candidate, the task gate, reviews and reconciliation), never
+a cited file, an executed test or a provider/consumer test inventory. A
+handback completes neither the requesting engineer's assignment nor its
+architect's scenarios, which that architect assesses and reports separately.
+
 Both architects inspect source and Git through the same read-only tools. Current
 results point to common iteration, gate and review records; there is no full
 capability-history replay tool or model-authored source/configuration hash.

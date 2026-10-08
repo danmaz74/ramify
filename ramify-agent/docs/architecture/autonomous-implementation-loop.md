@@ -622,16 +622,21 @@ continuing.
 
 Fakes can help an implementation, with explicit names and matching exposure,
 but no fake is mandatory and a fake pass is never handback. The capability
-architect coordinates provider and requesting-consumer tests, a combined
-current-source gate, semantic coverage review and checks of affected owners.
+architect decides the appropriate provider and requesting-consumer tests and
+coordinates them, a combined current-source gate, review and checks of
+affected owners.
 A provisional type or test failure stays visible until an owner-scoped repair
 and fresh gate settle it. Correcting a wrong expected value or adapting an API
 test requires an explicit plan reason and preserves the original behavioral
 requirement.
 
 A handback names the accepted plan revision, current source identity, checks,
-reviews, interface use and continuation brief. The harness verifies those
-references and the current candidate before accepting it. It resumes the
+reviews, interface use and continuation brief. It follows the capability
+architect's done report on the task's delegated outcome and on every
+obligation it registered; the original examples stay the request's context,
+with no per-example coverage state. The harness verifies those references and
+the current candidate before accepting it, never a cited test file or an
+executed-file inventory. It resumes the
 requesting engineer and parent coordinator once; their broader work remains
 open. A post-handback finding creates linked revision work without rewriting
 the earlier accepted source or evidence.
@@ -863,9 +868,10 @@ consumer's broader goal or a provider's independently queued entry.
 Plan 17 owns partial/full audit selection, locking and evidence reuse. The
 harness captures obligations and authorized scopes; ramify-audit executes checks
 and supplies complete runner results, executed file identities, failures and
-artifacts. A task handback checks real provider and consumer execution evidence
-from that public report. It does not run a supplemental scope probe or infer
-repair ownership from diagnostic paths. Required scenarios belong to the
+artifacts. A task handback reads no execution evidence from that public
+report: the capability architect assesses it and reports the outcome. The
+harness does not run a supplemental scope probe or infer repair ownership
+from diagnostic paths. Required scenarios belong to the
 bounded delegated goal; unrelated pending consumer scenarios stay pending.
 
 Capture the check commands, selection policy and required evidence obligations

@@ -153,9 +153,9 @@ A **capability architect** is the agent coordinating one
 
 ## Handback
 
-A **handback** is the accepted return of a verified
-[capability task](#capability-task) result to its suspended parent coordinator
-and requesting engineer.
+A **handback** is the accepted return of a
+[capability task](#capability-task) result, on its capability architect's done
+report, to its suspended parent coordinator and requesting engineer.
 
 ## Contract
 
