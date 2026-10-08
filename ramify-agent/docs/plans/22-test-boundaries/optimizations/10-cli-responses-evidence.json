@@ -1,0 +1,666 @@
+{
+  "baseCommit": "8222af73afb7d68bc411e3d7ff005a3cf23cb2bc",
+  "committedTargetAtQualification": "8222af73afb7d68bc411e3d7ff005a3cf23cb2bc",
+  "sourceHashes": {
+    "subs/harness/module.ramify": "21957d7049b44525b1ca41d2411b1c1e2599a12a03395dbe0a2f3eda2ba091a7",
+    "subs/harness/src/tests/hook-checks.test.ts": "1488afb64250651d6a872e9ed0060c9bd5273e40d74f7213ebf0b81f31a1d3e0",
+    "subs/harness/src/tests/helpers/hook-run-boundaries.ts": "d3dd22c1b1fe89da1ee49d48b1ae2b92382455d7683d4b45f894e72d5c4a7532",
+    "subs/harness/src/tests/hook-checks.boundary.test.ts": "819951508a9fcacf8bbbfd1e05a5eaefbe19a994b8914935e03840283c684f5a",
+    "subs/harness/src/tests/hook-run-boundaries.test.ts": "7b23d29526d1c1abd1a2db403e96095920407d0745dd23ac32e1205dc642c7c3",
+    "subs/harness/subs/evidence/module.ramify": "05dd81e72158e605a989dc68cc2db7b02c3fca40096ec475e74bff00b9c7b55f",
+    "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts": "19da373af4d4482c53f0b4bbe1e40e7646c1a86d4737a25a58c04d0cbfe9a037",
+    "subs/harness/subs/evidence/src/tests/helpers/scripted-cli.ts": "1b8fd3e3b1fba057b04c8b7327db1ffc5aa25245bf79b6a00df8c93fc3c9b11b",
+    "subs/harness/subs/evidence/src/tests/scripted-cli.test.ts": "67344d6595076b37b0f04fa58f4bde09d5bdf98a29b84b42de61e4ac3e8f681a"
+  },
+  "configurationHashes": {
+    "package.json": "df8473368f6e34409bc6f7917ba183bda93db16cf2b75f8a561c42ab12c29551",
+    "package-lock.json": "9d0b5e4332475cfc10b20c6f8c3d2aff035703a25af88710bc2beeb361ea96d6",
+    "vitest.config.ts": "c0f54f605e468027bffb775b4847c487bb88fb59f1b06528dbacb09738f07e7e",
+    "ramify-audit.json": "9bfaaa5d6b95d590cf044ecab60faec812b2e39fd5a7752be28e7190afa80baa"
+  },
+  "caseMapping": [
+    {
+      "title": "findings are reported with their count, and the same finding reported again is not new",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 9,
+      "originalCallbackSha256": "5cf19aaff7c760e72815cd55a0e9d0d4cb635122c7eb2ab9b0d6e1a8b1fba423",
+      "currentCallbackSha256": "56c9291287d5cdbb18e7251779d45c0a21d5d5b76c9d2fc00a2bf3805f07bcfa",
+      "native": false
+    },
+    {
+      "title": "a cold daemon is not checked with the CLI's reason, and is never a pass",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 6,
+      "originalCallbackSha256": "1a96ac0a8c1c23309396636ee1f7304d1b1cf009b01bda6649c8e4c2523006f0",
+      "currentCallbackSha256": "1a96ac0a8c1c23309396636ee1f7304d1b1cf009b01bda6649c8e4c2523006f0",
+      "native": false
+    },
+    {
+      "title": "an executable that never answers within the harness's own bound is not checked either",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.boundary.test.ts",
+      "originalSourceExpectationOccurrences": 4,
+      "originalCallbackSha256": "a89b26c8fba36c823a6baf43c77e8c7a427b8b261af35cb153a112b7e7db4bca",
+      "currentCallbackSha256": "a89b26c8fba36c823a6baf43c77e8c7a427b8b261af35cb153a112b7e7db4bca",
+      "native": true
+    },
+    {
+      "title": "a mutation whose changed set is unknown records the gap and runs a complete check",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 6,
+      "originalCallbackSha256": "9c64f74493f16aa6c32cb1fd3ca93907b060e67126cb7c52c80ba865458faaee",
+      "currentCallbackSha256": "9c64f74493f16aa6c32cb1fd3ca93907b060e67126cb7c52c80ba865458faaee",
+      "native": false
+    },
+    {
+      "title": "a shell call whose complete check passes is not told at all: the gap is recorded, not reported",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "00718b8f42ba741463246008c6b0c849eb2cf960e30612a048bf2582fe4f5b9d",
+      "currentCallbackSha256": "00718b8f42ba741463246008c6b0c849eb2cf960e30612a048bf2582fe4f5b9d",
+      "native": false
+    },
+    {
+      "title": "a shell call whose complete check could not run is told that it could not, and is never a pass",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 2,
+      "originalCallbackSha256": "a0f01b7ee5cdd8f5d544d51f2f153250779f6db1a076c7fd1d789d8b4ef2a071",
+      "currentCallbackSha256": "f2866b0ea6e685c53c8dd3317765386772d789dc7a623f9554c4e285cfffebd3",
+      "native": false
+    },
+    {
+      "title": "a check that passed with nothing new tells the engineer nothing",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "de1173f2e3ee3248d70a733af3b21df0d17246f4593efcaab0bd9198049c37bd",
+      "currentCallbackSha256": "de1173f2e3ee3248d70a733af3b21df0d17246f4593efcaab0bd9198049c37bd",
+      "native": false
+    },
+    {
+      "title": "both report shapes are read: `findings` of a changed check and `diagnostics` of a complete one, each identified by Ramify's id",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 5,
+      "originalCallbackSha256": "931f2d69bf064db5097be1841afd51b2805ce2ed8fa74ce8e79d04774af57787",
+      "currentCallbackSha256": "931f2d69bf064db5097be1841afd51b2805ce2ed8fa74ce8e79d04774af57787",
+      "native": false
+    },
+    {
+      "title": "PB3-H01: exit 0 naming only excluded and inert paths shows each as not analyzed, never as passing source checks",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 5,
+      "originalCallbackSha256": "a8d3f34f1e1628cc0ca78abec93ed7463af7db5423b4868852691ef643a8a73c",
+      "currentCallbackSha256": "a8d3f34f1e1628cc0ca78abec93ed7463af7db5423b4868852691ef643a8a73c",
+      "native": false
+    },
+    {
+      "title": "PB3-H01: mixed results keep every path's disposition and reason, under a verdict and under exit 2",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 7,
+      "originalCallbackSha256": "0923a70f1648ac7eedde2acb406ae99ea2dca3fd7e73b5834954da95502c8fb7",
+      "currentCallbackSha256": "0923a70f1648ac7eedde2acb406ae99ea2dca3fd7e73b5834954da95502c8fb7",
+      "native": false
+    },
+    {
+      "title": "PB3-H02: project findings returned for an excluded-only request at exit 1 reach the engineer as a violation",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 2,
+      "originalCallbackSha256": "3be83a0c1751e71a5c4bddaa49e75d11f99d16ae75eede53a663ee7c62d69b15",
+      "currentCallbackSha256": "3be83a0c1751e71a5c4bddaa49e75d11f99d16ae75eede53a663ee7c62d69b15",
+      "native": false
+    },
+    {
+      "title": "PB3-H02: findings returned with exit 2 are reported and stand, and that check clears nothing",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 6,
+      "originalCallbackSha256": "99d370c121253b33ab9753b5ecb99621d089df0826f5f578546dba4762f57791",
+      "currentCallbackSha256": "99d370c121253b33ab9753b5ecb99621d089df0826f5f578546dba4762f57791",
+      "native": false
+    },
+    {
+      "title": "PB3-H03: unanalyzed and unrun paths clear no standing finding; the provider's confirmed deletion clears it",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 8,
+      "originalCallbackSha256": "61c610946db16d8b074d579a05b2ee6766cdccc04233dcb32e3accb2b65e1e6f",
+      "currentCallbackSha256": "61c610946db16d8b074d579a05b2ee6766cdccc04233dcb32e3accb2b65e1e6f",
+      "native": false
+    },
+    {
+      "title": "PB3-H04: a boundary violation in auxiliary source is relayed with Ramify's own message and severity",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 5,
+      "originalCallbackSha256": "538e5875435c90fb10e1c0e64c2cd1cfe8aba5cb243a95b0a3ac07e00099e5c9",
+      "currentCallbackSha256": "538e5875435c90fb10e1c0e64c2cd1cfe8aba5cb243a95b0a3ac07e00099e5c9",
+      "native": false
+    },
+    {
+      "title": "PB3-H04: a compiler-selected scratch warning is relayed as not blocking with its own message, and the scratch file as not analyzed",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "f3c527ee23e6473ecaea73b7958e1e4e30118619c9f5ac9dfad2837ab2274f4e",
+      "currentCallbackSha256": "e74c89a9a5634492c85fdb008c1985e83283fb109ce9d994c4bda679a75ca176",
+      "native": false
+    },
+    {
+      "title": "PB3-H04: a warning that arrives with a later revision is relayed for the file this invocation wrote earlier",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 1,
+      "originalCallbackSha256": "900f585bf158ddd3edf698507d3616435280080a5159a0bd105b25b5a49bc0b4",
+      "currentCallbackSha256": "900f585bf158ddd3edf698507d3616435280080a5159a0bd105b25b5a49bc0b4",
+      "native": false
+    },
+    {
+      "title": "PB3-H04: a configuration path is the provider's to classify, with no filename shortcut and no complete check",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 6,
+      "originalCallbackSha256": "ac6a0f601929bb401197ba41fe5130cc907f028fd9b597287ceff6b9aa9c1b10",
+      "currentCallbackSha256": "ac6a0f601929bb401197ba41fe5130cc907f028fd9b597287ceff6b9aa9c1b10",
+      "native": false
+    },
+    {
+      "title": "a result the harness does not read is an explicit gap, never a pass",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 4,
+      "originalCallbackSha256": "a888ea048233dba898beae78a0b656c98af43a049fcbb6ba1d470ccb847db38b",
+      "currentCallbackSha256": "a888ea048233dba898beae78a0b656c98af43a049fcbb6ba1d470ccb847db38b",
+      "native": false
+    },
+    {
+      "title": "an edit that matched nothing changed no file, and is still a mutation with its hook check",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 11,
+      "originalCallbackSha256": "53f5e1d196a39143d9aeee52c7c647d99f3cd5fc6fe99fee15e1bb918b59466c",
+      "currentCallbackSha256": "16383c4a2d4ba02eb917d368c8ad335087a7bed0698ddd7a0ef71d8691c30339",
+      "native": false
+    },
+    {
+      "title": "the finding itself reaches the engineer, labelled, located and with what to do, never as a file to open",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 2,
+      "originalCallbackSha256": "6224a7470b3a9e55c37be23143693ce32727ec247d1e5d0c5a3fecdcb7fe7f54",
+      "currentCallbackSha256": "6224a7470b3a9e55c37be23143693ce32727ec247d1e5d0c5a3fecdcb7fe7f54",
+      "native": false
+    },
+    {
+      "title": "a finding stands until a check covering its file no longer reports it, and a check that did not check clears nothing",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 7,
+      "originalCallbackSha256": "c9ae3af4c7375bf599de56f14b07b8a543bfe3f2bae8cec3bdfbc0f2b1d72f98",
+      "currentCallbackSha256": "c9ae3af4c7375bf599de56f14b07b8a543bfe3f2bae8cec3bdfbc0f2b1d72f98",
+      "native": false
+    },
+    {
+      "title": "two files importing the same forbidden symbol are two findings, and fixing one clears that one alone",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 7,
+      "originalCallbackSha256": "e7a087af1dbe458fed172afe376a95815ab559ad0ba615aee4718dd0e4e07c80",
+      "currentCallbackSha256": "e7a087af1dbe458fed172afe376a95815ab559ad0ba615aee4718dd0e4e07c80",
+      "native": false
+    },
+    {
+      "title": "a violation whose offsets moved keeps standing: it is neither cleared nor new",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "3de369cf363968a10edf31759a3f037913f1c98107e62059236aa04c162ad5f8",
+      "currentCallbackSha256": "3de369cf363968a10edf31759a3f037913f1c98107e62059236aa04c162ad5f8",
+      "native": false
+    },
+    {
+      "title": "says so, and the import findings it no longer reports stand until a check that evaluates imports clears them",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 9,
+      "originalCallbackSha256": "835141dd52d3b193b6924578ec51d1aa18989c3f7edd86493eb8d61c539de5f4",
+      "currentCallbackSha256": "835141dd52d3b193b6924578ec51d1aa18989c3f7edd86493eb8d61c539de5f4",
+      "native": false
+    },
+    {
+      "title": "are relayed as not blocking with Ramify's own code and message, and only for files this invocation wrote",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "776b351dca17855be4384706c5cc2c5d910226f966f7d0a6b56ada8930b5c414",
+      "currentCallbackSha256": "776b351dca17855be4384706c5cc2c5d910226f966f7d0a6b56ada8930b5c414",
+      "native": false
+    },
+    {
+      "title": "a warning is relayed beside a description error: no warning is suppressed for an invalid analysis",
+      "originalFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "currentFile": "subs/harness/src/tests/hook-checks.test.ts",
+      "originalSourceExpectationOccurrences": 2,
+      "originalCallbackSha256": "9f3809bace2bad8567b9f80f30a572390a2260cae4f0dcfa283f7e023c322dfd",
+      "currentCallbackSha256": "9f3809bace2bad8567b9f80f30a572390a2260cae4f0dcfa283f7e023c322dfd",
+      "native": false
+    },
+    {
+      "title": "reads a complete check with no findings as checked",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "1103f94b1114b4494d0424ba6a798647cd6d88d8a0c3f29a870efbf2e8e5549f",
+      "currentCallbackSha256": "1103f94b1114b4494d0424ba6a798647cd6d88d8a0c3f29a870efbf2e8e5549f",
+      "native": false
+    },
+    {
+      "title": "reads exit 1 as findings",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 2,
+      "originalCallbackSha256": "b867f3fb36421a7d8e8a69ba6ffb16d9a9e3f5bf70d4a8ead555f68ebf7553c4",
+      "currentCallbackSha256": "b867f3fb36421a7d8e8a69ba6ffb16d9a9e3f5bf70d4a8ead555f68ebf7553c4",
+      "native": false
+    },
+    {
+      "title": "reads a complete check that could not complete as not checked, with the execution it gave",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 2,
+      "originalCallbackSha256": "64de4a59dcabb602f6d935b3511d4d2453d9a31c0856454ba0e7612e51ab57b1",
+      "currentCallbackSha256": "64de4a59dcabb602f6d935b3511d4d2453d9a31c0856454ba0e7612e51ab57b1",
+      "native": false
+    },
+    {
+      "title": "runs the hook check for the named paths, with its deadline, and keeps each path's disposition",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 4,
+      "originalCallbackSha256": "58423f4b37e730257ec75b74b753df7ec9e4d22f56daf4e433c3d1533f215296",
+      "currentCallbackSha256": "7efdad9b0a212d3b4ee542c5ad178aaae9725815a3fa50ddb45cb3a2321d433b",
+      "native": false
+    },
+    {
+      "title": "reads a cold daemon and an uncovered configuration change as not checked, never as a pass",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "770486a35818252125e828d17ad52fcd300cd77fd486cd4bd35c76c3072219c0",
+      "currentCallbackSha256": "26f61204db5625923cb92bf599f144792f1d21e6499ba2de4534fc85bddaf201",
+      "native": false
+    },
+    {
+      "title": "refuses a changed document that is not the project's, names other paths, or contradicts its exit code",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "31b8d0af6921fd1c93a017ca7af2d7f11a7946f3cc9ee2e15e2d019f2337a5a8",
+      "currentCallbackSha256": "abf20703aa6b054872ad794d61c8ba1b92e1cbee4e1ba6a8ba5521b7f221544b",
+      "native": false
+    },
+    {
+      "title": "reads an earlier document version, or a verdict without a document, as unsupported",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "a1e8c0fd580c2ee08f472205f0a63ac5266132e97270e3147e1b3e90ff177674",
+      "currentCallbackSha256": "a934be3ce11a19da2b838a7a20a7f932f5b4465369f253edf9c1309880de06a3",
+      "native": false
+    },
+    {
+      "title": "names the invocation and its exit code where the CLI gave no reason",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 5,
+      "originalCallbackSha256": "a485605092016c47e3f4fc37f4443d8f48aedaadb2c6932de6854be287950b65",
+      "currentCallbackSha256": "af32affd2a4ca52d9f97056ce5f88e688ad07896d0c3fba1a53d643aced340b4",
+      "native": false
+    },
+    {
+      "title": "reads an invocation failure as not checked with its own reason",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 1,
+      "originalCallbackSha256": "e26e8eea54ff91fb44e12d3ad4d88543612c65be219f009a98002a162d7447cd",
+      "currentCallbackSha256": "085639191a58baceb3ff471244ff8727e6f7972c96fdde6c8ad7d7edc5f90d10",
+      "native": false
+    },
+    {
+      "title": "reads an exit code the contract does not define as not checked",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 2,
+      "originalCallbackSha256": "912188a29ce15484189e87e9da2d8ad1bec1915220ba1f0562d7c1e8bafde1db",
+      "currentCallbackSha256": "912188a29ce15484189e87e9da2d8ad1bec1915220ba1f0562d7c1e8bafde1db",
+      "native": false
+    },
+    {
+      "title": "accepts the exact source identity and owned exclusion",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 1,
+      "originalCallbackSha256": "14c06fb90744ab6cba4b46ede4c7e49f7f1973e4272395e8af022020b9fdb1dd",
+      "currentCallbackSha256": "14c06fb90744ab6cba4b46ede4c7e49f7f1973e4272395e8af022020b9fdb1dd",
+      "native": false
+    },
+    {
+      "title": "refuses old versions, mismatched input and project identities",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 3,
+      "originalCallbackSha256": "4869a4650b109cd0e0e00ba1ce5d748439dfeafd2aa21ff5629a6b7f99ed9c9b",
+      "currentCallbackSha256": "4869a4650b109cd0e0e00ba1ce5d748439dfeafd2aa21ff5629a6b7f99ed9c9b",
+      "native": false
+    },
+    {
+      "title": "accepts renamed child directories and grouping directories, with diagnostic analysis limits",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 1,
+      "originalCallbackSha256": "7b211a6090bb9857c5fd64019e5fd8e2b472dadd7b4fc509cda1ca03b96aa623",
+      "currentCallbackSha256": "7b211a6090bb9857c5fd64019e5fd8e2b472dadd7b4fc509cda1ca03b96aa623",
+      "native": false
+    },
+    {
+      "title": "refuses unsafe paths, duplicate identities, cycles and contradictory excluded placements",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 6,
+      "originalCallbackSha256": "6f7eadeadbc721ef4c05af005d24def52d89bd395d6e9b26cb19d96c52ed1756",
+      "currentCallbackSha256": "6f7eadeadbc721ef4c05af005d24def52d89bd395d6e9b26cb19d96c52ed1756",
+      "native": false
+    },
+    {
+      "title": "refuses contradictory owner parents, directories and path selections",
+      "originalFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "currentFile": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "originalSourceExpectationOccurrences": 4,
+      "originalCallbackSha256": "5f595d074fb7a5d119c4d062df8dbe0b53326d47b617965207af83d66b4230d4",
+      "currentCallbackSha256": "5f595d074fb7a5d119c4d062df8dbe0b53326d47b617965207af83d66b4230d4",
+      "native": false
+    }
+  ],
+  "reports": [
+    {
+      "label": "baseline",
+      "artifact": "/tmp/plan22-cli-responses-baseline.json",
+      "sha256": "44d4da4b7a2ec29738dbff78f44f888b7dc4dec9d9bea0d080f891b684f60a0d",
+      "passed": 41,
+      "failed": 0,
+      "pending": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 2.432979248046875,
+          "cases": 26
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+          "durationSeconds": 0.15090576171875,
+          "cases": 15
+        }
+      ]
+    },
+    {
+      "label": "first",
+      "artifact": "/tmp/plan22-cli-responses-first.json",
+      "sha256": "7de924227597a18c8487a516496ff32d14306d7fc71e13a98be29aedb1a2c4b3",
+      "passed": 28,
+      "failed": 12,
+      "pending": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 0.32966845703125,
+          "cases": 25
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+          "durationSeconds": 0.026659423828125,
+          "cases": 15
+        }
+      ]
+    },
+    {
+      "label": "second",
+      "artifact": "/tmp/plan22-cli-responses-second.json",
+      "sha256": "e504cc9bfd2799ea94718b96b62d8a323cee373e054916a8c874efec1b0cda17",
+      "passed": 38,
+      "failed": 2,
+      "pending": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 0.33554541015625,
+          "cases": 25
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+          "durationSeconds": 0.024857177734375,
+          "cases": 15
+        }
+      ]
+    },
+    {
+      "label": "third",
+      "artifact": "/tmp/plan22-cli-responses-third.json",
+      "sha256": "50dbe2e139b99bd45dc73e585a732d9ed6c412fe2268799d1a0666a95597f777",
+      "passed": 24,
+      "failed": 1,
+      "pending": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 0.377255126953125,
+          "cases": 25
+        }
+      ]
+    },
+    {
+      "label": "run-fourth",
+      "artifact": "/tmp/plan22-cli-responses-run-fourth.json",
+      "sha256": "8baebdf2d85a5c214b0d417ef211fd29819b6977d22bfc421c52d88cff805d30",
+      "passed": 0,
+      "failed": 1,
+      "pending": 24,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 0.500859130859375,
+          "cases": 25
+        }
+      ]
+    },
+    {
+      "label": "run-fifth",
+      "artifact": "/tmp/plan22-cli-responses-run-fifth.json",
+      "sha256": "e5ff3ca921f9a3e097f4db7487221e9cf5f769132b2d227b5d4ca69a9fe4ba35",
+      "passed": 0,
+      "failed": 1,
+      "pending": 24,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 0.525113525390625,
+          "cases": 25
+        }
+      ]
+    },
+    {
+      "label": "run-sixth",
+      "artifact": "/tmp/plan22-cli-responses-run-sixth.json",
+      "sha256": "8369dbbe288d711f36c1d01d15e9433c04c4dd7fb8f7b298b0bef3dc51d4042d",
+      "passed": 0,
+      "failed": 1,
+      "pending": 24,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 0.42586376953125,
+          "cases": 25
+        }
+      ]
+    },
+    {
+      "label": "run-seventh",
+      "artifact": "/tmp/plan22-cli-responses-run-seventh.json",
+      "sha256": "dfc077c19525d427e3a61a51ec734a2dac1cb20f529247d1e5242fdc2de3229d",
+      "passed": 0,
+      "failed": 1,
+      "pending": 24,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 0.569891357421875,
+          "cases": 25
+        }
+      ]
+    },
+    {
+      "label": "qualified-initial",
+      "artifact": "/tmp/plan22-cli-responses-qualified-initial.json",
+      "sha256": "7530a0c57f8eff9cf55972a478f359b12ef5382923f86a29d8f694aa3acd8ac0",
+      "passed": 52,
+      "failed": 0,
+      "pending": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/composition.test.ts",
+          "durationSeconds": 4.53130078125,
+          "cases": 11
+        },
+        {
+          "file": "subs/harness/src/tests/hook-checks.boundary.test.ts",
+          "durationSeconds": 0.411251708984375,
+          "cases": 1
+        },
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 0.650611328125,
+          "cases": 25
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+          "durationSeconds": 0.0268115234375,
+          "cases": 15
+        }
+      ]
+    },
+    {
+      "label": "controls",
+      "artifact": "/tmp/plan22-cli-responses-controls.json",
+      "sha256": "0559756bf3a49a66052afa13ec3a464b1c6465740c5eee819d396c0818c2b125",
+      "passed": 7,
+      "failed": 0,
+      "pending": 0,
+      "files": [
+        {
+          "file": "subs/harness/subs/evidence/src/tests/scripted-cli.test.ts",
+          "durationSeconds": 0.008607421875,
+          "cases": 7
+        }
+      ]
+    },
+    {
+      "label": "final",
+      "artifact": "/tmp/plan22-cli-responses-final.json",
+      "sha256": "5f40d6b3cd0686a2dd445fad80ce14459f05210c3238b59b62df92ca3749bf6a",
+      "passed": 65,
+      "failed": 0,
+      "pending": 0,
+      "files": [
+        {
+          "file": "subs/harness/src/tests/composition.test.ts",
+          "durationSeconds": 4.332606201171875,
+          "cases": 11
+        },
+        {
+          "file": "subs/harness/src/tests/hook-checks.boundary.test.ts",
+          "durationSeconds": 0.41257763671875,
+          "cases": 1
+        },
+        {
+          "file": "subs/harness/src/tests/hook-checks.test.ts",
+          "durationSeconds": 0.650185791015625,
+          "cases": 25
+        },
+        {
+          "file": "subs/harness/src/tests/hook-run-boundaries.test.ts",
+          "durationSeconds": 0.01384375,
+          "cases": 6
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+          "durationSeconds": 0.030750244140625,
+          "cases": 15
+        },
+        {
+          "file": "subs/harness/subs/evidence/src/tests/scripted-cli.test.ts",
+          "durationSeconds": 0.00855517578125,
+          "cases": 7
+        }
+      ]
+    }
+  ],
+  "discovery": {
+    "artifact": "/tmp/plan22-cli-responses-list.json",
+    "sha256": "1496b86a9ed1e6587a5b6684a57aa134f90e3521caab471c78f94df03f5f3584",
+    "cases": 2039,
+    "newSelectedFiles": [
+      "subs/harness/src/tests/hook-checks.test.ts",
+      "subs/harness/src/tests/hook-checks.boundary.test.ts",
+      "subs/harness/src/tests/hook-run-boundaries.test.ts",
+      "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
+      "subs/harness/subs/evidence/src/tests/scripted-cli.test.ts"
+    ],
+    "nonemptyCaseFiles": 266,
+    "configuredFiles": 267,
+    "configuredFilesArtifact": "/tmp/plan22-cli-responses-files.json",
+    "configuredFilesSha256": "9f8a7bd33101a395c88cae922d196ddda2f74035c252a5ad637f24d740951af8",
+    "configuredFilesWithoutCases": [
+      "subs/harness/src/tests/fixture-trials.test.ts"
+    ],
+    "limit": "case list omits existing conditionally empty optional fixture; filesOnly is authoritative configured selection"
+  },
+  "ordinaryGuard": {
+    "attempts": 0,
+    "scope": "setup/imports/flow/cleanup in both original ordinary files and both strict-control files",
+    "limit": "per-file Vitest mock guard; root enforcement and CJS bypass controls remain Plan22 iteration6"
+  },
+  "resources": {
+    "nativeProducer": "PID recorded before exec; process.kill(pid,0) returns ESRCH in teardown",
+    "ownedAnalysisProcessesAtHandoff": 0,
+    "materialization": "two owner views in one private p22cr endpoint; stop CLI exit0; endpoint removed",
+    "baselineLeak": "PID2801212 PPID1 sleep30 observed after original baseline; later no sleep30 processes observed; no broad kill"
+  },
+  "checks": {
+    "typeCheck": {
+      "command": "npm run type-check",
+      "exit": 0,
+      "scopes": 4,
+      "artifact": "/tmp/plan22-cli-responses-types-final.log"
+    },
+    "selfCheck": {
+      "command": "npm run check:self",
+      "exit": 0,
+      "errors": 0,
+      "warnings": 0,
+      "analysisLimits": 313,
+      "artifact": "/tmp/plan22-cli-responses-self-final.log"
+    }
+  },
+  "unrun": [
+    "Released full nested candidate audit (coordinator gate before merge)",
+    "Integrated target focused verification (coordinator after merge)",
+    "Plan22 global guard and partition qualification"
+  ]
+}

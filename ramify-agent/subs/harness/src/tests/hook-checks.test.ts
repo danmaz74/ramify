@@ -1,7 +1,7 @@
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { FindingsSeen, findingIdentities, runHookCheck, type HookCheck } from '../hooks/post-write.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
@@ -10,9 +10,18 @@ import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { capturedCheck, capturedFinding, changedDocument } from './helpers/check-payloads.js';
-import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
-import { initRepository, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
-import { gitService } from '../../subs/evidence/src/git.js';
+import { addModule, assign, byRole, completionProposed, edit, outline, submit } from './helpers/iterations.js';
+import { onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
+import { ScriptedCli } from '../../subs/evidence/src/tests/helpers/scripted-cli.js';
+import { hookRunBoundaries } from './helpers/hook-run-boundaries.js';
+import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
+vi.mock('node:child_process', async importOriginal => {
+  const { guardedChildProcess } = await import('./helpers/process-guard.js');
+  return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
+});
+beforeEach(resetSpawnAttempts);
+const checks: Array<() => void> = [];
+const pending = new WeakMap<ScriptedCli, { code: number; stdout: string; times: number }>();
 
 /*
  * The post-write hook check.
@@ -24,46 +33,41 @@ import { gitService } from '../../subs/evidence/src/git.js';
  * clears only on the provider's coverage, and where the changed set is
  * unknown the harness runs a complete check instead of claiming hook
  * coverage. The installed CLI's own payloads, captured by the evidence
- * owner's provider fixture, are replayed through a real executable.
+ * owner's provider fixture, are replayed through strict raw replies without processes.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) try { await cleanup(); } catch (error) { errors.push(error); }
+  for (const check of checks.splice(0)) try { check(); } catch (error) { errors.push(error); }
+  try { expect(spawnAttempts(), 'ordinary hook setup/flow/teardown process attempts').toEqual([]); } catch (error) { errors.push(error); }
+  if (errors.length) throw new AggregateError(errors, 'hook teardown failed');
 });
 
-/** A `ramify` whose answers this test chooses, spawned like any other executable. */
-async function stub(body: string, options: { readonly timeoutMs?: number } = {}): Promise<{ ramify: RamifyCli; root: string }> {
-  const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-hook-'));
-  cleanups.push(() => rm(directory, { recursive: true, force: true }));
-  const executable = join(directory, 'ramify');
-  await writeFile(executable, `#!/bin/sh\n${body}\n`);
-  await chmod(executable, 0o755);
-  return { ramify: new RamifyCli({ executable, timeoutMs: options.timeoutMs ?? 30_000 }), root: directory };
-}
-
 function request(ramify: RamifyCli, root: string, paths: readonly string[] | null, seen = new FindingsSeen()) {
+  if (ramify instanceof ScriptedCli && pending.has(ramify)) {
+    const reply = pending.get(ramify);
+    expect(reply, 'explicit hook reply required').toBeDefined();
+    ramify.declare({ cwd: root, argv: paths === null
+      ? ['check', '--batch', '--root', root, '--format', 'json', '--no-snapshot']
+      : ['check', '--changed', ...[...new Set(paths)].sort(), '--format', 'json', '--deadline', '2000'],
+      result: { code: reply!.code, stdout: reply!.stdout, stderr: '' }, times: reply!.times });
+    pending.delete(ramify);
+  }
   return { ramify, projectRoot: root, paths, hookTimeoutMs: 2_000, seen, ran: 0, logFile: (check: number) => join(root, 'hooks', `${check}.json`) };
 }
 
-/**
- * A `ramify` that prints the document the test last gave it and exits with
- * the code given beside it, for either form of check.
- */
-async function answering(): Promise<{ ramify: RamifyCli; root: string; answer: (document: unknown, exitCode: number) => Promise<void> }> {
-  const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-hook-answer-'));
-  cleanups.push(() => rm(directory, { recursive: true, force: true }));
-  const report = join(directory, 'report.json');
-  const code = join(directory, 'exit');
-  const { ramify, root } = await stub(`cat '${report}'\nexit "$(cat '${code}')"`);
-  return {
-    ramify,
-    root,
-    answer: async (document, exitCode) => {
-      await writeFile(report, JSON.stringify(document));
-      await writeFile(code, String(exitCode));
-    },
-  };
+/** Each payload is finite; its check inputs come independently from the case's hook request. */
+async function answering() {
+  const root = await mkdtemp(join(tmpdir(), 'ramify-agent-hook-answer-'));
+  cleanups.push(() => rm(root, { recursive: true, force: true }));
+  const ramify = new ScriptedCli();
+  checks.push(() => { ramify.assertComplete(); expect(pending.has(ramify), 'unused payload').toBe(false); });
+  return { ramify, root, answer: async (document: unknown, exitCode: number, times = 1) => {
+    ramify.assertComplete(); expect(pending.has(ramify), 'previous payload unused').toBe(false);
+    pending.set(ramify, { code: exitCode, stdout: `${JSON.stringify(document)}\n`, times });
+  } };
 }
 
 /** A `ramify.analysis/3` complete report, as `ramify check --batch --format json --no-snapshot` prints one. */
@@ -88,7 +92,7 @@ function denied(file: string, line = 1): Record<string, unknown> {
 describe('a hook check after a settled mutation', () => {
   test('findings are reported with their count, and the same finding reported again is not new', async () => {
     const { ramify, root, answer } = await answering();
-    await answer(changedDocument(root, ['a.ts'], [denied('a.ts')]), 1);
+    await answer(changedDocument(root, ['a.ts'], [denied('a.ts')]), 1, 2);
     const seen = new FindingsSeen();
 
     const first = await runHookCheck(request(ramify, root, ['a.ts'], seen));
@@ -126,17 +130,6 @@ describe('a hook check after a settled mutation', () => {
     expect(result.gaps).toEqual([]);
   });
 
-  test('an executable that never answers within the harness\'s own bound is not checked either', async () => {
-    const { ramify, root } = await stub('sleep 30', { timeoutMs: 400 });
-
-    const result = await runHookCheck(request(ramify, root, ['a.ts']));
-
-    expect(result.checks[0]!.outcome).toBe('not-checked');
-    expect(result.checks[0]!.reason).toContain('exited with');
-    expect(result.checks[0]).toMatchObject({ provider: null, dispositions: [] });
-    expect(result.text).toContain('Nothing was verified by this check');
-  });
-
   test('a mutation whose changed set is unknown records the gap and runs a complete check', async () => {
     const { ramify, root, answer } = await answering();
     await answer(completeDocument(root, [denied('b.ts')]), 1);
@@ -168,7 +161,8 @@ describe('a hook check after a settled mutation', () => {
   });
 
   test('a shell call whose complete check could not run is told that it could not, and is never a pass', async () => {
-    const { ramify, root } = await stub('echo \'{"schemaVersion":"ramify.cli/1","status":"unavailable","reason":"cold","exitCode":2}\'\nexit 2');
+    const { ramify, root, answer } = await answering();
+    await answer({ schemaVersion: 'ramify.cli/1', status: 'unavailable', reason: 'cold', exitCode: 2 }, 2);
 
     const result = await runHookCheck(request(ramify, root, null));
 
@@ -349,7 +343,7 @@ describe('per-path dispositions from the installed provider', () => {
   test('PB3-H04: a compiler-selected scratch warning is relayed as not blocking with its own message, and the scratch file as not analyzed', async () => {
     const { ramify, root, answer } = await answering();
     const scratch = capturedCheck('compiler-selected-scratch', root);
-    await answer(scratch.document, scratch.exitCode);
+    await answer(scratch.document, scratch.exitCode, 2);
     const seen = new FindingsSeen();
 
     const result = await runHookCheck(request(ramify, root, scratch.paths, seen));
@@ -437,12 +431,11 @@ describe('a mutation is observed even when the tool failed', () => {
         '',
       ].join('\n'),
     });
-    await installMiniRunner(root);
-    await initRepository(root);
+    const boundary = hookRunBoundaries(root);
+    checks.push(() => boundary.assertComplete());
 
     const { service } = await openRuns(root, {
-      git: gitService,
-      inputs: treeInputs(),
+      ...boundary.options,
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
@@ -452,6 +445,7 @@ describe('a mutation is observed even when the tool failed', () => {
           // the same: the harness never learns what it did from its result.
           edit('notes.ts', 'noteLimit = 999', 'noteLimit = 500'),
           edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
+          { kind: 'await', until: async () => boundary.edited() },
         )],
       }),
     });

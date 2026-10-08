@@ -41,3 +41,6 @@ expose-src GitInspection, inspectGit from "git.ts" to parent
 expose-src CandidateTreePreview, previewCandidateTree from "candidate-tree.ts" to parent
 
 expose-src productionSourceGit, ProvisionalSourceGit from "provisional-git.ts" to parent
+
+// Strict scripted check replies remain testing source in their owning adapter.
+expose-test ScriptedCli, CliReply from "helpers/scripted-cli.ts" to parent
