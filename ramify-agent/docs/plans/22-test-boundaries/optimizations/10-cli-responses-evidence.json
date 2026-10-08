@@ -615,14 +615,21 @@
     "artifact": "/tmp/plan22-cli-responses-list.json",
     "sha256": "1496b86a9ed1e6587a5b6684a57aa134f90e3521caab471c78f94df03f5f3584",
     "cases": 2039,
-    "files": 266,
     "newSelectedFiles": [
       "subs/harness/src/tests/hook-checks.test.ts",
       "subs/harness/src/tests/hook-checks.boundary.test.ts",
       "subs/harness/src/tests/hook-run-boundaries.test.ts",
       "subs/harness/subs/evidence/src/tests/ramify-cli.test.ts",
       "subs/harness/subs/evidence/src/tests/scripted-cli.test.ts"
-    ]
+    ],
+    "nonemptyCaseFiles": 266,
+    "configuredFiles": 267,
+    "configuredFilesArtifact": "/tmp/plan22-cli-responses-files.json",
+    "configuredFilesSha256": "9f8a7bd33101a395c88cae922d196ddda2f74035c252a5ad637f24d740951af8",
+    "configuredFilesWithoutCases": [
+      "subs/harness/src/tests/fixture-trials.test.ts"
+    ],
+    "limit": "case list omits existing conditionally empty optional fixture; filesOnly is authoritative configured selection"
   },
   "ordinaryGuard": {
     "attempts": 0,
