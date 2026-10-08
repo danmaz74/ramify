@@ -289,7 +289,10 @@
       "subs/web/src/session-metrics.tsx",
       "subs/web/src/tests/run-page.test.tsx",
       "subs/web/src/tests/plan23-session-metrics.test.tsx",
-      "docs/plans/23-session-reuse-and-run-efficiency/iterations/12-results.md"
+      "docs/plans/23-session-reuse-and-run-efficiency/iterations/12-results.md",
+      "subs/web/src/tests/session-page.test.tsx",
+      "subs/web/src/tests/session-timeline.test.tsx",
+      "subs/web/src/tests/sessions-page.test.tsx"
     ],
     "13": [
       "scripts/live-trial.ts",
