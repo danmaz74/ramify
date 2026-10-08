@@ -6,8 +6,9 @@ qualified and integrated in the original target,
 `/home/app/ramify-plan21-project-boundary-adoption`, branch
 `feat/plan21-project-boundary-adoption`. Retain that delivery history and its
 audit provenance. The [main-target reconciliation](optimizations/main-target-reconciliation.md)
-records adoption of cuts 9–10, preservation of committed main changes and the
-new pre-merge audit gate; it is not evidence that the main merge has happened.
+records candidate preparation and preservation of committed main changes.
+[Main integration](optimizations/main-target-integrated.md) records the passing
+new pre-merge audit, merge and integrated verification.
 
 ## User's workflow
 
@@ -88,10 +89,10 @@ Delivery cuts qualified so far:
 | 10: guarded hook/CLI reply matrices, strict consumption controls and retained native timeout with producer retirement | `531ee940` | [Passing pre-merge released audit](optimizations/10-premerge-audit.md), [integrated verification](optimizations/10-integrated-results.md) |
 
 These cuts have integrated focused passes in the original Plan 21 target.
-Main already contains cuts 1–8; cuts 9–10 are being qualified in the clean
-reconciliation candidate before adoption into main. Their earlier audits remain
-evidence for their recorded original inputs, rather than a pass for the new
-combined candidate. The initial full baseline failed one
+Main received cuts 1–8 with the Plan21 merge and now contains cuts 9–10
+after the [audited reconciliation and integrated checks](optimizations/main-target-integrated.md).
+Their earlier audits remain evidence for their recorded original inputs; the
+new reconciliation audit qualifies the combined main candidate. The initial full baseline failed one
 crash fixture, subsequently corrected with focused evidence. A later released
 full nested audit of all four integrated cuts passed: [audit receipt](optimizations/04-released-audit.md). This was post-merge qualification. Subsequent cuts require
 passing released audits before merge. Final full-audit qualification and
