@@ -521,6 +521,19 @@
       "owningCases": [
         "P1: one consumer delegates, resumes after provider conformance and verifies against the real provider > K4: the contract gate runs the suite against the fake and the provider gate runs it against the real provider"
       ]
+    },
+    {
+      "file": "subs/harness/src/tests/plan23-trial-attribution.boundary.test.ts",
+      "boundary": "Native Git scratch attribution and target cwd through the public trial attribution CLI",
+      "whyFakeCannotProve": "Actual Git blob bytes, full object IDs, native diff/blame and OS CLI/filesystem behavior establish setup attribution and target paths; scripted outputs do not establish these boundaries.",
+      "owningCases": [
+        "public trial attribution CLI verifies the exact established scratch append from original Git objects",
+        "public trial attribution CLI attributes missing EOF newline replacement as two setup additions and one deletion",
+        "public trial attribution CLI preserves shifted setup identities and retains later same-file agent lines",
+        "public trial attribution CLI proves reverted setup empty without exempting remaining agent lines",
+        "public trial attribution CLI refuses mixed unknown binary dirty and symlink setup exemptions",
+        "prepared trial tool uses actual assigned module src cwd and external report destination"
+      ]
     }
   ]
 }
