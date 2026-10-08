@@ -37,7 +37,26 @@ export interface DeliveredChangeRequest {
   readonly harnessPaths: ReadonlySet<string>;
   /** Each writer's recorded line events, which split a commit several writers share; null where none can be read. */
   readonly recorded: ReadonlyMap<string, LineEventSummary | null>;
+  /** Verified surviving setup lines: additions in final, deletions in base, with their origin/removing commit. */
+  readonly harnessDeltas?: HarnessLineIdentities;
+  /** Paths whose simultaneous writer contributions cannot be separated reliably. */
+  readonly overlappingPaths?: ReadonlySet<string>;
   readonly signal?: AbortSignal | undefined;
+}
+
+/** Owner-local producer seam. The producer verifies mappings against these exact revisions.
+ * Null means a mapping is unknown; [] means verified no surviving setup lines of that kind.
+ * Counts or source-commit line numbers cannot substitute for final/base positions.
+ */
+export interface HarnessLineIdentities {
+  readonly base: string;
+  readonly final: string;
+  readonly entries: readonly {
+    readonly commit: string;
+    readonly path: string;
+    readonly added: readonly number[] | null;
+    readonly deleted: readonly number[] | null;
+  }[];
 }
 
 export type DeliveredChange =
@@ -75,6 +94,22 @@ export async function deliveredChange(history: ChangeHistory, request: Delivered
     byCommit.set(commit, paths);
   };
   let harness = 0;
+  const setupLine = (commit: string, path: string, kind: keyof Tally, line: number): boolean => {
+    if (request.harness.has(commit)) return false; // Exclusive setup commit already has exact commit attribution.
+    const mapping = request.harnessDeltas;
+    const entries = mapping?.entries.filter(entry => entry.commit === commit && entry.path === path) ?? [];
+    if (entries.length === 0) return false;
+    const positions = entries.flatMap(entry => entry[kind] ?? []);
+    const unknown = mapping!.base !== base || mapping!.final !== final || entries.some(entry => entry[kind] === null) ||
+      positions.some(position => !Number.isInteger(position) || position < 1) || !Number.isInteger(line) || line < 1;
+    if (unknown) {
+      unattribute(`setup line mapping unavailable for ${commit.slice(0, 12)} ${path} ${kind}: exact final/base revision-bound identities required`);
+      return true;
+    }
+    if (!positions.includes(line)) return false;
+    harness += 1;
+    return true;
+  };
   const binaryPaths: string[] = [];
 
   try {
@@ -91,7 +126,7 @@ export async function deliveredChange(history: ChangeHistory, request: Delivered
         const origins = await history.lineOrigins(projectRoot, base, final, file.after, file.added, signal);
         for (const origin of origins) {
           if (origin.boundary) unattribute('Git blames an added line on the base or earlier');
-          else tally(origin.commit, file.after, 'added');
+          else if (!setupLine(origin.commit, file.after, 'added', origin.line)) tally(origin.commit, file.after, 'added');
         }
         unanswered(lines(file.added), origins, 'Git named no commit for an added line', unattribute);
       }
@@ -102,7 +137,7 @@ export async function deliveredChange(history: ChangeHistory, request: Delivered
           const index = order.indexOf(last.commit);
           const removing = index >= 0 && index < order.length - 1 ? order[index + 1]! : null;
           if (removing === null) unattribute('Git names no commit of the range that removed a deleted line');
-          else tally(removing, file.before, 'deleted');
+          else if (!setupLine(removing, file.before, 'deleted', last.line)) tally(removing, file.before, 'deleted');
         }
         unanswered(lines(file.deleted), seen, 'Git named no commit for a deleted line', unattribute);
       }
@@ -125,6 +160,10 @@ export async function deliveredChange(history: ChangeHistory, request: Delivered
       continue;
     }
     for (const [path, entry] of paths) {
+      if (request.overlappingPaths?.has(path) || owners.some(writer => request.recorded.get(writer)!.gaps.some(gap => gap.startsWith('changed-paths-unknown:') || gap.startsWith('overlapping-writers:')))) {
+        unattribute(`commit ${commit.slice(0, 12)} has uncertain overlapping writer attribution in ${path}`, entry.added + entry.deleted);
+        continue;
+      }
       for (const kind of ['added', 'deleted'] as const) {
         if (entry[kind] === 0) continue;
         const shares = owners.map(writer => request.recorded.get(writer)!.paths.find(recorded => recorded.path === path)?.[kind] ?? 0);

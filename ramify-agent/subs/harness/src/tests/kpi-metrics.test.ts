@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { metricSchema, type Metric } from '../interfaces/protocol/runs.js';
 import type { DeliveredChange } from '../kpi/delivered.js';
-import { kpiMetrics, type InvocationFacts, type MetricInputs } from '../kpi/metrics.js';
+import { comparableScopeMetrics, kpiMetrics, type InvocationFacts, type MetricInputs } from '../kpi/metrics.js';
 import { runView } from '../projections/inputs.js';
 import { metricsOf } from '../projections/metrics.js';
 import type { Observation } from '../run/observations.js';
@@ -323,4 +323,57 @@ describe('ST04: the projection groups invocations by the session they started in
       evidence: ['baseline: constructed', 'ses-0001 from inv-0002: a continued start the executor made fresh counts as a term of its own'],
     });
   });
+});
+
+
+describe('Plan23 F6 corresponding scope components and weighted partial evidence', () => {
+  const splitSize = (source: number, api: number, architect: number, support: number): ScopeSize => ({
+    policy: 'scope-size/2', snapshot: 'ms-0001', bytes: source + api + architect + support, subtotal: source + api + architect + support, coverage: 'complete',
+    components: [{ component: 'owned-source', detail: 'source', bytes: source, state: 'measured' },
+      { component: 'api-views', detail: 'api', bytes: api, state: 'measured' },
+      { component: 'architect-view', detail: 'architect', bytes: architect, state: 'measured' },
+      { component: 'support-documents', detail: 'support and brief', bytes: support, state: 'measured' }],
+  });
+  const baseline = splitSize(100, 20, 30, 50);
+  const one = splitSize(40, 10, 15, 25);
+  test('project50/120 and total90/200 use their corresponding baselines; weights3,1 at90,50 mean80bytes', () => {
+    const ratios = comparableScopeMetrics({ baseline, writers: new Map([['one', one]]), delivered: delivered([['one', 1]]) });
+    expect(ratios.projectOnly.ratio).toMatchObject({ unit: 'dimensionless', value: 50 / 120, numerator: 50, denominator: 120 });
+    expect(ratios.total.ratio).toMatchObject({ value: 90 / 200, numerator: 90, denominator: 200 });
+    const weighted = comparableScopeMetrics({ baseline, writers: new Map([['one', one], ['two', splitSize(30, 5, 5, 10)]]), delivered: delivered([['one', 3], ['two', 1]]) });
+    expect(weighted.total.mean).toMatchObject({ state: 'measured', value: 80, numerator: 320, denominator: 4, unit: 'bytes (change-weighted mean)' });
+  });
+
+  test('partial writers retain known byte-line subtotal and weight, overlaps retain unrelated known contribution', () => {
+    const partial: ScopeSize = { ...one, bytes: null, subtotal: 80, coverage: 'partial', components: one.components.map(component =>
+      component.component === 'support-documents' ? { ...component, bytes: null, state: 'unavailable', buckets: { known: 15 }, reason: 'missing support' } : component) };
+    const value = comparableScopeMetrics({ baseline, writers: new Map([['one', one], ['two', partial]]), delivered: delivered([['one', 3], ['two', 1]], [['unknown overlapping writer', 2]]) });
+    expect(value.total).toMatchObject({ attributedWeight: 4, completeSizeWeight: 3, unknownSizeWeight: 1, unattributedWeight: 2,
+      mean: { state: 'partial', value: null, subtotal: 350, denominator: 4 }, ratio: { state: 'partial', value: null } });
+    expect(value.projectOnly.mean).toMatchObject({ state: 'partial', subtotal: 200 });
+    // Existing KPI keeps complete-size weight separate, but preserves partial byte-line contributions too.
+    const old = computed(inputs([writer('one', { size: one }), writer('two', { size: partial })], { delivered: delivered([['one', 3], ['two', 1]]) }));
+    expect(find(old, 'scope-bytes-per-changed-line')).toMatchObject({ state: 'unavailable', subtotal: 350, denominator: 3 });
+  });
+
+  test('missingB, zeroB, delivered-zero, incompatiblepolicy and frozen snapshot identities remain distinct', () => {
+    const args = { writers: new Map([['one', one]]), delivered: delivered([['one', 1]]) };
+    expect(comparableScopeMetrics({ ...args, baseline: { unavailable: 'missing baseline' } }).total.ratio).toMatchObject({ state: 'unavailable', value: null, subtotal: 90 });
+    expect(comparableScopeMetrics({ ...args, baseline: splitSize(0, 0, 0, 0) }).total.ratio).toMatchObject({ state: 'not-applicable', value: null, denominator: 0 });
+    expect(comparableScopeMetrics({ ...args, baseline, delivered: delivered([]) }).total.mean).toMatchObject({ state: 'not-applicable', numerator: 0, denominator: 0 });
+    expect(comparableScopeMetrics({ ...args, baseline: { ...baseline, policy: 'scope-size/1' } }).total.ratio).toMatchObject({ state: 'unavailable' });
+    const mismatch = comparableScopeMetrics({ ...args, baseline, writers: new Map([['one', { ...one, snapshot: 'ms-0002' }]]) });
+    expect(mismatch.total).toMatchObject({ unknownSizeWeight: 1, mean: { state: 'partial', subtotal: 0 } });
+    const zero = comparableScopeMetrics({ baseline, writers: new Map([['one', splitSize(0, 0, 0, 0)]]), delivered: delivered([['one', 1]]) });
+    expect(zero.total.ratio).toMatchObject({ state: 'measured', value: 0 });
+  });
+});
+
+
+test('Plan23 captured partial zero subtotal remains zero while absent scope remains unknown', () => {
+  const captured = computed(inputs([writer('one', { size: size(null, 'owned-source') })], { delivered: delivered([['one', 1]]) }));
+  expect(find(captured, 'scope-bytes-per-changed-line')).toMatchObject({ state: 'unavailable', subtotal: 0, value: null });
+  expect(find(captured, 'session-weighted-total')).toMatchObject({ state: 'unavailable', subtotal: 0, value: null });
+  const missing = computed(inputs([writer('one', { size: null })], { delivered: delivered([['one', 1]]) }));
+  expect(find(missing, 'scope-bytes-per-changed-line')).toMatchObject({ state: 'unavailable', subtotal: null, value: null });
 });

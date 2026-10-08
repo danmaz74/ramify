@@ -5,6 +5,7 @@ import { readMeasurement, type MeasurementDocument, type ModuleMeasurement } fro
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import { sha256, type LoadedPackage } from '../prompts/packages.js';
+import type { DeliveredManifest } from '../prompts/delivered-manifest.js';
 import type { WriteScope } from '../work/scope.js';
 import {
   measurementSnapshotSchema, scopeSizeSchema,
@@ -53,7 +54,7 @@ export interface DeclaredScope {
    * Ramify does not inventory counts its bytes on disk when the invocation
    * started, which are null where nothing was there.
    */
-  readonly locations?: ReadonlyArray<{ readonly path: string; readonly bytes: number | null }> | undefined;
+  readonly locations?: ReadonlyArray<{ readonly path: string; readonly bytes: number | null; readonly files?: readonly { readonly path: string; readonly bytes: number }[] }> | undefined;
   /** Owned nested project roots the scope includes. Ramify does not inventory them, so they add no bytes, as in `B`. */
   readonly nestedProjects?: readonly string[] | undefined;
   /** The bytes of the brief the invocation was delivered, a handoff document of its own. */
@@ -86,6 +87,38 @@ export function writeScopeMeasurement(scope: WriteScope, providers: readonly str
   };
 }
 
+/** A separate read proxy; callers must never merge it into the writer size. */
+export function readScopeMeasurement(scope: WriteScope): DeclaredScope {
+  return { exactOwners: [...new Set(scope.read)], subtrees: [], apiViews: true, architectView: false, supportDocuments: [] };
+}
+
+/** Actual delivered/inherited files, not the available package inventory. */
+export function deliveredScopeInputs(declared: DeclaredScope, manifest: DeliveredManifest): {
+  readonly scope: DeclaredScope;
+  readonly supplementary: readonly { readonly path: string; readonly bytes: number }[];
+} {
+  const files = new Map<string, number>();
+  const identities = new Map<string, string>();
+  const addFile = (path: string, bytes: number, hash: string) => {
+    if (identities.has(path) && (identities.get(path) !== hash || files.get(path) !== bytes)) throw new Error(`Conflicting delivered support revisions for ${path}`);
+    identities.set(path, hash); files.set(path, bytes);
+  };
+  const briefs = new Map<string, number>();
+  for (const entry of manifest.entries) {
+    if (entry.kind === 'brief') continue;
+    for (const source of entry.sources) addFile(source.path, source.bytes, source.hash);
+    // A declaration/procedure may have one source without an expanded source list.
+    if (entry.sources.length === 0 && entry.source !== null) addFile(entry.source, entry.bytes, entry.hash);
+    if (entry.sources.length === 0 && entry.source === null && ['role-instructions', 'procedure', 'skill', 'tool-declaration'].includes(entry.kind)) addFile(`delivered-inputs/${entry.kind}/${entry.hash}`, entry.bytes, entry.hash);
+  }
+  for (const entry of manifest.entries) if (entry.kind === 'brief' &&
+    !(entry.source !== null && identities.get(entry.source) === entry.hash && files.get(entry.source) === entry.bytes)) briefs.set(entry.hash, entry.bytes);
+  return {
+    scope: { ...declared, supportDocuments: [...files.keys()], brief: [...briefs.values()].reduce((sum, bytes) => sum + bytes, 0) },
+    supplementary: [...files].map(([path, bytes]) => ({ path, bytes })),
+  };
+}
+
 /** The captured plan's path, as the baseline's support set names it. */
 export function planSupportPath(planId: string): string {
   return `plans/${planId}/plan.md`;
@@ -97,20 +130,29 @@ export function planSupportPath(planId: string): string {
  * delivered, and the bytes on disk of each extra location.
  */
 export async function invocationScope(
-  projectRoot: string, planId: string, declared: DeclaredScope, loaded: LoadedPackage, brief: string,
+  projectRoot: string, planId: string, declared: DeclaredScope, loaded: LoadedPackage, brief: string, delivered?: DeliveredManifest,
 ): Promise<DeclaredScope> {
   const locations = [];
   for (const location of declared.locations ?? []) {
     const path = join(projectRoot, location.path);
-    const found = await stat(path).catch(() => null);
-    locations.push({ path: location.path, bytes: found === null ? null : found.isDirectory() ? await directoryBytes(path) : found.size });
+    const found = await stat(path).catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return null; throw error; });
+    locations.push({ path: location.path, bytes: found === null ? null : found.isDirectory() ? await directoryBytes(path) : found.size,
+      files: found === null ? [] : await locationFiles(projectRoot, path) });
   }
-  return {
-    ...declared,
-    locations,
-    supportDocuments: [planSupportPath(planId), ...loaded.files.map(file => file.path)],
-    brief: Buffer.byteLength(brief, 'utf8'),
-  };
+  if (delivered !== undefined) return deliveredScopeInputs({ ...declared, locations }, delivered).scope;
+  // Legacy consumers still use their captured package; integration replaces these with delivered manifests.
+  return { ...declared, locations, supportDocuments: [planSupportPath(planId), ...loaded.files.map(file => file.path)], brief: Buffer.byteLength(brief, 'utf8') };
+}
+
+async function locationFiles(root: string, path: string): Promise<readonly { path: string; bytes: number }[]> {
+  const found = await stat(path);
+  if (found.isFile()) return [{ path: inventoryPath(root, path), bytes: found.size }];
+  if (!found.isDirectory()) return [];
+  const files: { path: string; bytes: number }[] = [];
+  for (const entry of await readdir(path, { withFileTypes: true })) {
+    if (entry.isDirectory() || entry.isFile()) files.push(...await locationFiles(root, join(path, entry.name)));
+  }
+  return files;
 }
 
 export interface SnapshotRequest {
@@ -179,17 +221,16 @@ export function scopeSize(snapshot: MeasurementSnapshot, scope: DeclaredScope): 
 
   // Numbers of two states are never merged: the measurement document and
   // the view the scope was resolved against must be of one revision.
-  const mismatch = revisionMismatch(snapshot);
+  const mismatch = snapshot.policy !== scopeSizePolicy ? `snapshot policy ${snapshot.policy} is not comparable with ${scopeSizePolicy}` : revisionMismatch(snapshot);
   if (mismatch !== null) {
     for (const [index, component] of components.entries()) {
-      if (component.component === 'support-documents' || component.state !== 'measured') continue;
-      if (component.component === 'architect-view' && !scope.architectView) continue;
-      components[index] = { ...component, bytes: null, state: 'unavailable', reason: mismatch };
+      if (snapshot.policy === scopeSizePolicy && component.component === 'support-documents') continue;
+      if (snapshot.policy === scopeSizePolicy && component.component === 'architect-view' && !scope.architectView) continue;
+      components[index] = { ...component, bytes: null, buckets: {}, state: 'unavailable', reason: mismatch };
     }
   }
 
-  const measured = components.filter(component => component.state === 'measured');
-  const subtotal = measured.reduce((total, component) => total + (component.bytes ?? 0), 0);
+  const subtotal = components.reduce((total, component) => total + componentSubtotal(component), 0);
   const complete = components.every(component => component.state === 'measured');
   return scopeSizeSchema.parse({
     policy: scopeSizePolicy,
@@ -199,6 +240,19 @@ export function scopeSize(snapshot: MeasurementSnapshot, scope: DeclaredScope): 
     subtotal,
     coverage: complete ? 'complete' : 'partial',
   });
+}
+
+/** Known disjoint buckets survive partial coverage; incompatible-state buckets are cleared first. */
+export function componentSubtotal(component: ScopeComponent): number {
+  return component.bytes ?? Object.values(component.buckets ?? {}).reduce((sum, bytes) => sum + bytes, 0);
+}
+
+/** Project content excludes architect and delivered support, using the same snapshot and policy. */
+export function projectOnlySize(size: ScopeSize): ScopeSize {
+  const components = size.components.filter(component => component.component === 'owned-source' || component.component === 'api-views');
+  const subtotal = components.reduce((sum, component) => sum + componentSubtotal(component), 0);
+  const complete = components.every(component => component.state === 'measured');
+  return { ...size, components, subtotal, bytes: complete ? subtotal : null, coverage: complete ? 'complete' : 'partial' };
 }
 
 /** Why the snapshot's measurement and its view describe two states, or null where they are of one revision. */
@@ -264,6 +318,11 @@ function ownedSource(
   const held = (owner: string): boolean => selected.some(({ module, bucket }) =>
     module.id === owner || (bucket === 'subtree' && isDescendant(byId, owner, module.id)));
   const counted = new Set<string>();
+  const outside = new Set<string>();
+  const outsideAggregateCovered = (path: string): boolean => (scope.locations ?? []).some(other =>
+    other.path !== path && other.files === undefined && other.bytes !== null &&
+    path.startsWith(`${other.path.replace(/\/+$/, '')}/`) &&
+    !document.files.some(file => file.path === other.path || file.path.startsWith(`${other.path.replace(/\/+$/, '')}/`)));
   for (const location of scope.locations ?? []) {
     const beneath = document.files.filter(file => file.path === location.path || file.path.startsWith(`${location.path.replace(/\/+$/, '')}/`));
     if (beneath.length > 0) {
@@ -274,9 +333,15 @@ function ownedSource(
         buckets[bucket] = (buckets[bucket] ?? 0) + file.bytes;
       }
       notes.push(`${location.path} (extra)`);
-    } else {
+    } else if (location.files === undefined && !outside.has(location.path) && !outsideAggregateCovered(location.path)) {
+      outside.add(location.path);
       buckets['outside-inventory'] = (buckets['outside-inventory'] ?? 0) + (location.bytes ?? 0);
       notes.push(location.bytes === null ? `${location.path} (extra, absent when the invocation started)` : `${location.path} (extra, outside Ramify's inventory, bytes on disk)`);
+    }
+    for (const file of location.files ?? []) {
+      if (counted.has(file.path) || document.files.some(entry => entry.path === file.path)) continue;
+      counted.add(file.path);
+      buckets['outside-inventory'] = (buckets['outside-inventory'] ?? 0) + file.bytes;
     }
   }
   for (const directory of scope.nestedProjects ?? []) {
@@ -311,15 +376,14 @@ function apiViews(
       state: 'unavailable', reason: `ramify measure reported API views unavailable: ${views.reason}` };
   }
   const buckets = { ordinary: 0, tests: 0 };
+  const missing: string[] = [];
   for (const { module, bucket } of selected) {
     const measured = module[bucket];
-    if (measured.views === undefined) {
-      return { component: 'api-views', detail: 'declared ordinary and testing API-view areas', bytes: null,
-        state: 'unavailable', reason: `ramify measure omitted API-view bytes for ${module.id}` };
-    }
+    if (measured.views === undefined) { missing.push(module.id); continue; }
     buckets.ordinary += measured.views.ordinaryBytes;
     buckets.tests += measured.views.testsBytes;
   }
+  if (missing.length > 0) return { component: 'api-views', detail: 'declared ordinary and testing API-view areas', bytes: null, state: 'unavailable', reason: `ramify measure omitted API-view bytes for ${missing.join(', ')}`, buckets };
   return {
     component: 'api-views',
     detail: 'each declared ordinary and testing area once, by owner and physical source area',
@@ -352,10 +416,20 @@ function architectView(snapshot: MeasurementSnapshot, scope: DeclaredScope): Sco
  * here again, and a file Ramify's inventory already supplied is not either.
  */
 function supportDocuments(snapshot: MeasurementSnapshot, document: MeasurementDocument | null, scope: DeclaredScope): ScopeComponent {
-  const inventoried = inventoryPaths(document);
-  const named = [...new Set(scope.supportDocuments)].filter(path => path !== architectViewDirectory && !inventoried.has(path));
+  const inventoried = new Set<string>();
+  if (document !== null) {
+    const { selected } = selectModules(document.modules, scope);
+    const byId = new Map(document.modules.map(module => [module.id, module]));
+    for (const file of document.files) {
+      if (selected.some(({ module, bucket }) => module.id === file.owner || (bucket === 'subtree' && isDescendant(byId, file.owner, module.id))) ||
+          (scope.locations ?? []).some(location => file.path === location.path || file.path.startsWith(`${location.path.replace(/\/+$/, '')}/`))) inventoried.add(file.path);
+    }
+    for (const location of scope.locations ?? []) for (const file of location.files ?? []) inventoried.add(file.path);
+  }
+  const named = [...new Set(scope.supportDocuments)].filter(path => path !== architectViewDirectory && !path.startsWith(`${architectViewDirectory}/`) && !inventoried.has(path));
   const captured = new Map<string, number>();
   for (const entry of snapshot.supplementary) if (!captured.has(entry.path)) captured.set(entry.path, entry.bytes);
+  for (const file of document?.files ?? []) if (!captured.has(file.path)) captured.set(file.path, file.bytes);
   const missing = named.filter(path => !captured.has(path));
   const documents = named.filter(path => captured.has(path)).reduce((total, path) => total + captured.get(path)!, 0);
   const buckets = { documents, ...(scope.brief === undefined ? {} : { brief: scope.brief }) };
@@ -376,18 +450,6 @@ function supportDocuments(snapshot: MeasurementSnapshot, document: MeasurementDo
   return { component: 'support-documents', detail, bytes: documents + (scope.brief ?? 0), state: 'measured', buckets };
 }
 
-/** What Ramify's inventory already supplied, so a support document is never counted twice. */
-function inventoryPaths(document: MeasurementDocument | null): Set<string> {
-  const files = (document as { files?: unknown } | null)?.files;
-  if (!Array.isArray(files)) return new Set();
-  const paths = new Set<string>();
-  for (const file of files) {
-    const path = (file as { path?: unknown }).path;
-    if (typeof path === 'string') paths.add(path);
-  }
-  return paths;
-}
-
 /** The bytes of a published directory, or null when it is not there. */
 export async function directoryBytes(directory: string): Promise<number | null> {
   let entries;
@@ -399,7 +461,7 @@ export async function directoryBytes(directory: string): Promise<number | null> 
   let total = 0;
   for (const entry of entries) {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) total += (await directoryBytes(path)) ?? 0;
+    if (entry.isDirectory()) { const bytes = await directoryBytes(path); if (bytes === null) return null; total += bytes; }
     else if (entry.isFile()) total += (await stat(path)).size;
   }
   return total;

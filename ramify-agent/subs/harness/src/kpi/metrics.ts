@@ -3,7 +3,7 @@ import type { Role } from '../interfaces/protocol/runs.js';
 import { rawOutputGapKinds, type Observation } from '../run/observations.js';
 import type { InvocationOutcome, LineEventSummary, ScopeSize } from '../run/records.js';
 import { roles } from '../run/records.js';
-import { scopeSizePolicy } from './capture.js';
+import { projectOnlySize, scopeSizePolicy } from './capture.js';
 import type { DeliveredChange } from './delivered.js';
 
 /*
@@ -141,6 +141,8 @@ function bytesPerChangedLine(inputs: MetricInputs): Metric {
   }
 
   let numerator = 0;
+  let partialSubtotal = 0;
+  let hasPartialSubtotal = false;
   let known = 0;
   let total = 0;
   let covered = 0;
@@ -151,9 +153,15 @@ function bytesPerChangedLine(inputs: MetricInputs): Metric {
   for (const facts of writers) if (!weighted.has(facts.id)) { covered += 1; evidence.push(`${facts.id}: w_e = 0, it delivered no line`); }
   for (const [invocation, weight] of delivered.weights) {
     total += weight;
-    const gap = sizeGap(byId.get(invocation)?.size ?? null);
+    const size = byId.get(invocation)?.size ?? null;
+    const gap = sizeGap(size) ?? (!('unavailable' in inputs.baseline) && size!.snapshot !== inputs.baseline.snapshot ? 'scope snapshot differs from the frozen baseline snapshot' : null);
     if (gap !== null) {
       unknownSize.push(`${invocation}: w_e = ${lines(weight)}, S_e unknown: ${gap}`);
+      if (size !== null && size.policy === measurementPolicyVersion && size.bytes === null && ('unavailable' in inputs.baseline || size.snapshot === inputs.baseline.snapshot)) {
+        hasPartialSubtotal = true;
+        partialSubtotal += weight * size.subtotal;
+        evidence.push(`${invocation}: known scope subtotal ${size.subtotal} bytes contributes ${weight * size.subtotal} byte-lines; weight ${lines(weight)} has incomplete size`);
+      }
       continue;
     }
     const bytes = byId.get(invocation)!.size!.bytes!;
@@ -169,12 +177,12 @@ function bytesPerChangedLine(inputs: MetricInputs): Metric {
   const coverage = { covered, total: Math.max(writers.length, covered + unknownSize.length) };
 
   if (unknownSize.length > 0) {
-    // The subtotal and the denominator are the known writers' alone: the
-    // total is not known, and it is not zero.
+    // Partial known byte-line contributions survive; the denominator is
+    // complete-size weight only. No whole-run mean is reported.
     return metric({
-      id, unit, state: 'unavailable', subtotal: known > 0 ? numerator : null, denominator: known, coverage,
+      id, unit, state: 'unavailable', subtotal: known > 0 || hasPartialSubtotal ? numerator + partialSubtotal : null, denominator: known, coverage,
       evidence: [...unknownSize, ...evidence],
-      note: `A writer's scope size is unknown, so the total is unknown. The subtotal is sum(w_e * S_e) over the writers of known size, and the denominator their ${lines(known)} of the ${lines(total + unattributed)} delivered`,
+      note: `A writer's scope size is unknown, so the total is unknown. The subtotal retains known byte-line contributions including partial sizes, and the denominator covers complete sizes only: their ${lines(known)} of the ${lines(total + unattributed)} delivered`,
       ...common,
     });
   }
@@ -242,33 +250,38 @@ function sessionWeightedTotal(inputs: MetricInputs): Metric {
   let total = 0;
   const missing: string[] = [];
   let covered = 0;
+  let hasKnownSize = false;
   for (const [session, list] of sessions) {
-    const largest = new Map<string, number | null>();
+    const largest = new Map<string, number>();
+    const unavailable = new Set<string>();
     for (const facts of list) {
-      if (facts.size === null || facts.size.policy !== measurementPolicyVersion) {
-        largest.set(facts.size === null ? 'scope' : `${facts.size.policy} scope`, null);
+      if (facts.size === null || facts.size.policy !== measurementPolicyVersion || (!('unavailable' in inputs.baseline) && facts.size.snapshot !== inputs.baseline.snapshot)) {
+        unavailable.add(facts.size === null ? 'scope' : facts.size.policy !== measurementPolicyVersion ? `${facts.size.policy} scope` : `incompatible snapshot ${facts.size.snapshot}`);
         continue;
       }
+      hasKnownSize = true;
       for (const component of facts.size.components) {
         const known = largest.get(component.component);
-        if (component.bytes === null || component.state !== 'measured') largest.set(component.component, null);
-        else if (known !== null) largest.set(component.component, Math.max(known ?? 0, component.bytes));
+        if (component.bytes === null || component.state !== 'measured') unavailable.add(component.component);
+        const subtotal = component.bytes ?? Object.values(component.buckets ?? {}).reduce((sum, bytes) => sum + bytes, 0);
+        largest.set(component.component, Math.max(known ?? 0, subtotal));
       }
     }
-    const unknown = [...largest].filter(([, bytes]) => bytes === null).map(([component]) => component);
+    const unknown = [...unavailable];
+    total += [...largest.values()].reduce<number>((sum, bytes) => sum + bytes, 0);
     if (unknown.length > 0) {
       missing.push(`${session}: ${unknown.join(', ')} unavailable`);
       continue;
     }
     covered += 1;
-    total += [...largest.values()].reduce<number>((sum, bytes) => sum + (bytes ?? 0), 0);
+
   }
   const coverage = { covered, total: sessions.size };
   // The contexts a degraded continuation began, each a term beside its session's first.
   const restarted = [...sessions].filter(([key, list]) => key !== list[0]!.session).map(([key]) => `${key}: a continued start the executor made fresh counts as a term of its own`);
   if (sessions.size === 0) return metric({ id, unit, state: 'not-applicable', coverage, note: 'No session ran', ...common });
   if (missing.length > 0) {
-    return metric({ id, unit, state: 'unavailable', subtotal: covered > 0 ? total : null, coverage, evidence: [...missing, ...restarted], note: 'A session\'s scope size is missing a component, so the total is unknown; the known subtotal in bytes is shown', ...common });
+    return metric({ id, unit, state: 'unavailable', subtotal: hasKnownSize ? total : null, coverage, evidence: [...missing, ...restarted], note: 'A session\'s scope size is missing a component, so the total is unknown; the known subtotal in bytes is shown', ...common });
   }
   if ('unavailable' in inputs.baseline) {
     return metric({ id, unit, state: 'unavailable', subtotal: total, coverage, evidence: [`baseline: ${inputs.baseline.unavailable}`, ...restarted], note: 'The frozen baseline B is unavailable; the sum of S_s in bytes is shown', ...common });
@@ -468,4 +481,68 @@ export function kpiMetrics(inputs: MetricInputs, guarding: { readonly statement:
     ...observationCoverage(inputs),
     ...usageMetrics(inputs),
   ];
+}
+
+
+/** Complete and partial weights are explicit beside the known byte-line subtotal. */
+export interface ScopeComparison {
+  readonly mean: Metric;
+  readonly ratio: Metric;
+  readonly attributedWeight: number;
+  readonly completeSizeWeight: number;
+  readonly unknownSizeWeight: number;
+  readonly unattributedWeight: number;
+}
+
+/** Two corresponding baselines, never a project numerator divided by a total baseline. */
+export function comparableScopeMetrics(input: {
+  readonly baseline: ScopeSize | { readonly unavailable: string };
+  readonly writers: ReadonlyMap<string, ScopeSize | null>;
+  readonly delivered: DeliveredChange;
+}): { readonly projectOnly: ScopeComparison; readonly total: ScopeComparison } {
+  const calculate = (projectOnly: boolean): ScopeComparison => {
+    const prefix = projectOnly ? 'project-only' : 'total';
+    const common = { measurementPolicy: measurementPolicyVersion };
+    const gaps: string[] = [];
+    let attributedWeight = 0, completeSizeWeight = 0, unknownSizeWeight = 0, unattributedWeight = 0, subtotal = 0;
+    let covered = 0;
+    if (input.delivered.state !== 'measured') {
+      const state = input.delivered.state;
+      const note = input.delivered.reason;
+      return { mean: metric({ id: `${prefix}.weighted-scope-bytes`, unit: 'bytes (change-weighted mean)', state, note, ...common }),
+        ratio: metric({ id: `${prefix}.scope-ratio`, unit: 'dimensionless', state, note, ...common }),
+        attributedWeight, completeSizeWeight, unknownSizeWeight, unattributedWeight };
+    }
+    for (const [id, weight] of input.delivered.weights) {
+      attributedWeight += weight;
+      const supplied = input.writers.get(id) ?? null;
+      const size = supplied === null ? null : projectOnly ? projectOnlySize(supplied) : supplied;
+      const mismatch = size !== null && !('unavailable' in input.baseline) && size.snapshot !== input.baseline.snapshot;
+      const gap = sizeGap(size) ?? (mismatch ? 'different frozen snapshot' : null);
+      if (gap !== null) {
+        unknownSizeWeight += weight;
+        gaps.push(`${id}: ${weight} delivered lines with unknown size: ${gap}`);
+        if (size !== null && size.policy === measurementPolicyVersion && !mismatch) subtotal += weight * size.subtotal;
+      } else {
+        completeSizeWeight += weight;
+        subtotal += weight * size!.bytes!;
+        covered += 1;
+      }
+    }
+    for (const [reason, weight] of input.delivered.unattributed) { unattributedWeight += weight; gaps.push(`${weight} unattributed lines: ${reason}`); }
+    const coverage = { covered, total: input.delivered.weights.size };
+    const state = unknownSizeWeight > 0 || unattributedWeight > 0 ? 'partial' : attributedWeight === 0 ? 'not-applicable' : 'measured';
+    const mean = metric({ id: `${prefix}.weighted-scope-bytes`, unit: 'bytes (change-weighted mean)', state,
+      value: state === 'measured' ? subtotal / attributedWeight : null, numerator: subtotal, subtotal,
+      denominator: attributedWeight, coverage, evidence: gaps, note: state === 'partial' ? 'Known byte-line subtotal only; incomplete sizes or unattributed delivered lines prevent a whole-run mean' : null, ...common });
+    let result: Metric;
+    const baseline = 'unavailable' in input.baseline ? input.baseline : projectOnly ? projectOnlySize(input.baseline) : input.baseline;
+    const baselineGap = 'unavailable' in baseline ? baseline.unavailable : sizeGap(baseline);
+    if (baselineGap !== null) result = metric({ id: `${prefix}.scope-ratio`, unit: 'dimensionless', state: 'unavailable', subtotal,
+      evidence: [...gaps, `baseline: ${baselineGap}`], coverage, ...common });
+    else if (state !== 'measured') result = metric({ id: `${prefix}.scope-ratio`, unit: 'dimensionless', state, subtotal, denominator: (baseline as ScopeSize).bytes, coverage, evidence: gaps, note: 'Ratio unavailable; subtotal is known weighted byte-lines, not a normalized value', ...common });
+    else result = ratio(`${prefix}.scope-ratio`, 'dimensionless', mean.value!, (baseline as ScopeSize).bytes!, { coverage, ...common });
+    return { mean, ratio: result, attributedWeight, completeSizeWeight, unknownSizeWeight, unattributedWeight };
+  };
+  return { projectOnly: calculate(true), total: calculate(false) };
 }
