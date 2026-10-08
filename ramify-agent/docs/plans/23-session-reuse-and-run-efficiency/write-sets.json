@@ -285,6 +285,10 @@
       "subs/harness/subs/agent/src/tests/plan23-session-operations.test.ts",
       "subs/harness/subs/agent/subs/pi/src/tests/plan23-prefix-preservation.test.ts",
       "subs/harness/src/tests/plan23-session-store.test.ts"
+    ],
+    "session-store-cache": [
+      "subs/harness/src/run/session-store.ts",
+      "subs/harness/src/tests/plan23-session-store-cache.test.ts"
     ]
   }
 }
