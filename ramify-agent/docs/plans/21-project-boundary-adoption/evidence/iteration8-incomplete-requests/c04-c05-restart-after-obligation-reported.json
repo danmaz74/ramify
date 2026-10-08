@@ -1,0 +1,93 @@
+{
+  "cases": [
+    "PB3-C04",
+    "PB3-C05"
+  ],
+  "test": "capability-recovery.test.ts",
+  "boundary": "obligation-reported",
+  "crashedAfter": {
+    "sequence": 51,
+    "type": "obligation-reported",
+    "id": "cap-001",
+    "judgment": "done",
+    "basedOnRevision": 0,
+    "revision": 1,
+    "by": "inv-0010"
+  },
+  "eventsBeforeCrash": 51,
+  "afterRestart": [
+    {
+      "sequence": 49,
+      "type": "invocation-started",
+      "invocation": "inv-0010",
+      "role": "capability-architect"
+    },
+    {
+      "sequence": 50,
+      "type": "invocation-ended",
+      "invocation": "inv-0010",
+      "ended": "submitted"
+    },
+    {
+      "sequence": 51,
+      "type": "obligation-reported",
+      "id": "cap-001",
+      "judgment": "done",
+      "basedOnRevision": 0,
+      "revision": 1,
+      "by": "inv-0010"
+    },
+    {
+      "sequence": 53,
+      "type": "capability-coordinator-resumed",
+      "task": "cap-001",
+      "invocation": "inv-0010"
+    },
+    {
+      "sequence": 54,
+      "type": "capability-assigned",
+      "task": "cap-001",
+      "assignment": "cap-001.i01",
+      "invocation": "inv-0010"
+    },
+    {
+      "sequence": 56,
+      "type": "invocation-started",
+      "invocation": "inv-0011",
+      "role": "engineer"
+    },
+    {
+      "sequence": 57,
+      "type": "writer-acquired",
+      "invocation": "inv-0011"
+    },
+    {
+      "sequence": 59,
+      "type": "invocation-ended",
+      "invocation": "inv-0011",
+      "ended": "submitted"
+    },
+    {
+      "sequence": 64,
+      "type": "capability-assignment-settled",
+      "task": "cap-001",
+      "assignment": "cap-001.i01"
+    },
+    {
+      "sequence": 65,
+      "type": "capability-coordinator-resumed",
+      "task": "cap-001",
+      "invocation": "inv-0010"
+    },
+    {
+      "sequence": 67,
+      "type": "invocation-started",
+      "invocation": "inv-0012",
+      "role": "capability-architect"
+    }
+  ],
+  "nextBriefingObligations": [
+    "# Registered obligations",
+    "- cap-001 (delegated outcome): done, revision 1; not bound; last report done by inv-0010"
+  ]
+}
