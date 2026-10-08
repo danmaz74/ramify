@@ -115,4 +115,6 @@ unless forced, and evidence recorded under another ignore list never reused.
 gate and which are refused, nested invocations included, and the captured
 audit policy.
 `src/tests/workspace-preparation.boundary.test.ts` reads committed definitions without
-executing anything, and `src/tests/test-lock.test.ts` covers the test lock.
+executing anything. `src/tests/test-lock.test.ts` covers the in-process held
+and unavailable controls; `src/tests/test-lock.boundary.test.ts` covers the
+private kernel lock, waits, expiry, cancellation and runner errors.
