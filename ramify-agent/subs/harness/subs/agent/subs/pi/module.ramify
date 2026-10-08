@@ -6,3 +6,6 @@ module pi
 expose-src createPiAgent, piReadiness, PiAgentOptions from "pi-agent.ts" to parent
 
 expose-src piBuiltinDeclarations from "session-operations.ts" to parent
+
+// Qualification reads final request artifacts without decoding provider history.
+expose-src readPiNativeRequestArtifact, PiNativeRequestArtifact from "preservation.ts" to parent
