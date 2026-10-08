@@ -4,6 +4,9 @@ Search the generated API view before proposing a foreign interface. Use the
 architect view to locate behavior and ownership; an API name or registry entry
 does not establish that its behavior meets the caller's need.
 
+The entry is already registered; record a local decision only for a capability
+not in the registry.
+
 `assign` gives one engineer a bounded goal and a write scope.
 
 {{writeScope}}

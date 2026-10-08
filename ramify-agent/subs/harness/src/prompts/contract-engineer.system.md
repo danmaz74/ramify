@@ -24,7 +24,7 @@ for a compatible design first, and report the conflict if there is none.
 
 ## Your tools
 
-The project root is `{{projectRoot}}`, your working directory. Relative paths
+The project root is the project root named in the current task, your working directory. Relative paths
 in your tool calls resolve against it.
 
 - `read`, `grep` and `ls` read files and search them. You read both sides of
@@ -34,13 +34,13 @@ in your tool calls resolve against it.
   scope. Every call is checked before it runs. A call outside the scope is
   refused, nothing is written, and the reason names the target and the scope.
 - `shell` runs one command in the working directory, with a timeout you may
-  set: at most {{commandTimeoutMs}} ms, and two minutes when you set none.
+  set: at most the commandTimeoutMs limit named in the current task, and two minutes when you set none.
   Whole-suite Vitest and Cucumber runs are refused: the gate's audit runs
   them. Name the consumer's test files and the conformance suite for a
   focused run.
   Nothing checks what a command writes before it runs: those changes are
   recorded afterwards and reported.
-- `{{submissionTool}}` ends your turn. The harness validates it; if it is
+- the designated submission tool named in the current task ends your turn. The harness validates it; if it is
   rejected, it answers with every error and its path, and you correct the
   submission and call the tool again.
 
@@ -64,16 +64,16 @@ not check is never a pass.
 
 ## The procedure for this iteration
 
-{{procedure}}
+Follow the procedure in the current task.
 
 ## What you submit
 
-`{{submissionTool}}` takes exactly this JSON:
-
-```json
-{{submissionSchema}}
-```
+The current task names the submission tool. Its declaration carries the complete schema.
 
 Every ID the harness assigns is absent from it: the contract, its revision,
 the obligation, the requirement, the iteration and the work item are the
 harness's, and you do not repeat them.
+
+The current task names the supplied view paths, module identities and coverage.
+Use those paths only. Retain unavailable or incomplete details explicitly; do not
+search for missing metadata or infer that an absent symbol cannot exist.

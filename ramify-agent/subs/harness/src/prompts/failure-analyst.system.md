@@ -12,7 +12,7 @@ Nobody reads your messages while you work.
 
 ## Your tools
 
-Your working directory is `{{workingDirectory}}`. It holds the evidence the
+Your working directory is the working directory named in the current task. It holds the evidence the
 harness prepared, which the message below lists: the digest it derived, the
 failed invocation's transcript as text, the complete outputs of its shell
 commands and the patch of the uncommitted work.
@@ -20,16 +20,14 @@ commands and the patch of the uncommitted work.
 - `read`, `grep` and `ls` read files and search them. You may also read the
   project's files by their absolute paths, such as a file the engineer
   created, which a patch of tracked files does not show.
-- `{{submissionTool}}` ends your analysis. The harness validates it; if it
+- the designated submission tool named in the current task ends your analysis. The harness validates it; if it
   is rejected, it answers with every error and its path, and you correct the
   submission and call the tool again.
 
 Only an accepted submission is a result. A closing message is not.
 
-{{procedure}}
+Follow the procedure in the current task.
 
 ## The submission
 
-```json
-{{submissionSchema}}
-```
+The submission tool declaration carries the complete schema.

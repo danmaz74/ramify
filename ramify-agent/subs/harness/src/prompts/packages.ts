@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -20,6 +20,7 @@ import {
 import { coordinatorAssessmentJsonSchema, coordinatorAssessmentToolName, nonfunctionalRepairJsonSchema, nonfunctionalRepairToolName } from '../nonfunctional/submissions.js';
 import { promptPackageManifestSchema, type PromptPackageManifest, type ReviewKind } from '../run/records.js';
 import { shellMaxTimeoutMs } from '../tools/shell.js';
+import { renderRequiredSlots, stableRoleInstructions } from './tasks.js';
 
 /*
  * One prompt package per role, versioned and hashed into the run's
@@ -117,6 +118,8 @@ export interface LoadedPackage {
   readonly skillDirectory: string;
   /** A further skill this package carries, such as the contract skill; empty where it has none. */
   readonly extraSkill: string;
+  /** Only files expanded into the stable role's skill slots, including custom supplied paths. */
+  readonly embeddedSkillPaths?: readonly string[];
   readonly submissionSchema: string;
   /**
    * The reviewer's texts beyond its system prompt: one procedure per review
@@ -432,8 +435,9 @@ async function loadPackage(request: {
   const skillDirectory = request.options.skillDirectory ?? defaultSkillDirectory;
   const [system, procedure] = await Promise.all([readFile(request.systemFile, 'utf8'), readFile(request.procedureFile, 'utf8')]);
   const sections = await Promise.all(Object.entries(request.sections ?? {}).map(async ([name, file]) => ({ name, file, text: await readFile(file, 'utf8') })));
-  const skillFiles = (await listFiles(skillDirectory)).sort();
-  const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8');
+  const usesSkill = system.includes('{{skill}}');
+  const skillFiles = usesSkill ? [join(skillDirectory, 'SKILL.md')] : [];
+  const skill = usesSkill ? adaptReadOnlySkill(await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')) : '';
   const extraSkill = request.extraSkillFile === undefined ? '' : await readFile(request.extraSkillFile, 'utf8');
   const submissionSchema = `${JSON.stringify(request.schema, null, 2)}\n`;
   const schemaName = submissionSchemaNames[request.role as keyof typeof submissionSchemaNames] ?? `${request.role}.schema.json`;
@@ -441,7 +445,7 @@ async function loadPackage(request: {
   const files: PackageFile[] = [
     describe(request.systemFile, system, 'system'),
     describe(request.procedureFile, procedure, 'procedure'),
-    ...(await Promise.all(skillFiles.map(async path => describe(path, await readFile(path, 'utf8'), 'skill')))),
+    ...skillFiles.map(path => describe(path, skill, 'skill')),
     ...(request.extraSkillFile === undefined ? [] : [describe(request.extraSkillFile, extraSkill, 'skill')]),
     { path: schemaName, hash: sha256(submissionSchema), kind: 'submission-schema', bytes: Buffer.byteLength(submissionSchema) },
     ...(request.extraFiles ?? []),
@@ -460,6 +464,10 @@ async function loadPackage(request: {
     skill: skill.trim(),
     skillDirectory,
     extraSkill: withoutVersionComment(extraSkill).trim(),
+    embeddedSkillPaths: [
+      ...skillFiles.map(path => describe(path, skill, 'skill').path),
+      ...(request.extraSkillFile !== undefined && system.includes('{{contractSkill}}') ? [describe(request.extraSkillFile, extraSkill, 'skill').path] : []),
+    ],
     submissionSchema,
   };
 }
@@ -473,7 +481,7 @@ function describe(path: string, content: string, kind: PackageFile['kind']): Pac
   };
 }
 
-/** The package's hash: over every file below it, by path, so a changed skill changes it. */
+/** Package inventory identity. Actual per-turn delivered identities use delivered-manifest.ts. */
 function packageHash(files: readonly PackageFile[]): string {
   const parts = [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)).map(file => `${file.path}\n${file.hash}`);
   return sha256(parts.join('\n'));
@@ -557,16 +565,10 @@ export function renderNonfunctionalRepairPrompt(loaded: LoadedPackage, projectRo
 }
 
 function render(loaded: LoadedPackage, projectRoot: string, submissionTool: string, extra: Readonly<Record<string, string>> = {}): string {
-  return fill(loaded.system, {
-    ...extra,
-    projectRoot,
-    skillDirectory: loaded.skillDirectory,
-    skill: loaded.skill,
-    procedure: fill(loaded.procedure, { submissionTool }),
-    contractSkill: loaded.extraSkill,
-    submissionTool,
-    submissionSchema: loaded.submissionSchema.trim(),
-  });
+  const procedure = renderRequiredSlots(loaded.procedure, { submissionTool }, ['submissionTool']);
+  return [stableRoleInstructions(loaded), '# Current environment',
+    JSON.stringify({ projectRoot, workingDirectory: extra['workingDirectory'] ?? projectRoot, ...extra }),
+    '# Current procedure', procedure, `Submit this task using \`${submissionTool}\`; the tool declaration carries its complete schema.`].join('\n\n');
 }
 
 /** The rendered system prompt of one reviewer of one question. It is never stored either. */
@@ -580,7 +582,17 @@ export function renderReviewerPrompt(loaded: LoadedPackage, projectRoot: string,
 export function renderOrientationPrompt(loaded: LoadedPackage): string {
   const orientation = loaded.reviewer?.orientation;
   if (orientation === undefined) throw new Error(`The ${loaded.package} package has no design orientation`);
-  return fill(orientation.system, { submissionTool: orientationToolName, submissionSchema: orientation.submissionSchema.trim() });
+  return `${stableRoleInstructions(loaded)}\n\n# Current procedure\n${orientation.system}\n\nSubmit this orientation through \`${orientationToolName}\`.`;
+}
+
+/** Materialization and report-file instructions do not apply to harness read-only roles. */
+function adaptReadOnlySkill(skill: string): string {
+  return skill.replace(/1\. Classify[\s\S]*?(?=2\. Read)/,
+    '1. Classify the requested outcomes. Use the already supplied materialized views\n   named in the current task. There is no shell; do not run materialization.\n   Preserve every supplied coverage, revision and unavailable detail.\n')
+    .replace(/Before answering, read \[report\.md\][\s\S]*$/,
+      'Complete the current task using its designated submission tool. No report.md\nfile or shell command is required. Read placement references only for a real\nownership or placement question, not for a change to an existing symbol.\n')
+    .replace(/When requested to\n  verify a proposal,[\s\S]*?there\./,
+      'When verification needs commands unavailable to this role, retain that limit.');
 }
 
 /** The identity of what one invocation was given, beside the package's own hash. */
@@ -590,14 +602,4 @@ export function inputsHash(parts: readonly string[]): string {
 
 function fill(template: string, values: Readonly<Record<string, string>>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (match, name: string) => values[name] ?? match);
-}
-
-async function listFiles(directory: string): Promise<string[]> {
-  const files: string[] = [];
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await listFiles(path));
-    else if (entry.isFile()) files.push(path);
-  }
-  return files;
 }

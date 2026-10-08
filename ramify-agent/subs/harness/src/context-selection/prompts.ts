@@ -1,8 +1,10 @@
 import { createPackage, type ElementCatalog } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 
 /** The first local turn precedes every assignment and yields a session point. */
-export function workOrientationMessage(localBriefing: string): string {
-  return `${localBriefing}\n\nBefore organizing this work item, submit only your orientation. State what work you think it asks for, the focus you would use, and open questions. Do not assign an iteration or decide that a source suggestion is binding.`;
+export function workOrientationMessage(localBriefing: string, context?: { readonly goal: string; readonly requirements: readonly string[] }): string {
+  if (context && (!context.goal.trim() || context.requirements.length === 0)) throw new Error('Orientation requires goal and requirement text');
+  return [localBriefing, ...(context ? ['# Goal', context.goal, '# Requirements', ...context.requirements] : []),
+    'Before organizing this work item, submit only your orientation. State what work you think it asks for, the focus you would use, and open questions. Do not assign an iteration or decide that a source suggestion is binding. Submit your orientation using `submit_work_orientation`.'].join('\n\n');
 }
 
 /** The kinds a selector chooses among; functional and context elements come with the entry. */

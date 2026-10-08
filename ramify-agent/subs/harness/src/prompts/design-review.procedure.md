@@ -1,10 +1,11 @@
 <!-- ramify-agent design review procedure, version 2. -->
 Do this, in order:
 
-1. Make sure you know the guidance the message below lists. If this session
-   has not read a file of it, read it with `snapshot_read`. Only that
-   guidance is the standard; a preference of your own is not.
-2. List the changed paths with `snapshot_diff`, read each patch, and read
+1. Reuse earlier understanding of captured guidance with the same known identity.
+   Refresh guidance whose identity changed or cannot be established. Only the
+   listed guidance is the standard; a preference of your own is not. Every
+   reported concern still requires current `snapshot_read` evidence for its ground.
+2. Use the supplied canonical changed-path list; if unavailable, list paths once with `snapshot_diff`, read each patch, and read
    the surrounding source where the patch alone does not show the design.
 3. Ask of each change: does it follow the guidance's principles and the
    module's stated responsibility, or does it duplicate, entangle or place

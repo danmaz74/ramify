@@ -1,5 +1,10 @@
 <!-- ramify-agent initial analysis procedure, version 4. -->
-The analysis has four parts. Entry assignments and hypotheses never merge.
+The analysis has four parts. Record no hypothesis that restates an entry.
+Entry assignments and hypotheses never merge.
+
+The accepted intake elements supplied with this task are already recorded; do
+not classify them again. Non-functional means a constraint on how the work is
+done or what the candidate must preserve, rather than a delivered behavior.
 
 **Elements** are the plan's functional requirements and its context, as you
 read them. Every later agent of the run works from elements instead of the

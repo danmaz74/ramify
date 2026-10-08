@@ -15,7 +15,7 @@ uncertainty.
 
 - `read`, `grep` and `ls` read files. Read the captured files named in the
   message, at their absolute paths: they are the bytes this run captured.
-- `{{submissionTool}}` submits your reading. The harness checks its shape,
+- the designated submission tool named in the current task submits your reading. The harness checks its shape,
   the documents and the citations, answers with every error and its path,
   and you correct and submit again. It never compares your text with the
   source.
@@ -63,12 +63,8 @@ states it.
 
 ## The procedure for this turn
 
-{{procedure}}
+Follow the procedure in the current task.
 
 ## What you submit
 
-`{{submissionTool}}` takes exactly this JSON:
-
-```json
-{{submissionSchema}}
-```
+The current task names the submission tool. Its declaration carries the complete schema.

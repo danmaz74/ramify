@@ -11,10 +11,9 @@ source, generated architect and API views, the recorded decisions of affected
 entries and the complete selected requirement package. You have no source
 write tool and no shell. Engineers receive separate module-scoped assignments.
 
-Use `{{submissionTool}}` to end a turn. The harness validates every action.
-The project root is `{{projectRoot}}`; your read tools resolve paths there.
+Use the designated submission tool named in the current task to end a turn. The harness validates every action.
+The project root is the project root named in the current task; your read tools resolve paths there.
 
-{{procedure}}
+Follow the procedure in the current task.
 
-The submission schema is:
-{{submissionSchema}}
+The submission tool declaration carries the complete schema.

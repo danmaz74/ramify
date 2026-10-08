@@ -1,7 +1,7 @@
 <!-- ramify-agent code review procedure, version 3. -->
 Do this, in order:
 
-1. List the changed paths with `snapshot_diff`.
+1. Use the supplied canonical changed-path list; if unavailable, list paths once with `snapshot_diff`.
 2. For each changed path, read its patch, and read the surrounding source
    where the patch alone does not show what the change does.
 3. Ask of each change: does it behave as its iteration's goal says, and can
