@@ -106,11 +106,18 @@ export function spawnAttempts(): readonly SpawnAttempt[] { return state()?.attem
 /** Compatibility mock forwards to the installed dynamic native wrapper. */
 export function guardedChildProcess(actual: ChildProcess): ChildProcess {
   const guarded = { ...actual } as unknown as Record<string, unknown>;
-  for (const api of apis) guarded[api] = (...args: unknown[]) => {
-    const enforcement = state();
-    if (enforcement) return enforcement.invoke(api, args);
-    throw new ProcessSpawnGuardError(attemptOf(api, args));
-  };
+  for (const api of apis) {
+    const invoke = (args: unknown[], asynchronous = false) => {
+      const enforcement = state();
+      if (enforcement) return enforcement.invoke(api, args, asynchronous);
+      throw new ProcessSpawnGuardError(attemptOf(api, args));
+    };
+    const wrapper = (...args: unknown[]) => invoke(args);
+    if (api === 'exec' || api === 'execFile') Object.defineProperty(wrapper, promisify.custom, {
+      value: async (...args: unknown[]) => invoke(args, true),
+    });
+    guarded[api] = wrapper;
+  }
   guarded.default = guarded;
   return guarded as unknown as ChildProcess;
 }

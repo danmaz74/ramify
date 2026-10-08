@@ -67,7 +67,7 @@ describe('automatic ordinary runtime process boundary', () => {
       await writeFile(join(directory.root, 'src/tests/new-ordinary.test.ts'), `import { test, expect, vi, beforeAll, afterAll } from 'vitest';\n${row.code}\n`);
       const result = await launch(directory.root, ['run', '--project', 'node', '--project', 'web', 'new-ordinary.test.ts']);
       expect(result.code).toBe(1);
-      expect(result.text).toContain('Ordinary test attempted external processes');
+      expect(result.text, result.text).toContain('Ordinary test attempted external processes');
       expect(result.text).toContain(row.diagnostic);
       const observations = await observationsFor(directory.root);
       expect(observations).toHaveLength(1);
@@ -166,11 +166,45 @@ describe('builtin functions captured across a reused worker',()=>{
       // reuse the same process and cached CJS exports, in a proven order.
       await writeFile(join(directory.root,'reuse.config.ts'),`import {defineConfig} from 'vitest/config'; import {BaseSequencer} from 'vitest/node'; class Ordered extends BaseSequencer {async sort(files){return [...files].sort((a,b)=>a.moduleId.localeCompare(b.moduleId))}} export default defineConfig({test:{name:'reuse',include:['src/tests/*.test.ts'],setupFiles:[${JSON.stringify(setup)}],isolate:false,fileParallelism:false,maxWorkers:1,sequence:{sequencer:Ordered}}});`);
       const result=await launch(directory.root,['run','--config','reuse.config.ts']);
-      expect(result.code).toBe(1); expect(result.text).toContain('Ordinary test attempted external processes');
+      expect(result.code).toBe(1); expect(result.text, result.text).toContain('Ordinary test attempted external processes');
       const rows=(await readFile(observations,'utf8')).trim().split('\n').map(line=>JSON.parse(line) as {file:string;pid:number});
       expect(rows.map(row=>row.file)).toEqual(files);
       expect(new Set(rows.map(row=>row.pid)).size).toBe(1);
       expect(result.text).toContain(`${natives.length} passed`);
+    } finally { await directory.remove(); }
+  });
+});
+
+describe('forwarded guards captured across a reused worker', () => {
+  for (const nativeFirst of [false, true]) test(nativeFirst ? 'native/ordinary/native forwarding preserves command results and refused observations' : 'ordinary/native/ordinary forwarding preserves command results and refused observations', async () => {
+    const directory = await fixture();
+    try {
+      const files = ['src/tests/a.test.ts', 'src/tests/b.test.ts', 'src/tests/c.test.ts'];
+      const natives = nativeFirst ? [files[0]!, files[2]!] : [files[1]!];
+      await writeFile(join(directory.root, 'src/tests/test-boundaries.json'), JSON.stringify({ schema: 'ramify-agent.test-boundaries/1', boundaries: natives.map(file => ({ file, boundary: 'Forwarding adapter native positive control', whyFakeCannotProve: 'Actual promisified stdout/stderr and worker cache lifetime', owningCases: ['native'] })) }));
+      const rootHelper = join(projectRoot, 'src/tests/helpers/process-guard.ts');
+      await writeFile(join(directory.root, 'forwarded.ts'), `import cp from 'node:child_process'; import {promisify} from 'node:util'; import {randomUUID} from 'node:crypto'; import {guardedChildProcess as rootGuarded} from ${JSON.stringify(rootHelper)}; import {guardedChildProcess,spawnAttempts,resetSpawnAttempts} from ${JSON.stringify(facade)}; export const token=randomUUID(); export {spawnAttempts,resetSpawnAttempts}; export const ports=[rootGuarded(cp),guardedChildProcess(cp)].map(port=>({sync:port.execFileSync,async:promisify(port.execFile),exec:promisify(port.exec)}));`);
+      const observations = join(directory.root, 'observations.jsonl');
+      const marker = join(directory.root, 'unexpected-forwarded-launch');
+      const nativeCode = `for(const port of ports){expect(port.sync(process.execPath,['-e',"process.stdout.write('sync-out')"],{encoding:'utf8'})).toBe('sync-out'); expect(await port.async(process.execPath,['-e',"process.stdout.write('async-out');process.stderr.write('async-err')"])).toEqual({stdout:'async-out',stderr:'async-err'}); expect(await port.exec(JSON.stringify(process.execPath)+' -e '+JSON.stringify("process.stdout.write('exec-out');process.stderr.write('exec-err')"))).toEqual({stdout:'exec-out',stderr:'exec-err'}); await expect(port.async('/absent-native-executable')).rejects.toMatchObject({code:'ENOENT'});} expect(spawnAttempts()).toEqual([]); expect(rootAttempts()).toEqual([]);`;
+      const ordinaryCode = `for(const port of ports){try{port.sync(process.execPath,['-e',${JSON.stringify(`require('node:fs').writeFileSync(${JSON.stringify(marker)},'started')`)}])}catch{} try{await port.async('git',['--version'])}catch{} try{await port.exec('git --version')}catch{}} expect(spawnAttempts()).toHaveLength(3); expect(rootAttempts()).toHaveLength(6); resetSpawnAttempts(); expect(spawnAttempts()).toEqual([]); expect(rootAttempts()).toHaveLength(6); expect(existsSync(${JSON.stringify(marker)})).toBe(false);`;
+      for (const file of files) await writeFile(join(directory.root, file), `import {test,expect} from 'vitest'; import {appendFileSync,existsSync} from 'node:fs'; import {ports,token,spawnAttempts,resetSpawnAttempts} from '../../forwarded.ts'; import {spawnAttempts as rootAttempts} from ${JSON.stringify(rootHelper)}; test(${JSON.stringify(natives.includes(file) ? 'native' : 'ordinary')},async()=>{resetSpawnAttempts(); appendFileSync(${JSON.stringify(observations)},JSON.stringify({file:${JSON.stringify(file)},pid:process.pid,token})+'\\n'); ${natives.includes(file) ? nativeCode : ordinaryCode}});`);
+      await writeFile(join(directory.root, 'reuse.config.ts'), `import {defineConfig} from 'vitest/config'; import {BaseSequencer} from 'vitest/node'; class Ordered extends BaseSequencer {async sort(files){return [...files].sort((a,b)=>a.moduleId.localeCompare(b.moduleId))}} export default defineConfig({test:{name:'reuse',include:['src/tests/*.test.ts'],setupFiles:[${JSON.stringify(setup)}],isolate:false,fileParallelism:false,maxWorkers:1,sequence:{sequencer:Ordered}}});`);
+      const result = await launch(directory.root, ['run', '--config', 'reuse.config.ts']);
+      expect(result.code).toBe(1);
+      expect(result.text, result.text).toContain('Ordinary test attempted external processes');
+      expect(result.text).toContain(`${natives.length} passed`);
+      const rows = (await readFile(observations, 'utf8')).trim().split('\n').map(line => JSON.parse(line) as { file: string; pid: number; token: string });
+      expect(rows.map(row => row.file)).toEqual(files);
+      expect(new Set(rows.map(row => row.pid)).size).toBe(1);
+      expect(new Set(rows.map(row => row.token)).size).toBe(1);
+      const telemetry = await observationsFor(directory.root);
+      expect(telemetry).toHaveLength(3);
+      for (const record of telemetry) {
+        // Each native exec calls Node's exported execFile internally: two API observations, one command.
+        if (record.native) { expect(record.allowed).toHaveLength(10); expect(record.refused).toEqual([]); }
+        else { expect(record.allowed).toEqual([]); expect(record.refused).toHaveLength(6); }
+      }
     } finally { await directory.remove(); }
   });
 });

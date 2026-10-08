@@ -470,7 +470,9 @@
         "configured partition validation > fails configuration for excluded scratch",
         "configured partition validation > fails configuration for web boundary",
         "builtin functions captured across a reused worker > ordinary then native then ordinary",
-        "builtin functions captured across a reused worker > native then ordinary then native"
+        "builtin functions captured across a reused worker > native then ordinary then native",
+        "forwarded guards captured across a reused worker > ordinary/native/ordinary forwarding preserves command results and refused observations",
+        "forwarded guards captured across a reused worker > native/ordinary/native forwarding preserves command results and refused observations"
       ]
     }
   ]

@@ -12,6 +12,9 @@ CommonJS, default exports, `vi.importActual` and promisified use. Attempts are
 recorded before refusal and checked after user hooks and cleanup. Local helper
 resets, module resets and reinstalling the root guard cannot erase file evidence.
 Guard controls use independent recorders; ordinary scenarios have no opt-out.
+Forwarding helpers retain Node's promisified `{ stdout, stderr }` result and
+record local observations only for refused calls; native adapter errors retain
+their original outcome.
 
 Some claims require native Git objects, installed producer/CLI behavior or kernel
 process/lock behavior. Their exact files, claims, owning cases and reasons live in
@@ -51,4 +54,6 @@ The root guard writes per-file native/refused API and argument observations into
 Receipts include cwd, file, PID and time. Select the exact run's time window and
 cwd when gathering them. These generated observations are verification evidence,
 never production readiness or semantic authority. A passed ordinary file has
-zero refused attempts; native observations retain actual command counts.
+zero refused attempts; native observations retain API invocation traces. Node's `exec` delegates to
+its exported `execFile`, so that command has two API observations; do not equate
+raw observation counts with successful child-process counts.

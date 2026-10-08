@@ -60,3 +60,10 @@ owned projects/servers before returning configuration. It starts no workers or
 test setup. Exact registration errors fail configuration; the aggregate audit
 check remains unchanged. Per-file command observations are generated under the
 installed package cache without changing guard permission.
+
+Forwarding qualification also proves both worker orders through cached root and
+harness adapters. Promisified exec/execFile retain stdout and stderr; native
+ENOENT keeps its outcome and contributes no refused local observation. Local
+recorder resets do not erase root enforcement. The committed MAIN fixture-trial
+advance b23db328 was adopted before final qualification, preserving its ten
+changed files verbatim.
