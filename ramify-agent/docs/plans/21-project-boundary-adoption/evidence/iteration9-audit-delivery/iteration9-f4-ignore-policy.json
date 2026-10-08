@@ -1,0 +1,144 @@
+{
+  "schema": "plan21.iteration9.f4-policy/1",
+  "commits": {
+    "baseline": "bcff1cae6842f2332384b2ab65f4d75e9caaf9a4",
+    "policy": "37e37727dbc981721446baee2c1037decd69d83a",
+    "notes": "676878b6b66ea89f57952977818a6740eb2f2c70"
+  },
+  "gates": {
+    "first": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0001",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "1feefafca80b501f3da71760d7f9f0b9eed82181"
+        },
+        "requestedSourceCommit": "bcff1cae6842f2332384b2ab65f4d75e9caaf9a4",
+        "auditedSourceCommit": "bcff1cae6842f2332384b2ab65f4d75e9caaf9a4",
+        "requestedMode": "full",
+        "executedMode": "full",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "ded3330e002a0c9fb1de59dd62a9c417d35cc07f",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-30Z-bcff1cae6",
+        "treeRef": "refs/audited/by-tree/02c31c37ebd041fb05b8001aa805e6aa977897b2"
+      },
+      "selectedModules": null,
+      "carriedFailures": 0,
+      "checks": {
+        "root-command": "pass"
+      },
+      "scenarios": []
+    },
+    "refused": {
+      "verdict": "not-verified",
+      "cause": "infrastructure",
+      "commands": 0,
+      "audit": {
+        "requestId": "run-configured-witness:ga-0002",
+        "mode": "project-default",
+        "status": "failed",
+        "definition": {
+          "path": "",
+          "blob": ""
+        },
+        "requestedSourceCommit": "37e37727dbc981721446baee2c1037decd69d83a",
+        "auditedSourceCommit": null,
+        "requestedMode": null,
+        "executedMode": null,
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": null,
+        "detail": "Captured audit policy conflicts with ramify-audit.json at 37e37727dbc981721446baee2c1037decd69d83a; start a new run after reconciling the configuration"
+      },
+      "evidence": null,
+      "selectedModules": null,
+      "carriedFailures": 0,
+      "checks": {},
+      "scenarios": []
+    },
+    "rebased": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-new-policy:ga-0003",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "17054814b75d95aa3e8fe72d9d2cb09cdf275366"
+        },
+        "requestedSourceCommit": "37e37727dbc981721446baee2c1037decd69d83a",
+        "auditedSourceCommit": "37e37727dbc981721446baee2c1037decd69d83a",
+        "requestedMode": "full",
+        "executedMode": "full",
+        "fallbackReason": null,
+        "reuse": null,
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "3fb66c2c88af9e7536ca16a36aca1e1ebe793d50",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-30Z-37e37727d",
+        "treeRef": "refs/audited/by-tree/da70d4a5dae720a41033789851fecb54fd06544e"
+      },
+      "selectedModules": null,
+      "carriedFailures": 0,
+      "checks": {
+        "root-command": "pass"
+      },
+      "scenarios": []
+    },
+    "reused": {
+      "verdict": "passed",
+      "cause": null,
+      "commands": 0,
+      "audit": {
+        "requestId": "run-new-policy:ga-0004",
+        "mode": "project-default",
+        "status": "completed",
+        "definition": {
+          "path": "ramify-audit.json",
+          "blob": "17054814b75d95aa3e8fe72d9d2cb09cdf275366"
+        },
+        "requestedSourceCommit": "676878b6b66ea89f57952977818a6740eb2f2c70",
+        "auditedSourceCommit": "37e37727dbc981721446baee2c1037decd69d83a",
+        "requestedMode": "full",
+        "executedMode": "full",
+        "fallbackReason": null,
+        "reuse": {
+          "auditedCommit": "37e37727dbc981721446baee2c1037decd69d83a",
+          "ignoredChangedPaths": [
+            "notes/n.md"
+          ],
+          "requestedMode": "full",
+          "resolution": "defaulted"
+        },
+        "verdict": "pass",
+        "detail": "composed pass"
+      },
+      "evidence": {
+        "reportCommit": "3fb66c2c88af9e7536ca16a36aca1e1ebe793d50",
+        "runRef": "refs/audited/runs/2026-10-08T02-45-30Z-37e37727d",
+        "treeRef": "refs/audited/by-tree/da70d4a5dae720a41033789851fecb54fd06544e"
+      },
+      "selectedModules": null,
+      "carriedFailures": 0,
+      "checks": {
+        "root-command": "pass"
+      },
+      "scenarios": []
+    }
+  },
+  "executions": 2
+}

@@ -1,0 +1,10 @@
+# From ramify-agent/, after the first delivery audit: npx vitest run subs/web/src/tests/run-page.test.tsx subs/harness/src/tests/{execution-map-projection,protocol-contract,composition-recovery,work-item-api-views}.test.ts
+
+ RUN  v4.1.11 /home/app/ramify-plan21-project-boundary-adoption/ramify-agent
+
+
+ Test Files  5 passed (5)
+      Tests  116 passed (116)
+   Start at  04:16:17
+   Duration  10.79s (transform 4.31s, setup 84ms, import 7.00s, tests 12.07s, environment 656ms)
+

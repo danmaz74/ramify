@@ -1,0 +1,4 @@
+
+> ramify-agent@0.0.0 type-check
+> tsc --noEmit && tsc --noEmit -p subs/web/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p scripts/browser-acceptance/tsconfig.json
+

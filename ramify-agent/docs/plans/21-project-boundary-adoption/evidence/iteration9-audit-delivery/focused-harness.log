@@ -1,0 +1,85 @@
+# From ramify-agent/: npx vitest run <the 57 files below> (explicit files; no npm test)
+# subs/harness/src/tests/acceptance-trial.test.ts
+# subs/harness/src/tests/accepted-commit.test.ts
+# subs/harness/src/tests/audit-check-execution.test.ts
+# subs/harness/src/tests/audit-workspace-recovery.test.ts
+# subs/harness/src/tests/breaking-work.test.ts
+# subs/harness/src/tests/capability-acceptance.integration.test.ts
+# subs/harness/src/tests/capability-assignments.test.ts
+# subs/harness/src/tests/capability-dependencies.test.ts
+# subs/harness/src/tests/compaction.test.ts
+# subs/harness/src/tests/composition.test.ts
+# subs/harness/src/tests/contract-delegation-integration.test.ts
+# subs/harness/src/tests/direct-check-execution.test.ts
+# subs/harness/src/tests/engineer-briefing.test.ts
+# subs/harness/src/tests/engineer-submission.test.ts
+# subs/harness/src/tests/execution-map-durable.test.ts
+# subs/harness/src/tests/fixture-trials.test.ts
+# subs/harness/src/tests/gate-diagnostics.test.ts
+# subs/harness/src/tests/gate-not-verified.test.ts
+# subs/harness/src/tests/gate-progress.test.ts
+# subs/harness/src/tests/gate-repair-routing.test.ts
+# subs/harness/src/tests/integration-scenarios.test.ts
+# subs/harness/src/tests/iteration-gate-integration.test.ts
+# subs/harness/src/tests/iteration-gate.test.ts
+# subs/harness/src/tests/iteration-source-delivery.test.ts
+# subs/harness/src/tests/iterations-integration.test.ts
+# subs/harness/src/tests/iterations.test.ts
+# subs/harness/src/tests/materialization.test.ts
+# subs/harness/src/tests/module-header.test.ts
+# subs/harness/src/tests/no-rewind.test.ts
+# subs/harness/src/tests/nonfunctional-recovery.test.ts
+# subs/harness/src/tests/nonfunctional-repair.test.ts
+# subs/harness/src/tests/nonfunctional-run.test.ts
+# subs/harness/src/tests/plan-evidence-compatibility.test.ts
+# subs/harness/src/tests/progress-fixture.test.ts
+# subs/harness/src/tests/project-config.test.ts
+# subs/harness/src/tests/readiness.test.ts
+# subs/harness/src/tests/recorded-environment.test.ts
+# subs/harness/src/tests/review-lifecycle.test.ts
+# subs/harness/src/tests/review-stop.test.ts
+# subs/harness/src/tests/run-policy.test.ts
+# subs/harness/src/tests/run-projections.test.ts
+# subs/harness/src/tests/run-protocol-materialization.integration.test.ts
+# subs/harness/src/tests/run-protocol.test.ts
+# subs/harness/src/tests/run.test.ts
+# subs/harness/src/tests/scenario-briefings.test.ts
+# subs/harness/src/tests/scenario-projections.test.ts
+# subs/harness/src/tests/scenario-states.test.ts
+# subs/harness/src/tests/scratch-setup.test.ts
+# subs/harness/src/tests/setup-attribution.test.ts
+# subs/harness/src/tests/shell-tool.test.ts
+# subs/harness/src/tests/single-session.test.ts
+# subs/harness/src/tests/test-lock-bounds.test.ts
+# subs/harness/src/tests/test-lock-gate.test.ts
+# subs/harness/src/tests/union-values.test.ts
+# subs/harness/subs/audit/src/tests/audit-conformance.test.ts
+# subs/harness/subs/audit/src/tests/completed-audit.test.ts
+# subs/harness/subs/audit/src/tests/workspace-preparation.test.ts
+
+ RUN  v4.1.11 /home/app/ramify-plan21-project-boundary-adoption/ramify-agent
+
+Note: switching to 'c93c956874af67329a275337a8f4b23c39b3eb86'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+
+ Test Files  56 passed | 1 skipped (57)
+      Tests  455 passed | 2 skipped (457)
+   Start at  03:38:05
+   Duration  1015.26s (transform 11.73s, setup 842ms, import 50.52s, tests 2117.40s, environment 9ms)
+
+EXIT 0
