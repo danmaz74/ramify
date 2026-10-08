@@ -161,6 +161,8 @@
       "subs/harness/src/reviews/state.ts",
       "subs/harness/src/tests/plan23-fork-workflows.test.ts",
       "subs/harness/src/tests/plan23-continuing-work.test.ts",
+      "subs/harness/src/interfaces/protocol/transcripts.ts",
+      "subs/harness/src/tests/union-values.test.ts",
       "subs/harness/src/tests/nonfunctional-recovery.test.ts",
       "subs/harness/src/tests/session-reducer.test.ts",
       "subs/harness/subs/agent/src/interfaces/port.ts",
