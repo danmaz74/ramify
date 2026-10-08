@@ -1,6 +1,7 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit, unchangedGit } from './helpers/unchanged-run.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { GitError } from '../../subs/evidence/src/git.js';
+import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -134,6 +135,29 @@ describe('an implementation run with no entry capabilities', () => {
     expect(git.commits()).toEqual([]);
     const ignore = await readFile(runPath(root, 'review-notes', receipt.jobId, '..', '..', '.gitignore'), 'utf8');
     expect(ignore.trim().endsWith('*')).toBe(true);
+  }, 120_000);
+
+  test('a project without a valid committed audit configuration is refused before the run exists or any agent starts', async () => {
+    const { root } = await target();
+    const missing = 'ramify-audit.json is missing from audited commit unchanged-fixture-revision';
+    const asked: string[] = [];
+    const { service, agent } = await openRuns(root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      configuredAudit: {
+        async read(_root, head) { asked.push(head); throw new Error(missing); },
+        async run(): Promise<never> { throw new Error('no audit runs for a refused start'); },
+      },
+    });
+    cleanups.push(() => service.close());
+
+    const refused = await service.execute(startRun('review-notes')).then(() => null, (error: unknown) => error);
+    expect(refused).toMatchObject({ code: 'unreadable' });
+    expect((refused as Error).message).toContain('cannot be read, so no run can start');
+    expect((refused as Error).message).toContain(missing);
+    expect(asked).toEqual(['unchanged-fixture-revision']);
+    expect(agent!.sessions).toEqual([]);
+    expect(service.listRuns('review-notes')).toEqual([]);
+    expect(existsSync(join(root, 'plans', 'review-notes', '.harness', 'jobs'))).toBe(false);
   }, 120_000);
 
   test('a run branch git refuses fails readiness at run-branch, with git\'s own message, before any work', async () => {

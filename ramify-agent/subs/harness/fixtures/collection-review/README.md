@@ -40,7 +40,7 @@ port the operating system picks.
 ```bash
 npm run type-check    # ordinary source, every src/tests/, and the config files
 npm test              # every owner's tests, under Node
-npm run test:cucumber # the one feature scenario, through the real runner
+npm run test:cucumber # the feature scenarios, through the real runner
 npm run acceptance:quick # the scenarios in quick mode: the system in process
 npm run acceptance:full  # the scenarios in full mode: the listener over HTTP
 npm run build         # the browser bundle, into dist/
@@ -93,11 +93,15 @@ mode under this package's own `cucumber.js` profile.
 
 ramify-agent runs none of these scripts itself. A gate asks for the
 project's committed audit, whose configured Cucumber check runs the
-scenarios under the profile it commits; the fixture commits no audit
+scenarios under the profile it commits. The fixture commits no audit
 definition, so the tests that drive a run over it answer each gate with a
-scripted configured audit. `ramify-agent.json` beside `package.json` declares
-only that the type check prints `tsc`'s output, so a standalone diagnosis
-attributes a failed type check by where its errors lie.
+scripted configured audit; a trial copy made by `npm run trial -- prepare`
+commits one in the copy. `cucumber.js` also collects the feature files a run
+writes and their step definitions, in a module's `src/tests/features/` and
+`src/tests/steps/` or a testing module's `src/features/` and `src/steps/`,
+and leaves out `@ramify-pending` scenarios. `ramify-agent.json` beside
+`package.json` declares only that the type check prints `tsc`'s output, so a
+standalone diagnosis attributes a failed type check by where its errors lie.
 
 Step definitions and feature files sit in the conventional directories the
 harness writes feature files beneath and briefs engineers to use: a module's `src/tests/steps/` and `src/tests/features/`, or,

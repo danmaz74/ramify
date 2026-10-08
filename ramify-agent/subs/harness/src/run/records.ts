@@ -342,7 +342,11 @@ export const runRecordSchema = z.object({
   policy: runPolicySchema,
   /** The project's `ramify-agent.json`, validated or with the reason it is not. */
   projectConfig: capturedProjectConfigSchema,
-  /** Absent only in records made before configured readiness. */
+  /**
+   * Absent only in records made before configured readiness. `invalid` only
+   * in records made before `start-run` refused a missing or invalid
+   * committed audit configuration.
+   */
   auditConfiguration: z.union([
     z.object({ config: committedAuditConfigurationSchema }).strict(),
     z.object({ invalid: z.string() }).strict(),

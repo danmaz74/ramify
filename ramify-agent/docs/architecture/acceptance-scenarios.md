@@ -277,7 +277,11 @@ same, it is infrastructure, with ramify-audit's message.
 
 The `collection-review` fixture commits no audit definition: the tests that
 drive a run over it answer each gate with a scripted configured audit, and
-its `ramify-agent.json` declares only its type check's output.
+its `ramify-agent.json` declares only its type check's output. A trial copy,
+which `npm run trial -- prepare` makes, commits one in the copy: the
+fixture's type check, tests and Cucumber scenarios and a batch Ramify check.
+The copy's installation also links ramify-agent's `ramify`, which the
+audit's expected-file verification asks for ownership.
 
 ### 1. Plan capture
 
@@ -403,6 +407,8 @@ gains that section; the records are enough for it.
 
 ### 4. Readiness
 
+`start-run` refuses a project whose committed `ramify-audit.json` at HEAD is
+missing or invalid, before it creates the run or starts any agent.
 Readiness has no acceptance step of its own. It verifies the project root,
 removes stale scratch, and requires a clean repository, the compiler
 configuration, a valid `ramify-agent.json` and an answering Ramify command

@@ -2976,6 +2976,15 @@ export class RunService {
     if (!plan) throw new CommandRejection('not-found', `No plan with ID "${planId}"`);
     if (plan.status === 'unreadable') throw new CommandRejection('unreadable', `${plan.path}: ${plan.message}`);
     if (!await this.options.lock.held()) throw new CommandRejection('internal', 'This harness no longer holds the project lock');
+    // The committed audit definition is read before anything of the run is
+    // written or any agent starts: readiness, every gate and the final gate
+    // ask it, so a project without a valid one is refused here.
+    const sourceCommit = await this.git.currentHead(this.projectRoot);
+    if (sourceCommit === '') throw new CommandRejection('unreadable', 'No committed HEAD is available, so no committed audit configuration can be read and no run can start');
+    const auditConfiguration = await this.options.configuredAudit.read(this.projectRoot, sourceCommit)
+      .then(config => ({ config }), (error: unknown) => {
+        throw new CommandRejection('unreadable', `The committed audit configuration at ${sourceCommit} cannot be read, so no run can start: ${message(error)}`);
+      });
 
     // The plan's state directory exists, with its marker and its
     // `.gitignore`, before the evidence is captured: the run's own records
@@ -3021,10 +3030,6 @@ export class RunService {
     // with its reason; readiness reports it, and the start is not refused.
     // The gate command timeouts it declares replace the policy's own.
     const projectConfig = await captureProjectConfig(this.projectRoot);
-    const sourceCommit = await this.git.currentHead(this.projectRoot);
-    const auditConfiguration = sourceCommit === '' ? { invalid: 'No committed HEAD is available for audit configuration' }
-      : await this.options.configuredAudit.read(this.projectRoot, sourceCommit)
-        .then(config => ({ config }), error => ({ invalid: `Committed audit configuration at ${sourceCommit}: ${message(error)}` }));
     const record = runRecordSchema.parse({
       schema: jobSchemaVersion,
       jobId: runId,

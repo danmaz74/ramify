@@ -15,16 +15,16 @@ import { assign, byRole, completionProposed, outline, submit, viewedInputs, writ
 import { git, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { badgeAnalysis, badgeImplementation, badgeStepFile, badgeSteps } from './helpers/badge-scenarios.js';
 import { gitService as productionGit } from '../../subs/evidence/src/git.js';
-import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
-import { auditDefinition, commandCheck, privateConfiguredAudit } from './helpers/configured-repository.js';
+import { privateConfiguredAudit } from './helpers/configured-repository.js';
 
 /*
  * The fixture trials: implementation runs on a disposable copy of the
- * `collection-review` fixture with its own toolchain installed. The copy is
- * given a committed audit definition whose checks are the fixture's real
- * `npm test`, its real `npm run type-check` and a complete `ramify check
- * --batch`, and readiness, every gate and the final gate ask that audit; the architect
+ * `collection-review` fixture with its own toolchain installed. The copy's
+ * committed audit definition, which `prepare` writes, checks the fixture's
+ * real `npm run type-check`, its real `npm test`, its Cucumber scenarios and
+ * a complete `ramify check --batch`, and readiness, every gate and the final
+ * gate ask that audit; the architect
  * view is materialized and refreshed by the installed Ramify through a
  * private daemon, stopped before the copy is removed. The agent is the
  * scripted fake, which writes each stage's source through the implementation's
@@ -106,15 +106,8 @@ async function trial(plan: string, script: Parameters<typeof byRole>[0], check: 
     expect(project, prepared.stdout).toBeDefined();
 
     // The run, in this process, with a private daemon disposed before the
-    // copy is verified or removed.
-    // The copy's committed audit definition: the project's own checks.
-    await writeFile(join(project!, 'ramify-audit.json'), auditDefinition([
-      commandCheck('fixture-tests', [{ name: 'npm-test', cmd: 'npm', args: ['test'], timeoutMs: 600_000 }]),
-      commandCheck('fixture-type-check', [{ name: 'npm-type-check', cmd: 'npm', args: ['run', 'type-check'], timeoutMs: 600_000 }]),
-      commandCheck('fixture-structure', [{ name: 'ramify-check', cmd: ramifyExecutable, args: ['check', '--batch', '--format', 'json', '--no-snapshot'], timeoutMs: 600_000 }]),
-    ]));
-    await exec('git', ['add', 'ramify-audit.json'], { cwd: project! });
-    await exec('git', ['-c', 'user.name=trial', '-c', 'user.email=trial@localhost', 'commit', '--quiet', '--no-gpg-sign', '-m', 'Declare the trial\'s audit definition'], { cwd: project! });
+    // copy is verified or removed. The copy's committed audit definition is
+    // the one `prepare` wrote.
     const configured = await privateConfiguredAudit(createAuditWorkspaceOwnership(project!));
 
     const daemon = await realRamify();
@@ -210,9 +203,9 @@ function expectRealGatePassed(attempt: GateAttempt, checkpoint: GateAttempt['che
   // The committed audit answered it; the harness ran no command of its own.
   expect(attempt.commands).toEqual([]);
   expect(attempt.audit).toMatchObject({ status: 'completed', verdict: 'pass' });
-  // The project's own suite and type check through npm, and a complete Ramify check.
+  // The project's own type check, suite and scenarios through npm, and a complete Ramify check.
   const checks = (attempt.provider?.checks ?? {}) as Record<string, { passed?: boolean }>;
-  for (const id of ['fixture-tests', 'fixture-type-check', 'fixture-structure']) expect(checks[id]?.passed, id).toBe(true);
+  for (const id of ['fixture-type-check', 'fixture-tests', 'fixture-scenarios', 'fixture-structure']) expect(checks[id]?.passed, id).toBe(true);
 }
 
 describe.runIf(selected.includes('status-badge-tone'))('the status-badge-tone trial on the real fixture toolchain', () => {
