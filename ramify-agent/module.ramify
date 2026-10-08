@@ -169,3 +169,6 @@ expose-test guardedChildProcess, spawnAttempts from "helpers/process-guard.ts" t
 
 // Shared plain output for setup attribution; collectors remain owner-local.
 expose-sub HarnessLineIdentities from harness to descendants
+
+// Exact pure line verifier; no Git adapter or provider state crosses this surface.
+expose-src verifySetupLineIdentities, SetupLineIdentityInput, SetupCandidatePartition, RecordedSetupDelta, SetupSourceLine, SetupLineMappingFacts, SetupAddedLineFact, SetupDeletedLineFact from "trial-attribution.ts" to descendants
