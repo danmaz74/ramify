@@ -13,6 +13,7 @@ import { placementDecisions } from '../guard/write-guard.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import type { HookFinding } from '../hooks/post-write.js';
 import { inputsHash, loadPromptPackages, renderEngineerPrompt, sha256 } from '../prompts/packages.js';
+import { HarnessSessionOperations, readSessionPointReference, settleSessionEquipment, type HarnessTaskBrief } from '../run/session-operations.js';
 import { ExcursionWatcher } from '../run/excursions.js';
 import { runCheckpoint } from '../run/gates.js';
 import { captureProjectConfig } from '../run/project-config.js';
@@ -208,10 +209,11 @@ export async function runSingleSession(options: SingleSessionOptions): Promise<S
     // A held lock is someone else's and is left exactly as it is.
     return notStarted(error instanceof ProjectLockError ? error.message : `The project lock could not be taken: ${message(error)}`);
   }
+  let releaseLock = true;
   try {
-    return await runLocked({ ...options, projectRoot });
+    return await runLocked({ ...options, projectRoot }, () => { releaseLock = false; });
   } finally {
-    await lock.release();
+    if (releaseLock) await lock.release();
   }
 }
 
@@ -219,7 +221,7 @@ function notStarted(reason: string, records: string | null = null): SingleSessio
   return { status: 'not-started', reason, records, exitStatus: 2 };
 }
 
-async function runLocked(options: SingleSessionOptions): Promise<SingleSessionResult> {
+async function runLocked(options: SingleSessionOptions, retainProjectLock: () => void): Promise<SingleSessionResult> {
   const { projectRoot, agent, ramify } = options;
   const git = options.git ?? gitService;
   const progress = (event: SessionProgress) => {
@@ -295,6 +297,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     .catch(error => ({ error: message(error) }));
   if (typeof workingDirectory !== 'string') return notStarted(`The engineer cannot start in the module's src directory: ${workingDirectory.error}`);
   let scratchSettled = false;
+  let settlementConfirmed = true;
+  let sessions: HarnessSessionOperations | undefined;
   try {
   // A standalone session guards the same committed preparation inputs where a definition exists.
   const head = await git.currentHead(projectRoot);
@@ -363,7 +367,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     prompts: { package: loaded.package, hash: loaded.hash, inputsHash: inputsHash([systemPrompt, prompt]) },
   } satisfies SessionRecord);
   await writeFile(at(sessionLayout.session), `${JSON.stringify(record, null, 2)}\n`);
-  progress({ type: 'started', session: id, module: entry.module, directory: entry.dir, records, scope: shown, message: prompt });
+
 
   const observations = await ObservationLog.open(at(sessionLayout.observations));
   // The session is its own one invocation, so its identifier names both.
@@ -488,14 +492,26 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const writer = new WriterOwnership({ settleMs: limits.writerSettleMs, tree: { changed: () => git.changedPaths(projectRoot).catch(() => []) } });
   writer.acquire(id);
   // The start holds the prompts and is written before the model is called.
-  await transcript.started({
-    role: 'engineer', work: {}, start: 'opened', requested: 'fresh',
-    executor: agent.name, model: options.model ?? null, systemPrompt, prompt,
-  });
   const started = Date.now();
   let agentSession: AgentSession;
   try {
-    agentSession = agent.startSession(spec);
+    sessions = await HarnessSessionOperations.open(join(projectRoot, sessionsDirectory, 'session-operations'), agent);
+    const brief: HarnessTaskBrief = { kind: 'standalone-command', objective: 'Carry out this standalone module command and submit its observed result.',
+      goal: assignment.goal, requirements: [assignment.completionEvidence],
+      sections: [{ key: 'assignment', text: prompt.split(assignment.goal).join('') }],
+      environment: { projectRoot, workingDirectory, candidate: null, snapshot: null, limits,
+        availableTools: [...spec.builtinTools, ...spec.tools.map(tool => tool.name), engineerToolName],
+        views: views.flatMap(view => view.views.map(item => ({ path: item.path, revision: item.revision, modules: [view.module], coverage: item.coverage === null ? [] : [`${item.coverage} coverage limits`] }))),
+        supportPaths: loaded.files.map(file => file.path), cucumberConfiguration: null } };
+    agentSession = await sessions.start({ runId: `standalone:${id}`, operationId: id, session: id, loaded, brief, spec,
+      authority: { scope, guarded: guardedFiles }, validator: { name: engineerToolName, schema: capabilityEngineerJsonSchema, submissionSchema: 'ramify-agent.engineer-submission/1', bound: limits.rejectedSubmissionsPerTurn },
+      destination: { session: id, submission: sessionLayout.submission }, currentAuthority: async () => options.signal?.aborted !== true,
+      prepared: async packet => {
+        await writeFileAtomic(at(sessionLayout.session), `${JSON.stringify({ ...record, prompts: { package: loaded.package, hash: loaded.hash, inputsHash: inputsHash([packet.roleInstructions, packet.message]) } }, null, 2)}\n`);
+        progress({ type: 'started', session: id, module: entry.module, directory: entry.dir, records, scope: shown, message: packet.message });
+        await transcript.started({ role: 'engineer', work: {}, start: 'opened', requested: 'fresh', executor: agent.name, model: options.model ?? null,
+          systemPrompt: packet.roleInstructions, prompt: packet.message });
+      } });
   } catch (error) {
     const settled = await writer.release(id);
     const removed = await removeScratchDirectories(projectRoot, [entry.dir], git);
@@ -526,11 +542,13 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   }
   const elapsedMs = Date.now() - started;
   await recorder.recordGaps(agent);
-  await equipment.settle?.().catch(() => undefined);
+  await settleSessionEquipment(equipment.settle, limits.stopSettleMs).catch(() => false);
   const settled = await writer.release(id, agentSession);
+  settlementConfirmed = settled.confirmed;
+  if (!settlementConfirmed) retainProjectLock();
   const snapshot = await recordSettledSnapshot({ projectRoot, changed: () => git.changedPaths(projectRoot), scope: guarded }, observations);
-  const removed = await removeScratchDirectories(projectRoot, [entry.dir], git);
-  scratchSettled = true;
+  const removed = settlementConfirmed ? await removeScratchDirectories(projectRoot, [entry.dir], git) : { preservedTracked: [] };
+  scratchSettled = settlementConfirmed;
   const safety = await scratchSafetyRule(projectRoot, await declaredModuleDirectories(projectRoot), git);
 
   const interruption = bounds.interruption ?? (stoppedByCaller ? 'stopped-by-caller' as const : undefined);
@@ -602,6 +620,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const standing = tools.openFindings();
   await writeOutcome(at(sessionLayout.outcome), {
     session: id,
+    sessionOperation: { runId: `standalone:${id}`, operationId: id, ...(readSessionPointReference(agentSession.ref) === null ? { point: null } : { sessionId: readSessionPointReference(agentSession.ref)!.point.sessionId, point: readSessionPointReference(agentSession.ref)!.point }) },
     ended,
     ...(interruption === undefined ? {} : { interruption }),
     ...(error === undefined ? {} : { error }),
@@ -640,10 +659,12 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     ...(error === undefined ? {} : { error }),
   };
   progress({ type: 'summary', summary });
-  const passed = ended === 'submitted' && (gate === null || (gate.ran && gate.verdict === 'passed'));
+  const passed = settled.confirmed && ended === 'submitted' && (gate === null || (gate.ran && gate.verdict === 'passed'));
   return { status: 'finished', summary, exitStatus: passed ? 0 : 1 };
   } finally {
-    if (!scratchSettled) await removeScratchDirectories(projectRoot, [entry.dir], git);
+    const closed = await sessions?.close();
+    if (closed === false) { settlementConfirmed = false; retainProjectLock(); }
+    if (settlementConfirmed && !scratchSettled) await removeScratchDirectories(projectRoot, [entry.dir], git);
   }
 }
 

@@ -4,12 +4,12 @@ import type { AgentPort } from '../../../subs/agent/src/interfaces/port.js';
 import { createScriptedAgent, type Script, type ScriptedAgent, type ScriptStep } from '../../../subs/agent/src/scripted.js';
 import type { Role } from '../../interfaces/protocol/runs.js';
 import type { RunEvent } from '../../run/log.js';
-import type { RunService } from '../../run/service.js';
+import type { RunService, RunServiceOptions } from '../../run/service.js';
 import { analysis, entry, requestCompletion } from './analysis.js';
 import { copyFixture } from './fixture.js';
 import { decision as decisionBody, forkDecision, localDecision, registryChange, requestPlacement } from './placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write, type Turn } from './iterations.js';
-import { openRuns, runEventsOnDisk, runPath, startRun } from './runs.js';
+import { openRuns, runEventsOnDisk, runPath, startRun, type OpenRunsOptions } from './runs.js';
 import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged } from './contracts-git.js';
 import { declaringScenarios } from './declarations.js';
 import { finalCandidate } from './final-candidate.js';
@@ -151,6 +151,8 @@ async function target(cleanup: (step: () => Promise<void>) => void, given?: stri
 
 
 export interface SessionScenarioOptions {
+  readonly afterWrite?: RunServiceOptions['afterWrite'];
+  readonly onOpened?: (opened: Awaited<ReturnType<typeof openRuns>>, boundaries: OpenRunsOptions, script: Script) => void;
   /** Registers what the test removes afterwards. */
   readonly cleanup: (step: () => Promise<void>) => void;
   /** Steps each named role takes before its first turn's own. */
@@ -232,8 +234,9 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
   const script: Script = declaringScenarios(byRole(turns));
   const scripted = createScriptedAgent(script);
   let providerAttempt: string | undefined;
-  const opened = await openRuns(root, {
+  const boundaries: OpenRunsOptions = {
     git,
+    afterWrite: options.afterWrite,
     candidates: final.candidates,
     inputs: treeInputs(),
 
@@ -246,7 +249,9 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
         ? { outcome: { kind: 'completed', exitCode: 1 }, stderr: 'not ok\n' }
         : {};
     },
-  });
+  };
+  const opened = await openRuns(root, boundaries);
+  options.onOpened?.(opened, boundaries, script);
   options.cleanup(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);

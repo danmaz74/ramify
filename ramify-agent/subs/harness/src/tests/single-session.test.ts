@@ -17,12 +17,43 @@ import { blobsIn } from './helpers/transcripts.js';
 import { completionProposed, edit, read, shell, unsuitableScope, write } from './helpers/iterations.js';
 
 import { commandResult } from './helpers/command-result.js';
+import { testPolicy } from './helpers/runs.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 import { cleanups, notes, notesDirectory, notesSource, project, session, checked, passingGate, finished, outcomeOf, observationsOf, exists } from './single-session-fixture.js';
 
 describe('a single engineer session', () => {
+  test('an unconfirmed operation barrier retains project ownership and scratch and refuses the gate', async () => {
+    const root = await project();
+    const scratch = join(root, notesDirectory, 'src/tmp/unfinished.txt');
+    let release!: () => void; const pending = new Promise<void>(resolve => { release = resolve; });
+    let settled!: Promise<unknown>;
+    const scripted = createScriptedAgent([{ kind: 'submit', input: unsuitableScope('Controlled unfinished operation.') }]);
+    const agent: AgentPort = { ...scripted, bindSessionStore(store) {
+      const operations = scripted.bindSessionStore(store);
+      return { ...operations, async continue(value) {
+        await mkdir(join(root, notesDirectory, 'src/tmp'), { recursive: true });
+        await writeFile(scratch, 'Still owned by the operation.');
+        const handle = await operations.continue(value);
+        settled = pending.then(() => handle.settled());
+        return { ...handle, settled: () => settled as ReturnType<typeof handle.settled> };
+      } };
+    } };
+    const policy = testPolicy(root);
+    try {
+      const { result } = await session(root, [], { agent, policy: { ...policy, limits: { ...policy.limits, stopSettleMs: 50, writerSettleMs: 50 } } });
+      const summary = finished(result);
+      expect((await outcomeOf(summary.records)).settled.confirmed).toBe(false);
+      expect(result.exitStatus).toBe(1);
+      expect(summary.gate).toBeNull();
+      const guarded = await session(root, [], { gate: true }, { starts: false });
+      expect(guarded.result).toMatchObject({ status: 'not-started', reason: expect.stringContaining('holds the project lock') });
+      expect(await exists(scratch)).toBe(true); expect(await exists(join(root, lockPath))).toBe(true);
+      await expect(acquireProjectLock(root)).rejects.toThrow('holds the project lock');
+    } finally { release(); await settled; }
+  }, 120_000);
+
   test('relative reads, writes, and shell start in module src while observations remain project-relative', async () => {
     const root = await project();
     const cwd = join(root, notesDirectory, 'src');
@@ -50,7 +81,7 @@ describe('a single engineer session', () => {
     expect(await exists(join(root, sibling))).toBe(false);
     const observations = await observationsOf(summary.records);
     const activities = observations.filter(line => line.type === 'activity').map(line => line.data.activity);
-    expect(activities).toEqual(expect.arrayContaining([{ kind: 'read', callId: 'call-1', path: notesSource }]));
+    expect(activities).toEqual(expect.arrayContaining([{ kind: 'read', callId: `${summary.session}:call-1`, path: notesSource }]));
     const guards = observations.filter(line => line.type === 'guard');
     expect(guards.map(line => line.data.resolved)).toEqual([
       join(root, notesSource), join(cwd, 'new.ts'), join(root, sibling),
@@ -93,7 +124,8 @@ describe('a single engineer session', () => {
     expect(events[2]).toMatchObject({ type: 'submission', accepted: true, answer });
     // The prompt is the goal; what the person did not give reads "not stated".
     const started = events[0] as Extract<SessionProgress, { type: 'started' }>;
-    expect(started.message).toContain('## Goal\n\nRaise the note limit to 500.');
+    expect(started.message).toContain('# Goal\nRaise the note limit to 500.');
+    expect(started.message.split('Raise the note limit to 500.')).toHaveLength(2);
     expect(started.message).toContain('## Approach the architect asked for\n\nNot stated.');
     expect(started.message).toContain('## Completion evidence\n\nNot stated.');
     expect(agent.sessions[0]!.spec.prompt).toBe(started.message);
@@ -112,7 +144,7 @@ describe('a single engineer session', () => {
     const summary = finished(result);
     expect(await exists(join(root, outside))).toBe(false);
     expect(await readFile(join(root, 'docs/notes.md'), 'utf8')).toBe('# Notes\n');
-    expect(agent.sessions[0]!.denied).toHaveLength(1);
+    expect(agent.sessions[0]!.results[0]!.isError).toBe(true);
 
     const guards = (await observationsOf(summary.records)).filter(line => line.type === 'guard');
     expect(guards.map(line => (line.type === 'guard' ? [line.data.requested, line.data.verdict] : null))).toEqual([
@@ -350,10 +382,16 @@ describe('the session\'s records', () => {
       name: scripted.name,
       support: scripted.support,
       appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
-      startSession(spec) {
-        const path = join(spec.sessionDirectory, '..', 'transcript.jsonl');
-        atStart = existsSync(path) ? readFileSync(path, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as TranscriptEntry) : [];
-        return scripted.startSession(spec);
+      startSession: spec => scripted.startSession(spec),
+      bindSessionStore(store) {
+        const operations = scripted.bindSessionStore(store);
+        return { ...operations, async continue(input) {
+          const folders = await readdir(join(root, sessionsDirectory));
+          const session = folders.find(folder => folder !== 'session-operations')!;
+          const path = join(root, sessionsDirectory, session, 'transcript.jsonl');
+          atStart = existsSync(path) ? readFileSync(path, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as TranscriptEntry) : [];
+          return operations.continue(input);
+        } };
       },
     };
     const { result } = await session(root, [], { agent }, {
@@ -393,13 +431,13 @@ describe('the session\'s records', () => {
     ]);
     // The shell's changed set is unknown, so its check is a complete one, whose log the entry names.
     expect(decisions[0]).toMatchObject({
-      callId: 'call-1', atCompletion: false,
+      callId: `${id}:call-1`, atCompletion: false,
       checks: [{ mode: 'changed', outcome: 'not-checked', log: null }, { mode: 'complete', log: { stored: 'file', path: 'hooks/001.json' } }],
     });
-    expect(decisions[1]).toMatchObject({ callId: 'call-2', tool: 'write', verdict: 'blocked-scope', requested: join(root, outside) });
+    expect(decisions[1]).toMatchObject({ callId: `${id}:call-2`, tool: 'write', verdict: 'blocked-scope', requested: join(root, outside) });
     expect(decisions[3]).toMatchObject({ atCompletion: true, callId: null, checks: [{ mode: 'changed' }] });
     expect(decisions[4]).toMatchObject({
-      callId: 'call-4', verdict: 'accepted', text: { stored: 'inline', text: sessionAcceptance('completion-proposed', false) },
+      callId: `${id}:call-4`, verdict: 'accepted', text: { stored: 'inline', text: sessionAcceptance('completion-proposed', false) },
     });
     // The records hold none of it.
     const recordText = await readFile(join(summary.records, 'session.json'), 'utf8') + await readFile(join(summary.records, 'outcome.json'), 'utf8')

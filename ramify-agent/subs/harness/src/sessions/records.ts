@@ -93,6 +93,7 @@ const standingViolationSchema = z.object({
 export const sessionOutcomeSchema = z.object({
   schema: z.literal('ramify-agent.session-outcome/1'),
   session: text,
+  sessionOperation: invocationOutcomeSchema.shape.sessionOperation,
   ended: invocationOutcomeSchema.shape.ended,
   interruption: z.enum(['idle-timeout', 'absolute-timeout', 'stopped-by-caller', 'adapter-fault']).optional(),
   error: z.string().optional(),

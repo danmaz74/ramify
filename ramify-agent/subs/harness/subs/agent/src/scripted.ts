@@ -6,6 +6,7 @@ import { assistantText, contextBudgetReached, noMessageDetail } from './interfac
 import type {
   ActualStart,
   AgentPort,
+  AgentEvent,
   AssistantBlock,
   AgentSession,
   AppendOutcome,
@@ -15,6 +16,7 @@ import type {
   SessionOutcome,
   SessionRef,
   SessionSpec,
+  SessionStart,
   TokenUsage,
   ToolAction,
   ToolCallBlock,
@@ -198,8 +200,8 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
 
   return {
     name: 'scripted',
-    bindSessionStore: sessionStore => createScriptedOperations(sessionStore, script, options),
-    sessionOperations: options.sessionStore ? createScriptedOperations(options.sessionStore, script, options) : null,
+    bindSessionStore: sessionStore => createScriptedOperations(sessionStore, script, options, sessions),
+    sessionOperations: options.sessionStore ? createScriptedOperations(options.sessionStore, script, options, sessions) : null,
     support,
     sessions,
 
@@ -638,12 +640,36 @@ export function createScriptedSessionDriver(script: SessionScript): SessionOpera
 }
 
 /** Reuses existing Script declarations; durable session history remains solely in the new store. */
-function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOptions): SessionOperationDriver {
+function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOptions, observations: ScriptedSessionRecord[]): SessionOperationDriver {
   return {
     async dispatch(input, runtime) {
       await runtime.assertLive();
       // This private actor executes one script, without reading or writing any old session.
-      const actor = createScriptedAgent(script, { ...options, sessionStore: undefined });
+      const diagnosticMode = input.session.currentPoint.turn === 0 && input.session.parent === null ? 'fresh'
+        : input.session.parent !== null && input.session.currentPoint.turn === input.session.parent.turn ? 'fork' : 'continue';
+      const diagnosticRef = JSON.stringify(input.session.currentPoint);
+      const diagnosticStart: SessionStart = diagnosticMode === 'fresh' ? { mode: 'fresh' }
+        : diagnosticMode === 'fork' ? { mode: 'fork', from: JSON.stringify(input.session.parent) } : { mode: 'continue', ref: diagnosticRef };
+      const diagnostic = (spec: SessionSpec): SessionSpec => ({ ...spec, session: diagnosticStart });
+      const inheritedMessages: string[] = [];
+      const payloadKeys = new Map<string, string>();
+      for (const entry of input.session.transcript) {
+        if (entry.kind !== 'provider') continue;
+        if (!/^.+:event:\d+$/u.test(entry.key)) throw new Error('Unknown scripted provider event ancestry');
+        const previous = payloadKeys.get(entry.key);
+        if (previous !== undefined) { if (previous !== entry.payloadId) throw new Error('Conflicting scripted provider event ancestry'); continue; }
+        payloadKeys.set(entry.key, entry.payloadId);
+        const bytes = await runtime.readPayload(entry.payloadId);
+        const event = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as Partial<AgentEvent>;
+        if (event === null || typeof event !== 'object' || typeof event.type !== 'string') throw new Error('Corrupt scripted provider event ancestry');
+        if (event.type !== 'message' || event.role !== 'user') continue;
+        if (!Array.isArray(event.blocks) || event.blocks.some(block => block.type !== 'text' || typeof block.text !== 'string')) throw new Error('Corrupt scripted user event ancestry');
+        // Retry may already contain this operation's current packet; it is supplied once below.
+        if (!entry.key.startsWith(`${input.key.operationId}:event:`)) inheritedMessages.push(event.blocks.map(block => block.type === 'text' ? block.text : '').join('\n'));
+      }
+      const inherited = [...inheritedMessages, ...input.session.additions.map(addition => addition.text)];
+      // Only script perception receives its already visible context. Actual records and emitted packets remain current-only.
+      const actor = createScriptedAgent(typeof script === 'function' ? spec => script({ ...diagnostic(spec), prompt: [...inherited, spec.prompt].join('\n\n') }) : script, { ...options, sessionStore: undefined });
       let eventIndex = 0;
       let events: Promise<unknown> = Promise.resolve();
       let eventError: unknown;
@@ -651,8 +677,7 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
       const scopedCall = (callId: string) => `${input.key.operationId}:${callId}`;
       const declarations = input.session.declarations;
       const submission = declarations.find(item => item.name === input.task.submissionTool)!;
-      let toolCalls = 0;
-      let submissions = 0;
+      let activeCallId: string | null = null;
       const spec: SessionSpec = {
         role: input.task.role, scope: { workingDirectory: input.task.environment.workingDirectory },
         systemPrompt: input.session.initialInstructions, prompt: input.task.message,
@@ -661,18 +686,27 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
         tools: declarations.filter(item => item.name !== submission.name).map(declaration => ({
           ...declaration,
           action: value => runtime.describeTool(declaration.name, value).action,
-          async execute(value) { await flush(); toolCalls++; return runtime.callTool(scopedCall(`tool-${toolCalls}`), declaration.name, value); },
+          async execute(value) { const callId = activeCallId; await flush(); if (callId === null) throw new Error('Scripted tool has no observed call identity'); return runtime.callTool(callId, declaration.name, value); },
         })),
-        submission: { ...submission, async accept(value) { await flush(); submissions++; return runtime.submit(scopedCall(`submission-${submissions}`), value); } },
+        submission: { ...submission, async accept(value) { const callId = activeCallId; await flush(); if (callId === null) throw new Error('Scripted submission has no observed call identity'); return runtime.submit(callId, value); } },
         onEvent(event) {
+          if (event.type === 'tool-started') activeCallId = scopedCall(event.callId);
+          const observed = { ...event, ...('callId' in event && typeof event.callId === 'string' ? { callId: scopedCall(event.callId) } : {}),
+            ...('blocks' in event ? { blocks: event.blocks.map(block => block.type === 'tool-call' ? { ...block, callId: scopedCall(block.callId) } : block) } : {}) } as AgentEvent;
           const index = eventIndex++;
           events = events.then(async () => {
-            await runtime.persistPayload(`${input.key.operationId}:event:${index}`, new TextEncoder().encode(JSON.stringify(event)));
-            runtime.onEvent(event);
+            await runtime.persistPayload(`${input.key.operationId}:event:${index}`, new TextEncoder().encode(JSON.stringify(observed)));
+            runtime.onEvent(observed);
           }).catch(error => { eventError ??= error; });
         },
       };
       const session = actor.startSession(spec);
+      for (const record of actor.sessions) {
+        Object.defineProperty(record, 'spec', { value: diagnostic(record.spec) });
+        Object.defineProperty(record, 'start', { value: { mode: diagnosticMode } });
+        Object.defineProperty(record, 'inherited', { value: inherited });
+        observations.push(record);
+      }
       const stop = () => { void session.stop(); };
       runtime.signal.addEventListener('abort', stop, { once: true });
       try { const result = await session.outcome; await flush(); return result; }
@@ -682,8 +716,8 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
 }
 
 /** Provider built-ins are bound here, never by a harness-side transcript decoder. */
-function createScriptedOperations(sessionStore: SessionStore, script: Script, options: ScriptedAgentOptions): SessionOperations {
-  const operations = createSessionOperations({ sessionStore, driver: options.operationScript ? createScriptedSessionDriver(options.operationScript) : createScriptDeclarationDriver(script, options) });
+function createScriptedOperations(sessionStore: SessionStore, script: Script, options: ScriptedAgentOptions, observations: ScriptedSessionRecord[]): SessionOperations {
+  const operations = createSessionOperations({ sessionStore, driver: options.operationScript ? createScriptedSessionDriver(options.operationScript) : createScriptDeclarationDriver(script, options, observations) });
   function enrich(bindings: SessionExecutionBindings, declarations: readonly SessionToolDeclaration[]): SessionExecutionBindings {
     const tools = [...bindings.tools];
     for (const declaration of declarations) {

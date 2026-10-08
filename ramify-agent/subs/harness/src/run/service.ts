@@ -241,6 +241,8 @@ import { ContentStore } from '../transcripts/store.js';
 import { readBody, readTranscript, TranscriptWriter } from '../transcripts/writer.js';
 import { SubmissionJudge, validateAgainst, type SubmissionValidation } from './submissions.js';
 import { nodeProcessGroups, WriterBlockedError, WriterOwnership, type ProcessGroups, type TreeObserver } from './writer.js';
+import { HarnessSessionOperations, readSessionPointReference, settleSessionEquipment, type HarnessTaskBrief } from './session-operations.js';
+import type { TaskEnvironment, TaskKind } from '../prompts/tasks.js';
 import { processGroupIdentity } from '../../subs/evidence/src/run-command.js';
 
 /*
@@ -391,6 +393,8 @@ class CandidateDriftError extends Error {}
 
 /** What one invocation is: its role, its work, its prompt and the one submission it may make. */
 interface InvocationRequest<T> {
+  readonly restore?: boolean;
+  readonly originalInvocation?: string;
   readonly role: Role;
   readonly work: Invocation['work'];
   /** The count of this role's invocations for this work, this one included. */
@@ -398,6 +402,8 @@ interface InvocationRequest<T> {
   readonly loaded: LoadedPackage;
   readonly systemPrompt: string;
   readonly prompt: string;
+  /** Exact owning task inputs; headings in the old display brief carry no ancestry authority. */
+  readonly task?: { readonly kind?: TaskKind; readonly goal: string; readonly requirements: readonly string[]; readonly omit?: readonly string[]; readonly candidate?: string; readonly snapshot?: string; readonly consultationSubmissionSchema?: string; readonly views?: TaskEnvironment['views'] };
   readonly start: SessionStart;
   readonly toolName: string;
   readonly description: string;
@@ -633,6 +639,8 @@ class ScratchSetupRefusal extends Error {
 }
 
 class Run {
+  restoring = false;
+  readonly restoredInvocations = new Set<string>();
   readonly mutex = new Mutex();
   /**
    * Serializes the start of invocations: each one's identifier and its
@@ -723,6 +731,7 @@ export class RunService {
   private readonly preparedScopes = new WeakMap<AssignmentBody, WriteScope>();
   private readonly commands = new CommandLedger();
   private readonly commandMutex = new Mutex();
+  private sessionOperations: Promise<HarnessSessionOperations> | undefined;
   private closed = false;
   private closing: Promise<void> | undefined;
 
@@ -1220,7 +1229,7 @@ export class RunService {
     /** Set when the request was settled before this attempt's start could be recorded. */
     let fenced = false;
     const result = await this.runInvocation<ReviewSubmission>(run, agent, {
-      role: 'reviewer',
+      role: 'reviewer', task: { kind, goal: `Review ${request.key.candidate}`, requirements: [JSON.stringify(request)], candidate: request.key.candidate, snapshot: snapshot.tree },
       work: { workItem: request.workItem, iteration: request.key.iteration },
       attempt: state.attempts.length + 1,
       loaded,
@@ -2202,7 +2211,7 @@ export class RunService {
   private async appendReconciliationBrief(agent: AgentPort, key: string, parent: ArchitectRef | null, brief: string): Promise<BriefAppend> {
     if (parent === null) return { session: null, ref: null, outcome: 'no-session', reason: 'The local architect\'s session was not kept after its completion request' };
     try {
-      const answer = await agent.appendContext(parent.ref, key, brief);
+      const answer = await (await this.operations(agent)).append(parent.ref, key, brief);
       if (answer.outcome === 'session-lost') return { session: parent.session, ref: null, outcome: 'session-lost', reason: 'The local architect\'s session can no longer be read' };
       return { session: parent.session, ref: answer.ref, outcome: answer.outcome, reason: null };
     } catch (error) {
@@ -2550,6 +2559,20 @@ export class RunService {
               .catch(error => this.warn(`Run ${run.record.jobId}: ${message(error)}`));
             report.effects.push(`${run.key}: resumed the non-functional phase`);
           }
+        } else if (this.options.agent?.bindSessionStore && !run.log.find('stop-requested') && run.log.all('invocation-started').some(event =>
+          (this.committedBody(run, runLayout.invocation(event.data.invocation)) as Invocation | null)?.sessionOperation?.runId === run.record.jobId)) {
+          const { packages } = await loadPromptPackages({ ...(this.options.skillDirectory === undefined ? {} : { skillDirectory: this.options.skillDirectory }), capabilityWorkflow: this.workflow !== null });
+          if ([...packages].some(([role, loaded]) => run.record.prompts[role]?.hash !== loaded.hash)) throw new Error('Captured owning prompt packages changed before restoration');
+          if (run.log.all('writer-released').some(event => event.data.confirmed !== true)) throw new Error('Original writer settlement was unconfirmed');
+          for (const effect of await this.completeEffects(run)) report.effects.push(`${run.key}: ${effect}`);
+          for (const decision of await this.completeDeliveries(run)) report.effects.push(`${run.key}: the delivery of decision ${decision}`);
+          run.index = await this.options.inputs.index(this.projectRoot, run.record.manifest).catch(() => null);
+          const baseline = measurementSnapshotSchema.parse(JSON.parse(await readFile(run.path(runLayout.measurement(snapshotId(1))), 'utf8')));
+          run.restoring = true;
+          run.done = this.drive(run, this.options.agent, packages, baseline, true)
+            .catch(error => this.fail(run, error instanceof WriterBlockedError ? 'writer-unsettled' : 'recovery-exhausted', `Original owning workflow restoration failed: ${message(error)}`))
+            .catch(error => this.warn(`Run ${run.record.jobId}: ${message(error)}`));
+          report.effects.push(`${run.key}: restored ordinary owning workflow from its original task correlations`);
         } else {
         for (const effect of await this.completeEffects(run)) report.effects.push(`${run.key}: ${effect}`);
         for (const decision of await this.completeDeliveries(run)) report.effects.push(`${run.key}: the delivery of decision ${decision}`);
@@ -2681,7 +2704,7 @@ export class RunService {
               return { session: null, ref: null, outcome: 'no-session', reason: 'No retained parent point' };
             }
             try {
-              const answer = await agent.appendContext(orientation.data.point, key, recorded.packageText);
+              const answer = await (await this.operations(agent)).append(orientation.data.point, key, recorded.packageText);
               return answer.outcome === 'session-lost'
                 ? { session: event.data.session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' }
                 : { session: event.data.session, ref: answer.ref, outcome: answer.outcome, reason: null };
@@ -3939,7 +3962,9 @@ export class RunService {
     // The start is serialized with every other start, since the identifiers
     // are counted from the log; the session itself runs outside it, so a
     // reader and the writer run at once.
-    const started = await run.starting.run(() => this.startInvocation(run, agent, request), request.reader === true ? 'after' : 'first');
+    const restored = run.restoring ? await this.restoreInvocation(run, agent, request) : null;
+    if (restored?.result) return restored.result;
+    const started = restored?.started ?? await run.starting.run(() => this.startInvocation(run, agent, request), request.reader === true ? 'after' : 'first');
     if ('refused' in started) {
       // A run that has spent its bounds starts nothing more. The writer's
       // path fails the run with the counter as evidence; a reader is only
@@ -3948,10 +3973,59 @@ export class RunService {
       return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session: '', kept: false };
     }
     try {
-      return await this.runSession(run, agent, started.id, started.session, started.observations, started.transcript, request);
+      return await this.runSession(run, agent, started.id, started.session, started.observations, started.transcript, restored ? { ...request, restore: restored.hasIntent } : request);
     } finally {
       started.closed();
     }
+  }
+
+  /** Restore only an exact owning role/work/request phase; no whole-history cursor or new identity. */
+  private async restoreInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>) {
+    const pending = run.log.all('invocation-started').filter(event => !run.log.all('invocation-ended').some(ended => ended.data.invocation === event.data.invocation));
+    const analysisPrefix = !run.log.find('analysis-accepted') && ['catalog-extractor', 'initial-architect'].includes(request.role);
+    const candidates = run.log.all('invocation-started').filter(event => !run.restoredInvocations.has(event.data.invocation) && event.data.role === request.role &&
+      canonicalJson(event.data.work) === canonicalJson(request.work) && (pending.includes(event) || analysisPrefix || event.data.invocation === request.originalInvocation));
+    const matched = [];
+    for (const event of candidates) {
+      const record = invocationSchema.parse(this.committedBody(run, runLayout.invocation(event.data.invocation)));
+      if (record.prompt.hash !== request.loaded.hash || request.originalInvocation !== event.data.invocation && record.prompt.requestedInputsHash !== inputsHash([request.systemPrompt, request.prompt])) continue;
+      const packet = await (await this.operations(agent)).packet(run.record.jobId, event.data.invocation);
+      if (packet && packet.submissionTool !== request.toolName) continue;
+      matched.push({ event, record, packet });
+    }
+    if (matched.length > 1) throw new Error('Ambiguous original owning task correlation');
+    if (matched.length === 0) {
+      if (candidates.some(event => pending.includes(event))) throw new Error('Original unfinished owning task inputs changed or are unavailable');
+      return null;
+    }
+    const { event, packet } = matched[0]!; const id = event.data.invocation;
+    run.restoredInvocations.add(id);
+    const ended = run.log.all('invocation-ended').find(item => item.data.invocation === id);
+    if (ended) {
+      const outcome = invocationOutcomeSchema.parse(this.committedBody(run, runLayout.outcome(id)));
+      if (!outcome.settled.confirmed || outcome.ended !== 'submitted' || !outcome.submission) throw new Error('Original accepted owning phase is not confirmed');
+      const bytes = await readIfExists(run.path(runLayout.submission(id)));
+      if (!bytes || sha256(bytes) !== outcome.submission.hash) throw new Error('Original accepted owning destination changed');
+      const { schema, ...body } = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+      if (schema !== request.submissionSchema) throw new Error('Original accepted owning validator schema changed');
+      return { hasIntent: true, result: { id, ended: outcome.ended, value: body as T, ref: outcome.session?.ref ?? '', session: event.data.session,
+        kept: ended.data.kept, outcomeKind: 'submitted' as const, elapsedMs: outcome.elapsedMs, inFlight: [], lastText: null } };
+    }
+    if (request.writer && run.writer.held === undefined) {
+      const acquired = run.log.all('writer-acquired').some(item => item.data.invocation === id);
+      const released = run.log.all('writer-released').find(item => item.data.invocation === id);
+      if (!acquired || released) throw new Error('Original writer has no pending ownership');
+      run.writer.acquire(id);
+      for (const group of run.log.all('writer-process-registered').filter(item => item.data.invocation === id)) {
+        const identity = await processGroupIdentity(group.data.pid);
+        if (identity !== null && identity === group.data.identity) run.writer.register(id, group.data.pid);
+        else throw new Error('Original writer process ownership cannot be authenticated');
+      }
+    }
+    let closed = () => undefined as void;
+    run.live.set(id, { role: request.role, reader: request.reader === true, session: undefined, done: new Promise<void>(resolve => { closed = () => resolve(); }) });
+    return { hasIntent: packet !== null, started: { id, session: event.data.session, observations: await ObservationLog.open(run.path(runLayout.observations(id))),
+      transcript: this.invocationTranscript(run, event.data.session, id), closed: () => { run.live.delete(id); closed(); } } };
   }
 
   /**
@@ -3991,12 +4065,13 @@ export class RunService {
     const continues = opens ? undefined : this.continuationOf(run, session, request.continuing!);
     const invocation = invocationSchema.parse({
       schema: 'ramify-agent.invocation/1',
+      sessionOperation: { runId: run.record.jobId, operationId: id },
       id,
       role: request.role,
       work: request.work,
       attempt: request.attempt,
       session: requestedSession(request),
-      prompt: { package: request.loaded.package, hash: request.loaded.hash, inputsHash: inputsHash([request.systemPrompt, request.prompt]) },
+      prompt: { package: request.loaded.package, hash: request.loaded.hash, requestedInputsHash: inputsHash([request.systemPrompt, request.prompt]) },
       scope: request.measured === undefined ? request.scope : {
         ...request.scope,
         size: scopeSize(request.measured.snapshot,
@@ -4044,20 +4119,6 @@ export class RunService {
       // The transcript's start holds the prompts, and is written before the
       // session starts, so a crash before the first reply still leaves them.
       const transcript = this.invocationTranscript(run, session, id, observations);
-      await transcript.started({
-        role: request.role,
-        work: request.work,
-        start: opens ? 'opened' : 'continued',
-        requested: request.start.mode,
-        continues,
-        fork: request.start.mode === 'fork' ? request.fork : undefined,
-        replaces: opens ? request.replaces : undefined,
-        requestedBy: opens ? request.requestedBy : undefined,
-        executor: agent.name,
-        model: this.options.model ?? null,
-        systemPrompt: request.systemPrompt,
-        prompt: request.prompt,
-      });
       if (request.writer === true) {
         // The writer is acquired before the session starts, so a stop that
         // arrives between them applies to a writer the log already names.
@@ -4178,10 +4239,30 @@ export class RunService {
 
     let agentSession: AgentSession;
     try {
-      agentSession = agent.startSession(spec);
+      agentSession = await (await this.operations(agent)).start({ runId: run.record.jobId, operationId: id, session, loaded: request.loaded,
+        brief: await this.taskBrief(run, request, spec, limits), spec, restore: request.restore,
+        authority: { scope: request.guarded === undefined ? null : { revision: request.guarded.revision, projectRoot: request.guarded.projectRoot, roots: request.guarded.roots, files: request.guarded.files, excluded: request.guarded.excluded ?? [], denied: request.guarded.denied ?? [], guarded: request.guarded.guarded ?? [] }, writer: request.writer === true, work: request.work },
+        validator: { name: request.toolName, schema: request.inputSchema, submissionSchema: request.submissionSchema, bound: limits.rejectedSubmissionsPerTurn },
+        destination: { run: run.record.jobId, invocation: id, submission: runLayout.submission(id) },
+        accepted: () => { if (value === undefined || submissionHash === null) throw new Error('Accepted destination was not retained'); return { value, schema: request.submissionSchema, submissionHash }; }, currentAuthority: async () => !this.ignoring(run) && request.fenced?.() !== true,
+        prepared: async packet => {
+          const recorded = await readTranscript(run.path(runLayout.transcript(session)));
+          const starts = recorded.entries.filter(entry => entry.type === 'started' && entry.invocation === id);
+          if (recorded.unreadable.length > 0 || starts.length > 1) throw new Error('Original invocation transcript start is unavailable or ambiguous');
+          const prior = starts[0];
+          if (prior?.type === 'started') {
+            if (prior.role !== request.role || JSON.stringify(prior.work) !== JSON.stringify(request.work) ||
+              await readBody(run.directory, run.store, prior.systemPrompt) !== packet.roleInstructions ||
+              await readBody(run.directory, run.store, prior.prompt) !== packet.message) throw new Error('Original invocation transcript input identity changed');
+            return;
+          }
+          await transcript.started({ role: request.role, work: request.work, start: request.start.mode === 'continue' ? 'continued' : 'opened', requested: request.start.mode,
+          continues: request.start.mode === 'continue' ? this.continuationOf(run, session, request.continuing!) : undefined, fork: request.fork, replaces: request.replaces, requestedBy: request.requestedBy,
+          executor: agent.name, model: this.options.model ?? null, systemPrompt: packet.roleInstructions, prompt: packet.message }); } });
     } catch (error) {
       const keptAs = keeping('failed', undefined);
       const failure = `The agent session could not start: ${message(error)}`;
+
       await this.endInvocation(run, id, session, keptAs, {
         ...stoppedOutcome(),
         ended: 'failed',
@@ -4205,6 +4286,14 @@ export class RunService {
     // stop and ends the invocation as failed with the bound as its
     // interruption; settlement below is what then says whether it is gone.
     const outcome = await bounds.outcome(agentSession);
+    if (outcome.kind === 'submitted' && value === undefined) {
+      const accepted = await (await this.operations(agent)).acceptance(run.record.jobId, id);
+      const bytes = await readIfExists(run.path(runLayout.submission(id)));
+      if (!accepted || !bytes || accepted.schema !== request.submissionSchema || canonicalJson(accepted.destination) !== canonicalJson({ run: run.record.jobId, invocation: id, submission: runLayout.submission(id) }) || canonicalJson(accepted.validator) !== canonicalJson({ name: request.toolName, schema: request.inputSchema, submissionSchema: request.submissionSchema, bound: limits.rejectedSubmissionsPerTurn }) || sha256(bytes) !== accepted.submissionHash || canonicalJson(accepted.input) !== canonicalJson(outcome.input)) throw new Error('Original accepted destination is unavailable or changed');
+      const { schema, ...body } = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+      if (schema !== accepted.schema || canonicalJson(body) !== canonicalJson(accepted.value)) throw new Error('Original accepted destination value changed');
+      value = accepted.value as T; submissionHash = accepted.submissionHash;
+    }
     const interruption = bounds.interruption;
     const inFlight = inFlightAtBound ?? recorder.inFlight();
     const elapsedMs = this.now().getTime() - started;
@@ -4216,7 +4305,7 @@ export class RunService {
     // Whatever the equipment started ends before the writer is released:
     // discarding a reply is not shutdown, and a command still running is a
     // command that can still write.
-    await equipment.settle?.().catch(error => this.warn(`Run ${run.record.jobId}: ${id} did not settle its own tools: ${message(error)}`));
+    await settleSessionEquipment(equipment.settle, limits.stopSettleMs).catch(error => this.warn(`Run ${run.record.jobId}: ${id} did not settle its own tools: ${message(error)}`));
 
     // An architect writes nothing, so it holds no writer; its settlement is
     // still the harness's own observation of the session.
@@ -4256,6 +4345,7 @@ export class RunService {
       // What the implementation answered, not what was asked for: a fork it
       // could not take is a fresh session, and the comparison of fork cost
       // must not be corrupted by one that silently became fresh.
+      sessionOperation: { runId: run.record.jobId, operationId: id, ...(readSessionPointReference(ref) === null ? { point: null } : { sessionId: readSessionPointReference(ref)!.point.sessionId, point: readSessionPointReference(ref)!.point }) },
       session: {
         ref,
         mode: agentSession.start.mode === 'continue' ? 'continued' : agentSession.start.mode,
@@ -4288,6 +4378,25 @@ export class RunService {
       inFlight,
       lastText: recorder.lastText,
     };
+  }
+
+  private operations(agent: AgentPort): Promise<HarnessSessionOperations> {
+    return this.sessionOperations ??= HarnessSessionOperations.open(join(this.projectRoot, 'plans', '.harness', 'session-operations'), agent);
+  }
+
+  private async taskBrief<T>(run: Run, request: InvocationRequest<T>, spec: SessionSpec, limits: RunPolicy['limits']): Promise<HarnessTaskBrief> {
+    const kind = request.task?.kind ?? taskKindFor(request.role, request.toolName, request.continuing);
+    const records = committedRecords(run.log.ledger.replay());
+    const item = records.workItems.find(item => item.id === request.work.workItem);
+    const goal = request.task?.goal ?? item?.goal ?? `Read the captured plan for ${run.record.planId} and perform the current ${kind} task.`;
+    const requirements = request.task?.requirements ?? [new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)))];
+    const sections = taskSupportSections(request.prompt, [goal, ...requirements, ...(request.task?.omit ?? [])]);
+    return { kind, objective: `Perform ${kind} for ${JSON.stringify(request.work)}; use the current evidence and designated submission.`, goal, requirements, sections,
+      ...(request.task?.consultationSubmissionSchema === undefined ? {} : { consultationSubmissionSchema: request.task.consultationSubmissionSchema }),
+      environment: { projectRoot: this.projectRoot, workingDirectory: spec.scope.workingDirectory,
+        candidate: request.task?.candidate ?? request.candidateBefore ?? null, snapshot: request.task?.snapshot ?? null,
+        limits, availableTools: [...spec.builtinTools, ...spec.tools.map(tool => tool.name), spec.submission.name],
+        views: request.task?.views ?? (run.record.manifest.architectView.status === 'materialized' ? [{ path: join(this.projectRoot, '.ramify-architect'), revision: run.record.manifest.architectView.revision, modules: [...(run.index?.modules.keys() ?? [])], coverage: run.record.manifest.architectView.coverageLimits }] : []), supportPaths: request.loaded.files.map(file => file.path), cucumberConfiguration: null } };
   }
 
   // The initial analysis
@@ -4352,6 +4461,7 @@ export class RunService {
 
     const result = await this.runInvocation<InitialAnalysisSubmission>(run, agent, {
       role: 'initial-architect',
+      task: { kind: 'initial-analysis', goal: intake.value.goal, requirements: [plan] },
       work: {},
       attempt: 1,
       loaded,
@@ -4510,6 +4620,16 @@ export class RunService {
       await this.fail(run, 'internal', 'No prompt package is loaded for the local architect');
       return false;
     }
+    // Registration can publish a provider before its consumer has received
+    // the original contract handback. Finish that captured active turn first;
+    // only then may the new frontier's provider priority take effect.
+    let restoredActiveItem = run.restoring && this.workflow === null
+      ? [...run.log.events].reverse().find(event =>
+        (event.type === 'work-item-started' || event.type === 'work-item-resumed') &&
+        !run.log.events.some(later => later.sequence > event.sequence &&
+          (later.type === 'work-item-yielded' || later.type === 'work-item-completed') &&
+          later.data.workItem === event.data.workItem))
+      : undefined;
     // The frontier is read again on every round, because a delegation
     // creates work items while the run is running: a provider work item of a
     // requirement just registered is taken before the next independent entry
@@ -4529,7 +4649,10 @@ export class RunService {
         return false;
       }
       const state = this.scheduleStateOf(run, records);
-      const next = nextWorkItem(state);
+      const activeId = restoredActiveItem?.type === 'work-item-started' || restoredActiveItem?.type === 'work-item-resumed' ? restoredActiveItem.data.workItem : undefined;
+      restoredActiveItem = undefined;
+      const active = records.workItems.find(item => item.id === activeId && !state.completed.has(item.id));
+      const next = active === undefined ? nextWorkItem(state) : { item: active, resumes: null };
       if (next === null) {
         const open = records.workItems.filter(item => !state.completed.has(item.id));
         if (open.length === 0) return true;
@@ -4640,7 +4763,7 @@ export class RunService {
       const ended = run.log.all('invocation-ended').find(event => event.data.invocation === latest.data.invocation);
       const outcome = this.committedBody(run, runLayout.outcome(latest.data.invocation)) as InvocationOutcome | null;
       if (ended?.data.kept && outcome?.session?.ref) {
-        const continued = await agent.appendContext(outcome.session.ref, `recover:${activeId}:${latest.data.invocation}`,
+        const continued = await (await this.operations(agent)).append(outcome.session.ref, `recover:${activeId}:${latest.data.invocation}`,
           `Recover capability ${activeId} from the committed plan and task state`);
         if (continued.outcome !== 'session-lost') { point = continued.ref; session = latest.data.session; }
       }
@@ -4762,7 +4885,7 @@ export class RunService {
         const started = run.log.all('invocation-started').find(event => event.data.invocation === ended.data.invocation);
         if (started?.data.role !== 'local-architect' || started.data.work.workItem !== item.id) continue;
         const recordedInvocation = this.committedBody(run, runLayout.invocation(ended.data.invocation)) as Invocation | null;
-        if (recordedInvocation?.prompt.inputsHash !== inputsHash([
+        if (recordedInvocation?.prompt.requestedInputsHash !== inputsHash([
           renderWorkOrientationPrompt(local, this.projectRoot, workingDirectory), orientationStart,
         ])) continue;
         const raw = await readIfExists(run.path(runLayout.submission(ended.data.invocation)));
@@ -4861,7 +4984,7 @@ export class RunService {
           await this.afterWrite('context-package-append-requested', run.record.jobId);
           if (session === undefined || ref === undefined) return { session: null, ref: null, outcome: 'no-session', reason: 'No retained parent point' };
           try {
-            const answer = await agent.appendContext(ref, key, recorded.packageText);
+            const answer = await (await this.operations(agent)).append(ref, key, recorded.packageText);
             return answer.outcome === 'session-lost'
               ? { session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' }
               : { session, ref: answer.ref, outcome: answer.outcome, reason: null };
@@ -5163,6 +5286,7 @@ export class RunService {
     /** Why its next turn continues that session: what happened since its last turn. */
     let continuing: ContinueReason | undefined;
     let attempt = 0;
+    let originalLocalInvocation: string | undefined;
     let gateRound = 0;
     let failedGate: { id: string; cause: string | null; summary: string[] } | undefined;
     /** The cause of the first gate that failed; exhaustion preserves it. */
@@ -5274,6 +5398,25 @@ export class RunService {
         lastResult = resumed.result;
         lastIterationGate = resumed.returnedGate;
         continuing = 'capability-returned';
+      }
+    }
+
+    if (run.restoring) {
+      const main: typeof run.log.events[number][] = [];
+      for (const event of run.log.all('invocation-started').filter(event => event.data.role === 'local-architect' && event.data.work.workItem === item.id)) {
+        const packet = await (await this.operations(agent)).packet(run.record.jobId, event.data.invocation);
+        if (packet?.submissionTool === localArchitectToolName) main.push(event);
+      }
+      const latest = main.at(-1);
+      if (latest?.type === 'invocation-started' && !run.log.all('work-item-yielded').some(event => event.data.invocation === latest.data.invocation)) {
+        originalLocalInvocation = latest.data.invocation;
+        const original = invocationSchema.parse(this.committedBody(run, runLayout.invocation(originalLocalInvocation)));
+        const previous = committedRecords(run.log.ledger.replay()).outcomes.get(originalLocalInvocation);
+        attempt = original.attempt - 1; session = latest.data.session;
+        sessionRef = previous?.session?.ref || original.session.from || undefined;
+        continuing = latest.data.continues?.reason;
+        const selection = await this.currentSelection(run, item.id);
+        if (selection) contextPackage = { text: selection.packageText, selection: selection.event.data.selection, citation: selection.selection.package };
       }
     }
 
@@ -5438,6 +5581,9 @@ export class RunService {
       let unreported: string[] = [];
       const result = await this.runInvocation<LocalArchitectSubmission>(run, agent, {
         role: 'local-architect',
+        originalInvocation: originalLocalInvocation,
+        task: { goal: item.goal, requirements: contextPackage === undefined ? [plan] : [contextPackage.text], omit: contextPackage === undefined ? [] : [contextPackage.text],
+          views: (views.evidence?.views ?? []).map(view => ({ path: view.path, revision: view.revision, modules: [item.module], coverage: view.coverage === null ? [] : [`${view.coverage} coverage limits`] })) },
         work: { workItem: item.id },
         attempt,
         loaded,
@@ -5511,6 +5657,7 @@ export class RunService {
         },
         measured: { snapshot: baseline, scope: scope },
       });
+      originalLocalInvocation = undefined;
       sessionRef = result.kept && result.ref !== '' ? result.ref : undefined;
       session = sessionRef === undefined ? undefined : result.session;
 
@@ -5679,22 +5826,23 @@ export class RunService {
         continue;
       }
 
-      const revision = outlines.length + 1;
-      const outline = workItemOutlineSchema.parse({
-        schema: 'ramify-agent.work-item-outline/1',
-        workItem: item.id,
-        revision,
-        invocation: result.id,
-        ...result.value.outline,
-        hypothesesSeen: hypotheses.map(hypothesis => refOf(hypothesis.id, hypothesis.revision, hypothesis)),
-      } satisfies WorkItemOutline);
-      // The revision that commits a completion request records the point
-      // after it, which this work item's reconciliation forks; and it starts
-      // the work item's wait for its reviews.
-      await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation: result.id, architectRef: architectRefOf(result) } }, [
-        { path: workLayout.outline(item.id, revision), id: item.id, revision, body: outline },
-      ]);
-      await this.afterWrite('outline-revised', run.record.jobId);
+      const completedOutline = run.restoring ? run.log.all('outline-revised').find(event =>
+        event.data.workItem === item.id && event.data.invocation === result.id && event.data.architectRef !== undefined) : undefined;
+      if (completedOutline === undefined) {
+        const revision = outlines.length + 1;
+        const outline = workItemOutlineSchema.parse({
+          schema: 'ramify-agent.work-item-outline/1', workItem: item.id, revision,
+          invocation: result.id, ...result.value.outline,
+          hypothesesSeen: hypotheses.map(hypothesis => refOf(hypothesis.id, hypothesis.revision, hypothesis)),
+        } satisfies WorkItemOutline);
+        await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation: result.id, architectRef: architectRefOf(result) } }, [
+          { path: workLayout.outline(item.id, revision), id: item.id, revision, body: outline },
+        ]);
+        await this.afterWrite('outline-revised', run.record.jobId);
+      } else {
+        const outline = workItemOutlineSchema.parse(this.committedBody(run, workLayout.outline(item.id, completedOutline.data.revision)));
+        if (outline.invocation !== result.id) throw new Error('Original completion outline identity changed');
+      }
       run.reviews?.wake();
       if (this.ignoring(run)) return null;
 
@@ -5717,7 +5865,7 @@ export class RunService {
           continue turns;
         }
         if (undelivered.length > 0) returned = this.latestBasis(run, item.id)?.id;
-        gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary);
+        gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary, undefined, run.restoring);
         gateRound += 1;
         if (gate === null) return null;
         if (gate.verdict !== 'passed') break;
@@ -6656,7 +6804,7 @@ export class RunService {
         if (context.session === null || context.ref === null) {
           return { outcome: 'session-lost', generation: context.generation, session: context.session, reason: 'the run has no architect context to append to' };
         }
-        const answer = await agent.appendContext(context.ref, decision.id, briefText(decision));
+        const answer = await (await this.operations(agent)).append(context.ref, decision.id, briefText(decision));
         // The append reached the parent and its completion is not in the log.
         await this.afterWrite('brief-appending', run.record.jobId);
         if (answer.outcome === 'session-lost') {
@@ -6851,6 +6999,14 @@ export class RunService {
     registry: ReadonlyMap<string, RegistryEntry>,
     architectRef: ArchitectRef | null,
   ): Promise<IterationAssignment | null> {
+    if (run.restoring) {
+      const original = [...run.log.all('iteration-assigned'), ...run.log.all('contract-requested')].find(event => event.data.workItem === item.id && event.data.invocation === invocation);
+      if (original) {
+        const assignment = committedRecords(run.log.ledger.replay()).assignments.get(original.data.iteration);
+        if (!assignment) throw new Error('Original licensed assignment is unavailable');
+        return assignment;
+      }
+    }
     const committed = committedRecords(run.log.ledger.replay());
     let outlines = committed.outlines.get(item.id) ?? [];
     const delivery = run.log.all('hypotheses-delivered').filter(event => event.data.workItem === item.id).at(-1);
@@ -6939,7 +7095,7 @@ export class RunService {
 
     // The outline revision is committed only once the scope it plans is
     // captured, so a scope the provider refuses leaves no revision behind.
-    if (submission.outline !== undefined) {
+    if (submission.outline !== undefined && !run.log.all('outline-revised').some(event => event.data.workItem === item.id && event.data.invocation === invocation)) {
       const revision = outlines.length + 1;
       const outline = workItemOutlineSchema.parse({
         schema: 'ramify-agent.work-item-outline/1',
@@ -7232,7 +7388,7 @@ export class RunService {
     for (let count = priorTurns - (recovered === undefined ? 0 : 1);
       count < run.record.policy.limits.maxIterationsPerWorkItem; count += 1) {
       qualification ??= await this.runInvocation<QualificationAction>(run, agent, {
-      role: 'local-architect', work: { workItem: item.id, request: request.id },
+      role: 'local-architect', task: { kind: 'capability-qualification', goal: request.original.need, requirements: [JSON.stringify(request.original)] }, work: { workItem: item.id, request: request.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.work.workItem === item.id && event.data.work.request === request.id).length + 1,
       loaded: local, systemPrompt: renderLocalArchitectPrompt(local, this.projectRoot, parent.workingDirectory),
       prompt: [
@@ -7498,7 +7654,7 @@ export class RunService {
     ];
     let unreported: string[] = [];
     const action = pendingAction ?? await this.runInvocation<CapabilityAction>(run, agent, {
-      role: 'capability-architect', work: { capabilityTask: task.id, request: request.id }, attempt,
+      role: 'capability-architect', task: { kind: 'capability', goal: request.original.need, requirements: [JSON.stringify(request.original)] }, work: { capabilityTask: task.id, request: request.id }, attempt,
       loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
       prompt: [
         `# Capability task ${task.id}`, `Use task ${task.id}, planRevision ${plan.revision} and invocation ${coordinatorBasis} as your action basis.`,
@@ -7545,25 +7701,8 @@ export class RunService {
     pendingAction = undefined;
     if (this.ignoring(run)) return null;
     if (action.ended === 'context-budget-reached') {
-      const returns = this.capabilityBudgetReturns(run, task.id);
-      progress = `context budget return ${returns}: ${JSON.stringify({ prior: progress,
-        report: action.lastText?.slice(0, 3000) ?? null, outcome: runLayout.outcome(action.id) })}`;
-      coordinatorBasis = action.id;
-      coordinatorPoint = undefined;
-      coordinatorSession = undefined;
-      reconstructedFrom = action.session;
-      await this.write(run, { type: 'capability-coordinator-resumed', data: {
-        task: task.id, invocation: action.id, session: action.session,
-      } });
-      await this.afterWrite('capability-coordinator-resumed', run.record.jobId);
-      if (this.ignoring(run)) return null;
-      if (returns >= run.record.policy.limits.budgetReturnsPerIteration) {
-        await this.fail(run, 'limit-exceeded',
-          `Capability architect of ${task.id} exhausted its captured context-budget return bound; unfinished task remains`,
-          [runLayout.outcome(action.id)]);
-        return null;
-      }
-      continue;
+      await this.fail(run, 'limit-exceeded', `Capability architect ${task.id} reached its hard context limit without an accepted action; its unfinished task remains`, [runLayout.outcome(action.id)]);
+      return null;
     }
     if (action.ended !== 'submitted') {
       // An exhausted rejection bound names what the last rejected handback
@@ -7718,10 +7857,10 @@ export class RunService {
       }
     }
     const continuation = consumer.point === null || consumer.session === undefined ? { outcome: 'session-lost' as const }
-      : await agent.appendContext(consumer.point, `consult:${id}`, `Read-only consultation ${id}: ${action.question}`);
+      : await (await this.operations(agent)).append(consumer.point, `consult:${id}`, `Read-only consultation ${id}: ${action.question}`);
     const reconstructed = continuation.outcome === 'session-lost';
     const response = await this.runInvocation(run, agent, {
-      role: 'engineer', work: { capabilityTask: task.id, request: request.id },
+      role: 'engineer', task: { kind: 'consultation', goal: action.question, requirements: [JSON.stringify(plan)], consultationSubmissionSchema: JSON.stringify(z.toJSONSchema(responseSchema)) }, work: { capabilityTask: task.id, request: request.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'engineer' &&
         event.data.work.capabilityTask === task.id && event.data.work.request === request.id).length + 1,
       loaded, systemPrompt: renderEngineerPrompt(loaded, this.projectRoot, run.record.policy.limits.commandTimeoutMs, this.projectRoot),
@@ -7985,10 +8124,10 @@ export class RunService {
     for (let count = priorTurns - (recovered === undefined ? 0 : 1);
       count < run.record.policy.limits.maxIterationsPerWorkItem; count += 1) {
     const appended = qualification !== undefined || point === undefined ? { outcome: 'session-lost' as const }
-      : await agent.appendContext(point, `nested:${request.id}:${count}`, `Qualify nested request ${request.id} from ${assignment.id}`);
+      : await (await this.operations(agent)).append(point, `nested:${request.id}:${count}`, `Qualify nested request ${request.id} from ${assignment.id}`);
     const lost = appended.outcome === 'session-lost' || session === undefined;
     qualification ??= await this.runInvocation<QualificationAction>(run, agent, {
-      role: 'capability-architect', work: { capabilityTask: parentTask.id, request: request.id },
+      role: 'capability-architect', task: { kind: 'capability-qualification', goal: request.original.need, requirements: [JSON.stringify(request.original)] }, work: { capabilityTask: parentTask.id, request: request.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.work.capabilityTask === parentTask.id &&
         event.data.work.request === request.id).length + 1,
       loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
@@ -8265,13 +8404,28 @@ export class RunService {
     assignedIndex: ArchitectIndex | null,
     resume?: { readonly session: SessionId; readonly point: string; readonly guidance: string; readonly priorInvocation: string },
   ): Promise<IterationOutcome | null> {
+    const savedResult = committedRecords(run.log.ledger.replay()).results.get(assignment.id);
+    if (run.restoring && savedResult) {
+      for (const invocation of [...savedResult.invocations].reverse()) {
+        const outcome = committedRecords(run.log.ledger.replay()).outcomes.get(invocation);
+        if (!outcome?.settled.confirmed) throw new Error('Original iteration outcome has no confirmed settlement');
+        if (!outcome.submission) continue;
+        const bytes = await readIfExists(run.path(runLayout.submission(invocation)));
+        if (!bytes || sha256(bytes) !== outcome.submission.hash) throw new Error('Original iteration destination changed');
+        const { schema, ...body } = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+        if (schema !== 'ramify-agent.engineer-submission/1') throw new Error('Original iteration destination schema changed');
+        const parsed = engineerSubmissionSchema.parse(body);
+        if (parsed.kind === 'contract-needed') return { kind: 'closed', result: savedResult, need: { need: parsed.need, suggestedProvider: parsed.suggestedProvider, injectionSites: parsed.injectionSites, invocation } };
+      }
+      return { kind: 'closed', result: savedResult };
+    }
     const loaded = packages.get('engineer');
     if (loaded === undefined) {
       await this.fail(run, 'internal', 'No prompt package is loaded for the engineer');
       return null;
     }
     const number = assignment.coordination?.kind === 'capability-task'
-      ? assignment.coordination.sequence : this.assignedCount(run, item.id);
+      ? assignment.coordination.sequence : Number.parseInt(assignment.id.slice(assignment.id.lastIndexOf('.i') + 2), 10);
     // Every engineer invocation of the iteration, a budget return's too,
     // runs under the bounds its assignment raised, and its prompt states the
     // longest a command may run.
@@ -8345,6 +8499,7 @@ export class RunService {
     // result reuses that exact gate. No second engineer or audit runs.
     const passed = [...priorGates].reverse().find(gate => gate.verdict === 'passed' && gate.audited !== null);
     if (passed !== undefined) {
+      if (await this.candidates.commitTree(this.projectRoot, passed.audited!) !== (await this.previewCandidateTree()).tree) throw new CandidateDriftError('Original engineer gate candidate changed before handback');
       const closed = await this.closeIteration(run, item, number, assignment, {
         outcome: 'accepted', invocations, findings: [], gate: passed.id, commit: passed.audited,
       });
@@ -8364,7 +8519,7 @@ export class RunService {
       let degraded: InvocationRequest<EngineerSubmission>['degraded'];
       if (sessionRef !== undefined) {
         const note = `Continuing iteration ${assignment.id}.`;
-        const appended = await agent.appendContext(sessionRef, `${assignment.id}:${attempt}`, note);
+        const appended = await (await this.operations(agent)).append(sessionRef, `${assignment.id}:${attempt}`, note);
         if (appended.outcome === 'session-lost') {
           const used = this.reconstructions(run, item.id, assignment.coordination?.kind === 'capability-task' ? assignment.id : undefined);
           if (used >= run.record.policy.limits.sessionReconstructionsPerWork) {
@@ -8402,7 +8557,7 @@ export class RunService {
       // holds it from its first prompt.
       let assignmentPackage: string | undefined;
       try {
-        if (assignment.source !== undefined && start.mode === 'fresh') assignmentPackage = await this.packageText(run, assignment.source);
+        if (assignment.source !== undefined) assignmentPackage = await this.packageText(run, assignment.source);
       } catch (error) {
         await this.fail(run, 'inputs-changed', `The assignment package of ${assignment.id} cannot be delivered: ${message(error)}`);
         return null;
@@ -8414,8 +8569,12 @@ export class RunService {
         commandTimeoutMs: bounds.commandTimeoutMs,
       });
 
+      const invocationViews = replay === undefined ? await this.iterationViews(run, assignment) : [];
       const result = replay ?? await this.runInvocation<EngineerSubmission>(run, agent, {
         role: 'engineer',
+        originalInvocation: run.restoring && latestStart && !run.log.all('invocation-ended').some(event => event.data.invocation === latestStart.data.invocation) ? latestStart.data.invocation : undefined,
+        task: { kind: start.mode === 'continue' ? 'repair' : 'engineering', goal: assignment.goal, requirements: assignmentPackage === undefined ? [assignment.completionEvidence] : [assignmentPackage], omit: assignmentPackage === undefined ? [] : [assignmentPackage],
+          views: invocationViews.flatMap(entry => entry.views.map(view => ({ path: view.path, revision: view.revision, modules: [entry.module], coverage: view.coverage === null ? [] : [`${view.coverage} coverage limits`] }))) },
         workingDirectory,
         work: { workItem: item.id, iteration: assignment.id },
         attempt,
@@ -8426,7 +8585,7 @@ export class RunService {
           projectRoot: this.projectRoot,
           workingDirectory,
           base: this.accepted(run),
-          views: await this.iterationViews(run, assignment),
+          views: invocationViews,
           testAreas: await this.ownedTestAreas(run, assignment.gate.tests),
           ...(failedGate === undefined ? {} : { failedGate }),
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
@@ -8444,9 +8603,7 @@ export class RunService {
         ...(replacing === undefined ? {} : { replaces: { session: replacing, reason: 'reconstructed' } }),
         ...(degraded === undefined ? {} : { degraded }),
         // A proposed completion is kept for the repair its gate may ask
-        // for; any other result closes the iteration, and a budget return
-        // starts a fresh session unless it is the last one the iteration may
-        // make.
+        // for; a raw budget limit retains unfinished work and ends this run below.
         keep: (ended, value) => {
           if (ended === 'context-budget-reached') {
             return finished(this.budgetReturns(run, assignment.id) + 1 >= run.record.policy.limits.budgetReturnsPerIteration ? 'work-closed' : 'not-kept');
@@ -8506,7 +8663,7 @@ export class RunService {
       });
       const replayed = replay !== undefined;
       replay = undefined;
-      if (!replayed) invocations.push(result.id);
+      if (!replayed && !invocations.includes(result.id)) invocations.push(result.id);
       guidancePending = undefined;
       sessionRef = result.kept && result.ref !== '' ? result.ref : undefined;
       session = sessionRef === undefined ? undefined : result.session;
@@ -8523,18 +8680,8 @@ export class RunService {
       if (this.ignoring(run)) return null;
 
       if (result.ended === 'context-budget-reached') {
-        const returns = this.budgetReturns(run, assignment.id);
-        const report = result.value;
-        handoff = report !== undefined && report.kind === 'partial'
-          ? { done: [...report.done], unfinished: [...report.unfinished] }
-          : { done: [], unfinished: ['the session reached its context budget before it reported'] };
-        findings.push(`The engineer reached its context budget (return ${returns} of ${run.record.policy.limits.budgetReturnsPerIteration})`);
-        if (returns >= run.record.policy.limits.budgetReturnsPerIteration) {
-          return close('partial');
-        }
-        sessionRef = undefined;
-        session = undefined;
-        continue;
+        await this.fail(run, 'limit-exceeded', `Engineer ${result.id} reached its hard context limit without an accepted return; ${assignment.id} remains unfinished`, [runLayout.outcome(result.id)]);
+        return null;
       }
 
       // An engineer that ended without a result, whether a bound, the
@@ -8827,6 +8974,17 @@ export class RunService {
       return null;
     }
     const records = committedRecords(run.log.ledger.replay());
+    if (run.restoring) {
+      const original = run.log.all('contract-requested').find(event => event.data.workItem === item.id && event.data.requestedBy === request.requestedBy && event.data.invocation === request.invocation);
+      if (original) {
+        const assignment = records.assignments.get(original.data.iteration);
+        if (!assignment) throw new Error('Original contract assignment is unavailable');
+        const number = Number.parseInt(assignment.id.slice(assignment.id.lastIndexOf('.i') + 2), 10);
+        return this.runContractSession(run, agent, packages, baseline, item, assignment, loaded, { need: request.need,
+          provider: original.data.provider, capability: original.data.capability, number,
+          requestedBy: { invocation: request.invocation, reason: 'contract-needed' } });
+      }
+    }
     const index = await this.refreshIndex(run);
 
     // The owner comes from the registry, and from nothing an engineer said.
@@ -8999,6 +9157,8 @@ export class RunService {
       readonly requestedBy?: RequestRelation | undefined;
     },
   ): Promise<ContractOutcome | null> {
+    const savedResult = committedRecords(run.log.ledger.replay()).results.get(assignment.id);
+    if (run.restoring && savedResult) return { findings: [...savedResult.findings], result: savedResult };
     // A revision its architect assigned may raise the bounds, as any
     // assignment may; a sub-session an engineer's need opened runs under
     // the policy's.
@@ -9007,14 +9167,25 @@ export class RunService {
     // Its write scope, and the provider whole: the agreement is written on
     // the provider's side of the boundary.
     const measurementScope = writeScopeMeasurement(assignment.scope, [subject.provider]);
-    const invocations: string[] = [];
+    const priorStarts = run.log.all('invocation-started').filter(event => event.data.role === 'contract-engineer' && event.data.work.iteration === assignment.id);
+    const priorGates = run.log.all('gate-attempted').flatMap(event => { const parsed = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(event.data.gate))); return parsed.success && parsed.data.subject.iteration === assignment.id ? [parsed.data] : []; });
+    const latestStart = priorStarts.at(-1);
+    let originalContractInvocation = run.restoring && latestStart && !priorGates.some(gate => gate.proposedBy === latestStart.data.invocation && gate.verdict !== 'passed') ? latestStart.data.invocation : undefined;
+    const invocations: string[] = priorStarts.map(event => event.data.invocation);
     const findings: string[] = [];
     let sessionRef: string | undefined;
     /** The contract engineer's session while the harness keeps it; `sessionRef` is its executor's point. */
     let session: SessionId | undefined;
     let failedGate: { id: string; cause: string | null; summary: string[] } | undefined;
-    let repairRound = 0;
-    let attempt = 0;
+    let repairRound = priorGates.filter(gate => gate.next === 'repair').length;
+    let attempt = originalContractInvocation ? priorStarts.length - 1 : priorStarts.length;
+    const priorRepair = [...priorGates].reverse().find(gate => gate.next === 'repair');
+    if (priorRepair) failedGate = await this.diagnosticsOf(run, priorRepair);
+    if (latestStart) {
+      const outcome = committedRecords(run.log.ledger.replay()).outcomes.get(latestStart.data.invocation);
+      const ended = run.log.all('invocation-ended').find(event => event.data.invocation === latestStart.data.invocation);
+      if (ended?.data.kept && outcome?.settled.confirmed && outcome.session?.ref) { session = latestStart.data.session; sessionRef = outcome.session.ref; }
+    }
 
     for (;;) {
       if (this.ignoring(run)) return null;
@@ -9031,7 +9202,7 @@ export class RunService {
       // The requester's assignment package reaches the session once.
       let assignmentPackage: string | undefined;
       try {
-        if (assignment.source !== undefined && sessionRef === undefined) assignmentPackage = await this.packageText(run, assignment.source);
+        if (assignment.source !== undefined) assignmentPackage = await this.packageText(run, assignment.source);
       } catch (error) {
         await this.fail(run, 'inputs-changed', `The assignment package of contract ${assignment.id} cannot be delivered: ${message(error)}`);
         return null;
@@ -9039,6 +9210,8 @@ export class RunService {
 
       const result = await this.runInvocation<ContractSubmission>(run, agent, {
         role: 'contract-engineer',
+        originalInvocation: originalContractInvocation,
+        task: { kind: 'contract', goal: assignment.goal, requirements: assignmentPackage === undefined ? [assignment.completionEvidence] : [assignmentPackage] },
         work: { workItem: item.id, iteration: assignment.id },
         attempt,
         loaded,
@@ -9086,7 +9259,8 @@ export class RunService {
         bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs },
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
-      invocations.push(result.id);
+      if (!invocations.includes(result.id)) invocations.push(result.id);
+      originalContractInvocation = undefined;
       sessionRef = result.kept && result.ref !== '' ? result.ref : undefined;
       session = sessionRef === undefined ? undefined : result.session;
 
@@ -9094,15 +9268,10 @@ export class RunService {
       const lines = await this.recordLineEvents(run, result.id, before, after);
       if (this.ignoring(run)) return null;
 
-      // A threshold return registers nothing, as an `incomplete` submission
-      // does: a contract session that did not finish has established no
-      // agreement, whatever it wrote.
+      // A hard limit is no accepted incomplete return and establishes no agreement.
       if (result.ended === 'context-budget-reached') {
-        findings.push('the contract session reached its context budget before it established the agreement; nothing was registered');
-        const closed = await this.closeIteration(run, item, subject.number, assignment, {
-          outcome: 'partial', invocations, findings, gate: null, commit: null,
-        });
-        return this.ignoring(run) ? null : { findings, result: closed };
+        await this.fail(run, 'limit-exceeded', `Contract engineer ${result.id} reached its hard context limit without an accepted return; ${assignment.id} remains unfinished`, [runLayout.outcome(result.id)]);
+        return null;
       }
 
       // A contract session that ended without a result is closed as a
@@ -9199,6 +9368,14 @@ export class RunService {
     repairRound: number,
   ): Promise<GateAttempt | null> {
     run.writer.requireSettled(`The ${assignment.id} gate cannot run`);
+    if (run.restoring) {
+      const original = run.log.all('gate-attempted').flatMap(event => { const parsed = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(event.data.gate))); return parsed.success && parsed.data.subject.iteration === assignment.id && parsed.data.proposedBy === invocation && parsed.data.checkpoint === 'contract' ? [parsed.data] : []; });
+      if (original.length > 1) throw new Error('Ambiguous original contract gate');
+      if (original[0]) {
+        if (original[0].verdict === 'passed' && (original[0].audited === null || await this.candidates.commitTree(this.projectRoot, original[0].audited) !== (await this.previewCandidateTree()).tree)) throw new CandidateDriftError('Original contract gate candidate changed before registration');
+        return original[0];
+      }
+    }
     const gateId = gateAttemptId(this.gateCount(run) + 1);
     const index = await this.refreshIndex(run);
 
@@ -9305,6 +9482,29 @@ export class RunService {
     submission: EstablishedContract,
   ): Promise<{ readonly findings: string[]; readonly cycle?: DependencyCycle | undefined } | null> {
     const records = committedRecords(run.log.ledger.replay());
+    if (run.restoring) {
+      const registered = run.log.all('contract-registered').find(event => event.data.iteration === assignment.id);
+      const reopened = run.log.all('evidence-reopened').find(event => event.data.iteration === assignment.id);
+      if (registered || reopened) {
+        const phase = registered ?? reopened!;
+        const nextRegistration = [...run.log.all('contract-registered'), ...run.log.all('evidence-reopened')].filter(event => event.sequence > phase.sequence).sort((left, right) => left.sequence - right.sequence)[0]?.sequence ?? Number.POSITIVE_INFINITY;
+        const own = phase.data.requirements.map(id => records.requirements.get(id)).find(requirement => requirement?.consumer === item.module);
+        const priorCycle = run.log.all('dependency-cycle-detected').find(event => event.sequence > phase.sequence && event.sequence < nextRegistration && event.data.closedBy === item.id && phase.data.requirements.some(id => event.data.requirements.includes(id)));
+        const findings = registered ? [registered.data.mode === 'access-only'
+          ? `the agreement ${registered.data.contract} establishes access to existing behavior: no obligation and no fake`
+          : `the agreement ${registered.data.contract} is registered; ${own?.id ?? '(unavailable)'} is open and ${registered.data.obligation} is owed by ${submission.provider}`]
+          : [`the agreement ${reopened!.data.contract} is reopened at revision ${reopened!.data.revision}; ${phase.data.requirements.join(', ')} verify again`,
+            ...reopened!.data.bindings.map(binding => { const followUp = reopened!.data.followUps.find(entry => entry.workItem === binding.workItem); return followUp ? `${binding.subject.id} at revision ${binding.subject.revision} goes to ${followUp.workItem}, which follows ${followUp.follows}` : `${binding.subject.id} at revision ${binding.subject.revision} stays with ${binding.workItem}, which has not finished`; }),
+            ...reopened!.data.superseded.map(id => `${id} closed as superseded: it was assigned under the previous revision`)];
+        if (priorCycle) return { findings, cycle: { members: priorCycle.data.members, requirements: priorCycle.data.requirements, workItems: priorCycle.data.workItems } };
+        if (phase.data.obligation === null) return { findings };
+        if (!own || own.revision !== phase.data.revision) throw new Error('Original registered requirement identity is unavailable');
+        const obligation = records.obligations.get(phase.data.obligation);
+        if (!obligation || obligation.revision !== phase.data.revision) throw new Error('Original registered obligation identity is unavailable');
+        const cycle = await this.checkDependencyGraph(run, item, { from: own.forCapability, to: obligation.capability, requirement: own.id, workItem: item.id });
+        return cycle === undefined ? null : { findings, ...(cycle === null ? {} : { cycle }) };
+      }
+    }
     // The capability is the one the harness put on the assignment when it
     // resolved the owner from the registry. The agreement did not choose it.
     const capability = assignment.externalCapabilities[0]?.capability;
@@ -10319,11 +10519,14 @@ export class RunService {
       invocation: id, ended: outcome.ended, submission: outcome.submission?.hash ?? null, session,
       ...(degraded === undefined ? {} : { degraded }),
     };
+    const packet = this.sessionOperations === undefined ? null : await this.sessionOperations.then(operations => operations.packet(run.record.jobId, id), () => null);
+    const invocation = packet === null ? null : invocationSchema.parse(this.committedBody(run, runLayout.invocation(id)));
     const written = await this.write(run, {
       type: 'invocation-ended',
       data: keeping.kept ? { ...ended, kept: true } : { ...ended, kept: false, finished: keeping.finished },
     }, [
       { path: runLayout.outcome(id), id, revision: 1, body: outcome },
+      ...(invocation === null || packet === null ? [] : [{ path: runLayout.invocation(id), id, revision: 2, body: { ...invocation, prompt: { ...invocation.prompt, inputsHash: inputsHash([packet.roleInstructions, packet.message]), manifest: packet.manifest } } }]),
     ]);
     // The transcript's end follows the log's, so the point it names is one
     // the log has; recovery ends an interrupted invocation's transcript too.
@@ -11464,6 +11667,7 @@ export class RunService {
       if (unsettled.length > 0) {
         throw new Error(`The harness has ${unsettled.length} run driver${unsettled.length === 1 ? '' : 's'} whose settlement was not confirmed; its project lock remains held`);
       }
+      if (this.sessionOperations && await this.sessionOperations.then(operations => operations.close(), () => true) === false) throw new Error('Session operation settlement is unavailable; its project lock remains held');
       await this.options.lock.release();
     });
   }
@@ -11974,4 +12178,66 @@ function readinessAuditOutcome(gate: GateAttempt) {
   if (overall === null || gate.audited === null || gate.evidence === null) return [];
   return [{ path: runLayout.gateAuditOutcome(gate.id), id: gate.id, revision: 1,
     body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: gate.id, overall, audited: gate.audited } }];
+}
+
+/** Mechanical section identities only; goal/requirements are supplied by their owning records. */
+export function taskSupportSections(prompt: string, separatelyDelivered: readonly string[]): HarnessTaskBrief['sections'] {
+  const remaining = prompt.split('\n');
+  for (const text of [...new Set(separatelyDelivered.map(text => text.trimEnd()))].filter(text => text.trim().length > 0).sort((a, b) => b.length - a.length)) {
+    const block = text.split('\n');
+    let fence: { marker: string; width: number } | undefined;
+    for (let index = 0; index < remaining.length; index++) {
+      const line = remaining[index]!;
+      // Literal support is not a separately delivered renderer block, even
+      // when its entire quoted line happens to equal a short goal.
+      const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
+      if (fence) {
+        if (marker && marker[1]![0] === fence.marker && marker[1]!.length >= fence.width && marker[2]!.trim() === '') fence = undefined;
+        continue;
+      }
+      if (block.every((part, offset) => remaining[index + offset] === part)) {
+        remaining.splice(index, block.length); index -= 1; continue;
+      }
+      if (marker) fence = { marker: marker[1]![0]!, width: marker[1]!.length };
+    }
+  }
+  const sections: Array<{ key: string; text: string }> = [];
+  let heading = 'context'; let lines: string[] = [];
+  const counts = new Map<string, number>();
+  const flush = () => {
+    const headingOnly = (lines[0]?.startsWith('# ') || lines[0]?.startsWith('## ')) && lines.slice(1).every(line => line.trim() === '');
+    const text = lines.join('\n').trim(); lines = [];
+    if (!text || headingOnly) return;
+    const count = counts.get(heading) ?? 0; counts.set(heading, count + 1);
+    sections.push({ key: `support:${heading}:${count}`, text });
+  };
+  for (const line of remaining) {
+    // Markdown headings affect grouping only. Content is never selected by inferred meaning.
+    if (line.startsWith('# ') || line.startsWith('## ')) { flush(); heading = line; }
+    lines.push(line);
+  }
+  flush(); return sections;
+}
+function taskKindFor(role: Role, tool: string, continuing?: ContinueReason): TaskKind {
+  if (tool === 'submit_capability_qualification') return 'capability-qualification';
+  if (tool === 'answer_capability_consultation') return 'consultation';
+  if (tool === workOrientationToolName) return 'orientation';
+  if (tool === orientationToolName) return 'design-orientation';
+  if (tool === reconciliationToolName) return 'reconciliation';
+  if (tool === intakeToolName) return 'intake';
+  if (tool === principleToolName) return 'principles';
+  if (tool === checkToolName) return 'check';
+  if (role === 'initial-architect') return 'initial-analysis';
+  if (role === 'local-architect') return continuing === 'completion-refused' ? 'completion' : continuing === 'repair' ? 'repair' : 'assignment';
+  if (role === 'capability-architect') return 'capability';
+  if (role === 'engineer') return continuing === 'repair' ? 'repair' : 'engineering';
+  if (role === 'contract-engineer') return 'contract';
+  if (role === 'context-selector') return 'selection';
+  if (role === 'global-fork') return 'placement';
+  if (role === 'failure-analyst') return 'failure-analysis';
+  if (role === 'nonfunctional-repair-engineer') return 'repair';
+  if (tool === coordinatorActionToolName) return 'action';
+  if (tool === coordinatorInvestigationToolName) return 'investigation';
+  if (tool === coordinatorAssessmentToolName) return 'assessment';
+  throw new Error(`Current task kind unavailable for ${role}/${tool}`);
 }

@@ -663,8 +663,14 @@ export const degradeRelationSchema = z.object({
 }).strict();
 export type DegradeRelation = z.infer<typeof degradeRelationSchema>;
 
+/** Provider-neutral operation linkage. No executor file names or provider entry IDs. */
+export const sessionOperationLinkSchema = z.object({ runId: text, operationId: text,
+  sessionId: text.optional(), point: z.object({ sessionId: text, kind: z.enum(['turn', 'checkpoint']), turn: z.int().nonnegative(), checkpoint: text }).strict().nullable().optional(),
+}).strict();
+
 export const invocationSchema = z.object({
   schema: z.literal('ramify-agent.invocation/1'),
+  sessionOperation: sessionOperationLinkSchema.optional(),
   id: text,
   role: roleSchema,
   work: invocationWorkSchema,
@@ -678,7 +684,7 @@ export const invocationSchema = z.object({
     from: z.string().optional(),
     degradedReason: z.string().optional(),
   }).strict(),
-  prompt: z.object({ package: text, hash: sha256Schema, inputsHash: sha256Schema }).strict(),
+  prompt: z.object({ package: text, hash: sha256Schema, inputsHash: sha256Schema.optional(), requestedInputsHash: sha256Schema.optional(), manifest: z.record(z.string(), z.unknown()).optional() }).strict(),
   /** The write scope's revision, and the scope size this invocation was measured at. */
   scope: z.object({
     write: z.int().nonnegative().nullable(),
@@ -697,6 +703,7 @@ export type Invocation = z.infer<typeof invocationSchema>;
 
 export const invocationOutcomeSchema = z.object({
   schema: z.literal('ramify-agent.invocation-outcome/1'),
+  sessionOperation: sessionOperationLinkSchema.optional(),
   invocation: text,
   ended: z.enum(['submitted', 'ended', 'failed', 'stopped', 'context-budget-reached', 'invalid-submission']),
   /** Each one is a `rejection` observation with its errors. */
