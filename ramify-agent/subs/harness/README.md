@@ -36,6 +36,23 @@ public contracts of that behavior: the vocabulary of the evidence a run works
 from, the run's own commands and vocabulary, and the HTTP protocol it
 serves.
 
+## Durable sessions
+
+The harness owns the shared production session ledger and original immutable
+payloads. Materialized files are projections, not authority. Role instructions
+remain stable; current procedure, environment, submission and changed briefing
+sections are delivered per task. A fork uses the recorded request-time turn or
+checkpoint, with inherited history distinct from declared post-point updates.
+Terminal Retry is model-free and preserves original identity. Stop closes
+admission before drainage; a stopped receipt may have no reusable point.
+Missing or corrupt history and raw hard budgets retain explicit failure.
+
+Session observations, input attribution and exploration retain original source
+identities, exact byte/provenance limits and unknown quantities. Setup exclusions
+require verified BASE/FINAL line identities or independently verified exclusive
+effects; broad path and commit waivers are insufficient. Metrics do not change
+architect authority or establish performance comparisons.
+
 ## Layout
 
 `src/interfaces/` holds this module's public contracts, the only source it
@@ -312,14 +329,14 @@ hiding or measured complexity justifies it.
     its analysis is checked against, and how its inputs have changed.
   - `service.ts`: the runs of one project, their commands, their lifecycle,
     their recovery and the queries that read them. One invocation goes
-    through one path, whatever its role: the record is committed before
-    `startSession`, the judge is the one answer to an invalid submission, and
-    the closing event is the last write of the invocation. A fresh or forked
-    invocation opens a session and a continued one joins the session its
-    loop kept; each end records whether the session is kept or finished, and
-    run end and recovery finish every session still kept. Each start that is
-    not fresh records its point and its reason, and each end a start the
-    executor could not honor. Each invocation writes its session's
+    through one path, whatever its role: the invocation is committed before
+    the admitted session operation, the judge is the one answer to an invalid submission, and
+    the closing event is the last write of the invocation. A recorded create or exact-point fork
+    establishes a session and a continued invocation uses its recorded expected
+    point; each end records whether the session is kept or finished, and
+    run end and recovery finish every session still kept. Each invocation records its immutable source point, original operation
+    identity and reason. Unsupported or unavailable sources fail explicitly;
+    only named source-backed reconstruction may establish a new session. Each invocation writes its session's
     transcript beside its observations: its start before the session
     starts, and its end and point after the log's. An engineer or contract
     session that ends without a result, by a bound, a provider error, an
@@ -833,9 +850,9 @@ commits a completion request records the point after it. Design review
 binds a small selection of guidance from the candidate (its principles
 documents and the READMEs on the way to what changed) and forks the one
 orientation session of that selection, made once by a reviewer that read
-it; a changed selection is another orientation. A fork point that is
-missing, or a fork the executor cannot take, starts fresh with the same
-complete message, and the attempt records the start that was made. The
+it; a changed selection is another orientation. A missing or unsupported fork point makes the review explicitly unavailable;
+a failed orientation is not a reason to silently create a fresh review. The
+attempt records its exact source and current candidate snapshot. The
 queue drains waiting requests in the order they were recorded, overflows
 beyond its bound, retries once, and finishes at once a request no attempt
 of which could finish before its work item's deadline; a writer's start
@@ -870,8 +887,9 @@ only; the queue stays open. An empty attention set goes to the work item's
 gate with no agent call. Otherwise one round records its basis (the audited
 source, the settled requests, the attention set in risk and credibility
 order, and the round's correction floor) and forks the local architect at
-the point after its completion request, fresh with the same packet where
-that point is gone. Its one submission relates, disposes of each signal and
+the original accepted completion-request point. A genuinely missing source
+uses only the explicitly recorded, source-backed reconciliation reconstruction;
+unsupported or corrupt history remains a failure. Its one submission relates, disposes of each signal and
 names the next action; the harness refuses a correction below the floor and
 a waiver outside the work item's module before the child decides, binds
 actor, source, authority, revisions and the repair intent, and commits the
@@ -908,10 +926,6 @@ is committed on a `check-findings-recorded` line that holds the accepted
 command, so a retry after a restart receives its original receipt; a run
 that has ended accepts none.
 
-`src/probes/pi-fork.probe.ts` is a development probe, run by hand with a
-real model and never by the test suite: it forks a pinned pi session point
-as a reviewer confined to an audited Git candidate and reports the start
-pi actually made and what the snapshot tools answered.
 
 ## The run
 
@@ -937,7 +951,7 @@ pi actually made and what the snapshot tools answered.
 - **The phases.** One invocation of the initial architect, then readiness,
   then the work items, then the final gate. The frontier is read again on
   every round, because a delegation creates work items while the run runs.
-  `invocation-started` is appended before `startSession` and
+  `invocation-started` is appended before the model operation is admitted and
   `writer-acquired` before any writer starts, so a stop that arrives in
   between applies to a known invocation.
 - **The initial analysis.** One `initial-architect` invocation over the
@@ -1042,8 +1056,9 @@ pi actually made and what the snapshot tools answered.
   to the architect context for it, and a later fork finds the capability
   there. Physical containment alone does not make a capability local.
 - **The local architect.** One continuing session per work item: each turn
-  after the first continues the point the last one reached, and compaction is
-  allowed and recorded. `request-completion` commits an outline and runs the
+  after the first continues its durable recorded point with the current task
+  and revision-bound updates. The policy permits compaction; the preserving Pi
+  implementation conservatively disables actual compaction. `request-completion` commits an outline and runs the
   `work-item` gate; requesting completion with no iteration is a legitimate
   outcome, because a goal existing behavior already satisfies is verified
   reuse and the gate is what verifies it. `unresolved` states the conflict

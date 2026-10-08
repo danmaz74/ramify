@@ -44,15 +44,7 @@ export interface PiAgentOptions {
   readonly model?: string | undefined;
   /** pi's agent directory, which holds its credentials (`auth.json`) and model settings. Default: pi's own, `~/.pi/agent` or `PI_CODING_AGENT_DIR`. */
   readonly agentDirectory?: string | undefined;
-  /** How long `settled()` waits for pi to report itself idle before answering `timed-out`. */
-  readonly settleMs?: number | undefined;
-  /**
-   * pi's own compaction thresholds. They govern when pi compacts a session
-   * whose policy allows it, and they are not the context policy's
-   * `reportReserveTokens`, which is room for a role's final report. Default:
-   * pi's own.
-   */
-  readonly compaction?: { readonly reserveTokens?: number | undefined; readonly keepRecentTokens?: number | undefined } | undefined;
+
 }
 
 /** How this adapter reaches pi's models; tests supply a runtime with a scripted provider. */
@@ -61,10 +53,6 @@ export interface PiRuntimeSource {
   readonly preservingExtensions?: NonNullable<ConstructorParameters<typeof DefaultResourceLoader>[0]>['extensionFactories'];
   readonly agentDirectory: string;
   readonly model?: string | undefined;
-  readonly settleMs?: number | undefined;
-  readonly compaction?: PiAgentOptions['compaction'];
-  /** pi's first delay before it retries a failed model call; default pi's own. Tests shorten it. */
-  readonly retryDelayMs?: number | undefined;
   runtime(): Promise<ModelRuntime>;
 }
 
@@ -76,8 +64,6 @@ export function createPiAgent(options: PiAgentOptions = {}): AgentPort {
     agentDirectory,
     sessionStore: options.sessionStore,
     model: options.model,
-    settleMs: options.settleMs,
-    compaction: options.compaction,
     runtime: () => {
       runtime ??= ModelRuntime.create({ authPath: join(agentDirectory, 'auth.json'), modelsPath: join(agentDirectory, 'models.json') });
       runtime.catch(() => { runtime = undefined; });
