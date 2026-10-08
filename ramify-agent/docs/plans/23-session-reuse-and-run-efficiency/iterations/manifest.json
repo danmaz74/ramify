@@ -337,8 +337,21 @@
         "V01",
         "V02"
       ],
-      "status": "in progress in isolated worktree after accepted iteration11",
-      "writeBoundary": "Web run/session/metrics presentation and web tests only. Harness projection changes require coordination, not independent formula edits."
+      "status": "accepted ordinary presentation; final native/live/full qualification remains iteration14",
+      "writeBoundary": "Web run/session/metrics presentation and web tests only. Harness projection changes require coordination, not independent formula edits.",
+      "receipt": "12-results.md",
+      "providerHead": "c887f0b5a9b53925c8d50f41df3bbfcfb5ff93d8",
+      "receiptHead": "0382512d5870b29e7b759d8d7060dfdb0fb9b400",
+      "integratedHead": "dc6a487d",
+      "integrationVerification": {
+        "ordinaryFiles": 6,
+        "ordinaryTests": 92,
+        "typeCheck": "passed all four configured scopes",
+        "structure": "passed; partial analysis coverage; 326 retained analysis limits",
+        "webBuild": "passed; retained greater-than-500kB chunk warning",
+        "logs": "/tmp/ramify-plan23-integrated-presentation-*.log",
+        "limit": "JSDOM render evidence only; native/live/full qualification remains iteration14."
+      }
     },
     {
       "id": "13",
@@ -377,7 +390,7 @@
         "Q02",
         "Q03"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree after accepted iterations12 and13",
       "writeBoundary": "Integration verification, exact native test-boundary registrations/witnesses, final reports and owner-local corrections found by qualification."
     }
   ],
