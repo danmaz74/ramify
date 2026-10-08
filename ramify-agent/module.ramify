@@ -129,6 +129,7 @@ expose-sub scenarioWarningKindSchema, ScenarioWarningKind from harness to descen
 expose-sub scenarioWarningViewSchema, ScenarioWarningView, analysisScenarioSchema, AnalysisScenario from harness to descendants
 expose-sub gateScenarioResultViewSchema, GateScenarioResultView, scenarioGateResultSchema, ScenarioGateResult from harness to descendants
 expose-sub scenarioViewSchema, ScenarioView, scenarioListResponseSchema, ScenarioListResponse from harness to descendants
+expose-sub obligationViewSchema, ObligationView from harness to descendants
 
 // protocol/transcripts.ts
 expose-sub transcriptBodySchema, TranscriptBody, transcriptLineRangeSchema from harness to descendants

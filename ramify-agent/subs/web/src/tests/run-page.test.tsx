@@ -277,15 +277,15 @@ test('the overview shows notices first: the module created, then every cycle, re
   expect(notices[1]!.textContent).toContain('resolved');
 });
 
-test('CA24: Run page keeps historical contract views and names an empty capability-task view', async () => {
-  const old = stubRun();
-  old.capabilityTasks = { schema: 'capability-tasks/1', version: old.snapshot.version,
+test('CA24: Run page keeps contract views and names an empty capability-task view for a run without capability requests', async () => {
+  const contractRun = stubRun();
+  contractRun.capabilityTasks = { schema: 'capability-tasks/1', version: contractRun.snapshot.version,
     terminal: { state: 'completed', reason: null, message: null }, requests: [], tasks: [], stack: [] };
-  const client = clientWith(old);
+  const client = clientWith(contractRun);
   render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(screen.getByRole('tab', { name: 'Capability tasks' }));
-  expect(await screen.findByText(/Historical contract work remains in its original views/)).toBeTruthy();
-  expect(client.calls).toContain(`getCapabilityTasks:${runId}:${old.snapshot.version}`);
+  expect(await screen.findByText(/Its contract work appears in the contract views/)).toBeTruthy();
+  expect(client.calls).toContain(`getCapabilityTasks:${runId}:${contractRun.snapshot.version}`);
 });
 
 test('overview presents the harness verdict with its exact candidate tree and audited gate commit', async () => {
@@ -548,7 +548,7 @@ test('CM19: a failed run says failed at run level only; a capability keeps its l
           scope: { modules: ['collection-review/workspace/reviews'], included: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
           checkpoint: 'iteration', completionEvidence: 'Its tests pass.', authorizations: [],
           result: { outcome: 'exhausted', gate: 'ga-0005', commit: null, findings: [], changedAssumptions: [], recommendation: null, failure: null },
-          gates: [{ id: 'ga-0005', checkpoint: 'iteration', verdict: 'failed', cause: 'in-scope', next: 'exhausted', repairRound: 3 }],
+          gates: [{ id: 'ga-0005', checkpoint: 'iteration', verdict: 'failed', cause: 'check-failed', next: 'exhausted', repairRound: 3 }],
           invocations: [],
           package: null,
         }],
@@ -735,6 +735,28 @@ test('before the analysis is accepted the Scenarios area says nothing is tracked
   render(<RunPage client={clientWith({ ...stubRun(), scenarios: { scenarios: [], total: 0, obligations: [] } })} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Scenarios' }));
   expect(await screen.findByText(/No scenario is tracked yet/)).toBeTruthy();
+});
+
+test('PB3-D04: the Scenarios area lists each registered obligation with its binding, its architect\'s report and where hint, and the reports outstanding', async () => {
+  const at = '2026-10-08T06:00:00.000Z';
+  const run = stubRun();
+  const obligations = [
+    { id: 'sc-001', kind: 'scenario', responsible: { kind: 'work-item', id: 'wi-001' }, status: 'done', revision: 1, case: null, description: null,
+      registeredBy: null, binding: { fakes: ['FakeReportReader'], invocation: 'inv-0007', submission: 'a'.repeat(64), sequence: 40, at },
+      report: { judgment: 'done', revision: 1, basedOnRevision: 0, where: 'notes.test.ts — the note limit test', invocation: 'inv-0009',
+        submission: 'b'.repeat(64), sequence: 52, at } },
+    { id: 'test-001', kind: 'test', responsible: { kind: 'work-item', id: 'wi-001' }, status: 'pending', revision: 0, case: null,
+      description: 'The notes test states the plan limit', registeredBy: { invocation: 'inv-0006', submission: 'c'.repeat(64) }, binding: null, report: null },
+  ];
+  render(<RunPage client={clientWith({ ...run, scenarios: scenarioListResponseSchema.parse({ ...run.scenarios, obligations }) })}
+    planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Scenarios' }));
+  const list = await screen.findByLabelText('Registered obligations');
+  expect(within(list).getByLabelText('Obligation sc-001').textContent).toBe('sc-001 · scenario · done · reported on by work-item wi-001'
+    + ' · bound by inv-0007, fakes: FakeReportReader · architect report done by inv-0009 (revision 1), where: notes.test.ts — the note limit test');
+  expect(within(list).getByLabelText('Obligation test-001').textContent).toBe('test-001 · registered test: The notes test states the plan limit · pending'
+    + ' · reported on by work-item wi-001 · not bound · no architect report yet');
+  expect(within(list).getByLabelText('Outstanding reports').textContent).toBe('A done report is outstanding on test-001.');
 });
 
 test('the review on the analysis page: each entry\'s scenarios with their origin, the integration scenario\'s plan text beside its sub-scenarios, and the warnings', async () => {
