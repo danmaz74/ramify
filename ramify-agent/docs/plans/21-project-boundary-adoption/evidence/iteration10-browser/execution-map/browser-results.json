@@ -47,8 +47,7 @@
     "narrow 480x700: modules drawer opens",
     "narrow view uses transcript panels and a switcher",
     "no browser exceptions",
-    "the run's remaining audit gap is counted and collapsed without losing detail",
-    "the gap list expands",
+    "a run whose gates all retain their audit outcomes shows no coverage gap",
     "the same disk-backed run renders in Chromium through its bounded pages",
     "durable capability detail opens at the exported run version",
     "durable browser page has no exceptions"
@@ -67,7 +66,7 @@
     "static": "browser-safe synthetic visual edge cases",
     "durable": {
       "planId": "review-notes",
-      "runId": "20261008T051954Z-14b140",
+      "runId": "20261008T054357Z-ea9cf6",
       "pages": 6,
       "nodes": 55,
       "links": 63,
