@@ -98,7 +98,14 @@ async function readinessLifecycle(root: string, configuredAudit: ConfiguredAudit
     if (failure.recovery !== null) recoveries.push(JSON.parse(await readFile(
       runPath(root, 'review-notes', receipt.jobId, runLayout.recovery(failure.recovery)), 'utf8')) as InfrastructureRecovery);
   }
-  return { snapshot: onlyRun(service, 'review-notes'), failures, attempts, recoveries };
+  // Each baseline gate's recorded audit outcome, where its request was answered and published.
+  const outcomes: Record<string, unknown> = {};
+  for (const event of events) {
+    if ((event.type !== 'readiness-passed' && event.type !== 'readiness-failed') || event.data.gate === undefined) continue;
+    const path = runPath(root, 'review-notes', receipt.jobId, runLayout.gateAuditOutcome(event.data.gate));
+    if (existsSync(path)) outcomes[event.data.gate] = JSON.parse(await readFile(path, 'utf8'));
+  }
+  return { snapshot: onlyRun(service, 'review-notes'), failures, attempts, recoveries, outcomes };
 }
 
 function step(result: Awaited<ReturnType<typeof attempt>>, name: string) {
@@ -330,6 +337,53 @@ describe('declared preparation and configured full readiness', () => {
     expect(mismatched.calls).not.toContain(`full:${fixture.head}`);
   });
 
+  test('readiness asks the final gate\'s nested full request; a nested failure or an undecided answer refuses it before branch creation, and applicable reuse passes', async () => {
+    const fixture = await project();
+    const config = configuration(fixture.head);
+    const requests: ConfiguredAuditInput[] = [];
+    const scripted = (answer: (input: ConfiguredAuditInput) => Partial<ConfiguredFullAuditResult>) => ({ calls: [] as string[], adapter: {
+      async read() { return config; },
+      async run(input: ConfiguredAuditInput) { requests.push(input); return resultOf(input, answer(input)); },
+    } satisfies ConfiguredAuditPort });
+    const project_ = (projectRoot: string, verdict: 'pass' | 'fail' | 'indeterminate', execution: 'ran' | 'reused' | 'not-run' = 'ran') => ({
+      projectRoot, verdict, execution, status: execution === 'not-run' ? 'cancelled' as const : 'completed' as const,
+      failures: verdict === 'fail' ? ['tools-check: FAIL'] : [], requestId: `request-${projectRoot}`,
+      auditedSourceCommit: execution === 'not-run' ? null : fixture.head, requestedMode: 'full' as const, executedMode: execution === 'not-run' ? null : 'full' as const,
+      fallbackReason: null, reuse: null, reportCommit: execution === 'not-run' ? null : `report-${projectRoot}`,
+      runRef: execution === 'not-run' ? null : `run-${projectRoot}`, treeRef: execution === 'not-run' ? null : `tree-${projectRoot}`,
+      retrievalCommands: [], durationSeconds: 1, counts: null, detail: verdict,
+    });
+    const complete = { status: 'complete' as const, skipped: [], unavailable: [] };
+
+    const failing = await attempt(fixture, config, scripted(input => ({ nested: input.nested === true, verdict: 'fail',
+      detail: 'invocation fail over 2 projects; failed: engine/tools', discovery: complete,
+      projects: [project_('.', 'pass'), project_('engine/tools', 'fail')] })));
+    expect(requests.map(input => [input.mode, input.nested])).toEqual([['full', true]]);
+    expect(step(failing, 'configured-full-audit')).toMatchObject({ outcome: 'failed', gate: 'ga-0001' });
+    expect(step(failing, 'run-branch')?.outcome).toBe('not-verified');
+    expect([failing.gate?.verdict, failing.gate?.cause]).toEqual(['failed', 'check-failed']);
+    expect(failing.gate?.audit?.projects?.map(entry => [entry.projectRoot, entry.verdict])).toEqual([['.', 'pass'], ['engine/tools', 'fail']]);
+    expect(recoveryFor(failing.attempt, failing.gate, defaultRunPolicy({ projectRoot: fixture.root }))).toBeNull();
+    expect((await git(fixture.root, 'branch', '--list', 'ramify-agent-run/*')).trim()).toBe('');
+
+    const undecided = await attempt(fixture, config, scripted(input => ({ nested: input.nested === true, verdict: 'indeterminate',
+      detail: 'invocation indeterminate over 1 project; discovery indeterminate beneath .', projects: [project_('.', 'pass')],
+      discovery: { status: 'indeterminate', skipped: [], unavailable: [{ enclosingProject: '.', reason: 'ownership query failed', definitions: ['engine/ramify-audit.json'] }] } })));
+    expect(step(undecided, 'configured-full-audit')?.outcome).toBe('not-verified');
+    expect([undecided.gate?.verdict, undecided.gate?.cause]).toEqual(['not-verified', 'infrastructure']);
+    expect((await git(fixture.root, 'branch', '--list', 'ramify-agent-run/*')).trim()).toBe('');
+
+    const reuse = { auditedCommit: 'earlier', ignoredChangedPaths: ['docs/a.md'], requestedMode: 'full' as const, resolution: 'requested' as const };
+    const reused = await attempt(fixture, config, scripted(input => ({ nested: input.nested === true, reused: true, reuse, auditedSourceCommit: 'earlier',
+      detail: 'invocation pass over 2 projects', discovery: complete,
+      projects: [{ ...project_('.', 'pass', 'reused'), reuse }, { ...project_('engine/tools', 'pass', 'reused'), reuse }] })));
+    expect(reused.attempt.verdict).toBe('passed');
+    expect(reused.attempt.audit).toMatchObject({ requestedSourceCommit: fixture.head, auditedSourceCommit: 'earlier', reused: true });
+    expect(reused.gate?.audit).toMatchObject({ nested: true, verdict: 'pass', reuse });
+    expect(reused.gate?.audit?.projects?.map(entry => entry.execution)).toEqual(['reused', 'reused']);
+    expect((await git(fixture.root, 'branch', '--show-current')).trim()).toBe('ramify-agent-run/readiness-fixture');
+  });
+
   test('a declared missing installation is repaired once, then readiness continues', async () => {
     const directory = 'subs/tool';
     const fixture = await project(async root => {
@@ -408,6 +462,8 @@ describe('declared preparation and configured full readiness', () => {
     expect(result.failures[0]).toMatchObject({ step: 'declared-packages', recovery: 'rec-0001', final: false });
     expect(result.recoveries[0]).toMatchObject({ action: 'reinstall-nested', outcome: 'recovered', attempt: 1 });
     expect(result.attempts.map(entry => entry.verdict)).toEqual(['failed', 'passed']);
+    // The baseline's answered audit keeps its outcome beside its gate, as a committing gate's does.
+    expect(Object.values(result.outcomes)).toEqual([{ schema: 'ramify-agent.gate-audit-outcome/1', gate: expect.any(String), overall: 'pass', audited: fixture.head }]);
   }, 120_000);
 
   test('RunService stops immediately when a declared installation repair is ineffective', async () => {

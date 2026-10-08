@@ -10288,6 +10288,7 @@ export class RunService {
       if (result.attempt.verdict === 'passed' && result.gate !== null && !signal.aborted && !this.ignoring(run)) {
         await this.write(run, { type: 'readiness-passed', data: { attempt: attemptNumber, gate: gateId } }, [
           { path: runLayout.gate(gateId), id: gateId, revision: 1, body: result.gate },
+          ...readinessAuditOutcome(result.gate),
           { path: runLayout.readiness(attemptNumber), id: String(attemptNumber), revision: 1, body: result.attempt },
         ]);
         await this.afterWrite('readiness-attempted', run.record.jobId);
@@ -10318,7 +10319,7 @@ export class RunService {
 
       const attempt = withRecovery(result.attempt, recovery?.id ?? null);
       const records = [
-        ...(result.gate === null ? [] : [{ path: runLayout.gate(gateId), id: gateId, revision: 1, body: result.gate }]),
+        ...(result.gate === null ? [] : [{ path: runLayout.gate(gateId), id: gateId, revision: 1, body: result.gate }, ...readinessAuditOutcome(result.gate)]),
         { path: runLayout.readiness(attemptNumber), id: String(attemptNumber), revision: 1, body: attempt },
         ...(recovery === null ? [] : [{ path: runLayout.recovery(recovery.id), id: recovery.id, revision: 1, body: recovery }]),
       ];
@@ -11832,4 +11833,17 @@ function reviewOutcome(
     case 'stopped':
       return notVerified(stop ?? 'stopped', stop === 'deadline' ? 'The reviews\' settlement bound passed while this attempt ran' : 'The run stopped its readers while this attempt ran', false);
   }
+}
+
+/**
+ * The readiness baseline's audit outcome, beside its gate as a committing
+ * gate's is: recorded only for an answered request with its published
+ * record, so the execution map projects the baseline's outcome rather than a
+ * publication without one.
+ */
+function readinessAuditOutcome(gate: GateAttempt) {
+  const overall = gate.audit?.verdict ?? null;
+  if (overall === null || gate.audited === null || gate.evidence === null) return [];
+  return [{ path: runLayout.gateAuditOutcome(gate.id), id: gate.id, revision: 1,
+    body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: gate.id, overall, audited: gate.audited } }];
 }

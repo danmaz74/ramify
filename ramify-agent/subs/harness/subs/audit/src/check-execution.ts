@@ -316,7 +316,7 @@ export interface ConfiguredAuditInput {
   /** The configuration the run captured; the commit's own must equal it. */
   readonly configuration: CommittedAuditConfiguration;
   readonly mode: ConfiguredAuditMode;
-  /** Audit the tracked nested definitions too, as the final gate does. */
+  /** Audit the tracked nested definitions too, as readiness's baseline and the final gate do. */
   readonly nested?: boolean;
   readonly runId: string;
   readonly attemptId: string;

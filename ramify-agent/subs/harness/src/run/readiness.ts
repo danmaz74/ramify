@@ -2,7 +2,8 @@ import { mkdir, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { GateCommandStarted } from '../checks/execution.js';
 import { configuredFullRecovery, sameAuditPolicy, type CommittedAuditConfiguration, type ConfiguredAuditPort, type ConfiguredFullAuditResult } from '../../subs/audit/src/check-execution.js';
-import { installOperation, setupChecks } from '../checks/checkpoint.js';
+import { checkpointPolicies, installOperation, setupChecks } from '../checks/checkpoint.js';
+import { configuredAuditRecord } from '../checks/gate.js';
 import { checkCommand, checkCommandEnvironment } from '../checks/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
@@ -25,7 +26,10 @@ import {
  * repository, that the compiler and project configuration are available,
  * and that Ramify answers. It then prepares the
  * committed audit workspace declarations in the run working tree and asks
- * the installed provider for one configured full audit of HEAD.
+ * the installed provider for one configured full nested audit of HEAD: the
+ * same request as the final gate, answered by an applicable earlier record
+ * where the provider finds one. A nested project's failure, or discovery it
+ * cannot decide, fails the baseline before the run branch exists.
  *
  * Missing dependencies or a nonexistent command are readiness failures, not
  * code-repair assignments. A failure that a bounded preparation can repair
@@ -141,7 +145,8 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
   let releaseWait: (() => void) | undefined;
   let audit: ConfiguredFullAuditResult;
   try {
-    audit = await execution.run({ projectRoot, sourceCommit: request.head, configuration: config!, mode: 'full',
+    audit = await execution.run({ projectRoot, sourceCommit: request.head, configuration: config!,
+      mode: checkpointPolicies.readiness.audit, nested: checkpointPolicies.readiness.nested,
       runId: request.runId, attemptId: request.gateId,
       signal: request.signal === undefined ? bound.signal : AbortSignal.any([request.signal, bound.signal]),
       started: request.started,
@@ -149,14 +154,14 @@ export async function runReadiness(execution: ConfiguredAuditPort, request: Read
       lockAcquired: () => { releaseWait?.(); releaseWait = undefined; },
     });
   } catch (error) {
-    audit = { status: 'failed', requestId: `${request.runId}:${request.gateId}`, mode: 'full', nested: false, projects: null, discovery: null,
+    audit = { status: 'failed', requestId: `${request.runId}:${request.gateId}`, mode: 'full', nested: checkpointPolicies.readiness.nested, projects: null, discovery: null,
       requestedSourceCommit: request.head, auditedSourceCommit: null, reused: false, reuse: null,
       requestedMode: null, executedMode: null, fallbackReason: null,
       verdict: null, reportCommit: null, runRef: null, treeRef: null, definition: { path: config!.path, blob: config!.blob },
       detail: error instanceof Error ? error.message : String(error), provider: { error: String(error) }, checks: {} };
   } finally { releaseWait?.(); bound.dispose(); }
   const gate = configuredGate(request, audit);
-  steps.push({ step: 'configured-full-audit', outcome: audit.status === 'completed' ? audit.verdict === 'pass' ? 'passed' : 'failed' : 'not-verified',
+  steps.push({ step: 'configured-full-audit', outcome: gate.verdict,
     detail: `${audit.detail}; requested ${audit.requestedSourceCommit}, audited ${audit.auditedSourceCommit ?? 'none'}` });
   if (request.signal?.aborted) return cancelledReadiness(request, steps, nested, gate, audit);
 
@@ -239,8 +244,14 @@ async function declaredPreparationStep(
   return { step: 'declared-preparation', outcome: 'passed', detail: `${setup.length} committed setup command${setup.length === 1 ? '' : 's'} passed in the run working tree` };
 }
 
+/**
+ * The baseline's gate. The verdict is the invocation's: a failure anywhere
+ * fails it, and an indeterminate answer (undecided discovery, a project not
+ * run) or an unanswered request leaves it not verified.
+ */
 function configuredGate(request: ReadinessRequest, audit: ConfiguredFullAuditResult): GateAttempt {
-  const verdict = audit.status === 'completed' ? audit.verdict === 'pass' ? 'passed' : 'failed' : 'not-verified';
+  const verdict = audit.status !== 'completed' || audit.verdict === null || audit.verdict === 'indeterminate' ? 'not-verified'
+    : audit.verdict === 'pass' ? 'passed' : 'failed';
   return {
     schema: 'ramify-agent.gate-attempt/3', id: request.gateId, checkpoint: 'readiness',
     subject: {}, proposedBy: null, repairRound: 0, infrastructureAttempt: 0,
@@ -248,16 +259,9 @@ function configuredGate(request: ReadinessRequest, audit: ConfiguredFullAuditRes
     evidence: audit.status === 'completed' && audit.reportCommit !== null && audit.runRef !== null && audit.treeRef !== null
       ? { reportCommit: audit.reportCommit, runRef: audit.runRef, treeRef: audit.treeRef } : null,
     provider: { result: audit.provider, checks: audit.checks },
-    audit: {
-      requestId: audit.requestId, mode: audit.mode, status: audit.status, definition: { ...audit.definition },
-      requestedSourceCommit: audit.requestedSourceCommit, auditedSourceCommit: audit.auditedSourceCommit,
-      requestedMode: audit.requestedMode, executedMode: audit.executedMode, fallbackReason: audit.fallbackReason,
-      reuse: audit.reuse === null ? null : { ...audit.reuse, ignoredChangedPaths: [...audit.reuse.ignoredChangedPaths] },
-      verdict: audit.status === 'completed' ? audit.verdict : null, detail: audit.detail,
-      nested: false, projects: null, discovery: null,
-    },
+    audit: configuredAuditRecord(audit),
     guardedChanges: [], commands: [], verdict,
-    cause: verdict === 'passed' ? null : audit.status === 'completed' ? 'check-failed' : 'infrastructure',
+    cause: verdict === 'passed' ? null : verdict === 'failed' ? 'check-failed' : 'infrastructure',
     next: verdict === 'passed' ? 'accept' : 'exhausted',
   };
 }
