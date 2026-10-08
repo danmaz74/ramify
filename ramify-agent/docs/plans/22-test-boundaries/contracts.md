@@ -1,6 +1,7 @@
 # Plan 22 contracts
 
-**Status:** proposed implementation contract for [Plan 22](main-plan.md).
+**Status:** implemented contract for [Plan 22](main-plan.md).
+[Final results](final-results.md) retain qualification and the aggregate timing limit.
 
 ## 1. The ordinary test boundary
 
@@ -91,7 +92,7 @@ the ordinary production suite. The driver is part of the complete audit.
 
 ## 4. Configured runner partition
 
-Proposed Vitest project names are `node`, `web` and `boundaries`. Keep the
+Declared Vitest project names are `node`, `web` and `boundaries`. Keep the
 current ordinary Node/JSDOM environments, React setup and machine-lock setup.
 Create another boundary environment only if inventory finds an actual need.
 
@@ -103,7 +104,7 @@ Boundary discovery selects those paths. No filename suffix or source-content
 heuristic decides membership, and no broad owner-directory exemption is allowed.
 Split mixed files so ordinary matrices do not inherit a real-boundary exemption.
 
-Proposed package scripts:
+Declared package scripts:
 
 | Command | Selection |
 | --- | --- |
@@ -119,7 +120,7 @@ a newly added ordinary test, invalid registration, missing registration file,
 duplicate path, a fixture file and `src/tmp/` exclusion. Registry errors fail
 configuration, not silently narrow execution.
 
-These project names/scripts are proposed and do not exist at authoring time.
+These project names/scripts were proposed at authoring and delivered in cut 13.
 Runner partition is developer configuration; no inventory or classification
 code enters production harness readiness, affected selection or audit logic.
 

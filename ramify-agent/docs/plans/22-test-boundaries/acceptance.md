@@ -1,6 +1,8 @@
 # Plan 22 acceptance matrix
 
-**Status:** planned, no runtime acceptance claimed. See [contracts](contracts.md).
+**Status:** execution qualified; controlled aggregate timing comparison unresolved.
+See [acceptance evidence](acceptance-results.md), [final results](final-results.md)
+and [contracts](contracts.md).
 
 | ID | Independent expected outcome / fixture | Iteration |
 | --- | --- | --- |

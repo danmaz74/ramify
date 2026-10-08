@@ -1,7 +1,8 @@
 # Optimization 13: automatic ordinary test boundaries
 
-**Status:** repaired focused qualification passed; the coordinator's next full
-nested premerge audit and safe integration remain required. Current core source
+**Status:** committed optimization qualified and integrated into MAIN.
+[Final qualification](13-premerge-audit.md) and [integration verification](13-integrated-results.md)
+retain the failed working-tree materializer observation and clean committed pass. Current core source
 `49ebd333c1edaf2df1aa17c96c227f3784d0a766`, tree
 `a5e2d6ebfa709d99b9f8c413d411a57e925a87f4`. Fresh base
 `9be12ee55385490e9db45f923b7b9f517d3a27d7`; adopted committed MAIN advance
@@ -64,9 +65,9 @@ Final raw artifacts use `/tmp/plan22-opt13-repaired-`: `qualified-focused.json`,
 `migration.json` and `processes.json`.
 
 The gain is guarded ordinary selection separate from actual tool/kernel
-witnesses. No controlled aggregate speedup is claimed. The next released full
-nested audit remains **UNRUN**; the coordinator must pass it before merging and
-complete final inventory, timing and architect preservation qualification.
+witnesses. No controlled aggregate speedup is claimed. At the repaired focused handoff, the next released full nested audit was
+**UNRUN**; full audit, integration and final documentation were subsequent
+coordinator gates, now recorded below.
 
 
 ## Second full audit and final correction
@@ -110,5 +111,11 @@ unchanged. Raw artifacts are `/tmp/plan22-opt13-post-materializer-`:
 `cases.json`; before/after materializer artifacts are
 `/tmp/plan22-opt13-materializer-{repro,named-types}.json`.
 
-The coordinator's next serialized full nested audit is still **UNRUN** and
+At the final focused handoff, the coordinator's next full audit was **UNRUN** and
 required before merge.
+
+## Final delivery
+
+The final released full nested audit passed before MAIN merge `30ef8480`.
+[Final results](../final-results.md) and [integration verification](13-integrated-results.md)
+record committed qualification, retained failures and the unresolved aggregate timing comparison.

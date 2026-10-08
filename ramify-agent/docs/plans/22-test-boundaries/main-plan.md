@@ -1,7 +1,8 @@
 # Plan 22: enforced test boundaries and prompt command cleanup
 
 **Date:** 2026-10-08. **Status:** implementation authorized; progressive
-optimization delivery in progress. See [execution](execution.md).
+optimization delivery qualified on MAIN; controlled aggregate timing comparison
+remains unresolved. See [final results](final-results.md) and [execution](execution.md).
 
 ## Outcome
 
@@ -30,7 +31,7 @@ explicit real-boundary evidence, as established by the predecessor correction.
   already separated ordinary lifecycle tests from real external services and
   reduced four-worker wall time from 686.42 s to 90.94 s. Those are historical
   measurements of a different suite, not this plan's runtime target.
-- [Contracts](contracts.md) define the proposed runner partition, strict fakes,
+- [Contracts](contracts.md) define the implemented runner partition, strict fakes,
   guard, cleanup and evidence rules.
 - [Acceptance](acceptance.md) assigns every plan-local case to an iteration.
 - [Iteration manifest](iterations/manifest.json) defines eight serial iterations.
@@ -40,7 +41,9 @@ explicit real-boundary evidence, as established by the predecessor correction.
 - [Planning validation](planning-validation.md) records artifact checks only,
   not implementation or runtime acceptance.
 
-The worktree is receiving Plan 21 changes. Implementation must capture an exact,
+At authoring, the original target was receiving Plan 21 changes. The user
+subsequently merged Plan 21 into main and changed the integration target to
+`/ramify`, branch `ramify-agent`. Implementation must capture an exact,
 clean delivery base containing the adopted configured-audit contracts. Preserve
 existing edits and changes delivered after this planning snapshot. Reconcile
 source drift in iteration 0 before migrating tests; do not restore the older
@@ -92,7 +95,7 @@ Keep all planned cases and final full-audit qualification regardless of ordering
 
 Each optimization retains its focused failures, verification results and
 handoff. On 2026-10-08 the user authorized one sequential subagent per
-optimization: create a worktree from the current Plan 21 worktree, apply and
+optimization: create a worktree from the current integration target, apply and
 test one optimization there, merge it back, then begin the next. The iteration
 groups define coverage; [execution](execution.md) defines the smaller delivery
 cuts and preservation rules. The cleanup fix is independent; minimum helpers
@@ -169,5 +172,5 @@ This plan defers changing production Git algorithms, provider internals,
 test concurrency, worker count, shared mutable fixtures and test quarantine.
 It adds agent-local testing guidance during implementation; it does not edit
 the toolkit roadmap or protected harness principles/specification during
-authoring. All proposed commands and runner projects are explicitly unimplemented
-until their owning iteration delivers them.
+authoring. The runner projects and commands were delivered in cut 13;
+[testing procedures](../../testing.spec.md) state their current behavior.

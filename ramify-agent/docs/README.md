@@ -3,9 +3,10 @@
 Design documents for the separate agent harness:
 
 - [Plan 22: enforced test boundaries and prompt command cleanup](plans/22-test-boundaries/main-plan.md),
-  implementation in progress: scripted ordinary scenarios, automatic process
-  guarding, explicit real-boundary selection and prompt command cleanup; final
-  audit and preservation qualification remain pending
+  qualified on committed source: scripted ordinary scenarios, automatic process
+  guarding, explicit native selection and prompt command cleanup;
+  [final results](plans/22-test-boundaries/final-results.md) retain the aggregate
+  timing limitation and failed working-tree materializer observation
 - [Harness principles](harness.principles.md)
 - [Agent declarations and automated audit evidence](analysis/2026-10-07-agent-declarations-and-audit-responsibilities.md),
   desired responsibility boundary and issues in the current implementation and

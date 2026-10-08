@@ -89,17 +89,19 @@ Delivery cuts qualified so far:
 | 10: guarded hook/CLI reply matrices, strict consumption controls and retained native timeout with producer retirement | `531ee940` | [Passing pre-merge released audit](optimizations/10-premerge-audit.md), [integrated verification](optimizations/10-integrated-results.md) |
 | 11: guarded settlement/shell/session cases and nine retained real-process witnesses | `dfc8b4f2` (main) | [Passing pre-merge released audit](optimizations/11-premerge-audit.md), [integrated verification](optimizations/11-integrated-results.md) |
 | 12: six guarded pure provider/executor cases and 36 unchanged native cases | `d27e3839` (main) | [Passing pre-merge released audit](optimizations/12-premerge-audit.md), [integrated verification](optimizations/12-integrated-results.md) |
+| 13: automatic ordinary guard, exact native registry and complete runner partition | `30ef8480` (main) | [Passing pre-merge released audit](optimizations/13-premerge-audit.md), [integrated verification](optimizations/13-integrated-results.md) |
 
 Cuts 1–10 have integrated focused passes in the original Plan 21 target.
 Main received cuts 1–8 with the Plan21 merge and now contains cuts 9–10
 after the [audited reconciliation and integrated checks](optimizations/main-target-integrated.md).
-Cuts 11–12 were created from, audited and integrated directly into main.
+Cuts 11–13 were created from, audited and integrated directly into main.
 Their earlier audits remain evidence for their recorded original inputs; the
 new reconciliation audit qualifies the combined main candidate. The initial full baseline failed one
 crash fixture, subsequently corrected with focused evidence. A later released
 full nested audit of all four integrated cuts passed: [audit receipt](optimizations/04-released-audit.md). This was post-merge qualification. Subsequent cuts require
-passing released audits before merge. Final full-audit qualification and
-project-wide automatic enforcement remain outstanding.
+passing released audits before merge. Final full-audit qualification, automatic enforcement and runner partition
+passed in cut 13. [Final results](final-results.md) retain the unresolved
+controlled aggregate timing comparison.
 
 Focused Vitest runs are permitted for the optimization's cases. Full-suite
 verification runs through the installed committed audit CLI, serialized after

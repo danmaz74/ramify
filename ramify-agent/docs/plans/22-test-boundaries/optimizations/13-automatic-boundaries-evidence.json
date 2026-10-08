@@ -244,8 +244,15 @@
       "warnings": 0,
       "analysisLimits": 313
     },
-    "fullNestedPremergeAudit": "Both prior candidate audits FAILED and retained; next audit of repaired49eb core UNRUN, required coordinator gate",
-    "integration": "UNRUN: required after premerge audit",
+    "fullNestedPremergeAudit": {
+      "status": "pass",
+      "source": "ce70bf386386e41326b43a4944f32137fae7fc24",
+      "report": "8b7da054b06e1f4c2a86d133adae0ba8d753ca8d",
+      "passedTests": 2088,
+      "existingOptionalSkippedTests": 2,
+      "ordinaryFilesWithZeroAttempts": 234
+    },
+    "integration": "Committed optimization is qualified by complete passing premerge audit and clean integrated assertion. Working-tree DataView failure remains unresolved; WIP causation and transient compiler/transport conditions cannot be distinguished from retained logs. No user source was repaired or overwritten.",
     "postMaterializerQualification": {
       "source": "49ebd333c1edaf2df1aa17c96c227f3784d0a766",
       "passed": 33,
@@ -15028,9 +15035,8 @@
     }
   ],
   "remaining": [
-    "Released full nested premerge audit and safe MAIN integration",
-    "Final original1932-row reconciliation and architect preservation judgment",
-    "Final timing qualification; no controlled aggregate speedup claimed"
+    "Controlled aggregate timing comparison remains unresolved; historical baseline and final coverage differ",
+    "Working-tree materializer DataView failure retained; concurrent user source excluded from committed qualification"
   ],
   "initialQualification": {
     "source": "d8b1ab957f139fb55d4aec0343bd29e715cee095",
@@ -15317,5 +15323,21 @@
       ],
       "timingContext": "Two unchanged composition runtime cases failed at the original5s threshold (5053.373ms/5000.510ms) while our native materializer and an independently observed MAIN multi-file Vitest run were active. Timing is consistent with contention; causation was not isolated experimentally. Composition11 passed alone afterward with unchanged bounds. The third failure was the remaining historical results-note filename reference, corrected with the exact K6/K7 map."
     }
+  },
+  "qualificationRemainingBeforeFinalDelivery": [
+    "Released full nested premerge audit and safe MAIN integration",
+    "Final original1932-row reconciliation and architect preservation judgment",
+    "Final timing qualification; no controlled aggregate speedup claimed"
+  ],
+  "finalDelivery": {
+    "integrationMerge": "30ef84809ac31a484c394fc9a75dc548c33da607",
+    "workingTreeFocused": {
+      "passed": 270,
+      "failed": 1,
+      "existingOptionalSkips": 2
+    },
+    "cleanCommittedNativeAssertion": "pass",
+    "receipt": "13-integrated-results.json",
+    "finalResults": "../final-results.md"
   }
 }
