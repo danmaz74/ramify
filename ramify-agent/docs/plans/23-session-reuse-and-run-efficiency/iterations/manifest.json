@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "proposed; implementation not started",
+  "status": "implementing; baseline audit has one retained native materializer failure",
   "execution": "dependency-ordered; disjoint iterations may run in parallel",
   "iterations": [
     {
@@ -10,8 +10,9 @@
       "cases": [
         "B01"
       ],
-      "status": "proposed",
-      "writeBoundary": "Plan artifacts and integration setup; no production implementation in this iteration."
+      "status": "accepted; baseline audit failed with retained qualification debt",
+      "writeBoundary": "Plan artifacts and integration setup; no production implementation in this iteration.",
+      "receipt": "00-results.md"
     },
     {
       "id": "1",
@@ -27,7 +28,7 @@
         "S05",
         "S06"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness/agent port and scripted implementation; new harness session-store adapter and its own tests. Own run/sessions.ts if required; do not edit run/service.ts, pi or shared run records."
     },
     {
@@ -43,7 +44,7 @@
         "P04",
         "P05"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness src/prompts/ templates/packages and new pure task/brief builders with isolated prompt tests. Do not edit run/service.ts or plan-evidence/scenarios implementations."
     },
     {
@@ -58,7 +59,7 @@
         "H03",
         "H04"
       ],
-      "status": "proposed",
+      "status": "in progress in isolated worktree",
       "writeBoundary": "Harness src/hooks/post-write.ts, src/tools/shell.ts and owner-local scheduling helpers/tests. Excludes shell-tests.ts, engineer-equipment.ts and run/service.ts."
     },
     {
@@ -224,5 +225,7 @@
       "status": "proposed",
       "writeBoundary": "Integration verification, exact native test-boundary registrations/witnesses, final reports and owner-local corrections found by qualification."
     }
-  ]
+  ],
+  "executionBase": "d01a57bdbac6a56c29a893519f70297513824313",
+  "contractFreeze": "74b314c8"
 }
