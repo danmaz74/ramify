@@ -474,6 +474,52 @@
         "forwarded guards captured across a reused worker > ordinary/native/ordinary forwarding preserves command results and refused observations",
         "forwarded guards captured across a reused worker > native/ordinary/native forwarding preserves command results and refused observations"
       ]
+    },
+    {
+      "file": "subs/harness/src/tests/breaking-work.boundary.test.ts",
+      "boundary": "Breaking feature green boundaries and unauthorized shell writes",
+      "whyFakeCannotProve": "Four cases execute fixture test assertions or actual shell mutations; scripted success cannot establish failing consumer assertions or process writes behind the guard.",
+      "owningCases": [
+        "K7: a breaking feature is isolated into iterations that are green at every accepted boundary > the reviewer-identity run stages the break, and every accepted boundary passes the breaking-iteration gate",
+        "the breaking-iteration boundary is not green by default > a break that leaves a consumer unadapted fails the whole-project gate, and only the adapted state is accepted",
+        "K6: the gate is not satisfied by weakening what it checks > an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes",
+        "K6: the gate is not satisfied by weakening what it checks > a deleted guarded file is recorded as after: null and does not pass as an absent file"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/engineer-api-preparation.boundary.test.ts",
+      "boundary": "Installed materializer source-area refresh and descendant API generation",
+      "whyFakeCannotProve": "The two cases compare actual generated API symbols and revisions before and after edits; literal metadata only qualifies decoder behavior.",
+      "owningCases": [
+        "cold Analysis and Model preparation publishes real separate source-area views and refreshes changed APIs on every invocation",
+        "an included child prepares all descendant owners, while a broad scope retains its exact modules"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/recorded-environment.boundary.test.ts",
+      "boundary": "Actual child environment observation",
+      "whyFakeCannotProve": "The command prints its own environment and the case verifies received values and durable records; a scripted printout cannot establish what the OS child received.",
+      "owningCases": [
+        "a gate attempt > records the names of a command's environment, and no secret reaches the command or the record"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/lock.boundary.test.ts",
+      "boundary": "Kernel lock holder identity and takeover",
+      "whyFakeCannotProve": "These cases require actual process liveness, a process that exited, and Linux start ticks; literal records cannot establish OS liveness or PID reuse behavior.",
+      "owningCases": [
+        "the lock holds this process and is refused while a live process holds it",
+        "a lock whose process is gone is taken over",
+        "a reused process ID is told apart by its start time"
+      ]
+    },
+    {
+      "file": "subs/harness/src/tests/contract-delegation-integration.test.ts",
+      "boundary": "Consumer tests enforce delegated provider conformance",
+      "whyFakeCannotProve": "The fixture Vitest assertions observe the consumer/providing module relation, including a conforming fake and the actual implementation. Scripted gate replies cannot prove those assertions execute.",
+      "owningCases": [
+        "P1: one consumer delegates, resumes after provider conformance and verifies against the real provider > K4: the contract gate runs the suite against the fake and the provider gate runs it against the real provider"
+      ]
     }
   ]
 }

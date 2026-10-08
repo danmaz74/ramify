@@ -1,14 +1,20 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
 import { moduleTreeResponseSchema } from '../interfaces/protocol/evidence.js';
 import { planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
 import { unservedRun } from '../projections/inputs.js';
 import { constructedRecord, runId } from './helpers/constructed.js';
-import { ProjectRootError, startServer, type RunningServer } from '../http/server.js';
+import { ProjectRootError, startServerWith as startServer, type RunningServer } from '../http/server.js';
 import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
+
+const unusedRamify = new RamifyCli({ executable: 'NO_COMMAND_IS_DECLARED' });
+const unexpectedCalls: string[][] = [];
+unusedRamify.run = async argv => { unexpectedCalls.push([...argv]); throw new Error('HTTP query declares no Ramify command'); };
+afterAll(() => { expect(unexpectedCalls).toEqual([]); });
 
 // A plain Node client: `fetch` and the protocol's schemas, nothing from the web client.
 async function query(server: RunningServer, path: string): Promise<{ status: number; body: unknown; type: string | null }> {
@@ -25,7 +31,7 @@ describe('the protocol over HTTP, with the web assets absent', () => {
     fixture = await copyFixture();
     await mkdir(join(fixture.root, 'plans', 'broken', 'plan.md'), { recursive: true });
     await mkdir(join(fixture.root, 'plans', '.harness', 'jobs'), { recursive: true });
-    server = await startServer({ projectRoot: fixture.root, port: 0, assetsDirectory: join(fixture.root, 'no-such-build') });
+    server = await startServer({ ramify: unusedRamify, projectRoot: fixture.root, port: 0, assetsDirectory: join(fixture.root, 'no-such-build') });
   });
   afterAll(async () => {
     await server.close();
@@ -109,7 +115,7 @@ describe('the protocol over HTTP, with the web assets absent', () => {
 describe('the module tree, through the one load the comparison shares', () => {
   test('unavailable before the view is materialized, unreadable when it is broken, and available with each module\'s name, directory and parent', async () => {
     const fixture = await copyFixture();
-    const server = await startServer({ projectRoot: fixture.root, port: 0, assetsDirectory: join(fixture.root, 'no-such-build') });
+    const server = await startServer({ ramify: unusedRamify, projectRoot: fixture.root, port: 0, assetsDirectory: join(fixture.root, 'no-such-build') });
     try {
       const tree = async () => {
         const { status, body } = await query(server, protocolPaths.modules);
@@ -152,7 +158,7 @@ describe('the web assets, when built', () => {
     const assets = join(fixture.root, '..', 'web');
     await mkdir(assets);
     await writeFile(join(assets, 'index.html'), '<!doctype html><title>client</title>');
-    const server = await startServer({ projectRoot: fixture.root, port: 0, assetsDirectory: assets });
+    const server = await startServer({ ramify: unusedRamify, projectRoot: fixture.root, port: 0, assetsDirectory: assets });
     try {
       expect(server.servesWebClient).toBe(true);
       for (const path of ['/', '/index.html', '/elsewhere']) {
@@ -171,8 +177,8 @@ describe('startServer', () => {
   test('refuses a directory that is not a Ramify project', async () => {
     const directory = await temporaryDirectory();
     try {
-      await expect(startServer({ projectRoot: directory.path, port: 0 })).rejects.toThrow(ProjectRootError);
-      await expect(startServer({ projectRoot: join(directory.path, 'missing'), port: 0 })).rejects.toThrow(/not a directory/);
+      await expect(startServer({ ramify: unusedRamify, projectRoot: directory.path, port: 0 })).rejects.toThrow(ProjectRootError);
+      await expect(startServer({ ramify: unusedRamify, projectRoot: join(directory.path, 'missing'), port: 0 })).rejects.toThrow(/not a directory/);
     } finally {
       await directory.remove();
     }

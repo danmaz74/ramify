@@ -2,11 +2,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { inPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
+import { createInPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
 import { projectEvent } from '../projections/events.js';
 import type { RunEvent } from '../run/log.js';
+import { inPlaceReplies } from './helpers/in-place-replies.js';
 import { copyFixture } from './helpers/fixture.js';
 import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, startRun } from './helpers/runs.js';
 import { assertUnchangedGit, openUnchangedRuns } from './helpers/unchanged-run.js';
@@ -32,7 +33,16 @@ describe('the in-place executor', () => {
     const passes = checkCommand({ argv: [process.execPath, '-e', ''], cwd: root, timeoutMs: 30_000 });
     const announced: GateCommandStart[] = [];
 
-    const gate = await runGate(inPlaceCheckExecution, 'readiness', {
+    const expected: GateCommandStart[] = [
+      { kind: 'setup', name: 'build', position: 1, total: 3 },
+      { kind: 'type-check', position: 2, total: 3 },
+      { kind: 'ramify-check', position: 3, total: 3 },
+    ];
+    const transport = inPlaceReplies(root, expected.map((_, index) => ({
+      argv: [process.execPath, '-e', ''],
+      effect: async () => { expect(announced, 'announcement precedes the external request').toEqual(expected.slice(0, index + 1)); },
+    })));
+    const gate = await runGate(createInPlaceCheckExecution(transport.runner), 'readiness', {
       id: 'ga-0001',
       projectRoot: root,
       directory: join(root, 'gate'),
@@ -45,6 +55,7 @@ describe('the in-place executor', () => {
       started: async command => { announced.push(command); },
     });
 
+    transport.assertComplete();
     expect(gate.verdict).toBe('passed');
     expect(announced).toEqual([
       { kind: 'setup', name: 'build', position: 1, total: 3 },

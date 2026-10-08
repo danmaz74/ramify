@@ -1,0 +1,93 @@
+import { rootDescription } from './helpers/root-description.js';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { afterEach, expect, test, vi } from 'vitest';
+import { privateRamify } from '../../subs/evidence/src/ramify-cli.js';
+import { loadArchitectIndex } from '../../subs/evidence/src/views.js';
+import { apiViewsOf, iterationApiViews } from '../work/session.js';
+import { temporaryDirectory } from './helpers/fixture.js';
+
+const cleanups: Array<() => Promise<void>> = [];
+afterEach(async () => {
+  vi.restoreAllMocks();
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups.splice(0).reverse()) { try { await cleanup(); } catch (error) { errors.push(error); } }
+  if (errors.length > 0) throw new AggregateError(errors, 'API fixture cleanup or scripted boundary verification failed');
+});
+
+async function fixture(nested = false) {
+  const directory = await temporaryDirectory();
+  cleanups.push(directory.remove);
+  const root = directory.path;
+  const files: Record<string, string> = {
+    'package.json': '{"name":"api-preparation","private":true,"type":"module"}',
+    'tsconfig.json': '{"compilerOptions":{"strict":true,"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext"},"include":["src/**/*.ts","subs/**/*.ts"]}',
+    'module.ramify': rootDescription('app', "expose-src readToken from \"api.ts\" to descendants\n"),
+    'src/api.ts': 'export function readToken(): string { return "original"; }\n',
+  };
+  for (const owner of ['cli', 'analysis', 'model']) {
+    files[`subs/${owner}/module.ramify`] = `ramify 1\nmodule ${owner}\n`;
+    files[`subs/${owner}/src/use.ts`] = 'export const ready = true;\n';
+    files[`subs/${owner}/src/tests/use.test.ts`] = 'export const expected = true;\n';
+  }
+  if (nested) {
+    files['subs/model/subs/detail/module.ramify'] = 'ramify 1\nmodule detail\n';
+    files['subs/model/subs/detail/src/use.ts'] = 'export const ready = true;\n';
+    files['subs/model/subs/detail/src/tests/use.test.ts'] = 'export const expected = true;\n';
+  }
+  for (const [path, content] of Object.entries(files)) {
+    await mkdir(join(root, path, '..'), { recursive: true });
+    await writeFile(join(root, path), content);
+  }
+  const cli = await privateRamify({ timeoutMs: 30_000 });
+  cleanups.push(cli.dispose);
+  expect(await cli.ramify.materialize(root, 'subs/cli')).toMatchObject({ ok: true });
+  return { root, ramify: cli.ramify, index: await loadArchitectIndex(root) };
+}
+
+test('cold Analysis and Model preparation publishes real separate source-area views and refreshes changed APIs on every invocation', async () => {
+  const { root, ramify, index } = await fixture();
+  await expect(readFile(join(root, 'subs/analysis/src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  await expect(readFile(join(root, 'subs/model/src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  const base = { modules: ['app/analysis', 'app/model'], rationale: 'Both owners are assigned.' };
+  const first = await iterationApiViews(ramify, root, index, base);
+  for (const entry of first) {
+    expect(entry.unavailable).toBeNull();
+    expect(entry.views.map(view => view.area)).toEqual(['src', 'src/tests']);
+    for (const view of entry.views) {
+      expect(view.revision).toBeTruthy();
+      expect(view.coverage).toBeNull();
+      expect(await readFile(join(root, view.path, 'external/src/api.ts.md'), 'utf8')).toContain('## `readToken`');
+    }
+  }
+  await writeFile(join(root, 'src/api.ts'), 'export function readFreshToken(): number { return 42; }\n');
+  await writeFile(join(root, 'module.ramify'), rootDescription('app', "expose-src readFreshToken from \"api.ts\" to descendants\n"));
+  const continued = await iterationApiViews(ramify, root, index, base);
+  for (const [i, entry] of continued.entries()) {
+    expect(entry.unavailable).toBeNull();
+    expect(entry.views[0]!.revision).not.toBe(first[i]!.views[0]!.revision);
+    for (const view of entry.views) {
+      const text = await readFile(join(root, view.path, 'external/src/api.ts.md'), 'utf8');
+      expect(text).toContain('## `readFreshToken`');
+      expect(text).not.toContain('## `readToken`');
+    }
+  }
+  const reconstructed = await iterationApiViews(ramify, root, await loadArchitectIndex(root), { module: 'app/analysis', included: [] });
+  expect(reconstructed[0]).toEqual(continued[0]);
+}, 90_000);
+
+test('an included child prepares all descendant owners, while a broad scope retains its exact modules', async () => {
+  const { root, ramify, index } = await fixture(true);
+  await expect(readFile(join(root, 'subs/model/subs/detail/src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  const selected = await iterationApiViews(ramify, root, index, { module: 'app', included: ['app/model'].map(module => ({ directory: module.split('/').slice(1).map(part => `subs/${part}`).join('/'), reason: 'Fixture whole child tree', instructions: 'Implement the assigned fixture behavior' })) });
+  expect(selected.map(entry => entry.module).sort()).toEqual(['app', 'app/model', 'app/model/detail']);
+  const descendant = selected.find(entry => entry.module === 'app/model/detail')!;
+  expect(descendant.unavailable).toBeNull();
+  expect(descendant.views.map(view => view.area)).toEqual(['src', 'src/tests']);
+  for (const view of descendant.views) {
+    expect(view.revision).toBeTruthy();
+    expect(await readFile(join(root, view.path, 'external/src/api.ts.md'), 'utf8')).toContain('## `readToken`');
+  }
+  expect((await iterationApiViews(ramify, root, index, { modules: ['app/model'], rationale: 'Only Model itself is assigned.' }))
+    .map(entry => entry.module)).toEqual(['app/model']);
+}, 90_000);
