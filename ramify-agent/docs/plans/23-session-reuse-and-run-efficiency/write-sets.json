@@ -7,7 +7,25 @@
     "docs/plans/23-session-reuse-and-run-efficiency/iterations/manifest.json",
     "vitest.config.ts",
     "src/tests/test-boundaries.json",
-    "module.ramify"
+    "module.ramify",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/00-base-and-contracts.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/01-session-operations.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/02-task-prompts.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/03-mutation-checks.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/04-focused-scenarios.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/05-catalog-contracts.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/06-metric-calculations.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/07-pi-preservation.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/08-continuation-integration.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/09-fork-integration.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/10-run-corrections.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/11-observation-integration.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/12-presentation.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/13-trial-corrections.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/iterations/14-qualification.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/main-plan.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/final-results.md",
+    "docs/plans/23-session-reuse-and-run-efficiency/acceptance-to-evidence.md"
   ],
   "iterations": {
     "0": [
