@@ -1,7 +1,7 @@
 # Iteration 0: Reconcile the base and freeze contracts
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** none.
-**Status:** proposed; not executed.
+**Status:** accepted for its recorded scope; see [00-results.md](00-results.md).
 
 ## Owners and write boundary
 

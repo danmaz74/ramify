@@ -1,7 +1,7 @@
 # Iteration 3: Correct and serialize mutation checks
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 0.
-**Status:** proposed; not executed.
+**Status:** accepted for its recorded scope; see [03-results.md](03-results.md).
 
 ## Owners and write boundary
 

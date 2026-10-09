@@ -1,7 +1,7 @@
 # Iteration 5: Catalog and scenario-form corrections
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 0.
-**Status:** proposed; not executed.
+**Status:** accepted for its recorded scope; see [05-results.md](05-results.md).
 
 ## Owners and write boundary
 

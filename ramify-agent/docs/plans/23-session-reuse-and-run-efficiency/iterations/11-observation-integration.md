@@ -1,7 +1,7 @@
 # Iteration 11: Capture all roles and publish metric projections
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 6, iteration 10.
-**Status:** proposed; not executed.
+**Status:** accepted for its recorded scope; see [11-results.md](11-results.md).
 
 ## Owners and write boundary
 

@@ -1,7 +1,7 @@
 # Iteration 9: Integrate predetermined forks and recovery
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 8.
-**Status:** proposed; not executed.
+**Status:** accepted for its recorded scope; see [09-results.md](09-results.md).
 
 ## Owners and write boundary
 
