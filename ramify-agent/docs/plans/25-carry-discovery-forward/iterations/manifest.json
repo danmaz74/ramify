@@ -102,8 +102,10 @@
         "D13",
         "I05"
       ],
-      "status": "planned",
-      "writeBoundary": "Harness NFR source inputs/prompts, named snapshot comparisons and candidate/recovery tests."
+      "status": "implemented; focused checks passed",
+      "writeBoundary": "Harness NFR source inputs/prompts, named snapshot comparisons and candidate/recovery tests.",
+      "sourceCommit": "8b1273d1c36917b69704291a32db6db51d5b2716",
+      "results": "04-results.md"
     },
     {
       "id": "5",
