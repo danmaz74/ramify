@@ -493,6 +493,27 @@
         "subs/harness/src/transcripts/recorder.ts",
         "subs/harness/src/tests/transcript-writer.test.ts"
       ]
+    },
+    "full-audit-fac6de30": {
+      "evidence": "572a512808b964c59c9628ba3553c82d31297e60",
+      "base": "fac6de307d5c631b507479532b74e919144bff0f",
+      "capabilityReplayWorker": [
+        "subs/harness/src/run/service.ts",
+        "subs/harness/src/tests/capability-acceptance.integration.test.ts",
+        "subs/harness/src/tests/capability-recovery.test.ts",
+        "subs/harness/src/tests/helpers/acceptance-flow.ts",
+        "subs/harness/src/tests/helpers/acceptance-boundaries.ts"
+      ],
+      "capturedCommitWorker": [
+        "subs/harness/subs/agent/src/interfaces/session-operations.ts",
+        "subs/harness/subs/agent/src/session-operations.ts",
+        "subs/harness/subs/agent/src/scripted.ts",
+        "subs/harness/subs/agent/src/tests/plan23-session-operations.test.ts",
+        "subs/harness/subs/agent/src/tests/scripted.test.ts",
+        "subs/harness/src/run/session-store.ts",
+        "subs/harness/src/tests/plan23-session-store-cache.test.ts"
+      ],
+      "reviewWorker": []
     }
   }
 }
