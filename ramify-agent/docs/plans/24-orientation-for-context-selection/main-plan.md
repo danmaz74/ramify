@@ -1,9 +1,10 @@
 # Plan 24: useful starting briefs and orientation reuse
 
 **Date:** 2026-10-09. **Status:** implementation in progress; iteration 0 base
-audit accepted through existing evidence and iteration 1 complete; iterations
-2–4 pending. See the [iteration 0 receipt](iterations/00-results.md) and
-[iteration 1 receipt](iterations/01-results.md). Source inspected at `1b052e74`.
+audit accepted through existing evidence and iterations 1–2 complete; iterations
+3–4 pending. See the [iteration 0 receipt](iterations/00-results.md),
+[iteration 1 receipt](iterations/01-results.md) and
+[iteration 2 receipt](iterations/02-results.md). Source inspected at `1b052e74`.
 
 ## Outcome and decisions
 
