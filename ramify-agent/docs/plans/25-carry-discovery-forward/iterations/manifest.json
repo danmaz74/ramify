@@ -45,8 +45,10 @@
         "S06",
         "S07"
       ],
-      "status": "planned",
-      "writeBoundary": "Harness task/brief builders, package prose, session-operation integration, narrow run callers and delivery tests."
+      "status": "implemented; focused checks passed",
+      "writeBoundary": "Harness task/brief builders, package prose, session-operation integration, narrow run callers and delivery tests.",
+      "sourceCommit": "e1678996ca8e8f1402ffec817e187cdb01ff48a6",
+      "results": "01-results.md"
     },
     {
       "id": "2",
