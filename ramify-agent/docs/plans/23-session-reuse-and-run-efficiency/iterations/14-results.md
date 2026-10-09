@@ -36,7 +36,7 @@ All four configured TypeScript scopes passed through `npm run type-check`. `npm 
 All three exact registered native files passed **14 cases in 12.72 seconds**:
 
 ```sh
-npm run test:boundaries -- subs/harness/src/tests/plan23-trial-attribution.boundary.test.ts subs/harness/src/tests/plan23-cucumber.boundary.test.ts subs/harness/subs/agent/subs/pi/src/tests/plan23-transport.boundary.test.ts
+npm run test:boundaries -- subs/harness/src/tests/plan23-trial-attribution.boundary.test.ts subs/harness/src/tests/plan23-cucumber.boundary.test.ts subs/harness/subs/agent/subs/pi/src/tests/plan23-transport.boundary.test.ts --maxWorkers 1
 ```
 
 Seven Git/public collector-CLI cases exercise exact setup identities, shifted/reverted/mixed changes, rename/deletion/binary partitions, prepared engineer cwd and external-output/symlink guards. The required missing-EOF positive produced two additions, one deletion, setup-only classification and exit zero on actual Git objects. The predicted defect did not reproduce; no conditional repair was made.
@@ -56,9 +56,9 @@ Initial PID **3867719 exited before restore PID 3867783**. Both phases completed
 Mandatory original-evidence verification passed **four cases in 3.28 seconds**:
 
 ```sh
-PLAN23_REQUIRE_LIVE_EVIDENCE=1 PLAN23_LIVE_EVIDENCE_DIRECTORY=/tmp/plan23-live-aac47684-original-20261009 npm run test:boundaries -- subs/harness/subs/agent/subs/pi/src/tests/plan23-transport.boundary.test.ts
+PLAN23_REQUIRE_LIVE_EVIDENCE=1 PLAN23_LIVE_EVIDENCE_DIRECTORY=/tmp/plan23-live-aac47684-original-20261009 npm run test:boundaries -- subs/harness/subs/agent/subs/pi/src/tests/plan23-transport.boundary.test.ts --maxWorkers 1
 ```
- Pi authenticates original bytes, public points/receipts, full settled prefixes including accepted terminal tool outputs, and every dependent request. Root/harness do not decode opaque provider transcripts; default fixtures do not substitute for this proof. [Verifier log](/home/app/ramify-plan23-evidence/aac47684aa8f4cfc4e524f6efb04c2de9ef01abc/qualification/plan23-aac47684-original-live-verifier.log).
+Pi authenticates original bytes, public points/receipts, full settled prefixes including accepted terminal tool outputs, and every dependent request. Root/harness do not decode opaque provider transcripts; default fixtures do not substitute for this proof. [Verifier log](/home/app/ramify-plan23-evidence/aac47684aa8f4cfc4e524f6efb04c2de9ef01abc/qualification/plan23-aac47684-original-live-verifier.log).
 
 ## Retained failures and limits
 
