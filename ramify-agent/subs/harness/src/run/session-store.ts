@@ -100,7 +100,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
     if (!sameFingerprint(before, after) || (before === null) !== (bytes === null)) {
       writer.state = null; writer.unavailable = 'Session ledger changed while validating'; throw new Error(writer.unavailable);
     }
-    return { log: after, digest: hash(bytes ?? new Uint8Array()) };
+    return { log: after, bytes: bytes ?? Buffer.alloc(0) };
   }
   const bodyPath = (id: string) => {
     if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('Invalid session record body identity');
@@ -154,7 +154,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
     const cached = writer.state;
     if (cached !== null) {
       const before = journalProof();
-      if (!sameFingerprint(before.log, cached.log) || before.digest !== cached.ledger.committedContentHash) {
+      if (!sameFingerprint(before.log, cached.log) || !cached.ledger.matchesCommittedContent(before.bytes)) {
         writer.state = null;
         writer.unavailable = 'Session ledger changed outside the owned writer';
         throw new Error(writer.unavailable);
@@ -181,7 +181,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
         for (const result of checked) if (result.status === 'fulfilled') cached.payloads.set(...result.value);
       }
       const after = journalProof();
-      if (!sameFingerprint(after.log, cached.log) || after.digest !== cached.ledger.committedContentHash) {
+      if (!sameFingerprint(after.log, cached.log) || !after.bytes.equals(before.bytes) || !cached.ledger.matchesCommittedContent(after.bytes)) {
         writer.state = null;
         writer.unavailable = 'Session ledger changed outside the owned writer';
         throw new Error(writer.unavailable);
@@ -194,7 +194,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
     const proof = journalProof();
     // The owner authenticates exactly the complete bytes it loaded, including
     // its legitimate torn-tail repair. Never reopen to learn a changed prefix.
-    if (proof.digest !== current.committedContentHash) {
+    if (!current.matchesCommittedContent(proof.bytes)) {
       writer.state = null; writer.unavailable = 'Session ledger changed while opening'; throw new Error(writer.unavailable);
     }
     const records = new Map<string, SessionStoreRecord>();
@@ -224,10 +224,10 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
     for (const id of payloadIds) payloads.set(id, await validatePayload(id));
     await assertWriter();
     const after = journalProof();
-    if (!sameFingerprint(after.log, proof.log) || after.digest !== proof.digest || after.digest !== current.committedContentHash) {
+    if (!sameFingerprint(after.log, proof.log) || !after.bytes.equals(proof.bytes) || !current.matchesCommittedContent(after.bytes)) {
       writer.state = null; writer.unavailable = 'Session ledger changed while validating'; throw new Error(writer.unavailable);
     }
-    const serializedRecords = new Map([...records].map(([id, item]) => [id, JSON.stringify(item)]));
+    const serializedRecords = new Map([...records].filter(([id]) => !bodyRefs.has(id)).map(([id, item]) => [id, JSON.stringify(item)]));
     const loaded: ValidatedState = { ledger: current, records, serializedRecords, bodyRefs, payloads, log: proof.log };
     writer.state = loaded;
     return loaded;
@@ -273,7 +273,15 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
         if (new Set(ids).size !== ids.length || new Set(input.expected.map(item => item.id)).size !== input.expected.length) throw new Error('Duplicate CAS record identity');
         const state = await load();
         const current = state.records;
-        const checkedExpected = input.expected.map(expected => ({ expected, actual: detachedRecord(state, JSON.stringify([input.runId, expected.id])) }));
+        const checkedExpected = input.expected.map(expected => {
+          const key = JSON.stringify([input.runId, expected.id]);
+          const bodyId = state.bodyRefs.get(key);
+          // The complete owned journal authenticates the private header.
+          // Validate every actual referenced body before deciding any conflict;
+          // comparing its revision needs no additional decoded body copy.
+          if (bodyId !== undefined) bodyBytes(bodyId);
+          return { expected, actual: current.get(key) ?? null };
+        });
         for (const { expected, actual } of checkedExpected) {
           if ((actual?.revision ?? null) !== expected.revision) return { kind: 'conflict' as const, reason: `Revision conflict for ${expected.id}` };
         }
@@ -303,7 +311,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
         for (const id of expectedBodyIds) bodyBytes(id);
         for (const item of headers) bodyBytes(item.bodyId);
         const beforeAppend = journalProof();
-        if (!sameFingerprint(beforeAppend.log, state.log) || beforeAppend.digest !== state.ledger.committedContentHash) {
+        if (!sameFingerprint(beforeAppend.log, state.log) || !state.ledger.matchesCommittedContent(beforeAppend.bytes)) {
           writer.state = null; writer.unavailable = 'Session ledger changed outside the owned writer'; throw new Error(writer.unavailable);
         }
         try {
@@ -312,7 +320,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
           // no recovery proof to this private adapter.
           await state.ledger.append({ event, records: [] });
           const proof = journalProof();
-          if (proof.log === null || proof.digest !== state.ledger.committedContentHash) {
+          if (proof.log === null || !state.ledger.matchesCommittedContent(proof.bytes)) {
             writer.unavailable = 'Session ledger changed outside the owned writer'; throw new Error(writer.unavailable);
           }
           for (const id of expectedBodyIds) bodyBytes(id);
@@ -329,7 +337,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
         for (const item of records) {
           const key = JSON.stringify([item.runId, item.id]);
           current.set(key, item);
-          state.serializedRecords.set(key, JSON.stringify(item));
+          state.serializedRecords.delete(key);
         }
         for (const item of headers) state.bodyRefs.set(JSON.stringify([item.runId, item.id]), item.bodyId);
         for (const [id, value] of payloads) state.payloads.set(id, value);

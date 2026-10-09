@@ -140,7 +140,7 @@ describe('Plan 23 owned session store replay cache', () => {
     await reopened.close(); const fresh = (await setup(path)).store;
     expect(await fresh.read('A', original.id)).toEqual(changed); expect(await fresh.getPayload(payload)).toEqual(bytes);
   });
-  it('hashes the actual journal despite identical metadata and keeps unexpected rewrites unavailable across adapters', async () => {
+  it('authenticates the actual journal despite identical metadata and keeps unexpected rewrites unavailable across adapters', async () => {
     const { path, store } = await setup(); const second = (await setup(path)).store; await commit(store, 1);
     const log = join(path, 'session-ledger.jsonl'); const original = await readFile(log, 'utf8');
     observed.frozenLog = { path: log, metadata: statSync(log, { bigint: true }) };
@@ -151,7 +151,7 @@ describe('Plan 23 owned session store replay cache', () => {
     await expect(second.read('A', 'session:s')).rejects.toThrow(/changed outside the owned writer/);
     await expect(commit(second, 2)).rejects.toThrow(/changed outside the owned writer/);
   });
-  it('binds the first loaded owner digest and never reopens to learn a different valid journal prefix', async () => {
+  it('binds the first loaded owner bytes and never reopens to learn a different valid journal prefix', async () => {
     const { path, store } = await setup(); await commit(store, 1); await store.close();
     const log = join(path, 'session-ledger.jsonl'); const original = await readFile(log, 'utf8'); observed.opens = 0;
     observed.afterOpen = () => writeFile(log, original.replace('session:s', 'session:x'));
