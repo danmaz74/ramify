@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
@@ -72,7 +73,16 @@ export async function acquireProjectLock(projectRoot: string): Promise<ProjectLo
 
 function handle(path: string, record: LockRecord): ProjectLock {
   const held = async () => {
-    const current = await readLock(path);
+    // Every ownership fence still reads the actual small lock file. Avoid
+    // queueing that immediate read behind unrelated asynchronous filesystem
+    // work; acquisition and liveness retain their asynchronous paths.
+    let text: string;
+    try { text = readFileSync(path, 'utf8'); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+      throw error;
+    }
+    const current = parseLock(text);
     return typeof current === 'object' && current.token === record.token;
   };
   return {
@@ -112,6 +122,10 @@ async function readLock(path: string): Promise<LockRecord | 'unreadable' | undef
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw error;
   }
+  return parseLock(text);
+}
+
+function parseLock(text: string): LockRecord | 'unreadable' {
   try {
     const parsed = lockRecordSchema.safeParse(JSON.parse(text));
     return parsed.success ? parsed.data : 'unreadable';
