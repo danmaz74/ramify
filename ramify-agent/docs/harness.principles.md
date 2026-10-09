@@ -479,5 +479,8 @@ reconstructing a smaller context through new exploration.
 
 A reused context is a cache, never the sole authority for decisions or progress.
 Any invocation must succeed from a fresh session and the repository alone.
+A fresh session receives in its prompt every input the harness holds or can
+derive for its task, so it rediscovers nothing the harness already knows; what
+the harness cannot establish comes from orientation/exploration.
 Context describes the source as it was when it was read; when that source has
 changed, the context is refreshed or discarded.

@@ -257,6 +257,31 @@ may continue it or [fork](#fork) from it: its initial context, the settled end
 of one of its invocations, or the result of one append to it. It identifies an
 immutable position within that session.
 
+## Orientation
+
+**Orientation** is the exploration a [session](#session) performs to
+understand the environment it works in before it acts on its task: searching
+and reading the project, the materials it was given and the results of its
+tools. It is driven by the task and ends when the agent believes it knows
+enough to act. Its result exists only in the session's context, so a
+session the harness retains can be continued or [forked](#fork) from it,
+and a lost session repeats it.
+
+## Initial orientation
+
+**Initial orientation** is the [orientation](#orientation) a fresh session
+performs from its initial context before its first task action. The harness
+records two kinds as submissions: a **work orientation**, the local
+architect's first turn for a [work item](#work-item), and a **design
+orientation**, a reviewer's reading of the design guidance a review selects.
+
+## Reorientation
+
+**Reorientation** is [orientation](#orientation) a session performs after
+its [initial orientation](#initial-orientation): when it enters a part of the
+project it has not explored, or when inherited context describes source that
+has changed.
+
 ## Included child
 
 An **included child** is a child module whose entire subtree is included in

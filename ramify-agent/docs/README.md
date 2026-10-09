@@ -2,6 +2,10 @@
 
 Design documents for the separate agent harness:
 
+- [Plan 24: useful starting briefs and orientation reuse](plans/24-orientation-for-context-selection/main-plan.md),
+  consolidated implementation plan for known task inputs and pointers, shared
+  work orientation, simple fresh fallbacks and existing inexpensive metrics;
+  benefit assessment remains with Dan
 - [Plan 23: session reuse and real-run corrections](plans/23-session-reuse-and-run-efficiency/main-plan.md),
   proposed implementation of exact session continuation/forks, task-specific
   submission tools, shell/scenario/briefing corrections and exploration metrics;
