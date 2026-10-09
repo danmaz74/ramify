@@ -277,12 +277,15 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     if (op.body.receipt) return clone(op.body.receipt);
     const loaded = await readSession(key.runId, op.body.sessionId); if (!loaded) throw new Error('Missing active session');
     const uncertain = op.body.effects.some(effect => effect.phase === 'intent');
-    const interruptedProvider = outcome.kind === 'stopped' && op.body.phase === 'dispatched';
+    // A provider turn that was dispatched and did not complete, whether stopped or failed, leaves no point a later Continue could resume from.
+    const interruptedProvider = (outcome.kind === 'stopped' || outcome.kind === 'failed') && op.body.phase === 'dispatched';
     const available = !unavailable && !uncertain && !interruptedProvider;
     const currentPoint = point(op.body.sessionId, executionIdentity(key, op.body).turn, 'turn');
     const snapshot: Snapshot = { ...op.body.snapshot, currentPoint, transcript: [...op.body.snapshot.transcript, ...op.body.provider], activeOperation: null, available };
     const status = unavailable ? 'unavailable' : outcome.kind === 'stopped' ? 'stopped' : uncertain ? 'unavailable' : outcome.kind === 'failed' ? 'failed' : 'completed';
-    const result = receipt(key, op.body.sessionId, status, uncertain ? 'External effect completion unknown; point unavailable' : interruptedProvider ? 'Provider completion interrupted; point unavailable' : reason, available ? currentPoint : null, outcome, currentPoint.turn);
+    // A failure keeps its own error as the reason; the null point says the turn is not reusable.
+    const interruptedReason = outcome.kind === 'failed' && reason !== null ? reason : 'Provider completion interrupted; point unavailable';
+    const result = receipt(key, op.body.sessionId, status, uncertain ? 'External effect completion unknown; point unavailable' : interruptedProvider ? interruptedReason : reason, available ? currentPoint : null, outcome, currentPoint.turn);
     const terminal: OperationBody = { ...op.body, phase: 'terminal', receipt: result };
     const committed = await commit({ runId: key.runId, expected: [{ id: op.record.id, revision: op.record.revision }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(key, op.record.id, op.record.revision + 1, terminal, false), record(key, loaded.record.id, loaded.record.revision + 1, { snapshot, points: available ? [...loaded.body.points, snapshot] : loaded.body.points }, true)], payloads: snapshot.transcript.map(item => item.payloadId) });
     if (committed.kind === 'conflict') { const winner = await readOperation(key); if (winner?.body.receipt) return clone(winner.body.receipt); throw new Error(committed.reason); }

@@ -135,6 +135,41 @@ describe('Plan 23 F1 high-level session operations', () => {
     expect(await rebuilt.inspect('run-A', P.sessionId)).toBeNull(); expect(dispatches).toBe(1);
     expect((await rebuilt.fork({ runId: 'run-A', operationId: 'safe-old', sourcePoint: P.point! })).status).toBe('completed');
   });
+  it('a failure before dispatch still publishes the next turn point', async () => {
+    let dispatches = 0; const store = memoryStore();
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    const P = await operations.create(create);
+    const denied = await (await operations.continue(continuation(P.sessionId, P.point!, 'denied', bindings({ currentAuthority: async () => false })))).receipt;
+    expect(denied).toMatchObject({ status: 'failed', turn: 1, reason: 'Current authority denied operation', outcome: { kind: 'failed', error: 'Current authority denied operation' } });
+    expect(denied.point).toMatchObject({ sessionId: P.sessionId, turn: 1, kind: 'turn' });
+    expect(dispatches).toBe(0);
+    expect((await operations.inspect('run-A', P.sessionId))?.currentPoint).toEqual(denied.point);
+    expect((await operations.fork({ runId: 'run-A', operationId: 'fork-denied', sourcePoint: denied.point! })).status).toBe('completed');
+  });
+  it.each(['returned', 'thrown'] as const)('a failure after dispatch (%s) exposes no reusable point while the earlier settled point still forks', async mode => {
+    const store = memoryStore(); let dispatches = 0;
+    // A half-finished provider turn: the assistant's tool call is persisted, its result never arrives.
+    const driver: SessionOperationDriver = { async dispatch(input, runtime) {
+      dispatches++;
+      await runtime.callTool('read-1', 'read', {});
+      await runtime.persistPayload(`${input.key.operationId}:assistant`, new TextEncoder().encode('{"toolCall":"read-1"}'));
+      if (mode === 'thrown') throw new Error('stream error after tool call');
+      return { kind: 'failed', error: 'stream error after tool call' };
+    } };
+    const operations = createSessionOperations({ sessionStore: store, driver });
+    const P = await operations.create(create);
+    const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'interrupted'))).receipt;
+    expect(end).toMatchObject({ status: 'failed', turn: 1, point: null, outcome: { kind: 'failed', error: 'stream error after tool call' },
+      reason: mode === 'thrown' ? 'stream error after tool call' : 'Provider completion interrupted; point unavailable' });
+    expect((await store.read('run-A', 'operation:interrupted'))?.body).toMatchObject({ phase: 'terminal', effects: [{ callId: 'read-1', phase: 'completed' }] });
+    expect(await operations.inspect('run-A', P.sessionId)).toBeNull();
+    const rebuilt = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    expect(await (await rebuilt.retry({ runId: 'run-A', operationId: 'interrupted', bindings: bindings() })).receipt).toEqual(end);
+    expect(await (await rebuilt.continue(continuation(P.sessionId, P.point!, 'resume'))).receipt).toMatchObject({ status: 'unavailable', point: null });
+    expect((await rebuilt.fork({ runId: 'run-A', operationId: 'fork-interrupted', sourcePoint: { sessionId: P.sessionId, turn: 1, kind: 'turn', checkpoint: 'guessed' } })).status).toBe('unavailable');
+    expect((await rebuilt.fork({ runId: 'run-A', operationId: 'fork-settled', sourcePoint: P.point! })).status).toBe('completed');
+    expect(dispatches).toBe(1);
+  });
   it('original-operation lookup refuses corrupt points and envelopes without dispatch or acceptance', async () => {
     let dispatches = 0; const store = memoryStore();
     const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });

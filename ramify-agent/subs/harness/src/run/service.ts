@@ -2236,12 +2236,18 @@ export class RunService {
     return { kind: 'assessed', next: record!.next };
   }
 
-  /** The brief's append to the local architect's session. A lost session, a failure and no session are outcomes, never thrown. */
+  /**
+   * The brief's append to the local architect's session. A lost session, a
+   * failure and no session are outcomes, never thrown. A conflict, such as an
+   * append while the session's turn is active, is a failure of this append
+   * alone: the session is intact and the brief reaches its next input.
+   */
   private async appendReconciliationBrief(agent: AgentPort, key: string, parent: ArchitectRef | null, brief: string): Promise<BriefAppend> {
     if (parent === null) return { session: null, ref: null, outcome: 'no-session', reason: 'The local architect\'s session was not kept after its completion request' };
     try {
       const answer = await (await this.operations(agent)).append(parent.ref, key, brief);
       if (answer.outcome === 'session-lost') return { session: parent.session, ref: null, outcome: 'session-lost', reason: 'The local architect\'s session can no longer be read' };
+      if (answer.outcome === 'conflict') return { session: parent.session, ref: null, outcome: 'failed', reason: `The local architect's session did not take the brief: ${answer.reason}` };
       return { session: parent.session, ref: answer.ref, outcome: answer.outcome, reason: null };
     } catch (error) {
       return { session: parent.session, ref: null, outcome: 'failed', reason: message(error) };
@@ -2251,8 +2257,9 @@ export class RunService {
   /**
    * What the architect's own session holds after the append: the point its
    * next turn continues from, the note in its transcript, or, where the
-   * append did not land, the brief its next input carries from the log. A
-   * session that can no longer be read is finished as lost.
+   * append did not land, the brief its next input carries from the log. Only
+   * a session that can no longer be read is finished as lost; a conflict
+   * leaves it in place.
    */
   private async afterBriefAppend(run: Run, reconciliation: string, appended: BriefAppend, brief: string, parent: ParentSession): Promise<void> {
     if (appended.outcome === 'appended' || appended.outcome === 'already-present') {
@@ -2734,9 +2741,9 @@ export class RunService {
             }
             try {
               const answer = await (await this.operations(agent)).append(orientation.data.point, key, recorded.packageText, 'support:work-item-package');
-              return answer.outcome === 'session-lost'
-                ? { session: event.data.session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' }
-                : { session: event.data.session, ref: answer.ref, outcome: answer.outcome, reason: null };
+              if (answer.outcome === 'session-lost') return { session: event.data.session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' };
+              if (answer.outcome === 'conflict') return { session: event.data.session, ref: null, outcome: 'failed', reason: `The parent session did not take the package: ${answer.reason}` };
+              return { session: event.data.session, ref: answer.ref, outcome: answer.outcome, reason: null };
             } catch (error) { return { session: event.data.session, ref: null, outcome: 'failed', reason: message(error) }; }
           },
           complete: result => ({ event: run.log.next({ type: 'context-package-appended', data: {
@@ -4947,7 +4954,7 @@ export class RunService {
       if (ended?.data.kept && outcome?.session?.ref) {
         const continued = await (await this.operations(agent)).append(outcome.session.ref, `recover:${activeId}:${latest.data.invocation}`,
           `Recover capability ${activeId} from the committed plan and task state`);
-        if (continued.outcome !== 'session-lost') { point = continued.ref; session = latest.data.session; }
+        if (continued.outcome === 'appended' || continued.outcome === 'already-present') { point = continued.ref; session = latest.data.session; }
       }
       if (session === undefined) reconstructedFrom = latest.data.session;
     }
@@ -5138,9 +5145,9 @@ export class RunService {
           if (session === undefined || ref === undefined) return { session: null, ref: null, outcome: 'no-session', reason: 'No retained parent point' };
           try {
             const answer = await (await this.operations(agent)).append(ref, key, recorded.packageText, 'support:work-item-package');
-            return answer.outcome === 'session-lost'
-              ? { session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' }
-              : { session, ref: answer.ref, outcome: answer.outcome, reason: null };
+            if (answer.outcome === 'session-lost') return { session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' };
+            if (answer.outcome === 'conflict') return { session, ref: null, outcome: 'failed', reason: `The parent session did not take the package: ${answer.reason}` };
+            return { session, ref: answer.ref, outcome: answer.outcome, reason: null };
           } catch (error) { return { session, ref: null, outcome: 'failed', reason: message(error) }; }
         },
         complete: result => ({ event: run.log.next({ type: 'context-package-appended', data: {
@@ -6989,12 +6996,14 @@ export class RunService {
         const answer = await (await this.operations(agent)).append(context.ref, decision.id, briefText(decision));
         // The append reached the parent and its completion is not in the log.
         await this.afterWrite('brief-appending', run.record.jobId);
-        if (answer.outcome === 'session-lost') {
+        if (answer.outcome === 'session-lost' || answer.outcome === 'conflict') {
           return {
             outcome: 'session-lost',
             generation: context.generation,
             session: context.session,
-            reason: `the architect context of generation ${context.generation} can no longer be read`,
+            reason: answer.outcome === 'conflict'
+              ? `the architect context of generation ${context.generation} did not take the brief: ${answer.reason}`
+              : `the architect context of generation ${context.generation} can no longer be read`,
           };
         }
         return { outcome: answer.outcome, generation: context.generation, session: context.session, ref: answer.ref };
@@ -8318,7 +8327,7 @@ export class RunService {
       count < run.record.policy.limits.maxIterationsPerWorkItem; count += 1) {
     const appended = qualification !== undefined || point === undefined ? { outcome: 'session-lost' as const }
       : await (await this.operations(agent)).append(point, `nested:${request.id}:${count}`, `Qualify nested request ${request.id} from ${assignment.id}`);
-    const lost = appended.outcome === 'session-lost' || session === undefined;
+    const lost = (appended.outcome !== 'appended' && appended.outcome !== 'already-present') || session === undefined;
     qualification ??= await this.runInvocation<QualificationAction>(run, agent, {
       role: 'capability-architect', task: { kind: 'capability-qualification', goal: request.original.need, requirements: [JSON.stringify(request.original)] }, work: { capabilityTask: parentTask.id, request: request.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.work.capabilityTask === parentTask.id &&
@@ -8713,7 +8722,7 @@ export class RunService {
       if (sessionRef !== undefined) {
         const note = `Continuing iteration ${assignment.id}.`;
         const appended = await (await this.operations(agent)).append(sessionRef, `${assignment.id}:${attempt}`, note);
-        if (appended.outcome === 'session-lost') {
+        if (appended.outcome !== 'appended' && appended.outcome !== 'already-present') {
           const used = this.reconstructions(run, item.id, assignment.coordination?.kind === 'capability-task' ? assignment.id : undefined);
           if (used >= run.record.policy.limits.sessionReconstructionsPerWork) {
             findings.push(`The engineer's session was lost and ${used} reconstruction${used === 1 ? '' : 's'} were already spent`);

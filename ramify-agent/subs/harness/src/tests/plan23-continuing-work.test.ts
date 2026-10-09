@@ -150,7 +150,7 @@ function interceptCommits(store: SessionStore, before: (input: CommitInput, path
       ? { kind: 'unresolved', request: 'cr-1', invocation: 'engineer-1', problem: 'Insufficient exposed API evidence', evidence: ['V1 does not establish behavior'] } : { result: 'accepted' } }]; });
     const first = await turn(adapter, input('local-architect', 'orientation', 'op-1'));
     const appended = await adapter.append(first.ref, 'selected-package:1', 'K1: current selected requirement package');
-    expect(appended.outcome).toBe('appended'); if (appended.outcome === 'session-lost') throw new Error('missing parent');
+    expect(appended.outcome).toBe('appended'); if (appended.outcome !== 'appended') throw new Error('missing parent');
     const second = await turn(adapter, input('local-architect', 'assignment', 'op-2', appended.ref));
     const qualification = input('local-architect', 'capability-qualification', 'op-3', second.ref);
     let validations = 0;
