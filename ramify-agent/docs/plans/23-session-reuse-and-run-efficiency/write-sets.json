@@ -405,7 +405,9 @@
         "subs/harness/src/tests/helpers/acceptance-flow.ts",
         "subs/harness/src/tests/helpers/dependency-flow.ts",
         "subs/harness/src/tests/helpers/acceptance-boundaries.ts",
-        "subs/harness/src/tests/helpers/dependency-boundaries.ts"
+        "subs/harness/src/tests/helpers/dependency-boundaries.ts",
+        "subs/harness/src/tests/plan21-workflows.integration.test.ts",
+        "subs/harness/src/tests/check-findings-composition.integration.test.ts"
       ],
       "agentTestWorker": [
         "subs/harness/subs/agent/src/tests/port-additions.test.ts",
@@ -427,7 +429,9 @@
         "subs/harness/src/tests/composition.test.ts",
         "subs/harness/src/tests/composition-recovery.test.ts",
         "subs/harness/src/tests/composition-recovery-chains.test.ts",
-        "subs/harness/src/tests/composition-recovery-delegation.test.ts"
+        "subs/harness/src/tests/composition-recovery-delegation.test.ts",
+        "subs/harness/src/tests/helpers/recovery-boundaries.ts",
+        "subs/harness/src/tests/helpers/recovery-boundaries.test.ts"
       ],
       "workflowTestWorker": [
         "subs/harness/src/tests/run.test.ts",
