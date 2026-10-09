@@ -15,6 +15,7 @@ import { placementDecisions } from '../guard/write-guard.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import type { HookFinding } from '../hooks/post-write.js';
 import { inputsHash, loadPromptPackages, renderEngineerPrompt, sha256 } from '../prompts/packages.js';
+import { deliveredSupportPaths } from '../prompts/tasks.js';
 import { HarnessSessionOperations, readSessionPointReference, settleSessionEquipment, type HarnessTaskBrief } from '../run/session-operations.js';
 import { ExcursionWatcher } from '../run/excursions.js';
 import { runCheckpoint } from '../run/gates.js';
@@ -508,7 +509,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
       environment: { projectRoot, workingDirectory, candidate: null, snapshot: null, limits,
         availableTools: [...spec.builtinTools, ...spec.tools.map(tool => tool.name), engineerToolName],
         views: views.flatMap(view => view.views.map(item => ({ path: item.path, revision: item.revision, modules: [view.module], coverage: item.coverage === null ? [] : [`${item.coverage} coverage limits`] }))),
-        supportPaths: loaded.files.map(file => file.path), cucumberConfiguration: JSON.stringify({ kind: 'not-applicable', reason: 'Standalone assignment selects no registered feature files' }) } };
+        supportPaths: deliveredSupportPaths(loaded, 'standalone-command'), cucumberConfiguration: JSON.stringify({ kind: 'not-applicable', reason: 'Standalone assignment selects no registered feature files' }) } };
     agentSession = await sessions.start({ runId: `standalone:${id}`, operationId: id, session: id, loaded, brief, spec,
       authority: { scope, guarded: guardedFiles }, validator: { name: engineerToolName, schema: capabilityEngineerJsonSchema, submissionSchema: 'ramify-agent.engineer-submission/1', bound: limits.rejectedSubmissionsPerTurn },
       destination: { session: id, submission: sessionLayout.submission }, currentAuthority: async () => options.signal?.aborted !== true,
