@@ -40,6 +40,9 @@ describe('a single engineer session', () => {
     expect(recorded.scopeSize!.subtotal).toBeGreaterThan(0);
     expect(recorded.sessionOperation).toMatchObject({ runId: `standalone:${recorded.id}`, operationId: recorded.id, turn: 1, sourcePoint: { turn: 0, kind: 'checkpoint' } });
     expect(packet.message).toContain('## Approach the architect asked for\n\nNot stated.');
+    expect(packet.message).toContain(`${root}/${notesDirectory}/src/tests/`);
+    expect(packet.message).toContain(`${root}/${notesDirectory}/module.ramify`);
+    expect(packet.message).not.toContain('npx vitest run <path/to/file.test.ts>');
   });
 
   test('an unconfirmed operation barrier retains project ownership and scratch and refuses the gate', async () => {

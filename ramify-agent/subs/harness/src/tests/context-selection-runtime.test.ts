@@ -23,6 +23,7 @@ import { installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun } from '
 import { openUnchangedRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { passingAudit } from './helpers/direct-check-execution.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -59,12 +60,27 @@ test('one oriented local context selects once, appends the work-item package onc
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
+  await writeFile(join(fixture.root, 'cucumber.json'), '{}');
+  const audit = passingAudit();
+  // Synthetic provider facts exercise briefing delivery, not runner execution.
+  const configuredAudit = {
+    ...audit,
+    async read(root: string, commit: string) {
+      const config = await audit.read(root, commit);
+      return { ...config, checks: [...config.checks, { id: 'scenario-setup', executor: { kind: 'command', commands: [
+        { cmd: 'cucumber-js', args: ['--config', 'cucumber.json', '--profile', 'integration'], parser: 'cucumber' },
+      ] } }] };
+    },
+    async run(input: Parameters<typeof audit.run>[0]) {
+      return audit.run({ ...input, configuration: await audit.read(input.projectRoot, input.sourceCommit) });
+    },
+  };
   const agent = createScriptedAgent(declaringScenarios(byRole({
     'initial-architect': [submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core', 'Summarizes a review.')]))],
     'local-architect': [submit(requestCompletion())],
   })));
   const opened = await openUnchangedRuns(fixture.root, {
-    agent, inputs: treeInputs(), unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001', 'final verification of plan "revision-diff"'],
+    agent, configuredAudit, inputs: treeInputs(), unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001', 'final verification of plan "revision-diff"'],
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('revision-diff'));
@@ -81,6 +97,15 @@ test('one oriented local context selects once, appends the work-item package onc
   expect(appends[0]!.data.outcome).toBe('appended');
   expect(events.filter(event => event.type === 'context-package-prompt-bound')).toHaveLength(0);
   expect(agent.sessions.filter(session => session.spec.submission.name === 'submit_work_orientation')).toHaveLength(1);
+  const initial = agent.sessions.find(session => session.spec.role === 'initial-architect')!;
+  expect(initial.spec.prompt).toContain('argv ["cucumber-js","--config","cucumber.json","--profile","integration"]');
+  expect(initial.spec.prompt).toContain(`Configuration/support pointer: \`${fixture.root}/cucumber.json\``);
+  const orienting = agent.sessions.find(session => session.spec.submission.name === 'submit_work_orientation')!;
+  expect(orienting.spec.prompt).toContain('The plan asks for review-summary-request.');
+  expect(orienting.spec.prompt).toContain('The plan asks for review-summary-acceptance.');
+  expect(orienting.spec.prompt).toContain(`${fixture.root}/subs/workspace/subs/reviews/subs/core/src/tests/`);
+  const selectingSession = agent.sessions.find(session => session.spec.role === 'context-selector')!;
+  expect([...selectingSession.inherited, selectingSession.spec.prompt].join('\n')).toContain(`${fixture.root}/subs/workspace/subs/reviews/subs/core/module.ramify`);
   expect(agent.sessions.filter(session => session.spec.role === 'context-selector')).toHaveLength(1);
   const recorded = await recordedPackage(fixture.root, receipt.jobId, events, selections[0]!);
   expect(recorded.selection.package).toEqual({ elements: ['fr-001', 'fr-002'], deviations: [], hash: selections[0]!.data.packageHash });

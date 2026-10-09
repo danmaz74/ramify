@@ -206,7 +206,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
         return { isError: true, text };
       }
       if (testRun.kind === 'whole-suite') {
-        const explanation = `Refused, nothing ran: \`${testRun.segment}\` runs the project's whole test suite (${testRun.reason}). The whole suite is not run from \`shell\`: it runs through ramify-audit at the gates, a full run takes minutes and waits behind every other suite run on this machine, and it verifies far more than this iteration is judged on. To run particular tests, name their files: \`npx vitest run <path/to/file.test.ts> …\` or \`npm test -- <path/to/file.test.ts>\`. Watch mode is refused for the same reason: it never ends on its own.`;
+        const explanation = `Refused, nothing ran: \`${testRun.segment}\` runs the project's whole test suite (${testRun.reason}). The whole suite runs through ramify-audit at the gates. To run particular tests, use the project's declared runner and its focused file or scenario options; inspect its audit configuration and package scripts. Watch mode is refused because it never ends on its own.`;
         await options.refused?.(explanation);
         return { isError: true, text: explanation };
       }

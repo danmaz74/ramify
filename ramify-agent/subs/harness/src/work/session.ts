@@ -20,6 +20,7 @@ import type { EngineerBounds } from '../run/policy.js';
 import { analysisLines, boundOf, digestLines } from './failure.js';
 import type { IterationResult, WriteScope } from './iterations.js';
 import type { DefaultWriteScope } from './scope.js';
+import type { TestArea } from '../run/project-config.js';
 
 /*
  * What a local architect is given for one work item: the goal, its
@@ -149,6 +150,8 @@ export interface WorkItemBriefing {
   readonly projectRoot?: string | undefined;
   readonly workingDirectory?: string | undefined;
   readonly moduleDirectory?: string | undefined;
+  readonly testAreas?: readonly TestArea[] | undefined;
+  readonly setup?: string | undefined;
   readonly onboarding: Onboarding;
   readonly views: ApiViewResult;
   /** What an assignment based on this work item's module gives its engineer, where the provider or the view knows the module. */
@@ -319,12 +322,13 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
       briefing.workingDirectory === briefing.projectRoot
         ? '- The assigned module source directory was absent when this session began. This session remains at the project root even if an engineer creates the module. Do not create it from this reader session.'
         : '- This is the assigned module\'s source directory.',
-      ...(briefing.workingDirectory === briefing.projectRoot && briefing.moduleDirectory !== undefined ? [
-        `- Assigned module declaration: \`${rooted(join(briefing.moduleDirectory, 'module.ramify'))}\` (read it if present).`,
-        `- Assigned module source: \`${rooted(join(briefing.moduleDirectory, 'src'))}/\` (read it if present).`,
-      ] : []),
       '- Any project-relative path in this briefing resolves from the project root; structured submissions keep their project-relative paths.',
     ]),
+    ...(briefing.moduleDirectory === undefined ? [] : [
+      `- Assigned module declaration: \`${rooted(join(briefing.moduleDirectory, 'module.ramify'))}\` (read it if present).`,
+      `- Assigned module source: \`${rooted(join(briefing.moduleDirectory, 'src'))}/\` (read it if present).`,
+    ]),
+    ...(briefing.testAreas ?? []).map(area => `- Test area (${area.module}): \`${rooted(area.area)}/\`.`),
     briefing.onboarding.path === '(module directory unavailable)'
       ? `- Onboarding unavailable: ${briefing.onboarding.missing}. No other module's prose stands in for it.`
       : briefing.onboarding.purpose === null
@@ -343,6 +347,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     }
   }
   lines.push(`- The architect view is at \`${rooted(architectViewDirectory)}/\`.`, '');
+  if (briefing.setup) lines.push(briefing.setup, '');
   lines.push(...defaultWriteScopeSection(briefing.defaultWriteScope ?? []));
 
   lines.push('## Hypotheses you received', '');

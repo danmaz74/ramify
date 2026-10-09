@@ -314,6 +314,8 @@ export function failureAnalysisMessage(request: {
     `The project is at \`${request.projectRoot}\`, with the engineer's uncommitted work in it. Read a file there by its absolute path where the patch does not show it, such as a file the engineer created.`,
     '',
     'Read, then submit your account.',
+    '',
+    'The engineer shell refuses whole-suite and watch-mode test runs; gates run the configured audit. A refusal means nothing ran. Focused commands run from the engineer working directory, under the recorded timeout and environment, and complete output is retained separately from its tail. Interpret these restrictions alongside the supplied tool results.',
   ].join('\n');
 }
 
@@ -380,4 +382,3 @@ export async function renderTranscript(
   const omitted = rendered.length - transcriptHeadCharacters - transcriptTailCharacters;
   return `${rendered.slice(0, transcriptHeadCharacters)}\n\n… ${omitted} characters of the middle are left out …\n\n${rendered.slice(-transcriptTailCharacters)}`;
 }
-

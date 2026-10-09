@@ -347,6 +347,8 @@ export interface IterationBriefing {
   readonly package?: string | undefined;
   /** The test areas of the modules whose tests the assignment owns; absent where the run could not read them. */
   readonly testAreas?: readonly TestArea[] | undefined;
+  /** Authored check facts already known to this caller. */
+  readonly setup?: string | undefined;
 }
 
 /** The first user message of one engineer invocation. */
@@ -421,7 +423,8 @@ export function iterationMessage(briefing: IterationBriefing): string {
     ...(briefing.testAreas ?? []).map(area => `- \`${area.area}/\` (\`${area.module}\`)`),
     '',
     'To see how particular tests run before you propose completion, name their files to the project\'s runner from `shell`,',
-    'such as `npx vitest run <path/to/file.test.ts>`. A whole-suite run is refused there: the gate\'s audit runs it.',
+    ...(briefing.setup ? [briefing.setup] : ['Inspect the project\'s declared audit and package scripts for its focused test command.']),
+    'A whole-suite run is refused there: the gate\'s audit runs it.',
     '',
   );
   lines.push(...obligationsToBindSection(briefing.obligations ?? (assignment.obligations ?? []).map(id => ({ id, text: null }))));

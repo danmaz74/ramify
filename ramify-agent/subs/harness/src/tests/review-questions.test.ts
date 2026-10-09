@@ -54,7 +54,7 @@ const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 /** The candidates with guidance: one principles document and the notes module's README, which the third iteration rewrites. */
 function guidedCommits(): Record<string, ScriptedCommit> {
   const scripted = candidates();
-  const guidance = { [principles]: 'Keep every store in memory.\n', [readme]: 'Notes keep one note per review run.\n' };
+  const guidance = { 'ramify-agent.json': '{"schema":"ramify-agent.project/1"}\n', [`${notesDirectory}/src/tests/notes.test.ts`]: 'export {};\n', [principles]: 'Keep every store in memory.\n', [readme]: 'Notes keep one note per review run.\n' };
   return {
     'revision-01': { ...scripted['revision-01']!, files: { ...scripted['revision-01']!.files, ...guidance } },
     'revision-02': { ...scripted['revision-02']!, files: { ...scripted['revision-02']!.files, ...guidance } },
@@ -175,6 +175,10 @@ describe('three questions over one candidate', () => {
     const opened = eventsOf(events, 'session-opened');
     const reviewerSessions = agent.sessions.filter(session => session.spec.role === 'reviewer');
     const sessionOf = (request: string) => reviewerSessions.find(session => new RegExp(`review ${request} `, 'u').test(session.spec.prompt))!;
+    expect(sessionOf('rq-0001').spec.prompt).toContain('Configuration/support pointer: `ramify-agent.json`');
+    expect(sessionOf('rq-0001').spec.prompt).toContain(`\`${notesDirectory}/src/tests/\`: inspect with snapshot_list`);
+    expect(sessionOf('rq-0001').spec.prompt).not.toContain(`Configuration/support pointer: \`${root}/`);
+    expect(sessionOf('rq-0003').spec.prompt).not.toContain('## Declared project checks');
     for (const [request, iteration] of [['rq-0002', 0], ['rq-0005', 1], ['rq-0008', 2]] as const) {
       const architectRef = assigned[iteration]!.data.architectRef!;
       const reviewer = sessionOf(request);

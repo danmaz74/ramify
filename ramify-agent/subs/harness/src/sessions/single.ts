@@ -1,4 +1,5 @@
 import { taskSupportSections } from '../work/task-support.js';
+import { declaredCheckInputs, moduleInputPointers } from '../work/starting-inputs.js';
 import { deliveredScopeInputs, writeScopeMeasurement } from '../kpi/capture.js';
 import { randomBytes } from 'node:crypto';
 import { mkdir, realpath, stat, writeFile } from 'node:fs/promises';
@@ -21,7 +22,7 @@ import { ExcursionWatcher } from '../run/excursions.js';
 import { runCheckpoint } from '../run/gates.js';
 import { captureProjectConfig } from '../run/project-config.js';
 import { readCommittedAuditConfiguration } from '../../subs/audit/src/check-execution.js';
-import { declaredModuleDirectories } from '../run/project-config.js';
+import { declaredModuleDirectories, moduleTestAreas } from '../run/project-config.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { recordSettledSnapshot } from '../run/mutations.js';
 import { ObservationLog } from '../run/observations.js';
@@ -307,8 +308,13 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
   const head = await git.currentHead(projectRoot);
   const auditExists = await stat(join(projectRoot, 'ramify-audit.json')).then(found => found.isFile(), () => false);
   let auditPaths: string[] = [];
+  let declaredChecks: readonly unknown[] = [];
   if (auditExists) {
-    try { auditPaths = await auditPreparationPaths(await readCommittedAuditConfiguration(projectRoot, head), projectRoot); }
+    try {
+      const configuration = await readCommittedAuditConfiguration(projectRoot, head);
+      auditPaths = await auditPreparationPaths(configuration, projectRoot);
+      declaredChecks = configuration.checks;
+    }
     catch (error) { return notStarted(`Committed audit configuration cannot be guarded: ${message(error)}`); }
   }
   const guardedFiles = await captureGuardedFiles(projectRoot, [], {}, [...auditPaths, ...scopeConfigurationPaths(scope)]);
@@ -348,7 +354,18 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
     authorizations: [],
   };
   const systemPrompt = renderEngineerPrompt(loaded, projectRoot, undefined, workingDirectory);
-  const prompt = iterationMessage({ assignment, projectRoot, workingDirectory, base: head, views });
+  const testAreas = (await moduleTestAreas(projectRoot, initial)).filter(area => tests.exactOwners.includes(area.module)
+    || tests.subtrees.some(subtree => area.module === subtree || area.module.startsWith(`${subtree}/`)));
+  const setupPaths = [...auditPaths];
+  for (const path of ['ramify-agent.json', 'package.json']) {
+    if ((await stat(join(projectRoot, path)).catch(() => null))?.isFile()) setupPaths.push(path);
+  }
+  const setup = declaredCheckInputs({ projectRoot, checks: declaredChecks, paths: [...new Set(setupPaths)] });
+  const modulePointers = moduleInputPointers({ projectRoot, testAreas, modules: views.flatMap(view => {
+    const module = initial === null ? undefined : findModule(initial, view.module);
+    return module === undefined ? [] : [{ module: module.module, directory: module.dir, apiPaths: view.views.map(view => view.path) }];
+  }) });
+  const prompt = [iterationMessage({ assignment, projectRoot, workingDirectory, base: head, views, testAreas, setup }), modulePointers].filter(Boolean).join('\n\n');
   const shown = scopePaths(projectRoot, scope);
 
   let record: SessionRecord = sessionRecordSchema.parse({

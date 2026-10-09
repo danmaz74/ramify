@@ -91,8 +91,8 @@ describe('the shell tool', () => {
     const result = await tool.definition.execute({ command: 'touch before && npm test' }, new AbortController().signal);
     expect(result.isError).toBe(true);
     expect(result.text).toContain('Refused, nothing ran: `npm test`');
-    expect(result.text).toContain('it runs through ramify-audit at the gates');
-    expect(result.text).toContain('npx vitest run <path/to/file.test.ts>');
+    expect(result.text).toContain('runs through ramify-audit at the gates');
+    expect(result.text).toContain("use the project's declared runner");
     expect(result.text).not.toContain('run_scope_tests');
     expect(refusals).toHaveLength(1);
     expect(tool.calls).toBe(0);

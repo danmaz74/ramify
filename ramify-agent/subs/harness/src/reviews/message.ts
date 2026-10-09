@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { posix } from 'node:path';
 import { capabilityEngineerSubmissionSchema } from '../work/engineer.js';
 import { deviationNotice } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import type { IterationAssignment } from '../work/iterations.js';
@@ -32,6 +33,8 @@ export interface ReviewBriefing {
   readonly planDocument?: string | null | undefined;
   /** Exact committed producer/binding evidence, authenticated against the reviewed feature bytes. */
   readonly pendingBindings?: readonly { readonly path: string; readonly sha256: string; readonly scenario: string; readonly invocation: string; readonly submission: string }[] | undefined;
+  /** Declared check facts with candidate-relative configuration references. */
+  readonly setup?: string | undefined;
 }
 
 const questions = { code: 'Code review', scope: 'Scope review', design: 'Design review' } as const;
@@ -85,6 +88,14 @@ export function reviewMessage(briefing: ReviewBriefing): string {
     '',
   );
   lines.push('Read snapshot_diff first, then inspect the changed implementation and the source required to judge it. The audited diff includes harness-produced changes; no feature or pending-tag patch is hidden.', '');
+  if (briefing.setup) lines.push(briefing.setup, '');
+  if (assignment !== null && kind !== 'design') {
+    const modules = assignment.scope.resolved.ownership.modules.filter(module => assignment.gate.tests.exactOwners.includes(module.id)
+      || assignment.gate.tests.subtrees.some(owner => module.id === owner || module.id.startsWith(`${owner}/`)));
+    const testAreas = modules.map(module => posix.join(module.directory, 'src/tests')).filter(area => snapshot.directories.has(area));
+    if (testAreas.length > 0) lines.push('## Candidate test pointers', '',
+      ...testAreas.map(area => `- \`${area}/\`: inspect with snapshot_list; read named files with snapshot_read.`), '');
+  }
   for (const binding of briefing.pendingBindings ?? []) lines.push(`Harness pending-tag binding: ${binding.scenario} in ${binding.path}, exact candidate sha256 ${binding.sha256}, accepted producer ${binding.invocation}, submission ${binding.submission}. This attribution supplies provenance; review the actual audited patch.`, '');
   if (briefing.checkFindings.length > 0) {
     lines.push('## CheckFindings this work item already holds', '');

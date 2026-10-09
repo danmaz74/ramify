@@ -600,6 +600,8 @@ describe('CF10: a missing fork point and a failed brief append', () => {
     expect(first!.spec.session.mode).toBe('fresh');
     expect(first!.start).toEqual({ mode: 'fresh' });
     expect(first!.spec.prompt).toContain('## CheckFindings needing attention (1)');
+    expect(first!.spec.prompt).toContain('The plan asks for review-notes-request.');
+    expect(first!.spec.prompt).toContain(`${root}/${notesDirectory}/src/tests/`);
     const record = await committed<ReconciliationAssessment>(root, runId, reconciliationLayout.assessment('wi-001.rc01'));
     expect(record).toMatchObject({ requestedStart: 'fork', actualStart: 'fresh' });
     const forkEnded = eventsOf(events, 'invocation-ended').find(event => event.data.invocation === record.invocation)!;

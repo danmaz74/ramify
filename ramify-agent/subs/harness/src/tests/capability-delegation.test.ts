@@ -590,8 +590,11 @@ test('a restart with an unqualified pending request qualifies it fresh and recor
   const recoveredOutcome = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.outcome(recovered!.data.invocation)), 'utf8')) as InvocationOutcome;
   expect(recoveredOutcome.ended).toBe('submitted');
   expect(recoveredOutcome.session?.mode).toBe('fresh');
-  // Its one model turn is the fresh one, carrying the full captured plan package.
-  expect(qualifications).toEqual([{ mode: 'fresh', prompt: expect.stringContaining('A must show a label for a fact from B, including a fresh value and a source.') }]);
+  // Its fresh turn receives the work-item package, including elements beyond its engineer assignment subset.
+  expect(qualifications).toEqual([{ mode: 'fresh', prompt: expect.stringContaining('The plan asks for a-reads-b-request.') }]);
+  expect(qualifications[0]!.prompt).toContain('The plan asks for a-reads-b-acceptance.');
+  expect(qualifications[0]!.prompt).not.toContain('# Captured plan package');
+  expect(qualifications[0]!.prompt).toContain(`${fixture.root}/subs/a/src/tests/`);
   await stopWaitingRun(second.service, receipt.jobId);
 }, 60_000);
 

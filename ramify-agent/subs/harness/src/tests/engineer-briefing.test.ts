@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { loadPromptPackages, renderEngineerPrompt } from '../prompts/packages.js';
 import { iterationMessage } from '../work/engineer.js';
 import type { IterationAssignment } from '../work/iterations.js';
+import { declaredCheckInputs, moduleInputPointers } from '../work/starting-inputs.js';
 
 /** Only what the message reads of an assignment. */
 function assignment(): IterationAssignment {
@@ -21,6 +22,26 @@ function assignment(): IterationAssignment {
 }
 
 describe('what an engineer is told about the Ramify project it works in', () => {
+  test('known setup renders the declared project runner and rooted references without an invented focused command', () => {
+    const setup = declaredCheckInputs({ projectRoot: '/p', paths: ['ramify-audit.json', 'checks/cucumber.json'], checks: [
+      { id: 'scenario-check', executor: { kind: 'command', commands: [{ cmd: 'npm', args: ['run', 'acceptance', '--', '--profile', 'integration'], cwd: 'checks', parser: 'cucumber', env: { WORLD: 'secret-value' } }] } },
+    ] });
+    const message = iterationMessage({ assignment: assignment(), projectRoot: '/p', workingDirectory: '/p/subs/reviews/src', base: 'abc', setup });
+    expect(message).toContain('argv ["npm","run","acceptance","--","--profile","integration"]; cwd `/p/checks`');
+    expect(message).toContain('`/p/checks/cucumber.json`');
+    expect(message).toContain('environment names: WORLD');
+    expect(message).not.toContain('secret-value'); expect(message).not.toContain('npx vitest');
+    expect(declaredCheckInputs({ projectRoot: '/p', checks: [] })).toBe('');
+  });
+
+  test('module pointers keep module-cwd and selector-workspace references rooted and testing modules use their known test area', () => {
+    const pointers = moduleInputPointers({ projectRoot: '/p', modules: [{ module: 'app/checks', directory: 'subs/checks', apiPaths: ['subs/checks/src/.ramify'] }],
+      testAreas: [{ module: 'app/checks', area: 'subs/checks/src' }] });
+    expect(pointers).toContain('declaration `/p/subs/checks/module.ramify`');
+    expect(pointers).toContain('Test area: `/p/subs/checks/src/`');
+    expect(pointers).toContain('Observed API view: `/p/subs/checks/src/.ramify/`');
+    expect(pointers).not.toContain('src/tests/');
+  });
   test('the system prompt says what crosses a module boundary, where the answer is and how an unexposed symbol is reported', async () => {
     const { packages } = await loadPromptPackages();
     const prompt = renderEngineerPrompt(packages.get('engineer')!, '/p');

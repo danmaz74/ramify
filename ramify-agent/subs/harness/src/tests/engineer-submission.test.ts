@@ -336,7 +336,7 @@ describe('a rejected submission in a run', () => {
     // The whole suite is the gate's audit's to run: refused before anything spawned.
     expect(refused!.isError).toBe(true);
     expect(refused!.text).toContain('Refused, nothing ran: `npx vitest run`');
-    expect(refused!.text).toContain('npx vitest run <path/to/file.test.ts>');
+    expect(refused!.text).toContain("use the project's declared runner");
     const shellRuns = commands.filter(request => request.argv[0] === 'bash');
     expect(shellRuns.map(request => request.argv)).toEqual([['bash', '-c', named]]);
   }, 300_000);
