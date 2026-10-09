@@ -1,11 +1,13 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { createSessionOperations } from '../../subs/agent/src/session-operations.js';
 import type { SessionOperationDriver } from '../../subs/agent/src/interfaces/session-operations.js';
 import { openSessionStore } from '../run/session-store.js';
 import { runPlan23LiveSessionOn, type Plan23LiveSessionOptions } from '../qualification/live-session.js';
+// The qualification helper reads the persisted journal as its evidence.
+vi.unmock('../run/session-store.js');
 const directories: string[] = [];
 afterEach(async () => { for (const path of directories.splice(0)) await rm(path, { recursive: true, force: true }); });
 async function fixture(driver?: SessionOperationDriver) {

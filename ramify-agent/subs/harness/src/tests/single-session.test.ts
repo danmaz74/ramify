@@ -20,6 +20,9 @@ import { completionProposed, edit, read, shell, unsuitableScope, write } from '.
 import { commandResult } from './helpers/command-result.js';
 import { testPolicy } from './helpers/runs.js';
 
+// This file includes the physical session-store persistence witness.
+vi.unmock('../run/session-store.js');
+
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 import { cleanups, notes, notesDirectory, notesSource, project, session, checked, passingGate, finished, outcomeOf, observationsOf, exists } from './single-session-fixture.js';

@@ -12,8 +12,9 @@ ordering, rather than elapsed-speed expectations.
 Workflow tests mock the disk-backed session store with a directory-scoped
 in-memory adapter. It preserves detached JSON values, copied payload bytes,
 atomic compare-and-swap and close/reopen state while real session operations and
-workflow logic execute. The small session-store adapter tests explicitly unmock
-their subject to verify actual bytes, corruption and recovery. Registered native
+workflow logic execute. Small tests whose subject is disk persistence explicitly
+unmock the store to verify actual bytes, corruption, recovery and qualification
+evidence. Registered native
 witnesses keep their actual tool/kernel boundaries.
 
 Performance and exhaustive/scale probes use `*.stress.ts` and the separate,
