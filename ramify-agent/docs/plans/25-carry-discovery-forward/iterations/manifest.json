@@ -1,0 +1,117 @@
+{
+  "plan": "../main-plan.md",
+  "status": "proposed; implementation not started",
+  "execution": "serial in dependency order",
+  "incorporates": "../../26-instruction-block-delivery/main-plan.md",
+  "iterations": [
+    {
+      "id": "0",
+      "file": "00-block-foundation.md",
+      "dependsOn": [],
+      "cases": [
+        "B01",
+        "D01",
+        "D02",
+        "D03",
+        "D04",
+        "D05"
+      ],
+      "status": "planned",
+      "writeBoundary": "Harness block resolver, manifest/intent readers and briefing occurrence model; no runtime writer switch."
+    },
+    {
+      "id": "1",
+      "file": "01-instruction-delivery.md",
+      "dependsOn": [
+        "0"
+      ],
+      "cases": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07"
+      ],
+      "status": "planned",
+      "writeBoundary": "Harness task/brief builders, package prose, session-operation integration, narrow run callers and delivery tests."
+    },
+    {
+      "id": "2",
+      "file": "02-discovery-records.md",
+      "dependsOn": [
+        "1"
+      ],
+      "cases": [
+        "D1",
+        "D2",
+        "D3"
+      ],
+      "status": "planned",
+      "writeBoundary": "Harness internal pointer shape, orientation/assignment/engineer/result schemas, record constructors and producer prose."
+    },
+    {
+      "id": "3",
+      "file": "03-discovery-delivery.md",
+      "dependsOn": [
+        "2"
+      ],
+      "cases": [
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D11",
+        "I01",
+        "I02",
+        "I03",
+        "I04"
+      ],
+      "status": "planned",
+      "writeBoundary": "Harness starting-point rendering, architect/engineer/reviewer task callers, snapshot filtering and fresh fallback tests."
+    },
+    {
+      "id": "4",
+      "file": "04-nfr-context.md",
+      "dependsOn": [
+        "3"
+      ],
+      "cases": [
+        "D8",
+        "D9",
+        "D10",
+        "D12",
+        "D13",
+        "I05"
+      ],
+      "status": "planned",
+      "writeBoundary": "Harness NFR source inputs/prompts, named snapshot comparisons and candidate/recovery tests."
+    },
+    {
+      "id": "5",
+      "file": "05-qualification.md",
+      "dependsOn": [
+        "4"
+      ],
+      "cases": [
+        "Q01",
+        "Q02",
+        "Q03",
+        "Q04",
+        "I06"
+      ],
+      "status": "planned",
+      "writeBoundary": "Harness integrated/projection tests, affected current documentation, receipts and final configured audit."
+    }
+  ]
+}
