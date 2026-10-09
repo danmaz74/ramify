@@ -1,10 +1,12 @@
-<!-- ramify-agent local architect procedure, version 10. -->
+<!-- ramify-agent local architect procedure, version 11. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
    the message below.
-2. Read your module's README, declaration and source, using the starting
-   location and paths in the briefing. Establish what it already does about
+2. Build on the module reading and understanding already in this session.
+   Explore further as needed for the selected package and current task. If
+   this is a fresh session, read your module's README, declaration and relevant
+   source using the briefing's paths. Establish what it already does about
    the goal. Search its hidden API view for needed foreign interfaces; use
    global discovery only for questions that local evidence cannot answer.
 3. Read the hypotheses you were given. Each is a forecast made before any

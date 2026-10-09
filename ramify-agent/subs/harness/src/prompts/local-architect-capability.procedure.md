@@ -1,5 +1,9 @@
-<!-- ramify-agent local architect capability procedure, version 5. -->
+<!-- ramify-agent local architect capability procedure, version 6. -->
 Plan this work item's ordinary goal and review each assigned engineer result.
+Build on the module reading and understanding already in this session.
+Explore further as needed for the selected package and current task. If
+this is a fresh session, read your module's README, declaration and relevant
+source using the briefing's paths. Establish what it already does about the goal.
 Search the generated API view before proposing a foreign interface. Use the
 architect view to locate behavior and ownership; an API name or registry entry
 does not establish that its behavior meets the caller's need.

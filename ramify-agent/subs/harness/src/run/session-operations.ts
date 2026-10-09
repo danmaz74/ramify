@@ -16,6 +16,8 @@ export interface HarnessTaskBrief {
   readonly goal: string;
   readonly requirements: readonly string[];
   readonly sections: BriefingRevision['sections'];
+  /** Selector forks keep the parent's known facts; their new task adds only selection inputs. */
+  readonly retainInheritedSections?: boolean;
   readonly environment: TaskEnvironment;
   readonly consultationSubmissionSchema?: string;
 }
@@ -134,9 +136,11 @@ export class HarnessSessionOperations {
     if (spec.session.mode !== 'fresh' && (!sourceRef || sourceRef.runId !== runId)) throw new Error('The requested session point is unavailable; explicit workflow recovery is required');
     const prior = sourceRef ? await this.context(runId, sourceRef.point) : null;
     const originalSections = input.brief.sections;
-    // A removed support section gets an explicit replacement. The recorded revision is never inferred from text.
+    // Selector forks retain known facts; other removed support sections get an explicit replacement.
+    // The recorded revision is never inferred from text.
     const sections = [...originalSections, ...(prior?.history.at(-1)?.sections ?? []).filter(section => !['goal', 'requirements'].includes(section.key) && !originalSections.some(current => current.key === section.key))
-      .map(section => ({ key: section.key, text: `# Current briefing update\n${section.key} no longer applies to this task.` }))];
+      .map(section => input.brief.retainInheritedSections && spec.role === 'context-selector' && spec.session.mode === 'fork'
+        ? section : { key: section.key, text: `# Current briefing update\n${section.key} no longer applies to this task.` })];
     const revision = exactInputHash(JSON.stringify([input.brief.goal, input.brief.requirements, sections]));
     const current = taskBriefingRevision({ revision, goal: input.brief.goal, requirements: input.brief.requirements, sections });
     const history = [...(prior?.history ?? [])];

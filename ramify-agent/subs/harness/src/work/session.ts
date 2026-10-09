@@ -306,7 +306,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     `- Context: ${ids(item.contextRefs)}`,
     '',
     briefing.package === undefined
-      ? 'Their text arrives in your work-item package once you have oriented.'
+      ? 'The requirement, acceptance and context elements are supplied with this task. Non-functional, fixed and recommendation elements are selected after orientation.'
       : `Your work-item package \`${briefing.package.hash}\`, already in your session, holds these elements whole with the non-functional, fixed and recommendation elements selected for this work item: ${ids(briefing.package.elements)}. An assignment names, in \`citedElements\`, the elements of this package its iteration must honor; its engineer and reviewers receive exactly those.`,
     '',
     'Tests that state the acceptance are part of the work.',
@@ -505,7 +505,6 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     lines.push(`## Earlier outlines`, '', `This work item already has ${briefing.outlines.length} outline revision(s).`, '');
   }
 
-  lines.push('Read your module, decide, and submit.');
   return lines.join('\n');
 }
 

@@ -4526,7 +4526,8 @@ export class RunService {
     const requirements = request.task?.requirements ?? [new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)))];
     const sections = [...taskSupportSections(request.prompt, [goal, ...requirements, ...(request.task?.omit ?? [])]), ...(request.task?.literalSections ?? [])];
     // Role/task rules deliver known facts; the agent decides what to inspect.
-    if (['initial-architect', 'local-architect', 'capability-architect', 'engineer', 'contract-engineer', 'nonfunctional-repair-engineer'].includes(request.role)) {
+    if (['initial-architect', 'local-architect', 'capability-architect', 'engineer', 'contract-engineer', 'nonfunctional-repair-engineer'].includes(request.role)
+      || (request.role === 'context-selector' && request.start.mode === 'fresh')) {
       const setup = await this.checkInputSection(run);
       if (setup && !request.prompt.includes(setup)) sections.push({ key: 'support:declared-checks', text: setup });
       const names = request.task?.modules ?? (item === undefined ? [] : [item.module]);
@@ -4552,6 +4553,7 @@ export class RunService {
       }
     }
     return { kind, objective: `Perform ${kind} for ${JSON.stringify(request.work)}; use the current evidence and designated submission.`, goal, requirements, sections,
+      ...(request.role === 'context-selector' && request.start.mode === 'fork' ? { retainInheritedSections: true } : {}),
       ...(request.task?.consultationSubmissionSchema === undefined ? {} : { consultationSubmissionSchema: request.task.consultationSubmissionSchema }),
       environment: { projectRoot: this.projectRoot, workingDirectory: spec.scope.workingDirectory,
         candidate: request.task?.candidate ?? request.candidateBefore ?? null, snapshot: request.task?.snapshot ?? null,
@@ -5107,7 +5109,8 @@ export class RunService {
     }
     const orientationRequirements = [this.planPackage(run, evidence.catalog,
       [...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs])];
-    const orientationStart = workOrientationMessage(briefing, { goal: item.goal, requirements: orientationRequirements });
+    const orientationBriefing = [briefing, '# Goal', item.goal, '# Requirements', ...orientationRequirements].join('\n\n');
+    const orientationStart = workOrientationMessage(orientationBriefing);
     let orientation = run.log.all('work-orientation-recorded').find(event => event.data.workItem === item.id);
     if (orientation === undefined) {
       // A completed dedicated orientation may precede its own event if the
@@ -5159,7 +5162,7 @@ export class RunService {
         await this.fail(run, 'invalid-submission', `No valid work orientation was obtained for ${item.id} within the captured retry bound`);
         return { kind: 'failed' };
       }
-      const packet = orientationPacket({ workItem: item.id, briefing, submission: prior.value });
+      const packet = orientationPacket({ workItem: item.id, briefing: orientationBriefing, submission: prior.value });
       const path = runLayout.orientationPacket(item.id, packet.hash);
       await writeOnce(run.path(path), packet.text);
       await this.write(run, { type: 'work-orientation-recorded', data: { workItem: item.id, invocation: prior.id, packetHash: packet.hash, packet: path, point: prior.ref } });
@@ -5270,7 +5273,7 @@ export class RunService {
       ].join('\n');
       const selected = await this.selectElements(run, agent, selector, item,
         { catalog, planDeviations: this.planDeviationsOf(run), workItemElements: [...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs] },
-        { packet, orientationInvocation: from.invocation, point: from.point, session: from.session });
+        { packet, update: packet, orientationInvocation: from.invocation, point: from.point, session: from.session });
       if (selected === 'failed') return null;
       if (selected === undefined) {
         await this.fail(run, 'invalid-submission', `No valid context selection was obtained for ${item.id} within the captured retry bound`);
@@ -5294,7 +5297,7 @@ export class RunService {
    */
   private async selectElements(
     run: Run, agent: AgentPort, selector: LoadedPackage, item: WorkItem, source: SelectionSource,
-    from: { readonly packet: string; readonly orientationInvocation: string; readonly point: string | null; readonly session: SessionId | undefined },
+    from: { readonly packet: string; readonly update?: string; readonly orientationInvocation: string; readonly point: string | null; readonly session: SessionId | undefined },
   ): Promise<RunEventOf<'context-selection-recorded'> | undefined | 'failed'> {
     const supersedes = run.log.all('context-selection-recorded').filter(event => event.data.workItem === item.id).at(-1)?.data.selection;
     let selectionEvent: RunEventOf<'context-selection-recorded'> | undefined;
@@ -5304,9 +5307,11 @@ export class RunService {
       const workspace = run.path(join('work', item.id, 'selector-workspace'));
       await mkdir(workspace, { recursive: true });
       const result = await this.runInvocation<ContextSelectorSubmission>(run, agent, {
-        role: 'context-selector', work: { workItem: item.id }, attempt, loaded: selector,
+        role: 'context-selector', task: { kind: supersedes === undefined ? 'selection' : 'reselection', goal: item.goal,
+          requirements: [this.planPackage(run, source.catalog, source.workItemElements)] },
+        work: { workItem: item.id }, attempt, loaded: selector,
         systemPrompt: renderContextSelectorPrompt(selector, this.projectRoot),
-        prompt: contextSelectorMessage(from.packet, source.catalog),
+        prompt: contextSelectorMessage(forked ? from.update : from.packet, source.catalog),
         start: forked ? { mode: 'fork', from: from.point! } : { mode: 'fresh' },
         ...(forked ? { fork: { from: { session: from.session!, invocation: from.orientationInvocation }, reason: 'context-selection' as const, briefs: [] } } : {}),
         ...(forked ? {} : { degraded: { requested: 'fork' as const, reason: 'the recorded orientation has no retained session point' } }),

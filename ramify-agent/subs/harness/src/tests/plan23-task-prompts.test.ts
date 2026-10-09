@@ -204,6 +204,10 @@ describe('P01/P02/P05: stable role and complete current tasks', () => {
     expect(assignment.roleInstructions).toBe(orientation.roleInstructions);
     expect(assignment.additions.filter(item => item.kind === 'tool-declaration').map(item => item.key)).toEqual(['tool:submit_work_item_result']);
     expect(assignment.manifest.entries.filter(item => item.kind === 'tool-declaration')).toHaveLength(2);
+    expect(orientation.message).toContain("Explore your module's README, declaration and relevant source");
+    expect(orientation.message).toContain('Non-functional, fixed and recommendation elements');
+    expect(assignment.message).toContain('Build on the module reading and understanding already in this session.');
+    expect(assignment.message).toMatch(/If\s+this is a fresh session, read your module's README/u);
     expect(() => buildTaskPacket({ ...input(loaded, 'orientation'), briefing, inheritedPoint: 'P:T1', inherited: orientation.additions,
       loaded: { ...loaded, workOrientation: { ...loaded.workOrientation!, submissionSchema: '{"type":"object","additionalProperties":false}' } }, supplyRoleInstructions: false })).toThrow('Immutable tool declaration changed');
   });

@@ -104,7 +104,16 @@ test('one oriented local context selects once, appends the work-item package onc
   expect(orienting.spec.prompt).toContain('The plan asks for review-summary-request.');
   expect(orienting.spec.prompt).toContain('The plan asks for review-summary-acceptance.');
   expect(orienting.spec.prompt).toContain(`${fixture.root}/subs/workspace/subs/reviews/subs/core/src/tests/`);
+  expect(orienting.spec.prompt).toContain("Explore your module's README, declaration and relevant source");
+  expect(orienting.spec.prompt).not.toContain('once you have oriented');
+  expect(orienting.spec.prompt).not.toContain('Read your module, decide, and submit.');
   const selectingSession = agent.sessions.find(session => session.spec.role === 'context-selector')!;
+  expect(selectingSession.start.mode).toBe('fork');
+  expect(selectingSession.spec.prompt).not.toContain('## Local architect briefing');
+  expect(selectingSession.spec.prompt).not.toContain('## Local architect orientation');
+  expect(selectingSession.spec.prompt).not.toContain('The plan asks for review-summary-request.');
+  expect(selectingSession.spec.prompt).not.toContain('no longer applies to this task');
+  expect(selectingSession.spec.prompt).not.toContain(`${fixture.root}/subs/workspace/subs/reviews/subs/core/module.ramify`);
   expect([...selectingSession.inherited, selectingSession.spec.prompt].join('\n')).toContain(`${fixture.root}/subs/workspace/subs/reviews/subs/core/module.ramify`);
   expect(agent.sessions.filter(session => session.spec.role === 'context-selector')).toHaveLength(1);
   const recorded = await recordedPackage(fixture.root, receipt.jobId, events, selections[0]!);
@@ -114,6 +123,7 @@ test('one oriented local context selects once, appends the work-item package onc
   const organizing = agent.sessions.filter(session => session.spec.submission.name === 'submit_work_item_result');
   expect(organizing).toHaveLength(1);
   expect(organizing[0]!.start.mode).toBe('continue');
+  expect(organizing[0]!.spec.prompt).toContain('Build on the module reading and understanding already in this session.');
   // The package is in the session once, as its append, byte for byte; the brief names it by hash.
   expect(organizing[0]!.inherited.filter(text => text === recorded.packageText)).toHaveLength(1);
   expect(organizing[0]!.spec.prompt).not.toContain(recorded.packageText);
@@ -246,8 +256,43 @@ test('lost parent session reconstructs the exact package in a fresh organizing p
   expect(events.find(event => event.type === 'context-package-appended')?.data.outcome).toBe('session-lost');
   const organizing = agent.sessions.find(session => session.spec.submission.name === 'submit_work_item_result');
   expect(organizing?.start.mode).toBe('fresh');
+  expect(organizing?.spec.prompt).toMatch(/If\s+this is a fresh session, read your module's README/u);
   const recorded = await recordedPackage(fixture.root, receipt.jobId, events, selection);
   expect(organizing?.spec.prompt).toContain(recorded.packageText);
   expect(organizing?.spec.prompt.split(recorded.packageText)).toHaveLength(2);
   expect(events.find(event => event.type === 'context-package-prompt-bound')?.data.packageHash).toBe(selection.data.packageHash);
+}, 120_000);
+
+test('a fresh selector receives the ordinary work brief, its complete own elements and recorded orientation', async () => {
+  const fixture = await copyFixture();
+  cleanups.push(fixture.remove);
+  await installTestRunner(fixture.root);
+  // Exercise the existing no-point branch: accepted orientation with no retained point.
+  const start = HarnessSessionOperations.prototype.start;
+  const spy = vi.spyOn(HarnessSessionOperations.prototype, 'start').mockImplementation(async function (this: HarnessSessionOperations, input) {
+    const session = await start.call(this, input);
+    return input.spec.submission.name === 'submit_work_orientation' ? { ...session, ref: '' } : session;
+  });
+  cleanups.push(async () => { spy.mockRestore(); });
+  const agent = createScriptedAgent(declaringScenarios(byRole({
+    'initial-architect': [submit(analysis([{ ...entry('review-summary', 'collection-review/workspace/reviews/core'), contextRefs: ['review-context'] }]))],
+    'local-architect': [submit(requestCompletion())],
+  })));
+  const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(),
+    unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001', 'final verification of plan "revision-diff"'], });
+  cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('revision-diff'));
+  await opened.service.settled('revision-diff', receipt.jobId);
+  expect(onlyRun(opened.service, 'revision-diff').state).toBe('completed');
+  const selector = agent.sessions.find(session => session.spec.role === 'context-selector')!;
+  expect(selector.start.mode).toBe('fresh');
+  expect(selector.inherited).toEqual([]);
+  for (const text of ['The plan asks for review-summary-request.', 'The plan asks for review-summary-acceptance.', 'The plan explains review-context.']) {
+    expect(selector.spec.prompt).toContain(text);
+    expect(selector.spec.prompt.split(text)).toHaveLength(2);
+  }
+  expect(selector.spec.prompt).toContain('## Local architect orientation');
+  expect(selector.spec.prompt).toContain(`${fixture.root}/subs/workspace/subs/reviews/subs/core/module.ramify`);
+  expect(selector.spec.prompt).toContain('Select, by ID, the elements');
+  expect(selector.spec.prompt).not.toContain('once you have oriented');
 }, 120_000);

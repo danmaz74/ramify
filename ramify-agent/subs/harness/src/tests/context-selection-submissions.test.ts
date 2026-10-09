@@ -69,4 +69,13 @@ describe('context selection submissions', () => {
     expect(message).toContain('The catalog holds no non-functional, fixed or recommendation element.');
     expect(message).not.toContain('Serve with a timeout.');
   });
+
+  test('a selector fork carries selectable elements without an inherited packet; a new placement update is delivered', () => {
+    const fork = contextSelectorMessage(undefined, catalog);
+    expect(fork).toContain('Keep the timeout.');
+    expect(fork).toContain('Select, by ID');
+    expect(fork).not.toContain('The parent packet');
+    const update = 'Placement decision `gd-002` placed `field-diff` in `core`.';
+    expect(contextSelectorMessage(update, catalog)).toContain(update);
+  });
 });
