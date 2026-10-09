@@ -75,7 +75,59 @@ async function turn(adapter: HarnessSessionOperations, request: HarnessOperation
   return session;
 }
 
+type CommitInput = Parameters<SessionStore['commit']>[0];
+type CommitPath = 'ordinary' | 'captured';
+type FaultHit = { path: CommitPath; runId: string; operationId: string; phase: 'intent' | 'terminal' };
+
+/** Fixture faults preserve the advertised strong admission and its original receiver. */
+function interceptCommits(store: SessionStore, before: (input: CommitInput, path: CommitPath) => (() => Promise<void>) | undefined): SessionStore {
+  const captured = store.commitCaptured?.bind(store);
+  const intercept = (input: CommitInput, commit: SessionStore['commit'], path: CommitPath): ReturnType<SessionStore['commit']> => {
+    try {
+      // Select/copy fault evidence synchronously. A returned hook closes over
+      // only that evidence; it never rereads borrowed bodies after admission.
+      const after = before(input, path);
+      const committed = commit(input); // Real captured producer runs before any await.
+      return committed.then(async result => { if (result.kind === 'committed') await after?.(); return result; });
+    } catch (error) { return Promise.reject(error); }
+  };
+  const fault: SessionStore = { ...store, commit: input => intercept(input, value => store.commit(value), 'ordinary') };
+  if (captured) fault.commitCaptured = input => intercept(input, captured, 'captured');
+  return fault;
+}
+
  describe('W01/W02: harness-owned continued tasks', () => {
+  test.each(['ordinary', 'captured'] as const)('fault adapter delegates the %s producer synchronously and runs its snapshotted hook after completion', async path => {
+    const order: string[] = []; let finish!: () => void; const completed = new Promise<void>(resolve => { finish = resolve; });
+    let owned: CommitInput | undefined;
+    const store: SessionStore = { async read() { return null; }, async putPayload() { return 'unused'; }, async getPayload() { return null; },
+      commit(value) { expect(this).toBe(store); order.push('ordinary producer'); owned = structuredClone(value); return completed.then(() => ({ kind: 'committed' })); },
+      commitCaptured(value) { expect(this).toBe(store); order.push('captured producer'); owned = JSON.parse(JSON.stringify(value)) as CommitInput; return completed.then(() => ({ kind: 'committed' })); },
+    };
+    const controlled = interceptCommits(store, (value, method) => { const phase = value.records[0]!.body['phase']; order.push(`before:${method}:${phase}`); return async () => { order.push(`after:${method}:${phase}`); }; });
+    const body = { phase: 'intent' };
+    const value: CommitInput = { runId: 'fixed-run', expected: [{ id: 'operation:fixed', revision: null }], records: [{ runId: 'fixed-run', id: 'operation:fixed', revision: 1, schema: 'ramify-agent.session-operation/1', body }], payloads: [] };
+    const answer = path === 'captured' ? controlled.commitCaptured!(value) : controlled.commit(value);
+    expect(order).toEqual([`before:${path}:intent`, `${path} producer`]);
+    body.phase = 'changed after admission';
+    expect(owned?.records[0]?.body).toEqual({ phase: 'intent' });
+    finish(); expect(await answer).toEqual({ kind: 'committed' }); expect(order).toEqual([`before:${path}:intent`, `${path} producer`, `after:${path}:intent`]);
+  });
+  test('a captured CAS conflict or rejected producer never reports a post-durable fault prefix', async () => {
+    for (const result of ['conflict', 'rejected'] as const) {
+      const order: string[] = [];
+      const store: SessionStore = { async read() { return null; }, async putPayload() { return 'unused'; }, async getPayload() { return null; },
+        async commit() { throw new Error('The advertised producer must remain active'); },
+        commitCaptured() { expect(this).toBe(store); order.push('captured producer'); return result === 'conflict' ? Promise.resolve({ kind: 'conflict', reason: 'Actual CAS refused' }) : Promise.reject(new Error('Actual write refused')); },
+      };
+      const controlled = interceptCommits(store, (_input, path) => { order.push(`before:${path}`); return async () => { order.push('post-durable prefix'); }; });
+      const value: CommitInput = { runId: 'fixed-run', expected: [{ id: 'operation:fixed', revision: null }], records: [{ runId: 'fixed-run', id: 'operation:fixed', revision: 1, schema: 'ramify-agent.session-operation/1', body: { phase: 'intent' } }], payloads: [] };
+      const answer = controlled.commitCaptured!(value);
+      if (result === 'conflict') expect(await answer).toEqual({ kind: 'conflict', reason: 'Actual CAS refused' });
+      else await expect(answer).rejects.toThrow('Actual write refused');
+      expect(order).toEqual(['before:captured', 'captured producer']);
+    }
+  });
   test('separately delivered goal blocks preserve literal support, embedded JSON and fenced goal lines in the actual packet', async () => {
     const support = '# Current support\nUnknown stays unknown. Literal JSON: {"goal":"no","unknown":"known"}.\n```text\nno\n{"goal":"no"}\n```';
     const prompt = `# Goal\nno\n\n# Requirements\nR1\n\n${support}`;
@@ -193,17 +245,22 @@ async function turn(adapter: HarnessSessionOperations, request: HarnessOperation
     await expect(second.adapter.start({ ...request, brief: { ...request.brief, requirements: ['Changed unauthorized Retry input'] } })).rejects.toThrow('Conflicting harness session correlation');
   });
   test('unfinished operation Retry rebinds fresh closures but preserves original task/policy and already accepted destination effect', async () => {
-    let blockTerminal = true; let firstEffects = 0; let retryEffects = 0; const observed: SessionDriverInvocation[] = [];
+    let blockTerminal = true; let firstEffects = 0; let retryEffects = 0; const observed: SessionDriverInvocation[] = []; const terminalFaults: FaultHit[] = [];
     const script: SessionScript = invocation => { observed.push(invocation); return [{ kind: 'submit', callId: 'fixed-acceptance', input: { result: 'original result' } }]; };
     const first = await open(script, agent => ({ ...agent, bindSessionStore(store) {
-      const fault: SessionStore = { ...store, async commit(value) {
-        if (blockTerminal && value.records.some(record => record.id === 'operation:retry-original' && record.body['phase'] === 'terminal')) throw new Error('interrupted terminal commit');
-        return store.commit(value);
-      } }; return agent.bindSessionStore(fault);
+      const fault = interceptCommits(store, (value, path) => {
+        if (blockTerminal && value.records.some(record => record.id === 'operation:retry-original' && record.body['phase'] === 'terminal')) {
+          terminalFaults.push({ path, runId: value.runId, operationId: 'retry-original', phase: 'terminal' });
+          throw new Error('interrupted terminal commit');
+        }
+        return undefined;
+      }); return agent.bindSessionStore(fault);
     } }));
     const request = input('engineer', 'engineering', 'retry-original');
     const session = await first.adapter.start({ ...request, spec: { ...request.spec, submission: { ...request.spec.submission, accept: async () => { firstEffects++; return { accepted: true }; } } } });
     await expect(session.outcome).rejects.toThrow('interrupted terminal commit');
+    expect(terminalFaults.length).toBeGreaterThan(0);
+    expect(new Set(terminalFaults.map(hit => `${hit.path}:${hit.runId}:${hit.operationId}:${hit.phase}`))).toEqual(new Set(['captured:run-A:retry-original:terminal']));
     await expect(session.settled()).rejects.toThrow('Cannot attest quiescence'); await first.adapter.close(); blockTerminal = false;
     const next = await open(script, undefined, first.root);
     const resumed = await turn(next.adapter, { ...request, spec: { ...request.spec, submission: { ...request.spec.submission, accept: async () => { retryEffects++; return { accepted: true }; } } } });
@@ -250,17 +307,18 @@ async function turn(adapter: HarnessSessionOperations, request: HarnessOperation
   test.each(['accepted', 'unfinished'] as const)('ordinary service restart restores the exact %s intake phase before another task', async phase => {
     const fixture = await copyFixture(); roots.push(fixture.root); await installTestRunner(fixture.root);
     const git = scenarioGit(fixture.root, { head: 'restoration-source', after: 'restoration-source', commits: [], recovered: [] });
-    let reached = false; let fault = true;
+    let reached = false; let fault = true; const intentFaults: FaultHit[] = [];
     const firstScripted = createScriptedAgent(declaringScenarios([{ kind: 'submit', input: emptyAnalysis() }]));
     const firstAgent: AgentPort = phase === 'accepted' ? firstScripted : { ...firstScripted, bindSessionStore(store) {
-      const interrupted: SessionStore = { ...store, async commit(value) {
-        const result = await store.commit(value);
-        if (fault && value.records.some(record => record.id === 'operation:inv-0001' && record.body['phase'] === 'intent')) { fault = false; reached = true; await freeze(); }
-        return result;
-      } }; return firstScripted.bindSessionStore(interrupted);
+      const interrupted = interceptCommits(store, (value, path) => {
+        if (!fault || !value.records.some(record => record.id === 'operation:inv-0001' && record.body['phase'] === 'intent')) return undefined;
+        const hit: FaultHit = { path, runId: value.runId, operationId: 'inv-0001', phase: 'intent' };
+        return async () => { fault = false; reached = true; intentFaults.push(hit); await freeze(); };
+      }); return firstScripted.bindSessionStore(interrupted);
     } };
     const first = await openRuns(fixture.root, { git, agent: firstAgent, afterWrite: async kind => { if (phase === 'accepted' && kind === 'invocation-ended') { reached = true; await freeze(); } } });
     const receipt = await first.service.execute(startRun('review-notes')); await until(() => reached);
+    expect(intentFaults).toEqual(phase === 'unfinished' ? [{ path: 'captured', runId: receipt.jobId, operationId: 'inv-0001', phase: 'intent' }] : []);
     await staleCrashLock(fixture.root);
     const resumed = createScriptedAgent(declaringScenarios(spec => spec.role === 'initial-architect'
       ? [{ kind: 'fail', error: 'Controlled stop after restored intake' }] : []));
@@ -314,7 +372,7 @@ async function turn(adapter: HarnessSessionOperations, request: HarnessOperation
   test.each([['engineer', 'unfinished'], ['engineer', 'accepted'], ['contract-engineer', 'unfinished'], ['contract-engineer', 'accepted'], ['contract-engineer', 'registered'], ['local-architect', 'completion-outline']] as const)('ordinary %s restores its %s original phase and completes without duplicate handbacks', async (role, phase) => {
     const fixture = await copyFixture(); roots.push(fixture.root);
     let reached = false; let operation = ''; let runId = ''; let boundaries!: OpenRunsOptions; let originalScript!: Parameters<typeof createScriptedAgent>[0];
-    let selected = false;
+    let selected = false; const intentFaults: FaultHit[] = [];
     const scenario = runSessionScenario({ root: fixture.root, cleanup: () => undefined,
       onOpened: (_opened, external, script) => { boundaries = external; originalScript = script; },
       afterWrite: async (kind, id) => {
@@ -326,11 +384,11 @@ async function turn(adapter: HarnessSessionOperations, request: HarnessOperation
       },
       port: scripted => ({ ...scripted, bindSessionStore(store) {
         let faultOperation = '';
-        const controlled: SessionStore = { ...store, async commit(value) {
-          const result = await store.commit(value);
-          if (phase === 'unfinished' && faultOperation && value.records.some(record => record.id === `operation:${faultOperation}` && record.body['phase'] === 'intent')) { reached = true; await freeze(); }
-          return result;
-        } };
+        const controlled = interceptCommits(store, (value, path) => {
+          if (phase !== 'unfinished' || !faultOperation || !value.records.some(record => record.id === `operation:${faultOperation}` && record.body['phase'] === 'intent')) return undefined;
+          const hit: FaultHit = { path, runId: value.runId, operationId: faultOperation, phase: 'intent' };
+          return async () => { reached = true; intentFaults.push(hit); await freeze(); };
+        });
         const operations = scripted.bindSessionStore(controlled);
         return { ...operations, async continue(value) {
           const target = !selected && value.task.role === role;
@@ -341,7 +399,9 @@ async function turn(adapter: HarnessSessionOperations, request: HarnessOperation
       } }),
     });
     void scenario.catch(() => undefined);
-    await until(() => reached, 20000); await staleCrashLock(fixture.root);
+    await until(() => reached, 20000);
+    expect(intentFaults).toEqual(phase === 'unfinished' ? [{ path: 'captured', runId, operationId: operation, phase: 'intent' }] : []);
+    await staleCrashLock(fixture.root);
     const resumedAgent = createScriptedAgent(originalScript);
     // The scenario's original contract gate states revision-01. Its normal
     // forward-only fixture only supplies the final candidate; restoration also
