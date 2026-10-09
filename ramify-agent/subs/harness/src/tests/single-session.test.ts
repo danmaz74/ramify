@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
@@ -35,7 +36,7 @@ describe('a single engineer session', () => {
     expect(packet.message.split(prompt)).toHaveLength(2);
     expect(agent.sessions[0]!.spec.prompt).toBe(packet.message);
     const recorded = sessionRecordSchema.parse(JSON.parse(await readFile(join(finished(result).records, 'session.json'), 'utf8')));
-    expect(recorded.prompts.manifest).toMatchObject({ schema: 'ramify-agent.delivered-inputs/1', currentMessage: { bytes: Buffer.byteLength(packet.message) } });
+    expect(recorded.prompts.manifest).toMatchObject({ schema: 'ramify-agent.delivered-inputs/2', currentMessage: { bytes: Buffer.byteLength(packet.message) } });
     expect(recorded.scopeSize).toMatchObject({ bytes: null, coverage: 'partial', components: expect.arrayContaining([expect.objectContaining({ component: 'support-documents', state: 'measured' })]) });
     expect(recorded.scopeSize!.subtotal).toBeGreaterThan(0);
     expect(recorded.sessionOperation).toMatchObject({ runId: `standalone:${recorded.id}`, operationId: recorded.id, turn: 1, sourcePoint: { turn: 0, kind: 'checkpoint' } });
@@ -441,7 +442,19 @@ describe('the session\'s records', () => {
       expect.objectContaining({ type: 'ended', ended: 'submitted', interruption: null, error: null, actual: { mode: 'fresh', degradedReason: null } }),
       expect.objectContaining({ type: 'point', point: { session: id, invocation: id } }),
     ]);
-    expect(await blobsIn(join(summary.records, 'blobs'))).toHaveLength(1);
+    const started = entries[0]!;
+    if (started.type !== 'started' || started.systemPrompt.stored !== 'blob') throw new Error('Missing stored role prefix');
+    const user = entries.find(entry => entry.type === 'message' && entry.role === 'user');
+    if (!user || user.type !== 'message' || user.role !== 'user') throw new Error('Missing task message');
+    const taskBody = user.blocks.find(block => block.type === 'text');
+    if (!taskBody || taskBody.type !== 'text' || taskBody.body.stored !== 'blob') throw new Error('Missing stored framed task');
+    expect(await blobsIn(join(summary.records, 'blobs'))).toEqual([started.systemPrompt.hash, taskBody.body.hash].sort());
+    for (const body of [started.systemPrompt, taskBody.body]) {
+      const content = await readFile(join(summary.records, 'blobs', body.hash), 'utf8');
+      expect(Buffer.byteLength(content)).toBe(body.bytes);
+      expect(createHash('sha256').update(content).digest('hex')).toBe(body.hash);
+    }
+    expect(await readFile(join(summary.records, 'blobs', taskBody.body.hash), 'utf8')).toBe(scripted.sessions[0]!.spec.prompt);
 
     // The shell's result is what the agent saw, and names the complete output.
     const shellResult = entries.find(entry => entry.type === 'message' && entry.role === 'tool-result' && entry.tool === 'shell');

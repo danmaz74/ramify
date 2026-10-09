@@ -24,6 +24,7 @@ import { openUnchangedRuns, assertUnchangedGit } from './helpers/unchanged-run.j
 import { scenariosCommit } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { passingAudit } from './helpers/direct-check-execution.js';
+import { scriptedCandidates } from './helpers/candidates.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -164,11 +165,16 @@ test('a selected non-functional element and recommendation reach the runtime pac
     return [];
   }));
   const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(),
+    candidates: scriptedCandidates(fixture.root, {
+      'scenarios-of-revision-diff': { tree: 'a'.repeat(40), files: {}, base: 'scenarios-of-revision-diff', changes: [] },
+      ['a'.repeat(40)]: { tree: 'a'.repeat(40), files: {}, base: 'scenarios-of-revision-diff', changes: [], comparisons: { 'unchanged-fixture-revision': { changes: [] } } },
+    }),
     previewCount: 5, unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001', 'final verification of plan "revision-diff"'], });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('revision-diff'));
   await opened.service.settled('revision-diff', receipt.jobId);
   const events = await runEventsOnDisk(fixture.root, 'revision-diff', receipt.jobId);
+  expect(onlyRun(opened.service, 'revision-diff').state, JSON.stringify(events.slice(-8))).toBe('completed');
   const selected = events.find(event => event.type === 'context-selection-recorded');
   expect(selected?.type, JSON.stringify(events.map(event => ({ type: event.type, data: event.data })))).toBe('context-selection-recorded');
   if (!selected || selected.type !== 'context-selection-recorded') return;

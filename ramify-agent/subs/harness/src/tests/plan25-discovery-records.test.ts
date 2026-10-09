@@ -8,6 +8,7 @@ import { assignmentBodySchema, assignmentErrors } from '../work/assignment.js';
 import { capabilityEngineerSubmissionSchema, engineerSubmissionSchema, validateEngineer } from '../work/engineer.js';
 import { iterationAssignmentSchema, iterationResultSchema, iterationLayout } from '../work/iterations.js';
 import { startingPointSchema } from '../work/starting-points.js';
+import { gateAttemptSchema, runLayout } from '../run/records.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
 import { assign, byRole, completionProposed, outline, submit, treeInputs } from './helpers/iterations.js';
@@ -109,20 +110,30 @@ describe('D1–D3: optional explicit discovery records', () => {
     const opened = await openUnchangedRuns(fixture.root, {
       unchangedCheckpoints: checks, previewCount: crash === 'passed-gate' ? 5 : 4, inputs: treeInputs(), candidates, agent,
       afterWrite: async (event, runId) => {
+        const events = await runEventsOnDisk(fixture.root, 'review-notes', runId);
+        const engineer = events.find(e => e.type === 'invocation-started' && e.data.role === 'engineer' && e.data.work.iteration === 'wi-001.i01');
+        if (!engineer || engineer.type !== 'invocation-started') return;
         if (crash === 'passed-gate') {
-          const latest = (await runEventsOnDisk(fixture.root, 'review-notes', runId)).at(-1);
-          if (event === 'gate-attempted' && latest?.type === 'gate-attempted' && latest.data.checkpoint === 'iteration') { reached = true; await freeze(); }
+          // gate-attempted is the pre-commit effect hook. Freeze only after
+          // the accepted gate and its audited source are durably committed.
+          if (event !== 'gate-committed') return;
+          const passed = [...events].reverse().find(e => e.type === 'gate-attempted' && e.data.checkpoint === 'iteration');
+          if (!passed || passed.type !== 'gate-attempted') return;
+          const gate = gateAttemptSchema.parse(JSON.parse(await readFile(runPath(fixture.root, 'review-notes', runId, runLayout.gate(passed.data.gate)), 'utf8')));
+          expect(gate).toMatchObject({ checkpoint: 'iteration', verdict: 'passed', proposedBy: engineer.data.invocation, subject: { workItem: 'wi-001', iteration: 'wi-001.i01' } });
+          expect(events.some(e => e.type === 'iteration-closed' && e.data.iteration === 'wi-001.i01')).toBe(false);
+          reached = true; await freeze();
           return;
         }
         if (event !== 'invocation-ended') return;
-        const events = await runEventsOnDisk(fixture.root, 'review-notes', runId);
-        const ended = events.at(-1);
-        if (ended?.type === 'invocation-ended' && events.some(e => e.type === 'invocation-started' && e.data.invocation === ended.data.invocation && e.data.role === 'engineer')) { reached = true; await freeze(); }
+        const ended = events.find(e => e.type === 'invocation-ended' && e.data.invocation === engineer.data.invocation);
+        if (ended?.type === 'invocation-ended') { expect(ended.data.ended).toBe('submitted'); reached = true; await freeze(); }
       },
     });
     // The frozen old service models the crashed process; it is never allowed to resume.
     const receipt = await opened.service.execute(startRun('review-notes'));
     await until(() => reached, 20_000);
+    await expect(readFile(runPath(fixture.root, 'review-notes', receipt.jobId, iterationLayout.result('wi-001', 1)), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     const assignmentPath = runPath(fixture.root, 'review-notes', receipt.jobId, iterationLayout.assignment('wi-001', 1));
     const assignmentBytes = await readFile(assignmentPath, 'utf8');
     expect(iterationAssignmentSchema.parse(JSON.parse(assignmentBytes)).startingPoints).toEqual(points);

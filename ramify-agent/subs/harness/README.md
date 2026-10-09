@@ -40,12 +40,22 @@ serves.
 
 The harness owns the shared production session ledger and original immutable
 payloads. Materialized files are projections, not authority. Role instructions
-remain stable; current procedure, environment, submission and changed briefing
-sections are delivered per task. A fork uses the recorded request-time turn or
+remain pinned; each task selects its current procedure family/hash and submission
+tool. Effective named blocks are inherited at the exact point, with only missing,
+changed or explicitly withdrawn procedure/environment/briefing values appended.
+Set framing and hashes remain identical on first delivery and replacement;
+null/empty environment values replace whole fields. A fork uses the recorded request-time turn or
 checkpoint, with inherited history distinct from declared post-point updates.
 Terminal Retry is model-free and preserves original identity. Stop closes
 admission before drainage; a stopped receipt may have no reusable point.
 Missing or corrupt history and raw hard budgets retain explicit failure.
+
+New manifests and operation intents use `/2`; readers retain `/1` compatibility.
+Physical inherited/appended bytes and provenance remain distinct from effective
+block state. Original retry packets, declarations and contexts are immutable.
+Briefing content hashes and ordered occurrence identities differ: A → B → A
+creates a new A occurrence after B. Named accepted appends share this history;
+prepared or uncommitted failures cannot establish inherited delivery.
 
 Session observations, input attribution and exploration retain original source
 identities, exact byte/provenance limits and unknown quantities. Setup exclusions
@@ -648,8 +658,10 @@ hiding or measured complexity justifies it.
   package offers its role; a member a package does not offer is one no run
   can produce. `write-scope.procedure.md` is the one write-scope section of
   every architect procedure that assigns a scope, filled into its
-  `{{writeScope}}` and hashed with the package. The rendered prompt is never stored: it may hold file
-  contents. The contract package is an engineer's with the contract skill
+  `{{writeScope}}` and hashed with the package. The admitted task packet is retained
+  in its immutable operation correlation; invocation records expose its actual
+  delivery manifest. Each current task selects its effective procedure key/hash,
+  and inherited role/tool prefixes remain intact. The contract package is an engineer's with the contract skill
   beside the module architect's: the role is an engineer, and the skill is
   what makes the invocation a contract iteration. An engineer's prompt
   states the longest one of its commands may run, its iteration's. The
@@ -1520,3 +1532,24 @@ existing records and projections for timing, usage, start modes, fallback reason
 and exploration. Benefit assessment belongs to Dan; these changes add no trial
 or performance threshold. [Plan 24](../../docs/plans/24-orientation-for-context-selection/main-plan.md)
 records implementation and qualification.
+
+Optional explicit `startingPoints` on orientation, assignment and engineer results
+use the named `support:starting-points` section. The harness records producer,
+work-item/iteration/invocation and source-boundary origins; exact path/note pairs
+coalesce with every origin. Pointers are unverified navigation help, carrying no
+scope, obligation or satisfaction authority. Retained orientation is inherited;
+fresh fallback supplies available recorded pointers. Engineers receive selected
+assignment pointers, architects receive labeled result pointers, and reviewers
+receive pointers for their exact candidate. Snapshot filters omit inaccessible,
+absent, symlink, generated-view and run-record hints using captured entries.
+
+NFR briefs group accepted work across the run and capture `run-start` and
+`accepted-boundary` comparisons to the prepared tree. Only reliable recorded
+history supplies `run-start`; dirty original captures retain their qualification,
+and failed diffs remain errors. Named NFR diff tools use the supplied comparison,
+defaulting to run-start when available, with actual base/target identities. Legacy
+retry retains its original default/schema. Repair uses guarded workspace tools;
+reassessment rebuilds candidate comparisons and pointer filtering. Every NFR/fixed
+element still needs the assessor's independent judgment. [Plan 25](../../docs/plans/25-carry-discovery-forward/main-plan.md)
+joins deterministic delivery, record compatibility and configured qualification;
+it supplies no provider cache-hit, cost or latency benefit claim.

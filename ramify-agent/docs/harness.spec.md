@@ -190,6 +190,93 @@ usage, start modes and exploration. [Session observations](metrics/session-obser
 describes access and coverage. These are inputs for Dan's benefit assessment;
 implementation and qualification require no benefit trial or performance gate.
 
+### Effective Instruction Blocks and Exact Delivery
+
+Each task selects its current role, kind, objective, submission tool and
+`procedure:<role>:<family>` key with the SHA-256 of its exact rendered set text.
+The selected body must be available at the selected session point or supplied
+with that task. Assignment, completion and ordinary local-architect repair use
+the main family; orientation, reconciliation and qualification have distinct
+families. Inherited procedures remain available, but only the current selection
+is active. Current tools, cwd, validator, destination and read/write authority
+bind independently of inherited prose.
+
+Reusable procedure, environment and named briefing inputs use invariant framing:
+`# Block <key>`, followed by `Current value; replaces any earlier value for this key.`
+and the exact body, separated by LF. First delivery and replacement use identical
+framing; equality and selected-procedure hashes include that framing. A structural
+withdrawal uses `Withdrawn; this block no longer applies.` with a final LF. Role
+instructions stay pinned and same-name submission declarations remain immutable.
+
+Resolve effective blocks by replaying actual ordered inputs at the chosen point.
+Fresh tasks supply the complete current inputs; continuations and forks supply
+missing/changed blocks and explicit withdrawals. A retaining selector's omitted
+section remains inherited. Environment fields replace whole values in declared
+order with deterministic object properties and preserved array order. Null and
+empty values clear earlier values explicitly. Superseded inputs remain physically
+in the conversation; effective state is not physical context size.
+
+Briefing content identity hashes canonical ordered section bodies/provenance.
+Occurrence identity identifies an accepted update after its predecessor and
+durable operation identity. A → B → A has equal A content hashes and distinct
+ordered A occurrences. Unchanged content at the selected point reuses its
+occurrence. Named accepted appends use the same history; ad hoc prose is not
+parsed into blocks. A fork inherits only its named point, never a later parent
+or sibling. Prepared-only or uncommitted failures establish no delivery.
+
+New task manifests and harness operation intents use `/2`; readers accept `/1`
+and `/2`. Manifests retain ordered physical inherited/appended entries with exact
+bytes, hashes and actual source provenance. Legacy normalization interprets known
+components without changing their physical bytes or manufacturing separately
+delivered environment fields. Retry uses the original admitted packet, schema,
+declarations, context and destination exactly, including legacy `/1` operations.
+Historical hashes and evidence are not rewritten.
+
+### Optional Discovery Handoffs and NFR Comparisons
+
+Work orientation, architect assignments and engineer completion/partial results
+may declare concise `startingPoints` path/note pairs. Paths are normalized literal
+project-relative locations, never absolute paths, traversal or globs. Omission
+remains valid. Syntax validation does not probe existence or judge relevance.
+No extra discovery invocation, completeness rule or semantic decision follows.
+
+The shared named `support:starting-points` briefing groups pointers by their
+harness-recorded producer, work item, iteration, invocation and source boundary
+when available. Identical path/note pairs coalesce while retaining every origin.
+Assignment pointers reach the engineer; result pointers reach its architect and
+that exact candidate's code/scope/design reviewers. Retained orientation and
+selector contexts need no repeated pointer list; fresh consumers receive usable
+recorded orientation pointers alongside their ordinary current brief.
+
+Workspace consumers use their current cwd conventions. Snapshot consumers use
+the pinned candidate's project-relative paths and existing captured entry/access
+filters. Missing, symlink, generated-view, run-record or inaccessible hints are
+omitted without task failure or new filesystem probes. Origin boundaries describe
+history, not unchanged files. Hints grant no access, writes or completion authority;
+the consumer inspects the current source and explores beyond stale hints.
+
+NFR source preparation supplies two captured comparisons to the same candidate
+tree: `run-start` from reliable original recorded source, and `accepted-boundary`
+from the latest accepted commit. Dirty original capture retains its qualification:
+the commit comparison excludes uncommitted starting bytes. Missing reliable
+history omits `run-start`; current HEAD cannot fabricate it, and a failed diff
+cannot become an empty comparison. Changed paths obey existing NFR source filters.
+
+NFR `snapshot_diff` accepts only captured comparison names and reports actual
+base/target identities for both lists and patches. New tasks default to reliable
+`run-start`, otherwise explicitly to `accepted-boundary`. Legacy admitted tasks
+retain their original declaration/default on exact retry. Ordinary reviewer
+iteration-base semantics remain. Repair retains guarded workspace tools and its
+prepared candidate identity; reassessment rebuilds comparisons and filters hints
+for the new candidate. Scoped investigations retain their declared read scope.
+
+NFR assessment starts from supplied implementation locations and requests a
+relevant diff when useful; no initial pathless diff is required. Every fixed/NFR
+obligation, broader permitted inspection, uncertainty and independent judgment
+remains. Pointer notes, previous completion reports and green audits cannot
+establish satisfaction. Audit establishes configured test health; responsible
+architects assess semantic completion.
+
 ### Review Patch Delivery
 
 Before invoking a code, scope or design reviewer, collect patches through the
