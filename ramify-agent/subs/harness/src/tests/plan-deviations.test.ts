@@ -451,7 +451,7 @@ describe('the deviation limit', () => {
     const runId = receipt.jobId;
 
     // Five deviations hold nothing; the sixth is recorded held, and the run waits.
-    await until(async () => (await runEventsOnDisk(project, plan, runId)).filter(event => event.type === 'plan-deviation-recorded').length === 6);
+    await until(() => opened.service.events(plan, runId)?.filter(event => event.type === 'plan-deviation-recorded').length === 6);
     const recorded = (await runEventsOnDisk(project, plan, runId)).filter(event => event.type === 'plan-deviation-recorded');
     expect(recorded.map(event => event.type === 'plan-deviation-recorded' && event.data.held)).toEqual([false, false, false, false, false, true]);
     const waiting = runResponseSchema.parse(await get(origin, protocolPaths.run(plan, runId))).run;
@@ -487,7 +487,10 @@ describe('the deviation limit', () => {
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun(plan));
     const runId = receipt.jobId;
-    await until(async () => (await runEventsOnDisk(project, plan, runId)).some(event => event.type === 'plan-deviation-recorded' && event.data.held));
+    // Disk durability precedes publication of the run's version. Wait for the
+    // served state before taking the version used by the person's command.
+    await until(() => opened.service.events(plan, runId)?.some(event => event.type === 'plan-deviation-recorded' && event.data.held) === true);
+    expect((await runEventsOnDisk(project, plan, runId)).some(event => event.type === 'plan-deviation-recorded' && event.data.held)).toBe(true);
     await opened.service.execute(command('respond-to-check-finding', runId, opened.service.getRun(plan, runId)!.version, {
       checkFinding: 'cf-0002', expectedRevision: 2, request: 'cfd-0002', option: 'reject', note: 'Stop and fix the plan instead.',
     }));
