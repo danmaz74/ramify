@@ -3,11 +3,11 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createScriptedAgent, type Script } from '../../subs/agent/src/scripted.js';
-import type { AgentPort, AgentSession, SessionSpec } from '../../subs/agent/src/interfaces/port.js';
+import type { AgentPort, AgentSession } from '../../subs/agent/src/interfaces/port.js';
 import { WriterBlockedError, WriterOwnership } from '../run/writer.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
-import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
-import { emptyAnalysis, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { copyFixture } from './helpers/fixture.js';
+import { emptyAnalysis, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
 import { settlementBoundaries } from './helpers/settlement-boundaries.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 vi.mock('node:child_process', async original =>
@@ -87,6 +87,13 @@ describe('the harness confirms settlement itself', () => {
 });
 
 describe('a run whose invocation is not confirmed settled', () => {
+  // Exercise the real timeout of an unresolved barrier without spending the
+  // production 30-second grace on each of the three analysis sessions.
+  function settlementPolicy(projectRoot: string) {
+    const policy = testPolicy(projectRoot);
+    return { ...policy, limits: { ...policy.limits, stopSettleMs: 10 } };
+  }
+
   /** The scripted fake, with sessions that never confirm they are idle. */
   function unsettling(script: Script): AgentPort {
     const scripted = createScriptedAgent(declaringScenarios(script));
@@ -109,7 +116,7 @@ describe('a run whose invocation is not confirmed settled', () => {
     const boundaries = settlementBoundaries(fixture.root);
     cleanups.push(async () => boundaries.assertComplete());
 
-    const { service } = await openRuns(fixture.root, { ...boundaries.options, agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
+    const { service } = await openRuns(fixture.root, { ...boundaries.options, policy: settlementPolicy, agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
     cleanups.push(() => service.close().catch(() => undefined));
 
     const receipt = await service.execute(startRun('review-notes'));
@@ -133,7 +140,7 @@ describe('a run whose invocation is not confirmed settled', () => {
       expect(outcome.settled.confirmed, invocation).toBe(false);
       expect(outcome.ended, invocation).toBe('submitted');
     }
-  }, 180_000);
+  });
 
   test('a tree the run never checked is left exactly as it was', async () => {
     const fixture = await copyFixture();
@@ -142,13 +149,13 @@ describe('a run whose invocation is not confirmed settled', () => {
     cleanups.push(async () => boundaries.assertComplete());
     await writeFile(join(fixture.root, 'src', 'untouched.ts'), 'export const x = 1;\n');
 
-    const { service } = await openRuns(fixture.root, { ...boundaries.options, agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
+    const { service } = await openRuns(fixture.root, { ...boundaries.options, policy: settlementPolicy, agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
     cleanups.push(() => service.close().catch(() => undefined));
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
 
     expect(await readFile(join(fixture.root, 'src', 'untouched.ts'), 'utf8')).toBe('export const x = 1;\n');
-  }, 180_000);
+  });
 
   test('close retains the project lock when session settlement was not confirmed', async () => {
     const fixture = await copyFixture();
@@ -156,7 +163,7 @@ describe('a run whose invocation is not confirmed settled', () => {
     const boundaries = settlementBoundaries(fixture.root);
     cleanups.push(async () => boundaries.assertComplete());
 
-    const opened = await openRuns(fixture.root, { ...boundaries.options, agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
+    const opened = await openRuns(fixture.root, { ...boundaries.options, policy: settlementPolicy, agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
     const receipt = await opened.service.execute(startRun('review-notes'));
     await opened.service.settled('review-notes', receipt.jobId);
 
@@ -166,5 +173,5 @@ describe('a run whose invocation is not confirmed settled', () => {
     // retry cannot release ownership without a separate recovery contract.
     await expect(opened.service.close()).rejects.toThrow('settlement was not confirmed');
     expect(await opened.lock.held()).toBe(true);
-  }, 180_000);
+  });
 });
