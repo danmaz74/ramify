@@ -74,13 +74,13 @@ async function keep(name: string, root: string): Promise<void> {
 
 /** The revision a briefing shows for an obligation, which a report is based on. */
 function revisionOf(prompt: string, id: string): number {
-  const line = new RegExp(`^- ${id} \\([^)]*\\): (pending|bound|done), revision (\\d+);`, 'mu').exec(prompt);
-  if (line === null) throw new Error(`The briefing lists no ${id}:\n${prompt.slice(-2000)}`);
+  const line = [...prompt.matchAll(new RegExp(`^- ${id} \\([^)]*\\): (pending|bound|done), revision (\\d+);`, 'gmu'))].at(-1);
+  if (line === undefined) throw new Error(`The briefing lists no ${id}:\n${prompt.slice(-2000)}`);
   return Number(line[2]);
 }
 
 function stateOf(prompt: string, id: string): string {
-  return new RegExp(`^- ${id} \\([^)]*\\): (pending|bound|done), revision`, 'mu').exec(prompt)?.[1] ?? 'absent';
+  return [...prompt.matchAll(new RegExp(`^- ${id} \\([^)]*\\): (pending|bound|done), revision`, 'gmu'))].at(-1)?.[1] ?? 'absent';
 }
 
 /**
@@ -94,11 +94,11 @@ function production(roles: (spec: SessionSpec) => readonly ScriptStep[] | undefi
       return submit({ relations: [], dispositions: [], next: { kind: 'complete' }, brief: 'No concern needs attention.' });
     }
     if (spec.role === 'reviewer') {
-      if (spec.prompt.startsWith('Design orientation.')) {
+      if (spec.submission.name === 'submit_orientation') {
         const read = [...spec.prompt.matchAll(/^## (\S+) \(sha256 /gmu)].map(match => match[1]!);
         return submit({ read, summary: 'The notes module keeps the note limit the plan asks for.' });
       }
-      const changed = spec.prompt.split('## The changed paths\n\n')[1]?.split('\n\n')[0] ?? '';
+      const changed = spec.prompt.split('## The changed paths\n\n').at(-1)?.split('\n\n')[0] ?? '';
       const paths = [...changed.matchAll(/^- [A-Z] (.+)$/gmu)].map(match => match[1]!);
       return [...paths.map(path => ({ kind: 'tool' as const, tool: 'snapshot_diff', input: { path } })),
         { kind: 'submit', input: { inspected: paths, missing: [], concerns: [] } }];
@@ -427,7 +427,7 @@ describe('F5/F6 capability workflow: delegation, handback and suspended consumer
     const script = production(spec => {
       if (spec.role === 'initial-architect') return submit(analysis([entry('richer-a-fact', consumer)]));
       if (spec.submission.name === 'submit_capability_qualification') {
-        const [, request, invocation] = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const [, request, invocation] = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         return submit({ kind: 'delegate-capability', request, invocation, provider,
           placementReason: 'B owns the fact and its interface', constraints: [], requirementRefs: [] });
       }
@@ -446,7 +446,7 @@ describe('F5/F6 capability workflow: delegation, handback and suspended consumer
         return [...submit(forgotten), ...submit({ ...requestCompletion(), reports: [done(spec.prompt, 'sc-001', 'subs/a/src/tests/caller.test.ts')] })];
       }
       if (spec.role === 'capability-architect') {
-        const [, task, revision, invocation] = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+        const [, task, revision, invocation] = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
         const basis = { task, planRevision: Number(revision), invocation };
         capabilityArchitect += 1;
         if (capabilityArchitect === 1) {
@@ -455,8 +455,8 @@ describe('F5/F6 capability workflow: delegation, handback and suspended consumer
             completionEvidence: 'B\'s own tests and D\'s unchanged test pass',
           }).assignment });
         }
-        const outcome = new RegExp(`^- ${task} \\(delegated outcome\\): (pending|bound|done), revision (\\d+)`, 'mu').exec(spec.prompt);
-        if (outcome === null) throw new Error(`The capability briefing lacks ${task}'s obligation line`);
+        const outcome = [...spec.prompt.matchAll(new RegExp(`^- ${task} \\(delegated outcome\\): (pending|bound|done), revision (\\d+)`, 'gmu'))].at(-1);
+        if (outcome === undefined) throw new Error(`The capability briefing lacks ${task}'s obligation line`);
         const handback = (reports: unknown[]) => ({ ...basis, kind: 'request-handback',
           summary: 'readFact(true) returns the fact with its source; readFact() keeps the old text for D',
           interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact'], use: 'Call readFact(true) for the sourced text' }], limitations: [], reports });
@@ -465,8 +465,9 @@ describe('F5/F6 capability workflow: delegation, handback and suspended consumer
           where: 'subs/b/src/tests/fact.test.ts' }]))];
       }
       if (spec.role === 'engineer') {
-        const owner = /Your starting module is `([^`]+)`/u.exec(spec.prompt)?.[1];
-        if (spec.prompt.includes('# Iteration cap-') && owner === provider) {
+        const objective = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gmu)].at(-1);
+        const work = objective === undefined ? {} : JSON.parse(objective[1]!) as { iteration?: string };
+        if (work.iteration?.startsWith('cap-') && spec.scope.workingDirectory === join(root, 'subs/b/src')) {
           return submit(completionProposed('readFact names its source on request.'),
             write('fact.ts', 'export function readFact(withSource = false): string { return withSource ? \'old from B\' : \'old\'; }\n'),
             write('tests/fact.test.ts', [
@@ -544,6 +545,15 @@ describe('F5/F6 capability workflow: delegation, handback and suspended consumer
     const final = gates.find(gate => gate.checkpoint === 'final');
 
     expect(events.at(-1)!.type, JSON.stringify(events.slice(-10))).toBe('job-completed');
+    const delegation = events.find(event => event.type === 'capability-delegated')!;
+    const qualified = JSON.parse(await readFile(runPath(root, capabilityPlan, runId, runLayout.outcome(delegation.data.invocation)), 'utf8')) as { session: { ref: string } };
+    const nextAction = events.find(event => event.type === 'invocation-started' && event.sequence > events.find(entry => entry.type === 'capability-handed-back')!.sequence
+      && event.data.role === 'local-architect' && event.data.continues?.reason === 'capability-returned');
+    expect(nextAction?.type).toBe('invocation-started');
+    if (nextAction?.type !== 'invocation-started') throw new Error('No recovered local architect action');
+    const action = JSON.parse(await readFile(runPath(root, capabilityPlan, runId, runLayout.invocation(nextAction.data.invocation)), 'utf8')) as { session: { from: string } };
+    expect(action.session.from).toBe(qualified.session.ref);
+
     // PB3-R01: the new-policy run resumed its capability coordination.
     expect(reopened.recovery.effects).toContainEqual(expect.stringContaining('resumed capability coordination'));
     const job = JSON.parse(await readFile(runPath(root, capabilityPlan, runId, 'job.json'), 'utf8')) as { policy: { version: string } };

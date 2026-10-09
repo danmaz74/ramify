@@ -1477,13 +1477,17 @@ export class RunService {
     const policy = run.record.policy.reviews!;
     const workspace = run.path(join(dirname(reviewLayout.orientation(key)), key.slice(0, 16)));
     await mkdir(workspace, { recursive: true });
+    const guidanceMessage = orientationMessage(guidance);
     const result = await this.runInvocation<OrientationSubmission>(run, agent, {
       role: 'reviewer',
+      task: { kind: 'design-orientation', goal: `Read the captured design guidance for ${request.workItem}.`,
+        requirements: ['Name every captured guidance path and summarize what it asks of the design.'],
+        omit: [guidanceMessage], literalSections: [{ key: 'support:design-guidance', text: guidanceMessage }] },
       work: { workItem: request.workItem, iteration: request.key.iteration },
       attempt: 1,
       loaded,
       systemPrompt: renderOrientationPrompt(loaded),
-      prompt: orientationMessage(guidance),
+      prompt: guidanceMessage,
       start: { mode: 'fresh' },
       toolName: orientationToolName,
       description: orientationSubmissionDescription,
@@ -5643,9 +5647,14 @@ export class RunService {
         if (context.kind === 'failed') return null;
         if (context.kind === 'ready') {
           contextPackage = context.package;
-          session = resumes === null ? context.session : undefined;
-          sessionRef = resumes === null ? context.ref : undefined;
-          continuing = sessionRef === undefined ? undefined : 'context-selected';
+          // A recovered handback already authenticated its accepted qualification
+          // point. The context selection still supplies the package and the
+          // immutable review fork source; it cannot rewind this action session.
+          if (continuing !== 'capability-returned' || sessionRef === undefined) {
+            session = resumes === null ? context.session : undefined;
+            sessionRef = resumes === null ? context.ref : undefined;
+            continuing = sessionRef === undefined ? undefined : 'context-selected';
+          }
         }
       }
       // The package is in the session once: appended after the orientation,

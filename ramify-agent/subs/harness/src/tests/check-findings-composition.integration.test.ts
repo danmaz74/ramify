@@ -46,6 +46,9 @@ describe('the composed CheckFinding path over a real repository', () => {
     const root = await reviewTarget(cleanups);
     await mkdir(join(root, 'docs'), { recursive: true });
     await writeFile(join(root, principles), principlesText);
+    const guidancePaths = [principles, 'README.md', 'subs/workspace/README.md', 'subs/workspace/subs/reviews/README.md', `${notesDirectory}/README.md`];
+    const guidanceBytes = await Promise.all(guidancePaths.map(path => readFile(join(root, path), 'utf8')));
+    const deliveredOrientations: string[] = [];
     await initRepository(root);
 
     const defect = concern(limit, 'The note limit is 50 characters, and the plan asks for 500', 'high');
@@ -88,7 +91,11 @@ describe('the composed CheckFinding path over a real repository', () => {
     });
     const script = (spec: SessionSpec): readonly ScriptStep[] => {
       if (spec.role === 'initial-architect') return [{ kind: 'submit', input: analysis([entry('review-notes', notes)]) }];
-      return spec.role === 'reviewer' && spec.prompt.startsWith('Design orientation.') ? orientation(spec) : scripted(spec);
+      if (spec.role === 'reviewer' && spec.submission.name === 'submit_orientation') {
+        deliveredOrientations.push(spec.prompt);
+        return orientation(spec);
+      }
+      return scripted(spec);
     };
     const opened = await openRuns(root, {
       script,
@@ -126,6 +133,15 @@ describe('the composed CheckFinding path over a real repository', () => {
       return view.view;
     };
     const { createHash } = await import('node:crypto');
+    expect(deliveredOrientations).toHaveLength(1);
+    for (const [index, path] of guidancePaths.entries()) {
+      const bytes = guidanceBytes[index]!;
+      const header = `## ${path} (sha256 ${createHash('sha256').update(bytes).digest('hex').slice(0, 12)})`;
+      // The captured path/header and the whole original body travel together,
+      // even when a README contains its own higher-level Markdown headings.
+      expect(deliveredOrientations[0]).toContain(`${header}\n\n${bytes.trimEnd()}`);
+    }
+
     expect(await git(root, 'show', `${commits[1]}:${principles}`)).toBe(principlesText);
     expect(detail('cf-0002').reports.items[0]).toMatchObject({
       source: { kind: 'tree', id: trees[1] },
