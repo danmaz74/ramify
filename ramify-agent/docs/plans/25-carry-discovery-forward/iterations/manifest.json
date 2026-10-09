@@ -61,8 +61,10 @@
         "D2",
         "D3"
       ],
-      "status": "planned",
-      "writeBoundary": "Harness internal pointer shape, orientation/assignment/engineer/result schemas, record constructors and producer prose."
+      "status": "implemented; focused checks passed",
+      "writeBoundary": "Harness internal pointer shape, orientation/assignment/engineer/result schemas, record constructors and producer prose.",
+      "sourceCommit": "83ab0d59753c25c5d269b122a2ecb2d706c42f30",
+      "results": "02-results.md"
     },
     {
       "id": "3",
