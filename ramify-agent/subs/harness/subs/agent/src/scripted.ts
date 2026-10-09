@@ -607,9 +607,33 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
       // Only script perception receives its already visible context. Actual records and emitted packets remain current-only.
       const actor = createScriptActor(typeof script === 'function' ? spec => script({ ...diagnostic(spec), prompt: [...inherited, spec.prompt].join('\n\n') }) : script, { ...options, sessionStore: undefined });
       let eventIndex = 0;
-      let events: Promise<unknown> = Promise.resolve();
+      let events: Promise<void> = Promise.resolve();
       let eventError: unknown;
-      const flush = async () => { await events; if (eventError !== undefined) throw eventError; };
+      let eventFailed = false;
+      let scheduled = false;
+      const queued: { key: string; bytes: Uint8Array; event: AgentEvent }[] = [];
+      const drainQueued = () => {
+        const batch = queued.splice(0);
+        if (batch.length === 0) return events;
+        events = events.then(async () => {
+          if (eventFailed) return;
+          try {
+            if (runtime.persistPayloads) await runtime.persistPayloads(batch.map(({ key, bytes }) => ({ key, bytes })));
+            else for (const entry of batch) await runtime.persistPayload(entry.key, entry.bytes);
+            // Even the sequential compatibility path persists every entry before any display/effect.
+            for (const entry of batch) runtime.onEvent({ ...entry.event, observation: { ...entry.event.observation, sourceId: entry.key } });
+          } catch (error) { if (!eventFailed) { eventFailed = true; eventError = error; } }
+        });
+        return events;
+      };
+      const flush = async () => {
+        for (;;) {
+          const current = drainQueued();
+          await current;
+          if (eventFailed) throw eventError;
+          if (queued.length === 0 && events === current) return;
+        }
+      };
       const scopedCall = (callId: string) => `${input.key.operationId}:${callId}`;
       const declarations = input.session.declarations;
       const submission = declarations.find(item => item.name === input.task.submissionTool)!;
@@ -626,14 +650,26 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
         })),
         submission: { ...submission, async accept(value) { const callId = activeCallId; await flush(); if (callId === null) throw new Error('Scripted submission has no observed call identity'); return runtime.submit(callId, value); } },
         onEvent(event) {
+          if (eventFailed) return;
           if (event.type === 'tool-started') activeCallId = scopedCall(event.callId);
           const observed = { ...event, ...('callId' in event && typeof event.callId === 'string' ? { callId: scopedCall(event.callId) } : {}),
             ...('blocks' in event ? { blocks: event.blocks.map(block => block.type === 'tool-call' ? { ...block, callId: scopedCall(block.callId) } : block) } : {}) } as AgentEvent;
           const index = eventIndex++;
-          events = events.then(async () => {
-            await runtime.persistPayload(`${input.key.operationId}:event:${index}`, new TextEncoder().encode(JSON.stringify(observed)));
-            runtime.onEvent({ ...observed, observation: { ...observed.observation, sourceId: `${input.key.operationId}:event:${index}` } });
-          }).catch(error => { eventError ??= error; });
+          try {
+            const text = JSON.stringify(observed);
+            const snapshot = JSON.parse(text) as AgentEvent;
+            // Typed optional metadata retains its original explicit-undefined meaning;
+            // nested provider values are detached from this one exact wire encoding.
+            for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(observed))) {
+              if (descriptor.enumerable && 'value' in descriptor && descriptor.value === undefined) Object.defineProperty(snapshot, key, { value: undefined, enumerable: true, writable: true, configurable: true });
+            }
+            queued.push({ key: `${input.key.operationId}:event:${index}`, bytes: new TextEncoder().encode(text), event: snapshot });
+          }
+          catch (error) { eventFailed = true; eventError = error; }
+          if (!scheduled) {
+            scheduled = true;
+            queueMicrotask(() => { scheduled = false; void drainQueued(); });
+          }
         },
       };
       const session = actor.execute(spec);

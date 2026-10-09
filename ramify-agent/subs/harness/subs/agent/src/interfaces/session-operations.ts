@@ -67,6 +67,8 @@ export interface SessionDriverRuntime {
   submit(callId: string, input: unknown): Promise<SubmissionVerdict>;
   /** Persist exact opaque provider bytes before their dependent effects/dispatches. A key is immutable and repeatable. */
   persistPayload(key: string, bytes: Uint8Array): Promise<TranscriptPayloadId>;
+  /** Optional atomic publication of ordered opaque references. Every entry is durably persisted and authority checked. */
+  persistPayloads?(entries: readonly { readonly key: string; readonly bytes: Uint8Array }[]): Promise<readonly TranscriptPayloadId[]>;
   readPayload(id: TranscriptPayloadId): Promise<Uint8Array>;
   onEvent(event: AgentEvent): void;
 }

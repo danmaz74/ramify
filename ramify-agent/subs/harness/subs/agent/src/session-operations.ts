@@ -426,6 +426,40 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
               }, owner.token));
               return id;
             }),
+            persistPayloads(entries) {
+              // Capture the entire caller-owned input before admission or any await.
+              const captured = entries.map(entry => ({ key: entry.key, bytes: new Uint8Array(entry.bytes) }));
+              return admit(async () => {
+                const references: SessionTranscriptEntry[] = [];
+                for (const entry of captured) {
+                  await assertLive();
+                  const payloadId = await store.putPayload(entry.bytes);
+                  references.push({ key: entry.key, payloadId, kind: 'provider' });
+                }
+                // Rebind authority only after this publication owns the queue.
+                await serial(async () => {
+                  await assertLive();
+                  return updateOperation(key, body => {
+                    if (stopped || abort.signal.aborted) throw new Error('Operation stopped');
+                    const candidate = [...body.provider];
+                    const identities = new Map<string, string>();
+                    for (const entry of candidate) {
+                      const previous = identities.get(entry.key);
+                      if (previous !== undefined && previous !== entry.payloadId) throw new Error(`Provider payload key conflicts for ${entry.key}`);
+                      identities.set(entry.key, entry.payloadId);
+                    }
+                    for (const entry of references) {
+                      const previous = identities.get(entry.key);
+                      if (previous !== undefined && previous !== entry.payloadId) throw new Error(`Provider payload key conflicts for ${entry.key}`);
+                      if (previous === undefined) { identities.set(entry.key, entry.payloadId); candidate.push(entry); }
+                    }
+                    // Construct and validate the whole candidate before the one CAS publication.
+                    return { ...body, provider: candidate };
+                  }, owner.token);
+                });
+                return references.map(entry => entry.payloadId);
+              });
+            },
             readPayload: id => admit(async () => { const bytes = await store.getPayload(id); if (bytes === null) throw new SessionDriverUnavailableError(`Missing provider payload ${id}`); return bytes; }),
             onEvent(event) { if (!admissionClosed && !abort.signal.aborted && liveOwnerTokens.has(owner.token)) bindings.onEvent({ ...event, execution: executionIdentity(key, dispatched), replayed: recovering && 'callId' in event && dispatched.effects.some(effect => effect.callId === event.callId && effect.phase === 'completed') }); },
           }); } finally { admissionClosed = true; await drain(); }

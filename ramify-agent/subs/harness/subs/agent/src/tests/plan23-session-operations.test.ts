@@ -354,6 +354,129 @@ describe('Plan 23 F1 high-level session operations', () => {
   });
 });
 
+describe('ordered opaque provider payload batches', () => {
+  it('captures all caller bytes and keys, retains each authority check, and deduplicates in first-entry order', async () => {
+    const store = memoryStore(); const put = store.putPayload; const persisted: string[] = []; let authorities = 0;
+    store.putPayload = async bytes => { const text = new TextDecoder().decode(bytes); if (text === 'A' || text === 'B') persisted.push(text); return put(bytes); };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      const entries = [{ key: 'first', bytes: new TextEncoder().encode('A') }, { key: 'second', bytes: new TextEncoder().encode('B') }, { key: 'first', bytes: new TextEncoder().encode('A') }];
+      const before = (await store.read('run-A', 'operation:batch'))!; const checked = authorities;
+      const pending = runtime.persistPayloads!(entries);
+      entries[0]!.key = 'changed'; entries[1]!.bytes.fill(88); entries.splice(2, 1);
+      expect(await pending).toEqual(['QQ==', 'Qg==', 'QQ==']);
+      expect(authorities - checked).toBe(4);
+      const after = (await store.read('run-A', 'operation:batch'))!;
+      expect(after.revision).toBe(before.revision + 1);
+      expect(after.body['provider']).toEqual([{ key: 'first', payloadId: 'QQ==', kind: 'provider' }, { key: 'second', payloadId: 'Qg==', kind: 'provider' }]);
+      expect(await runtime.persistPayloads!([{ key: 'first', bytes: new TextEncoder().encode('A') }])).toEqual(['QQ==']);
+      const duplicate = (await store.read('run-A', 'operation:batch'))!;
+      expect(duplicate.revision).toBe(after.revision + 1); expect(duplicate.body['provider']).toEqual(after.body['provider']);
+      return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create);
+    expect((await (await operations.continue(continuation(P.sessionId, P.point!, 'batch', bindings({ currentAuthority: async () => { authorities++; return true; } })))).settled()).status).toBe('completed');
+    expect(persisted).toEqual(['A', 'B', 'A', 'A']);
+  });
+  it.each(['within batch', 'already published', 'ambiguous stored keys'])('refuses conflicting immutable keys %s without publishing a prefix', async mode => {
+    const store = memoryStore();
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      if (mode !== 'within batch') await runtime.persistPayload('same', new TextEncoder().encode('original'));
+      const before = (await store.read('run-A', 'operation:conflict'))!;
+      const read = store.read;
+      if (mode === 'ambiguous stored keys') {
+        const conflictingId = await store.putPayload(new TextEncoder().encode('conflict'));
+        store.read = async (run, id) => {
+          const record = await read(run, id);
+          return record && id === 'operation:conflict' ? { ...record, body: { ...record.body, provider: [...record.body['provider'] as unknown[], { key: 'same', payloadId: conflictingId, kind: 'provider' }] } } : record;
+        };
+      }
+      const batch = mode === 'within batch'
+        ? [{ key: 'new', bytes: new TextEncoder().encode('first') }, { key: 'new', bytes: new TextEncoder().encode('conflict') }]
+        : [{ key: 'new', bytes: new TextEncoder().encode('first') }, { key: 'same', bytes: new TextEncoder().encode('conflict') }];
+      await expect(runtime.persistPayloads!(batch)).rejects.toThrow('Provider payload key conflicts');
+      store.read = read;
+      expect(await store.read('run-A', 'operation:conflict')).toEqual(before);
+      return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'conflict'))).settled();
+    expect(end.status).toBe('completed');
+    expect((await operations.inspect('run-A', P.sessionId))?.transcript.filter(entry => entry.kind === 'provider').map(entry => entry.key)).toEqual(mode === 'within batch' ? [] : ['same']);
+  });
+  it('keeps all references unpublished when a later durable payload fails and starts no dependent effect', async () => {
+    const store = memoryStore(); const put = store.putPayload; let effects = 0;
+    store.putPayload = async bytes => { if (new TextDecoder().decode(bytes) === 'second') throw new Error('Second payload failed'); return put(bytes); };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      await runtime.persistPayloads!([{ key: 'a', bytes: new TextEncoder().encode('first') }, { key: 'b', bytes: new TextEncoder().encode('second') }]);
+      await runtime.callTool('unlicensed', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const bound = bindings({ tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }] });
+    expect(await (await operations.continue(continuation(P.sessionId, P.point!, 'failed-put', bound))).settled()).toMatchObject({ status: 'failed', reason: 'Second payload failed' });
+    expect((await store.read('run-A', 'operation:failed-put'))?.body).toMatchObject({ provider: [], effects: [], quiescent: true });
+    expect(await store.getPayload('Zmlyc3Q=')).toEqual(new TextEncoder().encode('first')); expect(effects).toBe(0);
+  });
+  it('rechecks current authority after the last awaited write before publishing any references', async () => {
+    const store = memoryStore(); const put = store.putPayload; let allowed = true; let effects = 0;
+    store.putPayload = async bytes => { const id = await put(bytes); if (new TextDecoder().decode(bytes) === 'last') allowed = false; return id; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      await runtime.persistPayloads!([{ key: 'a', bytes: new TextEncoder().encode('first') }, { key: 'b', bytes: new TextEncoder().encode('last') }]);
+      await runtime.callTool('unlicensed', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const bound = bindings({ currentAuthority: async () => allowed, tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }] });
+    expect(await (await operations.continue(continuation(P.sessionId, P.point!, 'late-authority', bound))).settled()).toMatchObject({ status: 'failed', reason: 'Current authority denied operation' });
+    expect((await store.read('run-A', 'operation:late-authority'))?.body).toMatchObject({ provider: [], effects: [], quiescent: true }); expect(effects).toBe(0);
+  });
+  it('retains the original owner/CAS boundary for complete batch publication', async () => {
+    const store = memoryStore(); const commit = store.commit; let effects = 0;
+    store.commit = async input => input.records.some(record => record.id === 'operation:cas-batch' && (record.body['provider'] as unknown[])?.length === 2)
+      ? { kind: 'conflict', reason: 'Independent CAS loss' } : commit(input);
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      await runtime.persistPayloads!([{ key: 'a', bytes: new TextEncoder().encode('first') }, { key: 'b', bytes: new TextEncoder().encode('last') }]);
+      await runtime.callTool('unlicensed', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const bound = bindings({ tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }] });
+    expect(await (await operations.continue(continuation(P.sessionId, P.point!, 'cas-batch', bound))).settled()).toMatchObject({ status: 'failed', reason: 'Independent CAS loss' });
+    expect((await store.read('run-A', 'operation:cas-batch'))?.body).toMatchObject({ provider: [], effects: [], quiescent: true }); expect(effects).toBe(0);
+  });
+  it('drains an admitted ignored-signal batch after Stop without publishing late references', async () => {
+    const entered = deferred(); const release = deferred(); const store = memoryStore(); const put = store.putPayload; const attempted: string[] = [];
+    store.putPayload = async bytes => { const text = new TextDecoder().decode(bytes); if (text === 'first' || text === 'second') attempted.push(text); if (text === 'first') { entered.resolve(); await release.promise; } return put(bytes); };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      void runtime.persistPayloads!([{ key: 'a', bytes: new TextEncoder().encode('first') }, { key: 'b', bytes: new TextEncoder().encode('second') }]).catch(() => undefined);
+      await entered.promise; return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const handle = await operations.continue(continuation(P.sessionId, P.point!, 'stopped-batch'));
+    await entered.promise; const stopping = handle.stop(); const idle = handle.settled(); const idleEnded = observation(idle); const stopEnded = observation(stopping);
+    const fenced = await handle.receipt; expect(fenced).toMatchObject({ status: 'stopped', point: null });
+    await flush(); expect(idleEnded()).toBe(false); expect(stopEnded()).toBe(false);
+    expect((await store.read('run-A', 'operation:stopped-batch'))?.body).toMatchObject({ provider: [] });
+    release.resolve(); expect(await idle).toEqual(fenced); expect(await stopping).toEqual(fenced);
+    expect(attempted).toEqual(['first']); expect((await store.read('run-A', 'operation:stopped-batch'))?.body).toMatchObject({ provider: [], quiescent: true });
+  });
+  it.each(['authority revoked', 'Stop'])('rebinds a queued batch only after publication ownership: %s', async reason => {
+    const store = memoryStore(); const commit = store.commit; const put = store.putPayload;
+    const owned = deferred(); const release = deferred(); const written = deferred(); let allowed = true; let authorities = 0; let baseline = 0;
+    store.commit = async input => {
+      if (input.records.some(record => record.id === 'operation:queued-batch' && (record.body['provider'] as { key: string }[])?.length === 1 && (record.body['provider'] as { key: string }[])[0]?.key === 'blocker' && record.body['phase'] === 'dispatched')) { owned.resolve(); await release.promise; }
+      return commit(input);
+    };
+    store.putPayload = async bytes => { const id = await put(bytes); if (new TextDecoder().decode(bytes) === 'last') written.resolve(); return id; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      const first = runtime.persistPayload('blocker', new TextEncoder().encode('blocker'));
+      await owned.promise; baseline = authorities;
+      const batch = runtime.persistPayloads!([{ key: 'a', bytes: new TextEncoder().encode('first') }, { key: 'b', bytes: new TextEncoder().encode('last') }]);
+      const outcomes = await Promise.allSettled([first, batch]);
+      expect(outcomes[1]).toMatchObject({ status: 'rejected' }); return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const bound = bindings({ currentAuthority: async () => { authorities++; return allowed; } });
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'queued-batch', bound));
+    await written.promise; await flush(); expect(authorities - baseline).toBe(2);
+    const stopping = reason === 'Stop' ? handle.stop() : null; if (reason === 'authority revoked') allowed = false;
+    release.resolve(); const receipt = await handle.settled(); if (stopping) expect(await stopping).toEqual(receipt);
+    expect(receipt.status).toBe(reason === 'Stop' ? 'stopped' : 'completed');
+    expect((await store.read('run-A', 'operation:queued-batch'))?.body).toMatchObject({ provider: [{ key: 'blocker' }], quiescent: true });
+  });
+});
+
 describe('Plan 23 original execution observation identities', () => {
   it('prepares the durable original executing turn before every event and terminal lookup has zero effects', async () => {
     const prepared: unknown[] = []; const events: unknown[] = []; let dispatches = 0; let accepts = 0;
