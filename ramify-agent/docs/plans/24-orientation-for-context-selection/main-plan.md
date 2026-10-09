@@ -1,7 +1,8 @@
 # Plan 24: useful starting briefs and orientation reuse
 
-**Date:** 2026-10-09. **Status:** consolidated implementation plan for review;
-implementation not started. Source inspected at `1b052e74`.
+**Date:** 2026-10-09. **Status:** implementation in progress; iteration 0 base
+audit accepted through existing evidence, iterations 1–4 pending. See the
+[iteration 0 receipt](iterations/00-results.md). Source inspected at `1b052e74`.
 
 ## Outcome and decisions
 
