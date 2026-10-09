@@ -22,6 +22,11 @@ describe('shell suite classification', () => {
   ])('allows a focused run: %s', command => { expect(kind(command)).toBe('focused'); });
 
   test.each([
+    'cucumber-js --config=cucumber.json', 'cucumber-js -c cucumber.json', 'cucumber-js features/x.feature:12',
+    'cd pkg && npm test -- -c cucumber.json', 'cucumber-js -p focused features/x.feature:12',
+  ])('an unprepared config or feature selection is unverified, not a whole suite: %s', command => { expect(kind(command)).toBe('unverified'); });
+
+  test.each([
     'bash -c "npx vitest run"', 'eval "npm test"', 'npm run custom',
     'echo "a && npx vitest run"', 'echo $(npx vitest run)',
   ])('leaves an indirect command alone: %s', command => { expect(kind(command)).toBe('none'); });

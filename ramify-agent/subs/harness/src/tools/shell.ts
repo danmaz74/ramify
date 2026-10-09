@@ -227,9 +227,17 @@ export function createShellTool(options: ShellOptions): ShellTool {
         executionSignal.throwIfAborted();
         await options.starting(call);
         const before = options.mutation === undefined ? null : await snapshot(options.mutation);
-        // Revalidate after queueing and snapshot capture, at the actual process dispatch seam.
+        // Revalidate after queueing and snapshot capture, at the actual
+        // process dispatch seam. The call has started, so its record ends
+        // here and the refusal is observed like every other.
         if (focused !== undefined && !await focusedFilesMatch(focused.selection, focused.sourceFiles)) {
-          return { isError: true, text: 'Refused, nothing ran: prepared Cucumber configuration or source changed before dispatch.' };
+          const text = 'Refused, nothing ran: prepared Cucumber configuration or source changed before dispatch.';
+          await options.ended(call, {
+            outcome: { kind: 'runner-error', error: { kind: 'refused-before-dispatch', message: text } },
+            exitCode: null, elapsedMs: 0, change: { kind: 'refused', reason: 'prepared Cucumber configuration or source changed before dispatch' },
+          });
+          await options.refused?.(text);
+          return { isError: true, text };
         }
         executionSignal.throwIfAborted();
         const began = Date.now();

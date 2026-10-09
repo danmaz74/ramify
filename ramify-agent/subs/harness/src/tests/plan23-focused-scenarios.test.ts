@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { isAbsolute, join } from 'node:path';
 import { buildFocusedScenarioCommand } from '../work/focused-scenarios.js';
+import { focusedCommandPendingNote } from '../work/engineer.js';
 import { classifyShellTestRun } from '../tools/shell-tests.js';
 import { loadCucumberConfiguration } from '../../subs/evidence/src/cucumber-configuration.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
@@ -45,6 +46,21 @@ describe('H05/H06: declared focused pending scenario preparation', () => {
     if (result.kind !== 'available') throw new Error(result.reason);
     expect(classifyShellTestRun(result.shellCommand, { workingDirectory: '/project', testScripts: {} }).kind).toBe('unverified');
     expect(classifyShellTestRun(`${result.shellCommand} --tags @other`, { workingDirectory: '/project', testScripts: {}, focusedCucumber: [result.selection] }).kind).toBe('unverified');
+  });
+  test('every spelling of the config and profile options names the prepared selection; a line-suffixed feature path is a path', async () => {
+    const result = buildFocusedScenarioCommand({ effective: await effective(), featurePaths: ['features/A.feature'], scratchDirectory: '/project/subs/status/src/tmp', cucumberExecutable: '/project/node_modules/.bin/cucumber-js' });
+    if (result.kind !== 'available') throw new Error(result.reason);
+    const config = result.argv[2]!; const facts = { workingDirectory: '/project', testScripts: {}, focusedCucumber: [result.selection] };
+    for (const spelling of [`cucumber-js -c '${config}' -p ramify-focused`, `cucumber-js --config='${config}' --profile=ramify-focused`, `cucumber-js --profile ramify-focused --config '${config}'`])
+      expect(classifyShellTestRun(spelling, facts).kind).toBe('focused');
+    expect(classifyShellTestRun(`cucumber-js -c '${config}' -p ramify-focused features/A.feature:12`, facts).kind).toBe('unverified');
+    expect(classifyShellTestRun(`cucumber-js -c '${config}' -p other`, facts).kind).toBe('unverified');
+    expect(classifyShellTestRun('cucumber-js features/A.feature:12', { workingDirectory: '/project', testScripts: {} })).toMatchObject({ kind: 'unverified', reason: expect.stringContaining('pending') });
+  });
+  test('the exact focused command is briefed with why a plain feature path runs none of the assigned pending scenarios', async () => {
+    const source = await effective(); if (source.kind !== 'available') throw new Error(source.reason);
+    expect(source.configuration['tags']).toBe('not @ramify-pending');
+    expect(focusedCommandPendingNote).toBe('The default profile\'s tag filter excludes `@ramify-pending` scenarios, so a plain `cucumber-js <feature>` would run none of your assigned scenarios; the generated profile enables them.');
   });
   test.each(['--help', '--version', '--dry-run'])('%s is non-executing rather than scenario evidence', flag => {
     expect(classifyShellTestRun(`cucumber-js features/A.feature ${flag}`, { workingDirectory: '/project', testScripts: {} })).toMatchObject({ kind: 'non-executing', mode: flag.slice(2) });

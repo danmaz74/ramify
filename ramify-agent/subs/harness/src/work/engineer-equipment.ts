@@ -1,8 +1,8 @@
 import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
-import { readdir, readFile, realpath } from 'node:fs/promises';
+import { readdir, readFile, readlink, realpath } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, relative, sep } from 'node:path';
+import { basename, join, relative, sep } from 'node:path';
 import type {
   BuiltinTool, GuardedCall, GuardDecision, SettledMutation, ToolDefinition, WriteTool,
 } from '../../subs/agent/src/interfaces/port.js';
@@ -146,6 +146,8 @@ export interface EngineerEquipment {
   readonly completionCheck: () => CompletionCheck | null;
   /** The shell calls of the invocation now equipped, in order. */
   readonly shellLog: () => readonly ShellCallRecord[];
+  /** The submission policy the hook checks name their remedies in; the submission validator names the same one. */
+  readonly submissions: HookSubmissionPolicy | undefined;
 }
 
 /**
@@ -175,9 +177,11 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     // thing at every step.
     seen = new FindingsSeen();
     current = session;
+    // A log is numbered in its basename alone: the directories above it
+    // carry the plan and run identities, whose own digits are no count.
     hookChecks = Math.max(0, ...session.observations.observations.filter(item => item.type === 'hook-check').map(item => {
       const log = item.data.log;
-      const match = log === null ? null : /(?:hook[^\d]*|check[^\d]*)(\d+)/u.exec(log);
+      const match = log === null ? null : /(\d+)\D*$/u.exec(basename(log));
       return match === null ? 0 : Number(match[1]);
     }));
     completion = null;
@@ -204,7 +208,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     // What each guarded call resolved to, which is what the mutation
     // observation of that call names.
     const queued = new Set<AbortController>();
-    const admitted = new Map<string, { lease: MutationLease; before: MutationSnapshot; reservation: HookCheckReservation }>();
+    const admitted = new Map<string, { lease: MutationLease; before: MutationSnapshot; reservation: HookCheckReservation; resolved: string | null }>();
     const commandIds = new Map<unknown, string[]>();
     const shellReservations = new Map<number, HookCheckReservation>();
     let stopping = false;
@@ -340,7 +344,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
             session.transcript?.note({ kind: 'guard-denied', callId: call.callId, tool: call.tool, verdict: decision.verdict, requested: decision.requested, reason: decision.reason, text });
             return { allow: false, text };
           }
-          admitted.set(call.callId, { lease, before: await projectMutationSnapshot(projectRoot), reservation });
+          admitted.set(call.callId, { lease, before: await projectMutationSnapshot(projectRoot), reservation, resolved: decision.resolved });
           return { allow: true };
         } catch (error) { lease.release(); throw error; }
       },
@@ -350,8 +354,13 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
         const entry = admitted.get(call.callId);
         if (entry === undefined) throw new Error('Executed guarded mutation has no admitted lease');
         try {
-          const change = call.failed ? { kind: 'unknown' as const, reason: 'mutating handler failed' }
+          const observed = call.failed ? { kind: 'unknown' as const, reason: 'mutating handler failed' }
             : changesBetween(entry.before, await projectMutationSnapshot(projectRoot));
+          // A built-in edit or write that succeeded wrote the one path the
+          // guard resolved and nothing else: that is the tool's contract,
+          // not the agent's claim, so it stands as the changed set where
+          // the tree inventory could not be compared.
+          const change: MutationChange = observed.kind === 'unknown' && !call.failed && entry.resolved !== null ? { kind: 'known', paths: [entry.resolved] } : observed;
           return await observe(call.callId, call.tool, call.failed, change, entry.lease, entry.reservation);
         } finally { admitted.delete(call.callId); entry.lease.release(); }
       },
@@ -408,12 +417,14 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     findingsAtCompletion,
     completionCheck: () => completion,
     shellLog: () => shellLog,
+    submissions: inputs.submissions,
   };
 }
 
 /** Stable relevant-project inventory: additions, deletion and configuration bytes are included.
  * Execution output, installed dependencies and generated views are outside this observation scope.
- * Symlinks and unreadable/unsupported entries are uncertainty, never proof of emptiness. */
+ * A symlink is identified by its target and is not followed; unreadable/unsupported entries are
+ * uncertainty, never proof of emptiness. */
 export async function projectMutationSnapshot(projectRoot: string): Promise<MutationSnapshot> {
   const excluded = new Set(['.git', 'node_modules', '.ramify', '.ramify-architect']);
   const files: Record<string, string> = {};
@@ -424,8 +435,8 @@ export async function projectMutationSnapshot(projectRoot: string): Promise<Muta
         const path = join(directory, entry.name);
         const name = relative(root, path).split(sep).join('/');
         if (/^plans\/(?:[^/]+\/)?\.harness(?:\/|$)/u.test(name) || excluded.has(entry.name)) continue;
-        if (entry.isSymbolicLink()) throw new Error(`symlink observation is unsupported: ${name}`);
-        if (entry.isDirectory()) await walk(path);
+        if (entry.isSymbolicLink()) files[name] = `symlink:${await readlink(path)}`;
+        else if (entry.isDirectory()) await walk(path);
         else if (entry.isFile()) files[name] = createHash('sha256').update(await readFile(path)).digest('hex');
         else throw new Error(`unsupported filesystem entry: ${name}`);
       }

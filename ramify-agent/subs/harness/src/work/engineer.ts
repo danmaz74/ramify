@@ -3,7 +3,7 @@ import type { JsonSchema } from '../../subs/agent/src/interfaces/port.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
-import { openFindingsMessage, type HookFinding } from '../hooks/post-write.js';
+import { openFindingsMessage, type HookFinding, type HookSubmissionPolicy } from '../hooks/post-write.js';
 import { needAsBehaviorSchema } from '../contracts/submission.js';
 import { capabilityNeedInputSchema } from '../capability/records.js';
 import { bindingErrors, obligationBindingSchema } from './obligations.js';
@@ -152,6 +152,12 @@ export function iterationAcceptance(kind: EngineerSubmission['kind'], checkNotRu
 /** What the submission tool tells the engineer about itself. */
 export const engineerSubmissionDescription = 'End your turn with the result of this iteration. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.';
 
+/**
+ * Told beside the exact focused Cucumber command: why that command, and not
+ * a plain feature path, runs the assigned pending scenarios.
+ */
+export const focusedCommandPendingNote = 'The default profile\'s tag filter excludes `@ramify-pending` scenarios, so a plain `cucumber-js <feature>` would run none of your assigned scenarios; the generated profile enables them.';
+
 /** A line that would be read as one of the trailers the harness writes itself. */
 const trailerLine = /^\s*Ramify-[A-Za-z-]*\s*:/m;
 
@@ -173,6 +179,11 @@ export interface EngineerEvidence {
    * where the session can still act on it.
    */
   readonly openFindings?: readonly HookFinding[] | undefined;
+  /**
+   * The submissions legal for this engineer, which a refusal over open
+   * findings names as its remedies; the hook checks name the same ones.
+   */
+  readonly submissions?: HookSubmissionPolicy | undefined;
   /** The obligations the captured assignment names, which `bindings` must bind exactly once each. */
   readonly assigned?: readonly string[] | undefined;
   /** What a `contract-needed` injection site is judged against: the view, this module, and the registry's owner of a capability. */
@@ -282,7 +293,7 @@ export function validateEngineer(input: unknown, evidence: EngineerEvidence = {}
   if (value.kind === 'completion-proposed' && evidence.openFindings !== undefined && evidence.openFindings.length > 0) {
     errors.push({
       path: 'kind',
-      message: openFindingsMessage(evidence.openFindings),
+      message: openFindingsMessage(evidence.openFindings, evidence.submissions),
       expected: '"completion-proposed" only once no Ramify module violation stands',
     });
   }

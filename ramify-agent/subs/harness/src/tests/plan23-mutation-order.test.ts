@@ -1,10 +1,12 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { FindingsSeen, openFindingsMessage, runHookCheck, type HookCheckReservation } from '../hooks/post-write.js';
+import { completionCheckFileLimit, FindingsSeen, openFindingsMessage, runHookCheck, type HookCheckReservation } from '../hooks/post-write.js';
 import { changesBetween, MutationOrder, type MutationChange, type MutationSnapshot } from '../hooks/mutation-order.js';
-import { createShellTool } from '../tools/shell.js';
+import { createShellTool, type ShellResult } from '../tools/shell.js';
+import { validateEngineer } from '../work/engineer.js';
 import { ScriptedCli } from '../../subs/evidence/src/tests/helpers/scripted-cli.js';
 import type { CommandRun, CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { changedDocument } from './helpers/check-payloads.js';
@@ -56,8 +58,25 @@ describe('Plan 23 observed mutation checks', () => {
     seen.settle({ covered: [] }, [{ identity: 'standing', category: 'import', code: 'denied', message: 'standing', file: 'src/a.ts', line: 1, importer: null, original: null }]);
     for (const change of [{ kind: 'known', paths: [] }, { kind: 'refused', reason: 'not permitted' }] as const)
       expect(await runHookCheck({ ...options(cli, root, seen), change })).toEqual({ checks: [], gaps: [], text: null });
-    expect(await runHookCheck({ ...options(cli, root, seen), paths: [] })).toEqual({ checks: [], gaps: [], text: null });
     expect(cli.calls).toEqual([]); expect(seen.open().map(item => item.identity)).toEqual(['standing']); cli.assertComplete();
+  });
+  test('H01: a caller-supplied empty path list is no observation and retains a complete check', async () => {
+    const root = await workspace(); const cli = new ScriptedCli();
+    declareComplete(cli, root, completeDocument(root), 0);
+    const result = await runHookCheck({ ...options(cli, root), paths: [] });
+    expect(result.checks.map(check => [check.mode, check.outcome])).toEqual([['changed', 'not-checked'], ['complete', 'passed']]);
+    expect(result.gaps.map(gap => gap.kind)).toEqual(['changed-paths-unknown']);
+    expect(cli.calls).toHaveLength(1); cli.assertComplete();
+  });
+  test('H01: an observed changed set beyond the changed-check limit is checked completely, never passed on the command line', async () => {
+    const root = await workspace(); const cli = new ScriptedCli();
+    declareComplete(cli, root, completeDocument(root), 0);
+    const paths = Array.from({ length: completionCheckFileLimit + 1 }, (_, index) => `src/file-${index}.ts`);
+    const result = await runHookCheck({ ...options(cli, root), change: { kind: 'known', paths } });
+    expect(result.checks.map(check => [check.mode, check.outcome])).toEqual([['changed', 'not-checked'], ['complete', 'passed']]);
+    expect(result.checks[0]!.reason).toBe(`the mutation changed ${completionCheckFileLimit + 1} paths, more than the ${completionCheckFileLimit} one changed check is given`);
+    expect(result.gaps.map(gap => gap.kind)).toEqual(['changed-paths-unknown']);
+    expect(cli.calls.map(call => call.argv.includes('--changed'))).toEqual([false]); cli.assertComplete();
   });
   test('H01/H03: unknown changes retain a complete check; completion independently checks after an empty mutation', async () => {
     const root = await workspace(); const cli = new ScriptedCli(); const seen = new FindingsSeen();
@@ -65,7 +84,7 @@ describe('Plan 23 observed mutation checks', () => {
     const unknown = await runHookCheck({ ...options(cli, root, seen), change: { kind: 'unknown', reason: 'no inventory' } });
     expect(unknown.checks.map(check => [check.mode, check.outcome])).toEqual([['changed', 'not-checked'], ['complete', 'passed']]);
     expect(unknown.gaps.map(gap => gap.kind)).toEqual(['changed-paths-unknown']);
-    expect((await runHookCheck({ ...options(cli, root, seen), paths: [] })).checks).toEqual([]);
+    expect((await runHookCheck({ ...options(cli, root, seen), change: { kind: 'known', paths: [] } })).checks).toEqual([]);
     const completion = await runHookCheck({ ...options(cli, root, seen), paths: [], purpose: 'completion' });
     expect(completion.checks.map(check => [check.mode, check.outcome])).toEqual([['complete', 'passed']]);
     expect(completion.gaps).toEqual([]); expect(cli.calls).toHaveLength(2); cli.assertComplete();
@@ -127,6 +146,15 @@ describe('Plan 23 observed mutation checks', () => {
       expect(text).toContain('`capability-needed`'); expect(text).toContain('`partial`');
       expect(text).toContain('`completion-proposed` is refused'); expect(text).not.toContain('contract-needed');
     } cli.assertComplete();
+  });
+  test('H04: the submission validator refuses a capability-workflow completion in the same legal outcomes as the hook checks', () => {
+    const submissions = { legalOutcomes: ['completion-proposed', 'partial', 'unsuitable', 'capability-needed'], completionOutcome: 'completion-proposed' };
+    const standing = { identity: 'capability', category: 'import', code: 'denied-access', message: 'not exposed', file: 'src/a.ts', line: 1, importer: null, original: null };
+    const refused = validateEngineer({ kind: 'completion-proposed', summary: 'Done.', findings: [] }, { capabilityWorkflow: true, openFindings: [standing], submissions });
+    expect(refused.ok).toBe(false); if (refused.ok) return;
+    expect(refused.errors.map(error => error.path)).toEqual(['kind']);
+    expect(refused.errors[0]!.message).toContain('`capability-needed`'); expect(refused.errors[0]!.message).toContain('`partial`');
+    expect(refused.errors[0]!.message).not.toContain('contract-needed');
   });
 });
 
@@ -254,6 +282,23 @@ describe('Plan 23 shell mutation settlement', () => {
     const rejected = await shell.definition.execute({ command: 'reject' }, new AbortController().signal).catch(error => error as unknown);
     expect(rejected).toBeInstanceOf(AggregateError); expect((rejected as AggregateError).cause).toBe(original); expect((rejected as AggregateError).errors).toEqual([original, observation]);
     await order.run(root, async () => { phases.push('released'); }); expect(phases).toEqual(['ended', 'settled', 'released']); await shell.settle();
+  });
+  test('H02: a focused command whose prepared files changed before dispatch ends its record, is observed as refused and reaches no executor or check', async () => {
+    const root = await workspace(); const config = join(root, 'cucumber-focused.json'); const prepared = '{"ramify-focused":{}}'; await writeFile(config, prepared);
+    const selection = { cwd: root, config, profile: 'ramify-focused', paths: [join(root, 'features/A.feature')], configurationIdentity: createHash('sha256').update(prepared).digest('hex') };
+    const command = `cd '${root}' && cucumber-js --config 'cucumber-focused.json' --profile 'ramify-focused'`;
+    const phases: string[] = []; const ended: ShellResult[] = []; const refusals: string[] = [];
+    const shell = createShellTool({ workingDirectory: root, judge: async () => ({ ok: true }), outputFile: n => join(root, 'output', `${n}.log`),
+      focusedCommands: [{ shellCommand: command, selection, environment: {}, sourceFiles: {} }],
+      starting: async () => { phases.push('starting'); await writeFile(config, '{"default":{}}'); }, ended: async (_call, result) => { phases.push('ended'); ended.push(result); },
+      refused: async text => { refusals.push(text); }, commandExecution: async () => { phases.push('command'); return commandResult(); },
+      mutation: { worktree: root, snapshot: async () => inventory({}), settled: async () => { phases.push('settled'); return null; } } });
+    const result = await shell.definition.execute({ command }, new AbortController().signal);
+    expect(result).toEqual({ isError: true, text: 'Refused, nothing ran: prepared Cucumber configuration or source changed before dispatch.' });
+    expect(phases).toEqual(['starting', 'ended']); expect(refusals).toEqual([result.text]);
+    expect(ended).toEqual([{ outcome: { kind: 'runner-error', error: { kind: 'refused-before-dispatch', message: result.text } }, exitCode: null, elapsedMs: 0,
+      change: { kind: 'refused', reason: 'prepared Cucumber configuration or source changed before dispatch' } }]);
+    await shell.settle();
   });
   test('H02: Stop during input judgment fences a late command', async () => {
     const root = await workspace(); const judged = deferred(); let commands = 0;

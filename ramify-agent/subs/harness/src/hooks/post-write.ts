@@ -299,9 +299,9 @@ export interface HookCheckOptions {
 export const completionCheckDeadlineMs = 60_000;
 
 /**
- * How many source files the check at `completion-proposed` passes to one
- * changed check. A write scope larger than this is not checked here; the
- * gate's complete check covers it.
+ * How many paths one changed check is given. An observed changed set larger
+ * than this is treated as unknown, so the complete check runs instead of a
+ * command line naming thousands of paths.
  */
 export const completionCheckFileLimit = 400;
 
@@ -311,22 +311,28 @@ export const completionCheckFileLimit = 400;
  */
 export async function runHookCheck(options: HookCheckOptions): Promise<HookOutcome> {
   const mutation = options.purpose !== 'completion';
+  // Only observed evidence skips a mutation's check: a refused call, or a
+  // compared inventory that proved no change. A caller-supplied empty path
+  // list is no such proof and is checked as an unknown changed set.
   if (mutation && options.change?.kind === 'refused') return { checks: [], gaps: [], text: null };
-  const requested = options.change?.kind === 'known' ? options.change.paths
+  if (mutation && options.change?.kind === 'known' && options.change.paths.length === 0) return { checks: [], gaps: [], text: null };
+  const observed = options.change?.kind === 'known' ? options.change.paths
     : options.change === undefined ? options.paths ?? null : null;
-  if (mutation && requested !== null && requested.length === 0) return { checks: [], gaps: [], text: null };
+  const oversized = observed !== null && observed.length > completionCheckFileLimit;
+  const requested = oversized ? null : observed;
+  const unknownReason = oversized ? `the mutation changed ${observed.length} paths, more than the ${completionCheckFileLimit} one changed check is given` : undefined;
   // Reserve before any provider, scheduling or file-system await. Old callers
   // can keep supplying ran; the invocation-owned counter is authoritative.
   const checkNumber = options.seen.claimCheck(options.reservation ?? options.seen.reserveCheck(options.ran));
   if (options.lease !== undefined) {
     options.lease.assertHeld(options.projectRoot);
-    return performHookCheck(options, requested, checkNumber);
+    return performHookCheck(options, requested, checkNumber, unknownReason);
   }
   return sharedMutationOrder.run(options.projectRoot,
-    () => performHookCheck(options, requested, checkNumber), options.signal);
+    () => performHookCheck(options, requested, checkNumber, unknownReason), options.signal);
 }
 
-async function performHookCheck(options: HookCheckOptions, requested: readonly string[] | null, checkNumber: number): Promise<HookOutcome> {
+async function performHookCheck(options: HookCheckOptions, requested: readonly string[] | null, checkNumber: number, unknownReason?: string): Promise<HookOutcome> {
   if (options.signal?.aborted) return {
     checks: [{ paths: requested ?? [], mode: requested === null || requested.length === 0 ? 'complete' : 'changed',
       outcome: 'not-checked', reason: 'stopped', newFindings: 0, log: null, provider: null, dispositions: [] }],
@@ -346,11 +352,13 @@ async function performHookCheck(options: HookCheckOptions, requested: readonly s
     completeNeeded = true;
     if (options.purpose !== 'completion') gaps.push({
       kind: 'changed-paths-unknown',
-      detail: 'the mutation named no path the harness could establish, so a changed check covers nothing and a complete check was run',
+      detail: unknownReason === undefined
+        ? 'the mutation named no path the harness could establish, so a changed check covers nothing and a complete check was run'
+        : `${unknownReason}, so a changed check covers nothing and a complete check was run`,
     });
     if (options.purpose !== 'completion') checks.push({
       paths: [], mode: 'changed', outcome: 'not-checked',
-      reason: 'the changed set could not be established', newFindings: 0, log: null, provider: null, dispositions: [], ...nothingReported,
+      reason: unknownReason ?? 'the changed set could not be established', newFindings: 0, log: null, provider: null, dispositions: [], ...nothingReported,
     });
   } else {
     const log = options.logFile(checkNumber);

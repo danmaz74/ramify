@@ -117,13 +117,23 @@ function classifySegment(raw: string[], segment: string, testScript: string | nu
   if (argv.includes('--version') || argv.includes('-V') || argv.includes('-v')) return { kind: 'non-executing', segment, mode: 'version' };
   if (executable === 'cucumber-js' && (argv.includes('--dry-run') || argv.includes('-d') || argv.includes('--dry-run=true'))) return { kind: 'non-executing', segment, mode: 'dry-run' };
   if (executable === 'cucumber-js') {
-    const configAt = argv.indexOf('--config');
-    const profileAt = argv.indexOf('--profile');
-    const config = configAt < 0 || !argv[configAt + 1] ? null : resolve(cwd, argv[configAt + 1]!);
-    const profile = profileAt < 0 ? null : argv[profileAt + 1];
+    // The config and profile options in each of Cucumber's spellings; every
+    // other word is a path or a further option, and any of them makes the
+    // command something other than the prepared focused one.
+    let config: string | null = null;
+    let profile: string | null = null;
+    const rest: string[] = [];
+    for (let i = 0; i < argv.length; i += 1) {
+      const word = argv[i]!;
+      if (word === '--config' || word === '-c') { const value = argv[++i]; config = value === undefined || value === '' ? null : resolve(cwd, value); continue; }
+      if (word.startsWith('--config=')) { const value = word.slice('--config='.length); config = value === '' ? null : resolve(cwd, value); continue; }
+      if (word === '--profile' || word === '-p') { profile = argv[++i] ?? null; continue; }
+      if (word.startsWith('--profile=')) { profile = word.slice('--profile='.length); continue; }
+      rest.push(word);
+    }
     const exact = known.find(item => item.cwd === cwd && item.config === config && item.profile === profile && item.paths.length > 0 && item.configurationIdentity);
-    if (exact && argv.length === 4 && configAt !== profileAt && configAt % 2 === 0 && profileAt % 2 === 0) return { kind: 'focused', segment };
-    if (config || argv.some(word => !word.startsWith('-') && word.endsWith('.feature'))) return { kind: 'unverified', segment,
+    if (exact && rest.length === 0) return { kind: 'focused', segment };
+    if (config !== null || rest.some(word => !word.startsWith('-') && /\.feature(?::\d+)?$/u.test(word))) return { kind: 'unverified', segment,
       reason: 'CLI paths/config do not establish effective Cucumber focus; default profiles can merge broader paths and exclude pending scenarios' };
     return { kind: 'whole-suite', segment, reason: 'no test file or directory was named' };
   }

@@ -13,7 +13,8 @@ import { openRunsWithoutProcesses, expectNoProcesses, forgetExternalTools } from
 import { scriptedGit, scenariosCommit } from './helpers/scripted-git.js';
 import { installTestRunner, runEventsOnDisk, startRun } from './helpers/runs.js';
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { createServer } from 'node:net';
+import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createSessionOperations } from '../../subs/agent/src/session-operations.js';
@@ -41,14 +42,21 @@ async function root() { const path = await mkdtemp(join(tmpdir(), 'plan23-real-c
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
 function pending(promise: Promise<unknown>) { let done = false; void promise.then(() => { done = true; }, () => { done = true; }); return () => done; }
 async function flush() { await new Promise<void>(done => setImmediate(done)); }
-async function equipment(path: string, id: string, ramify: Parameters<typeof engineerEquipment>[0]['ramify'] = new FakeRamifyCli()) {
+async function equipment(path: string, id: string, ramify: Parameters<typeof engineerEquipment>[0]['ramify'] = new FakeRamifyCli(),
+  outputPath: Parameters<typeof engineerEquipment>[0]['outputPath'] = (kind, invocation, number) => join(path, 'plans/.harness', `${invocation}-${kind}-${number}.json`)) {
   const observations = await ObservationLog.open(join(path, 'plans/.harness', `${id}.jsonl`));
   const tools = engineerEquipment({ projectRoot: path, ramify, commands: { hookTimeoutMs: 1000 } as never,
     bounds: { rejectedToolInputsPerTurn: 3 }, refresh: async () => null, index: () => null,
     guarded: { revision: 1, projectRoot: path, roots: [path], files: [], placement: async paths => paths.map(path => ({ path, allowed: true })) },
-    scopeRevision: 1, outputPath: (kind, invocation, number) => join(path, 'plans/.harness', `${invocation}-${kind}-${number}.json`),
+    scopeRevision: 1, outputPath,
     submissions: { legalOutcomes: ['completion-proposed', 'partial', 'unsuitable'], completionOutcome: 'completion-proposed' } });
   return { tools, observations, equipped: tools.equip({ invocation: id, observations, callId: () => 'mutable-most-recent-id', reminders: () => [] }) };
+}
+/** One admitted built-in write of `file`, settled through the equipment as the port would. */
+async function writeThrough(equipped: Awaited<ReturnType<typeof equipment>>['equipped'], path: string, callId: string, file: string, content: string) {
+  const call = { callId, tool: 'write', input: { path: file }, action: { kind: 'write' as const, paths: [file] } };
+  expect(await equipped.guard!(call)).toEqual({ allow: true }); await writeFile(join(path, file), content);
+  await equipped.afterMutation!({ ...call, failed: false });
 }
 const policy: SessionExecutionPolicy = { context: { compaction: 'forbidden', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 }, authority: { write: true }, validator: { schema: 'current' }, destination: { record: 'submission' } };
 
@@ -104,7 +112,54 @@ describe('Plan23 composed run equipment', () => {
     expect(changesBetween(added, await projectMutationSnapshot(path))).toEqual({ kind: 'known', paths: ['owned/.harness/source.ts'] });
     await rm(join(path, 'owned'), { recursive: true }); await rm(join(path, 'a.ts'));
     expect(changesBetween(added, await projectMutationSnapshot(path))).toEqual({ kind: 'known', paths: ['a.ts'] });
-    await symlink('/outside/source', join(path, 'ambiguous')); expect(await projectMutationSnapshot(path)).toMatchObject({ kind: 'unknown', reason: expect.stringContaining('symlink') });
+  });
+
+  test('a symlink is inventoried by its target, never followed: no change stays proven, one changed file is named, and a retargeted link is a change', async () => {
+    const path = await root(); await writeFile(join(path, 'a.ts'), 'aa'); await mkdir(join(path, 'linked-dir')); await writeFile(join(path, 'linked-dir/inner.ts'), 'inner');
+    await symlink('/outside/source', join(path, 'link')); await symlink(join(path, 'linked-dir'), join(path, 'dir-link'));
+    const before = await projectMutationSnapshot(path);
+    expect(before).toMatchObject({ kind: 'complete', files: { link: 'symlink:/outside/source', 'dir-link': `symlink:${join(path, 'linked-dir')}`, 'linked-dir/inner.ts': expect.any(String) } });
+    expect(Object.keys(before.kind === 'complete' ? before.files : {})).not.toContain('dir-link/inner.ts');
+    expect(changesBetween(before, await projectMutationSnapshot(path))).toEqual({ kind: 'known', paths: [] });
+    await writeFile(join(path, 'a.ts'), 'bb');
+    expect(changesBetween(before, await projectMutationSnapshot(path))).toEqual({ kind: 'known', paths: ['a.ts'] });
+    const edited = await projectMutationSnapshot(path);
+    await rm(join(path, 'link')); await symlink('/outside/other', join(path, 'link'));
+    expect(changesBetween(edited, await projectMutationSnapshot(path))).toEqual({ kind: 'known', paths: ['link'] });
+  });
+
+  test('a successful built-in write whose inventory cannot be compared is checked for the one path the guard resolved', async () => {
+    const path = await root(); await writeFile(join(path, 'a.ts'), 'before'); const ramify = new ScriptedCli();
+    const server = createServer(); await new Promise<void>(listening => server.listen(join(path, 'socket'), listening));
+    cleanup.push(() => new Promise<void>(closed => server.close(() => closed())));
+    expect(await projectMutationSnapshot(path)).toMatchObject({ kind: 'unknown', reason: expect.stringContaining('unsupported filesystem entry') });
+    ramify.declare({ cwd: path, argv: ['check', '--changed', 'a.ts', '--format', 'json', '--deadline', '1000'], result: { code: 0, stdout: JSON.stringify(changedDocument(path, ['a.ts'])), stderr: '' } });
+    const { equipped, observations } = await equipment(path, 'resolved', ramify);
+    await writeThrough(equipped, path, 'write-a', 'a.ts', 'after'); ramify.assertComplete();
+    expect(observations.observations.filter(item => item.type === 'mutation').map(item => item.data)).toMatchObject([{ callId: 'write-a', paths: [join(path, 'a.ts')], attributable: true, toolFailed: false }]);
+    expect(observations.observations.filter(item => item.type === 'hook-check').map(item => [item.data.mode, item.data.paths, item.data.outcome])).toEqual([['changed', ['a.ts'], 'passed']]);
+    expect(observations.observations.filter(item => item.type === 'coverage-gap')).toEqual([]);
+    // A failed handler still leaves the changed set unknown: the contract says nothing about what it wrote.
+    ramify.declare({ cwd: path, argv: ['check', '--batch', '--root', path, '--format', 'json', '--no-snapshot'], result: { code: 2, stdout: JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable', reason: 'stub', exitCode: 2 }), stderr: '' } });
+    const failed = { callId: 'write-failed', tool: 'write', input: { path: 'a.ts' }, action: { kind: 'write' as const, paths: ['a.ts'] } };
+    expect(await equipped.guard!(failed)).toEqual({ allow: true }); await equipped.afterMutation!({ ...failed, failed: true }); ramify.assertComplete();
+    expect(observations.observations.filter(item => item.type === 'mutation').at(-1)!.data).toMatchObject({ callId: 'write-failed', paths: [], attributable: false, toolFailed: true });
+    expect(observations.observations.filter(item => item.type === 'hook-check').at(-1)!.data).toMatchObject({ mode: 'complete', outcome: 'not-checked' });
+  });
+
+  test('hook check numbering continues from the log basename when the plan id says check and the run id carries digits', async () => {
+    const path = await root(); await writeFile(join(path, 'a.ts'), 'v0');
+    const outputPath: Parameters<typeof engineerEquipment>[0]['outputPath'] = (kind, invocation, number) =>
+      join(path, 'plans/check-findings/.harness/runs/run-20261009', invocation, kind === 'hook' ? 'hooks' : 'shell', `${String(number).padStart(3, '0')}.json`);
+    const first = await equipment(path, 'numbered', new FakeRamifyCli(), outputPath);
+    await writeThrough(first.equipped, path, 'one', 'a.ts', 'v1'); await writeThrough(first.equipped, path, 'two', 'a.ts', 'v2');
+    const logsOf = (observations: ObservationLog) => observations.observations.flatMap(item => item.type === 'hook-check' && item.data.log !== null ? [basename(item.data.log)] : []);
+    expect(logsOf(first.observations)).toEqual(['001.json', '002.json']);
+    const second = await readFile(join(path, 'plans/check-findings/.harness/runs/run-20261009/numbered/hooks/002.json'), 'utf8');
+    const restored = await equipment(path, 'numbered', new FakeRamifyCli(), outputPath);
+    await writeThrough(restored.equipped, path, 'three', 'a.ts', 'v3');
+    expect(logsOf(restored.observations)).toEqual(['001.json', '002.json', '003.json']);
+    expect(await readFile(join(path, 'plans/check-findings/.harness/runs/run-20261009/numbered/hooks/002.json'), 'utf8')).toBe(second);
   });
 
   test('three overlapping same-name shell calls retain their original guard IDs in shell and mutation records', async () => {

@@ -178,7 +178,7 @@ import {
 import { engineerWorkingDirectory, repairWorkingDirectory } from '../work/engineer-directory.js';
 import { createGitInspectionTool } from '../work/git-inspection.js';
 import {
-  capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerJsonSchema, engineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
+  capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerJsonSchema, engineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, focusedCommandPendingNote, iterationAcceptance, iterationMessage,
   type AssignedObligation,
   validateEngineer, type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
@@ -8795,7 +8795,7 @@ export class RunService {
           ...(briefedScenarios === undefined ? {} : { scenarios: briefedScenarios }),
           ...(assignedObligations.length === 0 ? {} : { obligations: assignedObligations }),
           ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
-        })}${featurePaths.length === 0 ? '' : focused.command.kind === 'available' ? `\n\n# Exact focused scenario command\n\n${focused.command.shellCommand}\nSupport/world/loader: ${JSON.stringify(focused.command.support)}\nEnvironment names: ${Object.keys(focused.command.environment).sort().join(', ')}. Config SHA-256 ${focused.command.configurationIdentity}; current generated and source bytes are revalidated at dispatch.` : `\n\nFocused scenario command unavailable: ${focused.command.reason}. Do not combine CLI feature paths with the broad default profile.`}${guidancePending === undefined ? '' : `\n\n# Qualified existing behavior\n\n${guidancePending}`}`,
+        })}${featurePaths.length === 0 ? '' : focused.command.kind === 'available' ? `\n\n# Exact focused scenario command\n\n${focused.command.shellCommand}\nSupport/world/loader: ${JSON.stringify(focused.command.support)}\nEnvironment names: ${Object.keys(focused.command.environment).sort().join(', ')}. Config SHA-256 ${focused.command.configurationIdentity}; current generated and source bytes are revalidated at dispatch.\n${focusedCommandPendingNote}` : `\n\nFocused scenario command unavailable: ${focused.command.reason}. Do not combine CLI feature paths with the broad default profile.`}${guidancePending === undefined ? '' : `\n\n# Qualified existing behavior\n\n${guidancePending}`}`,
         start,
         session,
         // The engineer is kept only after a proposed completion, and
@@ -8830,6 +8830,7 @@ export class RunService {
             .find(evidence => evidence.obligation !== undefined && evidence.against === 'real')?.obligation ?? null,
           kind: assignment.kind,
           openFindings: tools.openFindings(),
+          submissions: tools.submissions,
           assigned: assignment.obligations ?? [],
           seams: {
             index: run.index,

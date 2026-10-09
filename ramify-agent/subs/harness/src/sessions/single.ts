@@ -406,7 +406,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
     // is judged: the hook checks saw only the mutations they covered.
     validate: async input => capabilityEngineerSubmissionSchema.safeParse(input).success
       ? validateEngineer(input, {
-        capabilityWorkflow: true, kind: 'ordinary', obligation: null, openFindings: tools.openFindings(),
+        capabilityWorkflow: true, kind: 'ordinary', obligation: null, openFindings: tools.openFindings(), submissions: tools.submissions,
       })
       : { ok: false, errors: [{ path: 'kind', message: 'This session accepts only the current capability engineer submissions' }] },
     accept: async value => {
