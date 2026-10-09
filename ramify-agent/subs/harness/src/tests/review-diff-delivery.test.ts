@@ -26,7 +26,7 @@ afterEach(async () => {
 
 const index = `${notesDirectory}/src/index.ts`;
 const clean = (...paths: string[]): ScriptStep => ({ kind: 'submit', input: { inspected: paths, missing: [], concerns: [] } });
-function engineers(firstStore = 'export const store = new Map(); // v1\n'): ScriptStep[][] {
+function engineers(firstStore = 'export const store = new Map(); // v1\n'): (readonly ScriptStep[])[] {
   return [
     submit(completionProposed('Added the note store.'), write(store, firstStore)),
     submit(completionProposed('Stated the note limit.'), write(limit, 'export const limit = (text: string) => text.length <= 50;\n')),

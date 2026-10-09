@@ -1,5 +1,6 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { z } from 'zod';
 import type { AgentPort, AgentSession, AppendOutcome, SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import type { AgentSessionPoint, SessionExecutionIdentity, SessionExecutionBindings, SessionExecutionPolicy, SessionOperations, SessionTaskInput, SessionToolDeclaration } from '../../subs/agent/src/interfaces/session-operations.js';
 import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-operations.js';
@@ -9,6 +10,7 @@ import { buildTaskPacket, type TaskEnvironment, type TaskKind, type TaskPacket }
 import { buildBriefingDelivery, taskBriefingRevision, type BriefingRevision } from '../prompts/briefings.js';
 import { exactInputHash, type DeliveredInput } from '../prompts/delivered-manifest.js';
 import type { LoadedPackage } from '../prompts/packages.js';
+import { deliveredManifestViewSchema } from '../interfaces/protocol/runs.js';
 
 export interface HarnessTaskBrief {
   readonly kind: TaskKind;
@@ -44,7 +46,7 @@ interface Context {
   readonly revision: string;
 }
 interface Intent {
-  readonly schema: 'ramify-agent.harness-operation/1';
+  readonly schema: 'ramify-agent.harness-operation/1' | 'ramify-agent.harness-operation/2';
   readonly runId: string;
   readonly operationId: string;
   readonly session: string;
@@ -55,6 +57,44 @@ interface Intent {
   readonly policy: SessionExecutionPolicy;
   readonly task: SessionTaskInput;
   readonly declarations: readonly SessionToolDeclaration[];
+}
+
+const retainedText = z.string().min(1);
+const pointSchema = z.object({ sessionId: retainedText, kind: z.enum(['turn', 'checkpoint']), turn: z.int().nonnegative(), checkpoint: z.string() }).strict();
+const retainedSource = z.object({ path: retainedText, hash: retainedText, bytes: z.int().nonnegative(), kind: z.string().optional() }).strict();
+const inputSchema = z.object({ key: retainedText, kind: z.enum(['role-instructions', 'procedure', 'brief', 'environment', 'task', 'tool-declaration', 'skill']),
+  text: z.string(), source: z.string().nullable(), revision: z.string().nullable(), sources: z.array(retainedSource).optional() }).strict();
+const annotatedInputSchema = inputSchema.extend({ block: z.object({ key: retainedText, effect: z.enum(['set', 'remove']) }).strict().optional() }).strict();
+const revisionSchema = z.object({ revision: retainedText, sections: z.array(z.object({ key: retainedText, text: z.string(), source: z.string().nullable().optional() }).strict()) }).strict();
+const occurrenceSchema = revisionSchema.extend({ contentHash: retainedText.optional() }).strict();
+const jsonRecord = z.record(z.string(), z.unknown());
+const declarationSchema = z.object({ name: retainedText, description: z.string(), inputSchema: jsonRecord, mutating: z.boolean() }).strict();
+const packetFields = { roleInstructions: z.string(), message: z.string(), submissionTool: retainedText,
+  declaration: z.object({ name: retainedText, description: z.string(), inputSchema: z.object({ type: z.literal('object') }).strict(), mutating: z.literal(false) }).strict(),
+  manifest: deliveredManifestViewSchema };
+const intentFields = { runId: retainedText, operationId: retainedText, session: retainedText, source: pointSchema.nullable(), mode: z.enum(['fresh', 'continue', 'fork']),
+  policy: z.object({ context: z.object({ compaction: z.enum(['forbidden', 'allowed']), budgetTokens: z.number().nullable(), budgetFraction: z.number().nullable(), reportReserveTokens: z.number() }).strict(),
+    authority: jsonRecord, validator: jsonRecord, destination: jsonRecord }).strict(),
+  task: z.object({ role: retainedText, message: z.string(), submissionTool: retainedText, policyIdentity: retainedText, validatorIdentity: retainedText, destinationIdentity: retainedText,
+    environment: z.object({ workingDirectory: retainedText, candidate: z.string().nullable(), snapshot: z.string().nullable(), limits: jsonRecord }).strict() }).strict(),
+  declarations: z.array(declarationSchema) };
+const intentSchema = z.discriminatedUnion('schema', [
+  z.object({ schema: z.literal('ramify-agent.harness-operation/1'), ...intentFields,
+    packet: z.object({ ...packetFields, additions: z.array(inputSchema) }).strict(),
+    context: z.object({ inherited: z.array(inputSchema), history: z.array(revisionSchema), revision: retainedText }).strict(),
+  }).strict(),
+  z.object({ schema: z.literal('ramify-agent.harness-operation/2'), ...intentFields,
+    packet: z.object({ ...packetFields, additions: z.array(annotatedInputSchema) }).strict(),
+    context: z.object({ inherited: z.array(annotatedInputSchema), history: z.array(occurrenceSchema), revision: retainedText }).strict(),
+  }).strict(),
+]);
+
+/** Validate both retained wire forms without normalizing or rewriting any original bytes. */
+export function readHarnessOperationIntent(value: unknown): Intent {
+  intentSchema.parse(value);
+  const intent = value as Intent;
+  if (intent.schema === 'ramify-agent.harness-operation/1' && intent.packet.manifest.schema !== 'ramify-agent.delivered-inputs/1') throw new Error('Legacy harness intent requires its legacy manifest');
+  return intent;
 }
 /** Only unavailable reusable context licenses a new ordinary fresh invocation. */
 export class ReusableSessionUnavailableError extends Error {}
@@ -116,9 +156,10 @@ export class HarnessSessionOperations {
     return found;
   }
   async packet(runId: string, operationId: string): Promise<TaskPacket | null> {
-    const intent = await this.read<Intent>(this.path('operations', [runId, operationId]));
-    if (!intent) return null;
-    if (intent.schema !== 'ramify-agent.harness-operation/1' || intent.runId !== runId || intent.operationId !== operationId) throw new Error('Invalid harness operation identity');
+    const raw = await this.read<unknown>(this.path('operations', [runId, operationId]));
+    if (!raw) return null;
+    const intent = readHarnessOperationIntent(raw);
+    if (intent.runId !== runId || intent.operationId !== operationId) throw new Error('Invalid harness operation identity');
     return intent.packet;
   }
   async acceptance(runId: string, operationId: string): Promise<{ readonly input: unknown; readonly value: unknown; readonly schema: string; readonly submissionHash: string; readonly destination: Readonly<Record<string, unknown>>; readonly validator: Readonly<Record<string, unknown>> } | null> {
@@ -129,7 +170,9 @@ export class HarnessSessionOperations {
   async start(input: HarnessOperationInput): Promise<AgentSession & { readonly unavailableReason?: string | undefined }> {
     const { runId, operationId } = input;
     const path = this.path('operations', [runId, operationId]);
-    const previous = await this.read<Intent>(path);
+    const raw = await this.read<unknown>(path);
+    const previous = raw === null ? null : readHarnessOperationIntent(raw);
+    if (previous && (previous.runId !== runId || previous.operationId !== operationId)) throw new Error('Invalid harness operation identity');
     if (input.restore && !previous) throw new Error('Original operation correlation unavailable');
     const spec = input.restore && previous ? { ...input.spec, scope: { workingDirectory: previous.task.environment.workingDirectory },
       session: previous.mode === 'fresh' ? { mode: 'fresh' as const } : previous.mode === 'continue'
