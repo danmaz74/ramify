@@ -7,4 +7,4 @@ expose-src Ledger, LedgerEntry, RecordSchema, openLedger, OpenLedgerOptions, Tra
 expose-src EffectSpec, PendingEffect from "effects.ts" to parent
 expose-src LedgerFileSystem, LedgerFileHandle, LedgerOpenFlags, nodeFileSystem from "fs.ts" to parent
 expose-src writeFileAtomic, writeFileExclusive, syncDirectory, ExclusiveWrite from "atomic.ts" to parent
-expose-src JsonLines, CorruptJsonLinesError, readJsonLines, appendJsonLine, discardPartialLine from "jsonl.ts" to parent
+expose-src JsonLines, CorruptJsonLinesError, readJsonLines, appendJsonLine, withJsonLineAppender, discardPartialLine from "jsonl.ts" to parent

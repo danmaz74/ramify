@@ -62,6 +62,59 @@ export async function appendJsonLine(path: string, record: unknown): Promise<voi
   }
 }
 
+/** Opens one bounded caller-owned scope. Each admitted record is still one
+ * ordered, individually flushed line. The result includes drainage and close;
+ * callers acknowledge records only after this scope returns. The append
+ * capability expires after the callback and refuses writes after any failure.
+ */
+export async function withJsonLineAppender<T>(
+  path: string,
+  use: (append: (record: unknown) => Promise<void>) => Promise<T>,
+): Promise<T> {
+  const handle = await open(path, 'a');
+  let accepting = true;
+  let failed = false;
+  let failure: unknown;
+  let tail: Promise<void> = Promise.resolve();
+  const append = (record: unknown): Promise<void> => {
+    if (!accepting) return Promise.reject(new Error('JSON line append scope is closed'));
+    if (failed) return Promise.reject(failure);
+    let line: string;
+    try {
+      const encoded = JSON.stringify(record);
+      if (encoded === undefined) throw new TypeError('The record has no JSON representation');
+      line = `${encoded}\n`;
+    } catch (error) {
+      failed = true;
+      failure = error;
+      return Promise.reject(error);
+    }
+    const task = tail.then(async () => {
+      if (failed) throw failure;
+      try {
+        await handle.appendFile(line);
+        await handle.datasync();
+      } catch (error) {
+        failed = true;
+        failure = error;
+        throw error;
+      }
+    });
+    tail = task.then(() => undefined, () => undefined);
+    return task;
+  };
+  try {
+    let result: T;
+    try { result = await use(append); }
+    finally { accepting = false; await tail; }
+    if (failed) throw failure;
+    return result;
+  } finally {
+    accepting = false;
+    await handle.close();
+  }
+}
+
 /** Truncates the file to its complete lines. */
 export async function discardPartialLine(path: string, loaded: JsonLines): Promise<void> {
   if (loaded.discardedPartial !== null) await truncate(path, loaded.completeBytes);
