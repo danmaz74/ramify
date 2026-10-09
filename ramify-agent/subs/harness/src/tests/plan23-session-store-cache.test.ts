@@ -491,3 +491,111 @@ describe('Plan 23 owned session store replay cache', () => {
     await expect(openSessionStore({ directory: path })).rejects.toThrow();
   });
 });
+
+function captureGate() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
+
+describe('synchronous logical JSON commit admission', () => {
+  it('detaches complete metadata before envelope body accessors, encodes each body once in order, and rejects caller aliases', async () => {
+    const { path, store } = await setup(); const payload = await store.putPayload(new Uint8Array([1, 2, 3]));
+    const trace: string[] = []; const firstBody = Object.assign(Object.create(null), { '10': 'ten', '2': 'two', negative: -0, huge: Infinity, omitted: undefined,
+      date: new Date('2026-01-02T03:04:05.000Z'), nested: { ['__proto__']: { kept: true }, constructor: 'data', values: [undefined, NaN, -Infinity] }, fn: () => 'omitted', ['__proto__']: { dropped: true } });
+    Object.defineProperty(firstBody, 'getter', { enumerable: true, get() { trace.push('nested getter'); return 'captured'; } });
+    firstBody.custom = { toJSON() { trace.push('nested toJSON'); return { exact: 'native' }; } };
+    const input = { runId: 'A', expected: [{ id: 'session:s', revision: null }, { id: 'session:other', revision: null }], payloads: [payload], records: [record(1), { ...record(1), id: 'session:other' }] };
+    Object.defineProperty(input.records[0]!, 'id', { enumerable: true, configurable: true, get() { trace.push('header first'); return 'session:s'; } });
+    Object.defineProperty(input.records[1]!, 'id', { enumerable: true, configurable: true, get() { trace.push('header second'); return 'session:other'; } });
+    Object.defineProperty(input.records[0]!, 'body', { enumerable: true, get() {
+      trace.push('body first'); input.runId = 'changed-by-body'; input.expected[0]!.id = 'changed-by-body'; input.payloads.splice(0);
+      Object.defineProperty(input.records[1]!, 'id', { value: 'changed-by-body', configurable: true, enumerable: true });
+      return firstBody;
+    } });
+    Object.defineProperty(input.records[1]!, 'body', { enumerable: true, get() { trace.push('body second'); return { toJSON() { trace.push('root toJSON'); return { label: 'second' }; } }; } });
+    const pending = store.commitCaptured(input);
+    expect(trace).toEqual(['header first', 'header second', 'body first', 'nested getter', 'nested toJSON', 'body second', 'root toJSON']);
+    firstBody.nested.values.push('caller mutation'); firstBody.nested.__proto__.kept = false; input.records.splice(0); input.expected.splice(0); input.payloads.push('unavailable');
+    expect(await pending).toEqual({ kind: 'committed' });
+    const firstBytes = '{"2":"two","10":"ten","negative":0,"huge":null,"date":"2026-01-02T03:04:05.000Z","nested":{"__proto__":{"kept":true},"constructor":"data","values":[null,null,null]},"getter":"captured","custom":{"exact":"native"}}';
+    const secondBytes = '{"label":"second"}';
+    const firstHash = createHash('sha256').update(firstBytes).digest('hex'); const secondHash = createHash('sha256').update(secondBytes).digest('hex');
+    expect(await readFile(join(path, 'record-bodies', `${firstHash}.json`), 'utf8')).toBe(firstBytes);
+    expect(await readFile(join(path, 'record-bodies', `${secondHash}.json`), 'utf8')).toBe(secondBytes);
+    const entry = JSON.parse((await readFile(join(path, 'session-ledger.jsonl'), 'utf8')).trim());
+    expect(entry.event).toEqual({ type: 'session-store-commit/2', runId: 'A', records: [
+      { runId: 'A', id: 'session:s', revision: 1, schema: 'ramify-agent.session/1', bodyId: firstHash },
+      { runId: 'A', id: 'session:other', revision: 1, schema: 'ramify-agent.session/1', bodyId: secondHash },
+    ], payloads: [payload] });
+    expect(entry.records).toEqual([]);
+    await store.close(); const reopened = (await setup(path)).store;
+    expect(await reopened.read('A', 'session:s')).toEqual(record(1, JSON.parse(firstBytes)));
+    expect(await reopened.read('A', 'session:other')).toEqual({ ...record(1, JSON.parse(secondBytes)), id: 'session:other' });
+  });
+
+  it('captures all input synchronously while an earlier durable append blocks the writer queue', async () => {
+    const { store } = await setup(); const entered = captureGate(); const release = captureGate();
+    observed.duringAppend = async () => { entered.resolve(); await release.promise; };
+    const earlier = commit(store, 1, [], { value: 'earlier' }); await entered.promise;
+    let getters = 0; const body = { nested: { values: ['original'] }, get literal() { getters++; return 'captured'; } };
+    const input = { runId: 'A', expected: [{ id: 'session:s', revision: 1 }], records: [record(2, body)], payloads: [] as string[] };
+    const pending = store.commitCaptured(input); expect(getters).toBe(1);
+    input.runId = 'B'; input.expected[0]!.revision = 0; (input.records[0] as { id: string }).id = 'changed'; input.payloads.push('missing'); body.nested.values.push('changed');
+    release.resolve(); expect(await earlier).toEqual({ kind: 'committed' }); expect(await pending).toEqual({ kind: 'committed' });
+    expect(await store.read('A', 'session:s')).toEqual(record(2, { nested: { values: ['original'] }, literal: 'captured' })); expect(getters).toBe(1);
+  });
+
+  it.each(['array', 'undefined', 'cycle', 'bigint', 'throwing getter'] as const)('refuses unsupported %s bodies before publishing any record or journal', async shape => {
+    const { path, store } = await setup(); let body: unknown;
+    if (shape === 'array') body = ['invalid']; else if (shape === 'undefined') body = undefined;
+    else if (shape === 'bigint') body = { integer: 1n };
+    else if (shape === 'cycle') { const value: Record<string, unknown> = {}; value['self'] = value; body = value; }
+    else body = { get value() { throw new Error('capture getter refused'); } };
+    const pending = store.commitCaptured({ runId: 'A', expected: [{ id: 'session:s', revision: null }], records: [{ ...record(1), body: body as Record<string, unknown> }], payloads: [] });
+    await expect(pending).rejects.toThrow(); expect(await store.read('A', 'session:s')).toBeNull();
+    await expect(readFile(join(path, 'session-ledger.jsonl'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('refuses a later body getter without publishing an earlier prepared member of the same transaction', async () => {
+    const { path, store } = await setup(); await commit(store, 1, [], { value: 'original' });
+    const before = await readFile(join(path, 'session-ledger.jsonl')); const trace: string[] = [];
+    const first = record(2, { toJSON() { trace.push('first'); return { value: 'prepared only' }; } });
+    const second = { ...record(1), id: 'session:new' };
+    Object.defineProperty(second, 'body', { enumerable: true, get() { trace.push('second'); throw new Error('Later body refused'); } });
+    await expect(store.commitCaptured({ runId: 'A', expected: [{ id: 'session:s', revision: 1 }, { id: 'session:new', revision: null }], records: [first, second], payloads: [] })).rejects.toThrow('Later body refused');
+    expect(trace).toEqual(['first', 'second']); expect(await readFile(join(path, 'session-ledger.jsonl'))).toEqual(before);
+    expect(await store.read('A', 'session:s')).toEqual(record(1, { value: 'original' })); expect(await store.read('A', 'session:new')).toBeNull();
+    await expect(readFile(join(path, 'record-bodies', `${bodyHash({ value: 'prepared only' })}.json`))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it.each(['body', 'journal', 'payload', 'owner'] as const)('retains actual %s refusal before a captured CAS conflict can bypass physical proof', async damage => {
+    const { path, store } = await setup(); const payload = await store.putPayload(new Uint8Array([3, 4, 5])); const body = { value: 'original' };
+    await commit(store, 1, [payload], body);
+    if (damage === 'body') await writeFile(join(path, 'record-bodies', `${bodyHash(body)}.json`), '{"value":"changed"}');
+    if (damage === 'payload') await writeFile(join(path, 'payloads', payload), new Uint8Array([9, 8, 7]));
+    if (damage === 'owner') await rm(join(path, 'plans', '.harness', 'lock'));
+    if (damage === 'journal') {
+      const log = join(path, 'session-ledger.jsonl'); observed.frozenLog = { path: log, metadata: statSync(log, { bigint: true }) };
+      await writeFile(log, (await readFile(log, 'utf8')).replace('session:s', 'session:x'));
+    }
+    const pending = store.commitCaptured({ runId: 'A', expected: [{ id: 'session:s', revision: 0 }], records: [record(1, { value: 'new' })], payloads: [payload] });
+    await expect(pending).rejects.toThrow(damage === 'body' ? /record body/ : damage === 'journal' ? /changed outside/ : damage === 'owner' ? /ownership unavailable/ : /payload/);
+  });
+
+  it.each(['body write', 'append before', 'append after'] as const)('keeps captured commit %s uncertainty and authoritative recovery without a speculative cache', async fault => {
+    const { path, store } = await setup(); await commit(store, 1, [], { value: 'original' });
+    if (fault === 'body write') observed.failBodyWrite = true; else observed.failAppend = fault === 'append before' ? 'before' : 'after';
+    await expect(store.commitCaptured({ runId: 'A', expected: [{ id: 'session:s', revision: 1 }], records: [record(2, { value: 'captured' })], payloads: [] })).rejects.toThrow(/injected/);
+    const expected = fault === 'append after' ? record(2, { value: 'captured' }) : record(1, { value: 'original' });
+    expect(await store.read('A', 'session:s')).toEqual(expected);
+    await store.close(); expect(await (await setup(path)).store.read('A', 'session:s')).toEqual(expected);
+  });
+
+  it('keeps captured multi-record CAS conflict atomic and matches the ordinary normalized body wire', async () => {
+    const { path, store } = await setup(); const body = { nested: { value: 'original' }, date: new Date('2026-01-01T00:00:00.000Z'), values: [-0, Infinity, undefined] };
+    const normalized = { nested: { value: 'original' }, date: '2026-01-01T00:00:00.000Z', values: [0, null, null] };
+    await commit(store, 1, [], body); const before = await readFile(join(path, 'session-ledger.jsonl'));
+    expect(await store.commitCaptured({ runId: 'A', expected: [{ id: 'session:s', revision: 0 }, { id: 'session:new', revision: null }], records: [record(1, body), { ...record(1, body), id: 'session:new' }], payloads: [] })).toMatchObject({ kind: 'conflict' });
+    expect(await readFile(join(path, 'session-ledger.jsonl'))).toEqual(before); expect(await store.read('A', 'session:new')).toBeNull();
+    expect(await store.commitCaptured({ runId: 'A', expected: [{ id: 'session:s', revision: 1 }], records: [record(2, body)], payloads: [] })).toEqual({ kind: 'committed' });
+    expect(await store.read('A', 'session:s')).toEqual(record(2, normalized));
+    expect(await readFile(join(path, 'record-bodies', `${bodyHash(normalized)}.json`), 'utf8')).toBe(JSON.stringify(normalized));
+  });
+});

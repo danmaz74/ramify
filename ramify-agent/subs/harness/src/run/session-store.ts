@@ -32,6 +32,8 @@ export interface LedgerSessionStoreOptions { readonly directory: string }
 export interface LedgerSessionStore extends SessionStore {
   /** Fresh independently owned record with the native JSON normalization of read followed by a JSON clone. */
   readDetached(runId: string, id: string): Promise<SessionStoreRecord | null>;
+  /** Captures complete logical JSON input before any queued writer work. */
+  commitCaptured(input: SessionStoreCommit): ReturnType<SessionStore['commit']>;
   close(): Promise<void>;
 }
 type SessionLedger = Awaited<ReturnType<typeof openLedger<z.infer<typeof eventSchema>>>>;
@@ -270,6 +272,111 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
     await serialized(directory, async () => { writer.references--; if (writer.references === 0) { writers.delete(directory); await writer.lock.release(); } });
     throw error;
   }
+  type Prepared = { readonly record: SessionStoreRecord; readonly bytes: string };
+  function preparedBody(header: Record<string, unknown>, encoded: string, parsed = JSON.parse(encoded) as Record<string, unknown>): Prepared {
+    const record = envelope.parse({ ...header, body: parsed });
+    const keys = Object.keys(parsed);
+    const validatedKeys = Object.keys(record.body);
+    // The record parser can omit keys such as __proto__. Reuse bytes only
+    // when validation retained every own key, its order and actual value.
+    const unchanged = keys.length === validatedKeys.length && validatedKeys.every((key, index) => key === keys[index] && record.body[key] === parsed[key]);
+    return { record, bytes: unchanged ? encoded : JSON.stringify(record.body) };
+  }
+  function prepareOrdinary(input: SessionStoreCommit): Prepared[] {
+    return input.records.map(item => {
+      const plain = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+      if (!plain(item) || !plain(item.body)) {
+        // Retain the whole-envelope normalization and validation errors for
+        // unsupported or invalid record/body shapes.
+        const record = envelope.parse(JSON.parse(JSON.stringify(item)));
+        return { record, bytes: JSON.stringify(record.body) };
+      }
+      const encoded = JSON.stringify(item.body);
+      const parsed = JSON.parse(encoded) as Record<string, unknown>;
+      const header = JSON.parse(JSON.stringify({ ...item, body: undefined }));
+      return preparedBody(header, encoded, parsed);
+    });
+  }
+  function commitOwned(input: SessionStoreCommit, admitted?: readonly Prepared[]): ReturnType<SessionStore['commit']> {
+    return serialized(logPath, async () => {
+      await assertWriter();
+      if (!input.runId) throw new Error('Missing run identity');
+      const prepared = admitted ?? prepareOrdinary(input);
+      const records = prepared.map(item => item.record);
+      const ids = records.map(item => item.id);
+      if (new Set(ids).size !== ids.length || new Set(input.expected.map(item => item.id)).size !== input.expected.length) throw new Error('Duplicate CAS record identity');
+      const state = await load();
+      const current = state.records;
+      const checkedExpected = input.expected.map(expected => {
+        const key = JSON.stringify([input.runId, expected.id]);
+        const bodyId = state.bodyRefs.get(key);
+        // The complete owned journal authenticates the private header.
+        // Validate every actual referenced body before deciding any conflict;
+        // comparing its revision needs no additional decoded body copy.
+        if (bodyId !== undefined) bodyBytes(bodyId);
+        return { expected, actual: current.get(key) ?? null };
+      });
+      for (const { expected, actual } of checkedExpected) {
+        if ((actual?.revision ?? null) !== expected.revision) return { kind: 'conflict' as const, reason: `Revision conflict for ${expected.id}` };
+      }
+      for (const item of records) {
+        const expected = input.expected.find(value => value.id === item.id);
+        if (item.runId !== input.runId || !expected || item.revision !== (expected.revision ?? 0) + 1) throw new Error(`Invalid CAS envelope for ${item.id}`);
+      }
+      const payloads = new Map(state.payloads);
+      for (const id of new Set(input.payloads)) {
+        // load already validated cached identities for this transaction.
+        if (!payloads.has(id)) payloads.set(id, await validatePayload(id, undefined, 'Missing committed payload'));
+      }
+      // Cache the JSON representation the ledger actually commits. In
+      // particular, Dates, undefined fields and non-finite numbers must not
+      // read differently before and after reopening the authoritative log.
+      const headers: z.infer<typeof headerSchema>[] = [];
+      for (const { record: item, bytes } of prepared) {
+        const bodyId = hash(bytes);
+        await writeFileExclusive(bodyPath(bodyId), bytes);
+        bodyBytes(bodyId);
+        headers.push({ runId: item.runId, id: item.id, revision: item.revision, schema: item.schema, bodyId });
+      }
+      const event = eventSchema.parse({ type: 'session-store-commit/2', runId: input.runId, records: headers, payloads: [...new Set(input.payloads)] });
+      await assertWriter();
+      const expectedBodyIds = new Set(input.expected.map(item => state.bodyRefs.get(JSON.stringify([input.runId, item.id]))).filter((id): id is string => id !== undefined));
+      for (const id of expectedBodyIds) bodyBytes(id);
+      for (const item of headers) bodyBytes(item.bodyId);
+      const beforeAppend = journalProof();
+      if (!sameFingerprint(beforeAppend.log, state.log) || !state.ledger.matchesCommittedContent(beforeAppend.bytes)) {
+        writer.state = null; writer.unavailable = 'Session ledger changed outside the owned writer'; throw new Error(writer.unavailable);
+      }
+      try {
+        // One flushed header transaction references complete authenticated
+        // bodies already persisted atomically. Advisory record copies add
+        // no recovery proof to this private adapter.
+        await state.ledger.append({ event, records: [] });
+        const proof = journalProof();
+        if (proof.log === null || !state.ledger.matchesCommittedContent(proof.bytes)) {
+          writer.unavailable = 'Session ledger changed outside the owned writer'; throw new Error(writer.unavailable);
+        }
+        for (const id of expectedBodyIds) bodyBytes(id);
+        for (const item of headers) bodyBytes(item.bodyId);
+        state.log = proof.log;
+        await assertWriter();
+      } catch (error) {
+        // A failed append can leave a torn or complete durable line. Replay
+        // is authoritative on the next operation; never publish speculative
+        // records or keep the old ledger's potentially stale byte position.
+        writer.state = null;
+        throw error;
+      }
+      for (const item of records) {
+        const key = JSON.stringify([item.runId, item.id]);
+        current.set(key, item);
+        state.serializedRecords.delete(key);
+      }
+      for (const item of headers) state.bodyRefs.set(JSON.stringify([item.runId, item.id]), item.bodyId);
+      for (const [id, value] of payloads) state.payloads.set(id, value);
+      return { kind: 'committed' as const };
+    });
+  }
   return {
     async close() {
       await serialized(logPath, async () => {
@@ -299,103 +406,28 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
     getPayload: id => serialized(logPath, async () => { await assertWriter(); return readPayload(id); }),
     async commit(input: SessionStoreCommit) {
       const captured = structuredClone(input);
-      return serialized(logPath, async () => {
-        await assertWriter();
-        const input = captured;
-        if (!input.runId) throw new Error('Missing run identity');
-        const prepared = input.records.map(item => {
-          const plain = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
-          if (!plain(item) || !plain(item.body)) {
-            // Retain the whole-envelope normalization and validation errors for
-            // unsupported or invalid record/body shapes.
-            const record = envelope.parse(JSON.parse(JSON.stringify(item)));
-            return { record, bytes: JSON.stringify(record.body) };
-          }
-          const encoded = JSON.stringify(item.body);
-          const parsed = JSON.parse(encoded) as Record<string, unknown>;
-          const header = JSON.parse(JSON.stringify({ ...item, body: undefined }));
-          const record = envelope.parse({ ...header, body: parsed });
-          const keys = Object.keys(parsed);
-          const validatedKeys = Object.keys(record.body);
-          // The record parser can omit keys such as __proto__. Reuse bytes only
-          // when validation retained every own key, its order and actual value.
-          const unchanged = keys.length === validatedKeys.length && validatedKeys.every((key, index) => key === keys[index] && record.body[key] === parsed[key]);
-          return { record, bytes: unchanged ? encoded : JSON.stringify(record.body) };
+      return commitOwned(captured);
+    },
+    async commitCaptured(input: SessionStoreCommit) {
+      // Body references are borrowed only inside this synchronous admission.
+      // Copy every metadata field before body getters/toJSON run; never pass
+      // a raw exotic body through structuredClone or into the queued writer.
+      const items = [...input.records];
+      const headers = items.map(item => {
+        const header: Record<string, unknown> = {};
+        // Unlike object rest, excluding the key this way does not invoke an
+        // accessor on the envelope's body before metadata has been detached.
+        for (const key of Object.keys(item)) if (key !== 'body') Object.defineProperty(header, key, {
+          value: (item as unknown as Record<string, unknown>)[key], enumerable: true, writable: true, configurable: true,
         });
-        const records = prepared.map(item => item.record);
-        const ids = records.map(item => item.id);
-        if (new Set(ids).size !== ids.length || new Set(input.expected.map(item => item.id)).size !== input.expected.length) throw new Error('Duplicate CAS record identity');
-        const state = await load();
-        const current = state.records;
-        const checkedExpected = input.expected.map(expected => {
-          const key = JSON.stringify([input.runId, expected.id]);
-          const bodyId = state.bodyRefs.get(key);
-          // The complete owned journal authenticates the private header.
-          // Validate every actual referenced body before deciding any conflict;
-          // comparing its revision needs no additional decoded body copy.
-          if (bodyId !== undefined) bodyBytes(bodyId);
-          return { expected, actual: current.get(key) ?? null };
-        });
-        for (const { expected, actual } of checkedExpected) {
-          if ((actual?.revision ?? null) !== expected.revision) return { kind: 'conflict' as const, reason: `Revision conflict for ${expected.id}` };
-        }
-        for (const item of records) {
-          const expected = input.expected.find(value => value.id === item.id);
-          if (item.runId !== input.runId || !expected || item.revision !== (expected.revision ?? 0) + 1) throw new Error(`Invalid CAS envelope for ${item.id}`);
-        }
-        const payloads = new Map(state.payloads);
-        for (const id of new Set(input.payloads)) {
-          // load already validated cached identities for this transaction.
-          if (!payloads.has(id)) payloads.set(id, await validatePayload(id, undefined, 'Missing committed payload'));
-        }
-        // Cache the JSON representation the ledger actually commits. In
-        // particular, Dates, undefined fields and non-finite numbers must not
-        // read differently before and after reopening the authoritative log.
-        const headers: z.infer<typeof headerSchema>[] = [];
-        for (const { record: item, bytes } of prepared) {
-          const bodyId = hash(bytes);
-          await writeFileExclusive(bodyPath(bodyId), bytes);
-          bodyBytes(bodyId);
-          headers.push({ runId: item.runId, id: item.id, revision: item.revision, schema: item.schema, bodyId });
-        }
-        const event = eventSchema.parse({ type: 'session-store-commit/2', runId: input.runId, records: headers, payloads: [...new Set(input.payloads)] });
-        await assertWriter();
-        const expectedBodyIds = new Set(input.expected.map(item => state.bodyRefs.get(JSON.stringify([input.runId, item.id]))).filter((id): id is string => id !== undefined));
-        for (const id of expectedBodyIds) bodyBytes(id);
-        for (const item of headers) bodyBytes(item.bodyId);
-        const beforeAppend = journalProof();
-        if (!sameFingerprint(beforeAppend.log, state.log) || !state.ledger.matchesCommittedContent(beforeAppend.bytes)) {
-          writer.state = null; writer.unavailable = 'Session ledger changed outside the owned writer'; throw new Error(writer.unavailable);
-        }
-        try {
-          // One flushed header transaction references complete authenticated
-          // bodies already persisted atomically. Advisory record copies add
-          // no recovery proof to this private adapter.
-          await state.ledger.append({ event, records: [] });
-          const proof = journalProof();
-          if (proof.log === null || !state.ledger.matchesCommittedContent(proof.bytes)) {
-            writer.unavailable = 'Session ledger changed outside the owned writer'; throw new Error(writer.unavailable);
-          }
-          for (const id of expectedBodyIds) bodyBytes(id);
-          for (const item of headers) bodyBytes(item.bodyId);
-          state.log = proof.log;
-          await assertWriter();
-        } catch (error) {
-          // A failed append can leave a torn or complete durable line. Replay
-          // is authoritative on the next operation; never publish speculative
-          // records or keep the old ledger's potentially stale byte position.
-          writer.state = null;
-          throw error;
-        }
-        for (const item of records) {
-          const key = JSON.stringify([item.runId, item.id]);
-          current.set(key, item);
-          state.serializedRecords.delete(key);
-        }
-        for (const item of headers) state.bodyRefs.set(JSON.stringify([item.runId, item.id]), item.bodyId);
-        for (const [id, value] of payloads) state.payloads.set(id, value);
-        return { kind: 'committed' as const };
+        return header;
       });
+      const metadata = structuredClone({ runId: input.runId, expected: input.expected, payloads: input.payloads, headers });
+      const prepared = items.map((item, index) => {
+        const header = JSON.parse(JSON.stringify(metadata.headers[index]!)) as Record<string, unknown>;
+        return preparedBody(header, JSON.stringify(item.body));
+      });
+      return commitOwned({ runId: metadata.runId, expected: metadata.expected, payloads: metadata.payloads, records: prepared.map(item => item.record) }, prepared);
     },
   };
 }

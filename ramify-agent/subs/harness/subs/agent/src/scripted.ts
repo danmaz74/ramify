@@ -691,8 +691,10 @@ function createScriptDeclarationDriver(script: Script, options: ScriptedAgentOpt
 /** Provider built-ins are bound here, never by a harness-side transcript decoder. */
 function createScriptedOperations(ownedStore: SessionStore, script: Script, options: ScriptedAgentOptions, observations: ScriptedSessionRecord[], lost: ReadonlySet<string>): SessionOperations {
   const detachedRead = ownedStore.readDetached?.bind(ownedStore);
+  const capturedCommit = ownedStore.commitCaptured?.bind(ownedStore);
   const sessionStore: SessionStore = { async read(runId, id) { return id.startsWith('session:') && lost.has(id.slice(8)) ? null : ownedStore.read(runId, id); }, putPayload: bytes => ownedStore.putPayload(bytes), getPayload: id => ownedStore.getPayload(id), commit: input => ownedStore.commit(input) };
   if (detachedRead) sessionStore.readDetached = async (runId, id) => id.startsWith('session:') && lost.has(id.slice(8)) ? null : detachedRead(runId, id);
+  if (capturedCommit) sessionStore.commitCaptured = input => capturedCommit(input);
   const operations = createSessionOperations({ sessionStore, driver: options.operationScript ? createScriptedSessionDriver(options.operationScript) : createScriptDeclarationDriver(script, options, observations) });
   function enrich(bindings: SessionExecutionBindings, declarations: readonly SessionToolDeclaration[]): SessionExecutionBindings {
     const tools = [...bindings.tools];

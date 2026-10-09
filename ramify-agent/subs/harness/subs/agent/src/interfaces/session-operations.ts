@@ -36,6 +36,13 @@ export interface SessionStore {
   putPayload(bytes: Uint8Array): Promise<TranscriptPayloadId>;
   getPayload(id: TranscriptPayloadId): Promise<Uint8Array | null>;
   commit(input: SessionStoreCommit): Promise<{ readonly kind: 'committed' } | { readonly kind: 'conflict'; readonly reason: string }>;
+  /** Optional strong admission: capture all headers, expected revisions and payload IDs,
+   * before reading bodies, then capture each native JSON representation in record
+   * order, synchronously before returning a promise. No mutable input survives
+   * admission; normalize bodies through JSON.parse(JSON.stringify(body)) before
+   * existing owning-schema validation. Later writer/authority/CAS proofs
+   * remain mandatory. Ordinary commit has no implied strong admission guarantee. */
+  commitCaptured?(input: SessionStoreCommit): Promise<{ readonly kind: 'committed' } | { readonly kind: 'conflict'; readonly reason: string }>;
 }
 /** Serialized values, not executable authority or validator closures. */
 export interface SessionExecutionPolicy { readonly context: ContextPolicy; readonly authority: Readonly<Record<string, unknown>>; readonly validator: Readonly<Record<string, unknown>>; readonly destination: Readonly<Record<string, unknown>> }

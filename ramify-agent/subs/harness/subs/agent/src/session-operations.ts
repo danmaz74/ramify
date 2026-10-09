@@ -4,7 +4,7 @@ import type { GuardedCall, SessionOutcome, SubmissionVerdict, ToolResult } from 
 import type {
   AgentSessionPoint, AgentSessionSnapshot, ContinueSessionInput, SessionEffectRecord, SessionExecutionBindings,
   SessionOperationHandle, SessionOperationKey, SessionOperationReceipt, SessionOperations, SessionOperationsOptions,
-  SessionStoreRecord, SessionExecutionIdentity, SessionTaskInput, SessionToolChange, SessionTranscriptEntry,
+  SessionStore, SessionStoreRecord, SessionExecutionIdentity, SessionTaskInput, SessionToolChange, SessionTranscriptEntry,
 } from './interfaces/session-operations.js';
 
 type Snapshot = AgentSessionSnapshot;
@@ -64,10 +64,14 @@ function errorText(error: unknown): string { return error instanceof Error ? err
 export function createSessionOperations(options: SessionOperationsOptions): SessionOperations {
   const store = options.sessionStore;
   const detachedRead = store.readDetached?.bind(store);
+  const capturedCommit = store.commitCaptured?.bind(store);
+  const commit: SessionStore['commit'] = input => capturedCommit ? capturedCommit(input) : store.commit(input);
   const active = new Map<string, Active>();
   const activeKey = (key: SessionOperationKey) => canonical([key.runId, key.operationId]);
   const record = (key: SessionOperationKey, id: string, revision: number, body: unknown, session: boolean): SessionStoreRecord => ({
-    runId: key.runId, id, revision, schema: session ? 'ramify-agent.session/1' : 'ramify-agent.session-operation/1', body: clone(body) as Record<string, unknown>,
+    // The optional producer captures this borrowed body before its call
+    // returns. Every record below is admitted immediately, without an await.
+    runId: key.runId, id, revision, schema: session ? 'ramify-agent.session/1' : 'ramify-agent.session-operation/1', body: (capturedCommit ? body : clone(body)) as Record<string, unknown>,
   });
   async function readOperation(key: SessionOperationKey): Promise<{ record: SessionStoreRecord; body: OperationBody } | null> {
     const found = await (detachedRead ? detachedRead(key.runId, operationRecordId(key.operationId)) : store.read(key.runId, operationRecordId(key.operationId)));
@@ -127,7 +131,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     const result = receipt(key, snapshot.sessionId, 'completed', null, snapshot.currentPoint, null, turn);
     const op: OperationBody = { kind, input, sessionId: snapshot.sessionId, snapshot, effects: [], provider: [], owner: null, phase: 'terminal', receipt: result };
     const records = [record(key, operationRecordId(key.operationId), 1, op, false), record(key, sessionRecordId(snapshot.sessionId), (sessionPrior?.record.revision ?? 0) + 1, { snapshot, points: [...(sessionPrior?.body.points ?? []), snapshot] }, true)];
-    const committed = await store.commit({ runId: key.runId, expected: [{ id: records[0]!.id, revision: null }, { id: records[1]!.id, revision: sessionPrior?.record.revision ?? null }], records, payloads: snapshot.transcript.map(entry => entry.payloadId) });
+    const committed = await commit({ runId: key.runId, expected: [{ id: records[0]!.id, revision: null }, { id: records[1]!.id, revision: sessionPrior?.record.revision ?? null }], records, payloads: snapshot.transcript.map(entry => entry.payloadId) });
     if (committed.kind === 'conflict') return await terminalDuplicate(key, input) ?? receipt(key, snapshot.sessionId, 'conflict', committed.reason);
     return clone(result);
   }
@@ -182,7 +186,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         snapshot = { ...snapshot, policy: clone(input.policy), activeOperation: input.operationId, transcript: [...snapshot.transcript, await payload(`prepare:${input.operationId}`, frozen)] };
       } catch (error) { return completedHandle(receipt(input, input.sessionId, error instanceof SessionDriverUnavailableError ? 'unavailable' : 'conflict', errorText(error))); }
       const op: OperationBody = { kind: 'continue', input: frozen, sessionId: input.sessionId, snapshot, effects: [], provider: [], owner: null, phase: 'intent', receipt: null };
-      const committed = await store.commit({ runId: input.runId, expected: [{ id: operationRecordId(input.operationId), revision: null }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(input, operationRecordId(input.operationId), 1, op, false), record(input, loaded.record.id, loaded.record.revision + 1, { ...loaded.body, snapshot }, true)], payloads: snapshot.transcript.map(entry => entry.payloadId) });
+      const committed = await commit({ runId: input.runId, expected: [{ id: operationRecordId(input.operationId), revision: null }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(input, operationRecordId(input.operationId), 1, op, false), record(input, loaded.record.id, loaded.record.revision + 1, { ...loaded.body, snapshot }, true)], payloads: snapshot.transcript.map(entry => entry.payloadId) });
       if (committed.kind === 'conflict') return completedHandle(await terminalDuplicate(input, frozen) ?? receipt(input, input.sessionId, 'conflict', committed.reason));
       return launch(input, input.bindings, false);
     },
@@ -255,7 +259,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     const prior = await readOperation(key);
     if (!prior?.body.receipt || prior.body.phase !== 'terminal' || prior.body.owner?.token !== token) throw new Error('Cannot attest quiescence without the original terminal owner');
     if (prior.body.quiescent === true) return;
-    const committed = await store.commit({ runId: key.runId, expected: [{ id: prior.record.id, revision: prior.record.revision }], records: [record(key, prior.record.id, prior.record.revision + 1, { ...prior.body, quiescent: true }, false)], payloads: [...prior.body.snapshot.transcript, ...prior.body.provider].map(item => item.payloadId) });
+    const committed = await commit({ runId: key.runId, expected: [{ id: prior.record.id, revision: prior.record.revision }], records: [record(key, prior.record.id, prior.record.revision + 1, { ...prior.body, quiescent: true }, false)], payloads: [...prior.body.snapshot.transcript, ...prior.body.provider].map(item => item.payloadId) });
     if (committed.kind === 'conflict') throw new Error(`Quiescence attestation conflicted: ${committed.reason}`);
   }
   // The durable operation revision fences every callback, including another recovering writer.
@@ -264,7 +268,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     if (!prior || prior.body.phase === 'terminal') throw new Error('Operation fenced after settlement');
     if (ownerToken && prior.body.owner?.token !== ownerToken) throw new Error('Execution ownership lost');
     const body = work(prior.body);
-    const committed = await store.commit({ runId: key.runId, expected: [{ id: prior.record.id, revision: prior.record.revision }], records: [record(key, prior.record.id, prior.record.revision + 1, body, false)], payloads: [...body.snapshot.transcript, ...body.provider].map(item => item.payloadId) });
+    const committed = await commit({ runId: key.runId, expected: [{ id: prior.record.id, revision: prior.record.revision }], records: [record(key, prior.record.id, prior.record.revision + 1, body, false)], payloads: [...body.snapshot.transcript, ...body.provider].map(item => item.payloadId) });
     if (committed.kind === 'conflict') throw new Error(committed.reason);
     return body;
   }
@@ -280,7 +284,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     const status = unavailable ? 'unavailable' : outcome.kind === 'stopped' ? 'stopped' : uncertain ? 'unavailable' : outcome.kind === 'failed' ? 'failed' : 'completed';
     const result = receipt(key, op.body.sessionId, status, uncertain ? 'External effect completion unknown; point unavailable' : interruptedProvider ? 'Provider completion interrupted; point unavailable' : reason, available ? currentPoint : null, outcome, currentPoint.turn);
     const terminal: OperationBody = { ...op.body, phase: 'terminal', receipt: result };
-    const committed = await store.commit({ runId: key.runId, expected: [{ id: op.record.id, revision: op.record.revision }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(key, op.record.id, op.record.revision + 1, terminal, false), record(key, loaded.record.id, loaded.record.revision + 1, { snapshot, points: available ? [...loaded.body.points, snapshot] : loaded.body.points }, true)], payloads: snapshot.transcript.map(item => item.payloadId) });
+    const committed = await commit({ runId: key.runId, expected: [{ id: op.record.id, revision: op.record.revision }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(key, op.record.id, op.record.revision + 1, terminal, false), record(key, loaded.record.id, loaded.record.revision + 1, { snapshot, points: available ? [...loaded.body.points, snapshot] : loaded.body.points }, true)], payloads: snapshot.transcript.map(item => item.payloadId) });
     if (committed.kind === 'conflict') { const winner = await readOperation(key); if (winner?.body.receipt) return clone(winner.body.receipt); throw new Error(committed.reason); }
     if (op.body.owner) ownerControllers.get(op.body.owner.token)?.abort();
     return clone(result);
@@ -298,7 +302,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     const owner = { token: randomUUID(), pid: process.pid };
     liveOwnerTokens.add(owner.token);
     try {
-      const claimed = await store.commit({ runId: key.runId, expected: [{ id: previous.record.id, revision: previous.record.revision }], records: [record(key, previous.record.id, previous.record.revision + 1, { ...previous.body, owner }, false)], payloads: [...previous.body.snapshot.transcript, ...previous.body.provider].map(item => item.payloadId) });
+      const claimed = await commit({ runId: key.runId, expected: [{ id: previous.record.id, revision: previous.record.revision }], records: [record(key, previous.record.id, previous.record.revision + 1, { ...previous.body, owner }, false)], payloads: [...previous.body.snapshot.transcript, ...previous.body.provider].map(item => item.payloadId) });
       if (claimed.kind === 'conflict') { liveOwnerTokens.delete(owner.token); return completedHandle(receipt(key, previous.body.sessionId, 'conflict', 'Execution claim raced another operation')); }
     } catch (error) { liveOwnerTokens.delete(owner.token); throw error; }
     const abort = new AbortController();

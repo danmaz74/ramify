@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSessionOperations } from '../session-operations.js';
 import { SessionDriverUnavailableError } from '../interfaces/session-operations.js';
 import { createScriptedAgent, createScriptedSessionDriver } from '../scripted.js';
-import type { AgentSessionPoint, ContinueSessionInput, SessionExecutionBindings, SessionExecutionPolicy, SessionOperationDriver, SessionStore, SessionStoreRecord, SessionTaskInput, SessionToolDeclaration } from '../interfaces/session-operations.js';
+import type { AgentSessionPoint, ContinueSessionInput, SessionExecutionBindings, SessionExecutionPolicy, SessionOperationDriver, SessionStore, SessionStoreCommit, SessionStoreRecord, SessionTaskInput, SessionToolDeclaration } from '../interfaces/session-operations.js';
 
 const policy: SessionExecutionPolicy = { context: { compaction: 'forbidden', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 }, authority: { write: true }, validator: { version: 1 }, destination: { record: 'A' } };
 const tools: SessionToolDeclaration[] = [
@@ -799,5 +799,116 @@ describe('Plan 23 original execution observation identities', () => {
     const left = await operations.operationIdentity('run-A', 'left'); const right = await operations.operationIdentity('run-A', 'right');
     expect(left?.turn).toBe(2); expect(right?.turn).toBe(2); expect(left?.sessionId).not.toBe(right?.sessionId); expect(left?.sourcePoint).toEqual(L.point); expect(right?.sourcePoint).toEqual(R.point);
     expect((await operations.inspect('run-A', L.sessionId))?.parent).toEqual(first.point); expect((await operations.inspect('run-A', R.sessionId))?.parent).toEqual(C.point);
+  });
+});
+
+
+/** An independently owned adapter with synchronous native JSON capture. */
+function capturingStore() {
+  const store = memoryStore(); const ordinary = store.commit; const captured: SessionStoreCommit[] = [];
+  store.commitCaptured = function(input) {
+    expect(this).toBe(store);
+    const owned = JSON.parse(JSON.stringify(input)) as SessionStoreCommit;
+    captured.push(owned);
+    return ordinary(owned);
+  };
+  return { store, captured };
+}
+
+describe('optional synchronous commit admission', () => {
+  it('activates and binds the advertised capability once through effects, acceptance, publication and terminal Retry', async () => {
+    const { store, captured } = capturingStore(); let effects = 0; let accepts = 0; let dispatches = 0; let published = 0;
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      dispatches++; await runtime.callTool('original-write', 'write', { exact: 'original' });
+      const input = { orientation: 'accepted' }; await runtime.submit('original-submit', input); return { kind: 'submitted', input };
+    } } });
+    store.commitCaptured = async () => { throw new Error('Advertised admission must be captured once'); };
+    store.commit = async () => { throw new Error('Default commit must not substitute for the advertised admission'); };
+    const P = await operations.create(create); const bound = bindings({ tools: [{ ...tools[1]!, execute: async input => { effects++; expect(input).toEqual({ exact: 'original' }); return { text: 'written' }; } }],
+      submission: { name: task.submissionTool, accept: async input => { accepts++; expect(input).toEqual({ orientation: 'accepted' }); return { accepted: true }; } }, publish: async () => { published++; } });
+    const receipt = await (await operations.continue(continuation(P.sessionId, P.point!, 'captured-task', bound))).settled();
+    expect(receipt).toMatchObject({ status: 'completed', outcome: { kind: 'submitted', input: { orientation: 'accepted' } } });
+    expect(captured.flatMap(input => input.records).filter(item => item.id === 'operation:captured-task').at(-1)?.body).toMatchObject({ phase: 'terminal', quiescent: true,
+      effects: [{ callId: 'original-write', phase: 'completed', result: { text: 'written' } }, { callId: 'original-submit', phase: 'completed', result: null, verdict: { accepted: true } }] });
+    const commits = captured.length;
+    expect(await (await operations.retry({ runId: 'run-A', operationId: 'captured-task', bindings: bindings() })).settled()).toEqual(receipt);
+    expect(captured).toHaveLength(commits); expect(dispatches).toBe(1); expect(effects).toBe(1); expect(accepts).toBe(1); expect(published).toBe(1);
+  });
+
+  it('preserves the dynamic ordinary commit and defensive body copies for adapters without the capability', async () => {
+    const store = memoryStore(); const ordinary = store.commit; let commits = 0;
+    const operations = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    store.commit = async input => {
+      commits++; const answer = await ordinary(input);
+      for (const item of input.records) {
+        const snapshot = item.body['snapshot'] as { currentPoint?: { turn: number } } | undefined;
+        if (snapshot?.currentPoint) snapshot.currentPoint.turn = 999;
+        const receipt = item.body['receipt'] as { point?: { turn: number } } | undefined;
+        if (receipt?.point) receipt.point.turn = 999;
+      }
+      return answer;
+    };
+    const P = await operations.create(create); expect(P.point?.turn).toBe(0);
+    const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'default-copy'))).settled();
+    expect(end.status).toBe('completed'); expect(end.point?.turn).toBe(1); expect(commits).toBeGreaterThan(0);
+    expect((await operations.inspect('run-A', P.sessionId))?.currentPoint).toEqual(end.point);
+  });
+
+  it.each(['reject', 'conflict'] as const)('refuses advertised %s admission before intent, model dispatch, effects or acceptance', async kind => {
+    const { store, captured } = capturingStore(); let dispatches = 0; let effects = 0; let accepts = 0;
+    const base = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) }); const P = await base.create(create);
+    store.commitCaptured = async () => { if (kind === 'reject') throw new Error('Owning captured admission refused'); return { kind: 'conflict', reason: 'Owning CAS conflict' }; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    const bound = bindings({ tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }], submission: { name: task.submissionTool, accept: async () => { accepts++; return { accepted: true }; } } });
+    if (kind === 'reject') await expect(operations.continue(continuation(P.sessionId, P.point!, 'refused-capture', bound))).rejects.toThrow('Owning captured admission refused');
+    else expect(await (await operations.continue(continuation(P.sessionId, P.point!, 'refused-capture', bound))).settled()).toMatchObject({ status: 'conflict' });
+    expect(await store.read('run-A', 'operation:refused-capture')).toBeNull(); expect(dispatches).toBe(0); expect(effects).toBe(0); expect(accepts).toBe(0); expect(captured).toHaveLength(1);
+  });
+
+  it('retains Stop fencing and actual ignored-signal drainage while capturing terminal records', async () => {
+    const { store } = capturingStore(); const entered = deferred(); const release = deferred(); let accepts = 0;
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) { await runtime.callTool('blocked-original', 'read', {}); await runtime.submit('forbidden-late', {}); return { kind: 'ended' }; } } });
+    const P = await operations.create(create); const bound = bindings({ tools: [{ ...tools[0]!, execute: async () => { entered.resolve(); await release.promise; return { text: 'late result' }; } }], submission: { name: task.submissionTool, accept: async () => { accepts++; return { accepted: true }; } } });
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'captured-stop', bound)); await entered.promise;
+    const stopping = handle.stop(); const idle = handle.settled(); const ended = observation(idle); const receipt = await handle.receipt;
+    expect(receipt).toMatchObject({ status: 'stopped', point: null }); await flush(); expect(ended()).toBe(false);
+    expect((await store.read('run-A', 'operation:captured-stop'))?.body).toMatchObject({ effects: [{ callId: 'blocked-original', phase: 'intent', result: null }] });
+    release.resolve(); expect(await idle).toEqual(receipt); expect(await stopping).toEqual(receipt); expect(accepts).toBe(0);
+    expect((await store.read('run-A', 'operation:captured-stop'))?.body).toMatchObject({ effects: [{ callId: 'blocked-original', phase: 'intent', result: null }], quiescent: true });
+  });
+
+  it('keeps fresh durable owner fencing before any tool handler on the captured path', async () => {
+    const { store } = capturingStore(); let effects = 0;
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(input, runtime) {
+      const prior = (await store.read(input.key.runId, 'operation:captured-owner'))!;
+      await store.commit({ runId: input.key.runId, expected: [{ id: prior.id, revision: prior.revision }], records: [{ ...prior, revision: prior.revision + 1, body: { ...prior.body, owner: { token: 'foreign-owner', pid: 999999 } } }], payloads: [] });
+      await runtime.callTool('foreign-denied', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const handle = await operations.continue(continuation(P.sessionId, P.point!, 'captured-owner', bindings({ tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }] })));
+    expect(await handle.receipt).toMatchObject({ status: 'failed', reason: expect.stringContaining('ownership lost') }); await expect(handle.settled()).rejects.toThrow('Cannot attest quiescence');
+    expect(effects).toBe(0); expect((await store.read('run-A', 'operation:captured-owner'))?.body).toMatchObject({ effects: [], provider: [] });
+  });
+
+  it.each(['default', 'advertised'] as const)('forwards only real scripted %s admission and preserves lost-parent plus original terminal lookup', async mode => {
+    const store = mode === 'advertised' ? capturingStore().store : memoryStore(); const original = store.commitCaptured; let admissions = 0; let dispatches = 0;
+    if (original) store.commitCaptured = function(input) { expect(this).toBe(store); admissions++; return original.call(this, input); };
+    const agent = createScriptedAgent([], { sessionStore: store, operationScript: () => { dispatches++; return [{ kind: 'end' }]; } });
+    if (mode === 'default') {
+      const ordinary = store.commit; store.commit = async input => {
+        const answer = await ordinary(input);
+        for (const item of input.records) {
+          const snapshot = item.body['snapshot'] as { currentPoint?: { turn: number } } | undefined;
+          if (snapshot?.currentPoint) snapshot.currentPoint.turn = 999;
+        }
+        return answer;
+      };
+    }
+    if (mode === 'advertised') { store.commitCaptured = async () => { throw new Error('Scripted forwarding must bind and snapshot the real capability'); }; store.commit = async () => { throw new Error('Scripted strong admission must not fall through'); }; }
+    const operations = agent.sessionOperations!; const P = await operations.create(create); const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'captured-script'))).settled();
+    expect(end.status).toBe('completed'); expect(P.point?.turn).toBe(0); expect(end.point?.turn).toBe(1); expect(agent.loseSession(end.point!)).toBe(true); expect(await operations.inspect('run-A', P.sessionId)).toBeNull();
+    expect((await operations.fork({ runId: 'run-A', operationId: 'lost-captured-fork', sourcePoint: end.point! })).status).toBe('unavailable');
+    expect((await (await operations.continue(continuation(P.sessionId, end.point!, 'lost-captured-next'))).settled()).status).toBe('unavailable');
+    expect(await (await operations.retry({ runId: 'run-A', operationId: 'captured-script', bindings: bindings() })).settled()).toEqual(end); expect(dispatches).toBe(1);
+    expect(admissions > 0).toBe(mode === 'advertised');
   });
 });
