@@ -636,7 +636,7 @@ export async function verifyAvailableAppend(name: 'context-package-append-reques
     expect(await adapter.operations.inspect(original.runId, original.point.sessionId, original.point)).toEqual(before);
     expect(agent.sessions).toHaveLength(calls);
     expect((await logLines(root, runId)).map(line => line.text)).toEqual(frozen.map(line => line.text));
-    expect(await adapter.append(source, key, `${text}\nchanged`, section)).toEqual({ outcome: 'session-lost' });
+    expect(await adapter.append(source, key, `${text}\nchanged`, section)).toEqual({ outcome: 'conflict', reason: 'Operation key binds different input' });
     expect(await adapter.operations.inspect(original.runId, original.point.sessionId)).toEqual(current);
     expect(agent.sessions).toHaveLength(calls);
   } finally {
