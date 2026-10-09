@@ -34,6 +34,8 @@ const a = 'capability-coordination/a';
 const b = 'capability-coordination/b';
 const d = 'capability-coordination/d';
 const p = 'capability-coordination';
+const assignmentPoints = [{ path: 'subs/a/src/caller.ts', note: 'Consumer compatibility outside the B write scope.' }];
+const engineerPoints = [{ path: 'subs/b/src/fact.ts', note: 'Source metadata implementation.' }];
 
 function script(root: string, seen: string[], mode: 'assignments' | 'boundary' | 'partial-blocker' = 'assignments',
   prompts: string[] = []): Script {
@@ -70,35 +72,35 @@ function script(root: string, seen: string[], mode: 'assignments' | 'boundary' |
       edit('caller.ts', 'Fact: ${value}', 'Fresh fact: ${value}'),
       write('extra.ts', "export const sourceHint = 'B';\n"),
       edit('tests/caller.test.ts', "toBe('Fact: old')", "toBe('this test still fails')"));
-      const objective = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gm)].at(-1);
+      const objective = [...spec.prompt.matchAll(/^Perform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gm)].at(-1);
       const work = objective === undefined ? {} : JSON.parse(objective[1]!) as { iteration?: string };
       const owner = work.iteration?.startsWith('cap-') ? [[a, 'subs/a/src'], [b, 'subs/b/src'], [d, 'subs/d/src'], [p, 'src']].find(([, directory]) => spec.scope.workingDirectory === join(root, directory!))?.[0] : undefined;
       if (mode === 'partial-blocker' && owner === a) return submit({
         kind: 'partial', done: ['A kept the readable selected denial'], unfinished: ['Root-owned stale assertion in src/tests/stale.test.ts'],
-        findings: ['A cannot write the root test from its module scope'],
+        findings: ['A cannot write the root test from its module scope'], startingPoints: engineerPoints,
       }, write('caller.ts', "export const renderA = () => 'readable denial';\n"));
       if (mode === 'partial-blocker' && owner === p) return submit({
-        kind: 'completion-proposed', summary: 'Root updated its stale assertion', findings: [],
+        kind: 'completion-proposed', summary: 'Root updated its stale assertion', findings: [], startingPoints: engineerPoints,
       }, edit('tests/stale.test.ts', "expect('old')", "expect('readable denial')"));
-      if (owner === b) return submit({ kind: 'completion-proposed', summary: 'B extended', findings: [] },
+      if (owner === b) return submit({ kind: 'completion-proposed', summary: 'B extended', findings: [], startingPoints: engineerPoints },
         write('fact.ts', "export const readFact = () => 'old from B';\n"),
         write('../../a/src/caller.ts', 'export const escaped = true;\n'));
-      if (owner === d) return submit({ kind: 'completion-proposed', summary: 'D migrated', findings: [] },
+      if (owner === d) return submit({ kind: 'completion-proposed', summary: 'D migrated', findings: [], startingPoints: engineerPoints },
         write('consumer.ts', "export const useFact = () => 'old';\n"),
         write('../module.ramify', 'ramify 1\nmodule d\nexpose-src legacyLabel from \"consumer.ts\" to parent\n'));
-      if (owner === p) return submit({ kind: 'completion-proposed', summary: 'P exposed', findings: [] },
+      if (owner === p) return submit({ kind: 'completion-proposed', summary: 'P exposed', findings: [], startingPoints: engineerPoints },
         write('../module.ramify', rootDescription('capability-coordination', 'expose-sub readFact from b to descendants\nexpose-sub legacyLabel from d to descendants\n')),
         write('../subs/b/src/companion.ts', 'export const companion = true;\n'));
-      if (owner === a) return submit({ kind: 'completion-proposed', summary: 'A integrated', findings: [] },
+      if (owner === a) return submit({ kind: 'completion-proposed', summary: 'A integrated', findings: [], startingPoints: engineerPoints },
         write('caller.ts', "export const renderA = () => 'old from B';\n"));
-      throw new Error(`Unexpected engineer turn ${engineer}: ${spec.prompt.slice(0, 150)}`);
+      throw new Error(`Unexpected engineer turn ${engineer}: owner=${owner}, work=${JSON.stringify(work)}, cwd=${spec.scope.workingDirectory}`);
     }
     if (spec.role === 'capability-architect') {
       architect += 1;
       const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
       const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
       if (mode === 'partial-blocker') return architect <= 2
-        ? submit({ ...basis, kind: 'assign', assignment: assign(architect === 1 ? a : p, { goal: architect === 1 ? 'Render A denial' : 'Repair root-owned stale assertion', approach: 'Change only owned source or tests', completionEvidence: 'Owned source diff' }).assignment })
+        ? submit({ ...basis, kind: 'assign', assignment: assign(architect === 1 ? a : p, { startingPoints: assignmentPoints, goal: architect === 1 ? 'Render A denial' : 'Repair root-owned stale assertion', approach: 'Change only owned source or tests', completionEvidence: 'Owned source diff' }).assignment })
         : [{ kind: 'wait', ms: 60_000 }];
       if (mode === 'boundary' && architect === 1) return submit({ ...basis, kind: 'request-placement',
         problem: 'Should another owner take the source fact?', evidence: ['B currently owns it'] });
@@ -119,7 +121,7 @@ function script(root: string, seen: string[], mode: 'assignments' | 'boundary' |
       ];
       const owners = [b, d, p, a];
       if (architect >= 2 && architect <= 5) return submit({ ...basis, kind: 'assign', assignment: assign(owners[architect - 2]!, {
-        goal: `Update ${owners[architect - 2]}`, approach: 'Change owned source', completionEvidence: 'Owned source diff',
+        startingPoints: assignmentPoints, goal: `Update ${owners[architect - 2]}`, approach: 'Change owned source', completionEvidence: 'Owned source diff',
         scope: { base: { module: owners[architect - 2]!, included: owners[architect - 2] === p ? [{ directory: 'subs/b', reason: 'Fixture child', instructions: 'Implement fixture behavior' }] : [] },
           extra: [], read: [], rationale: 'Scoped compatibility change' },
       }).assignment });
@@ -159,6 +161,12 @@ test('an explicit partial capability result returns its cross-owner blocker to t
   expect(events.filter(event => event.type === 'capability-assigned').map(event => event.data.assignment))
     .toEqual(['cap-001.i01', 'cap-001.i02']);
   const partial = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'work-items/cap-001/iterations/01/result.json'), 'utf8'));
+  expect(partial.startingPoints).toEqual(engineerPoints);
+  expect(prompts.some(prompt => prompt.includes('## Recorded starting points')
+    && prompt.includes('"producer":"engineer partial result"')
+    && prompt.includes('"capabilityTask":"cap-001"')
+    && prompt.includes('"iteration":"cap-001.i01"')
+    && prompt.includes(engineerPoints[0]!.note))).toBe(true);
   expect(partial.findings).toContain('unfinished: Root-owned stale assertion in src/tests/stale.test.ts');
   expect(prompts.some(prompt => prompt.includes('unfinished: Root-owned stale assertion in src/tests/stale.test.ts')))
     .toBe(true);
@@ -172,7 +180,8 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
   const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'assignment', 'a+b'); answers.push(boundaryAnswers);
 
   const seen: string[] = [];
-  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(fixture.root, seen), inputs: treeInputs(),
+  const discoveryPrompts: string[] = [];
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(fixture.root, seen, 'assignments', discoveryPrompts), inputs: treeInputs(),
     });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -232,6 +241,23 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
   ]);
   const assignments = await Promise.all([1, 2, 3, 4].map(async number => JSON.parse(await readFile(
     runPath(fixture.root, 'need', receipt.jobId, `work-items/cap-001/iterations/0${number}/assignment.json`), 'utf8')) as IterationAssignment));
+  expect(assignments.map(assignment => assignment.startingPoints)).toEqual([assignmentPoints, assignmentPoints, assignmentPoints, assignmentPoints]);
+  await until(() => discoveryPrompts.some(prompt => prompt.includes('"producer":"engineer accepted result"')
+    && prompt.includes('"iteration":"cap-001.i04"') && prompt.includes(engineerPoints[0]!.note)), 20_000);
+  for (const number of [1, 2, 3, 4]) {
+    const result = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, `work-items/cap-001/iterations/0${number}/result.json`), 'utf8'));
+    expect(result.startingPoints).toEqual(engineerPoints);
+    expect(result.coordination).toMatchObject({ kind: 'capability-task', id: 'cap-001', sequence: number });
+    const invocation = events.find(event => event.type === 'invocation-started' && event.data.work.iteration === `cap-001.i0${number}` && event.data.role === 'engineer');
+    if (invocation?.type !== 'invocation-started') throw new Error('Missing capability engineer');
+    const session = opened.agent!.sessions.find(session => session.spec.role === 'engineer' && session.spec.prompt.includes(`"iteration":"cap-001.i0${number}"`));
+    expect(session?.spec.prompt).toContain('## Recorded starting points');
+    expect(session?.spec.prompt).toContain(assignmentPoints[0]!.note);
+    expect(session?.spec.prompt).toContain('"capabilityTask":"cap-001"');
+    expect(discoveryPrompts.some(prompt => prompt.includes('"producer":"engineer accepted result"')
+      && prompt.includes(`"iteration":"cap-001.i0${number}"`)
+      && prompt.includes(engineerPoints[0]!.note))).toBe(true);
+  }
   expect(assignments.map(assignment => 'module' in assignment.scope.base ? assignment.scope.base.module : assignment.scope.base.modules[0])).toEqual([b, d, p, a]);
   expect(assignments.map(assignment => assignment.coordination?.kind === 'capability-task' ? assignment.coordination.sequence : null)).toEqual([1, 2, 3, 4]);
   expect(events.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect' &&

@@ -1,0 +1,129 @@
+{
+  "plan": "../main-plan.md",
+  "status": "complete; coordinator implementation scope accepted; configured final audit passed",
+  "execution": "serial in dependency order",
+  "incorporates": "../../26-instruction-block-delivery/main-plan.md",
+  "iterations": [
+    {
+      "id": "0",
+      "file": "00-block-foundation.md",
+      "dependsOn": [],
+      "cases": [
+        "B01",
+        "D01",
+        "D02",
+        "D03",
+        "D04",
+        "D05"
+      ],
+      "status": "complete; final qualification recorded in 05-results.md",
+      "sourceCommit": "5306bf94b49846b38d99817d05236a46568902e0",
+      "results": "00-results.md",
+      "writeBoundary": "Harness block resolver, manifest/intent readers and briefing occurrence model; no runtime writer switch."
+    },
+    {
+      "id": "1",
+      "file": "01-instruction-delivery.md",
+      "dependsOn": [
+        "0"
+      ],
+      "cases": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07"
+      ],
+      "status": "complete; final qualification recorded in 05-results.md",
+      "writeBoundary": "Harness task/brief builders, package prose, session-operation integration, narrow run callers and delivery tests.",
+      "sourceCommit": "e1678996ca8e8f1402ffec817e187cdb01ff48a6",
+      "results": "01-results.md"
+    },
+    {
+      "id": "2",
+      "file": "02-discovery-records.md",
+      "dependsOn": [
+        "1"
+      ],
+      "cases": [
+        "D1",
+        "D2",
+        "D3"
+      ],
+      "status": "complete; final qualification recorded in 05-results.md",
+      "writeBoundary": "Harness internal pointer shape, orientation/assignment/engineer/result schemas, record constructors and producer prose.",
+      "sourceCommit": "83ab0d59753c25c5d269b122a2ecb2d706c42f30",
+      "results": "02-results.md"
+    },
+    {
+      "id": "3",
+      "file": "03-discovery-delivery.md",
+      "dependsOn": [
+        "2"
+      ],
+      "cases": [
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D11",
+        "I01",
+        "I02",
+        "I03",
+        "I04"
+      ],
+      "status": "complete; final qualification recorded in 05-results.md",
+      "writeBoundary": "Harness starting-point rendering, architect/engineer/reviewer task callers, snapshot filtering and fresh fallback tests.",
+      "sourceCommit": "71b084fd0b8c8a9983b3854b0de3c2ac433262b9",
+      "results": "03-results.md"
+    },
+    {
+      "id": "4",
+      "file": "04-nfr-context.md",
+      "dependsOn": [
+        "3"
+      ],
+      "cases": [
+        "D8",
+        "D9",
+        "D10",
+        "D12",
+        "D13",
+        "I05"
+      ],
+      "status": "complete; final qualification recorded in 05-results.md",
+      "writeBoundary": "Harness NFR source inputs/prompts, named snapshot comparisons and candidate/recovery tests.",
+      "sourceCommit": "8b1273d1c36917b69704291a32db6db51d5b2716",
+      "results": "04-results.md"
+    },
+    {
+      "id": "5",
+      "file": "05-qualification.md",
+      "dependsOn": [
+        "4"
+      ],
+      "cases": [
+        "Q01",
+        "Q02",
+        "Q03",
+        "Q04",
+        "I06"
+      ],
+      "status": "complete; final qualification recorded in 05-results.md",
+      "writeBoundary": "Harness integrated/projection tests, affected current documentation, receipts and final configured audit.",
+      "sourceCommit": "2df3a6cc2825b3b5e5e9c7e8e61db23544b1ef80",
+      "results": "05-results.md"
+    }
+  ]
+}

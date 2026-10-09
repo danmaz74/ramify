@@ -1,4 +1,4 @@
-<!-- ramify-agent capability architect procedure, version 5. -->
+<!-- ramify-agent capability architect procedure, version 6. -->
 Read the original need and its provisional source first. Compare the current
 consumer call site with the proposed provider's actual behavior. Read prior
 decisions of every affected owner. Treat a registry name as a clue, never as
@@ -56,3 +56,10 @@ Your briefing lists your earlier reports with the accepted source each was
 made against where that source has since moved. Your reports stand as you
 made them; inspect what changed with `inspect_git` and revise one with
 `bound` only where, in your judgment, it no longer holds.
+
+In assignment `startingPoints`, optionally select a few useful source, test,
+support, caller or API-view locations you already encountered, with a short
+note about what to inspect. Paths are literal and project-relative. Select
+useful pointers for the engineer; do not forward your entire exploration.
+These hints authorize no writes and establish no completion or obligation.
+No extra discovery turn is required; you may omit them.

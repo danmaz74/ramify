@@ -14,7 +14,8 @@ import { failureAnalysisToolName } from '../work/failure.js';
 import { workOrientationToolName, contextSelectorToolName } from '../context-selection/submissions.js';
 import { coordinatorActionJsonSchema, coordinatorActionToolName, coordinatorAssessmentToolName,
   coordinatorInvestigationJsonSchema, coordinatorInvestigationToolName, nonfunctionalRepairToolName } from '../nonfunctional/submissions.js';
-import { buildDeliveredManifest, type DeliveredInput, type DeliveredManifest } from './delivered-manifest.js';
+import { buildDeliveredManifest, exactInputHash, type DeliveredInput, type DeliveredManifest } from './delivered-manifest.js';
+import { effectiveBlocks, renderBlockSet, renderBlockRemoval, resolveBlockAdditions } from './blocks.js';
 import { taskBriefingRevision, type BriefingDelivery } from './briefings.js';
 
 export type TaskKind = 'initial-analysis' | ExtractionTurn | 'placement' | 'orientation' | 'assignment' | 'completion' | 'repair'
@@ -31,6 +32,37 @@ export interface TaskEnvironment {
   readonly views: readonly { readonly path: string; readonly revision: string | null; readonly modules: readonly string[]; readonly coverage: readonly string[] }[];
   readonly supportPaths: readonly string[];
   readonly cucumberConfiguration: string | null;
+}
+
+
+/** Intentional families for every supported pair, independent of source paths or equal prose. */
+const procedureFamilies: Readonly<Partial<Record<LoadedPackage['role'], Partial<Record<TaskKind, string>>>>> = {
+  'initial-architect': { 'initial-analysis': 'main' },
+  'catalog-extractor': { intake: 'intake', principles: 'principles', check: 'check' },
+  'global-fork': { placement: 'main' },
+  'local-architect': { orientation: 'orientation', assignment: 'main', completion: 'main', repair: 'main', reconciliation: 'reconciliation', 'capability-qualification': 'qualification' },
+  'context-selector': { selection: 'main', reselection: 'main' },
+  engineer: { engineering: 'main', repair: 'main', 'standalone-command': 'main', consultation: 'consultation' },
+  'capability-architect': { capability: 'main', reconciliation: 'reconciliation', 'capability-qualification': 'qualification' },
+  'contract-engineer': { contract: 'main' },
+  reviewer: { code: 'code', scope: 'scope', design: 'design', 'design-orientation': 'orientation' },
+  'failure-analyst': { 'failure-analysis': 'main' },
+  'nonfunctional-coordinator': { assessment: 'assessment', action: 'action', investigation: 'investigation' },
+  'nonfunctional-repair-engineer': { repair: 'main' },
+};
+
+const environmentFields = ['projectRoot', 'workingDirectory', 'candidate', 'snapshot', 'limits', 'availableTools', 'views', 'supportPaths', 'cucumberConfiguration'] as const satisfies readonly (keyof TaskEnvironment)[];
+
+/** Objects are canonical; arrays retain the caller's order and replace atomically. */
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value !== null && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, child]) => [key, canonicalJson(child)]));
+  return value;
+}
+
+export function assertTaskProcedureSelection(history: readonly DeliveredInput[], key: string, hash: string): void {
+  const selected = effectiveBlocks(history).get(key);
+  if (!selected || selected.kind !== 'procedure' || exactInputHash(selected.text) !== hash) throw new Error(`Selected procedure ${key}/${hash} is unavailable`);
 }
 
 /**
@@ -132,30 +164,48 @@ export function buildTaskPacket(input: {
     inputSchema: { type: 'object' as const }, mutating: false as const };
   const previousDeclaration = input.inherited.find(item => item.kind === 'tool-declaration' && item.key === `tool:${task.tool}`);
   if (previousDeclaration && previousDeclaration.text !== JSON.stringify(declaration)) throw new Error(`Immutable tool declaration changed for ${task.tool}; use a new tool name`);
-  const envText = `# Current environment\n${JSON.stringify(environment, null, 2)}`;
-  const procedureText = `# Current procedure\n${procedure}`;
+  const previousRole = input.inherited.filter(item => item.key === `role:${loaded.role}` && item.kind === 'role-instructions');
+  if (previousRole.some(item => item.text !== roleInstructions)) throw new Error(`Pinned role instructions changed for ${loaded.role}`);
+  const procedureKey = `procedure:${loaded.role}:${task.family}`;
+  const procedureBody = `# Current procedure\n${procedure}`;
+  const procedureHash = exactInputHash(renderBlockSet(procedureKey, procedureBody));
+  const reusable = resolveBlockAdditions({ inherited: input.inherited, desired: [
+    { key: procedureKey, kind: 'procedure', body: procedureBody, source: task.source, revision: loaded.package, sources: procedureSources(loaded, task) },
+    ...environmentFields.map(key => ({ key: `environment:${key}`, kind: 'environment' as const,
+      body: JSON.stringify({ [key]: canonicalJson(environment[key]) }, null, 2), source: null, revision: null })),
+  ] });
+  // Interpret recognizable legacy sections without inventing physical field deliveries.
+  // A framing migration delivers the current canonical representation once.
+  const briefing = input.briefing;
+  const upgrades = briefing.currentSections.filter(section =>
+    !briefing.additions.some(item => item.key === `brief:${section.key}`) &&
+    !input.inherited.some(item => item.block?.key === `brief:${section.key}`))
+    .map(section => ({ key: `brief:${section.key}`, kind: 'brief' as const, text: section.text, source: section.source ?? null, revision: briefing.revision,
+      block: { key: `brief:${section.key}`, effect: section.effect ?? 'set' } }));
+  const briefingAdditions = [...input.briefing.additions, ...upgrades].map(item => ({ ...item,
+    text: item.block?.effect === 'remove' ? renderBlockRemoval(item.key) : renderBlockSet(item.key, item.text),
+    block: item.block ?? { key: item.key, effect: 'set' as const } }));
   const revisionText = `Briefing revision: ${input.briefing.revision}; based on: ${input.briefing.basedOnRevision ?? 'none'} (${input.briefing.mode})`;
-  const taskText = [`# Current task: ${input.kind}`, input.objective,
+  const taskText = [`# Current task: ${input.kind}`, 'This selection supersedes every prior task selection.', `Active role: ${loaded.role}`, `Selected procedure: ${procedureKey}; SHA-256: ${procedureHash}`, input.objective,
     ...(input.changedPaths === undefined ? [] : ['', '# Canonical changed paths', ...input.changedPaths.map(item => `- ${item.path}${item.annotation ? ` (${item.annotation})` : ''}`)]),
     '', `Submit only through \`${task.tool}\`. Only an accepted submission completes this task.`].join('\n');
   const additions: DeliveredInput[] = [
-    ...(input.supplyRoleInstructions ? [{ key: `role:${loaded.role}`, kind: 'role-instructions' as const, text: roleInstructions,
+    ...(input.supplyRoleInstructions && previousRole.length === 0 ? [{ key: `role:${loaded.role}`, kind: 'role-instructions' as const, text: roleInstructions,
       source: loaded.files.find(file => file.kind === 'system')?.path ?? null, revision: loaded.package,
       sources: roleSources(loaded) }] : []),
     ...(!input.inherited.some(item => item.kind === 'tool-declaration' && item.key === `tool:${task.tool}` && item.text === JSON.stringify(declaration)) ? [{ key: `tool:${task.tool}`, kind: 'tool-declaration' as const, text: JSON.stringify(declaration), source: null, revision: null }] : []),
     { key: 'briefing-state', kind: 'task', text: revisionText, source: null, revision: input.briefing.revision },
-    ...input.briefing.additions,
-    { key: `procedure:${input.kind}`, kind: 'procedure', text: procedureText, source: task.source, revision: loaded.package,
-      sources: procedureSources(loaded, task) },
-    { key: 'environment', kind: 'environment', text: envText, source: null, revision: null },
+    ...briefingAdditions,
+    ...reusable,
     { key: 'task', kind: 'task', text: taskText, source: null, revision: input.briefing.revision },
   ];
+  assertTaskProcedureSelection([...input.inherited, ...additions], procedureKey, procedureHash);
   const message = additions.filter(item => item.kind !== 'role-instructions' && item.kind !== 'tool-declaration').map(item => item.text).join('\n\n');
   return { roleInstructions, message, submissionTool: task.tool, declaration, additions,
-    manifest: buildDeliveredManifest({ inheritedPoint: input.inheritedPoint, inherited: input.inherited, appended: additions, currentMessage: message }) };
+    manifest: buildDeliveredManifest({ inheritedPoint: input.inheritedPoint, inherited: input.inherited, appended: additions, currentMessage: message, schema: 'ramify-agent.delivered-inputs/2' }) };
 }
 
-function taskDefinition(loaded: LoadedPackage, kind: TaskKind, consultationSubmissionSchema?: string): { tool: string; schema: string; procedure: string; source: string | null; embedded: readonly string[] } {
+function taskDefinition(loaded: LoadedPackage, kind: TaskKind, consultationSubmissionSchema?: string): { tool: string; schema: string; procedure: string; source: string | null; embedded: readonly string[]; family: string } {
   let tool: string | undefined;
   let schema = loaded.submissionSchema;
   let procedure = loaded.procedure;
@@ -224,5 +274,7 @@ function taskDefinition(loaded: LoadedPackage, kind: TaskKind, consultationSubmi
   if (!tool) throw new Error(`Unsupported role/task pair ${role}/${kind}`);
   // Only the package's main procedure has its section files filled in; a replaced procedure embeds none.
   const embedded = procedure === loaded.procedure ? loaded.embeddedProcedurePaths ?? [] : [];
-  return { tool, schema, procedure, source, embedded };
+  const family = procedureFamilies[role]?.[kind];
+  if (!family) throw new Error(`Missing explicit procedure family ${role}/${kind}`);
+  return { tool, schema, procedure, source, embedded, family };
 }

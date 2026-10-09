@@ -340,7 +340,7 @@ export async function runDependencyGate(restartAfterHandback: boolean, realBound
           constraints: [], requirementRefs: [] });
       }
       if (spec.role === 'engineer') {
-        const objective = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gmu)].at(-1);
+        const objective = [...spec.prompt.matchAll(/^Perform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gmu)].at(-1);
         const work = objective === undefined ? {} : JSON.parse(objective[1]!) as { iteration?: string };
         engineerTurns += 1;
         if (engineerTurns === 1) return submit({ kind: 'capability-needed', summary: 'A needs B source', request: {

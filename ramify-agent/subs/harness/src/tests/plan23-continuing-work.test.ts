@@ -140,7 +140,7 @@ function interceptCommits(store: SessionStore, before: (input: CommitInput, path
     const packet = (await adapter.packet('run-A', 'literal-support'))!;
     expect(packet.message).toContain(support);
     expect(observed[0]!.task.message).toBe(packet.message);
-    expect(packet.manifest.entries.find(entry => entry.key.includes('support:# Current support:0'))).toMatchObject({ hash: exactInputHash(support), bytes: Buffer.byteLength(support), delivery: 'appended' });
+    expect(packet.manifest.entries.find(entry => entry.key.includes('support:# Current support:0'))).toMatchObject({ hash: exactInputHash(`# Block brief:support:# Current support:0\nCurrent value; replaces any earlier value for this key.\n${support}`), bytes: Buffer.byteLength(`# Block brief:support:# Current support:0\nCurrent value; replaces any earlier value for this key.\n${support}`), delivery: 'appended' });
     expect(packet.message.split('# Goal\n').length - 1).toBe(1);
     expect(packet.message).not.toContain('# Requirements\n\n');
   });

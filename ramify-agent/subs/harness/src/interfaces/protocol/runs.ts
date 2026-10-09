@@ -1373,10 +1373,16 @@ export const operationIdentitySchema = z.object({ runId: text, operationId: text
 }).strict();
 export type OperationIdentity = z.infer<typeof operationIdentitySchema>;
 const manifestSource = z.object({ path: text, hash: text, bytes: count, kind: z.string().optional() }).strict();
-export const deliveredManifestViewSchema = z.object({ schema: z.literal('ramify-agent.delivered-inputs/1'), inheritedPoint: z.string().nullable(), hash: text,
-  entries: z.array(z.object({ key: text, kind: z.enum(['role-instructions', 'procedure', 'brief', 'environment', 'task', 'tool-declaration', 'skill']), source: z.string().nullable(), revision: z.string().nullable(), hash: text, bytes: count, delivery: z.enum(['inherited', 'appended']), sources: z.array(manifestSource) }).strict()),
+const deliveredManifestEntrySchema = z.object({ key: text, kind: z.enum(['role-instructions', 'procedure', 'brief', 'environment', 'task', 'tool-declaration', 'skill']), source: z.string().nullable(), revision: z.string().nullable(), hash: text, bytes: count, delivery: z.enum(['inherited', 'appended']), sources: z.array(manifestSource) }).strict();
+const deliveredManifestFields = { inheritedPoint: z.string().nullable(), hash: text,
   currentMessage: z.object({ hash: text, bytes: count }).strict().nullable(),
-}).strict();
+};
+export const deliveredManifestViewSchema = z.discriminatedUnion('schema', [
+  z.object({ schema: z.literal('ramify-agent.delivered-inputs/1'), ...deliveredManifestFields, entries: z.array(deliveredManifestEntrySchema) }).strict(),
+  z.object({ schema: z.literal('ramify-agent.delivered-inputs/2'), ...deliveredManifestFields, entries: z.array(deliveredManifestEntrySchema.extend({
+    block: z.object({ key: text, effect: z.enum(['set', 'remove']) }).strict().optional(),
+  }).strict()) }).strict(),
+]);
 export type DeliveredManifestView = z.infer<typeof deliveredManifestViewSchema>;
 export const scopeSizeViewSchema = z.object({ policy: z.enum(['scope-size/1', 'scope-size/2']), snapshot: text,
   components: z.array(z.object({ component: z.enum(['owned-source', 'api-views', 'architect-view', 'support-documents']), detail: z.string(), bytes: count.nullable(), state: z.enum(['measured', 'unavailable', 'unknown']), reason: z.string().optional(), buckets: z.record(z.string(), count).optional() }).strict()),

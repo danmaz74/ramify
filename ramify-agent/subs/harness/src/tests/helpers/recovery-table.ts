@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect } from 'vitest';
@@ -632,11 +633,27 @@ export async function verifyAvailableAppend(name: 'context-package-append-reques
     if (appended.outcome === 'session-lost') throw new Error('Available original point was lost');
     expect(await adapter.append(source, key, text, section)).toEqual({ ...appended, outcome: 'already-present' });
     const current = await adapter.operations.inspect(original.runId, original.point.sessionId);
-    expect(current!.additions.filter(addition => addition.key === key)).toEqual([{ key, kind: 'brief', text, revision: null }]);
+    const addition = current!.additions.filter(addition => addition.key === key);
+    const expectedText = section === undefined ? text
+      : `# Block brief:${section}\nCurrent value; replaces any earlier value for this key.\n${text}`;
+    expect(addition).toEqual([{ key, kind: 'brief', text: expectedText,
+      revision: section === undefined ? null : expect.stringMatching(/^[a-f0-9]{64}$/u) }]);
+    if (section !== undefined) {
+      const pointFile = (point: typeof original.point) => join(root, 'plans/.harness/session-operations/correlations/points',
+        `${createHash('sha256').update(JSON.stringify([runId, point])).digest('hex')}.json`);
+      type Captured = { revision: string; history: { revision: string; sections: { key: string; text: string }[] }[] };
+      const prior = JSON.parse(await readFile(pointFile(original.point), 'utf8')) as Captured;
+      const retained = JSON.parse(await readFile(pointFile(current!.currentPoint), 'utf8')) as Captured;
+      expect(retained.history.slice(0, -1)).toEqual(prior.history);
+      expect(retained.history.at(-1)!.revision).toBe(addition[0]!.revision);
+      expect(retained.revision).toBe(addition[0]!.revision);
+      expect(retained.revision).not.toBe(prior.revision);
+      expect(retained.history.at(-1)!.sections.find(item => item.key === section)).toEqual({ key: section, text });
+    }
     expect(await adapter.operations.inspect(original.runId, original.point.sessionId, original.point)).toEqual(before);
     expect(agent.sessions).toHaveLength(calls);
     expect((await logLines(root, runId)).map(line => line.text)).toEqual(frozen.map(line => line.text));
-    expect(await adapter.append(source, key, `${text}\nchanged`, section)).toEqual({ outcome: 'conflict', reason: 'Operation key binds different input' });
+    await expect(adapter.append(source, key, `${text}\nchanged`, section)).rejects.toThrow('Conflicting harness session correlation');
     expect(await adapter.operations.inspect(original.runId, original.point.sessionId)).toEqual(current);
     expect(agent.sessions).toHaveLength(calls);
   } finally {

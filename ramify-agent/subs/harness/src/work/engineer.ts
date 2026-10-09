@@ -12,6 +12,7 @@ import { injectionSiteRule, moduleOwning } from './scope.js';
 import { engineerScenarioSection, type EngineerScenarios } from './scenario-briefing.js';
 import { scopePaths } from './scope.js';
 import type { TestArea } from '../run/project-config.js';
+import { startingPointsSchema } from './starting-points.js';
 
 /*
  * The engineer: what it submits, the one harness tool it is given, and the
@@ -59,6 +60,7 @@ export const engineerSubmissionSchema = z.discriminatedUnion('kind', [
     /** The engineer's own words. They enter the accepted commit's message and nothing else does. */
     summary: text,
     findings: z.array(text),
+    startingPoints: startingPointsSchema,
     recommendation: text.optional(),
     /**
      * One binding for every obligation the assignment names, each once, with
@@ -74,6 +76,7 @@ export const engineerSubmissionSchema = z.discriminatedUnion('kind', [
     done: z.array(text),
     unfinished: z.array(text),
     findings: z.array(text),
+    startingPoints: startingPointsSchema,
   }).strict(),
   z.object({
     kind: z.literal('unsuitable'),

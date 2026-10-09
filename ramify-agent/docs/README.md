@@ -2,6 +2,10 @@
 
 Design documents for the separate agent harness:
 
+- [Plan 25: discovery handoffs and instruction delivery](plans/25-carry-discovery-forward/main-plan.md),
+  consolidated delivery of effective named blocks, optional recorded source
+  pointers and candidate-bound NFR comparisons; [session observations](metrics/session-observations.md)
+  describes physical input/provenance access and benefit-assessment limits
 - [Plan 24: useful starting briefs and orientation reuse](plans/24-orientation-for-context-selection/main-plan.md),
   consolidated implementation plan for known task inputs and pointers, shared
   work orientation, simple fresh fallbacks and existing inexpensive metrics;

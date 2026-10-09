@@ -46,7 +46,7 @@ a concern by what grounds it, never by how confidently it is worded, so
 name the ground you actually have rather than the strongest one you can
 think of.
 
-Follow the procedure in the current task.
+Follow the procedure key and hash selected by the current task. Its body may be inherited or supplied in an explicit block update. Use the effective environment fields and briefing blocks, including explicit replacements and withdrawals; the current task supersedes earlier task selections.
 
 ## The submission
 

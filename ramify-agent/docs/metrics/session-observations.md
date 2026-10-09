@@ -1,8 +1,9 @@
 # Reading session observations
 
-Plan 24 reuses existing machine-readable records and projections. No new
+Plans 24/25 reuse existing machine-readable records and projections. No new
 collector or benefit trial is required. Dan can use these observations to assess
-orientation reuse; they do not establish a benefit themselves.
+orientation reuse and instruction/discovery delivery; they do not establish a
+benefit themselves.
 
 ## Per-invocation access
 
@@ -18,7 +19,10 @@ corresponding timing, usage and exploration details.
 | Observation | Existing location |
 | --- | --- |
 | Role and work identity | `invocation.json`: `role`, `work`; metrics evaluation also exposes role, work item, iteration and request. |
-| Task kind | The retained task packet's `message` starts its task section with `# Current task: <kind>`. Its delivered additions also name `procedure:<kind>`. See the correlation lookup below. |
+| Task kind and procedure | The retained packet's current task section starts with `# Current task: <kind>` and selects `procedure:<role>:<family>` with its exact framed SHA-256. That body can be inherited rather than appended. See the correlation lookup below. |
+| Actual instruction inputs | `invocation.json.prompt.manifest`, also `evaluation.efficiency.manifest`, preserves ordered inherited/appended entries, bytes, hashes, sources and inherited point. `/1` and `/2` are readable; new packets use `/2` with optional logical block key/effect. |
+| Briefing updates | The operation correlation's `context.history` retains ordered occurrence revisions and optional canonical `contentHash`; `context.revision` selects the current occurrence. Equal content hashes can name distinct A → B → A occurrences. Packet additions record actual set/remove effects. |
+| Discovery origin and comparison | `packet.additions` and retained context carry `brief:support:starting-points` producer/work/iteration/invocation/boundary origins and `brief:support:nonfunctional-source` captured comparison names/base/target/default. Inherited pointers need not appear again in current additions. |
 | Requested and actual start | `invocation.json.session.requested`; `outcome.json.session.mode` when recorded. Session detail includes `operation.mode`, continuation/fork lineage and `degraded`. For a separate fresh fallback, `degraded.requested` retains the original fork/continue intention while the new operation's mode is fresh. |
 | Fresh fallback reason | `session.invocations[].degraded.reason`, recorded start/outcome reasons, and the failed predecessor's outcome. Global append loss also appears as `brief-not-appended` in `events.jsonl`. |
 | Elapsed time | `outcome.json.elapsedMs`; metrics `efficiency.timing.elapsedMs`, from recorded invocation boundaries. Milestone, model and tool durations have their own fields and coverage. |
@@ -33,6 +37,25 @@ and `.operationId`. Its harness correlation is under
 `JSON.stringify([runId, operationId])`. Read `packet.message` or
 `packet.additions`; no provider payload decoding is needed. Legacy invocations
 without this correlation have no retained task-kind value here.
+
+To distinguish physical delivery from logical state, count ordered manifest
+entries by `delivery`. Superseded sets and withdrawals remain physical inherited
+bytes. Replay `/2` block effects in order for effective state; do not label that
+map as provider context size. The manifest hash covers its original serialized
+entry representation, not a schema parser's reordered serialization. Current
+message bytes exclude the separately delivered role and tool declaration.
+
+Support-size projections count delivered source identities and unique briefing
+content as defined by the scope-size policy, rather than summing every physical
+manifest entry. Read those components separately from inherited/appended totals.
+Original retries retain the exact old packet and manifest; legacy normalization
+does not synthesize physical field deliveries or change historical provenance.
+
+NFR comparison identities describe actual Git boundaries. `run-start` is absent
+when original provenance is unavailable; dirty original captures exclude
+uncommitted starting bytes. An empty accepted-boundary comparison can coexist
+with historical run-start changes, and unchanged caller pointers can be useful
+with either empty diff. Neither diff nor pointer provenance proves satisfaction.
 
 ## Coverage and interpretation
 

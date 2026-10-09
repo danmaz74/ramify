@@ -465,7 +465,7 @@ describe('F5/F6 capability workflow: delegation, handback and suspended consumer
           where: 'subs/b/src/tests/fact.test.ts' }]))];
       }
       if (spec.role === 'engineer') {
-        const objective = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gmu)].at(-1);
+        const objective = [...spec.prompt.matchAll(/^Perform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gmu)].at(-1);
         const work = objective === undefined ? {} : JSON.parse(objective[1]!) as { iteration?: string };
         if (work.iteration?.startsWith('cap-') && spec.scope.workingDirectory === join(root, 'subs/b/src')) {
           return submit(completionProposed('readFact names its source on request.'),

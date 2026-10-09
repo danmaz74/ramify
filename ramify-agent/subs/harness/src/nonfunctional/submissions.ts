@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 import type { ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
 import type { CandidateSource } from '../../subs/evidence/src/git.js';
-import { snapshotTools } from '../../subs/reviews/src/snapshot.js';
+import { snapshotTools, type CandidateSnapshot, type SnapshotComparison } from '../../subs/reviews/src/snapshot.js';
 import { z } from 'zod';
 import { assessmentCoverage, assessmentResultSchema, assessmentSchema, type Assessment, type Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 import type { RoundDecision } from '../../subs/nonfunctional/src/rounds.js';
@@ -177,15 +177,17 @@ export const nonfunctionalRepairToolName = 'submit_nonfunctional_repair';
 export function boundedNonfunctionalTools(input: {
   readonly source: CandidateSource; readonly projectRoot: string; readonly candidate: string;
   readonly base: string; readonly scope?: readonly string[] | undefined;
+  readonly comparisons?: readonly SnapshotComparison[]; readonly snapshot?: CandidateSnapshot;
 }): readonly ToolDefinition[] {
   const scopes = input.scope ?? ['.'];
   const allowed = (path: string) => nonfunctionalSourceAllows(path, scopes);
   let loaded: Promise<ReturnType<typeof snapshotTools>> | undefined;
   const tools = () => loaded ??= (async () => {
-    const entries = new Map((await input.source.treeEntries(input.projectRoot, input.candidate)).filter(entry => allowed(entry.path)).map(entry => [entry.path, entry]));
+    const entries = new Map([...(input.snapshot?.entries.values() ?? await input.source.treeEntries(input.projectRoot, input.candidate))].filter(entry => allowed(entry.path)).map(entry => [entry.path, entry]));
     const directories = new Set(['']);
     for (const path of entries.keys()) for (let directory = posix.dirname(path); directory !== '.' && !directories.has(directory); directory = posix.dirname(directory)) directories.add(directory);
-    const changes = (await input.source.diffNameStatus(input.projectRoot, input.base, input.candidate)).filter(change => allowed(change.path));
+    const changes = (input.snapshot?.changes ?? await input.source.diffNameStatus(input.projectRoot, input.base, input.candidate)).filter(change => allowed(change.path));
+    const comparisons = input.comparisons?.map(comparison => ({ ...comparison, changes: comparison.changes.filter(change => allowed(change.path)) }));
     const scopedSource: CandidateSource = { ...input.source,
       grepTree: async (root, commit, pattern, paths = [], signal) => {
         const files = [...entries.values()].filter(entry => entry.kind === 'file' && (paths.length === 0 || paths.some(path => entry.path === path || entry.path.startsWith(`${path}/`)))).map(entry => entry.path);
@@ -193,9 +195,9 @@ export function boundedNonfunctionalTools(input: {
         return files.length === 0 ? [] : input.source.grepTree(root, commit, pattern, files, signal);
       },
     };
-    return snapshotTools({ commit: input.candidate, base: input.base, tree: input.candidate, entries, directories, changes }, scopedSource, input.projectRoot);
+    return snapshotTools({ commit: input.candidate, base: input.base, tree: input.candidate, entries, directories, changes }, scopedSource, input.projectRoot, comparisons);
   })();
-  const declarations = snapshotTools({ commit: input.candidate, base: input.base, tree: input.candidate, entries: new Map(), directories: new Set(['']), changes: [] }, input.source, input.projectRoot);
+  const declarations = snapshotTools({ commit: input.candidate, base: input.base, tree: input.candidate, entries: new Map(), directories: new Set(['']), changes: [] }, input.source, input.projectRoot, input.comparisons);
   return declarations.definitions.map(definition => ({ ...definition,
     description: `${definition.description} Only the fixed NFR source scope is available; Git metadata and harness run records are excluded.`,
     execute: async (value, signal) => (await tools()).definitions.find(tool => tool.name === definition.name)!.execute(value, signal),

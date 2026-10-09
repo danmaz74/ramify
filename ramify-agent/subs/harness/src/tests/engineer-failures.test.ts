@@ -205,7 +205,7 @@ describe('an engineer ended by a bound in the middle of a command', () => {
     const initial = role('engineer')[0]!;
     expect(`${initial.systemPrompt}\n${initial.prompt}`).toMatch(/"commandTimeoutMs"\s*:\s*"?600000"?/);
     const currentEnvironment = (spec: SessionSpec) => {
-      const matches = [...spec.prompt.matchAll(/^# Current environment\n([\s\S]*?)\n\n# Current task:/gm)];
+      const matches = [...spec.prompt.matchAll(/^# Block environment:limits\nCurrent value; replaces any earlier value for this key\.\n(\{[\s\S]*?\n\})$/gm)];
       expect(matches.length).toBeGreaterThan(0);
       return JSON.parse(matches.at(-1)![1]!) as { limits: { commandTimeoutMs: number } };
     };

@@ -121,6 +121,14 @@ const readInput = z.object({ path: z.string(), startLine: z.int().positive().opt
 const searchInput = z.object({ pattern: z.string().min(1).max(500), path: z.string().optional() }).strict();
 const diffInput = z.object({ path: z.string().optional() }).strict();
 
+/** A caller-captured comparison; tools never accept arbitrary Git references. */
+export interface SnapshotComparison {
+  readonly name: 'run-start' | 'accepted-boundary';
+  readonly base: string;
+  readonly target: string;
+  readonly changes: readonly CandidateChange[];
+}
+
 /** What the tools answered, for the submission's validation and the attempt's records. */
 export interface SnapshotTools {
   readonly definitions: readonly ToolDefinition[];
@@ -136,8 +144,13 @@ export interface SnapshotTools {
 }
 
 /** The reviewer's four read tools over one snapshot. None of them mutates anything. */
-export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSource, projectRoot: string): SnapshotTools {
-  const changed = new Set(snapshot.changes.map(change => change.path));
+export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSource, projectRoot: string, comparisons?: readonly SnapshotComparison[]): SnapshotTools {
+  const defaultComparison = comparisons?.find(comparison => comparison.name === 'run-start') ?? comparisons?.find(comparison => comparison.name === 'accepted-boundary');
+  if (comparisons !== undefined && (defaultComparison === undefined || new Set(comparisons.map(item => item.name)).size !== comparisons.length
+    || comparisons.some(item => item.target !== snapshot.commit))) throw new Error('Snapshot comparisons must have distinct names and the pinned candidate target');
+  const comparisonInput = comparisons === undefined ? diffInput : z.object({ path: z.string().optional(),
+    comparison: z.enum(comparisons.map(item => item.name)).optional() }).strict();
+  const changed = new Set((comparisons?.flatMap(item => item.changes) ?? snapshot.changes).map(change => change.path));
   const inspected = new Set<string>();
   const read = new Map<string, string>();
   const denials: Array<{ tool: string; denial: SnapshotDenial; path: string }> = [];
@@ -230,21 +243,27 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
     return { text: shown.length === 0 ? 'No match' : `${shown.map(match => `${match.path}:${match.line}: ${match.text}`).join('\n')}${more}` };
   });
 
-  const diff = tool(snapshotToolNames.diff, 'Without a path, list every path the candidate changed from the iteration\'s base. With one, show that path\'s patch.', diffInput,
+  const diff = tool(snapshotToolNames.diff, comparisons === undefined
+    ? 'Without a path, list every path the candidate changed from the iteration\'s base. With one, show that path\'s patch.'
+    : `List changed paths or read a per-path patch for a captured named comparison. Default: ${defaultComparison!.name}. Only supplied comparison names are selectable.`, comparisonInput,
     input => input.path === undefined
       ? { kind: 'search', path: candidatePath(), pattern: null, glob: null }
       : { kind: 'read', path: candidatePath(input.path), range: null }, async (input, signal) => {
+    const comparison = comparisons === undefined ? undefined
+      : comparisons.find(item => item.name === ('comparison' in input ? input.comparison : undefined)) ?? defaultComparison!;
+    const compared = comparison === undefined ? snapshot : { ...snapshot, base: comparison.base, changes: comparison.changes };
+    const identity = comparison === undefined ? '' : `Comparison ${comparison.name}: base ${comparison.base}; target ${comparison.target}\n`;
     if (input.path === undefined) {
-      return { text: snapshot.changes.length === 0 ? 'The candidate changed nothing' : snapshot.changes.map(change => `${change.status}\t${change.path}`).join('\n') };
+      return { text: identity + (compared.changes.length === 0 ? 'The candidate changed nothing' : compared.changes.map(change => `${change.status}\t${change.path}`).join('\n')) };
     }
-    const path = resolveChangedPath(snapshot, input.path);
+    const path = resolveChangedPath(compared, input.path);
     if (typeof path !== 'string') return refuse(snapshotToolNames.diff, input.path, path);
-    const patch = await source.diffPatch(projectRoot, snapshot.base, snapshot.commit, path, signal);
+    const patch = await source.diffPatch(projectRoot, compared.base, snapshot.commit, path, signal);
     inspected.add(path);
     return {
-      text: patch.length > snapshotReadLimits.patchBytes
+      text: identity + (patch.length > snapshotReadLimits.patchBytes
         ? `${patch.slice(0, snapshotReadLimits.patchBytes)}\n(the patch holds ${patch.length} characters; the first ${snapshotReadLimits.patchBytes} are shown)`
-        : patch,
+        : patch),
     };
   });
 

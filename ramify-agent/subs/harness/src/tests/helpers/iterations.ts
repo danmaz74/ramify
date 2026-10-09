@@ -140,7 +140,7 @@ export function byWork(plan: Readonly<Record<string, readonly Turn[]>>): Script 
   const counts = new Map<string, number>();
   return (spec: SessionSpec): readonly ScriptStep[] => {
     // The callback sees inherited packets too. Only the newest renderer-owned current objective binds this turn.
-    const objectives = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gm)];
+    const objectives = [...spec.prompt.matchAll(/^Perform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gm)];
     let named: string | undefined;
     if (objectives.length > 0) {
       const work = JSON.parse(objectives.at(-1)![1]!) as { workItem?: unknown };
