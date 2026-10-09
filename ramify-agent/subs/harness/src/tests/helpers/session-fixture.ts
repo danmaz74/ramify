@@ -29,10 +29,10 @@ import { fixtureScratchGit } from './mock-git.js';
  *
  * - `lineage` (review-notes, completed): the session scenario, whose
  *   sessions are forked, appended to, continued, requested by a contract
- *   need and, because the executor forgets each engineer session once it
- *   ends, replaced by a reconstruction. It also loses the first local
- *   architect's session after its placement request, so the continuation
- *   that follows degrades to a fresh start.
+ *   need and, because the executor forgets each engineer session at its
+ *   first settled repair-context append, replaced by the owning engineer
+ *   reconstruction. The retained local architect continues its original
+ *   lineage; unavailable preserving forks are not replaced.
  * - `interrupted` (reviewer-identity, stopped): an initial architect that
  *   ignores the stop past its grace, so the run ends with the session its log
  *   still says is live.
@@ -73,33 +73,42 @@ export async function addSessionRuns(root: string): Promise<FinishedSessionRuns>
 
 async function lineageRun(root: string): Promise<FinishedSessionRuns['lineage']> {
   const cleanups: Array<() => Promise<void>> = [];
-  let forgetting: ReturnType<typeof setInterval> | undefined;
-  const forgotten = new Set<object>();
+  const forgotten = new Set<string>();
   try {
     const scenario = await runSessionScenario({
       root,
       cleanup: step => { cleanups.push(step); },
       // The executor can no longer read an engineer session once it ends, so
       // the provider's repair, which asks to continue it, is a reconstruction.
-      // It also loses the first local architect's session once its placement
-      // request ends, so the continuation after the answer starts fresh.
+      // The local architect remains available: its preserving continuation
+      // is not licensed to fall back to a fresh organizing session.
       port: scripted => {
-        forgetting = setInterval(() => {
-          const firstArchitect = scripted.sessions.find(session => session.spec.role === 'local-architect');
-          for (const session of scripted.sessions) {
-            if (session.outcome === undefined) continue;
-            if (session.spec.role === 'engineer' || (session === firstArchitect && !forgotten.has(session))) {
-              forgotten.add(session);
-              scripted.loseSession(JSON.parse(session.ref));
-            }
-          }
-        }, 5);
-        return scripted;
+        const port: AgentPort = {
+          ...scripted,
+          bindSessionStore(store) {
+            const operations = scripted.bindSessionStore!(store);
+            return {
+              ...operations,
+              async appendContext(input) {
+                // The named repair caller requests this append only after
+                // its original operation actually settled. A diagnostic
+                // actor outcome alone is not proof of engine quiescence.
+                const engineer = scripted.sessions.some(session => session.spec.role === 'engineer'
+                  && JSON.parse(session.ref).sessionId === input.sessionId);
+                if (engineer && !forgotten.has(input.sessionId)) {
+                  forgotten.add(input.sessionId);
+                  scripted.loseSession(input.expectedPoint);
+                }
+                return operations.appendContext(input);
+              },
+            };
+          },
+        };
+        return port;
       },
     });
     return { planId: sessionPlans.lineage, runId: scenario.runId, state: scenario.service.getRun(sessionPlans.lineage, scenario.runId)?.state ?? 'unknown' };
   } finally {
-    clearInterval(forgetting);
     for (const cleanup of cleanups.reverse()) await cleanup();
   }
 }

@@ -1,12 +1,40 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { recoveryBoundaries } from './helpers/recovery-boundaries.js';
 import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
+import { testPolicy } from './helpers/runs.js';
 vi.mock('node:child_process', async importOriginal => {
   const { guardedChildProcess } = await import('./helpers/process-guard.js');
   return guardedChildProcess(await importOriginal<typeof import('node:child_process')>());
 });
 beforeEach(resetSpawnAttempts);
 afterEach(() => expect(spawnAttempts(), 'ordinary recovery script controls start no processes').toEqual([]));
+
+test('independent completion and changed-path checks consume distinct exact recovery argv without inventing a passing report', async () => {
+  const root = '/declared/project';
+  const answer = recoveryBoundaries(root);
+  const complete = await answer.options.ramify.checkComplete(root);
+  const changed = await answer.options.ramify.checkChanged(['subs/a/src/caller.ts'], root, testPolicy(root).commands.hookTimeoutMs);
+  expect(complete).toMatchObject({ form: 'complete', outcome: 'not-checked' });
+  expect(changed).toMatchObject({ form: 'changed', outcome: 'not-checked' });
+  expect(answer.options.ramify.calls.map(call => call.argv)).toEqual([
+    ['check', '--batch', '--root', root, '--format', 'json', '--no-snapshot'],
+    ['check', '--changed', 'subs/a/src/caller.ts', '--format', 'json', '--deadline', String(testPolicy(root).commands.hookTimeoutMs)],
+  ]);
+  expect(() => answer.assertAnswered()).not.toThrow();
+});
+
+test.each([
+  ['wrong completion root', ['check', '--batch', '--root', '/other/project', '--format', 'json', '--no-snapshot']],
+  ['missing completion snapshot flag', ['check', '--batch', '--root', '/declared/project', '--format', 'json']],
+  ['mutation deadline on completion', ['check', '--batch', '--root', '/declared/project', '--format', 'json', '--no-snapshot', '--deadline', '1']],
+  ['unstated mutation path', ['check', '--changed', 'subs/unknown/src/file.ts', '--format', 'json', '--deadline', '1']],
+  ['wrong mutation deadline', ['check', '--changed', 'subs/a/src/caller.ts', '--format', 'json', '--deadline', '1']],
+  ['completion flags on mutation', ['check', '--changed', 'subs/a/src/caller.ts', '--format', 'json', '--no-snapshot']],
+] as const)('a caught recovery %s argv violation remains visible at teardown', async (_name, argv) => {
+  const answer = recoveryBoundaries('/declared/project');
+  await answer.options.ramify.run(argv, '/declared/project').catch(() => undefined);
+  expect(() => answer.assertAnswered()).toThrow('caught');
+});
 
 for (const operation of ['Git', 'candidate', 'source', 'Ramify'] as const) {
   test(`a caught recovery ${operation} script violation remains visible at teardown`, async () => {

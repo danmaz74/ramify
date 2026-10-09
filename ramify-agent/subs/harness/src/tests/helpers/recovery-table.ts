@@ -11,6 +11,12 @@ import {
 } from './composition.js';
 import { scenariosCommitName, type GitResponses } from './recovery-git.js';
 import { onlyRun, openRuns } from './runs.js';
+import { HarnessSessionOperations, readSessionPointReference } from '../../run/session-operations.js';
+import { readAcceptedEvidence } from '../../analysis/evidence.js';
+import { runRecordSchema } from '../../run/records.js';
+import { readRecordedContextSelection } from '../../context-selection/recorded.js';
+import { architectureLayout, placementDecisionSchema } from '../../architecture/records.js';
+import { briefText } from '../../architecture/context.js';
 
 /*
  * The recovery tables of the ten state machines, composed into one table
@@ -320,7 +326,7 @@ export const narrowedRows: ReadonlyArray<RecoveryRow & { readonly name: string; 
     name: 'invocation-ended of a context-budget return',
     write: 'invocation-ended',
     when: events => (events.at(-1)?.data as { ended?: string }).ended === 'context-budget-reached',
-    machines: ['SM8'], scenario: 'iteration', appended: interrupted,
+    machines: ['SM8'], scenario: 'engineer-budget', appended: interrupted,
     stated: 'The budget return is kept as it was: never a completion, counted over committed history, and no successor is started by recovery',
   },
   {
@@ -404,13 +410,17 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     // The same Git answers the restart: the commit the interrupted run made
     // is the one this one finds by the attempt's identity trailers.
     const first = await openRuns(root, {
-      agent, git, candidates: recoveredCandidates,
+      // This historical table verifies conservative recovery without an
+      // execution port. Supported owning-operation restoration is exercised
+      // separately by plan23-continuing-work, including accepted receipt replay.
+      git, candidates: recoveredCandidates,
       // Recovery runs no command; one it ran would fail here rather than
       // starting a process.
       commandExecution: statedCommands(root, []),
       inputs: scenario.inputs(),
     });
     reopened.push(first.service);
+    expect(first.agent, 'historical recovery has no execution port').toBeUndefined();
     const recovered = await logLines(root, runId);
 
     // Recovery called no agent.
@@ -420,7 +430,18 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     // exactly the row's stated state.
     expect(recovered.slice(0, frozen.length).map(line => line.text)).toEqual(frozen.map(line => line.text));
     const appended = recovered.slice(frozen.length).map(line => line.event);
-    expect(appended.filter(event => event.type !== 'session-finished').map(event => event.type), `what recovery appended after ${row.name}`).toEqual(row.appended);
+    // These three rows also license a model-free append when an original
+    // executor is available. This historical sweep has no execution port:
+    // keep that exact effect pending rather than inventing session-lost,
+    // delivery or a completed context package. Dedicated append controls
+    // exercise the available original store separately.
+    const pendingAppend = ['context-package-append-requested', 'decision-accepted', 'brief-appending'].includes(row.name);
+    expect(appended.filter(event => event.type !== 'session-finished').map(event => event.type), `what recovery appended after ${row.name}`).toEqual(pendingAppend ? ['job-interrupted'] : row.appended);
+    if (pendingAppend) {
+      expect(appended.some(event => ['context-package-appended', 'brief-appended', 'decision-delivered'].includes(event.type)), 'unavailable executor completed a pending append').toBe(false);
+      expect(recovered.flatMap(line => line.effect?.phase === 'completion' ? [line.effect.key] : []))
+        .toEqual(frozen.flatMap(line => line.effect?.phase === 'completion' ? [line.effect.key] : []));
+    }
     expectSessionsFinished(frozen.map(line => line.event), appended, recovered.map(line => line.event), row.name);
     for (const event of appended) expect(recoveryCompletions.has(event.type), `${event.type} is not a completion`).toBe(true);
     if (!frozenTerminal) {
@@ -429,7 +450,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     } else {
       expect(first.recovery.interrupted).toEqual([]);
     }
-    if (row.effect !== undefined) expect(first.recovery.effects.some(effect => row.effect!.test(effect)), first.recovery.effects.join('; ')).toBe(true);
+    if (row.effect !== undefined && !pendingAppend) expect(first.recovery.effects.some(effect => row.effect!.test(effect)), first.recovery.effects.join('; ')).toBe(true);
     else expect(first.recovery.effects).toEqual([]);
 
     // Each completion recovery appended completes something the log held open.
@@ -504,11 +525,12 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     reopened.pop();
     const askedAgain = { made: git.commits().length, found: git.recovered().length };
     const second = await openRuns(root, {
-      agent, git, candidates: recoveredCandidates,
+      git, candidates: recoveredCandidates,
       commandExecution: statedCommands(root, []),
       inputs: scenario.inputs(),
     });
     reopened.push(second.service);
+    expect(second.agent, 'historical recovery has no execution port').toBeUndefined();
     expect(second.recovery.interrupted).toEqual([]);
     expect(second.recovery.effects).toEqual([]);
     expect(second.recovery.rematerialized).toEqual([]);
@@ -562,4 +584,63 @@ async function expectMaterialized(root: string, runId: string, lines: readonly L
     else if ((await readFile(absolute, 'utf8')) !== recordText(body)) differing.push(path);
   }
   expect({ missing, differing }).toEqual({ missing: [], differing: [] });
+}
+
+/** The available append half of the same three conservative prefix controls. */
+export async function verifyAvailableAppend(name: 'context-package-append-requested' | 'decision-accepted' | 'brief-appending'): Promise<void> {
+  const row = allRows().find(row => row.name === name)!;
+  const crashed = await crashAt(scenarios[row.scenario], { write: row.write, when: row.when });
+  const { root, runId, agent } = crashed;
+  const directory = runDirectory(root, runId);
+  const frozen = await logLines(root, runId);
+  const calls = agent.sessions.length;
+  const adapter = await HarnessSessionOperations.open(join(root, 'plans/.harness/session-operations'), agent);
+  try {
+    let source: string;
+    let key: string;
+    let text: string;
+    if (name === 'context-package-append-requested') {
+      const request = frozen.map(line => line.event).find(event => event.type === 'context-package-append-requested');
+      const selected = frozen.map(line => line.event).find(event => event.type === 'context-selection-recorded');
+      const orientation = frozen.map(line => line.event).find(event => event.type === 'work-orientation-recorded');
+      if (request?.type !== 'context-package-append-requested' || selected?.type !== 'context-selection-recorded'
+        || orientation?.type !== 'work-orientation-recorded' || orientation.data.point === null) throw new Error('Missing original context append bindings');
+      const record = runRecordSchema.parse(JSON.parse(await readFile(join(directory, 'job.json'), 'utf8')));
+      const evidence = await readAcceptedEvidence(directory, record, frozen.map(line => line.event));
+      if (evidence.status !== 'available') throw new Error(evidence.reason);
+      const package_ = await readRecordedContextSelection(directory, selected, evidence.catalog, []);
+      if (package_.status !== 'available') throw new Error(package_.reason);
+      source = orientation.data.point; key = `context:${request.data.appendKey}`; text = package_.packageText;
+    } else {
+      const accepted = frozen.map(line => line.event).find(event => event.type === 'decision-accepted');
+      if (accepted?.type !== 'decision-accepted') throw new Error('Missing original accepted decision');
+      const decision = placementDecisionSchema.parse(committedRecords(frozen).get(architectureLayout.decision(accepted.data.decision)));
+      const parent = frozen.map(line => line.event).find(event => event.type === 'session-opened' && event.data.role === 'initial-architect');
+      if (parent?.type !== 'session-opened') throw new Error('Missing original architect context');
+      const ended = frozen.find(line => line.event.type === 'invocation-ended' && line.event.data.session === parent.data.session);
+      const outcome = ended?.records.find(record => (record.body as { schema?: string }).schema === 'ramify-agent.invocation-outcome/1')?.body as { session?: { ref: string } } | undefined;
+      if (!outcome?.session?.ref) throw new Error('Missing original accepted architect point');
+      source = outcome.session.ref; key = decision.id; text = briefText(decision);
+    }
+    const original = readSessionPointReference(source);
+    if (!original) throw new Error('Invalid original structured point');
+    const before = await adapter.operations.inspect(original.runId, original.point.sessionId, original.point);
+    expect(before?.currentPoint).toEqual(original.point);
+    const section = name === 'context-package-append-requested' ? 'support:work-item-package' : undefined;
+    const appended = await adapter.append(source, key, text, section);
+    expect(appended.outcome).toBe(name === 'brief-appending' ? 'already-present' : 'appended');
+    if (appended.outcome === 'session-lost') throw new Error('Available original point was lost');
+    expect(await adapter.append(source, key, text, section)).toEqual({ ...appended, outcome: 'already-present' });
+    const current = await adapter.operations.inspect(original.runId, original.point.sessionId);
+    expect(current!.additions.filter(addition => addition.key === key)).toEqual([{ key, kind: 'brief', text, revision: null }]);
+    expect(await adapter.operations.inspect(original.runId, original.point.sessionId, original.point)).toEqual(before);
+    expect(agent.sessions).toHaveLength(calls);
+    expect((await logLines(root, runId)).map(line => line.text)).toEqual(frozen.map(line => line.text));
+    expect(await adapter.append(source, key, `${text}\nchanged`, section)).toEqual({ outcome: 'session-lost' });
+    expect(await adapter.operations.inspect(original.runId, original.point.sessionId)).toEqual(current);
+    expect(agent.sessions).toHaveLength(calls);
+  } finally {
+    expect(await adapter.close(), 'model-free append retained an execution barrier').toBe(true);
+    await crashed.remove();
+  }
 }

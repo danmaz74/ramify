@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { runEventSchema } from '../run/log.js';
 import type { GateAttempt } from '../checks/records.js';
 import { observationSchema } from '../run/observations.js';
-import { runSchemas } from '../run/records.js';
+import { invocationSchema, runSchemas } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
 import { analysisSchemas } from '../analysis/records.js';
 import { workSchemas } from '../work/records.js';
@@ -37,12 +37,16 @@ import {
 } from '../interfaces/protocol/runs.js';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { RunQueries } from '../projections/queries.js';
+import { evaluationOf } from '../projections/metrics.js';
+import { ObservationLog } from '../run/observations.js';
+import { PortEventRecorder } from '../run/port-events.js';
+import { ExcursionWatcher } from '../run/excursions.js';
 import { crashAt, fileHashes, logLines, plan, runDirectory, runToEnd, scenarios, type ScenarioName } from './helpers/composition.js';
 import { allRows, machineNames, type Machine } from './helpers/recovery-table.js';
 import { observeValues, unionInventory } from './helpers/unions.js';
 import { openRuns, startRun, stopRun } from './helpers/runs.js';
 import { scenarioGit } from './helpers/recovery-git.js';
-import { copyFixture } from './helpers/fixture.js';
+import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
 
 /*
  * The composition suite, T1: the whole loop on the scripted agent, with no
@@ -106,7 +110,8 @@ beforeAll(async () => {
   // A run a crash interrupted, as a client reads it after the restart.
   const crashed = await crashAt(scenarios.iteration, { write: 'work-item-started' });
   const reopened = await openRuns(crashed.root, {
-    agent: crashed.agent,
+    // This query witness reconstructs an interrupted prefix without an
+    // execution port. Positive owning restoration has its own Plan 23 cases.
     git: crashed.git,
 
     inputs: scenarios.iteration.inputs(),
@@ -122,6 +127,71 @@ afterAll(async () => {
 });
 
 describe('the composed runs', () => {
+  test('failed reads, authority-refused reads and explicitly interrupted searches retain distinct recorded outcomes and unknown bytes', async () => {
+    const directory = await temporaryDirectory();
+    try {
+      const observations = await ObservationLog.open(join(directory.path, 'observations.jsonl'));
+      const recorder = new PortEventRecorder({ projectRoot: directory.path, observations,
+        invocation: { id: 'original-op', role: 'engineer', startedAt: '2026-10-08T00:00:00.000Z', submissionTool: 'submit', declaredPaths: [directory.path] },
+        context: { compaction: 'forbidden', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 },
+        excursions: new ExcursionWatcher({ projectRoot: directory.path, index: null, scope: undefined }),
+        judge: { countImplementationRejection: () => async () => {} } });
+      recorder.identify({ runId: 'original-run', operationId: 'original-op', sessionId: 'original-session', turn: 3,
+        sourcePoint: { sessionId: 'original-session', kind: 'checkpoint', turn: 2, checkpoint: 'original-brief' } });
+      await recorder.record({ type: 'tool-started', tool: 'read', callId: 'read-failed', input: {}, action: { kind: 'read', path: 'missing.ts', range: null }, mutating: false });
+      await recorder.record({ type: 'tool-finished', tool: 'read', callId: 'read-failed', isError: true, reachedTool: true, observation: { sourceId: 'read-failed:end', returnedBytes: null, elapsedMs: null } });
+      await recorder.record({ type: 'tool-started', tool: 'read', callId: 'read-refused', input: {}, action: { kind: 'read', path: '../outside.ts', range: null }, mutating: false });
+      await recorder.record({ type: 'tool-finished', tool: 'read', callId: 'read-refused', isError: true, reachedTool: false, observation: { sourceId: 'read-refused:end', returnedBytes: null, elapsedMs: null } });
+      await recorder.record({ type: 'tool-started', tool: 'grep', callId: 'search-interrupted', input: {}, action: { kind: 'search', path: '.', pattern: 'unfinished', glob: null }, mutating: false });
+      await recorder.record({ type: 'tool-finished', tool: 'grep', callId: 'search-interrupted', isError: true, reachedTool: true, observation: { sourceId: 'search-interrupted:end', returnedBytes: null, elapsedMs: null, outcome: 'interrupted' } });
+      const calls = observations.observations.filter(row => row.type === 'exploration');
+      expect(calls.map(row => [row.data.callId, row.data.outcome, row.data.returnedBytes, row.data.files])).toEqual([
+        ['read-failed', 'failed', null, null], ['read-refused', 'refused', null, null], ['search-interrupted', 'interrupted', null, null],
+      ]);
+      expect(calls.every(row => row.data.operationId === 'original-op' && row.data.sessionId === 'original-session' && row.data.turn === 3)).toBe(true);
+      expect(observations.observations.filter(row => row.type === 'usage')).toEqual([]);
+    } finally { await directory.remove(); }
+  });
+  test('plain efficiency projections retain original checkpoint and skill identities, legacy unknown scope and complete current scope without inventing charges', () => {
+    const skill = 'Exact supplied skill bytes\n';
+    const hash = createHash('sha256').update(skill).digest('hex');
+    const point = { sessionId: 'original-session', kind: 'checkpoint' as const, turn: 2, checkpoint: 'original-brief' };
+    const manifest = { schema: 'ramify-agent.delivered-inputs/1', inheritedPoint: null, hash,
+      entries: [{ key: 'supplied-skill', kind: 'skill', source: 'skills/supplied/SKILL.md', revision: 'recorded-r1', hash, bytes: Buffer.byteLength(skill), delivery: 'appended', sources: [] }],
+      currentMessage: { hash, bytes: Buffer.byteLength(skill) } };
+    const oldSize = { policy: 'scope-size/1', snapshot: 'ms-original', bytes: null, subtotal: 0, coverage: 'partial',
+      components: [{ component: 'owned-source', detail: 'Original source unavailable', state: 'unknown', bytes: null, reason: 'Not captured in the original record' }] };
+    const invocation = invocationSchema.parse({ schema: 'ramify-agent.invocation/1', id: 'original-op', role: 'engineer', work: {}, attempt: 1,
+      session: { requested: 'continued', actual: 'continued', ref: 'original-brief', from: 'original-brief' },
+      sessionOperation: { runId: 'original-run', operationId: 'original-op', sessionId: point.sessionId, turn: 3, sourcePoint: point, point },
+      prompt: { package: 'engineer', hash, inputsHash: hash, manifest }, scope: { write: null, measurement: null, size: oldSize },
+      writer: false, base: 'original-base', startedAt: '2026-10-08T00:00:00.000Z' });
+    const projected = evaluationOf({ invocation, outcome: null, observations: [], lines: null }).efficiency!;
+    expect(projected.operation?.point).toEqual(point);
+    expect(projected.manifest).toEqual(manifest);
+    expect(projected.declared).toEqual(oldSize);
+    expect(projected.chargeTotal).toBeNull();
+    expect(projected.charges).toEqual([]);
+    projected.manifest!.entries[0]!.sources.push({ path: 'client-only', hash, bytes: 0 });
+    expect(evaluationOf({ invocation, outcome: null, observations: [], lines: null }).efficiency?.manifest).toEqual(manifest);
+    const currentSize = { ...oldSize, policy: 'scope-size/2' as const, bytes: 7, subtotal: 7, coverage: 'complete' as const,
+      components: [{ component: 'owned-source' as const, detail: 'Exact current source', state: 'measured' as const, bytes: 7 }] };
+    expect(evaluationOf({ invocation: { ...invocation, scope: { ...invocation.scope, size: currentSize } }, outcome: null, observations: [], lines: null }).efficiency?.declared).toEqual(currentSize);
+  });
+  test('a raw engineer hard limit leaves its assignment unfinished with no accepted partial, successor or iteration gate', async () => {
+    const run = finished.get('engineer-budget')!;
+    const events = run.service.events(plan, run.runId)!;
+    const engineers = events.filter(event => event.type === 'invocation-started' && event.data.role === 'engineer');
+    expect(engineers).toHaveLength(1);
+    if (engineers[0]?.type !== 'invocation-started') throw new Error('Missing original engineer');
+    const engineer = engineers[0].data.invocation;
+    const ended = events.find(event => event.type === 'invocation-ended' && event.data.invocation === engineer);
+    expect(ended).toMatchObject({ data: { ended: 'context-budget-reached', submission: null } });
+    expect(events.filter(event => event.type === 'iteration-closed')).toEqual([]);
+    expect(events.filter(event => event.type === 'gate-attempted' && event.data.checkpoint !== 'readiness')).toEqual([]);
+    expect(run.service.getRun(plan, run.runId)).toMatchObject({ state: 'failed', failure: { reason: 'limit-exceeded' } });
+    expect(run.git.commits()).toHaveLength(1); // Only the separately licensed scenario materialization.
+  });
   test('removed included child keeps scope authority: the iteration gate audits and commits the removal, and the work-item gate finds it unchanged', async () => {
     const run = finished.get('iteration')!;
     const directory = runDirectory(run.root, run.runId);
@@ -502,6 +572,17 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
  * becoming a second copy of the test that owns them.
  */
 const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly file: string; readonly test: string }> = [
+  { union: 'run log[session-opened].data.fork.reason', values: ['capability-consultation'], file: 'subs/harness/src/tests/capability-consultation.test.ts', test: 'CA04 CA06 CA16: original A request consultation preserves its point or uses named recovery after actual loss (lost=%s)' },
+  { union: 'observation log.type', values: ['usage', 'model-duration'], file: 'subs/harness/src/tests/plan23-observation-integration.test.ts', test: 'captures original identities, exact output bytes, zero matches and recorded-rate estimates once across restoration' },
+  { union: 'observation log[usage].data.charge.source', values: ['estimated-from-recorded-rates'], file: 'subs/harness/src/tests/plan23-observation-integration.test.ts', test: 'captures original identities, exact output bytes, zero matches and recorded-rate estimates once across restoration' },
+  { union: 'observation log[exploration].data.outcome', values: ['failed', 'refused', 'interrupted'], file: 'subs/harness/src/tests/composition.test.ts', test: 'failed reads, authority-refused reads and explicitly interrupted searches retain distinct recorded outcomes and unknown bytes' },
+  { union: 'observation log[coverage-gap].data.kind', values: ['changed-paths-unknown'], file: 'subs/harness/src/tests/hook-checks.test.ts', test: 'a mutation whose changed set is unknown records the gap and runs a complete check' },
+  { union: 'record ramify-agent.invocation/1.sessionOperation.point.kind', values: ['checkpoint'], file: 'subs/harness/src/tests/composition.test.ts', test: 'plain efficiency projections retain original checkpoint and skill identities, legacy unknown scope and complete current scope without inventing charges' },
+  { union: 'query metrics.evaluation.invocations[].efficiency.operation.point.kind', values: ['checkpoint'], file: 'subs/harness/src/tests/composition.test.ts', test: 'plain efficiency projections retain original checkpoint and skill identities, legacy unknown scope and complete current scope without inventing charges' },
+  { union: 'query metrics.evaluation.invocations[].efficiency.manifest.entries[].kind', values: ['skill'], file: 'subs/harness/src/tests/composition.test.ts', test: 'plain efficiency projections retain original checkpoint and skill identities, legacy unknown scope and complete current scope without inventing charges' },
+  { union: 'query metrics.evaluation.invocations[].efficiency.declared.policy', values: ['scope-size/1'], file: 'subs/harness/src/tests/composition.test.ts', test: 'plain efficiency projections retain original checkpoint and skill identities, legacy unknown scope and complete current scope without inventing charges' },
+  { union: 'query metrics.evaluation.invocations[].efficiency.declared.components[].state', values: ['unknown'], file: 'subs/harness/src/tests/composition.test.ts', test: 'plain efficiency projections retain original checkpoint and skill identities, legacy unknown scope and complete current scope without inventing charges' },
+  { union: 'query metrics.evaluation.invocations[].efficiency.declared.coverage', values: ['complete'], file: 'subs/harness/src/tests/composition.test.ts', test: 'plain efficiency projections retain original checkpoint and skill identities, legacy unknown scope and complete current scope without inventing charges' },
   { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.extra[].kind', values: ['file'], file: 'subs/harness/src/tests/write-guard.boundary.test.ts', test: 'PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions' },
   { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.ownership.exclusions[].kind', values: ['owned-unwired', 'owned-nested-project', 'external', 'output'], file: 'subs/harness/src/tests/write-guard.boundary.test.ts', test: 'PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions' },
   { union: 'record ramify-agent.nonfunctional-repair-assignment/1.scope.resolved.included[].kind', values: ['owned-nested-project'], file: 'subs/harness/src/tests/write-guard.boundary.test.ts', test: 'PB3-S01–S05 S09: F1 whole owners, named physical children, independent trees and hard exclusions share tool/candidate decisions' },
@@ -519,7 +600,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[session-opened].data.requestedBy.reason', values: ['capability-needed'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'run log[invocation-started].data.continues.reason', values: ['capability-qualification'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'run log[invocation-started].data.continues.reason', values: ['capability-returned'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: scripted multi-owner migration, repair, handback and linked revision' },
-  { union: 'run log[invocation-started].data.continues.reason', values: ['capability-coordination'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA05 CA19 CA22 CA32: service restart reconstructs the active architect without dispatching the B entry' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['capability-coordination'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA05 CA19 CA22 CA32: service restart continues the durable active architect without dispatching the B entry' },
   { union: 'run log[capability-qualified].data.outcome', values: ['satisfied'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA02: local architect finds an existing API and the same engineer verifies it' },
   { union: 'run log[capability-qualified].data.outcome', values: ['request-placement'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'run log[capability-qualified].data.outcome', values: ['unresolved'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'an unresolved qualification returns through the global architect and the same local architect' },
@@ -645,9 +726,9 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.reconciliation-basis/1.requests[].result', values: ['not-verified'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a reader still running at the deadline is fenced and stopped, the queue stays open, and the correction\'s review still runs' },
   { union: 'run log[session-opened].data.fork.reason', values: ['scope-review', 'design-orientation'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
   { union: 'run log[review-orientation-recorded].data.outcome', values: ['oriented'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
-  { union: 'run log[review-orientation-recorded].data.outcome', values: ['failed'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a failed orientation is recorded once, and the design reviews of its guidance start fresh with the reason' },
+  { union: 'run log[review-orientation-recorded].data.outcome', values: ['failed'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a failed orientation is recorded once and its dependent design reviews remain unavailable' },
   { union: 'record ramify-agent.review-orientation/1.outcome', values: ['oriented'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
-  { union: 'record ramify-agent.review-orientation/1.outcome', values: ['failed'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a failed orientation is recorded once, and the design reviews of its guidance start fresh with the reason' },
+  { union: 'record ramify-agent.review-orientation/1.outcome', values: ['failed'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a failed orientation is recorded once and its dependent design reviews remain unavailable' },
   { union: 'run log[review-attempt-finished].data.reason', values: ['no-time-before-deadline'], file: 'subs/harness/src/tests/review-scheduling.test.ts', test: "after the completion request, a waiting request that could not finish before the work item's deadline is finished at once" },
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['pass'], file: 'subs/harness/src/tests/execution-map-durable.test.ts', test: 'replays the independent published audit result after restart' },
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['fail'], file: 'subs/harness/src/tests/execution-map-projection.test.ts', test: 'reads old gates without an audit fact and a failed published audit independently of verdict' },
@@ -867,6 +948,10 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  * a producer, so the list can neither hide a new gap nor outlive a closed one.
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
+  {
+    union: 'observation log[usage].data.charge.source', values: ['provider-recorded'],
+    reason: 'The current Pi producer records SDK usage and captured-rate estimates, never a provider-billed amount. Plain browser fixtures retain this provenance when explicitly supplied, but no actual agent observation producer reports a billed charge; the format must not relabel an SDK estimate as billing.',
+  },
   {
     union: 'record ramify-agent.measurement-snapshot/1.policy', values: ['scope-size/1'],
     reason: 'An earlier run\'s snapshot stays readable, but the harness now captures scope-size/2 only; the KPIs refuse a scope-size/1 size, which the KPI tests construct.',

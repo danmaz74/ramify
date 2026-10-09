@@ -374,11 +374,12 @@ describe('the recovery table', () => {
     expect(outcome.settled.confirmed).toBe(false);
     expect(onlyRun(service, 'review-notes').counts.invocations).toBe(1);
 
-    // The transcript's start was durable before the crash, and recovery
-    // adds the interrupted invocation's end after it, removing nothing.
+    // This boundary precedes preparation of the actual packet. No model
+    // call or transcript start happened; conservative recovery records its
+    // interruption and point without inventing delivered prompt bytes.
     const transcript = await readTranscript(runPath(root, 'review-notes', runId, runLayout.transcript('ses-0001')));
-    expect(transcript.entries.map(entry => [entry.n, entry.type])).toEqual([[1, 'started'], [2, 'ended'], [3, 'point']]);
-    expect(transcript.entries[1]).toMatchObject({ invocation: 'inv-0001', ended: 'failed', interruption: 'session-lost', actual: null });
+    expect(transcript.entries.map(entry => [entry.n, entry.type])).toEqual([[1, 'ended'], [2, 'point']]);
+    expect(transcript.entries[0]).toMatchObject({ invocation: 'inv-0001', ended: 'failed', interruption: 'session-lost', actual: null });
   }, 180_000);
 
   test('a crash after invocation-ended leaves the outcome as it was and appends no second end', async () => {
@@ -406,6 +407,11 @@ describe('the recovery table', () => {
     expect((await runEventsOnDisk(root, 'review-notes', runId)).some(event => event.type === 'analysis-accepted')).toBe(false);
     // The fresh run's intake reads a non-functional requirement the crashed
     // one did not, so its catalog, and the file it is staged in, differ.
+    // Interrupt this historical prefix without an execution port before
+    // starting the separately requested run with changed evidence.
+    const interrupted = await reopen(root);
+    expect(interrupted.recovery.interrupted).toEqual([`review-notes/${runId}`]);
+    await interrupted.service.close();
     const resumed = await openRuns(root, { git: gitOf(root),
       script: spec => spec.submission.name === intakeToolName
         ? [{ kind: 'submit', input: { goal: 'Keep reviewer notes on a review run.', elements: [
@@ -456,7 +462,9 @@ describe('the recovery table', () => {
     const { runId } = await crashAfter(root, 'placement-requested', false, undefined, undefined, agent);
     await rm(runPath(root, 'review-notes', runId, architectureLayout.request('pr-001')));
 
-    const { recovery } = await reopen(root, agent);
+    const sessionsBefore = agent.sessions.length;
+    const { recovery } = await reopen(root);
+    expect(agent.sessions).toHaveLength(sessionsBefore);
     // The record file is re-materialized from the line that committed it.
     expect(recovery.rematerialized.some(entry => entry.startsWith(`review-notes/${runId}`))).toBe(true);
     const request = JSON.parse(await readFile(runPath(root, 'review-notes', runId, architectureLayout.request('pr-001')), 'utf8')) as { id: string; forCapability: string };
@@ -484,7 +492,9 @@ describe('the recovery table', () => {
       () => agent.sessions.filter(session => session.spec.role === 'global-fork').length === 1,
     );
 
-    const { recovery } = await reopen(root, agent);
+    const sessionsBefore = agent.sessions.length;
+    const { recovery } = await reopen(root);
+    expect(agent.sessions).toHaveLength(sessionsBefore);
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     const types = events.map(event => event.type);
     expect(types.filter(type => type === 'view-refreshed')).toHaveLength(1);

@@ -76,8 +76,9 @@ describe('the session fixture over HTTP', () => {
     const reconstruction = sessions.find(session => session.lineage.replaces !== null)!;
     expect(reconstruction).toMatchObject({ role: 'engineer', lineage: { replaces: { reason: 'reconstructed' } } });
     expect(sessions.find(session => session.session === reconstruction.lineage.replaces!.session)).toMatchObject({ finished: 'replaced' });
-    expect(sessions.flatMap(session => session.invocations).filter(invocation => invocation.degraded !== null).map(invocation => invocation.degraded))
-      .toContainEqual(expect.objectContaining({ requested: 'fork', actual: 'fresh' }));
+    const degradations = sessions.flatMap(session => session.invocations).flatMap(invocation => invocation.degraded ?? []);
+    expect(degradations).toContainEqual(expect.objectContaining({ requested: 'continue', actual: 'fresh' }));
+    expect(degradations.filter(degraded => degraded.requested === 'fork')).toEqual([]);
     // The project's list and the run's snapshot count the degraded starts the log records.
     const degraded = sessions.map(session => [session.session, session.invocations.filter(invocation => invocation.degraded !== null).length] as const)
       .filter(([, count]) => count > 0);

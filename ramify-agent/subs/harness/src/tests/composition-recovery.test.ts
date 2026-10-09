@@ -12,8 +12,8 @@ afterEach(() => {
 /*
  * The composed recovery table (T1), for the rows whose scenarios are the
  * run, its work items, iterations, gates, writer, budget and stop. Each row crashes its scenario after one durable boundary, deletes every
- * record file the log commits, restarts twice with the scripted agent and
- * no network, and holds the recovered state to the checks in
+ * record file the log commits, restarts twice without an execution port or
+ * network, and holds the recovered state to the checks in
  * `helpers/recovery-table.ts`. Git and the commands readiness would spawn
  * are answered rather than run, by answers the scenario states and the crash
  * and both restarts share. The rows are split across three files only
@@ -21,7 +21,7 @@ afterEach(() => {
  * together they are the whole table.
  */
 
-const scenarios: readonly string[] = ['iteration', 'stop'];
+const scenarios: readonly string[] = ['iteration', 'stop', 'engineer-budget'];
 
 describe('the composed recovery table: the run, its work items, iterations, gates, writer, budget and stop', () => {
   for (const row of allRows().filter(candidate => scenarios.includes(candidate.scenario))) {

@@ -75,7 +75,7 @@ async function settledLog(root: string, runId: string): Promise<RunEvent[]> {
 /** A service opened over the crashed project: what recovery asks of Git is answered, and nothing is driven. */
 async function restart(root: string) {
   const restarted = await openRuns(root, {
-    script: [],
+    // This reader-prefix projection control deliberately has no execution port.
     git: mockGit({ changedPaths: async () => [], currentHead: async () => 'revision-03' }),
     candidates: scriptedCandidates(root, candidates()),
     policy: projectRoot => testPolicy(projectRoot, { reviews: testReviewPolicy() }),
@@ -118,7 +118,7 @@ describe('CF07: a stop owns every live reader, and a late result is fenced', () 
       }
     }
     await service.settled(plan, runId);
-    // The reader that ignored its stop has submitted by now, after the run ended.
+    // The reader that ignored its stop has finished after the run ended.
     await until(() => run.agent!.sessions.some(session => session.spec.prompt.includes('rq-0002') && session.outcome !== undefined), 10_000);
     const events = await settledLog(root, runId);
 
@@ -135,9 +135,11 @@ describe('CF07: a stop owns every live reader, and a late result is fenced', () 
     expect(reviewers).toHaveLength(2);
     expect(reviewers.every(session => session.stopCalls > 0)).toBe(true);
     expect(run.agent!.sessions.find(session => session.spec.role === 'engineer' && session.stopCalls > 0)).toBeDefined();
-    // The late concern reached the submission tool after the run ended, and was refused there.
+    // Current authority fences the late snapshot call before its concern
+    // reaches acceptance. No fabricated submission verdict is reported.
     const late = reviewers.find(session => session.spec.prompt.includes('rq-0002'))!;
-    expect(late.verdicts.at(-1)).toMatchObject({ accepted: false, final: true });
+    expect(late.verdicts).toEqual([]);
+    expect(late.outcome).toMatchObject({ kind: 'failed' });
     expect(service.checkFindings(plan, runId, { kind: 'list', owner: null, select: 'all' })).toMatchObject({ ok: true, view: { total: 0 } });
     expect(service.reviews(plan, runId)!.coverage).toEqual({ state: 'available', requested: 2, complete: 0, partial: 0, notVerified: 2, pending: 0 });
   }, 60_000);
@@ -222,7 +224,7 @@ describe('CF06: a crash around a review is recovered exactly once', () => {
     await staleCrashLock(root);
 
     const restarted = await restart(root);
-    expect(restarted.agent!.sessions).toHaveLength(0);
+    expect(restarted.agent).toBeUndefined();
     expect(restarted.recovery.reviews).toEqual([
       `${plan}/${run.runId}: review request rq-0001 of wi-001.i01`,
       `${plan}/${run.runId}: review attempt rq-0001.a01, finished as not verified`,
@@ -274,7 +276,7 @@ describe('CF06: a crash around a review is recovered exactly once', () => {
     await staleCrashLock(root);
 
     const restarted = await restart(root);
-    expect(restarted.agent!.sessions).toHaveLength(0);
+    expect(restarted.agent).toBeUndefined();
     expect(restarted.recovery.invocations).toContain(`${plan}/${run.runId}: ${started[0]!.data.invocation}`);
     expect(restarted.recovery.reviews).toEqual([`${plan}/${run.runId}: review attempt rq-0001.a01, finished as not verified`]);
     const after = await runEventsOnDisk(root, plan, run.runId);
@@ -312,7 +314,7 @@ describe('CF06: a crash around a review is recovered exactly once', () => {
     await rm(runPath(root, plan, runId, 'reviews'), { recursive: true });
     await rm(runPath(root, plan, runId, 'check-findings'), { recursive: true });
     const restarted = await restart(root);
-    expect(restarted.agent!.sessions).toHaveLength(0);
+    expect(restarted.agent).toBeUndefined();
     expect(restarted.recovery.rematerialized).toEqual([expect.stringMatching(new RegExp(`^${plan}/${runId}: \\d+ record file\\(s\\)$`, 'u'))]);
     expect(restarted.recovery.reviews).toEqual([]);
     expect(restarted.service.reviews(plan, runId)).toEqual(coverage);

@@ -203,7 +203,7 @@ export interface DuringContext {
 
 export type ScenarioName =
   | 'iteration' | 'delegation' | 'placement' | 'access' | 'breaking' | 'repair' | 'testless' | 'revision' | 'cycle' | 'stop'
-  | 'agent-fails' | 'no-submission' | 'invalid-analysis' | 'over-limit';
+  | 'agent-fails' | 'no-submission' | 'invalid-analysis' | 'over-limit' | 'engineer-budget';
 
 async function fixtureWith(modules: ReadonlyArray<{ directory: string; name: string; files: Record<string, string> }>, runner: 'mini' | 'exit-0' = 'mini') {
   const fixture = await copyFixture();
@@ -290,7 +290,7 @@ const iteration: Scenario = {
       unchanged(source(1)),
     ],
   },
-  exercises: 'the run, the analysis, readiness, one work item worked by an ordinary and a repair iteration, a budget return, the shell, a module removed, the gates and their commits',
+  exercises: 'the run, the analysis, readiness, one work item worked by an ordinary and a repair iteration, the shell, a module removed, the gates and their commits',
   ends: 'completed',
   finalCandidate: { head: source(1), tree: '1'.repeat(40) },
   target: () => fixtureWith([
@@ -340,7 +340,6 @@ const iteration: Scenario = {
       ),
     ],
     engineer: [
-      budgetTurn,
       [
         read(join(root, 'subs/workspace/subs/shared-ui/src/status-badge.tsx')),
         { kind: 'tool', tool: 'grep', input: { pattern: 'noteLimit', path: join(root, notesDirectory) } },
@@ -840,6 +839,21 @@ const cycle: Scenario = {
   inputs: treeInputs,
 };
 
+/** A raw hard limit has no accepted partial return, successor or passing gate. */
+const engineerBudget: Scenario = {
+  name: 'engineer-budget',
+  git: { head: base, after: materialized, commits: [materialize(featureOf(notesDirectory, 'review-notes'))] },
+  exercises: 'an engineer reaches the hard context limit without an accepted submission; its assignment stays unfinished',
+  ends: 'failed',
+  target: () => fixtureWith([notesModule]),
+  script: () => byRole({
+    'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
+    'local-architect': [submit(assign(notes, {}, outline()))],
+    engineer: [budgetTurn],
+  }),
+  inputs: treeInputs,
+};
+
 /** A stop that arrives while an engineer holds the writer. */
 const stopping: Scenario = {
   name: 'stop',
@@ -896,7 +910,7 @@ const overLimit: Scenario = {
 
 export const scenarios: Readonly<Record<ScenarioName, Scenario>> = {
   iteration, delegation, placement, access, breaking, repair, testless, revision, cycle, stop: stopping,
-  'agent-fails': agentFails, 'no-submission': noSubmission, 'invalid-analysis': invalidAnalysis, 'over-limit': overLimit,
+  'agent-fails': agentFails, 'no-submission': noSubmission, 'invalid-analysis': invalidAnalysis, 'over-limit': overLimit, 'engineer-budget': engineerBudget,
 };
 
 /** The completed path makes four exact tree previews; the final gate's unchanged commit keeps its head. */
@@ -1029,7 +1043,7 @@ export async function crashAt(scenario: Scenario, point: CrashPoint) {
   const receipt = await opened.service.execute(startRun(plan));
   const endedBeforeBoundary = opened.service.settled(plan, receipt.jobId).then(() => {
     commands.assertAnswered();
-    throw new Error(`${scenario.name} ended before it reached ${point.write}`);
+    throw new Error(`${scenario.name} ended before it reached ${point.write}: ${JSON.stringify(opened.service.getRun(plan, receipt.jobId)?.failure)}`);
   });
   const runId = await Promise.race([
     frozen,

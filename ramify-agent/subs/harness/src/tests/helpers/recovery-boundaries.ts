@@ -2,7 +2,6 @@ import type { AffectedDocument } from 'ramify.ts/cli';
 import { expect } from 'vitest';
 import type { CandidateSource } from '../../../subs/evidence/src/git.js';
 import type { ProvisionalSourceGit } from '../../../subs/evidence/src/provisional-git.js';
-import { completionCheckDeadlineMs } from '../../hooks/post-write.js';
 import { mockGit } from './mock-git.js';
 import { scriptedCandidates } from './candidates.js';
 import { mappedAudit } from './direct-check-execution.js';
@@ -97,10 +96,14 @@ export function recoveryBoundaries(root: string, entries: 'a' | 'a+b' = 'a+b', c
       if (args[0] === '--version') expect(args).toEqual(['--version']);
       if (args[0] === 'measure') expect(args).toEqual(['measure', '--root', root, '--format', 'json']);
       if (args[0] === 'check') {
-        expect(args.slice(0, 2)).toEqual(['check', '--changed']); const format = args.indexOf('--format'); expect(format).toBeGreaterThan(2);
-        for (const path of args.slice(2, format)) expect(Object.hasOwn(owners, path), `unstated hook path ${path}`).toBe(true);
-        expect(args.slice(format, -1)).toEqual(['--format', 'json', '--deadline']);
-        expect([String(testPolicy(root).commands.hookTimeoutMs), String(completionCheckDeadlineMs)]).toContain(args.at(-1));
+        if (args[1] === '--batch') {
+          expect(args).toEqual(['check', '--batch', '--root', root, '--format', 'json', '--no-snapshot']);
+        } else {
+          expect(args.slice(0, 2)).toEqual(['check', '--changed']); const format = args.indexOf('--format'); expect(format).toBeGreaterThan(2);
+          for (const path of args.slice(2, format)) expect(Object.hasOwn(owners, path), `unstated hook path ${path}`).toBe(true);
+          expect(args.slice(format, -1)).toEqual(['--format', 'json', '--deadline']);
+          expect(args.at(-1)).toBe(String(testPolicy(root).commands.hookTimeoutMs));
+        }
       }
       return super.run(args, cwd, signal);
     }

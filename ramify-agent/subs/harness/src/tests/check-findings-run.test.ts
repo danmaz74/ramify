@@ -103,11 +103,11 @@ describe('CheckFindings of a driven run', () => {
     await rm(runPath(root, plan, runId, 'check-findings'), { recursive: true });
     await staleCrashLock(root);
 
-    const restarted = await openRuns(root, { script: [] });
+    const restarted = await openRuns(root);
     cleanups.push(() => restarted.service.close());
     expect(restarted.recovery.interrupted).toEqual([`${plan}/${runId}`]);
     expect(restarted.recovery.rematerialized).toEqual([`${plan}/${runId}: 2 record file(s)`]);
-    expect(restarted.agent!.sessions).toHaveLength(0);
+    expect(restarted.agent).toBeUndefined();
     expect(restarted.service.checkFindings(plan, runId, { kind: 'list', owner: null, select: 'all' })).toEqual(list);
     expect(restarted.service.checkFindings(plan, runId, { kind: 'detail', checkFinding: 'cf-0001' })).toEqual(detail);
     expect(JSON.parse(await readFile(runPath(root, plan, runId, checkFindingLayout.decision('cf-0001', 'cfd-0001')), 'utf8')))
