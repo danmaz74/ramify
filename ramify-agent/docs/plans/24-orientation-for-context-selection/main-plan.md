@@ -1,11 +1,14 @@
 # Plan 24: useful starting briefs and orientation reuse
 
-**Date:** 2026-10-09. **Status:** implementation in progress; iteration 0 base
-audit accepted through existing evidence and iterations 1–3 complete; iteration
-4 pending. See the [iteration 0 receipt](iterations/00-results.md),
-[iteration 1 receipt](iterations/01-results.md) and
-[iteration 2 receipt](iterations/02-results.md) and
-[iteration 3 receipt](iterations/03-results.md). Source inspected at `1b052e74`.
+**Date:** 2026-10-09. **Status:** complete; iterations 0–4 delivered in the
+isolated implementation branch `feat/plan24-orientation`. The final configured
+full nested audit passed on the merged candidate `e1fa315c`. See the
+[iteration 0 receipt](iterations/00-results.md),
+[iteration 1 receipt](iterations/01-results.md),
+[iteration 2 receipt](iterations/02-results.md),
+[iteration 3 receipt](iterations/03-results.md) and
+[final iteration receipt](iterations/04-results.md). The source inventory below
+was inspected at `1b052e74` before implementation.
 
 ## Outcome and decisions
 
@@ -273,6 +276,15 @@ projection tests if code changes. Document existing field locations if no change
 is needed. Update the harness specification, catalog specification and affected
 README/procedure descriptions to match the implementation; reference this plan
 from the analyses. Do not add a new mandatory-input contract to the specification.
+
+During iteration 4, Dan additionally requested merging the existing
+[Pi provider identity adoption](../../spikes/pi-cache-reuse/adapter-results.md).
+The implementation branch `729033c0` was merged with both parents retained;
+related forks inherit its durable provider identity while logical sessions and
+histories remain independent. Plan 24's specific context-loss handling remains.
+The three linked result documents were preserved unchanged as historical,
+source-specific evidence. This adds correctness qualification of the integrated
+candidate, with no new live or benefit trial.
 
 Run focused tests for changed behavior, `npm run type-check` and
 `npm run check:self` from `ramify-agent/`. Follow the
