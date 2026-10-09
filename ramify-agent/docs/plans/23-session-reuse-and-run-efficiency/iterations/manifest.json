@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "implementing; failed baseline retained; focused native materializer repair passed",
+  "status": "implementing; iterations 0–13 accepted for recorded scopes; final qualification remains open after retained failed full audit",
   "execution": "dependency-ordered; disjoint iterations may run in parallel",
   "iterations": [
     {
@@ -28,7 +28,7 @@
         "S05",
         "S06"
       ],
-      "status": "accepted provider; pi/runtime integration remains iterations 7\u20139",
+      "status": "accepted provider; pi/runtime integration remains iterations 7–9",
       "writeBoundary": "Harness/agent port and scripted implementation; new harness session-store adapter and its own tests. Own run/sessions.ts if required; do not edit run/service.ts, pi or shared run records.",
       "receipt": "01-results.md",
       "providerHead": "10fd6f21a1de31d178a22471b450c8ebc2c382a1",
@@ -54,7 +54,7 @@
         "P04",
         "P05"
       ],
-      "status": "accepted provider; runtime consumers remain iterations 8\u201310",
+      "status": "accepted provider; runtime consumers remain iterations 8–10",
       "writeBoundary": "Harness src/prompts/ templates/packages and new pure task/brief builders with isolated prompt tests. Do not edit run/service.ts or plan-evidence/scenarios implementations.",
       "receipt": "02-results.md",
       "providerHead": "8dece7e3f1dff9f536505bdf7debbd0bb42357a6",
@@ -188,7 +188,7 @@
         "S10",
         "S11"
       ],
-      "status": "accepted provider; ordinary runtime wiring remains iterations 8\u20139 and live qualification 14",
+      "status": "accepted provider; ordinary runtime wiring remains iterations 8–9 and live qualification 14",
       "writeBoundary": "Harness/agent/pi implementation and tests only; consume accepted agent/storage contract from 1.",
       "receipt": "07-results.md",
       "providerHead": "d67738425bd248aa06126b1a49c465b285617c36",
@@ -488,7 +488,47 @@
     "auditSource": "637d8ff7eac6c010af8c3517ff42e1c5ef712ca6",
     "failedReport": "41209da07bbf06539523dc31c40afb52faef3aab",
     "writeSets": "../write-sets.json#qualificationRepairs.full-audit-637d8ff7",
-    "status": "focused repairs active; final full qualification remains failed/open",
-    "policy": "Keep exact original task, receipt and mutation authority; no new skips, timeout increases or blanket replay/fresh fallback."
+    "status": "focused corrections integrated; original 15-second workflow and fresh final native/live/full qualification remain open",
+    "policy": "Keep exact original task, receipt and mutation authority; no new skips, timeout increases or blanket replay/fresh fallback.",
+    "integratedAmendments": {
+      "runtimeAndNativeWorkflow": {
+        "providerHead": "b5cd7cea1b0ac7f968de61d01e2a67548596ed6d",
+        "integratedHead": "0a858079",
+        "nativeFiles": 4,
+        "nativeTests": 6,
+        "ordinaryFiles": 3,
+        "ordinaryTests": 90,
+        "scope": "Actual returned qualification checkpoint and complete immutable orientation guidance; no final full-audit claim"
+      },
+      "recoveryFixtures": {
+        "providerHead": "4919f1163c1a3442e2f170edd530847173f9c480",
+        "integratedHead": "728f581c",
+        "ordinaryFiles": 6,
+        "ordinaryTests": 115,
+        "scope": "Original crash-prefix, bounded-session and exact hook argv controls; no new skip or widened bound"
+      },
+      "genericJsonCopies": {
+        "providerHead": "06a3c12e43b6e4e063aabd8f357c4f9a72e040f4",
+        "integratedHead": "a71d40cc",
+        "ordinaryFiles": 4,
+        "ordinaryTests": 75,
+        "scope": "Detached JSON-compatible value copies and retained authority mutation fences; original full workflow still unqualified"
+      },
+      "ledgerOwnedContentHash": {
+        "integratedHead": "2cc50462d4ee53e2a85123740da82c5256d929d2",
+        "ordinaryFiles": 5,
+        "ordinaryTests": 38,
+        "typeCheck": "passed all four configured scopes",
+        "structure": "passed; 686 sources, 0 errors/warnings, 327 retained analysis limits",
+        "scope": "Exact complete original replay bytes and successfully flushed owner append bytes; no run or session policy"
+      }
+    },
+    "firstFailedFullAudit": {
+      "source": "637d8ff7eac6c010af8c3517ff42e1c5ef712ca6",
+      "report": "41209da07bbf06539523dc31c40afb52faef3aab",
+      "status": "failed; regression command reached original 1200000ms bound; no terminal suite summary",
+      "archive": "/home/app/ramify-plan23-evidence/637d8ff7eac6c010af8c3517ff42e1c5ef712ca6",
+      "evidenceLimit": "Audit coverage is incomplete; 119 observed failed titles are retained, not an exhaustive terminal result"
+    }
   }
 }
