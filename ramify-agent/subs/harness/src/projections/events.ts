@@ -50,7 +50,9 @@ function describe(event: RunEvent): [string, Ref[]] {
       ];
     }
     case 'invocation-prepared':
-      return [`Invocation ${event.data.invocation} prepared its actual delivered inputs and operation identity`, ref('invocation', event.data.invocation)];
+      return [event.data.recorded === 'delivered-inputs' ? `Invocation ${event.data.invocation} prepared its actual delivered inputs`
+        : event.data.recorded === 'operation-identity' ? `Invocation ${event.data.invocation} recorded its session operation identity`
+        : `Invocation ${event.data.invocation} prepared its actual delivered inputs and operation identity`, ref('invocation', event.data.invocation)];
     case 'invocation-started': {
       const continues = event.data.continues;
       return [

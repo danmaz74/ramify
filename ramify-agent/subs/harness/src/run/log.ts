@@ -71,7 +71,8 @@ const invocationEndedFields = {
 /** One line of a run's event log. */
 export const runEventSchema = z.discriminatedUnion('type', [
   /** Actual packet/scope/execution identity committed before observational events; does not start another invocation. */
-  event('invocation-prepared', z.object({ invocation: text }).strict()),
+  // Each of an invocation's two record revisions names its part; earlier logs name neither.
+  event('invocation-prepared', z.object({ invocation: text, recorded: z.enum(['delivered-inputs', 'operation-identity']).optional() }).strict()),
   /** The run's first event, holding the start command. It licenses the initial architect. */
   event('job-started', z.object({ command: acceptedCommandSchema }).strict()),
   /**

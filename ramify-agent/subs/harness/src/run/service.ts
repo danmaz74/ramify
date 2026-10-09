@@ -4168,7 +4168,8 @@ export class RunService {
       body = { ...body, sessionOperation: { ...identity, point: body.sessionOperation?.point } };
     }
     if (canonicalJson(body) === canonicalJson(prior.body)) return;
-    await this.write(run, { type: 'invocation-prepared', data: { invocation: id } }, [{ path: runLayout.invocation(id), id, revision: prior.revision + 1, body }]);
+    await this.write(run, { type: 'invocation-prepared', data: { invocation: id, recorded: supplied ? 'delivered-inputs' : 'operation-identity' } },
+      [{ path: runLayout.invocation(id), id, revision: prior.revision + 1, body }]);
   }
 
   private async startInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<

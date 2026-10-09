@@ -1006,6 +1006,14 @@ describe('the run protocol a client reads', () => {
     expect(summary({ pointRetained: false })).toBe('Invocation inv-0004 ended: submitted; session ses-0004 is kept, but retained no point to continue from');
   });
 
+  test('each prepared revision of an invocation names the part it recorded', () => {
+    const summary = (data: Record<string, unknown>) => projectEvent(runEventSchema.parse({ sequence: 1, jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z', type: 'invocation-prepared',
+      data: { invocation: 'inv-0001', ...data } })).summary;
+    expect(summary({ recorded: 'delivered-inputs' })).toBe('Invocation inv-0001 prepared its actual delivered inputs');
+    expect(summary({ recorded: 'operation-identity' })).toBe('Invocation inv-0001 recorded its session operation identity');
+    expect(summary({})).toBe('Invocation inv-0001 prepared its actual delivered inputs and operation identity');
+  });
+
   test('every event type of the run log has a projection that names its transition', () => {
     for (const option of runEventSchema.options) {
       const type = option.shape.type.value;
