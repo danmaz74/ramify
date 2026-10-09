@@ -528,6 +528,17 @@
         "subs/harness/src/tests/contract-revision-scripted.test.ts"
       ],
       "reviewWorker": []
+    },
+    "full-audit-6dd3e7f5": {
+      "source": "6dd3e7f58c276e6932b9da55323bf8303f1603fa",
+      "report": "7a5ea2f72e14b6820092a2ce38d9e95a9770c152",
+      "evidence": "/tmp/plan23-6dd3e7f5-final-audit.json",
+      "continuationFaultAdapterWorker01": [
+        "ramify-agent/subs/harness/src/tests/plan23-continuing-work.test.ts"
+      ],
+      "reviewWorker00": [],
+      "receiptWorker02": [],
+      "policy": "Preserve original crash/freeze boundaries, assertions, phases and timeouts. Fault wrappers must intercept the optional captured production commit as well as ordinary commit; no runtime guard changes or passing whole-plan claim."
     }
   }
 }
