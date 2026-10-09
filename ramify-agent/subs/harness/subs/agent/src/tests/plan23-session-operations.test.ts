@@ -354,6 +354,119 @@ describe('Plan 23 F1 high-level session operations', () => {
   });
 });
 
+describe('explicit independently owned normalized store captures', () => {
+  it('activates the advertised method with its original receiver and snapshots the capability before dispatch', async () => {
+    const store = memoryStore(); const read = store.read; let captures = 0; let dispatches = 0;
+    store.readDetached = async function(runId, id) { expect(this).toBe(store); captures++; const value = await read(runId, id); return value === null ? null : { ...value, body: JSON.parse(JSON.stringify(value.body)) as Record<string, unknown> }; };
+    store.read = async () => { throw new Error('Default read must not run for an advertised capture'); };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(input) { dispatches++; expect(input.task).toEqual(task); return { kind: 'ended' }; } } });
+    store.readDetached = async () => { throw new Error('Capability must be captured once'); };
+    const P = await operations.create(create); const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'owned'))).settled();
+    expect(end.status).toBe('completed'); expect(dispatches).toBe(1); expect(captures).toBeGreaterThan(0);
+    expect((await operations.inspect('run-A', P.sessionId))?.currentPoint).toEqual(end.point);
+    expect(await (await operations.retry({ runId: 'run-A', operationId: 'owned', bindings: bindings() })).settled()).toEqual(end); expect(dispatches).toBe(1);
+  });
+  it('retains the default defensive copy when an arbitrary adapter exposes its mutable read result', async () => {
+    const store = memoryStore(); const read = store.read; let escaped: SessionStoreRecord | null = null; let dispatches = 0;
+    store.read = async (runId, id) => { const value = await read(runId, id); if (id === 'operation:shared-read') escaped = value; return value; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(input) { dispatches++; expect(input.task).toEqual(task); return { kind: 'ended' }; } } });
+    const P = await operations.create(create);
+    const bound = bindings({ currentAuthority: async original => {
+      const escapedInput = escaped?.body['input'] as { task?: { message: string } } | undefined;
+      if (escapedInput?.task) escapedInput.task.message = 'Adapter mutated an exposed value';
+      expect(original.message).toBe('Orient A'); return true;
+    } });
+    expect((await (await operations.continue(continuation(P.sessionId, P.point!, 'shared-read', bound))).settled()).status).toBe('completed'); expect(dispatches).toBe(1);
+    expect((await read('run-A', 'operation:shared-read'))?.body).toMatchObject({ input: { task } });
+  });
+  it.each(['default', 'advertised'])('keeps native JSON body normalization and fresh nested captures on %s reads', async mode => {
+    const store = memoryStore(); const read = store.read;
+    const setup = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const P = await setup.create(create); const original = (await read('run-A', `session:${P.sessionId}`))!;
+    const snapshot = original.body['snapshot'] as Record<string, unknown>;
+    const raw = { ...original, body: { ...original.body, snapshot: { ...snapshot, policy: { ...policy, validator: { negativeZero: -0, huge: Infinity, nested: [{ literal: 'original' }], ['__proto__']: 'safe' } } } } };
+    store.read = async (runId, id) => id === raw.id ? raw : read(runId, id);
+    if (mode === 'advertised') store.readDetached = async (runId, id) => { const value = await store.read(runId, id); return value === null ? null : { ...value, body: JSON.parse(JSON.stringify(value.body)) as Record<string, unknown> }; };
+    const operations = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const first = (await operations.inspect('run-A', P.sessionId))!;
+    expect(first.policy.validator).toEqual({ negativeZero: 0, huge: null, nested: [{ literal: 'original' }], ['__proto__']: 'safe' }); expect(Object.is(first.policy.validator['negativeZero'], -0)).toBe(false);
+    (first.policy.validator['nested'] as { literal: string }[])[0]!.literal = 'Caller mutated the projection';
+    expect((await operations.inspect('run-A', P.sessionId))?.policy.validator).toEqual({ negativeZero: 0, huge: null, nested: [{ literal: 'original' }], ['__proto__']: 'safe' });
+    expect((raw.body.snapshot.policy.validator.nested[0] as { literal: string }).literal).toBe('original'); expect(Object.is(raw.body.snapshot.policy.validator.negativeZero, -0)).toBe(true); expect(raw.body.snapshot.policy.validator.huge).toBe(Infinity);
+  });
+  it.each(['operation identity', 'operation schema', 'operation phase', 'session schema', 'session identity', 'session points'])('retains %s refusal on an advertised capture', async issue => {
+    const store = memoryStore(); const read = store.read; const setup = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const P = await setup.create(create); let dispatches = 0;
+    store.readDetached = async (runId, id) => {
+      const value = await read(runId, id); if (!value) return null;
+      if (issue === 'operation identity' && id === 'operation:create') return { ...value, runId: 'other-run' };
+      if (issue === 'operation schema' && id === 'operation:create') return { ...value, schema: 'ramify-agent.session/1' };
+      if (issue === 'operation phase' && id === 'operation:create') return { ...value, body: { ...value.body, phase: 'invented' } };
+      if (issue === 'session schema' && id === `session:${P.sessionId}`) return { ...value, schema: 'ramify-agent.session-operation/1' };
+      if (issue === 'session identity' && id === `session:${P.sessionId}`) return { ...value, body: { ...value.body, snapshot: { ...(value.body['snapshot'] as Record<string, unknown>), runId: 'other-run' } } };
+      if (issue === 'session points' && id === `session:${P.sessionId}`) return { ...value, body: { ...value.body, points: null } };
+      return value;
+    };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    if (issue.startsWith('operation')) await expect(operations.operationIdentity('run-A', 'create')).rejects.toThrow(/Corrupt|Unsupported/);
+    else await expect(operations.inspect('run-A', P.sessionId)).rejects.toThrow(/Corrupt|Unsupported/);
+    expect(dispatches).toBe(0);
+  });
+  it('keeps Stop and actual ignored-signal tool drainage independent of an advertised terminal capture', async () => {
+    const store = memoryStore(); const read = store.read; const entered = deferred(); const release = deferred(); let accepts = 0; let finished = 0;
+    store.readDetached = async (runId, id) => { const value = await read(runId, id); return value === null ? null : { ...value, body: JSON.parse(JSON.stringify(value.body)) as Record<string, unknown> }; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) { await runtime.callTool('pending-owned', 'read', {}); await runtime.submit('late-owned', {}); return { kind: 'ended' }; } } });
+    const P = await operations.create(create); const bound = bindings({ tools: [{ ...tools[0]!, execute: async () => { entered.resolve(); await release.promise; finished++; return { text: 'actual late result' }; } }], submission: { name: task.submissionTool, accept: async () => { accepts++; return { accepted: true }; } } });
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'owned-stop', bound)); await entered.promise;
+    const stopping = handle.stop(); const idle = handle.settled(); const idleEnded = observation(idle);
+    const receipt = await handle.receipt; expect(receipt).toMatchObject({ status: 'stopped', point: null }); await flush(); expect(idleEnded()).toBe(false);
+    expect((await read('run-A', 'operation:owned-stop'))?.body).toMatchObject({ effects: [{ phase: 'intent' }] });
+    release.resolve(); expect(await idle).toEqual(receipt); expect(await stopping).toEqual(receipt); expect(accepts).toBe(0); expect(finished).toBe(1);
+    expect((await read('run-A', 'operation:owned-stop'))?.body).toMatchObject({ effects: [{ phase: 'intent', result: null }], quiescent: true });
+  });
+  it('keeps terminal lookup effect-free while an advertised original owner is still draining publication', async () => {
+    const store = memoryStore(); const read = store.read; const entered = deferred(); const release = deferred(); let dispatches = 0; let publications = 0;
+    store.readDetached = async (runId, id) => { const value = await read(runId, id); return value === null ? null : { ...value, body: JSON.parse(JSON.stringify(value.body)) as Record<string, unknown> }; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    const P = await operations.create(create); const bound = bindings({ publish: async () => { publications++; entered.resolve(); await release.promise; } });
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'owned-publish', bound)); await entered.promise;
+    const original = (await read('run-A', 'operation:owned-publish'))!;
+    expect(original.body['phase']).toBe('terminal'); expect(original.body['quiescent']).not.toBe(true);
+    const replay = await operations.retry({ runId: 'run-A', operationId: 'owned-publish', bindings: bindings({ publish: async () => { throw new Error('Publication must not repeat'); } }) });
+    expect(await replay.receipt).toEqual(original.body['receipt']);
+    const replayIdle = replay.settled(); const idleEnded = observation(replayIdle); await flush(); expect(idleEnded()).toBe(false); expect(dispatches).toBe(1); expect(publications).toBe(1);
+    release.resolve(); expect(await replayIdle).toEqual(await handle.settled()); expect(publications).toBe(1);
+    expect((await read('run-A', 'operation:owned-publish'))?.body['quiescent']).toBe(true);
+  });
+  it('retains fresh owner and physical corruption refusals on the advertised path', async () => {
+    const store = memoryStore(); const read = store.read; let corrupt = false; let handlers = 0;
+    store.readDetached = async (runId, id) => { if (corrupt) throw new Error('Authenticated body corruption'); const value = await read(runId, id); return value === null ? null : { ...value, body: JSON.parse(JSON.stringify(value.body)) as Record<string, unknown> }; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(input, runtime) {
+      const value = (await read(input.key.runId, 'operation:owned-loss'))!;
+      await store.commit({ runId: input.key.runId, expected: [{ id: value.id, revision: value.revision }], records: [{ ...value, revision: value.revision + 1, body: { ...value.body, owner: { token: 'other-owner', pid: 999999 } } }], payloads: [] });
+      await runtime.callTool('unlicensed', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const bound = bindings({ tools: [{ ...tools[0]!, execute: async () => { handlers++; return { text: 'unexpected' }; } }] });
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'owned-loss', bound));
+    expect(await handle.receipt).toMatchObject({ status: 'failed', reason: expect.stringContaining('ownership lost') }); await expect(handle.settled()).rejects.toThrow('Cannot attest quiescence'); expect(handlers).toBe(0);
+    expect((await read('run-A', 'operation:owned-loss'))?.body).toMatchObject({ effects: [], provider: [] });
+    corrupt = true; await expect(operations.operationIdentity('run-A', 'owned-loss')).rejects.toThrow('Authenticated body corruption'); expect(handlers).toBe(0);
+  });
+  it.each(['default', 'advertised'])('keeps scripted parent-loss fencing on the %s store while preserving terminal zero-dispatch lookup', async mode => {
+    const store = memoryStore(); const read = store.read; const captures: string[] = []; let dispatched = 0;
+    if (mode === 'advertised') store.readDetached = async function(runId, id) { expect(this).toBe(store); captures.push(id); const value = await read(runId, id); return value === null ? null : { ...value, body: JSON.parse(JSON.stringify(value.body)) as Record<string, unknown> }; };
+    const agent = createScriptedAgent([], { sessionStore: store, operationScript: () => { dispatched++; return [{ kind: 'end' }]; } }); const operations = agent.sessionOperations!;
+    const P = await operations.create(create); const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'lost-source'))).settled();
+    expect(dispatched).toBe(1); expect(agent.loseSession(end.point!)).toBe(true);
+    const capturedAtLoss = captures.filter(id => id.startsWith('session:')).length;
+    expect(await operations.inspect('run-A', P.sessionId)).toBeNull(); expect(captures.filter(id => id.startsWith('session:')).length).toBe(capturedAtLoss);
+    expect((await operations.fork({ runId: 'run-A', operationId: 'lost-fork', sourcePoint: end.point! })).status).toBe('unavailable');
+    expect((await (await operations.continue(continuation(P.sessionId, end.point!, 'lost-next'))).settled()).status).toBe('unavailable');
+    expect(await (await operations.retry({ runId: 'run-A', operationId: 'lost-source', bindings: bindings() })).settled()).toEqual(end); expect(dispatched).toBe(1);
+    if (mode === 'advertised') expect(captures).toContain('operation:lost-source');
+  });
+});
+
 describe('primitive string encoding with current owning bindings', () => {
   it('retains exact warmed wire bytes for escaped values and prototype-shaped keys while refusing changed content', async () => {
     const store = memoryStore();

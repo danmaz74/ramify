@@ -63,25 +63,26 @@ function errorText(error: unknown): string { return error instanceof Error ? err
 /** Durable provider-independent session lifecycle. The harness injects all persistence. */
 export function createSessionOperations(options: SessionOperationsOptions): SessionOperations {
   const store = options.sessionStore;
+  const detachedRead = store.readDetached?.bind(store);
   const active = new Map<string, Active>();
   const activeKey = (key: SessionOperationKey) => canonical([key.runId, key.operationId]);
   const record = (key: SessionOperationKey, id: string, revision: number, body: unknown, session: boolean): SessionStoreRecord => ({
     runId: key.runId, id, revision, schema: session ? 'ramify-agent.session/1' : 'ramify-agent.session-operation/1', body: clone(body) as Record<string, unknown>,
   });
   async function readOperation(key: SessionOperationKey): Promise<{ record: SessionStoreRecord; body: OperationBody } | null> {
-    const found = await store.read(key.runId, operationRecordId(key.operationId));
+    const found = await (detachedRead ? detachedRead(key.runId, operationRecordId(key.operationId)) : store.read(key.runId, operationRecordId(key.operationId)));
     if (found === null) return null;
     if (found.runId !== key.runId || found.id !== operationRecordId(key.operationId)) throw new Error('Corrupt session operation identity');
     if (found.schema !== 'ramify-agent.session-operation/1') throw new Error('Unsupported session operation schema');
-    const body = clone(found.body) as unknown as OperationBody;
+    const body = (detachedRead ? found.body : clone(found.body)) as unknown as OperationBody;
     if (!['intent', 'dispatched', 'terminal'].includes(body.phase) || typeof body.sessionId !== 'string' || !Array.isArray(body.effects) || !Array.isArray(body.provider)) throw new Error('Corrupt session operation');
     return { record: found, body };
   }
   async function readSession(runId: string, sessionId: string): Promise<{ record: SessionStoreRecord; body: SessionBody } | null> {
-    const found = await store.read(runId, sessionRecordId(sessionId));
+    const found = await (detachedRead ? detachedRead(runId, sessionRecordId(sessionId)) : store.read(runId, sessionRecordId(sessionId)));
     if (found === null) return null;
     if (found.schema !== 'ramify-agent.session/1') throw new Error('Unsupported session schema');
-    const body = clone(found.body) as unknown as SessionBody;
+    const body = (detachedRead ? found.body : clone(found.body)) as unknown as SessionBody;
     if (!body.snapshot || body.snapshot.sessionId !== sessionId || body.snapshot.runId !== runId || !Array.isArray(body.points)) throw new Error('Corrupt session envelope');
     return { record: found, body };
   }

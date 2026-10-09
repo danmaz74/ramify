@@ -29,6 +29,10 @@ export interface SessionStoreExpected { readonly id: string; readonly revision: 
 export interface SessionStoreCommit { readonly runId: string; readonly expected: readonly SessionStoreExpected[]; readonly records: readonly SessionStoreRecord[]; readonly payloads: readonly TranscriptPayloadId[] }
 export interface SessionStore {
   read(runId: string, id: string): Promise<SessionStoreRecord | null>;
+  /** Optional independently owned capture on every call, with identical storage proofs.
+   * Body is normalized exactly as JSON.parse(JSON.stringify(read(...).body)); root and
+   * every nested object/array share no mutable state with the store or another capture. */
+  readDetached?(runId: string, id: string): Promise<SessionStoreRecord | null>;
   putPayload(bytes: Uint8Array): Promise<TranscriptPayloadId>;
   getPayload(id: TranscriptPayloadId): Promise<Uint8Array | null>;
   commit(input: SessionStoreCommit): Promise<{ readonly kind: 'committed' } | { readonly kind: 'conflict'; readonly reason: string }>;
