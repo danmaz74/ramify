@@ -472,7 +472,9 @@
       ],
       "performanceWorker": [
         "subs/harness/src/run/session-store.ts",
-        "subs/harness/src/tests/plan23-session-store-cache.test.ts"
+        "subs/harness/src/tests/plan23-session-store-cache.test.ts",
+        "subs/harness/src/store/lock.ts",
+        "subs/harness/src/tests/lock.test.ts"
       ]
     }
   }
