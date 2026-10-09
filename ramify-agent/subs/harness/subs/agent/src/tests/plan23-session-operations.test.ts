@@ -354,6 +354,54 @@ describe('Plan 23 F1 high-level session operations', () => {
   });
 });
 
+describe('primitive string encoding with current owning bindings', () => {
+  it('retains exact warmed wire bytes for escaped values and prototype-shaped keys while refusing changed content', async () => {
+    const store = memoryStore();
+    const literal = 'line\n"\\😀\ud800';
+    const validator = { ['__proto__']: 'safe', ['quote"key']: literal };
+    const input = { ...create, operationId: 'cache-create', initialInstructions: literal, declarations: [], activate: [], policy: { ...policy, validator } };
+    const operations = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const P = await operations.create(input);
+    expect(await operations.create(input)).toEqual(P);
+    const snapshot = (await operations.inspect('run-A', P.sessionId))!;
+    const bytes = (await store.getPayload(snapshot.transcript[0]!.payloadId))!;
+    expect(new TextDecoder().decode(bytes)).toBe(String.raw`{"activate":[],"declarations":[],"initialInstructions":"line\n\"\\😀\ud800","operationId":"cache-create","policy":{"authority":{"write":true},"context":{"budgetFraction":null,"budgetTokens":null,"compaction":"forbidden","reportReserveTokens":0},"destination":{"record":"A"},"validator":{"__proto__":"safe","quote\"key":"line\n\"\\😀\ud800"}},"runId":"run-A"}`);
+    validator['quote"key'] = 'changed';
+    expect(await operations.create(input)).toMatchObject({ status: 'conflict' });
+    expect((await operations.inspect('run-A', P.sessionId))?.policy.validator).toEqual({ ['__proto__']: 'safe', ['quote"key']: literal });
+  });
+  it('reads a warmed binding getter again after current authority changes its value', async () => {
+    const store = memoryStore(); let value = 'accepted literal'; let reads = 0; let dispatches = 0; let revoke = false; let readsAtAuthority = 0;
+    const validator = Object.defineProperty({}, 'literal', { enumerable: true, get() { reads++; return value; } });
+    const capturedPolicy = { ...policy, validator };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    const P = await operations.create({ ...create, policy: capturedPolicy });
+    const bound = bindings({ policy: capturedPolicy, currentAuthority: async () => { if (revoke) { readsAtAuthority = reads; value = 'revoked literal'; } return true; } });
+    const warm = await (await operations.continue(continuation(P.sessionId, P.point!, 'warm-getter', bound))).settled();
+    expect(warm.status).toBe('completed'); expect(dispatches).toBe(1);
+    revoke = true;
+    const refused = await (await operations.continue(continuation(P.sessionId, warm.point!, 'changed-getter', bound))).settled();
+    expect(refused).toMatchObject({ status: 'failed', reason: expect.stringContaining('bindings differ') });
+    expect(reads).toBeGreaterThan(readsAtAuthority); expect(dispatches).toBe(1);
+    expect((await store.read('run-A', 'operation:changed-getter'))?.body).toMatchObject({ input: { policy: { validator: { literal: 'accepted literal' } } }, effects: [] });
+  });
+  it.each(['entry pressure', 'oversized value'])('retains changed-value refusal after warmed %s', async mode => {
+    const store = memoryStore(); let dispatches = 0; let revoke = false;
+    const original = mode === 'oversized value' ? `${'x'.repeat(600_000)}original` : 'retained selection';
+    const validator = { selected: original, literals: mode === 'entry pressure' ? Array.from({ length: 1_100 }, (_, index) => `distinct-${index}`) : ['known'] };
+    const capturedPolicy = { ...policy, validator };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    const P = await operations.create({ ...create, policy: capturedPolicy });
+    const bound = bindings({ policy: capturedPolicy, currentAuthority: async () => { if (revoke) validator.selected = `${original} changed`; return true; } });
+    const warm = await (await operations.continue(continuation(P.sessionId, P.point!, 'warm-pressure', bound))).settled();
+    expect(warm.status).toBe('completed'); expect(dispatches).toBe(1);
+    revoke = true;
+    const refused = await (await operations.continue(continuation(P.sessionId, warm.point!, 'changed-pressure', bound))).settled();
+    expect(refused).toMatchObject({ status: 'failed', reason: expect.stringContaining('bindings differ') }); expect(dispatches).toBe(1);
+    expect((await store.read('run-A', 'operation:changed-pressure'))?.body).toMatchObject({ input: { policy: { validator: { selected: original, literals: validator.literals } } }, effects: [] });
+  });
+});
+
 describe('ordered opaque provider payload batches', () => {
   it('captures all caller bytes and keys, retains each authority check, and deduplicates in first-entry order', async () => {
     const store = memoryStore(); const put = store.putPayload; const persisted: string[] = []; let authorities = 0;

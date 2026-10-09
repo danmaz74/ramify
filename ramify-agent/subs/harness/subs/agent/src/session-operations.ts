@@ -26,15 +26,36 @@ const ownerControllers = new Map<string, AbortController>();
 const ownerRuntimes = new Map<string, Active>();
 const emptyChange: SessionToolChange = { add: [], activate: [], inactivate: [] };
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+// Only immutable primitive encodings are retained; caller objects are always traversed anew.
+const encodedStrings = new Map<string, string>();
+const encodedStringEntryLimit = 512;
+const encodedStringByteLimit = 1024 * 1024;
+let encodedStringBytes = 0;
+function encodeString(value: string): string {
+  const previous = encodedStrings.get(value);
+  if (previous !== undefined) return previous;
+  const encoded = JSON.stringify(value);
+  const bytes = 2 * (value.length + encoded.length);
+  if (bytes > encodedStringByteLimit) return encoded;
+  while (encodedStrings.size >= encodedStringEntryLimit || encodedStringBytes + bytes > encodedStringByteLimit) {
+    const oldest = encodedStrings.entries().next().value!;
+    encodedStrings.delete(oldest[0]);
+    encodedStringBytes -= 2 * (oldest[0].length + oldest[1].length);
+  }
+  encodedStrings.set(value, encoded);
+  encodedStringBytes += bytes;
+  return encoded;
+}
 /** Canonical JSON binds content, rather than trusting caller-supplied identity strings. */
 function canonical(value: unknown): string {
+  if (typeof value === 'string') return encodeString(value);
   if (value === null || typeof value !== 'object') {
     const result = JSON.stringify(value);
     if (result === undefined) throw new TypeError('Session input must be JSON');
     return result;
   }
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(',')}}`;
+  return `{${Object.keys(value).sort().map(key => `${encodeString(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(',')}}`;
 }
 const equal = (a: unknown, b: unknown) => canonical(a) === canonical(b);
 function errorText(error: unknown): string { return error instanceof Error ? error.message : String(error); }
