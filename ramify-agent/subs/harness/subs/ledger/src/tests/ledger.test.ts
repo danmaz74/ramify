@@ -20,6 +20,8 @@ describe('one line is one transaction', () => {
     expect(ledger.replay()).toEqual([]);
     expect(ledger.pendingEffects()).toEqual([]);
     expect(ledger.committedContentHash).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+    expect(ledger.matchesCommittedContent(new Uint8Array())).toBe(true);
+    expect(ledger.matchesCommittedContent(new Uint8Array([0]))).toBe(false);
   });
 
   test('an append writes one line holding the event and every record body', async () => {
@@ -83,10 +85,14 @@ describe('owned complete-byte integrity', () => {
     expect(ledger.version).toBe(1);
     expect(ledger.committedContentHash).toBe(createHash('sha256').update(complete).digest('hex'));
     expect(await readFile(logOf(), 'utf8')).toBe(complete);
+    expect(ledger.matchesCommittedContent(Buffer.from(complete))).toBe(true);
+    expect(ledger.matchesCommittedContent(Buffer.from(`${complete}{"sequence":2`))).toBe(false);
     await ledger.append(transaction(2));
     const bytes = await readFile(logOf());
     expect(bytes.subarray(0, Buffer.byteLength(complete)).toString()).toBe(complete);
     expect(ledger.committedContentHash).toBe(createHash('sha256').update(bytes).digest('hex'));
+    expect(ledger.matchesCommittedContent(bytes)).toBe(true);
+    expect(ledger.matchesCommittedContent(Buffer.from(complete))).toBe(false);
     expect((await testLedger(directory.path)).committedContentHash).toBe(ledger.committedContentHash);
   });
 
@@ -100,6 +106,8 @@ describe('owned complete-byte integrity', () => {
     expect(foreign).not.toBe(bytes);
     await writeFile(logOf(), foreign);
     expect(ledger.committedContentHash).toBe(owned);
+    expect(ledger.matchesCommittedContent(Buffer.from(bytes))).toBe(true);
+    expect(ledger.matchesCommittedContent(await readFile(logOf()))).toBe(false);
     expect(createHash('sha256').update(await readFile(logOf())).digest('hex')).not.toBe(owned);
   });
 
@@ -112,10 +120,28 @@ describe('owned complete-byte integrity', () => {
     }));
     await expect(failing.append(transaction(2))).rejects.toThrow(`unknown ${phase} completion`);
     expect(failing.committedContentHash).toBe(owned);
+    expect(failing.matchesCommittedContent(await readFile(logOf()))).toBe(phase === 'write');
     expect(failing.version).toBe(1);
     const recovered = await testLedger(directory.path);
     expect(recovered.version).toBe(phase === 'write' ? 1 : 2);
     expect(recovered.committedContentHash).toBe(createHash('sha256').update(await readFile(logOf())).digest('hex'));
+    expect(recovered.matchesCommittedContent(await readFile(logOf()))).toBe(true);
+  });
+
+  test('byte comparisons respect a supplied view and retain no caller-owned bytes', async () => {
+    const ledger = await testLedger(directory.path);
+    await ledger.append(transaction(1));
+    const original = await readFile(logOf());
+    const padded = Buffer.concat([Buffer.from('prefix'), original, Buffer.from('suffix')]);
+    const view = new Uint8Array(padded.buffer, padded.byteOffset + 6, original.byteLength);
+    expect(ledger.matchesCommittedContent(view)).toBe(true);
+    view[0] = 0;
+    expect(ledger.matchesCommittedContent(view)).toBe(false);
+    expect(ledger.matchesCommittedContent(original)).toBe(true);
+    const copy = Buffer.from(original);
+    await ledger.append(transaction(2));
+    expect(ledger.matchesCommittedContent(copy)).toBe(false);
+    expect(ledger.matchesCommittedContent(await readFile(logOf()))).toBe(true);
   });
 });
 

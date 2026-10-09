@@ -66,6 +66,10 @@ export interface Ledger<E> {
    * until a fresh replay; later advisory materialization can fail after commit.
    */
   readonly committedContentHash: string;
+  /** Compares all supplied bytes to the exact owned complete prefix. Neither
+   * reads disk nor adopts or retains any supplied bytes as authoritative.
+   */
+  matchesCommittedContent(bytes: Uint8Array): boolean;
   /** Appends one line holding the whole transaction, flushed before it resolves, then materializes its records. */
   append(transaction: Transaction<E>): Promise<{ readonly sequence: number; readonly at: string }>;
   /** Every complete line, in order. */
@@ -202,6 +206,8 @@ export async function openLedger<E>(options: OpenLedgerOptions<E>): Promise<Ledg
   let logBytes = loaded.completeBytes;
   const content = createHash('sha256').update(loaded.completeContent);
   let committedContentHash = content.copy().digest('hex');
+  const committedChunks: Buffer[] = [Buffer.from(loaded.completeContent)];
+  let committedBytes: Buffer | null = committedChunks[0]!;
 
   /** Appends are serialized here; the chain also carries a failure to its caller only. */
   let queue: Promise<unknown> = Promise.resolve();
@@ -245,6 +251,8 @@ export async function openLedger<E>(options: OpenLedgerOptions<E>): Promise<Ledg
     lines.push(line);
     content.update(bytes);
     committedContentHash = content.copy().digest('hex');
+    committedChunks.push(Buffer.from(bytes));
+    committedBytes = null;
     return line;
   }
 
@@ -280,6 +288,14 @@ export async function openLedger<E>(options: OpenLedgerOptions<E>): Promise<Ledg
 
   const ledger: Ledger<E> = {
     get committedContentHash() { return committedContentHash; },
+    matchesCommittedContent(bytes) {
+      if (bytes.byteLength !== logBytes) return false;
+      if (committedBytes === null) {
+        committedBytes = Buffer.concat(committedChunks, logBytes);
+        committedChunks.splice(0, committedChunks.length, committedBytes);
+      }
+      return committedBytes.equals(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+    },
     get version() {
       return lines.at(-1)?.sequence ?? 0;
     },
