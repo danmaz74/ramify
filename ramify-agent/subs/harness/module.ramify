@@ -86,3 +86,13 @@ expose-sub SessionStore, SessionStoreRecord, SessionStoreCommit, SessionStoreExp
 
 // Fixed live qualification owns its runtime; root receives plain options/results.
 expose-src runPlan23LiveSession, Plan23LiveSessionOptions, Plan23LiveSessionResult from "qualification/live-session.ts" to parent
+
+// Review evidence uses the existing candidate and tool ports through parent composition.
+expose-sub CandidateSource, TreeEntry, TreeMatch, commitTree, treeEntries, readBlob, grepTree, diffPatch, diffNameStatus from evidence to descendants
+expose-sub JsonSchema, ToolAction, ToolDefinition, ToolResult, LineRange from agent to descendants
+expose-sub checkFindingIdSchema, checkFindingLocationSchema, checkFindingRiskSchema from check-findings to descendants
+expose-sub deviationNotice from plan-evidence to descendants
+expose-src schemaErrors, SubmissionError, SubmissionValidation from "run/submissions.ts" to descendants
+expose-src canonicalJson from "jobs/commands.ts" to descendants
+expose-test scriptedCandidates, ScriptedCommit, ScriptedCandidates from "helpers/candidates.ts" to descendants
+expose-test scratchCandidateReplies from "helpers/scratch-candidate-replies.ts" to descendants

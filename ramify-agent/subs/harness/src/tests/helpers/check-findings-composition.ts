@@ -4,7 +4,7 @@ import type { CheckFindingSummary } from '../../../subs/check-findings/src/inter
 import type { RunEvent } from '../../run/log.js';
 import type { RunPolicy } from '../../run/records.js';
 import type { RunService } from '../../run/service.js';
-import { snapshotToolNames } from '../../reviews/snapshot.js';
+import { snapshotToolNames } from '../../../subs/reviews/src/snapshot.js';
 import { analysis, entry, requestCompletion } from './analysis.js';
 import type { ScriptedCommit } from './candidates.js';
 import type { GateCommit } from './gate-git.js';

@@ -9,7 +9,7 @@ import { carriedCheckFindings, type RunEvent } from '../run/log.js';
 import type { ReconciliationBasis } from '../reviews/reconciliation.js';
 import { runLayout, type RunPolicy } from '../run/records.js';
 import { reconciliationLayout } from '../reviews/reconciliation.js';
-import { snapshotToolNames } from '../reviews/snapshot.js';
+import { snapshotToolNames } from '../../subs/reviews/src/snapshot.js';
 import {
   compositionCommits, compositionGates, compositionScenario, compositionTarget, concerns, disposition, principles, reconcile, review, submission, summariesOf, tagLimit,
   tags, tagsReadme,

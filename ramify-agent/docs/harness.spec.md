@@ -190,6 +190,29 @@ usage, start modes and exploration. [Session observations](metrics/session-obser
 describes access and coverage. These are inputs for Dan's benefit assessment;
 implementation and qualification require no benefit trial or performance gate.
 
+### Review Patch Delivery
+
+The harness child `reviews` prepares fixed candidate evidence and validates reviewer
+submissions; harness retains agent invocation, cancellation, durable records and
+CheckFinding coordination. Its preparation API binds delivered patches and observed
+tool answers to one validator.
+
+Before invoking a code, scope or design reviewer, collect patches through the
+candidate source between the request's fixed base and audited candidate. Apply
+the same snapshot path restrictions as the review tools. Include complete
+patches inline when their combined UTF-8 size is at most 200 KiB. Once collection
+exceeds that budget, stop acquiring further patches and deliver a name-status
+summary capped at 200 entries, with explicit omissions. Reviewers obtain the
+needed per-file patches through `snapshot_diff` against the same fixed commits.
+The complete canonical changed-path list remains supplied separately.
+
+Record the diff payload once as a literal delivered input, including its hash
+and byte count in the invocation's delivery manifest. A complete patch delivered
+in the current review message can establish inspection coverage without another
+tool call. A summary, unavailable patch or omitted patch cannot. Concern grounds
+still require a file read with `snapshot_read` during that review. Patch collection
+supplies evidence; it makes no judgment about correctness, scope or design.
+
 ### Principles And Specifications Are Captured And Sealed
 
 The harness captures applicable `.principles.md` documents as sources of fixed

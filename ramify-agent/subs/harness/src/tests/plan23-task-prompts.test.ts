@@ -378,7 +378,9 @@ describe('P04: manifests reflect supplied/inherited instructions and truthful re
     expect(packet.message).toContain('Reuse earlier understanding');
     expect(packet.message).toContain('Refresh guidance whose identity changed');
     expect(packet.message).toContain('current `snapshot_read` evidence');
-    expect(packet.message).toContain('read each patch');
+    expect(packet.message).toContain('Read the complete patches supplied in this message');
+    expect(packet.message).toContain('Fetch patches with `snapshot_diff` only for paths whose complete patches');
+    expect(packet.message).toContain('patch summary or omitted patch');
     expect(packet.roleInstructions).not.toContain('This session may begin with an earlier conversation');
     expect(stableRoleInstructions(loaded)).toBe(buildTaskPacket(input(loaded, 'design-orientation')).roleInstructions);
     expect(() => buildTaskPacket({ ...input(loaded, 'code'), environment: { ...environment(), snapshot: null } })).toThrow('snapshot');

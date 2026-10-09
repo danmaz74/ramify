@@ -5,7 +5,7 @@ import { startServerWith } from '../../http/server.js';
 import { protocolPaths } from '../../interfaces/protocol/paths.js';
 import { commandResponseSchema } from '../../interfaces/protocol/jobs.js';
 import { checkFindingDetailSchema } from '../../interfaces/protocol/check-findings.js';
-import { snapshotToolNames } from '../../reviews/snapshot.js';
+import { snapshotToolNames } from '../../../subs/reviews/src/snapshot.js';
 import { scriptedCandidates, testReviewPolicy, type ScriptedCommit } from './candidates.js';
 import { concern, disposition, reconcile, review, submission } from './check-findings-composition.js';
 import { declaringScenarios } from './declarations.js';

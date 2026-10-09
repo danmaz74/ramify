@@ -18,7 +18,7 @@ import { ExcursionWatcher } from '../run/excursions.js';
 import { ObservationLog } from '../run/observations.js';
 import { PortEventRecorder } from '../run/port-events.js';
 import { runLayout } from '../run/records.js';
-import { openCandidateSnapshot, snapshotTools } from '../reviews/snapshot.js';
+import { openCandidateSnapshot, snapshotTools } from '../../subs/reviews/src/snapshot.js';
 import { scriptedCandidates } from './helpers/candidates.js';
 import { temporaryDirectory } from './helpers/fixture.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';

@@ -839,7 +839,12 @@ redelivery of a report appends nothing. The state and its key indexes are
 replayed from the log after a restart; the record copies are materialized
 like any other record.
 
-`src/reviews/` holds iteration reviews (Plan 12). Every iteration that
+The `reviews` child owns fixed candidate snapshots and tools, bounded diff
+payloads, design guidance, review briefings and reviewer submission validation.
+Its `prepareReview` API returns the briefing, tools and a validator bound to
+that attempt's delivered patches and actual tool answers. `src/reviews/` retains
+durable review envelopes, scheduling, run-log projections, concern provenance
+and work-item reconciliation. Every iteration that
 closes accepted after an engineer's passing gate has one request per review
 question, code, scope and design, recorded before the driver passes it,
 keyed by the iteration, its audited commit, the question and the review

@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 import type { ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
 import type { CandidateSource } from '../../subs/evidence/src/git.js';
-import { snapshotTools } from '../reviews/snapshot.js';
+import { snapshotTools } from '../../subs/reviews/src/snapshot.js';
 import { z } from 'zod';
 import { assessmentCoverage, assessmentResultSchema, assessmentSchema, type Assessment, type Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 import type { RoundDecision } from '../../subs/nonfunctional/src/rounds.js';

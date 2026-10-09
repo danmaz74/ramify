@@ -7,7 +7,7 @@ import type { ProvisionalSourceGit } from '../../subs/evidence/src/provisional-g
 import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
 import { lstat, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, posix, relative, resolve, sep } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart, ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
 import { gitCandidateSource, gitChangeHistory, gitService, type CandidateSource, type ChangeHistory, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
@@ -62,16 +62,18 @@ import {
   type ForkPoint, type NotVerifiedReason, type OrientationSubmission, type ReviewAttempt, type ReviewOrientation, type ReviewRequest,
   type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
 } from '../reviews/records.js';
-import { orientationKey, readGuidance, type CapturedInput } from '../reviews/inputs.js';
-import { orientationMessage, pendingBindingEvidence, reviewMessage } from '../reviews/message.js';
+import { orientationKey, readGuidance, type CapturedInput } from '../../subs/reviews/src/inputs.js';
+import { orientationMessage } from '../../subs/reviews/src/message.js';
+import { pendingBindingEvidence } from '../reviews/binding-evidence.js';
+import { prepareReview, type PreparedReview } from '../../subs/reviews/src/preparation.js';
 import { ReviewQueue } from '../reviews/scheduler.js';
 import { candidateModuleIndex, concernModules, groundCredibility } from '../reviews/signals.js';
-import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotTools } from '../reviews/snapshot.js';
+import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotTools } from '../../subs/reviews/src/snapshot.js';
 import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage } from '../reviews/state.js';
 import {
   orientationJsonSchema, orientationSubmissionDescription, orientationToolName, reviewJsonSchema, reviewSubmissionDescription,
-  reviewToolName, validateOrientation, validateReview,
-} from '../reviews/submission.js';
+  reviewToolName, validateOrientation,
+} from '../../subs/reviews/src/submission.js';
 import type { AcceptedCommand, Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { FailureAnalysis, Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
@@ -666,6 +668,8 @@ class Run {
   done: Promise<void> = Promise.resolve();
   /** The run's review readers, once it reviews; undefined for a run whose policy requests none. */
   reviews: ReviewQueue | undefined;
+  /** Patch preparation belongs to its review request and stops with its readers. */
+  readonly reviewPreparations = new Map<string, AbortController>();
   /** Why the run stopped its readers, which a reader stopped for it records as its attempt's reason. */
   readerStop: NotVerifiedReason | undefined;
   /** When the run's reviews must be settled by, once its final settlement began; epoch milliseconds. */
@@ -1237,7 +1241,50 @@ export class RunService {
     const pendingBindings = await this.reviewPendingBindings(run, request, snapshot);
     const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, request.assignment));
     const held = selectCheckFindings(checkFindingStateOf(run.log.ledger), { kind: 'list', owner: { kind: 'work-item', workItem: request.workItem }, select: 'all', limit: 100 });
-    const tools = snapshotTools(snapshot, this.candidates, this.projectRoot);
+    // Binding reads may yield while this request is stopped or settled. Do
+    // not register preparation after its cancellation sweep has already run.
+    if (this.ignoring(run) || run.reviews?.accepting !== true || reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
+    let prepared: PreparedReview;
+    const preparation = new AbortController();
+    const preparationStarted = Date.now();
+    const preparationTimer = setTimeout(() => preparation.abort(new Error('Review patch preparation exceeded its attempt bound')), policy.attemptMs);
+    preparationTimer.unref?.();
+    run.reviewPreparations.set(id, preparation);
+    try {
+      prepared = await prepareReview({
+        source: this.candidates,
+        projectRoot: this.projectRoot,
+        signal: preparation.signal,
+        maxConcerns: policy.maxConcerns,
+        briefing: {
+          request: {
+            id: request.id, key: { kind, iteration: request.key.iteration, candidate: request.key.candidate },
+            workItem: request.workItem, base: request.base, tree: request.tree, gate: request.gate, guidance: request.guidance,
+          },
+          snapshot,
+          pendingBindings,
+          assignment: assignment.success ? {
+            goal: assignment.data.goal, approach: assignment.data.approach, completionEvidence: assignment.data.completionEvidence,
+            scopeRationale: assignment.data.scope.rationale,
+            testAreas: assignment.data.scope.resolved.ownership.modules.filter(module => assignment.data.gate.tests.exactOwners.includes(module.id)
+              || assignment.data.gate.tests.subtrees.some(owner => module.id === owner || module.id.startsWith(`${owner}/`)))
+              .map(module => posix.join(module.directory, 'src/tests')),
+          } : null,
+          checkFindings: held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [],
+          ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
+          ...(kind === 'design' ? {} : { setup: await this.checkInputSection(run, snapshot) }),
+          planDocument: snapshot.entries.get(planPath(run.record.planId))?.kind === 'file' ? planPath(run.record.planId) : null,
+        },
+      });
+    }
+    catch (error) {
+      if (this.ignoring(run) || run.reviews?.accepting !== true || reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
+      return await unavailable(`The audited candidate's patches could not be collected: ${message(error)}`) === 'committed';
+    } finally {
+      clearTimeout(preparationTimer);
+      run.reviewPreparations.delete(id);
+    }
+    if (this.ignoring(run) || run.reviews?.accepting !== true || reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
     const workspace = run.path(join(dirname(reviewLayout.attempt(attempt)), 'workspace'));
     await mkdir(workspace, { recursive: true });
 
@@ -1246,21 +1293,14 @@ export class RunService {
     let fenced = false;
     const result = await this.runInvocation<ReviewSubmission>(run, agent, {
       role: 'reviewer', task: { kind, goal: `Review ${request.key.candidate}`, requirements: [JSON.stringify(request)], candidate: request.key.candidate, snapshot: snapshot.tree, views: [],
-        ...(assignmentPackage === undefined ? {} : { omit: [assignmentPackage], literalSections: [{ key: 'support:assignment-package', text: assignmentPackage }] }) },
+        omit: [...(assignmentPackage === undefined ? [] : [assignmentPackage]), prepared.candidateDiff],
+        literalSections: [...(assignmentPackage === undefined ? [] : [{ key: 'support:assignment-package', text: assignmentPackage }]),
+          { key: 'support:candidate-diff', text: prepared.candidateDiff }] },
       work: { workItem: request.workItem, iteration: request.key.iteration },
       attempt: state.attempts.length + 1,
       loaded,
       systemPrompt: renderReviewerPrompt(loaded, '(no working directory: the audited candidate only)', kind),
-      prompt: reviewMessage({
-        request,
-        snapshot,
-        pendingBindings,
-        assignment: assignment.success ? assignment.data : null,
-        checkFindings: held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [],
-        ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
-        ...(kind === 'design' ? {} : { setup: await this.checkInputSection(run, snapshot) }),
-        planDocument: snapshot.entries.get(planPath(run.record.planId))?.kind === 'file' ? planPath(run.record.planId) : null,
-      }),
+      prompt: prepared.message,
       start: start.start,
       ...(start.fork === undefined ? {} : { fork: start.fork }),
       ...(start.degraded === undefined ? {} : { degraded: start.degraded }),
@@ -1268,13 +1308,13 @@ export class RunService {
       description: reviewSubmissionDescription,
       inputSchema: reviewJsonSchema,
       submissionSchema: 'ramify-agent.review-submission/1',
-      validate: input => validateReview(input, { snapshot, inspected: tools.inspected(), read: tools.read(), maxConcerns: policy.maxConcerns }),
+      validate: prepared.validate,
       keep: () => finished('work-closed'),
       scope: { write: null, measurement: null, size: null },
       reader: true,
       workingDirectory: workspace,
-      absoluteMs: policy.attemptMs,
-      equip: () => ({ builtinTools: [], tools: [...tools.definitions] }),
+      absoluteMs: Math.max(1, policy.attemptMs - (Date.now() - preparationStarted)),
+      equip: () => ({ builtinTools: [], tools: [...prepared.tools.definitions] }),
       // The start is recorded only for a request still unsettled, under the
       // mutex its deadline settles it under; a settled one's reader never starts.
       onStarted: async (invocation, session) => {
@@ -1308,7 +1348,7 @@ export class RunService {
     // transition takes the run mutex.
     const bindings = submission === undefined || submission.concerns.length === 0
       ? []
-      : await this.concernBindings(run, request, snapshot, tools, submission);
+      : await this.concernBindings(run, request, snapshot, prepared.tools, submission);
     const committed = await this.finishReview(run, request, attemptBody, outcome.result, settles, submission, bindings);
     return committed === 'committed';
   }
@@ -1737,6 +1777,7 @@ export class RunService {
         ? `${workItem}'s reviews had to settle by its completion request plus the settlement bound; this attempt was still running, and its reader was stopped`
         : `${workItem}'s reviews had to settle by its completion request plus the settlement bound; this review had not run`,
     }), unsettled.map(request => request.id));
+    for (const request of unsettled) run.reviewPreparations.get(request.id)?.abort();
     const readers = running.flatMap(invocation => {
       const live = run.live.get(invocation);
       return live === undefined ? [] : [live];
@@ -3298,6 +3339,7 @@ export class RunService {
   private async stopReaders(run: Run, reason: NotVerifiedReason, grace: number, writer = false): Promise<boolean> {
     run.readerStop ??= reason;
     run.reviews?.close();
+    for (const preparation of run.reviewPreparations.values()) preparation.abort();
     const sessions = run.sessions(live => writer || live.reader);
     let timer: NodeJS.Timeout | undefined;
     const settled = sessions.length === 0 || await Promise.race([
@@ -11980,6 +12022,7 @@ export class RunService {
       for (const run of active) {
         run.readiness?.controller.abort();
         run.reviews?.close();
+        for (const preparation of run.reviewPreparations.values()) preparation.abort();
         for (const session of run.sessions()) void session.stop().catch(() => undefined);
         run.notify();
       }

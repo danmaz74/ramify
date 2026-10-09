@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ScriptStep } from '../../subs/agent/src/scripted.js';
 import { reviewLayout } from '../reviews/records.js';
-import { snapshotToolNames } from '../reviews/snapshot.js';
+import { snapshotToolNames } from '../../subs/reviews/src/snapshot.js';
 import type { scriptedCandidates } from './helpers/candidates.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { completionProposed, submit, write } from './helpers/iterations.js';
@@ -200,7 +200,9 @@ describe('CF04: invalid, timed-out and unavailable reviews are not verified', ()
     const root = await reviewTarget(cleanups);
     const malformed: ScriptStep[] = [
       { kind: 'submit', input: { inspected: [], concerns: [] } },
-      { kind: 'submit', input: { inspected: [store], missing: [], concerns: [] } },
+      // The supplied store patch is valid inspection evidence; an unrelated
+      // path still cannot satisfy this candidate's changed-path coverage.
+      { kind: 'submit', input: { inspected: [limit], missing: [], concerns: [] } },
       { kind: 'submit', input: { verdict: 'looks fine' } },
     ];
     let source!: ReturnType<typeof scriptedCandidates>;

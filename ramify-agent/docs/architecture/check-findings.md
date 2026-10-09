@@ -754,14 +754,15 @@ expose-src applyCheckFindingEvent from "replay.ts" to parent
 expose-src selectCheckFindings from "queries.ts" to parent
 ```
 
-Use ordinary internal harness folders for `reviews/` and CheckFinding producer
-integration. Extend its run events/layout/projections and existing local
-architect submissions: `iteration-assigned` gains the local architect's
-session ref at assignment, and the event that commits a `request-completion`
-submission records the ref after it, so both fork points are durable. `checks/` supplies factual producer evidence;
-`work/engineer-equipment.ts` integrates the later seal hook. No source is moved
-merely to establish the new child, and existing gate attempts retain their
-formats until a concrete integration needs a versioned extension.
+The harness child `reviews` owns mechanical review preparation: fixed candidate
+snapshots and tools, bounded patch delivery, captured guidance, briefings and
+reviewer submission validation. Harness retains review scheduling, run-log
+projections, durable record envelopes and CheckFinding producer integration.
+Its run events retain both local architect fork points: the session ref at
+`iteration-assigned` and the ref after a committed `request-completion`
+submission. `checks/` supplies factual producer evidence;
+`work/engineer-equipment.ts` integrates the seal hook. Existing gate attempts
+retain their formats until a concrete integration needs a versioned extension.
 
 The child owns its domain API. The harness separately owns browser-safe wire
 projections in `src/interfaces/protocol/check-findings.ts`, including bounded CheckFinding

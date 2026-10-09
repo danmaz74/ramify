@@ -9,7 +9,7 @@ import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
 import { reconciliationLayout, type ReconciliationAssessment, type ReconciliationBasis } from '../reviews/reconciliation.js';
-import { snapshotToolNames } from '../reviews/snapshot.js';
+import { snapshotToolNames } from '../../subs/reviews/src/snapshot.js';
 import { requestCompletion } from './helpers/analysis.js';
 import { scriptedCandidates, testReviewPolicy, type ScriptedCommit } from './helpers/candidates.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
-import type { CandidateSource } from '../../subs/evidence/src/git.js';
-import { canonicalJson } from '../jobs/commands.js';
+import type { CandidateSource } from '../../evidence/src/git.js';
+import { canonicalJson } from '../../../src/jobs/commands.js';
 import { resolveSnapshotPath, type CandidateSnapshot } from './snapshot.js';
 
 /*

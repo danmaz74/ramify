@@ -23,7 +23,7 @@ import { forkDecision, forkDeviation, forkNothingPossible, registryChange, unres
 import { installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun, testPolicy, until } from './helpers/runs.js';
 import { assign, byRole, completionProposed, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { eventsOf, limit, notes, notesDirectory, plan as reviewPlan, reviewRun, reviewTarget, store, tool } from './helpers/reviews.js';
-import { snapshotToolNames } from '../reviews/snapshot.js';
+import { snapshotToolNames } from '../../subs/reviews/src/snapshot.js';
 import { reviewLayout, type ReviewRequest } from '../reviews/records.js';
 import { assertUnchangedGit, openUnchangedRuns as openRuns } from './helpers/unchanged-run.js';
 

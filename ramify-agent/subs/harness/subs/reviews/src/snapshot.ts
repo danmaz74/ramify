@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { posix, resolve } from 'node:path';
 import { z } from 'zod';
-import type { JsonSchema, ToolAction, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
-import type { CandidateSource, TreeEntry } from '../../subs/evidence/src/git.js';
+import type { JsonSchema, ToolAction, ToolDefinition, ToolResult } from '../../agent/src/interfaces/port.js';
+import type { CandidateSource, TreeEntry } from '../../evidence/src/git.js';
 
 /*
  * A reviewer's only view of the project: one audited candidate, served from

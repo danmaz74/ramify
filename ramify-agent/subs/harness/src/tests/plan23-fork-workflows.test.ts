@@ -6,7 +6,7 @@ import { createScriptedAgent, type SessionScript } from '../../subs/agent/src/sc
 import type { SessionDriverInvocation } from '../../subs/agent/src/interfaces/session-operations.js';
 import type { LoadedPackage } from '../prompts/packages.js';
 import { HarnessSessionOperations, readSessionPointReference, type HarnessOperationInput } from '../run/session-operations.js';
-import { orientationKey } from '../reviews/inputs.js';
+import { orientationKey } from '../../subs/reviews/src/inputs.js';
 import { runSessionScenario } from './helpers/session-scenario.js';
 import { runLayout } from '../run/records.js';
 import { architectureLayout, placementRequestSchema } from '../architecture/records.js';

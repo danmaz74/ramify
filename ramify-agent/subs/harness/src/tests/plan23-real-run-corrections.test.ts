@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { pendingBindingEvidence } from '../reviews/message.js';
+import { pendingBindingEvidence } from '../reviews/binding-evidence.js';
 import { ScriptedCli } from '../../subs/evidence/src/tests/helpers/scripted-cli.js';
 import { changedDocument } from './helpers/check-payloads.js';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';

@@ -10,7 +10,7 @@ import { capabilityEngineerJsonSchema, engineerJsonSchema, engineerSubmissionKin
 import { capabilityActionSchema } from '../capability/submission.js';
 import { forkJsonSchema, forkSubmissionKinds, forkToolName } from '../architecture/submission.js';
 import { contractJsonSchema, contractSubmissionKinds, contractToolName } from '../contracts/submission.js';
-import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToolName } from '../reviews/submission.js';
+import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToolName } from '../../subs/reviews/src/submission.js';
 import { reconciliationJsonSchema, reconciliationToolName } from '../reviews/reconciliation.js';
 import { failureAnalysisJsonSchema, failureAnalysisToolName } from '../work/failure.js';
 import { contextSelectorJsonSchema, contextSelectorToolName, workOrientationJsonSchema, workOrientationToolName } from '../context-selection/submissions.js';

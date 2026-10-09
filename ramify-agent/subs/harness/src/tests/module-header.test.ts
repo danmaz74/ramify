@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { candidateModuleIndex } from '../reviews/signals.js';
 import { parseModuleHeader } from '../run/module-header.js';
 import { moduleTestAreas } from '../run/project-config.js';
-import { openCandidateSnapshot } from '../reviews/snapshot.js';
+import { openCandidateSnapshot } from '../../subs/reviews/src/snapshot.js';
 import { scriptedCandidates } from './helpers/candidates.js';
 import { temporaryDirectory } from './helpers/fixture.js';
 import { readDeclaredTree } from './helpers/iterations.js';

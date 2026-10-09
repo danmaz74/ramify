@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
-import { ReviewQueue } from '../reviews/scheduler.js';
-import { openCandidateSnapshot, resolveSnapshotPath, snapshotToolNames, snapshotTools } from '../reviews/snapshot.js';
-import { validateReview } from '../reviews/submission.js';
-import { scriptedCandidates } from './helpers/candidates.js';
+import { openCandidateSnapshot, resolveSnapshotPath, snapshotToolNames, snapshotTools } from '../snapshot.js';
+import { validateReview } from '../submission.js';
+import { scriptedCandidates } from '../../../../src/tests/helpers/candidates.js';
 
 /*
  * The parts of a review that need no run: path resolution in a candidate,
@@ -151,58 +150,45 @@ describe('a reviewer\'s submission', () => {
     expect(errors({ ...clean, concerns: [{ ...concern('src/a.ts'), credibility: 'human-reviewed', modules: ['project/other'] }] }))
       .toEqual([expect.stringMatching(/^concerns\.0: .*credibility.*modules/u)]);
   });
-});
 
-describe('the bounded queue of readers', () => {
-  test('starts at most its concurrency, overflows beyond its queue, retries an unsettled request and parks a fenced one', async () => {
-    const unsettled = ['rq-1', 'rq-2', 'rq-3', 'rq-4', 'rq-5'];
-    const started: string[] = [];
-    const overflowed: string[] = [];
-    const releases = new Map<string, () => void>();
-    const results = new Map<string, boolean>([['rq-2', false]]);
-    let attempts = 0;
-    const queue = new ReviewQueue({
-      concurrency: 2,
-      queue: 2,
-      unsettled: () => unsettled,
-      attempt: async request => {
-        attempts += 1;
-        started.push(request);
-        await new Promise<void>(resolve => releases.set(request, resolve));
-        const committed = results.get(request) ?? true;
-        // A committed attempt settles its request unless the test keeps it for a retry.
-        if (committed && request !== 'rq-1') unsettled.splice(unsettled.indexOf(request), 1);
-        return committed;
-      },
-      overflow: async request => {
-        overflowed.push(request);
-        unsettled.splice(unsettled.indexOf(request), 1);
-      },
-      warn: () => undefined,
+  test('accepts inspected paths with complete prompt patches, but not paths merely listed or omitted', async () => {
+    const { snapshot: candidate } = await snapshot();
+    const evidence = {
+      snapshot: candidate,
+      inspected: new Set(['src/b.ts']),
+      deliveredPatches: new Set(['src/a.ts', 'src/gone.ts', 'README.md']),
+      read: new Map<string, string>(),
+      maxConcerns: 5,
+    };
+    const complete = { inspected: ['./src/a.ts', 'src/gone.ts', 'src/b.ts'], missing: [], concerns: [] };
+    // Delivered patches and tool answers can cover the same attempt, including a deleted file.
+    expect(validateReview(complete, evidence)).toEqual({ ok: true, value: complete });
+
+    // The canonical changed-path list does not prove its patches were supplied.
+    const omitted = validateReview(complete, { ...evidence, deliveredPatches: new Set(['src/a.ts']) });
+    expect(omitted).toMatchObject({ ok: false, errors: [{ path: 'inspected.1', message: expect.stringContaining('no complete patch was delivered') }] });
+    expect(validateReview({ ...complete, inspected: ['./src/a.ts', 'src/b.ts'], missing: [{ path: 'src/gone.ts', reason: 'Only a summary was supplied' }] },
+      { ...evidence, deliveredPatches: new Set(['src/a.ts']) })).toMatchObject({ ok: true });
+
+    // Delivery never makes an unchanged file part of the review's changed scope.
+    expect(validateReview({ ...complete, inspected: [...complete.inspected, 'README.md'] }, evidence))
+      .toMatchObject({ ok: false, errors: [{ path: 'inspected.3', message: expect.stringContaining('not a path the candidate changed') }] });
+  });
+
+  test('a delivered patch does not satisfy a concern ground without a current snapshot_read', async () => {
+    const { snapshot: candidate } = await snapshot();
+    const evidence = {
+      snapshot: candidate,
+      inspected: new Set<string>(),
+      deliveredPatches: new Set(['src/a.ts', 'src/gone.ts', 'src/b.ts']),
+      read: new Map<string, string>(),
+      maxConcerns: 5,
+    };
+    const submission = { inspected: ['src/a.ts', 'src/gone.ts', 'src/b.ts'], missing: [], concerns: [concern('src/a.ts', { path: 'src/a.ts' })] };
+    expect(validateReview(submission, evidence)).toMatchObject({
+      ok: false,
+      errors: [{ path: 'concerns.0.ground.path', message: expect.stringContaining('was not read with snapshot_read') }],
     });
-    queue.wake();
-    // Two run, two wait, and the fifth has no room.
-    expect(started).toEqual(['rq-1', 'rq-2']);
-    await new Promise(resolve => setTimeout(resolve, 0));
-    expect(overflowed).toEqual(['rq-5']);
-    expect(queue.active).toEqual(['rq-1', 'rq-2']);
-
-    // rq-1's attempt did not settle it: it is retried, oldest request first.
-    releases.get('rq-1')!();
-    await new Promise(resolve => setTimeout(resolve, 0));
-    expect(started).toEqual(['rq-1', 'rq-2', 'rq-1']);
-    unsettled.splice(unsettled.indexOf('rq-1'), 1);
-    releases.get('rq-1')!();
-    // rq-2's attempt committed nothing: it is parked, never started again.
-    releases.get('rq-2')!();
-    await new Promise(resolve => setTimeout(resolve, 0));
-    expect(started).toEqual(['rq-1', 'rq-2', 'rq-1', 'rq-3', 'rq-4']);
-    queue.close();
-    releases.get('rq-3')!();
-    releases.get('rq-4')!();
-    await queue.settled();
-    expect(queue.active).toEqual([]);
-    expect(unsettled).toEqual(['rq-2']);
-    expect(attempts).toBe(5);
+    expect(validateReview(submission, { ...evidence, read: new Map([['src/a.ts', 'sha256:1']]) })).toMatchObject({ ok: true });
   });
 });

@@ -5,7 +5,7 @@ import type { ScriptStep } from '../../subs/agent/src/scripted.js';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { reviewLayout } from '../reviews/records.js';
-import { snapshotToolNames } from '../reviews/snapshot.js';
+import { snapshotToolNames } from '../../subs/reviews/src/snapshot.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { testReviewPolicy } from './helpers/candidates.js';
 import { addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write } from './helpers/iterations.js';

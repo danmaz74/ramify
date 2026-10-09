@@ -210,6 +210,19 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       expect(await candidate.diffNameStatus(root, base, commit)).toEqual(['src/link', 'src/one.ts', 'src/raw.bin', 'src/replacement.ts'].map(path => ({ status: 'A', path })));
       expect(await candidate.diffPatch(root, base, commit, 'src/one.ts')).toContain('+export const one = 1;');
       await expect(candidate.readBlob(root, commit, 'src/two.ts')).rejects.toBeInstanceOf(GitError);
+
+      // A real filename can contain Git pathspec metacharacters. A validated
+      // snapshot path must never select other source or generated-view files.
+      await repository.write('src/*.ts', 'literal-star-only\n');
+      await repository.write('src/.ramify/private.ts', 'generated-view-must-not-leak\n');
+      await repository.git('add', '--all');
+      await repository.git('-c', 'user.name=f', '-c', 'user.email=f@l', 'commit', '--message', 'literal candidate path');
+      const literalCommit = (await repository.git('rev-parse', 'HEAD')).trim();
+      const literalPatch = await candidate.diffPatch(root, base, literalCommit, 'src/*.ts');
+      expect(literalPatch).toContain('+literal-star-only');
+      expect(literalPatch).not.toContain('generated-view-must-not-leak');
+      expect(literalPatch).not.toContain('export const one');
+      expect(literalPatch).not.toContain('export const two');
     });
   });
 

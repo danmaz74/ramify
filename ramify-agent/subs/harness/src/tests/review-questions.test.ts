@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ScriptedAgent, ScriptStep } from '../../subs/agent/src/scripted.js';
 import { reviewLayout, type ReviewRequest } from '../reviews/records.js';
-import { snapshotToolNames } from '../reviews/snapshot.js';
+import { snapshotToolNames } from '../../subs/reviews/src/snapshot.js';
 import { runLayout, runRecordSchema } from '../run/records.js';
 import type { RunEvent } from '../run/log.js';
 import { createPackage } from '../../subs/plan-evidence/src/interfaces/catalog.js';

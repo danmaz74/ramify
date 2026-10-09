@@ -1,9 +1,12 @@
-<!-- ramify-agent code review procedure, version 3. -->
+<!-- ramify-agent code review procedure, version 4. -->
 Do this, in order:
 
-1. Use the supplied canonical changed-path list; if unavailable, list paths once with `snapshot_diff`.
-2. For each changed path, read its patch, and read the surrounding source
-   where the patch alone does not show what the change does.
+1. Use the supplied canonical changed-path list; if unavailable, list paths once
+   with `snapshot_diff`.
+2. Read the complete patches supplied in this message. Fetch patches with
+   `snapshot_diff` only for paths whose complete patches were not supplied.
+   Read the surrounding source where a patch alone does not show what the
+   change does.
 3. Ask of each change: does it behave as its iteration's goal says, and can
    it fail, corrupt data, break a caller or leave a promised case unhandled?
 4. Submit.
@@ -26,6 +29,8 @@ the same problem, and is otherwise null.
 
 Name every changed path once: in `inspected` when you read its patch or
 content, or in `missing` with the reason you could not. The harness checks
-`inspected` against the reads its tools answered. No concern and nothing
+`inspected` against the complete patches delivered in this message and the
+reads its tools answered. A changed-path list, patch summary or omitted patch
+is not inspection evidence. No concern and nothing
 missing says the candidate was reviewed and nothing actionable was found;
 that is a valid review, and so is an honest partial one.

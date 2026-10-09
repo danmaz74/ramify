@@ -6,7 +6,7 @@ import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
 import { reviewLayout } from '../reviews/records.js';
-import { snapshotToolNames } from '../reviews/snapshot.js';
+import { snapshotToolNames } from '../../subs/reviews/src/snapshot.js';
 import { scriptedCandidates, testReviewPolicy } from './helpers/candidates.js';
 import { passingAudit } from './helpers/direct-check-execution.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';

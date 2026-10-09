@@ -6,7 +6,7 @@ import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { reconciliationLayout, type ReconciliationBasis } from '../reviews/reconciliation.js';
 import { reviewLayout, type ReviewRequest } from '../reviews/records.js';
-import { snapshotToolNames } from '../reviews/snapshot.js';
+import { snapshotToolNames } from '../../subs/reviews/src/snapshot.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { testReviewPolicy } from './helpers/candidates.js';
 import { afterFinished, concern, disposition, reconcile, review, submission } from './helpers/check-findings-composition.js';

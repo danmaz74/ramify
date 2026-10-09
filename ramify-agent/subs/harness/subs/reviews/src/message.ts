@@ -1,10 +1,5 @@
-import { createHash } from 'node:crypto';
-import { posix } from 'node:path';
-import { capabilityEngineerSubmissionSchema } from '../work/engineer.js';
-import { deviationNotice } from '../../subs/plan-evidence/src/interfaces/catalog.js';
-import type { IterationAssignment } from '../work/iterations.js';
+import { deviationNotice } from '../../plan-evidence/src/interfaces/catalog.js';
 import type { CapturedInput } from './inputs.js';
-import type { ReviewRequest } from './records.js';
 import type { CandidateSnapshot } from './snapshot.js';
 
 /*
@@ -20,11 +15,31 @@ import type { CandidateSnapshot } from './snapshot.js';
  * request are therefore given the same message.
  */
 
+/** The fixed question, without run storage or session-fork records. */
+export interface ReviewQuestion {
+  readonly id: string;
+  readonly key: { readonly kind: 'code' | 'scope' | 'design'; readonly iteration: string; readonly candidate: string };
+  readonly workItem: string;
+  readonly base: string;
+  readonly tree: string;
+  readonly gate: string;
+  readonly guidance: readonly { readonly ref: string; readonly hash: string }[];
+}
+
+/** Parent-normalized intent; review preparation does not interpret assignments or gate policy. */
+export interface ReviewIntent {
+  readonly goal: string;
+  readonly approach: string;
+  readonly completionEvidence: string;
+  readonly scopeRationale: string;
+  readonly testAreas: readonly string[];
+}
+
 export interface ReviewBriefing {
-  readonly request: ReviewRequest;
+  readonly request: ReviewQuestion;
   readonly snapshot: CandidateSnapshot;
-  /** The iteration's assignment, or null where its record could not be read. */
-  readonly assignment: IterationAssignment | null;
+  /** The iteration's normalized intent, or null where its record could not be read. */
+  readonly assignment: ReviewIntent | null;
   /** The CheckFindings of the work item, open or not, each with its title. */
   readonly checkFindings: ReadonlyArray<{ readonly id: string; readonly standing: string; readonly title: string }>;
   /** Code and scope: the assignment package the request cites, rendered by the package creator. */
@@ -35,6 +50,8 @@ export interface ReviewBriefing {
   readonly pendingBindings?: readonly { readonly path: string; readonly sha256: string; readonly scenario: string; readonly invocation: string; readonly submission: string }[] | undefined;
   /** Declared check facts with candidate-relative configuration references. */
   readonly setup?: string | undefined;
+  /** Complete inline patches or bounded fallback instructions from the same frozen comparison. */
+  readonly diffPayload?: string | undefined;
 }
 
 const questions = { code: 'Code review', scope: 'Scope review', design: 'Design review' } as const;
@@ -57,7 +74,7 @@ export function reviewMessage(briefing: ReviewBriefing): string {
         `Goal: ${assignment.goal}`,
         `Approach: ${assignment.approach}`,
         `Completion evidence: ${assignment.completionEvidence}`,
-        ...(kind === 'scope' ? [`Its write scope's rationale: ${assignment.scope.rationale}`] : []),
+        ...(kind === 'scope' ? [`Its write scope's rationale: ${assignment.scopeRationale}`] : []),
       ]),
     '',
   ];
@@ -89,12 +106,11 @@ export function reviewMessage(briefing: ReviewBriefing): string {
       : [...new Map(snapshot.changes.map(change => [`${change.status}\0${change.path}`, change])).values()].map(change => `- ${change.status} ${change.path}`)),
     '',
   );
-  lines.push('Use the supplied changed-path list, then read each relevant patch with snapshot_diff and inspect the source required to judge it. List paths with snapshot_diff only if the supplied list is unavailable. The audited diff includes harness-produced changes; no feature or pending-tag patch is hidden.', '');
+  if (briefing.diffPayload !== undefined) lines.push(briefing.diffPayload, '');
+  lines.push('Use the supplied changed-path list and complete patches delivered in this message. Fetch a relevant patch with snapshot_diff only when it is not supplied, and inspect the source required to judge it. List paths with snapshot_diff only if the supplied list is unavailable. The audited diff includes harness-produced changes; no feature or pending-tag patch is hidden.', '');
   if (briefing.setup) lines.push(briefing.setup, '');
   if (assignment !== null && kind !== 'design') {
-    const modules = assignment.scope.resolved.ownership.modules.filter(module => assignment.gate.tests.exactOwners.includes(module.id)
-      || assignment.gate.tests.subtrees.some(owner => module.id === owner || module.id.startsWith(`${owner}/`)));
-    const testAreas = modules.map(module => posix.join(module.directory, 'src/tests')).filter(area => snapshot.directories.has(area));
+    const testAreas = assignment.testAreas.filter(area => snapshot.directories.has(area));
     if (testAreas.length > 0) lines.push('## Candidate test pointers', '',
       ...testAreas.map(area => `- \`${area}/\`: inspect with snapshot_list; read named files with snapshot_read.`), '');
   }
@@ -120,21 +136,4 @@ export function orientationMessage(guidance: readonly CapturedInput[]): string {
   ];
   for (const entry of guidance) lines.push(`## ${entry.ref} (sha256 ${entry.hash.slice(0, 12)})`, '', entry.text.trimEnd(), '');
   return lines.join('\n');
-}
-
-
-/** Committed acceptance supplies identity; exact candidate/rendering bytes supply attribution. */
-export function pendingBindingEvidence(input: { readonly path: string; readonly scenario: string; readonly invocation: string;
-  readonly submission: string; readonly submissionBytes: Uint8Array; readonly candidateBytes: string; readonly expectedBytes: string | undefined }) {
-  if (input.expectedBytes === undefined || input.candidateBytes !== input.expectedBytes
-    || createHash('sha256').update(input.submissionBytes).digest('hex') !== input.submission) return null;
-  let raw: unknown;
-  try { raw = JSON.parse(new TextDecoder().decode(input.submissionBytes)); } catch { return null; }
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const { schema, ...body } = raw as Record<string, unknown>;
-  if (schema !== 'ramify-agent.engineer-submission/1') return null;
-  const proposal = capabilityEngineerSubmissionSchema.safeParse(body);
-  if (!proposal.success || proposal.data.kind !== 'completion-proposed' || !proposal.data.bindings.some(binding => binding.id === input.scenario)) return null;
-  return { path: input.path, scenario: input.scenario, invocation: input.invocation, submission: input.submission,
-    sha256: createHash('sha256').update(input.candidateBytes).digest('hex') };
 }
