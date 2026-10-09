@@ -1,9 +1,16 @@
-import { describe, expect, test } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, test } from 'vitest';
 import { architectViewDirectory } from '../../subs/evidence/src/views.js';
-import { baselineScope, deliveredScopeInputs, projectOnlySize, readScopeMeasurement, scopeSize, writeScopeMeasurement, type DeclaredScope } from '../kpi/capture.js';
+import { baselineScope, deliveredScopeInputs, invocationScope, projectOnlySize, readScopeMeasurement, scopeSize, writeScopeMeasurement, type DeclaredScope } from '../kpi/capture.js';
 import type { MeasurementSnapshot, ScopeComponent } from '../run/records.js';
+import type { LoadedPackage } from '../prompts/packages.js';
 import { buildDeliveredManifest, type DeliveredInput } from '../prompts/delivered-manifest.js';
 import type { WriteScope } from '../work/scope.js';
+
+const directories: string[] = [];
+afterEach(async () => { for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }); });
 
 /*
  * The `scope-size/2` recipe over a constructed snapshot: each file once,
@@ -112,6 +119,25 @@ describe('scope-size/2 measures what a writer was given to write', () => {
     expect(owned.detail).toContain('subs/a/new.ts (extra, absent when the invocation started)');
   });
 
+  test('an extra location that cannot be read is a coverage limit with its error, not an absent location', async () => {
+    const unreadable = scopeSize(snapshot(), scope({ exactOwners: ['p/a'], locations: [{ path: 'package.json', bytes: 90 }, { path: 'vendor/blob', bytes: null, files: [], unreadable: 'EACCES: permission denied' }] }));
+    const owned = component(unreadable.components, 'owned-source');
+    expect(owned).toMatchObject({ state: 'unavailable', bytes: null, reason: 'the bytes on disk of an extra location could not be read when the invocation started: vendor/blob: EACCES: permission denied', buckets: { 'outside-inventory': 90 } });
+    expect(owned.detail).toContain('vendor/blob (extra, unreadable when the invocation started)');
+    expect(unreadable).toMatchObject({ bytes: null, subtotal: 510 + 90, coverage: 'partial' });
+    // On disk: an absent location counts nothing, and a path through a file,
+    // which is not a directory, is unreadable with the system's error.
+    const root = await mkdtemp(join(tmpdir(), 'ramify-agent-scope-location-')); directories.push(root);
+    await writeFile(join(root, 'notes.txt'), '12345');
+    const loaded = { files: [] } as unknown as LoadedPackage;
+    const measured = await invocationScope(root, 'plan', scope({ locations: [{ path: 'absent', bytes: null }, { path: 'notes.txt/inner', bytes: null }, { path: 'notes.txt', bytes: null }] }), loaded, 'brief');
+    expect(measured.locations).toEqual([
+      { path: 'absent', bytes: null, files: [] },
+      { path: 'notes.txt/inner', bytes: null, files: [], unreadable: expect.stringContaining('ENOTDIR') },
+      { path: 'notes.txt', bytes: 5, files: [{ path: 'notes.txt', bytes: 5 }] },
+    ]);
+  });
+
   test('an included child subtree counts as a subtree, an owned nested project is named without bytes, and a bootstrapped module is unknown until it exists', () => {
     const declared = writeScopeMeasurement(writeScope([], [
       { directory: 'subs/a/subs/c', kind: 'child-subtree', owner: 'p/b', reason: 'r', instructions: 'i', projectInstructions: [] },
@@ -196,6 +222,14 @@ describe('Plan23 F6 delivered scope and partial byte arithmetic', () => {
     expect(partial).toMatchObject({ bytes: null, subtotal: 725, coverage: 'partial' });
     expect(projectOnlySize(partial)).toMatchObject({ bytes: null, subtotal: 520 });
     expect(scopeSize(snapshot({ viewRevision: 'rev/2' }), scope({ exactOwners: ['p/a'], apiViews: true, supportDocuments: ['skills/SKILL.md'] }))).toMatchObject({ bytes: null, subtotal: 200 });
+    // Two revisions leave a component the scope does not declare at its 0:
+    // no API-view area, no global view and an empty selection are 0 in any
+    // state, while a selected owner's bytes are of the mismatched revision.
+    const mismatched = scopeSize(snapshot({ viewRevision: 'rev/2' }), scope({ exactOwners: ['p/a'], apiViews: false, architectView: false, supportDocuments: ['skills/SKILL.md'] }));
+    expect(component(mismatched.components, 'api-views')).toMatchObject({ state: 'measured', bytes: 0 });
+    expect(component(mismatched.components, 'architect-view')).toMatchObject({ state: 'measured', bytes: 0 });
+    expect(component(mismatched.components, 'owned-source')).toMatchObject({ state: 'unavailable', bytes: null, reason: expect.stringContaining('two states') });
+    expect(component(scopeSize(snapshot({ viewRevision: 'rev/2' }), scope({ apiViews: false })).components, 'owned-source')).toMatchObject({ state: 'measured', bytes: 0 });
     expect(scopeSize({ ...snapshot(), policy: 'scope-size/1' }, scope({ exactOwners: ['p/a'], supportDocuments: ['skills/SKILL.md'] }))).toMatchObject({ bytes: null, subtotal: 0 });
   });
 

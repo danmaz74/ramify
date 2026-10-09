@@ -42,6 +42,11 @@ async function observed() {
     context: { compaction: 'forbidden', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 }, excursions: new ExcursionWatcher({ projectRoot: directory.path, index: null, scope: undefined }), judge: { countImplementationRejection: () => async () => {} } });
   recorder.identify(identity); return { directory, path, observations, recorder };
 }
+/** An engineer's edit: the first mutating call, which reads and searches before it are not. */
+async function edited(recorder: PortEventRecorder, callId: string, seconds: number) {
+  await recorder.record({ type: 'tool-started', tool: 'edit', callId, input: {}, action: { kind: 'write', paths: ['src/a.ts'] }, mutating: true, execution: identity, observation: { sourceId: `${callId}:start`, at: t(seconds) } });
+  await recorder.record({ type: 'tool-finished', tool: 'edit', callId, isError: false, reachedTool: true, execution: identity, observation: { sourceId: `${callId}:end`, at: t(seconds + 1), elapsedMs: 10 } });
+}
 async function explored(recorder: PortEventRecorder, callId: string, kind: 'read' | 'search', root: string, bytes: number | null, files: string[] | null, seconds: number) {
   const action = kind === 'read' ? { kind, path: 'src/a.ts', range: null } : { kind, path: '..', glob: '**/*.ts', pattern: 'absent' };
   await recorder.record({ type: 'tool-started', tool: kind, callId, input: {}, action, mutating: false, execution: identity, observation: { sourceId: `${callId}:start`, at: t(seconds) } });
@@ -55,6 +60,7 @@ describe('Plan 23 F6 durable observation integration', () => {
     await explored(f.recorder, 'r1', 'read', f.directory.path, 7, [join(f.directory.path, 'src/a.ts')], 1);
     await explored(f.recorder, 'r2', 'read', f.directory.path, 5, [join(f.directory.path, 'src/a.ts')], 2);
     await explored(f.recorder, 's1', 'search', f.directory.path, 0, [], 3);
+    await edited(f.recorder, 'e1', 4);
     await f.recorder.record(usageEvent); await f.recorder.record(usageEvent); await f.recorder.drain();
     const projected = evaluationOf({ invocation, outcome, observations: f.observations.observations, lines: null }).efficiency!;
     expect(projected.operation).toEqual(identity);
@@ -63,12 +69,46 @@ describe('Plan 23 F6 durable observation integration', () => {
     expect(projected.charges).toEqual([{ model: 'fixed/model', sourceRevision: 'captured-model-r1', currency: 'USD', source: 'estimated-from-recorded-rates', newInputTokens: 100, cachedInputTokens: 40, cacheWriteTokens: 10, outputTokens: 20,
       ratesPerMillion: { newInput: 2, cachedInput: 0.5, cacheWrite: 3, output: 4 }, newInput: 0.0002, cachedInput: 0.00002, cacheWrite: 0.00003, output: 0.00008, total: 0.00033, coverage: [] }]);
     expect(projected.chargeSubtotal).toBeCloseTo(0.00033); expect(projected.chargeTotal).toBeCloseTo(0.00033);
-    expect(projected.timing).toMatchObject({ elapsedMs: 5000, toMilestoneMs: 1000, modelElapsedMs: 120, toolElapsedMs: 30, checkElapsedMs: null });
+    // The milestone is the edit at t(4), not the first read at t(1); the tool
+    // duration covers the three exploration calls (30 ms) and the edit (10 ms).
+    expect(f.observations.observations.filter(row => row.type === 'milestone')).toEqual([expect.objectContaining({ data: { kind: 'first-engineering-action', at: t(4) } })]);
+    expect(projected.timing).toMatchObject({ elapsedMs: 5000, milestone: 'first-engineering-action', toMilestoneMs: 4000, modelElapsedMs: 120, toolElapsedMs: 40, toolSubtotalMs: 40, checkElapsedMs: null });
+    expect(projected.timing.coverage.filter(reason => /tool duration/i.test(reason))).toEqual([]);
     expect(projected.units).toEqual({ scope: 'bytes', returned: 'UTF-8 output bytes', duration: 'ms', charge: 'USD' });
     expect(invocationEfficiencySchema.safeParse(projected).success).toBe(true);
     const reopened = await ObservationLog.open(f.path);
     expect(evaluationOf({ invocation, outcome, observations: reopened.observations, lines: null }).efficiency).toEqual(projected);
     expect(f.recorder.usage).toEqual({ input: 100, cacheRead: 40, cacheWrite: 10, output: 20, total: 170 });
+  });
+  test('an invocation of no tool calls has a tool duration of 0 ms, one of an unreadable log none, and an incomplete one names its single known subtotal', async () => {
+    const f = await observed(); await f.recorder.record(usageEvent); await f.recorder.drain();
+    const none = evaluationOf({ invocation, outcome, observations: f.observations.observations, lines: null }).efficiency!;
+    expect(none.timing.toolElapsedMs).toBe(0); expect(none.timing.toolSubtotalMs).toBe(0);
+    expect(none.timing.coverage.filter(reason => /tool duration/i.test(reason))).toEqual([]);
+    const unreadable = evaluationOf({ invocation, outcome, observations: { unavailable: 'missing' }, lines: null }).efficiency!;
+    expect(unreadable.timing.toolElapsedMs).toBeNull(); expect(unreadable.timing.toolSubtotalMs).toBe(0);
+    // A read of unknown duration beside an edit of 10 ms: one entry, over
+    // every tool call, rather than one for the reads and one for all.
+    await explored(f.recorder, 'r1', 'read', f.directory.path, 7, [join(f.directory.path, 'src/a.ts')], 1);
+    await edited(f.recorder, 'e1', 2); await f.recorder.drain();
+    const rows = f.observations.observations.map(row => row.type === 'tool-duration' && row.data.callId === 'r1' ? { ...row, data: { ...row.data, elapsedMs: null } } : row);
+    const partial = evaluationOf({ invocation, outcome, observations: rows, lines: null }).efficiency!;
+    expect(partial.timing.toolElapsedMs).toBeNull(); expect(partial.timing.toolSubtotalMs).toBe(10);
+    expect(partial.timing.coverage.filter(reason => /known subtotal/i.test(reason))).toEqual(['tool duration: known subtotal 10 ms over 1 of 2 tool calls; total unavailable']);
+    // The exploration row's own recorded 10 ms stays with the exploration
+    // metrics, which the tool-duration subtotal does not touch.
+    expect(partial.exploration.metrics).toMatchObject({ toolElapsedMs: 10, coverage: [] });
+  });
+  test('an engineer\'s reads and searches alone record no milestone, while a mutating shell command does', async () => {
+    const f = await observed();
+    await explored(f.recorder, 'r1', 'read', f.directory.path, 7, [join(f.directory.path, 'src/a.ts')], 1);
+    await explored(f.recorder, 's1', 'search', f.directory.path, 0, [], 2);
+    await f.recorder.record({ type: 'tool-started', tool: 'shell', callId: 'c1', input: {}, action: { kind: 'command', command: 'ls' }, mutating: false, execution: identity, observation: { sourceId: 'c1:start', at: t(3) } });
+    await f.recorder.drain();
+    expect(f.observations.observations.filter(row => row.type === 'milestone')).toEqual([]);
+    await f.recorder.record({ type: 'tool-started', tool: 'shell', callId: 'c2', input: {}, action: { kind: 'command', command: 'sed -i' }, mutating: true, execution: identity, observation: { sourceId: 'c2:start', at: t(4) } });
+    await f.recorder.drain();
+    expect(f.observations.observations.filter(row => row.type === 'milestone')).toEqual([expect.objectContaining({ data: { kind: 'first-engineering-action', at: t(4) } })]);
   });
   test('plain immutable sibling/checkpoint fixtures keep actual zero and missing-rate states distinct', async () => {
     const f = await observed(); await f.recorder.record(usageEvent);
@@ -193,6 +233,8 @@ describe('Plan 23 F6 durable observation integration', () => {
           expect(manifest.success).toBe(true);
           expect(record.prompt.manifest.schema).toBe('ramify-agent.delivered-inputs/1'); expect(record.prompt.inputsHash).toMatch(/^[a-f0-9]{64}$/);
           expect(record.scope.size).not.toBeNull(); expect(record.scope.size.coverage).toMatch(/complete|partial/); expect(record.sessionOperation).toMatchObject(originalIdentity);
+          // One owned-source component per record, whether the role declares a size or not.
+          expect(record.scope.size.components.filter((component: { component: string }) => component.component === 'owned-source'), record.role).toHaveLength(1);
           admitted.set(originalIdentity.operationId, { role: record.role, manifestHash: record.prompt.manifest.hash }); original(event);
         } } });
       } }; } } as AgentPort) }).catch(error => { throw new Error(`${String(error)}\n${admissionErrors.join('\n')}`); });
@@ -204,11 +246,12 @@ describe('Plan 23 F6 durable observation integration', () => {
   }, 180_000);
 });
 
-function setupFixture(options: { oid?: boolean; original?: string; sourceLine?: number; prefix?: string; bytes?: Uint8Array } = {}) {
+function setupFixture(options: { oid?: boolean; original?: string; sourceLine?: number; prefix?: string; bytes?: Uint8Array; binary?: boolean } = {}) {
   const before = options.original ?? '# manual\n'; const setup = `${before}${before.endsWith('\n') ? '' : '\n'}**/src/tmp/\n`; const final = '**/src/tmp/\n# writer\n';
   const texts: Record<string, string> = { B: before, S: setup, F: final };
   const prefix = options.prefix ?? 'nested/';
-  const changes: ChangeHistory = { async commitsBetween() { return ['S', 'F']; }, async changedFiles() { return [{ before: '.gitignore', after: '.gitignore', binary: false, added: [[1, 2]], deleted: [[1, 1]] }]; },
+  const changes: ChangeHistory = { async commitsBetween() { return ['S', 'F']; }, async changedFiles() { return [{ before: '.gitignore', after: '.gitignore', binary: false, added: [[1, 2]], deleted: [[1, 1]] },
+      ...(options.binary ? [{ before: null, after: 'assets/logo.png', binary: true, added: [], deleted: [] }] : [])]; },
     async lineOrigins() { return [{ line: 1, commit: 'S', boundary: false, sourceLine: options.sourceLine ?? 2, sourcePath: `${prefix}.gitignore`, projectPrefix: prefix }, { line: 2, commit: 'F', boundary: false, sourceLine: 2, sourcePath: `${prefix}.gitignore`, projectPrefix: prefix }]; },
     async lineLastSeen(_root, _from, to) { return [{ line: 1, commit: to === 'F' ? 'S' : 'B', boundary: false, sourceLine: 1, sourcePath: `${prefix}.gitignore`, projectPrefix: prefix }]; } };
   const asked: string[] = [];
@@ -224,6 +267,10 @@ describe('Plan 23 exact setup attribution collection', () => {
     const f = setupFixture(); const identities = await setupLineIdentitiesOf(f.view, f.history, 'B', 'F');
     expect(identities).toEqual({ base: 'B', final: 'F', entries: [{ commit: 'S', path: '.gitignore', added: [1], deleted: [] }, { commit: 'F', path: '.gitignore', added: [], deleted: [] }] });
     expect(f.asked.length).toBeGreaterThan(0); expect(new Set(f.asked)).toEqual(new Set(['nested/.gitignore']));
+  });
+  test('a binary path in the direct diff has no line partitions and leaves the text identities verified', async () => {
+    const f = setupFixture({ binary: true });
+    expect(await setupLineIdentitiesOf(f.view, f.history, 'B', 'F')).toEqual({ base: 'B', final: 'F', entries: [{ commit: 'S', path: '.gitignore', added: [1], deleted: [] }, { commit: 'F', path: '.gitignore', added: [], deleted: [] }] });
   });
   test('missing OIDs and original invalid bytes never waive a commit or path', async () => {
     const old = setupFixture({ oid: false }); const invalid = setupFixture({ bytes: new Uint8Array([255, 10]) });

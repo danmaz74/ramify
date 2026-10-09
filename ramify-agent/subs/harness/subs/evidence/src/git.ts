@@ -455,13 +455,21 @@ export async function commitNameStatus(
  * `git diff --numstat` for what git tracks, and the lines of each untracked
  * file beside it, because a file git has never seen is work too. The index is
  * not touched.
+ *
+ * The paths are the project's own, relative to its root, as `changedFiles`
+ * reports them: `--relative` keeps the diff to a nested project's files,
+ * and the status paths, which Git always gives relative to the repository
+ * root, lose the project's prefix; a file outside the project is not its
+ * change.
  */
 export async function worktreeLineChanges(
   root: string,
   base: string = 'HEAD',
   signal?: AbortSignal,
 ): Promise<Array<{ readonly path: string; readonly added: number; readonly deleted: number; readonly binary: boolean; readonly bytes: number | null }>> {
-  const tracked = await gitOk(root, ['diff', '--numstat', '-z', base], signal);
+  const shown = (await gitOk(root, ['rev-parse', '--show-prefix'], signal)).stdout;
+  const prefix = shown.endsWith('\n') ? shown.slice(0, -1) : shown;
+  const tracked = await gitOk(root, ['diff', '--relative', '--numstat', '-z', base], signal);
   const changes = new Map<string, { path: string; added: number; deleted: number; binary: boolean; bytes: number | null }>();
   const fields = tracked.stdout.split('\0');
   for (let index = 0; index < fields.length; index += 1) {
@@ -490,7 +498,9 @@ export async function worktreeLineChanges(
   const status = await gitOk(root, ['status', '--porcelain', '-z', '--untracked-files=all'], signal);
   for (const entry of status.stdout.split('\0')) {
     if (entry === undefined || !entry.startsWith('?? ')) continue;
-    const path = entry.slice(3);
+    const repositoryPath = entry.slice(3);
+    if (!repositoryPath.startsWith(prefix)) continue;
+    const path = repositoryPath.slice(prefix.length);
     if (path === '' || changes.has(path)) continue;
     changes.set(path, { path, ...(await fileLines(join(root, path))) });
   }

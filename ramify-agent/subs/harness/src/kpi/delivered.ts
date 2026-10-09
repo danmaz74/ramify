@@ -15,8 +15,9 @@ import type { LineEventSummary } from '../run/records.js';
  * still held it. A commit the harness made, and a path only the harness
  * writes, is never a writer's. A commit goes to the writer invocations whose
  * work it holds; where several share one, as an engineer and its repair in
- * one gate commit, each path's lines are split by the writers' recorded
- * per-path increases. A line no writer can be named for stays unattributed
+ * one gate commit, each path's added and deleted lines are split, each kind
+ * by itself, by the writers' recorded per-path increases of that kind. A
+ * line no writer can be named for stays unattributed
  * with its reason, never assigned to a writer by guesswork.
  *
  * Binary paths carry no lines. This is a projection over the run's records

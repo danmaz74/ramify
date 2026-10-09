@@ -3,7 +3,7 @@ import { ensureScratchRule } from '../work/scratch.js';
 import { engineerWorkingDirectory } from '../work/engineer-directory.js';
 import type { WriteScope } from '../work/iterations.js';
 import { gitCandidateSource, gitChangeHistory, gitService } from '../../subs/evidence/src/git.js';
-import { verifySetupLineIdentities } from '../../../../src/trial-attribution.js';
+import { verifySetupLineIdentities } from '../kpi/setup-attribution.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';

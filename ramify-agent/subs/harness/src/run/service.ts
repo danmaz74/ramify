@@ -3110,7 +3110,7 @@ export class RunService {
       kind: 'implementation',
       agent: requested,
       createdAt: now.toISOString(),
-      manifest,
+      manifest: baseline.manifest,
       prompts: Object.fromEntries([...packages].map(([role, loaded]) => [role, { package: loaded.package, hash: loaded.hash }])),
       policy: withProjectTimeouts(policy, projectConfig),
       projectConfig,
@@ -3127,7 +3127,7 @@ export class RunService {
     const base = manifest.source?.commit ?? await this.git.currentHead(this.projectRoot);
     let run!: Run;
     run = new Run(record, directory, log, base, this.newWriter(record.policy, () => this.accepted(run)));
-    run.index = await this.options.inputs.index(this.projectRoot, manifest).catch(() => null);
+    run.index = await this.options.inputs.index(this.projectRoot, record.manifest).catch(() => null);
     const accepted = this.commands.accept(command, contentHash, runId, run.log.nextSequence, now);
     this.runs.set(run.key, run);
     await run.log.append({ type: 'job-started', data: { command: accepted } }, now);
@@ -3177,7 +3177,7 @@ export class RunService {
     planId: string,
     manifest: RunRecord['manifest'],
     packages: ReadonlyMap<string, LoadedPackage>,
-  ): Promise<{ reference: RunRecord['baseline']; snapshot: MeasurementSnapshot }> {
+  ): Promise<{ reference: RunRecord['baseline']; snapshot: MeasurementSnapshot; manifest: RunRecord['manifest'] }> {
     const support: Array<{ path: string; bytes: number }> = [];
     const plan = await supportDocument(this.projectRoot, join(this.projectRoot, 'plans', planId, 'plan.md'));
     if (plan !== null) support.push(plan);
@@ -3198,19 +3198,24 @@ export class RunService {
     // moved between them is retried, a bounded number of times, against a
     // refreshed view; a mismatch that remains is recorded, and every size
     // taken from it is unavailable with the reason.
-    let snapshot = await capture(manifest.architectView);
+    let view = manifest.architectView;
+    let snapshot = await capture(view);
     for (let retry = 0; retry < 2 && revisionMismatch(snapshot) !== null; retry += 1) {
       const index = await this.options.inputs.refresh(this.projectRoot);
       if (index === null) break;
-      snapshot = await capture(await this.viewIdentityOf(index));
+      view = await this.viewIdentityOf(index);
+      snapshot = await capture(view);
     }
+    // The run record names the view the baseline was measured against, which
+    // a successful retry refreshed.
+    const frozen = { ...manifest, architectView: view };
     const path = join(directory, runLayout.measurement(id));
     const content = `${JSON.stringify(snapshot, null, 2)}\n`;
     await writeOnce(path, content);
     if ('unavailable' in snapshot.measure) {
-      return { reference: { unavailable: snapshot.measure.unavailable }, snapshot };
+      return { reference: { unavailable: snapshot.measure.unavailable }, snapshot, manifest: frozen };
     }
-    return { reference: { measurement: { id, revision: 1, hash: sha256(content) } }, snapshot };
+    return { reference: { measurement: { id, revision: 1, hash: sha256(content) } }, snapshot, manifest: frozen };
   }
 
   private async stop(command: Extract<RunCommand, { type: 'stop-job' }>, contentHash: string): Promise<Receipt> {
@@ -4109,8 +4114,10 @@ export class RunService {
             const paths = new Set(actual.supplementary.map(entry => entry.path));
             const frozen = { ...snapshot, supplementary: [...snapshot.supplementary.filter(entry => !paths.has(entry.path)), ...actual.supplementary] };
             size = scopeSize(frozen, await invocationScope(this.projectRoot, run.record.planId, declared, request.loaded, packet.message, packet.manifest));
-            if (!request.measured) size = { ...size, bytes: null, coverage: 'partial', components: [...size.components,
-              { component: 'owned-source', detail: request.role, state: 'unknown', bytes: null, reason: 'This role has no recorded owned-source size declaration; delivered support subtotal retained' }] };
+            // One owned-source component: the unknown one stands in for the
+            // empty selection's.
+            if (!request.measured) size = { ...size, bytes: null, coverage: 'partial', components: size.components.map(component => component.component === 'owned-source'
+              ? { component: 'owned-source', detail: request.role, state: 'unknown', bytes: null, reason: 'This role has no recorded owned-source size declaration; delivered support subtotal retained' } : component) };
           }
         } catch (error) {
           const known = request.measured ? scopeSize(request.measured.snapshot, { ...request.measured.scope, supportDocuments: [], brief: 0 }) : null;

@@ -1,4 +1,11 @@
-import type { HarnessLineIdentities } from '../subs/harness/src/kpi/delivered.js';
+import type { HarnessLineIdentities } from './delivered.js';
+
+/*
+ * The exact pure verifier of the harness's own setup lines: given recorded
+ * setup deltas and the authenticated line facts a collector gathered, it
+ * names the surviving positions in the final tree and the base tree that are
+ * the harness's, and never guesses lineage or exempts a path or a commit.
+ */
 
 export interface SetupLineIdentityInput {
   readonly runId: string;
