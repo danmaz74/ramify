@@ -265,7 +265,8 @@ test('actual RunService delivers accepted classifications, rejects a bad catalog
     { subject: 'wi-001.i01', commit: null, changes: [] }, { subject: 'wi-001', commit: null, changes: [] },
     { subject: 'final verification of plan "revision-diff"', commit: null, changes: [] }],
     previews: Array.from({ length: 5 }, () => ({ repositoryRoot: fixture.root, head: scenario.commit!, tree })) });
-  const candidates = scriptedCandidates(fixture.root, { [scenario.commit!]: { tree, files: {}, base: 'unchanged-fixture-revision', changes: [] }, [tree]: { tree, files: {}, base: scenario.commit!, changes: [] } });
+  const candidates = scriptedCandidates(fixture.root, { [scenario.commit!]: { tree, files: {}, base: 'unchanged-fixture-revision', changes: [] }, [tree]: { tree, files: {}, base: scenario.commit!, changes: [],
+      comparisons: { 'unchanged-fixture-revision': { changes: [] } } } });
   const opened = await openRunsWithoutProcesses(fixture.root, git, { agent, inputs: treeInputs(), candidates }); cleanup.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('revision-diff')); await opened.service.settled('revision-diff', receipt.jobId);
   const events = await runEventsOnDisk(fixture.root, 'revision-diff', receipt.jobId);

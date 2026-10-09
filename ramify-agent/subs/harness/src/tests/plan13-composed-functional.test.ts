@@ -97,7 +97,8 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   });
   const candidates = scriptedCandidates(fixture.root, {
     [scenario.commit!]: { tree, files: {}, base: 'unchanged-fixture-revision', changes: [] },
-    [tree]: { tree, files: {}, base: scenario.commit!, changes: [] },
+    [tree]: { tree, files: {}, base: scenario.commit!, changes: [],
+      comparisons: { 'unchanged-fixture-revision': { changes: [] } } },
   });
   const opened = await openRunsWithoutProcesses(fixture.root, git, { agent, inputs: treeInputs(), candidates });
   cleanups.push(() => opened.service.close());

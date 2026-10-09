@@ -215,7 +215,8 @@ describe('CF02, CF03 and CF12: one routine assessment', () => {
     const moduleSource = join(root, notesDirectory, 'src');
     expect(parentTurn.spec.scope.workingDirectory).toBe(moduleSource);
     expect(fork!.spec.scope.workingDirectory).toBe(moduleSource);
-    expect(fork!.spec.prompt).toContain(`"workingDirectory": ${JSON.stringify(moduleSource)}`);
+    expect([...fork!.inherited, fork!.spec.prompt].join('\n')).toContain(
+      `# Block environment:workingDirectory\nCurrent value; replaces any earlier value for this key.\n{\n  "workingDirectory": ${JSON.stringify(moduleSource)}\n}`);
     // Its support paths are the delivered sources, not the package inventory.
     expect(fork!.spec.prompt).toContain('subs/harness/src/prompts/reconciliation.procedure.md');
     expect(fork!.spec.prompt).not.toContain('.schema.json');
