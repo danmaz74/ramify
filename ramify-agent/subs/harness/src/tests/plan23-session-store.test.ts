@@ -3,9 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openSessionStore, type LedgerSessionStore } from '../run/session-store.js';
+import { HarnessSessionOperations, readSessionPointReference, type HarnessOperationInput } from '../run/session-operations.js';
 import { createSessionOperations } from '../../subs/agent/src/session-operations.js';
-import { createScriptedSessionDriver } from '../../subs/agent/src/scripted.js';
-import type { ContinueSessionInput, SessionExecutionBindings, SessionExecutionPolicy, SessionOperationDriver, SessionStore, SessionStoreCommit, SessionStoreRecord, SessionTaskInput } from '../../subs/agent/src/interfaces/session-operations.js';
+import { createScriptedAgent, createScriptedSessionDriver } from '../../subs/agent/src/scripted.js';
+import type { ContinueSessionInput, SessionDriverInvocation, SessionExecutionBindings, SessionExecutionPolicy, SessionOperationDriver, SessionStore, SessionStoreCommit, SessionStoreRecord, SessionTaskInput } from '../../subs/agent/src/interfaces/session-operations.js';
+import type { LoadedPackage } from '../prompts/packages.js';
 
 const stores: LedgerSessionStore[] = []; const directories: string[] = [];
 afterEach(async () => { for (const store of stores.splice(0)) await store.close(); for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }); });
@@ -34,6 +36,17 @@ function interrupted(store: SessionStore, predicate: (commit: SessionStoreCommit
   } };
 }
 const opBody = (commit: SessionStoreCommit) => commit.records.find(item => item.schema === 'ramify-agent.session-operation/1')?.body;
+/** One harness operation of the engineer role, fresh or continuing the session holding `ref`. */
+function harnessInput(operationId: string, ref?: string): HarnessOperationInput {
+  const name = 'submit_iteration_result';
+  const loaded: LoadedPackage = { role: 'engineer', package: 'engineer/fixture', hash: '1'.repeat(64), files: [], submissionKinds: [], system: 'Stable engineer role.', procedure: 'Perform the current task with {{submissionTool}}.', skill: '', extraSkill: '', skillDirectory: '/skills', submissionSchema: '{}' };
+  return { runId: 'A', operationId, session: `harness-${operationId}`, loaded,
+    spec: { role: 'engineer', scope: { workingDirectory: '/project/module' }, systemPrompt: 'unused', prompt: 'unused', session: ref ? { mode: 'continue', ref } : { mode: 'fresh' }, context: policy.context, builtinTools: [], tools: [],
+      submission: { name, description: 'Owner submission', inputSchema: {}, accept: async () => ({ accepted: true }) }, onEvent: () => {} },
+    brief: { kind: 'engineering', objective: 'Implement A', goal: 'Preserve A', requirements: ['R1: preserve the result'], sections: [],
+      environment: { projectRoot: '/project', workingDirectory: '/project/module', candidate: null, snapshot: null, limits: { stopSettleMs: 1000 }, availableTools: [name], views: [], supportPaths: [], cucumberConfiguration: null } },
+    authority: { write: true }, validator: { revision: 1 }, destination: { record: operationId }, currentAuthority: async () => true };
+}
 
 describe('Plan 23 ledger session store', () => {
   it('immutable exact payload bytes and atomic multi-record CAS survive fresh adapters and missing materialized copies', async () => {
@@ -197,6 +210,47 @@ describe('Plan 23 ledger session store', () => {
     transformed.resolve();
     expect(await stopping).toEqual(stopped); expect(await idle).toEqual(stopped);
     expect(stopped.status).toBe('stopped'); expect(await handle.receipt).toEqual(stopped); expect(actualDispatches).toBe(0); expect(lateEvents).toBe(0);
+  });
+  it('two appends against one recorded point both commit, the session is never lost, and the second checkpoint follows the first', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'plan23-append-')); directories.push(root);
+    const seen: SessionDriverInvocation[] = []; const entered = deferred(); const gate = deferred();
+    const agent = createScriptedAgent([], { operationScript: invocation => {
+      seen.push(invocation);
+      return invocation.key.operationId === 'active' ? [{ kind: 'await', until: () => { entered.resolve(); return gate.promise; } }, { kind: 'submit', input: {} }] : [{ kind: 'submit', input: {} }];
+    } });
+    const adapter = await HarnessSessionOperations.open(root, agent);
+    try {
+      const first = await adapter.start(harnessInput('orient')); expect((await first.outcome).kind).toBe('submitted'); expect(await first.settled()).toBe('settled');
+      const T1 = readSessionPointReference(first.ref)!.point;
+      // Both packages name the orientation point the run recorded once; the second finds it stale.
+      const one = await adapter.append(first.ref, 'package:1', 'PACKAGE ONE');
+      const two = await adapter.append(first.ref, 'package:2', 'PACKAGE TWO');
+      expect(one.outcome).toBe('appended'); expect(two.outcome).toBe('appended');
+      if (one.outcome !== 'appended' || two.outcome !== 'appended') throw new Error('Expected both appends to land');
+      const C1 = readSessionPointReference(one.ref)!.point; const C2 = readSessionPointReference(two.ref)!.point;
+      expect(C1).toMatchObject({ sessionId: T1.sessionId, turn: T1.turn, kind: 'checkpoint' }); expect(C2).toMatchObject({ sessionId: T1.sessionId, turn: T1.turn, kind: 'checkpoint' });
+      expect(C2.checkpoint).not.toBe(C1.checkpoint);
+      const session = await adapter.operations.inspect('A', T1.sessionId);
+      expect(session).toMatchObject({ available: true, activeOperation: null, currentPoint: C2 });
+      expect(session!.additions.map(item => item.text)).toEqual(['PACKAGE ONE', 'PACKAGE TWO']);
+      expect((await adapter.operations.inspect('A', T1.sessionId, C1))!.additions.map(item => item.text)).toEqual(['PACKAGE ONE']);
+      expect((await adapter.operations.inspect('A', T1.sessionId, C2))!.additions.map(item => item.text)).toEqual(['PACKAGE ONE', 'PACKAGE TWO']);
+      // The next turn continues the same session from the second checkpoint and sees both packages.
+      const second = await adapter.start(harnessInput('assign', two.ref)); expect((await second.outcome).kind).toBe('submitted'); expect(await second.settled()).toBe('settled');
+      expect(seen[1]!.session.sessionId).toBe(T1.sessionId); expect(seen[1]!.session.currentPoint).toEqual(C2);
+      expect(seen[1]!.session.additions.map(item => item.text)).toEqual(expect.arrayContaining(['PACKAGE ONE', 'PACKAGE TWO']));
+      // While a turn is active, an append is a conflict the caller carries; the session stays intact and takes the package once the turn settles.
+      const third = await adapter.start(harnessInput('active', second.ref)); await entered.promise;
+      expect(await adapter.append(second.ref, 'package:3', 'PACKAGE THREE')).toEqual({ outcome: 'conflict', reason: 'Expected point is stale or session active' });
+      expect((await adapter.operations.inspect('A', T1.sessionId))?.available).toBe(true);
+      gate.resolve(); expect((await third.outcome).kind).toBe('submitted'); expect(await third.settled()).toBe('settled');
+      const three = await adapter.append(second.ref, 'package:3', 'PACKAGE THREE'); expect(three.outcome).toBe('appended');
+      if (three.outcome !== 'appended') throw new Error('Expected the third append to land');
+      expect(readSessionPointReference(three.ref)!.point).toMatchObject({ sessionId: T1.sessionId, turn: readSessionPointReference(third.ref)!.point.turn, kind: 'checkpoint' });
+      // Only a session that can no longer be read is lost.
+      expect(agent.loseSession(T1)).toBe(true);
+      expect(await adapter.append(three.ref, 'package:4', 'PACKAGE FOUR')).toEqual({ outcome: 'session-lost' });
+    } finally { expect(await adapter.close()).toBe(true); }
   });
   it('two reconstructed stores/agents cannot Retry the same live intent twice', async () => {
     const { path, store } = await setup(); const gate = deferred(); const entered = deferred(); let dispatches = 0;

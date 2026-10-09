@@ -224,17 +224,34 @@ export class HarnessSessionOperations {
         finally { clearTimeout(timer); }
       }, settled };
   }
+  /**
+   * Append a brief to the session holding `ref`. A stale `ref` is retried once
+   * against the session's current point, so two appends recorded against one
+   * point both land; a session with an active operation is a conflict the
+   * caller carries, and only an unreadable session is lost.
+   */
   async append(ref: string, key: string, text: string, briefingSectionKey?: string): Promise<AppendOutcome> {
     const parsed = readSessionPointReference(ref);
     if (!parsed) return { outcome: 'session-lost' };
-    const context = await this.context(parsed.runId, parsed.point);
-    const operationId = `append:${parsed.point.sessionId}:${key}`;
-    const snapshot = await this.operations.inspect(parsed.runId, parsed.point.sessionId);
+    const { runId } = parsed; const { sessionId } = parsed.point;
+    let point = parsed.point;
+    let context = await this.context(runId, point);
+    const operationId = `append:${sessionId}:${key}`;
+    const additions = [{ key, kind: 'brief' as const, text, revision: null }];
+    const snapshot = await this.operations.inspect(runId, sessionId);
     const wasPresent = snapshot?.additions.some(addition => addition.key === key) === true;
-    const receipt = await this.operations.appendContext({ runId: parsed.runId, operationId, sessionId: parsed.point.sessionId, expectedPoint: parsed.point,
-      additions: [{ key, kind: 'brief', text, revision: null }] });
+    let receipt = await this.operations.appendContext({ runId, operationId, sessionId, expectedPoint: point, additions });
+    if (receipt.status === 'conflict') {
+      const current = await this.operations.inspect(runId, sessionId);
+      if (current && current.activeOperation === null && JSON.stringify(current.currentPoint) !== JSON.stringify(point)) {
+        point = current.currentPoint;
+        context = await this.context(runId, point);
+        receipt = await this.operations.appendContext({ runId, operationId, sessionId, expectedPoint: point, additions });
+      }
+    }
+    if (receipt.status === 'conflict') return { outcome: 'conflict', reason: receipt.reason ?? 'The session cannot take the addition at this point' };
     if (receipt.status !== 'completed' || !receipt.point) return { outcome: 'session-lost' };
-    const already = await this.read<Context>(this.path('points', [parsed.runId, receipt.point]));
+    const already = await this.read<Context>(this.path('points', [runId, receipt.point]));
     let history = context.history; let revision = context.revision;
     if (briefingSectionKey !== undefined) {
       const previous = history.find(item => item.revision === revision);
@@ -243,9 +260,9 @@ export class HarnessSessionOperations {
       revision = exactInputHash(JSON.stringify(sections));
       history = [...history, { revision, sections }];
     }
-    await this.retain(this.path('points', [parsed.runId, receipt.point]), { ...context, history, revision, point: receipt.point,
+    await this.retain(this.path('points', [runId, receipt.point]), { ...context, history, revision, point: receipt.point,
       inherited: [...context.inherited, { key: `append:${key}`, kind: 'brief', text, source: null, revision: null }] });
-    return { outcome: already === null && !wasPresent ? 'appended' : 'already-present', ref: sessionPointReference(parsed.runId, receipt.point) };
+    return { outcome: already === null && !wasPresent ? 'appended' : 'already-present', ref: sessionPointReference(runId, receipt.point) };
   }
 }
 

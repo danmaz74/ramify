@@ -532,7 +532,12 @@ export interface AgentPort {
 
 }
 
-/** What an `appendContext` did. */
+/**
+ * What an `appendContext` did. A `conflict` is a session that is intact but
+ * cannot take the addition now, such as one with an active operation; only an
+ * unreadable or unavailable session is `session-lost`.
+ */
 export type AppendOutcome =
   | { readonly outcome: 'appended' | 'already-present'; readonly ref: SessionRef }
+  | { readonly outcome: 'conflict'; readonly reason: string }
   | { readonly outcome: 'session-lost' };
