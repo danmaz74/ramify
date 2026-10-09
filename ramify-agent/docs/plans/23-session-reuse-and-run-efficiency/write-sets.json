@@ -517,22 +517,23 @@
     },
     "four-worker-39aea6be": {
       "base": "39aea6be3c2297bb22b9d902a40004fb4cf51521",
-      "evidence": "/tmp/plan23-39aea6be-integrated-four-worker-workflows.log",
+      "evidence": "external, not in repository: /tmp/plan23-39aea6be-integrated-four-worker-workflows.log",
       "observationBatchWorker": [
         "subs/harness/src/run/observations.ts",
         "subs/harness/src/run/port-events.ts",
         "subs/harness/src/tests/observation-log.test.ts",
         "subs/harness/src/tests/plan23-observation-integration.test.ts"
       ],
-      "diagnosisWorkerTemporaryOnly": [
+      "watchdogBoundWorker": [
         "subs/harness/src/tests/contract-revision-scripted.test.ts"
       ],
+      "watchdogBoundChange": "permanent and user-approved: the contract workflow watchdog changed from 15 to 25 seconds on direct user instruction (2026-10-09T02:26:22.055Z), committed in 6dd3e7f5; in the passing audit 639b1eb3 the test ran 15393 ms, so that pass is conditional on this bound",
       "reviewWorker": []
     },
     "full-audit-6dd3e7f5": {
       "source": "6dd3e7f58c276e6932b9da55323bf8303f1603fa",
       "report": "7a5ea2f72e14b6820092a2ce38d9e95a9770c152",
-      "evidence": "/tmp/plan23-6dd3e7f5-final-audit.json",
+      "evidence": "7a5ea2f72e14b6820092a2ce38d9e95a9770c152:reports/audit/summary.json; the /tmp JSON copy is external, not in repository",
       "continuationFaultAdapterWorker01": [
         "ramify-agent/subs/harness/src/tests/plan23-continuing-work.test.ts"
       ],

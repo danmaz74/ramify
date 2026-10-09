@@ -39,6 +39,8 @@ Retry restores an unfinished operation with its original task, policy, validator
 environment and destination, using newly bound handlers. Recheck current authority
 before executing. Changed policy or inputs cannot become a retry. An ordinary
 Continue restores automatically and creates the next turn; there is no resume API.
+Continue on a session with an unfinished operation fails with a structured
+conflict; Retry or Stop settles it first.
 
 Stop fences model dispatch and submission acceptance, retains effect evidence,
 and settles outstanding calls before publishing a reusable point. Unknown effect
@@ -62,7 +64,9 @@ supported pi 0.87.1 `openai-codex/gpt-5.6-sol` path first. Validate support and 
 serialization, including later role instructions; flags alone are insufficient.
 An initial validation failure makes zero calls; a later failure prevents the next
 call and retains prior effects. The final check must sit outside pi's swallowed
-extension-error path. No implicit fresh/summary fallback or automatic compaction.
+extension-error path. No implicit fresh/summary fallback; compaction and budget
+tool-clearing never rewrite the promised prefix, and the preserving invocation
+stops at its limit.
 
 Definitions are immutable in full. An identical existing definition gets a fresh
 handler without another declaration; changed schema/description requires a new
@@ -106,12 +110,14 @@ The fixed workflow mapping is:
 | Selector | Fork orientation initially; fork requesting assignment/qualification for re-selection |
 | Read-only engineer consultation | Fork the recorded capability-request point |
 | Reconciliation | Fork completion-request or capability handback point |
-| Scope review | Fork the pinned assignment point; append reviewer authority at the proper instruction level |
+| Scope review | Fork the pinned assignment point; append reviewer authority at the same instruction level as the inherited role instructions |
 | Design review | Fork orientation keyed by captured guidance selection/hashes, scope, prompt and execution configuration; new orientation when identity changes or is unknown |
 | Global placement/unresolved request | Fork initial architect orientation plus accepted briefs through the recorded request point |
-| Initial architecture/orientation, catalog, code review, first capability/engineer/contract task, failure analysis, standalone command | Fresh under existing contracts |
+| Initial architecture, first local or design orientation, catalog, code review, first capability/engineer/contract task, failure analysis, standalone command | Fresh under existing contracts |
 | Non-functional coordinator/investigator/assessment/repair | Existing fresh policy |
 | New engineer iteration or existing budget-return recovery | Fresh from durable work note/plan/return records |
+
+Missing-parent recovery per row is recorded in [iteration 9's results](iterations/09-results.md).
 
 Missing parents follow only the named workflow's existing explicit fresh-recovery
 contract; otherwise report unavailable context. Hard context limits stop the

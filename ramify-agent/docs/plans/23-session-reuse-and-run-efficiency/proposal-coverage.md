@@ -43,8 +43,8 @@ completed where needed, not presumed absent or already qualified.
 | P4.7 smaller text, manifest, import-provenance and fixture faults | 2, 10, 13 | P04–P05, W10–W11, T02 |
 
 The source analysis's open Plan 4 priority and long toolkit-trial timing are not
-silently converted into implementation scope. This plan chooses exploration/time
-evidence first and leaves the separate score, the long trial and any performance
-comparison unscheduled. Stage
+silently converted into implementation scope. This plan implements the exploration/time
+evidence and leaves Plan 4's start to the user; the separate score, the long trial
+and any performance comparison stay unscheduled. Stage
 removal and default search exclusions remain separate proposals. No decision is
 needed to implement the selected scope.
