@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { lstat, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { createPiAgent } from '../../subs/agent/subs/pi/src/pi-agent.js';
+import { readPiNativeRequestArtifact } from '../../subs/agent/subs/pi/src/preservation.js';
 import type { AgentSessionPoint, AgentSessionSnapshot, SessionExecutionBindings, SessionExecutionPolicy, SessionOperationHandle, SessionOperationReceipt, SessionOperations, SessionStore, SessionTaskInput, SessionToolDeclaration } from '../../subs/agent/src/interfaces/session-operations.js';
 import type { ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
 import { openSessionStore } from '../run/session-store.js';
@@ -11,9 +12,13 @@ export interface Plan23LiveSessionOptions {
   readonly workingDirectory: string; readonly storeDirectory: string; readonly evidenceDirectory: string; readonly handoffFile: string;
   readonly operationTimeoutMs: number; readonly settlementTimeoutMs: number;
 }
+/** `packageVersion`, `transport` and `providerRetries` are read from the captured
+ * final-request artifacts, never restated; they are null when no request
+ * artifact was captured. The verifier compares them with its expected values.
+ */
 export interface Plan23LiveSessionResult {
   readonly schema: 'ramify-agent.plan23-live-session/1'; readonly phase: 'initial' | 'restore'; readonly runId: string; readonly sourceCandidate: string;
-  readonly model: 'openai-codex/gpt-5.6-sol'; readonly packageVersion: '0.87.1'; readonly transport: 'sse'; readonly providerRetries: 0;
+  readonly model: 'openai-codex/gpt-5.6-sol'; readonly packageVersion: string | null; readonly transport: string | null; readonly providerRetries: number | null;
   readonly status: 'completed' | 'failed' | 'unavailable'; readonly reason: string | null; readonly handoffFile: string; readonly evidenceFile: string;
 }
 const model = 'openai-codex/gpt-5.6-sol';
@@ -34,11 +39,16 @@ export async function runPlan23LiveSession(options: Plan23LiveSessionOptions): P
     return await runPlan23LiveSessionOn(options, { operations, store });
   } finally { await store.close(); }
 }
-/** Same-owner ordinary injection; not exposed outside harness. No opaque provider decoding occurs here. */
+/** Same-owner ordinary injection; not exposed outside harness. Only the public
+ * final-request artifact is read here; opaque provider state stays undecoded.
+ */
 export async function runPlan23LiveSessionOn(options: Plan23LiveSessionOptions, ports: { readonly operations: SessionOperations; readonly store: SessionStore }): Promise<Plan23LiveSessionResult> {
   const { operations, store } = ports;
   const evidenceFile = join(options.evidenceDirectory, `${options.phase}.json`);
-  const result = (status: Plan23LiveSessionResult['status'], reason: string | null): Plan23LiveSessionResult => ({ schema: 'ramify-agent.plan23-live-session/1', phase: options.phase, runId: options.runId, sourceCandidate: options.sourceCandidate, model, packageVersion: '0.87.1', transport: 'sse', providerRetries: 0, status, reason, handoffFile: options.handoffFile, evidenceFile });
+  // Every captured request artifact's recorded transport, retries and package version, distinct by value.
+  const observations = new Map<string, { packageVersion: string; transport: string; providerRetries: number }>();
+  const observed = () => { const values = [...observations.values()]; return values.length === 1 ? values[0]! : { packageVersion: null, transport: null, providerRetries: null }; };
+  const result = (status: Plan23LiveSessionResult['status'], reason: string | null): Plan23LiveSessionResult => ({ schema: 'ramify-agent.plan23-live-session/1', phase: options.phase, runId: options.runId, sourceCandidate: options.sourceCandidate, model, ...observed(), status, reason, handoffFile: options.handoffFile, evidenceFile });
   const activeHandles = new Set<SessionOperationHandle>();
   const captures: Capture[] = []; const receipts: SessionOperationReceipt[] = []; const submissions: unknown[] = []; const publications: SessionOperationReceipt[] = []; const events: unknown[] = []; let reads = 0;
   const runId = options.runId;
@@ -55,6 +65,8 @@ export async function runPlan23LiveSessionOn(options: Plan23LiveSessionOptions, 
       const bytes = await store.getPayload(entry.payloadId); assert(bytes, `Original payload unavailable: ${entry.payloadId}`);
       const file = join(options.evidenceDirectory, `payload-${entry.payloadId}.bin`); await writeFile(file, bytes);
       payloads.push({ ...entry, file, hash: digest(bytes) });
+      const request = entry.kind === 'provider' ? readPiNativeRequestArtifact(bytes) : null;
+      if (request) { const value = { packageVersion: request.packageVersion, transport: request.transport, providerRetries: request.maxRetries }; observations.set(JSON.stringify(value), value); }
     }
     captures.push({ name, snapshot, payloads }); return snapshot;
   }
@@ -111,6 +123,7 @@ export async function runPlan23LiveSessionOn(options: Plan23LiveSessionOptions, 
       const stoppedRetry = await finish(await operations.retry({ runId, operationId: 'stop-task', bindings: bindings(stopTask, 'NEVER ACCEPT') })); assert(same(stoppedRetry, receipt) && same(beforeRetry, { events: events.length, submissions: submissions.length, publications: publications.length, reads }), 'Stopped Retry performed work');
       assert(same(await operations.inspect(runId, restored.sessionId), stoppedSnapshot), 'Stopped Retry unexpectedly made an unavailable current point available'); assert(same(await physicalStoreInventory(), stoppedBytes), 'Stopped Retry changed durable ledger/payload bytes'); physicalStoreChecks.push({ operation: 'stop-task', files: stoppedBytes });
     }
+    assert(observations.size <= 1, 'Captured request artifacts disagree on transport, retries or package version');
     const completed = result('completed', null); await writeFile(evidenceFile, JSON.stringify({ ...completed, pid: process.pid, captures, receipts, submissions, publications, events, reads, physicalStoreChecks }, null, 2)); return completed;
   } catch (error) {
     const draining = [...activeHandles].map(handle => handle.stop()); barrierRelease();

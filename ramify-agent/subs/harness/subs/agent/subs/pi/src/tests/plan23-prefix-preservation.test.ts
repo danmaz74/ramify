@@ -75,7 +75,10 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     const recorded = await f.operations.inspect('run-A', f.P.sessionId);
     const requestEntry = recorded!.transcript.find(item => item.kind === 'provider' && item.key.includes(':pi-request:'))!;
     const requestArtifact = JSON.parse(new TextDecoder().decode(f.payloads.get(requestEntry.payloadId)!)) as Record<string, unknown>;
-    expect(requestArtifact).toMatchObject({ packageVersion: '0.87.1', transport: 'sse', model: 'openai-codex/gpt-5.6-sol', request: f.native.wireRequests[0] });
+    // Recorded observations of the installed package and the forced stream options, not restated constants.
+    expect(requestArtifact['packageVersion']).toBe('0.87.1'); expect(requestArtifact['transport']).toBe('sse'); expect(requestArtifact['maxRetries']).toBe(0);
+    expect(requestArtifact).toMatchObject({ schema: 'ramify.pi-native-request/1', model: 'openai-codex/gpt-5.6-sol', request: f.native.wireRequests[0] });
+    expect(f.native.transports).toEqual(['sse', 'sse']);
     expect(JSON.stringify(requestArtifact)).not.toContain('fixture-account');
     const first = prefix(f.native, 0); const second = prefix(f.native, 1);
     expect(first.instructions).toBe('Role A\nGeneral task protocol.');
@@ -346,5 +349,40 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     expect(receipt).toMatchObject({ status: 'completed', outcome: { kind: 'context-budget-reached' } }); expect(f.native.dispatches()).toBe(1); expect(f.accepted()).toBe(0);
     const snapshot = await f.operations.inspect('run-A', f.P.sessionId);
     expect(snapshot?.declarations.map(item => item.name)).toEqual(['read', 'submit_orientation']); expect(snapshot?.activeTools).toEqual(['read', 'submit_orientation']); f.native.verify();
+  });
+  it('a tool-call reply that reaches the budget ends after its tool result, before the next dispatch, without a fabricated error message', async () => {
+    const f = await fixture([[call('read', {}, 'budget-call')]]);
+    const bounded = { ...policy, context: { ...policy.context, budgetTokens: 1 } };
+    const events: unknown[] = [];
+    const bound = { ...f.bindings, policy: bounded, onEvent: (event: unknown) => { events.push(event); } };
+    const receipt = await (await f.operations.continue({ ...f.next(f.P.sessionId, f.P.point!, 'budget-call', bound), policy: bounded })).receipt;
+    expect(receipt).toMatchObject({ status: 'completed', turn: 1, outcome: { kind: 'context-budget-reached' } });
+    expect(f.native.dispatches()).toBe(1); expect(f.native.requests).toHaveLength(1); expect(f.reads()).toBe(1); expect(f.accepted()).toBe(0);
+    expect(events.filter(event => (event as { type: string }).type === 'context-observed')).toHaveLength(1);
+    const snapshot = await f.operations.inspect('run-A', f.P.sessionId);
+    const stateEntry = snapshot!.transcript.filter(item => item.kind === 'provider' && item.key.includes(':pi-state:')).at(-1)!;
+    const state = JSON.parse(new TextDecoder().decode(f.payloads.get(stateEntry.payloadId)!)) as { messages: Array<{ role: string; stopReason?: string; toolCallId?: string; isError?: boolean }> };
+    expect(state.messages.map(message => [message.role, message.stopReason ?? null])).toEqual([['system', null], ['user', null], ['assistant', 'toolUse'], ['toolResult', null]]);
+    expect(state.messages.at(-1)).toMatchObject({ role: 'toolResult', toolName: 'read', toolCallId: 'call_budget-call|fc_budget-call' }); expect(state.messages.at(-1)?.isError).not.toBe(true);
+    expect(state.messages.some(message => message.role === 'assistant' && (message.stopReason === 'error' || message.stopReason === 'aborted'))).toBe(false);
+    f.native.verify();
+  });
+  it('Retry of an interrupted operation through an unsupported-model adapter answers unavailable with the recorded session id and leaves the operation resumable', async () => {
+    const f = await fixture([[text('Interrupted before terminal write.')]]);
+    f.setFault(input => { const operation = input.records.find(record => record.schema === 'ramify-agent.session-operation/1'); if (operation?.body['phase'] === 'terminal') throw new Error('Crash before terminal write'); });
+    await expect((await f.operations.continue(f.next(f.P.sessionId, f.P.point!, 'interrupted'))).receipt).rejects.toThrow('Crash before terminal write');
+    expect(f.native.dispatches()).toBe(1); f.setFault(null);
+    const interrupted = await f.store.read('run-A', 'operation:interrupted'); expect(interrupted?.body['receipt']).toBeNull();
+    const unsupported = createPiAgentOn({ ...f.source, model: 'openai-codex/gpt-5.4' }).bindSessionStore!(f.store);
+    const receipt = await (await unsupported.retry({ runId: 'run-A', operationId: 'interrupted', bindings: f.bindings })).receipt;
+    expect(receipt).toEqual({ runId: 'run-A', operationId: 'interrupted', sessionId: f.P.sessionId, turn: null, point: null, status: 'unavailable', outcome: null, reason: 'Session preservation supports only openai-codex/gpt-5.6-sol on openai-codex-responses' });
+    expect(f.native.dispatches()).toBe(1);
+    // Not recorded: the operation record is unchanged, so a supported adapter still completes the same Retry.
+    expect(await f.store.read('run-A', 'operation:interrupted')).toEqual(interrupted);
+    const recovered = await (await createPiAgentOn(f.source).bindSessionStore!(f.store).retry({ runId: 'run-A', operationId: 'interrupted', bindings: f.bindings })).receipt;
+    expect(recovered).toMatchObject({ status: 'completed', sessionId: f.P.sessionId, turn: 1, outcome: { kind: 'ended' } }); expect(f.native.dispatches()).toBe(1);
+    const missing = await (await unsupported.retry({ runId: 'run-A', operationId: 'never-started', bindings: f.bindings })).receipt;
+    expect(missing).toMatchObject({ status: 'unavailable', point: null, reason: 'Operation intent missing' }); expect(await f.store.read('run-A', 'operation:never-started')).toBeNull();
+    f.native.verify();
   });
 });

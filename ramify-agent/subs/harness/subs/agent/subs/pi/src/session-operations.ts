@@ -10,7 +10,7 @@ import { assistantText, contextBudgetReached, noMessageDetail } from '../../../s
 import type { AgentEventObservation, BuiltinTool, SessionOutcome, ToolDefinition, ToolResult, WriteTool } from '../../../src/interfaces/port.js';
 import type { ContinueSessionInput, SessionDriverInvocation, SessionDriverRuntime, SessionExecutionBindings, SessionOperations, SessionOperationHandle, SessionOperationReceipt, SessionStore, SessionToolDeclaration } from '../../../src/interfaces/session-operations.js';
 import { builtinAction, chooseModel, permissiveSchema, type PiRuntimeSource } from './pi-agent.js';
-import { copy, decodePreservedTranscript, installedPiPublicExport, installedPiSerialization, same, sameNative, serializeNativePrefix, supportedPreservingModel, validateNativeRequest, type PiTranscriptMessage, type PiTranscriptTool, type PreservedPiTranscript } from './preservation.js';
+import { copy, decodePreservedTranscript, installedPiPackageVersion, installedPiPublicExport, installedPiSerialization, nativeRequestArtifact, same, sameNative, serializeNativePrefix, supportedPreservingModel, validateNativeRequest, type PiTranscriptMessage, type PiTranscriptTool, type PreservedPiTranscript } from './preservation.js';
 
 const builtinFactories = { read: createReadTool, edit: createEditTool, write: createWriteTool, grep: createGrepTool, find: createFindTool, ls: createLsTool };
 type NativeToolResult = Awaited<ReturnType<PiSession['agent']['state']['tools'][number]['execute']>>;
@@ -79,9 +79,12 @@ export function createPiSessionOperations(source: PiRuntimeSource, sessionStore:
     },
     async retry(input) {
       const previous = await sessionStore.read(input.runId, `operation:${input.operationId}`);
-      if (previous?.body['receipt']) return operations.retry(input);
-      const snapshot = previous?.body['snapshot'] as { sessionId?: string; declarations?: readonly SessionToolDeclaration[] } | undefined;
-      const unavailable = await availability(input.runId, input.operationId, snapshot?.sessionId ?? ''); if (unavailable) return unavailable;
+      // A missing or terminal operation is the generic engine's answer; neither consults the model.
+      if (!previous || previous.body['receipt']) return operations.retry(input);
+      const snapshot = previous.body['snapshot'] as { sessionId?: string; declarations?: readonly SessionToolDeclaration[] } | undefined;
+      const recordedSessionId = previous.body['sessionId'];
+      const sessionId = typeof recordedSessionId === 'string' ? recordedSessionId : snapshot?.sessionId ?? '';
+      const unavailable = await availability(input.runId, input.operationId, sessionId); if (unavailable) return unavailable;
       return operations.retry({ ...input, bindings: enrichBindings(input.bindings, snapshot?.declarations ?? []) });
     },
   };
@@ -203,7 +206,15 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
   session.agent.beforeToolCall = undefined;
   const nativeErrors = new Map<string, boolean>();
   session.agent.afterToolCall = async context => nativeErrors.has(context.toolCall.id) ? { isError: nativeErrors.get(context.toolCall.id) } : undefined;
-  session.agent.finishTurn = () => accepted !== undefined || final || budget !== undefined || fatal ? { action: 'end' } : undefined;
+  // The budget is decided here, before the loop can dispatch again: pi runs
+  // finishTurn after a turn's tool results and ends the loop on `end`, whereas
+  // a budget first seen at turn_end would only fail the next request, which pi
+  // records as a fabricated error message that was never dispatched.
+  session.agent.finishTurn = () => {
+    const usage = session.getContextUsage();
+    if (usage) { runtime.onEvent({ type: 'context-observed', tokens: usage.tokens, window: usage.contextWindow }); if (contextBudgetReached(input.session.policy.context, usage.tokens, usage.contextWindow)) budget = usage.tokens; }
+    return accepted !== undefined || final || budget !== undefined || fatal ? { action: 'end' } : undefined;
+  };
   session.agent.sessionId = input.session.sessionId;
   session.agent.state.messages = copy(messages);
   session.agent.state.tools = declarations.map(definition => ({ ...definition, label: definition.name,
@@ -233,14 +244,17 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
     const expected = await serializeNativePrefix(chosen.model, messages);
     const transform = options?.onPayload;
     // Cached WebSocket transport rewrites input after onPayload. Only the
-    // qualified full-payload SSE transport may cross this final fence.
-    return stream(model, context, { ...options, transport: 'sse', maxRetries: 0, onPayload: async (payload, requestModel) => {
+    // qualified full-payload SSE transport may cross this final fence. The
+    // artifact records the options object handed over, not a restatement.
+    const forced = { ...options, transport: 'sse' as const, maxRetries: 0 };
+    return stream(model, context, { ...forced, onPayload: async (payload, requestModel) => {
       try {
         const transformed = await transform?.(payload, requestModel); const body = transformed ?? payload;
         if (fatal) throw new Error(fatal);
         if ((body as Record<string, unknown>)['model'] !== chosen.model.id) throw new Error('Final native request changed model identity');
         const actual = validateNativeRequest(body, expected, inherited);
-        await runtime.persistPayload(`${input.key.operationId}:pi-request:${sequence}:${++requestCount}`, new TextEncoder().encode(JSON.stringify({ schema: 'ramify.pi-native-request/1', packageVersion: '0.87.1', transport: 'sse', model: modelIdentity, ...actual, request: copy(body) })));
+        const artifact = nativeRequestArtifact(forced, await installedPiPackageVersion(), modelIdentity, actual, body);
+        await runtime.persistPayload(`${input.key.operationId}:pi-request:${sequence}:${++requestCount}`, new TextEncoder().encode(JSON.stringify(artifact)));
         await runtime.assertLive();
         dispatchStarted = Date.now(); if (runtime.signal.aborted) throw new Error('Operation stopped');
         return body;
@@ -283,10 +297,6 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
         reachedTool: input.session.activeTools.includes(event.toolName) });
     }
     if (captured) reportMessage(captured as AgentSessionEvent, runtime, messageSourceId, chosen, modelElapsedMs, new Date(admissionAt).toISOString());
-    if (event.type === 'turn_end') {
-      const usage = session.getContextUsage();
-      if (usage) { runtime.onEvent({ type: 'context-observed', tokens: usage.tokens, window: usage.contextWindow }); if (contextBudgetReached(input.session.policy.context, usage.tokens, usage.contextWindow)) budget = usage.tokens; }
-    }
   });
   const stop = () => session.agent.abort(); runtime.signal.addEventListener('abort', stop, { once: true });
   try {
