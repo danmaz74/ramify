@@ -5060,10 +5060,11 @@ export class RunService {
         if (ended.data.submission === null || !ended.data.kept) continue;
         const started = run.log.all('invocation-started').find(event => event.data.invocation === ended.data.invocation);
         if (started?.data.role !== 'local-architect' || started.data.work.workItem !== item.id) continue;
-        const recordedInvocation = this.committedBody(run, runLayout.invocation(ended.data.invocation)) as Invocation | null;
-        if (recordedInvocation?.prompt.requestedInputsHash !== inputsHash([
-          renderWorkOrientationPrompt(local, this.projectRoot, workingDirectory), orientationStart,
-        ])) continue;
+        // The orientation is the local architect's operation whose recorded
+        // intent submits through the orientation tool. Its identity is that
+        // intent, not the prompt this restart would render for it.
+        const packet = await (await this.operations(agent)).packet(run.record.jobId, ended.data.invocation);
+        if (packet?.submissionTool !== workOrientationToolName) continue;
         const raw = await readIfExists(run.path(runLayout.submission(ended.data.invocation)));
         if (raw === undefined || sha256(raw) !== ended.data.submission) continue;
         try {
@@ -7615,7 +7616,12 @@ export class RunService {
       ].join('\n\n'),
       workingDirectory: parent.workingDirectory,
       start: point === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: point },
-      ...(point === undefined || parentSession === undefined ? {} : { session: parentSession, continuing: 'capability-qualification' as const }),
+      // Qualification continues the local architect's latest settled point.
+      // Without one, the fresh start is a degradation the record states.
+      ...(point === undefined
+        ? { ...(parentSession === undefined ? {} : { replaces: { session: parentSession, reason: 'reconstructed' as const } }),
+          degraded: { requested: 'continued' as const, reason: 'The local architect session point is unavailable; the request, its provisional source and the full captured plan package were supplied to a fresh session.' } }
+        : parentSession === undefined ? {} : { session: parentSession, continuing: 'capability-qualification' as const }),
       toolName: 'submit_capability_qualification',
       description: 'Qualify this exact request using current behavior and placement evidence.',
       inputSchema: z.toJSONSchema(qualificationActionSchema) as JsonSchema,

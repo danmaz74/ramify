@@ -1,17 +1,18 @@
 import { capabilityFlowBoundaries, flowInitialHead } from './helpers/capability-flow-boundaries.js';
 import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
+import { recoveryBoundaries } from './helpers/recovery-boundaries.js';
 import { assign, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { openRuns, runEventsOnDisk, runPath, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
+import { freeze, openRuns, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { capabilityPolicyFrom } from '../capability/policy.js';
 import { decision, forkDecision } from './helpers/placement.js';
 import type { CapabilityRequest, CapabilityTask } from '../capability/records.js';
-import { runLayout, type InvocationOutcome } from '../run/records.js';
+import { runLayout, type Invocation, type InvocationOutcome } from '../run/records.js';
 import { z } from 'zod';
 import { capabilityActionSchema } from '../capability/submission.js';
 
@@ -499,3 +500,156 @@ test('CA02: local architect finds an existing API and the same engineer verifies
   }
   await opened.service.settled('need', receipt.jobId);
 }, 30_000);
+
+/**
+ * The script of a run that reaches one delegated capability request and
+ * then waits in its capability architect, for the restart cases below.
+ */
+function delegatingScript(qualifications: Array<{ mode: string; prompt: string }> = []): Script {
+  return spec => {
+    if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
+    if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
+    if (spec.submission.name === 'submit_capability_qualification') {
+      qualifications.push({ mode: spec.session.mode, prompt: spec.prompt });
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
+      return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
+        placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
+    }
+    if (spec.role === 'engineer') return submit({ kind: 'capability-needed', summary: 'A needs source', request: {
+      need: 'B fact for A', usage: [{ path: 'subs/a/src/caller.ts', use: 'Display source', prospective: false }],
+      constraints: [], knownInterface: { kind: 'none-known' },
+      examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
+    } });
+    if (spec.role === 'capability-architect') return [{ kind: 'wait', ms: 60_000 }];
+    return [];
+  };
+}
+
+/** Stops the waiting run at whatever version it has reached. */
+async function stopWaitingRun(service: Awaited<ReturnType<typeof openCapabilityRuns>>['service'], jobId: string): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const current = service.events('need', jobId)!;
+    try { await service.execute(stopRun('need', jobId, current.at(-1)!.sequence)); break; }
+    catch (error) { if (!String(error).includes('at version') || attempt === 19) throw error; }
+  }
+  await service.settled('need', jobId);
+}
+
+test('a restart with an unqualified pending request qualifies it fresh and records the continuation it could not honor', async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  const boundaryAnswers = recoveryBoundaries(fixture.root);
+  cleanups.push(async () => boundaryAnswers.assertComplete());
+  let frozen = false;
+  const qualifications: Array<{ mode: string; prompt: string }> = [];
+  const options = { ...boundaryAnswers.options, script: delegatingScript(qualifications), inputs: treeInputs(),
+    // The crash lands after the qualification's start is durable and before
+    // its session is asked anything: the request is recorded, unqualified.
+    afterWrite: async (write: string, runId: string) => {
+      if (write !== 'invocation-started' || frozen) return;
+      const started = (await runEventsOnDisk(fixture.root, 'need', runId)).at(-1);
+      if (started?.type === 'invocation-started' && started.data.role === 'local-architect' && started.data.work.request === 'need-001') {
+        frozen = true; await freeze();
+      }
+    } };
+  const first = await openCapabilityRuns(fixture.root, options);
+  const receipt = await first.service.execute(startRun('need'));
+  await until(() => frozen, 30_000);
+  await staleCrashLock(fixture.root);
+  const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(before.filter(event => event.type === 'capability-requested')).toHaveLength(1);
+  expect(before.filter(event => event.type === 'capability-delegated')).toHaveLength(0);
+  expect(qualifications).toEqual([]);
+
+  const second = await openCapabilityRuns(fixture.root, options);
+  cleanups.push(() => second.service.close());
+  await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event =>
+    event.type === 'capability-delegated' || event.type === 'job-failed'), 30_000);
+  const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  const failedOutcomes = await Promise.all(after.flatMap(event => event.type === 'invocation-ended' && event.data.ended === 'failed'
+    ? [readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.outcome(event.data.invocation)), 'utf8')] : []));
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: after.slice(-12), failedOutcomes })).toHaveLength(0);
+  expect(after.filter(event => event.type === 'capability-delegated')).toHaveLength(1);
+  const starts = after.filter((event): event is Extract<typeof event, { type: 'invocation-started' }> =>
+    event.type === 'invocation-started' && event.data.role === 'local-architect' && event.data.work.request === 'need-001');
+  expect(starts).toHaveLength(2);
+  const [interrupted, recovered] = starts;
+  // The crashed qualification continued the architect's session and was closed by the restart.
+  expect(interrupted!.data.start).toBe('continued');
+  expect(after.filter((event): event is Extract<typeof event, { type: 'invocation-ended' }> =>
+    event.type === 'invocation-ended' && event.data.invocation === interrupted!.data.invocation).map(event => event.data.ended)).toEqual(['failed']);
+  const interruptedRecord = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.invocation(interrupted!.data.invocation)), 'utf8')) as Invocation;
+  expect(interruptedRecord.session).toMatchObject({ requested: 'continued', actual: 'continued' });
+  // The recovery had no settled point to continue. It asked to continue and
+  // records that it could not, rather than a fresh start it never wanted.
+  expect(recovered!.data.start).toBe('opened');
+  const recoveredRecord = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.invocation(recovered!.data.invocation)), 'utf8')) as Invocation;
+  expect(recoveredRecord.session).toEqual({ requested: 'continued', actual: 'fresh', ref: '',
+    degradedReason: expect.stringContaining('The local architect session point is unavailable') });
+  expect(recoveredRecord.attempt).toBe(2);
+  const recoveredOutcome = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.outcome(recovered!.data.invocation)), 'utf8')) as InvocationOutcome;
+  expect(recoveredOutcome.ended).toBe('submitted');
+  expect(recoveredOutcome.session?.mode).toBe('fresh');
+  // Its one model turn is the fresh one, carrying the full captured plan package.
+  expect(qualifications).toEqual([{ mode: 'fresh', prompt: expect.stringContaining('A must show a label for a fact from B, including a fresh value and a source.') }]);
+  await stopWaitingRun(second.service, receipt.jobId);
+}, 60_000);
+
+test('a restart finds the orientation whose event it had not recorded by its operation intent, not by the prompt it would render now', async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  const boundaryAnswers = recoveryBoundaries(fixture.root);
+  cleanups.push(async () => boundaryAnswers.assertComplete());
+  let frozen = false;
+  const options = { ...boundaryAnswers.options, script: delegatingScript(), inputs: treeInputs(),
+    // The crash lands after the orientation's accepted end and before the
+    // event that publishes it.
+    afterWrite: async (write: string, runId: string) => {
+      if (write !== 'invocation-ended' || frozen) return;
+      const events = await runEventsOnDisk(fixture.root, 'need', runId);
+      const ended = events.at(-1);
+      if (ended?.type !== 'invocation-ended' || events.some(event => event.type === 'work-orientation-recorded')) return;
+      if (events.some(event => event.type === 'invocation-started' && event.data.invocation === ended.data.invocation &&
+        event.data.role === 'local-architect' && event.data.work.workItem === 'wi-001')) { frozen = true; await freeze(); }
+    } };
+  const first = await openCapabilityRuns(fixture.root, options);
+  const receipt = await first.service.execute(startRun('need'));
+  await until(() => frozen, 30_000);
+  await staleCrashLock(fixture.root);
+  const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  const orientationEnd = before.at(-1);
+  if (orientationEnd?.type !== 'invocation-ended') throw new Error('Expected the orientation to have ended');
+  expect(orientationEnd.data.ended).toBe('submitted');
+  expect(before.filter(event => event.type === 'work-orientation-recorded')).toHaveLength(0);
+  const originalPurpose = 'A renders the fact for a caller and owns its consumer integration.';
+  const changedPurpose = 'A renders the fact for a caller; its purpose paragraph changed while the harness was down.';
+  const orientations = first.agent!.sessions.filter(session => session.spec.submission.name === 'submit_work_orientation');
+  expect(orientations).toHaveLength(1);
+  expect(orientations[0]!.spec.prompt).toContain(originalPurpose);
+  // The briefing is built from the project at each start. With the module's
+  // onboarding paragraph changed, the orientation prompt this restart would
+  // render is not the one the ended invocation was rendered from.
+  await writeFile(join(fixture.root, 'subs/a/README.md'), `# A\n\n${changedPurpose}\n`);
+
+  const second = await openCapabilityRuns(fixture.root, options);
+  cleanups.push(() => second.service.close());
+  await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event =>
+    event.type === 'capability-delegated' || event.type === 'job-failed'), 30_000);
+  const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  const failedOutcomes = await Promise.all(after.flatMap(event => event.type === 'invocation-ended' && event.data.ended === 'failed'
+    ? [readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.outcome(event.data.invocation)), 'utf8')] : []));
+  expect(after.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: after.slice(-12), failedOutcomes })).toHaveLength(0);
+  // The ended orientation is the one recorded; no second orientation was asked for.
+  const recorded = after.filter((event): event is Extract<typeof event, { type: 'work-orientation-recorded' }> =>
+    event.type === 'work-orientation-recorded' && event.data.workItem === 'wi-001');
+  expect(recorded).toHaveLength(1);
+  expect(recorded[0]!.data.invocation).toBe(orientationEnd.data.invocation);
+  expect(second.agent!.sessions.filter(session => session.spec.submission.name === 'submit_work_orientation')).toHaveLength(0);
+  // The packet it published carries the briefing of the restart, which differs from the one the invocation saw.
+  const packet = await readFile(runPath(fixture.root, 'need', receipt.jobId, recorded[0]!.data.packet!), 'utf8');
+  expect(packet).toContain(changedPurpose);
+  expect(packet).not.toContain(originalPurpose);
+  expect(after.filter(event => event.type === 'context-selection-recorded' && event.data.workItem === 'wi-001')).toHaveLength(1);
+  expect(after.filter(event => event.type === 'capability-delegated')).toHaveLength(1);
+  await stopWaitingRun(second.service, receipt.jobId);
+}, 60_000);
