@@ -414,7 +414,9 @@
         "subs/harness/src/projections/session-queries.ts",
         "subs/harness/src/tests/capability-assignments.test.ts",
         "subs/harness/src/tests/capability-submission.test.ts",
-        "subs/harness/src/tests/helpers/capability-flow-boundaries.ts"
+        "subs/harness/src/tests/helpers/capability-flow-boundaries.ts",
+        "subs/harness/subs/ledger/src/ledger.ts",
+        "subs/harness/subs/ledger/src/tests/ledger.test.ts"
       ],
       "runtimeWorker": [
         "subs/harness/src/run/service.ts",
