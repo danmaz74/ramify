@@ -64,6 +64,7 @@ import {
 } from '../reviews/records.js';
 import { orientationKey, readGuidance, type CapturedInput } from '../reviews/inputs.js';
 import { orientationMessage, pendingBindingEvidence, reviewMessage } from '../reviews/message.js';
+import { collectReviewDiffPayload } from '../reviews/diff-payload.js';
 import { ReviewQueue } from '../reviews/scheduler.js';
 import { candidateModuleIndex, concernModules, groundCredibility } from '../reviews/signals.js';
 import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotTools } from '../reviews/snapshot.js';
@@ -666,6 +667,8 @@ class Run {
   done: Promise<void> = Promise.resolve();
   /** The run's review readers, once it reviews; undefined for a run whose policy requests none. */
   reviews: ReviewQueue | undefined;
+  /** Patch preparation belongs to its review request and stops with its readers. */
+  readonly reviewPreparations = new Map<string, AbortController>();
   /** Why the run stopped its readers, which a reader stopped for it records as its attempt's reason. */
   readerStop: NotVerifiedReason | undefined;
   /** When the run's reviews must be settled by, once its final settlement began; epoch milliseconds. */
@@ -1238,6 +1241,21 @@ export class RunService {
     const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, request.assignment));
     const held = selectCheckFindings(checkFindingStateOf(run.log.ledger), { kind: 'list', owner: { kind: 'work-item', workItem: request.workItem }, select: 'all', limit: 100 });
     const tools = snapshotTools(snapshot, this.candidates, this.projectRoot);
+    let diffPayload: Awaited<ReturnType<typeof collectReviewDiffPayload>>;
+    const preparation = new AbortController();
+    const preparationStarted = Date.now();
+    const preparationTimer = setTimeout(() => preparation.abort(new Error('Review patch preparation exceeded its attempt bound')), policy.attemptMs);
+    preparationTimer.unref?.();
+    run.reviewPreparations.set(id, preparation);
+    try { diffPayload = await collectReviewDiffPayload(snapshot, this.candidates, this.projectRoot, preparation.signal); }
+    catch (error) {
+      if (this.ignoring(run) || run.reviews?.accepting !== true || reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
+      return await unavailable(`The audited candidate's patches could not be collected: ${message(error)}`) === 'committed';
+    } finally {
+      clearTimeout(preparationTimer);
+      run.reviewPreparations.delete(id);
+    }
+    if (this.ignoring(run) || run.reviews?.accepting !== true || reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
     const workspace = run.path(join(dirname(reviewLayout.attempt(attempt)), 'workspace'));
     await mkdir(workspace, { recursive: true });
 
@@ -1246,7 +1264,9 @@ export class RunService {
     let fenced = false;
     const result = await this.runInvocation<ReviewSubmission>(run, agent, {
       role: 'reviewer', task: { kind, goal: `Review ${request.key.candidate}`, requirements: [JSON.stringify(request)], candidate: request.key.candidate, snapshot: snapshot.tree, views: [],
-        ...(assignmentPackage === undefined ? {} : { omit: [assignmentPackage], literalSections: [{ key: 'support:assignment-package', text: assignmentPackage }] }) },
+        omit: [...(assignmentPackage === undefined ? [] : [assignmentPackage]), diffPayload.text],
+        literalSections: [...(assignmentPackage === undefined ? [] : [{ key: 'support:assignment-package', text: assignmentPackage }]),
+          { key: 'support:candidate-diff', text: diffPayload.text }] },
       work: { workItem: request.workItem, iteration: request.key.iteration },
       attempt: state.attempts.length + 1,
       loaded,
@@ -1254,6 +1274,7 @@ export class RunService {
       prompt: reviewMessage({
         request,
         snapshot,
+        diffPayload: diffPayload.text,
         pendingBindings,
         assignment: assignment.success ? assignment.data : null,
         checkFindings: held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [],
@@ -1268,12 +1289,12 @@ export class RunService {
       description: reviewSubmissionDescription,
       inputSchema: reviewJsonSchema,
       submissionSchema: 'ramify-agent.review-submission/1',
-      validate: input => validateReview(input, { snapshot, inspected: tools.inspected(), read: tools.read(), maxConcerns: policy.maxConcerns }),
+      validate: input => validateReview(input, { snapshot, inspected: tools.inspected(), deliveredPatches: new Set(diffPayload.inlinePaths), read: tools.read(), maxConcerns: policy.maxConcerns }),
       keep: () => finished('work-closed'),
       scope: { write: null, measurement: null, size: null },
       reader: true,
       workingDirectory: workspace,
-      absoluteMs: policy.attemptMs,
+      absoluteMs: Math.max(1, policy.attemptMs - (Date.now() - preparationStarted)),
       equip: () => ({ builtinTools: [], tools: [...tools.definitions] }),
       // The start is recorded only for a request still unsettled, under the
       // mutex its deadline settles it under; a settled one's reader never starts.
@@ -1737,6 +1758,7 @@ export class RunService {
         ? `${workItem}'s reviews had to settle by its completion request plus the settlement bound; this attempt was still running, and its reader was stopped`
         : `${workItem}'s reviews had to settle by its completion request plus the settlement bound; this review had not run`,
     }), unsettled.map(request => request.id));
+    for (const request of unsettled) run.reviewPreparations.get(request.id)?.abort();
     const readers = running.flatMap(invocation => {
       const live = run.live.get(invocation);
       return live === undefined ? [] : [live];
@@ -3298,6 +3320,7 @@ export class RunService {
   private async stopReaders(run: Run, reason: NotVerifiedReason, grace: number, writer = false): Promise<boolean> {
     run.readerStop ??= reason;
     run.reviews?.close();
+    for (const preparation of run.reviewPreparations.values()) preparation.abort();
     const sessions = run.sessions(live => writer || live.reader);
     let timer: NodeJS.Timeout | undefined;
     const settled = sessions.length === 0 || await Promise.race([
@@ -11980,6 +12003,7 @@ export class RunService {
       for (const run of active) {
         run.readiness?.controller.abort();
         run.reviews?.close();
+        for (const preparation of run.reviewPreparations.values()) preparation.abort();
         for (const session of run.sessions()) void session.stop().catch(() => undefined);
         run.notify();
       }

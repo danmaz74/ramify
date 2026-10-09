@@ -200,7 +200,9 @@ describe('CF04: invalid, timed-out and unavailable reviews are not verified', ()
     const root = await reviewTarget(cleanups);
     const malformed: ScriptStep[] = [
       { kind: 'submit', input: { inspected: [], concerns: [] } },
-      { kind: 'submit', input: { inspected: [store], missing: [], concerns: [] } },
+      // The supplied store patch is valid inspection evidence; an unrelated
+      // path still cannot satisfy this candidate's changed-path coverage.
+      { kind: 'submit', input: { inspected: [limit], missing: [], concerns: [] } },
       { kind: 'submit', input: { verdict: 'looks fine' } },
     ];
     let source!: ReturnType<typeof scriptedCandidates>;

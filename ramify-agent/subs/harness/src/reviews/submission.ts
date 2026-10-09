@@ -8,8 +8,9 @@ import { resolveChangedPath, resolveSnapshotPath, snapshotToolNames, type Candid
  * A reviewer's one submission, judged against what the harness observed.
  * The schema holds the shape; the rules below hold what it cannot: every
  * changed path is named once, as inspected or as missing with a reason; a
- * path named inspected was actually answered by a snapshot tool during this
- * attempt; every concern points at the candidate; and a concern's ground is
+ * path named inspected had its complete patch delivered in this attempt's
+ * prompt or was answered by a snapshot tool; every concern points at the
+ * candidate; and a concern's ground is
  * a file `snapshot_read` answered during this attempt. An agent's word that
  * it read something is never the evidence that it did.
  */
@@ -25,6 +26,8 @@ export interface ReviewEvidence {
   readonly snapshot: CandidateSnapshot;
   /** The changed paths a snapshot tool answered the content or patch of during this attempt. */
   readonly inspected: ReadonlySet<string>;
+  /** Canonical changed paths whose complete patches were delivered in this attempt's prompt. Summaries and omitted patches do not qualify. */
+  readonly deliveredPatches?: ReadonlySet<string>;
   /** Every file `snapshot_read` answered during this attempt, with the hash of its content. */
   readonly read: ReadonlyMap<string, string>;
   readonly maxConcerns: number;
@@ -55,11 +58,11 @@ export function validateReview(input: unknown, evidence: ReviewEvidence): Submis
   submission.inspected.forEach((path, index) => {
     name(path, `inspected.${index}`);
     const resolved = resolveChangedPath(evidence.snapshot, path);
-    if (typeof resolved === 'string' && !evidence.inspected.has(resolved)) {
+    if (typeof resolved === 'string' && !evidence.inspected.has(resolved) && !evidence.deliveredPatches?.has(resolved)) {
       errors.push({
         path: `inspected.${index}`,
-        message: `"${resolved}" is named inspected, and no ${snapshotToolNames.read} or ${snapshotToolNames.diff} call of this review answered it`,
-        expected: 'a path read through the snapshot tools, or named missing with the reason',
+        message: `"${resolved}" is named inspected, and no ${snapshotToolNames.read} or ${snapshotToolNames.diff} call of this review answered it and no complete patch was delivered in its prompt`,
+        expected: 'a path with a complete patch delivered in this prompt or read through the snapshot tools, or named missing with the reason',
       });
     }
   });

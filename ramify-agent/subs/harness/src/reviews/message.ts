@@ -35,6 +35,8 @@ export interface ReviewBriefing {
   readonly pendingBindings?: readonly { readonly path: string; readonly sha256: string; readonly scenario: string; readonly invocation: string; readonly submission: string }[] | undefined;
   /** Declared check facts with candidate-relative configuration references. */
   readonly setup?: string | undefined;
+  /** Complete inline patches or bounded fallback instructions from the same frozen comparison. */
+  readonly diffPayload?: string | undefined;
 }
 
 const questions = { code: 'Code review', scope: 'Scope review', design: 'Design review' } as const;
@@ -89,7 +91,8 @@ export function reviewMessage(briefing: ReviewBriefing): string {
       : [...new Map(snapshot.changes.map(change => [`${change.status}\0${change.path}`, change])).values()].map(change => `- ${change.status} ${change.path}`)),
     '',
   );
-  lines.push('Use the supplied changed-path list, then read each relevant patch with snapshot_diff and inspect the source required to judge it. List paths with snapshot_diff only if the supplied list is unavailable. The audited diff includes harness-produced changes; no feature or pending-tag patch is hidden.', '');
+  if (briefing.diffPayload !== undefined) lines.push(briefing.diffPayload, '');
+  lines.push('Use the supplied changed-path list and complete patches delivered in this message. Fetch a relevant patch with snapshot_diff only when it is not supplied, and inspect the source required to judge it. List paths with snapshot_diff only if the supplied list is unavailable. The audited diff includes harness-produced changes; no feature or pending-tag patch is hidden.', '');
   if (briefing.setup) lines.push(briefing.setup, '');
   if (assignment !== null && kind !== 'design') {
     const modules = assignment.scope.resolved.ownership.modules.filter(module => assignment.gate.tests.exactOwners.includes(module.id)

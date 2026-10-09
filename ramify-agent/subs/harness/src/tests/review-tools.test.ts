@@ -151,6 +151,47 @@ describe('a reviewer\'s submission', () => {
     expect(errors({ ...clean, concerns: [{ ...concern('src/a.ts'), credibility: 'human-reviewed', modules: ['project/other'] }] }))
       .toEqual([expect.stringMatching(/^concerns\.0: .*credibility.*modules/u)]);
   });
+
+  test('accepts inspected paths with complete prompt patches, but not paths merely listed or omitted', async () => {
+    const { snapshot: candidate } = await snapshot();
+    const evidence = {
+      snapshot: candidate,
+      inspected: new Set(['src/b.ts']),
+      deliveredPatches: new Set(['src/a.ts', 'src/gone.ts', 'README.md']),
+      read: new Map<string, string>(),
+      maxConcerns: 5,
+    };
+    const complete = { inspected: ['./src/a.ts', 'src/gone.ts', 'src/b.ts'], missing: [], concerns: [] };
+    // Delivered patches and tool answers can cover the same attempt, including a deleted file.
+    expect(validateReview(complete, evidence)).toEqual({ ok: true, value: complete });
+
+    // The canonical changed-path list does not prove its patches were supplied.
+    const omitted = validateReview(complete, { ...evidence, deliveredPatches: new Set(['src/a.ts']) });
+    expect(omitted).toMatchObject({ ok: false, errors: [{ path: 'inspected.1', message: expect.stringContaining('no complete patch was delivered') }] });
+    expect(validateReview({ ...complete, inspected: ['./src/a.ts', 'src/b.ts'], missing: [{ path: 'src/gone.ts', reason: 'Only a summary was supplied' }] },
+      { ...evidence, deliveredPatches: new Set(['src/a.ts']) })).toMatchObject({ ok: true });
+
+    // Delivery never makes an unchanged file part of the review's changed scope.
+    expect(validateReview({ ...complete, inspected: [...complete.inspected, 'README.md'] }, evidence))
+      .toMatchObject({ ok: false, errors: [{ path: 'inspected.3', message: expect.stringContaining('not a path the candidate changed') }] });
+  });
+
+  test('a delivered patch does not satisfy a concern ground without a current snapshot_read', async () => {
+    const { snapshot: candidate } = await snapshot();
+    const evidence = {
+      snapshot: candidate,
+      inspected: new Set<string>(),
+      deliveredPatches: new Set(['src/a.ts', 'src/gone.ts', 'src/b.ts']),
+      read: new Map<string, string>(),
+      maxConcerns: 5,
+    };
+    const submission = { inspected: ['src/a.ts', 'src/gone.ts', 'src/b.ts'], missing: [], concerns: [concern('src/a.ts', { path: 'src/a.ts' })] };
+    expect(validateReview(submission, evidence)).toMatchObject({
+      ok: false,
+      errors: [{ path: 'concerns.0.ground.path', message: expect.stringContaining('was not read with snapshot_read') }],
+    });
+    expect(validateReview(submission, { ...evidence, read: new Map([['src/a.ts', 'sha256:1']]) })).toMatchObject({ ok: true });
+  });
 });
 
 describe('the bounded queue of readers', () => {
