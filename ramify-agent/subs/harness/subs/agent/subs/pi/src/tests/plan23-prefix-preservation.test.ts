@@ -106,6 +106,7 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     expect(prefix(f.native, 3).input).toEqual([...third.input, { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Second task.', annotations: [] }], status: 'completed', id: 'msg_fixture', phase: 'final_answer' }, { role: 'user', content: [{ type: 'input_text', text: 'Third A' }] }]);
     expect(await (await anotherAdapter.continue(f.next(f.P.sessionId, f.P.point!, 'orient'))).receipt).toEqual(T1); expect(f.native.dispatches()).toBe(4);
     expect(f.native.transports).toEqual(['sse', 'sse', 'sse', 'sse']);
+    expect(f.native.wireHeaders).toEqual(Array(4).fill({ sessionId: f.P.sessionId, clientRequestId: f.P.sessionId }));
     f.native.verify();
   });
   it('a submission declaration that already states its schema is serialized without a second, empty schema statement', async () => {
@@ -149,7 +150,50 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     await (await f.operations.continue(f.next(f.P.sessionId, C2.point!, 'parent'))).receipt;
     expect(await f.operations.inspect('run-A', R.sessionId)).toEqual(beforeRight);
     expect((await f.operations.inspect('run-A', f.P.sessionId))?.declarations.map(item => item.name)).toEqual(['read', 'submit_orientation']);
-    expect(f.native.requests.map(item => item['prompt_cache_key'])).toEqual([f.P.sessionId, L.sessionId, R.sessionId, f.P.sessionId]);
+    expect(f.native.requests.map(item => item['prompt_cache_key'])).toEqual(Array(4).fill(f.P.sessionId));
+    expect(new Set([f.P.sessionId, L.sessionId, R.sessionId]).size).toBe(3);
+    expect(f.native.wireHeaders).toEqual(Array(4).fill({ sessionId: f.P.sessionId, clientRequestId: f.P.sessionId }));
+    f.native.verify();
+  });
+  it('shares the creation identity across nested forks before any model request and keeps unrelated roots distinct', async () => {
+    const f = await fixture([[text('Nested.')], [text('Sibling.')], [text('Root.')], [text('Unrelated.')]]);
+    const left = await f.operations.fork({ runId: 'run-A', operationId: 'left', sourcePoint: f.P.point! });
+    const nested = await f.operations.fork({ runId: 'run-A', operationId: 'nested', sourcePoint: left.point! });
+    const right = await f.operations.fork({ runId: 'run-A', operationId: 'right', sourcePoint: f.P.point! });
+    const unrelated = await f.operations.create({ runId: 'run-A', operationId: 'unrelated-create', initialInstructions: 'Unrelated root.', declarations: [read, orientation], activate: [read.name, orientation.name], policy });
+    const reopened = memoryStore({ records: [...f.records], payloads: [...f.payloads].map(([id, bytes]) => [id, Buffer.from(bytes).toString('base64')]) });
+    const restored = createPiAgentOn(f.source).bindSessionStore!(reopened.store);
+    for (const [index, session] of [nested, right, f.P, unrelated].entries()) {
+      const result = await (await restored.continue(f.next(session.sessionId, session.point!, `request-${index}`))).receipt;
+      expect(result).toMatchObject({ status: 'completed', sessionId: session.sessionId });
+      const snapshot = (await restored.inspect('run-A', session.sessionId))!;
+      const entry = snapshot.transcript.filter(item => item.key.includes(':pi-state:')).at(-1)!;
+      expect(JSON.parse(new TextDecoder().decode(reopened.payloads.get(entry.payloadId)!)).providerSessionId).toBe(index === 3 ? unrelated.sessionId : f.P.sessionId);
+      if (index < 2) expect((await restored.inspect('run-A', f.P.sessionId))?.currentPoint).toEqual(f.P.point);
+    }
+    expect(new Set([f.P, left, nested, right, unrelated].map(session => session.sessionId)).size).toBe(5);
+    const expected = [f.P.sessionId, f.P.sessionId, f.P.sessionId, unrelated.sessionId];
+    expect(f.native.wireRequests.map(body => body['prompt_cache_key'])).toEqual(expected);
+    expect(f.native.wireHeaders).toEqual(expected.map(sessionId => ({ sessionId, clientRequestId: sessionId })));
+    f.native.verify();
+  });
+  it('upgrades legacy child transcripts from the original creation identity and preserves it through a further fork', async () => {
+    const f = await fixture([[text('Parent.')], [text('Child.')], [text('Restored child.')], [text('Grandchild.')]]);
+    const parent = await (await f.operations.continue(f.next(f.P.sessionId, f.P.point!, 'parent'))).receipt;
+    const child = await f.operations.fork({ runId: 'run-A', operationId: 'child', sourcePoint: parent.point! });
+    const first = await (await f.operations.continue(f.next(child.sessionId, child.point!, 'child-first'))).receipt;
+    // Independent legacy fixture bypasses content addressing, as corruption fixtures do below.
+    for (const [id, bytes] of f.payloads) {
+      const value = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
+      if (value['schema'] === 'ramify.pi-transcript/1') { delete value['providerSessionId']; f.payloads.set(id, new TextEncoder().encode(JSON.stringify(value))); }
+    }
+    const restored = createPiAgentOn(f.source).bindSessionStore!(f.store);
+    const second = await (await restored.continue(f.next(child.sessionId, first.point!, 'child-restored'))).receipt;
+    expect(second.status).toBe('completed');
+    const grandchild = await restored.fork({ runId: 'run-A', operationId: 'grandchild', sourcePoint: second.point! });
+    expect((await (await restored.continue(f.next(grandchild.sessionId, grandchild.point!, 'grandchild-first'))).receipt).status).toBe('completed');
+    expect(f.native.wireRequests.map(body => body['prompt_cache_key'])).toEqual(Array(4).fill(f.P.sessionId));
+    expect(f.native.wireHeaders).toEqual(Array(4).fill({ sessionId: f.P.sessionId, clientRequestId: f.P.sessionId }));
     f.native.verify();
   });
   it('S08 rebinds an identical tool without redeclaration and conflicts on changed description/schema before dispatch', async () => {
@@ -168,10 +212,11 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     }
     expect(f.native.dispatches()).toBe(4); f.native.verify();
   });
-  it.each(['replace-head', 'replace-tools', 'replace-input', 'reorder-input', 'replace-model', 'throw'])('S09 fences a final %s hook before the initial request', async mutation => {
+  it.each(['replace-head', 'replace-tools', 'replace-input', 'reorder-input', 'replace-model', 'replace-cache-key', 'throw'])('S09 fences a final %s hook before the initial request', async mutation => {
     const f = await fixture([], [read, orientation], [pi => { pi.on('before_provider_request', event => {
       const body = event.payload as Record<string, unknown>;
       if (mutation === 'throw') throw new Error('Swallowed extension failure');
+      if (mutation === 'replace-cache-key') return { ...body, prompt_cache_key: 'wrong-provider-identity' };
       if (mutation === 'replace-model') return { ...body, model: 'gpt-5.4' };
       if (mutation === 'reorder-input') return { ...body, input: (body['input'] as Record<string, unknown>[]).map(item => Object.fromEntries(Object.entries(item).reverse())) };
       return { ...body, ...(mutation === 'replace-head' ? { instructions: 'Wrong head.' } : mutation === 'replace-tools' ? { tools: [] } : { input: [] }) };
@@ -246,13 +291,15 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     const receipt = await (await operations.continue(f.next(f.P.sessionId, f.P.point!, 'unsupported'))).receipt;
     expect(receipt).toMatchObject({ status: 'unavailable', point: null }); expect(f.native.dispatches()).toBe(0); expect(f.native.requests).toHaveLength(0); f.native.verify();
   });
-  it.each(['native-prefix', 'encoding', 'model', 'transport'])('S10 makes intact but corrupt %s history durably unavailable and Retry dispatches zero requests', async corruption => {
+  it.each(['native-prefix', 'encoding', 'model', 'transport', 'provider-identity-empty', 'provider-identity-type'])('S10 makes intact but corrupt %s history durably unavailable and Retry dispatches zero requests', async corruption => {
     const f = await fixture([[call('submit_orientation', { orientation: 'A' }, 'orient')]]);
     const T1 = await (await f.operations.continue(f.next(f.P.sessionId, f.P.point!, 'orient'))).receipt;
     const snapshot = await f.operations.inspect('run-A', f.P.sessionId);
     const entry = snapshot!.transcript.filter(item => item.kind === 'provider' && item.key.includes(':pi-state:')).at(-1)!;
     const value = JSON.parse(new TextDecoder().decode(f.payloads.get(entry.payloadId)!)) as Record<string, unknown>;
     if (corruption === 'native-prefix') (value['native'] as Record<string, unknown>)['instructions'] = 'Corrupt head.';
+    if (corruption === 'provider-identity-empty') value['providerSessionId'] = ' ';
+    if (corruption === 'provider-identity-type') value['providerSessionId'] = 7;
     if (corruption === 'model') value['model'] = 'Different/model';
     if (corruption === 'transport') value['transport'] = 'websocket-cached';
     // Independent corruption fixture bypasses content-addressing to exercise the decoder.
@@ -303,7 +350,7 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     if (shape === 'with-coerced-read') expect((interrupted!.body['effects'] as Array<{ tool: string; input: unknown }>).find(effect => effect.tool === 'read')?.input).toEqual({ offset: 2 });
     const stateEntry = (interrupted!.body['provider'] as Array<{ key: string; payloadId: string }>).filter(item => item.key.includes(':pi-state:')).at(-1)!;
     const opaque = JSON.parse(new TextDecoder().decode(f.payloads.get(stateEntry.payloadId)!)) as { messages: Array<{ role: string }>; transport: string; packageVersion: string; model: string };
-    expect(opaque).toMatchObject({ transport: 'sse', packageVersion: '0.87.1', model: 'openai-codex/gpt-5.6-sol' });
+    expect(opaque).toMatchObject({ providerSessionId: f.P.sessionId, transport: 'sse', packageVersion: '0.87.1', model: 'openai-codex/gpt-5.6-sol' });
     expect(opaque.messages.some(message => message.role === 'toolResult')).toBe(false);
     expect(opaque.messages.at(-1)?.role).toBe('assistant');
     const rebuilt = createPiAgentOn(f.source).bindSessionStore!(f.store);
@@ -334,6 +381,7 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     expect(receipt.reason).toBeNull();
     expect(receipt).toMatchObject({ status: 'completed', turn: 1, outcome: { kind: 'submitted', input: { orientation: 'A' } } });
     expect(f.reads()).toBe(1); expect(f.native.dispatches()).toBe(2);
+    expect(f.native.wireHeaders).toEqual(Array(2).fill({ sessionId: f.P.sessionId, clientRequestId: f.P.sessionId }));
     expect(prefix(f.native, 1).input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: 'Orient A' }] }, reason, call('read', {}, 'recover-read'), { type: 'function_call_output', call_id: 'call_recover-read', output: 'Exact read result.' }]); f.native.verify();
   });
   it('missing initial role cannot dispatch the installed default prompt', async () => {

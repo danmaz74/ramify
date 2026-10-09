@@ -31,6 +31,14 @@ presence proves neither HTTP dispatch nor full settled history: final accepted
 tool outputs may follow the last request. Pi-owned qualification verifies the
 complete settled messages including terminal submission outputs.
 
+Related forks share a Pi-owned provider session identity, persisted in the
+opaque transcript. Pi uses it for `session-id`, `x-client-request-id` and
+`prompt_cache_key`; logical harness session IDs and branch histories remain
+independent. Older transcripts and forks before the first request resolve this
+identity from the original creation operation. Unrelated roots use different
+identities. Compatible native prefixes can therefore reuse the parent's cache
+on a fork's first request; the provider still decides whether a cache hit occurs.
+
 ## Execution policy
 
 The driver binds fresh callable tools and the current designated submission.

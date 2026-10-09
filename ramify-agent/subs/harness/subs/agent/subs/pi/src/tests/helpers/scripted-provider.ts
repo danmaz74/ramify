@@ -208,7 +208,7 @@ export async function scriptedRuntime(scripted: ScriptedProvider): Promise<{ run
   return { runtime, agentDirectory, remove: () => rm(agentDirectory, { recursive: true, force: true }) };
 }
 
-export interface NativeCodexRuntime { readonly runtime: ModelRuntime; readonly model: Model; readonly agentDirectory: string; readonly requests: Record<string, unknown>[]; readonly wireRequests: Record<string, unknown>[]; readonly transports: unknown[]; dispatches(): number; push(...items: Array<readonly Record<string, unknown>[]>): void; verify(): void; remove(): Promise<void> }
+export interface NativeCodexRuntime { readonly runtime: ModelRuntime; readonly model: Model; readonly agentDirectory: string; readonly requests: Record<string, unknown>[]; readonly wireRequests: Record<string, unknown>[]; readonly transports: unknown[]; readonly wireHeaders: Array<{ sessionId: string | null; clientRequestId: string | null }>; dispatches(): number; push(...items: Array<readonly Record<string, unknown>[]>): void; verify(): void; remove(): Promise<void> }
 /** Real installed Codex serializer/parser, with only its HTTP transport intercepted. */
 export async function nativeCodexRuntime(outputs: readonly (readonly Record<string, unknown>[])[]): Promise<NativeCodexRuntime> {
   const agentDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-native-pi-'));
@@ -216,7 +216,7 @@ export async function nativeCodexRuntime(outputs: readonly (readonly Record<stri
   const model = runtime.getModel('openai-codex', 'gpt-5.6-sol');
   if (!model) throw new Error('Installed pi catalog lacks the qualified model');
   const native = await import(await installedPiPublicExport('./api/openai-codex-responses')) as { streamSimple: StreamFunction; stream: StreamFunction };
-  const queue = [...outputs]; const requests: Record<string, unknown>[] = []; const wireRequests: Record<string, unknown>[] = []; const transports: unknown[] = []; let dispatches = 0; let exhausted = false;
+  const queue = [...outputs]; const requests: Record<string, unknown>[] = []; const wireRequests: Record<string, unknown>[] = []; const transports: unknown[] = []; const wireHeaders: NativeCodexRuntime['wireHeaders'] = []; let dispatches = 0; let exhausted = false;
   const token = `fixture.${Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'fixture-account' } })).toString('base64')}.fixture`;
   const intercept: StreamFunction = (selected, context, options) => { transports.push(options?.transport); return native.streamSimple(selected, context, {
     ...options, transport: 'sse', maxRetries: 0,
@@ -229,6 +229,7 @@ export async function nativeCodexRuntime(outputs: readonly (readonly Record<stri
       if (!output) { exhausted = true; throw new Error('Unexpected native provider request'); }
       const wire = typeof init?.body === 'string' ? init.body : zlib.zstdDecompressSync(init?.body as Uint8Array).toString('utf8');
       wireRequests.push(JSON.parse(wire) as Record<string, unknown>);
+      const headers = new Headers(init?.headers); wireHeaders.push({ sessionId: headers.get('session-id'), clientRequestId: headers.get('x-client-request-id') });
       const event = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`;
       let sse = event({ type: 'response.created', response: { id: `resp_fixture_${index}` } });
       output.forEach((item, output_index) => {
@@ -240,7 +241,7 @@ export async function nativeCodexRuntime(outputs: readonly (readonly Record<stri
     },
   } as StreamOptions); };
   runtime.registerNativeProvider({ id: 'openai-codex', name: 'Intercepted installed Codex', auth: { apiKey: { name: 'Fixture', resolve: async () => ({ auth: { apiKey: token } }) } }, getModels: () => [model], stream: intercept, streamSimple: intercept } as Provider);
-  return { runtime, model, agentDirectory, requests, wireRequests, transports, dispatches: () => dispatches, push: (...items: Array<readonly Record<string, unknown>[]>) => queue.push(...items),
+  return { runtime, model, agentDirectory, requests, wireRequests, transports, wireHeaders, dispatches: () => dispatches, push: (...items: Array<readonly Record<string, unknown>[]>) => queue.push(...items),
     verify: () => { if (exhausted || queue.length || JSON.stringify(wireRequests) !== JSON.stringify(requests)) throw new Error(`Native script exhaustion=${exhausted}, unused=${queue.length}, final payload/wire equality=${JSON.stringify(wireRequests) === JSON.stringify(requests)}`); },
     remove: () => rm(agentDirectory, { recursive: true, force: true }) };
 }
