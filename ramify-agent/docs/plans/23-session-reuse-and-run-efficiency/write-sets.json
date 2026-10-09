@@ -514,6 +514,20 @@
         "subs/harness/src/tests/plan23-session-store-cache.test.ts"
       ],
       "reviewWorker": []
+    },
+    "four-worker-39aea6be": {
+      "base": "39aea6be3c2297bb22b9d902a40004fb4cf51521",
+      "evidence": "/tmp/plan23-39aea6be-integrated-four-worker-workflows.log",
+      "observationBatchWorker": [
+        "subs/harness/src/run/observations.ts",
+        "subs/harness/src/run/port-events.ts",
+        "subs/harness/src/tests/observation-log.test.ts",
+        "subs/harness/src/tests/plan23-observation-integration.test.ts"
+      ],
+      "diagnosisWorkerTemporaryOnly": [
+        "subs/harness/src/tests/contract-revision-scripted.test.ts"
+      ],
+      "reviewWorker": []
     }
   }
 }
