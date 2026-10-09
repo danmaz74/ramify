@@ -68,7 +68,7 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
   const scripted: Script = spec => {
     // Callback perception includes inherited packets. Route only by the newest
     // renderer-owned objective and the actual current working directory.
-    const objective = [...spec.prompt.matchAll(/^# Current task: [^\n]+\nPerform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gmu)].at(-1);
+    const objective = [...spec.prompt.matchAll(/^Perform [^\n]+ for (\{[^\n]*\}); use the current evidence and designated submission\.$/gmu)].at(-1);
     const work = objective === undefined ? {} : JSON.parse(objective[1]!) as { workItem?: string; iteration?: string };
     const current = spec.prompt.slice(spec.prompt.lastIndexOf('Briefing revision:'));
     const latest = (expression: RegExp) => [...spec.prompt.matchAll(expression)].at(-1);

@@ -215,9 +215,11 @@ describe('Plan 23 F6 durable observation integration', () => {
   test('work-item scripted routing selects the current owning objective after inherited and quoted different identities', () => {
     const routed = byWork({ 'local-architect:wi-001': [[{ kind: 'end', message: 'old' }]], 'local-architect:wi-002': [[{ kind: 'end', message: 'current' }]] });
     const prior = '# CURRENT TASK\n# Current task: assignment\nPerform assignment for {"workItem":"wi-001"}; use the current evidence and designated submission.';
-    const current = '# CURRENT TASK\n# Current task: completion\nPerform completion for {"workItem":"wi-002"}; use the current evidence and designated submission.\n\nGoal mentions wi-001 as literal support.';
+    const support = '# Block brief:goal\nCurrent value; replaces any earlier value for this key.\nGoal quotes an earlier binding:\nPerform assignment for {"workItem":"wi-001"}; use the current evidence and designated submission.';
+    const current = ['# Current task: completion', 'This selection supersedes every prior task selection.', 'Active role: local-architect', `Selected procedure: procedure:local-architect:main; SHA-256: ${'0'.repeat(64)}`, 'Perform completion for {"workItem":"wi-002"}; use the current evidence and designated submission.'].join('\n');
     if (typeof routed !== 'function') throw new Error('Expected callable scripted router');
-    expect(routed({ role: 'local-architect', prompt: `${prior}\n\n${current}` } as SessionSpec)).toEqual([{ kind: 'end', message: 'current' }]);
+    expect(routed({ role: 'local-architect', prompt: `${prior}\n\n${support}\n\n${current}` } as SessionSpec)).toEqual([{ kind: 'end', message: 'current' }]);
+    expect(routed({ role: 'local-architect', prompt: prior } as SessionSpec)).toEqual([{ kind: 'end', message: 'old' }]);
   });
   const pairs: [Role, TaskKind, string][] = [
       ['initial-architect', 'initial-analysis', 'submit_initial_analysis'], ['catalog-extractor', 'intake', 'submit_intake'],
