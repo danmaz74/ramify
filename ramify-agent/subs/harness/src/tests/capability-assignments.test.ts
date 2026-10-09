@@ -162,6 +162,11 @@ test('an explicit partial capability result returns its cross-owner blocker to t
     .toEqual(['cap-001.i01', 'cap-001.i02']);
   const partial = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'work-items/cap-001/iterations/01/result.json'), 'utf8'));
   expect(partial.startingPoints).toEqual(engineerPoints);
+  expect(prompts.some(prompt => prompt.includes('## Recorded starting points')
+    && prompt.includes('"producer":"engineer partial result"')
+    && prompt.includes('"capabilityTask":"cap-001"')
+    && prompt.includes('"iteration":"cap-001.i01"')
+    && prompt.includes(engineerPoints[0]!.note))).toBe(true);
   expect(partial.findings).toContain('unfinished: Root-owned stale assertion in src/tests/stale.test.ts');
   expect(prompts.some(prompt => prompt.includes('unfinished: Root-owned stale assertion in src/tests/stale.test.ts')))
     .toBe(true);
@@ -175,7 +180,8 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
   const boundaryAnswers = capabilityFlowBoundaries(fixture.root, 'assignment', 'a+b'); answers.push(boundaryAnswers);
 
   const seen: string[] = [];
-  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(fixture.root, seen), inputs: treeInputs(),
+  const discoveryPrompts: string[] = [];
+  const opened = await openGuardedCapabilityRuns(fixture.root, boundaryAnswers, { ...boundaryAnswers.options, script: script(fixture.root, seen, 'assignments', discoveryPrompts), inputs: treeInputs(),
     });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
@@ -236,10 +242,21 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
   const assignments = await Promise.all([1, 2, 3, 4].map(async number => JSON.parse(await readFile(
     runPath(fixture.root, 'need', receipt.jobId, `work-items/cap-001/iterations/0${number}/assignment.json`), 'utf8')) as IterationAssignment));
   expect(assignments.map(assignment => assignment.startingPoints)).toEqual([assignmentPoints, assignmentPoints, assignmentPoints, assignmentPoints]);
+  await until(() => discoveryPrompts.some(prompt => prompt.includes('"producer":"engineer accepted result"')
+    && prompt.includes('"iteration":"cap-001.i04"') && prompt.includes(engineerPoints[0]!.note)), 20_000);
   for (const number of [1, 2, 3, 4]) {
     const result = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, `work-items/cap-001/iterations/0${number}/result.json`), 'utf8'));
     expect(result.startingPoints).toEqual(engineerPoints);
     expect(result.coordination).toMatchObject({ kind: 'capability-task', id: 'cap-001', sequence: number });
+    const invocation = events.find(event => event.type === 'invocation-started' && event.data.work.iteration === `cap-001.i0${number}` && event.data.role === 'engineer');
+    if (invocation?.type !== 'invocation-started') throw new Error('Missing capability engineer');
+    const session = opened.agent!.sessions.find(session => session.spec.role === 'engineer' && session.spec.prompt.includes(`"iteration":"cap-001.i0${number}"`));
+    expect(session?.spec.prompt).toContain('## Recorded starting points');
+    expect(session?.spec.prompt).toContain(assignmentPoints[0]!.note);
+    expect(session?.spec.prompt).toContain('"capabilityTask":"cap-001"');
+    expect(discoveryPrompts.some(prompt => prompt.includes('"producer":"engineer accepted result"')
+      && prompt.includes(`"iteration":"cap-001.i0${number}"`)
+      && prompt.includes(engineerPoints[0]!.note))).toBe(true);
   }
   expect(assignments.map(assignment => 'module' in assignment.scope.base ? assignment.scope.base.module : assignment.scope.base.modules[0])).toEqual([b, d, p, a]);
   expect(assignments.map(assignment => assignment.coordination?.kind === 'capability-task' ? assignment.coordination.sequence : null)).toEqual([1, 2, 3, 4]);

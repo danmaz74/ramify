@@ -1,7 +1,7 @@
 import { boundedNonfunctionalTools, nonfunctionalSourceAllows } from '../nonfunctional/submissions.js';
 import { capabilityGuardedPolicy, capabilityAuthorizationErrors } from '../capability/authorization.js';
 import { taskSupportSections } from '../work/task-support.js';
-import { declaredCheckInputs, moduleInputPointers } from '../work/starting-inputs.js';
+import { declaredCheckInputs, moduleInputPointers, startingPointsSection, type StartingPointGroup } from '../work/starting-inputs.js';
 export { taskSupportSections } from '../work/task-support.js';
 import type { ProvisionalSourceGit } from '../../subs/evidence/src/provisional-git.js';
 import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
@@ -411,7 +411,7 @@ interface InvocationRequest<T> {
   /** Full ordinary task message where the reused start deliberately sends a thin delta. */
   readonly freshPrompt?: string | undefined;
   /** Exact owning task inputs; headings in the old display brief carry no ancestry authority. */
-  readonly task?: { readonly kind?: TaskKind; readonly goal: string; readonly requirements: readonly string[]; readonly omit?: readonly string[]; readonly literalSections?: HarnessTaskBrief['sections']; readonly candidate?: string; readonly snapshot?: string; readonly consultationSubmissionSchema?: string; readonly views?: TaskEnvironment['views']; readonly cucumberConfiguration?: string | null; readonly modules?: readonly string[] };
+  readonly task?: { readonly kind?: TaskKind; readonly goal: string; readonly requirements: readonly string[]; readonly omit?: readonly string[]; readonly literalSections?: HarnessTaskBrief['sections']; readonly startingPointGroups?: readonly StartingPointGroup[]; readonly candidate?: string; readonly snapshot?: string; readonly consultationSubmissionSchema?: string; readonly views?: TaskEnvironment['views']; readonly cucumberConfiguration?: string | null; readonly modules?: readonly string[] };
   readonly start: SessionStart;
   readonly toolName: string;
   readonly description: string;
@@ -1239,6 +1239,13 @@ export class RunService {
 
     const pendingBindings = await this.reviewPendingBindings(run, request, snapshot);
     const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, request.assignment));
+    const reviewedResult = committedRecords(run.log.ledger.replay()).results.get(request.key.iteration);
+    const discovery = assignment.success ? startingPointsSection([
+      this.assignmentStartingPoints(run, assignment.data),
+      await this.engineerStartingPoints(run, assignment.data,
+        reviewedResult?.gate === request.gate && reviewedResult.commit === request.key.candidate ? reviewedResult : undefined,
+        request.gate, request.key.candidate),
+    ], { projectRoot: this.projectRoot, snapshot, allows: path => nonfunctionalSourceAllows(path, ['.']) }) : undefined;
     const held = selectCheckFindings(checkFindingStateOf(run.log.ledger), { kind: 'list', owner: { kind: 'work-item', workItem: request.workItem }, select: 'all', limit: 100 });
     const tools = snapshotTools(snapshot, this.candidates, this.projectRoot);
     let diffPayload: Awaited<ReturnType<typeof collectReviewDiffPayload>>;
@@ -1266,7 +1273,7 @@ export class RunService {
       role: 'reviewer', task: { kind, goal: `Review ${request.key.candidate}`, requirements: [JSON.stringify(request)], candidate: request.key.candidate, snapshot: snapshot.tree, views: [],
         omit: [...(assignmentPackage === undefined ? [] : [assignmentPackage]), diffPayload.text],
         literalSections: [...(assignmentPackage === undefined ? [] : [{ key: 'support:assignment-package', text: assignmentPackage }]),
-          { key: 'support:candidate-diff', text: diffPayload.text }] },
+          { key: 'support:candidate-diff', text: diffPayload.text }, ...(discovery === undefined ? [] : [discovery])] },
       work: { workItem: request.workItem, iteration: request.key.iteration },
       attempt: state.attempts.length + 1,
       loaded,
@@ -4563,6 +4570,65 @@ export class RunService {
     return this.sessionOperations ??= HarnessSessionOperations.open(join(this.projectRoot, 'plans', '.harness', 'session-operations'), agent);
   }
 
+  private assignmentStartingPoints(run: Run, assignment: IterationAssignment): StartingPointGroup {
+    const issued = assignment.coordination?.kind === 'capability-task'
+      ? run.log.all('capability-assigned').find(event => event.data.assignment === assignment.id)
+      : run.log.all('iteration-assigned').find(event => event.data.iteration === assignment.id);
+    const invocation = issued?.data.invocation;
+    const record = invocation === undefined ? undefined : committedRecords(run.log.ledger.replay()).invocations.get(invocation);
+    const boundary = assignment.coordination?.kind === 'capability-task' ? assignment.coordination.startingTree : record?.candidateBefore ?? record?.base;
+    return { origin: { producer: 'architect assignment', workItem: assignment.workItem, iteration: assignment.id,
+      ...(invocation === undefined ? {} : { invocation }), ...(boundary === undefined ? {} : { boundary }),
+      ...(assignment.coordination?.kind === 'capability-task' ? { capabilityTask: assignment.coordination.id } : {}) }, points: assignment.startingPoints };
+  }
+
+  private async orientationStartingPoints(run: Run, workItem: string | undefined) {
+    const event = run.log.all('work-orientation-recorded').find(event => event.data.workItem === workItem);
+    if (event === undefined) return undefined;
+    const records = committedRecords(run.log.ledger.replay());
+    const outcome = records.outcomes.get(event.data.invocation);
+    const bytes = await readIfExists(run.path(runLayout.submission(event.data.invocation))).catch(() => undefined);
+    if (bytes === undefined || outcome?.submission?.hash !== sha256(bytes)) return undefined;
+    let raw: Record<string, unknown>;
+    try { raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>; } catch { return undefined; }
+    if (raw.schema !== 'ramify-agent.work-orientation/1') return undefined;
+    const { schema: _schema, ...body } = raw;
+    const parsed = workOrientationSubmissionSchema.safeParse(body);
+    if (!parsed.success) return undefined;
+    const record = records.invocations.get(event.data.invocation);
+    const boundary = record?.candidateBefore ?? record?.base;
+    const group: StartingPointGroup = { origin: { producer: 'local architect orientation', workItem: event.data.workItem,
+      invocation: event.data.invocation, ...(boundary === undefined ? {} : { boundary }) }, points: parsed.data.startingPoints };
+    return { group, submission: parsed.data };
+  }
+
+  /** A reviewer may precede result closure; its exact passing gate identifies the proposal. */
+  private async engineerStartingPoints(run: Run, assignment: IterationAssignment, result?: IterationResult, gateId?: string, candidate?: string): Promise<StartingPointGroup> {
+    const gate = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(gateId ?? result?.gate ?? '')));
+    const matches = gate.success && gate.data.subject.iteration === assignment.id
+      && (candidate === undefined || (gate.data.verdict === 'passed' && gate.data.commit === candidate));
+    const invocation = matches ? gate.data.proposedBy ?? undefined : result?.invocations.at(-1);
+    const records = committedRecords(run.log.ledger.replay());
+    const record = invocation === undefined ? undefined : records.invocations.get(invocation);
+    const outcome = invocation === undefined ? undefined : records.outcomes.get(invocation);
+    let points = result?.startingPoints;
+    if (result === undefined && invocation !== undefined && record?.work.iteration === assignment.id) {
+      const bytes = await readIfExists(run.path(runLayout.submission(invocation))).catch(() => undefined);
+      if (bytes !== undefined && outcome?.submission?.hash === sha256(bytes)) {
+        try {
+          const { schema, ...body } = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+          const proposal = schema === 'ramify-agent.engineer-submission/1' ? engineerSubmissionSchema.safeParse(body) : undefined;
+          if (proposal?.success && proposal.data.kind === 'completion-proposed') points = proposal.data.startingPoints;
+        } catch { /* An unavailable optional hint leaves the ordinary review intact. */ }
+      }
+    }
+    const boundary = result?.commit ?? (matches ? gate.data.commit : null) ?? outcome?.candidateAfter ?? record?.candidateBefore ?? record?.base;
+    return { origin: { producer: result === undefined ? 'engineer completion proposal at passing gate' : `engineer ${result.outcome} result`,
+      workItem: assignment.workItem, iteration: assignment.id, ...(invocation === undefined ? {} : { invocation }),
+      ...(boundary === undefined ? {} : { boundary }),
+      ...(assignment.coordination?.kind === 'capability-task' ? { capabilityTask: assignment.coordination.id } : {}) }, points };
+  }
+
   private async taskBrief<T>(run: Run, request: InvocationRequest<T>, spec: SessionSpec, limits: RunPolicy['limits']): Promise<HarnessTaskBrief> {
     const kind = request.task?.kind ?? taskKindFor(request.role, request.toolName, request.continuing);
     const records = committedRecords(run.log.ledger.replay());
@@ -4570,6 +4636,23 @@ export class RunService {
     const goal = request.task?.goal ?? item?.goal ?? `Read the captured plan for ${run.record.planId} and perform the current ${kind} task.`;
     const requirements = request.task?.requirements ?? [new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)))];
     const sections = [...taskSupportSections(request.prompt, [goal, ...requirements, ...(request.task?.omit ?? [])]), ...(request.task?.literalSections ?? [])];
+    const groups = [...request.task?.startingPointGroups ?? []];
+    if (request.role === 'engineer' && request.work.iteration !== undefined) {
+      const assignment = records.assignments.get(request.work.iteration);
+      if (assignment !== undefined) groups.push(this.assignmentStartingPoints(run, assignment));
+    }
+    if ((request.role === 'context-selector' && request.start.mode === 'fresh') || (request.role === 'local-architect' && kind !== 'orientation')) {
+      const orientation = run.log.all('work-orientation-recorded').find(event => event.data.workItem === request.work.workItem);
+      const parent = orientation === undefined ? undefined : run.log.all('invocation-started').find(event => event.data.invocation === orientation.data.invocation);
+      // Retained orientation sessions already contain the submission. A reconstructed
+      // architect keeps its explicit fallback section on subsequent turns.
+      if (request.start.mode === 'fresh' || request.session !== parent?.data.session) {
+        const oriented = await this.orientationStartingPoints(run, request.work.workItem);
+        if (oriented !== undefined) groups.unshift(oriented.group);
+      }
+    }
+    const discoveries = startingPointsSection(groups, { projectRoot: this.projectRoot });
+    if (discoveries !== undefined) sections.push(discoveries);
     // Role/task rules deliver known facts; the agent decides what to inspect.
     if (['initial-architect', 'local-architect', 'capability-architect', 'engineer', 'contract-engineer', 'nonfunctional-repair-engineer'].includes(request.role)
       || (request.role === 'context-selector' && request.start.mode === 'fresh')) {
@@ -5215,7 +5298,13 @@ export class RunService {
     const packetBytes = path && path === runLayout.orientationPacket(item.id, orientation!.data.packetHash)
       ? await readIfExists(run.path(path)).catch(() => undefined) : undefined;
     const usable = packetBytes !== undefined && sha256(packetBytes) === orientation?.data.packetHash;
-    const packet = usable ? packetBytes.toString('utf8') : orientationBriefing;
+    const oriented = await this.orientationStartingPoints(run, item.id);
+    // Render explicit discovery pairs once in the shared named section on fresh
+    // consumers. Retained packet bytes and their recorded hashes stay immutable.
+    const packet = usable && oriented !== undefined
+      ? orientationPacket({ workItem: item.id, briefing: orientationBriefing, submission: {
+        focus: oriented.submission.focus, currentUnderstanding: oriented.submission.currentUnderstanding, questions: oriented.submission.questions,
+      } }).text : usable ? packetBytes.toString('utf8') : orientationBriefing;
     const orientationInvocation = orientation?.data.invocation ?? attempts.at(-1);
     if (orientationInvocation === undefined) throw new Error('Work orientation has no recorded attempt');
     const orientationPoint = usable ? orientation!.data.point : null;
@@ -5882,6 +5971,7 @@ export class RunService {
         originalInvocation: originalLocalInvocation,
         task: { goal: item.goal, requirements: contextPackage === undefined ? [this.planPackage(run, await this.frozenCatalog(run), [...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs])] : [`Use the accepted work-item package ${contextPackage.citation.hash}, with selected elements ${contextPackage.citation.elements.join(', ') || '(none)'}. Its complete context is supplied once and remains in this session.`], omit: contextPackage === undefined ? [] : [contextPackage.text],
           literalSections: contextPackage !== undefined ? [{ key: 'support:work-item-package', text: contextPackage.text }] : [],
+          startingPointGroups: lastResult === undefined || lastAssignment === undefined ? [] : [await this.engineerStartingPoints(run, lastAssignment, lastResult)],
           views: (views.evidence?.views ?? []).map(view => ({ path: view.path, revision: view.revision, modules: [item.module], coverage: view.coverage === null ? [] : [`${view.coverage} coverage limits`] })) },
         work: { workItem: item.id },
         attempt,
@@ -7961,6 +8051,12 @@ export class RunService {
     let unreported: string[] = [];
     const action = pendingAction ?? await this.runInvocation<CapabilityAction>(run, agent, {
       role: 'capability-architect', task: { kind: 'capability', goal: request.original.need, requirements: [JSON.stringify(request.original)], modules: [task.provider, task.consumer, ...task.authority.map(entry => entry.owner)],
+        startingPointGroups: await Promise.all([...committedRecords(run.log.ledger.replay()).results.values()]
+          .filter(result => result.coordination?.kind === 'capability-task' && result.coordination.id === task.id)
+          .flatMap(result => {
+            const assignment = committedRecords(run.log.ledger.replay()).assignments.get(result.iteration);
+            return assignment === undefined ? [] : [this.engineerStartingPoints(run, assignment, result)];
+          })),
         omit: [`# Selected plan package ${selectedHash}\n\n${selected}`], literalSections: [{ key: 'support:selected-plan-package', text: `# Selected plan package ${selectedHash}\n\n${selected}` }, { key: 'support:capability-request', text: `Original request: ${JSON.stringify(request, null, 2)}` }] }, work: { capabilityTask: task.id, request: request.id }, attempt,
       loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
       prompt: [
