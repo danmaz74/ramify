@@ -343,7 +343,7 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
     };
     expect(second.session.requested).toBe('continued');
     expect(second.session.actual).toBe('fresh');
-    expect(second.session.degradedReason).toContain('reconstructed from records');
+    expect(second.session.degradedReason).toContain('ordinary task brief');
     expect(second.attempt).toBe(2);
     // The lost session is finished as replaced, and the reconstruction opens
     // a session of its own.
@@ -352,12 +352,10 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
     const [lost, reconstructed] = [sessionOf(result.invocations[0]!), sessionOf(result.invocations[1]!)];
     expect(reconstructed.start).toBe('opened');
     expect(reconstructed.session).not.toBe(lost.session);
-    expect(events.find(event => event.type === 'session-finished' && event.data.session === lost.session)!.data).toEqual({ session: lost.session, reason: 'replaced' });
+    expect(events.find(event => event.type === 'session-finished' && event.data.session === lost.session)!.data).toEqual({ session: lost.session, reason: 'lost' });
     expect(events.findIndex(event => event.type === 'session-finished' && event.data.session === lost.session))
       .toBeLessThan(events.findIndex(event => event.type === 'session-opened' && event.data.session === reconstructed.session));
-    // ST03: the reconstruction names the session it replaces, and why.
-    expect(events.find(event => event.type === 'session-opened' && event.data.session === reconstructed.session)!.data)
-      .toMatchObject({ replaces: { session: lost.session, reason: 'reconstructed' } });
+    expect(events.find(event => event.type === 'session-opened' && event.data.session === reconstructed.session)!.data).not.toHaveProperty('replaces');
     const iterationGates = (await gates(root, runId)).filter(gate => gate.checkpoint === 'iteration');
     expect(iterationGates.map(gate => gate.repairRound)).toEqual([0, 1]);
     expect(result.commit).toBe('revision-01');

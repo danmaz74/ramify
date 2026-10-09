@@ -3,7 +3,8 @@ import { resetSpawnAttempts, spawnAttempts } from './helpers/process-guard.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import type { Script } from '../../subs/agent/src/scripted.js';
+import { createScriptedAgent, type Script } from '../../subs/agent/src/scripted.js';
+import { declaringScenarios } from './helpers/declarations.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { recoveryBoundaries } from './helpers/recovery-boundaries.js';
@@ -137,7 +138,7 @@ test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and kee
   expect(starts).toContain('capability-architect:submit_capability_action:continue');
   expect(capabilityPrompts[0]).toContain('# Selected plan package ');
   expect(capabilityPrompts[0]).toContain('B owns the source fact. A integrates its calling code.');
-  expect(capabilityPrompts[1]).toContain('was delivered in full in the earlier turn; it is unchanged');
+  expect(capabilityPrompts[1]).toContain('B owns the source fact. A integrates its calling code.');
   const currentArchitect = opened.agent!.sessions.filter(session => session.spec.role === 'capability-architect')[1]!;
   expect(currentArchitect.spec.prompt).not.toContain('# Selected plan package ');
   expect(currentArchitect.inherited.filter(text => text.includes('# Selected plan package '))).toHaveLength(1);
@@ -654,5 +655,39 @@ test('a restart finds the orientation whose event it had not recorded by its ope
   expect(packet).not.toContain(originalPurpose);
   expect(after.filter(event => event.type === 'context-selection-recorded' && event.data.workItem === 'wi-001')).toHaveLength(1);
   expect(after.filter(event => event.type === 'capability-delegated')).toHaveLength(1);
+  await stopWaitingRun(second.service, receipt.jobId);
+}, 60_000);
+
+
+test('a restart recognizes exhausted orientation attempts and proceeds fresh without repeating them', async () => {
+  const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
+  const boundaryAnswers = recoveryBoundaries(fixture.root); cleanups.push(async () => boundaryAnswers.assertComplete());
+  const ordinary = declaringScenarios(delegatingScript());
+  const agentForRun = () => createScriptedAgent(spec => spec.submission.name === 'submit_work_orientation'
+    ? [{ kind: 'end', message: 'No orientation submission' }] : typeof ordinary === 'function' ? ordinary(spec) : ordinary);
+  let frozen = false;
+  const options = { ...boundaryAnswers.options, inputs: treeInputs(), afterWrite: async (write: string, runId: string) => {
+    if (write !== 'invocation-ended' || frozen) return;
+    const events = await runEventsOnDisk(fixture.root, 'need', runId);
+    const attempts = events.filter(event => event.type === 'invocation-ended' && events.some(start =>
+      start.type === 'invocation-started' && start.data.invocation === event.data.invocation && start.data.role === 'local-architect' && start.data.work.workItem === 'wi-001'));
+    if (attempts.length === testPolicy(fixture.root).limits.forkRetriesPerRequest + 1) { frozen = true; await freeze(); }
+  } };
+  const firstAgent = agentForRun(); const first = await openCapabilityRuns(fixture.root, { ...options, agent: firstAgent });
+  const receipt = await first.service.execute(startRun('need')); await until(() => frozen, 30_000); await staleCrashLock(fixture.root);
+  const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(firstAgent.sessions.filter(session => session.spec.submission.name === 'submit_work_orientation')).toHaveLength(testPolicy(fixture.root).limits.forkRetriesPerRequest + 1);
+  const last = before.at(-1)!; if (last.type !== 'invocation-ended') throw new Error('Expected exhausted orientation end');
+  const secondAgent = agentForRun(); const second = await openCapabilityRuns(fixture.root, { ...options, agent: secondAgent });
+  cleanups.push(() => second.service.close());
+  await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'capability-delegated' || event.type === 'job-failed'), 30_000);
+  const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(after.filter(event => event.type === 'job-failed')).toEqual([]);
+  expect(secondAgent.sessions.filter(session => session.spec.submission.name === 'submit_work_orientation')).toEqual([]);
+  const selector = secondAgent.sessions.find(session => session.spec.role === 'context-selector')!;
+  expect(selector.start.mode).toBe('fresh'); expect(selector.spec.prompt).toContain('The plan asks for a-reads-b-request.');
+  const selection = after.find(event => event.type === 'context-selection-recorded')!;
+  const record = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, selection.data.selection), 'utf8'));
+  expect(record).toMatchObject({ orientationInvocation: last.data.invocation, orientationPoint: null, degraded: true });
   await stopWaitingRun(second.service, receipt.jobId);
 }, 60_000);

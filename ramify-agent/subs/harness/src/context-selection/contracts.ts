@@ -13,6 +13,7 @@ const text = z.string().min(1);
 export const contextSelectionSchema = z.object({
   schema: z.literal('ramify-agent.context-selection/2'),
   workItem: text,
+  /** Last orientation attempt; it need not have submitted successfully on a degraded fresh selection. */
   orientationInvocation: text,
   orientationPoint: text.nullable(),
   selectorInvocation: text,

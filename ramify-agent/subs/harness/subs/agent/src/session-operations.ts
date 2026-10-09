@@ -93,8 +93,8 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
   async function verifyPayloads(snapshot: Snapshot): Promise<void> {
     for (const entry of snapshot.transcript) if (await store.getPayload(entry.payloadId) === null) throw new SessionDriverUnavailableError(`Unavailable transcript payload ${entry.payloadId}`);
   }
-  function receipt(key: SessionOperationKey, sessionId: string, status: SessionOperationReceipt['status'], reason: string | null, point: AgentSessionPoint | null = null, outcome: SessionOutcome | null = null, turn: number | null = null): SessionOperationReceipt {
-    return { runId: key.runId, operationId: key.operationId, sessionId, status, reason, point, outcome, turn };
+  function receipt(key: SessionOperationKey, sessionId: string, status: SessionOperationReceipt['status'], reason: string | null, point: AgentSessionPoint | null = null, outcome: SessionOutcome | null = null, turn: number | null = null, contextUnavailable = false): SessionOperationReceipt {
+    return { runId: key.runId, operationId: key.operationId, sessionId, status, reason, point, outcome, turn, ...(contextUnavailable ? { contextUnavailable: true } : {}) };
   }
   function point(sessionId: string, turn: number, kind: AgentSessionPoint['kind']): AgentSessionPoint { return { sessionId, turn, kind, checkpoint: randomUUID() }; }
   async function payload(key: string, value: unknown): Promise<SessionTranscriptEntry> {
@@ -154,7 +154,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
       const sessionId = randomUUID();
       let snapshot: Snapshot = { runId: input.runId, sessionId, parent: null, currentPoint: point(sessionId, 0, 'checkpoint'), initialInstructions: input.initialInstructions, policy: clone(input.policy), declarations: [], activeTools: [], additions: [], transcript: [], activeOperation: null, available: true };
       try { snapshot = prepare(snapshot, [], { add: input.declarations, activate: input.activate, inactivate: [] }); }
-      catch (error) { return receipt(input, sessionId, 'conflict', errorText(error)); }
+      catch (error) { return receipt(input, sessionId, 'conflict', errorText(error), null, null, null, error instanceof SessionDriverUnavailableError); }
       snapshot = { ...snapshot, transcript: [await payload(`create:${input.operationId}`, frozen)] };
       return commitSimple(input, frozen, 'create', snapshot, null, null);
     },
@@ -162,7 +162,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
       const frozen = clone(input) as unknown as Record<string, unknown>;
       const duplicate = await terminalDuplicate(input, frozen); if (duplicate) return duplicate;
       const source = await api.inspect(input.runId, input.sourcePoint.sessionId, input.sourcePoint);
-      if (!source) return receipt(input, input.sourcePoint.sessionId, 'unavailable', 'Source point unavailable');
+      if (!source) return receipt(input, input.sourcePoint.sessionId, 'unavailable', 'Source point unavailable', null, null, null, true);
       const sessionId = randomUUID();
       const child: Snapshot = { ...source, sessionId, parent: clone(input.sourcePoint), currentPoint: point(sessionId, source.currentPoint.turn, 'checkpoint'), activeOperation: null };
       return commitSimple(input, frozen, 'fork', child, null, null);
@@ -175,7 +175,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
       const prior = await terminalDuplicate(input, frozen);
       if (prior) return completedHandle(prior);
       const loaded = await readSession(input.runId, input.sessionId);
-      if (!loaded || !loaded.body.snapshot.available) return completedHandle(receipt(input, input.sessionId, 'unavailable', 'Session unavailable'));
+      if (!loaded || !loaded.body.snapshot.available) return completedHandle(receipt(input, input.sessionId, 'unavailable', 'Session unavailable', null, null, null, true));
       if (loaded.body.snapshot.activeOperation !== null || !equal(loaded.body.snapshot.currentPoint, input.expectedPoint)) return completedHandle(receipt(input, input.sessionId, 'conflict', 'Expected point is stale or session active'));
       let snapshot: Snapshot;
       try {
@@ -184,7 +184,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         snapshot = prepare(loaded.body.snapshot, input.additions, input.toolChange);
         if (!snapshot.activeTools.includes(input.task.submissionTool)) throw new Error('Designated submission tool is inactive');
         snapshot = { ...snapshot, policy: clone(input.policy), activeOperation: input.operationId, transcript: [...snapshot.transcript, await payload(`prepare:${input.operationId}`, frozen)] };
-      } catch (error) { return completedHandle(receipt(input, input.sessionId, error instanceof SessionDriverUnavailableError ? 'unavailable' : 'conflict', errorText(error))); }
+      } catch (error) { return completedHandle(receipt(input, input.sessionId, error instanceof SessionDriverUnavailableError ? 'unavailable' : 'conflict', errorText(error), null, null, null, error instanceof SessionDriverUnavailableError)); }
       const op: OperationBody = { kind: 'continue', input: frozen, sessionId: input.sessionId, snapshot, effects: [], provider: [], owner: null, phase: 'intent', receipt: null };
       const committed = await commit({ runId: input.runId, expected: [{ id: operationRecordId(input.operationId), revision: null }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(input, operationRecordId(input.operationId), 1, op, false), record(input, loaded.record.id, loaded.record.revision + 1, { ...loaded.body, snapshot }, true)], payloads: snapshot.transcript.map(entry => entry.payloadId) });
       if (committed.kind === 'conflict') return completedHandle(await terminalDuplicate(input, frozen) ?? receipt(input, input.sessionId, 'conflict', committed.reason));
@@ -198,7 +198,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
       if (prior.body.kind !== 'continue') return completedHandle(receipt(input, prior.body.sessionId, 'unavailable', 'Operation is not resumable'));
       const original = prior.body.input as unknown as Omit<ContinueSessionInput, 'bindings'>;
       try { validateBindings(original.task, original.policy, input.bindings); }
-      catch (error) { return completedHandle(receipt(input, prior.body.sessionId, 'conflict', errorText(error))); }
+      catch (error) { return completedHandle(receipt(input, prior.body.sessionId, 'conflict', errorText(error), null, null, null, error instanceof SessionDriverUnavailableError)); }
       const running = active.get(activeKey(input)); if (running) return running.handle;
       return launch(input, input.bindings, true);
     },
@@ -223,11 +223,11 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     const frozen = clone(input) as unknown as Record<string, unknown>;
     const duplicate = await terminalDuplicate(input, frozen); if (duplicate) return duplicate;
     const loaded = await readSession(input.runId, input.sessionId);
-    if (!loaded || !loaded.body.snapshot.available) return receipt(input, input.sessionId, 'unavailable', 'Session unavailable');
+    if (!loaded || !loaded.body.snapshot.available) return receipt(input, input.sessionId, 'unavailable', 'Session unavailable', null, null, null, true);
     if (loaded.body.snapshot.activeOperation !== null || !equal(input.expectedPoint, loaded.body.snapshot.currentPoint)) return receipt(input, input.sessionId, 'conflict', 'Expected point is stale or session active');
     let snapshot: Snapshot;
     try { await verifyPayloads(loaded.body.snapshot); snapshot = prepare(loaded.body.snapshot, additions, toolChange); }
-    catch (error) { return receipt(input, input.sessionId, error instanceof SessionDriverUnavailableError ? 'unavailable' : 'conflict', errorText(error)); }
+    catch (error) { return receipt(input, input.sessionId, error instanceof SessionDriverUnavailableError ? 'unavailable' : 'conflict', errorText(error), null, null, null, error instanceof SessionDriverUnavailableError); }
     snapshot = { ...snapshot, currentPoint: point(input.sessionId, snapshot.currentPoint.turn, 'checkpoint'), transcript: [...snapshot.transcript, await payload(`${kind}:${input.operationId}`, frozen)] };
     return commitSimple(input, frozen, kind, snapshot, loaded, null);
   }
@@ -285,7 +285,8 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
     const status = unavailable ? 'unavailable' : outcome.kind === 'stopped' ? 'stopped' : uncertain ? 'unavailable' : outcome.kind === 'failed' ? 'failed' : 'completed';
     // A failure keeps its own error as the reason; the null point says the turn is not reusable.
     const interruptedReason = outcome.kind === 'failed' && reason !== null ? reason : 'Provider completion interrupted; point unavailable';
-    const result = receipt(key, op.body.sessionId, status, uncertain ? 'External effect completion unknown; point unavailable' : interruptedProvider ? interruptedReason : reason, available ? currentPoint : null, outcome, currentPoint.turn);
+    const result = { ...receipt(key, op.body.sessionId, status, uncertain ? 'External effect completion unknown; point unavailable' : interruptedProvider ? interruptedReason : reason, available ? currentPoint : null, outcome, currentPoint.turn),
+      ...(unavailable && !uncertain && op.body.effects.length === 0 ? { contextUnavailable: true } : {}) };
     const terminal: OperationBody = { ...op.body, phase: 'terminal', receipt: result };
     const committed = await commit({ runId: key.runId, expected: [{ id: op.record.id, revision: op.record.revision }, { id: loaded.record.id, revision: loaded.record.revision }], records: [record(key, op.record.id, op.record.revision + 1, terminal, false), record(key, loaded.record.id, loaded.record.revision + 1, { snapshot, points: available ? [...loaded.body.points, snapshot] : loaded.body.points }, true)], payloads: snapshot.transcript.map(item => item.payloadId) });
     if (committed.kind === 'conflict') { const winner = await readOperation(key); if (winner?.body.receipt) return clone(winner.body.receipt); throw new Error(committed.reason); }

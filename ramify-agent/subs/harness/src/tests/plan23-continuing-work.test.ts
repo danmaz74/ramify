@@ -223,7 +223,7 @@ function interceptCommits(store: SessionStore, before: (input: CommitInput, path
     const root = await mkdtemp(join(tmpdir(), 'ramify-plan23-unavailable-')); roots.push(root);
     await expect(HarnessSessionOperations.open(root, unsupported)).rejects.toThrow(genericSessionDriverUnavailableError);
     let dispatches = 0; const modern = await open(() => { dispatches++; return [{ kind: 'submit', input: {} }]; });
-    await expect(modern.adapter.start(input('engineer', 'repair', 'unknown-parent', 'pi-file:old-entry'))).rejects.toThrow('explicit workflow recovery');
+    await expect(modern.adapter.start(input('engineer', 'repair', 'unknown-parent', 'pi-file:old-entry'))).rejects.toThrow('session point is unavailable');
     expect([factoryCalls, dispatches]).toEqual([0, 0]);
   });
   test('a saved harness intent before Create and before Continue completes the same idempotent preparation', async () => {

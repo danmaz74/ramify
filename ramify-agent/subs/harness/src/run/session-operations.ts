@@ -56,6 +56,9 @@ interface Intent {
   readonly task: SessionTaskInput;
   readonly declarations: readonly SessionToolDeclaration[];
 }
+/** Only unavailable reusable context licenses a new ordinary fresh invocation. */
+export class ReusableSessionUnavailableError extends Error {}
+
 export const genericSessionDriverUnavailableError = 'The configured agent does not expose injected high-level session operations';
 /** A provider-neutral transitional reference. It contains only a harness run and structured point. */
 export function sessionPointReference(runId: string, point: AgentSessionPoint): string {
@@ -108,7 +111,8 @@ export class HarnessSessionOperations {
 
   private async context(runId: string, point: AgentSessionPoint): Promise<Context> {
     const found = await this.read<Context>(this.path('points', [runId, point]));
-    if (!found || JSON.stringify(found.point) !== JSON.stringify(point)) throw new Error('The named session point has no recorded briefing ancestry');
+    if (!found) throw new ReusableSessionUnavailableError('The named session point has no recorded briefing ancestry');
+    if (JSON.stringify(found.point) !== JSON.stringify(point)) throw new Error('The recorded briefing ancestry names a different session point');
     return found;
   }
   async packet(runId: string, operationId: string): Promise<TaskPacket | null> {
@@ -122,7 +126,7 @@ export class HarnessSessionOperations {
     if (found && (found.runId !== runId || found.operationId !== operationId || typeof found.schema !== 'string' || !/^[a-f0-9]{64}$/u.test(found.submissionHash))) throw new Error('Invalid harness acceptance correlation');
     return found;
   }
-  async start(input: HarnessOperationInput): Promise<AgentSession> {
+  async start(input: HarnessOperationInput): Promise<AgentSession & { readonly unavailableReason?: string | undefined }> {
     const { runId, operationId } = input;
     const path = this.path('operations', [runId, operationId]);
     const previous = await this.read<Intent>(path);
@@ -133,7 +137,8 @@ export class HarnessSessionOperations {
     const settleMs = input.brief.environment.limits['stopSettleMs'];
     if (typeof settleMs !== 'number' || !Number.isFinite(settleMs) || settleMs <= 0) throw new Error('Captured session settlement bound is required');
     const sourceRef = spec.session.mode === 'fresh' ? null : readSessionPointReference(spec.session.mode === 'continue' ? spec.session.ref : spec.session.from);
-    if (spec.session.mode !== 'fresh' && (!sourceRef || sourceRef.runId !== runId)) throw new Error('The requested session point is unavailable; explicit workflow recovery is required');
+    if (sourceRef && sourceRef.runId !== runId) throw new Error('The requested point belongs to another run');
+    if (spec.session.mode !== 'fresh' && !sourceRef) throw new ReusableSessionUnavailableError('The requested session point is unavailable');
     const prior = sourceRef ? await this.context(runId, sourceRef.point) : null;
     const originalSections = input.brief.sections;
     // Selector forks retain known facts; other removed support sections get an explicit replacement.
@@ -190,12 +195,16 @@ export class HarnessSessionOperations {
         const receipt = spec.session.mode === 'fresh'
           ? await this.operations.create({ runId, operationId: `${operationId}:create`, initialInstructions: packet.roleInstructions, declarations, activate: declarations.map(item => item.name), policy })
           : await this.operations.fork({ runId, operationId: `${operationId}:fork`, sourcePoint: sourceRef!.point });
-        if (receipt.status !== 'completed' || !receipt.point) throw new Error(receipt.reason ?? 'Session creation/fork is unavailable');
+        if (spec.session.mode === 'fork' && receipt.status === 'unavailable' && receipt.contextUnavailable === true) throw new ReusableSessionUnavailableError(receipt.reason ?? 'Fork source unavailable');
+        if (receipt.status !== 'completed' || !receipt.point) throw new Error(receipt.reason ?? `Session creation/fork ${receipt.status}`);
         initialPoint = receipt.point;
       }
       if (!initialPoint) throw new Error('Session point unavailable');
       const inherited = await this.operations.inspect(runId, initialPoint.sessionId, initialPoint);
-      if (!inherited) throw new Error('Session state unavailable');
+      if (!inherited) {
+        if (spec.session.mode !== 'fresh') throw new ReusableSessionUnavailableError('Retained session state unavailable');
+        throw new Error('New session state unavailable');
+      }
       const additions = spec.session.mode !== 'fresh' ? packet.additions.filter(item => item.kind === 'role-instructions').map(item => ({ key: `role:${operationId}:${item.key}`, kind: 'role-instructions' as const, text: item.text, revision: item.revision })) : [];
       handle = await this.operations.continue({ runId, operationId, sessionId: initialPoint.sessionId, expectedPoint: initialPoint,
         task, additions, policy, bindings, toolChange: { add: declarations,
@@ -210,7 +219,9 @@ export class HarnessSessionOperations {
     };
     let barrier = observeBarrier();
     let ref = initialPoint ? sessionPointReference(runId, initialPoint) : '';
+    let unavailableReason: string | undefined;
     const outcome = handle.receipt.then(async receipt => {
+      if (spec.session.mode !== 'fresh' && receipt.status === 'unavailable' && receipt.contextUnavailable === true) unavailableReason = receipt.reason ?? 'Retained session unavailable';
       if (receipt.point) { await this.retain(this.path('points', [runId, receipt.point]), { ...intent.context, point: receipt.point }); ref = sessionPointReference(runId, receipt.point); }
       else ref = '';
       return receipt.outcome ?? { kind: 'failed' as const, error: receipt.reason ?? `Session operation ${receipt.status}` };
@@ -221,7 +232,7 @@ export class HarnessSessionOperations {
       try { return await Promise.race([barrier.then(() => 'settled' as const), new Promise<'timed-out'>(resolve => { timer = setTimeout(() => resolve('timed-out'), settleMs); })]); }
       finally { clearTimeout(timer); }
     };
-    return { outcome, start: { mode: spec.session.mode }, get ref() { return ref; },
+    return { outcome, start: { mode: spec.session.mode }, get ref() { return ref; }, get unavailableReason() { return unavailableReason; },
       async stop() {
         let timer: ReturnType<typeof setTimeout> | undefined;
         try { await Promise.race([handle.stop().then(() => settled()), new Promise<void>(resolve => { timer = setTimeout(resolve, settleMs); })]); }
@@ -239,7 +250,9 @@ export class HarnessSessionOperations {
     if (!parsed) return { outcome: 'session-lost' };
     const { runId } = parsed; const { sessionId } = parsed.point;
     let point = parsed.point;
-    let context = await this.context(runId, point);
+    let context: Context;
+    try { context = await this.context(runId, point); }
+    catch (error) { if (error instanceof ReusableSessionUnavailableError) return { outcome: 'session-lost' }; throw error; }
     const operationId = `append:${sessionId}:${key}`;
     const additions = [{ key, kind: 'brief' as const, text, revision: null }];
     const snapshot = await this.operations.inspect(runId, sessionId);
@@ -249,12 +262,14 @@ export class HarnessSessionOperations {
       const current = await this.operations.inspect(runId, sessionId);
       if (current && current.activeOperation === null && JSON.stringify(current.currentPoint) !== JSON.stringify(point)) {
         point = current.currentPoint;
-        context = await this.context(runId, point);
+        try { context = await this.context(runId, point); }
+        catch (error) { if (error instanceof ReusableSessionUnavailableError) return { outcome: 'session-lost' }; throw error; }
         receipt = await this.operations.appendContext({ runId, operationId, sessionId, expectedPoint: point, additions });
       }
     }
     if (receipt.status === 'conflict') return { outcome: 'conflict', reason: receipt.reason ?? 'The session cannot take the addition at this point' };
-    if (receipt.status !== 'completed' || !receipt.point) return { outcome: 'session-lost' };
+    if (receipt.status === 'unavailable' && receipt.contextUnavailable === true) return { outcome: 'session-lost' };
+    if (receipt.status !== 'completed' || !receipt.point) throw new Error(receipt.reason ?? `Context append ${receipt.status}`);
     const already = await this.read<Context>(this.path('points', [runId, receipt.point]));
     let history = context.history; let revision = context.revision;
     if (briefingSectionKey !== undefined) {

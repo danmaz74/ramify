@@ -129,7 +129,7 @@ describe('Plan 23 F1 high-level session operations', () => {
     const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; throw new SessionDriverUnavailableError('Opaque request prefix is corrupt'); } } });
     const P = await operations.create(create);
     const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'unsafe'))).receipt;
-    expect(end).toMatchObject({ status: 'unavailable', point: null, reason: 'Opaque request prefix is corrupt' });
+    expect(end).toMatchObject({ status: 'unavailable', contextUnavailable: true, point: null, reason: 'Opaque request prefix is corrupt' });
     const rebuilt = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
     expect(await (await rebuilt.retry({ runId: 'run-A', operationId: 'unsafe', bindings: bindings() })).receipt).toEqual(end);
     expect(await rebuilt.inspect('run-A', P.sessionId)).toBeNull(); expect(dispatches).toBe(1);
@@ -946,4 +946,13 @@ describe('optional synchronous commit admission', () => {
     expect(await (await operations.retry({ runId: 'run-A', operationId: 'captured-script', bindings: bindings() })).settled()).toEqual(end); expect(dispatches).toBe(1);
     expect(admissions > 0).toBe(mode === 'advertised');
   });
+});
+
+
+it('ordinary initialization/provider failure never advertises missing reusable context', async () => {
+  const operations = createSessionOperations({ sessionStore: memoryStore(), driver: { async dispatch() { throw new Error('Provider authorization denied'); } } });
+  const P = await operations.create(create);
+  const result = await (await operations.continue(continuation(P.sessionId, P.point!, 'provider-failure'))).settled();
+  expect(result).toMatchObject({ status: 'failed', outcome: { kind: 'failed', error: 'Provider authorization denied' } });
+  expect(result.contextUnavailable).not.toBe(true);
 });

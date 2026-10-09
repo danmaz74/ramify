@@ -358,6 +358,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * pending list is cleared, and the next fork is oriented from the
    * hypotheses, the registry and the decisions.
    */
+  /** A decision remains authoritative when its reusable parent cannot take the brief. */
+  event('brief-not-appended', z.object({ decision: text, generation: z.int().positive(), reason: text }).strict()),
   event('global-context-rebuilt', z.object({
     generation: z.int().positive(),
     reason: text,

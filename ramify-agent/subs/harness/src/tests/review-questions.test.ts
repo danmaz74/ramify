@@ -28,8 +28,8 @@ vi.mock('node:child_process', async original =>
  * design questions as three requests; scope review forks the local
  * architect at the point that produced the assignment; design review forks
  * one orientation per guidance selection, and a changed selection is a new
- * orientation; an unavailable preserving fork remains unavailable without
- * replacement fresh dispatch, and records its explicit outcome.
+ * orientation; an unavailable preserving fork starts a fresh ordinary review with
+ * its captured task inputs and records its degradation.
  *
  * The agent is the scripted fake, whose fork inherits a session's appended
  * context up to the ref it forks. Git's answers for the gates and the
@@ -272,8 +272,8 @@ describe('three questions over one candidate', () => {
   }, 120_000);
 });
 
-describe('unavailable fork inputs remain explicit', () => {
-  test('a genuinely unavailable preserving fork dispatches no replacement fresh reviewer', async () => {
+describe('unavailable reusable review context uses ordinary fresh inputs', () => {
+  test('an unavailable preserving fork makes one fresh invocation with the ordinary review inputs', async () => {
     const root = await reviewTarget(cleanups); let reviewDispatches = 0;
     const run = await reviewRun(root, cleanups, {
       commits: guidedCommits(), policy: { kinds: ['scope', 'design'], concurrency: 1, retries: 0 },
@@ -290,16 +290,19 @@ describe('unavailable fork inputs remain explicit', () => {
         }; };
       },
     });
-    expect(reviewDispatches).toBe(0);
+    expect(reviewDispatches).toBe(6);
     const attempted = eventsOf(run.events, 'review-attempt-finished');
     expect(attempted.length).toBeGreaterThan(0);
     const coverage = run.service.reviews(plan, run.runId)!.coverage;
     expect(coverage.state).toBe('available'); if (coverage.state !== 'available') throw new Error('Expected available coverage');
     expect(coverage.notVerified).toBeGreaterThan(0);
-    expect(eventsOf(run.events, 'invocation-ended').filter(event => event.data.degraded?.actual === 'fresh')).toEqual([]);
+    const degraded = eventsOf(run.events, 'invocation-ended').filter(event => event.data.degraded?.actual === 'fresh');
+    expect(degraded).toHaveLength(6);
+    expect(eventsOf(run.events, 'invocation-ended').filter(event => event.data.ended === 'failed')).toHaveLength(6);
+    expect(new Set(degraded.map(event => event.data.invocation)).size).toBe(6);
   }, 120_000);
 
-  test('a failed orientation is recorded once and its dependent design reviews remain unavailable', async () => {
+  test('a failed orientation is recorded once and its dependent design reviews start fresh', async () => {
     const root = await reviewTarget(cleanups);
     let agent!: ScriptedAgent;
     const run = await reviewRun(root, cleanups, {
@@ -324,10 +327,16 @@ describe('unavailable fork inputs remain explicit', () => {
     const failed = JSON.parse(await readFile(runPath(root, plan, runId, reviewLayout.orientation(orientations[0]!.data.key)), 'utf8'));
     expect(failed).toMatchObject({ outcome: 'failed', ref: null, summary: null, reason: expect.stringContaining('ended') });
     const reviewers = agent.sessions.filter(session => session.spec.role === 'reviewer' && session.spec.submission.name !== 'submit_orientation');
-    expect(reviewers.map(session => session.spec.session.mode)).toEqual(['fork']);
-    for (const attempt of ['rq-0001.a01', 'rq-0002.a01']) expect(await attemptRecord(root, runId, attempt)).toMatchObject({ requestedStart: 'fork', actualStart: null, invocation: null, result: { result: 'not-verified' } });
+    expect(reviewers.map(session => session.spec.session.mode)).toEqual(['fresh', 'fresh', 'fork']);
+    for (const reviewer of reviewers.slice(0, 2)) {
+      expect(reviewer.inherited).toEqual([]);
+      expect(reviewer.spec.prompt).toContain(principles);
+      expect(reviewer.spec.prompt).toContain(readme);
+      expect(reviewer.spec.prompt).toContain('snapshot_read');
+    }
+    for (const attempt of ['rq-0001.a01', 'rq-0002.a01']) expect(await attemptRecord(root, runId, attempt)).toMatchObject({ requestedStart: 'fork', actualStart: 'fresh', result: { result: 'complete' } });
     expect(await attemptRecord(root, runId, 'rq-0003.a01')).toMatchObject({ requestedStart: 'fork', actualStart: 'fork' });
-    expect(service.reviews(plan, runId)!.coverage).toEqual({ state: 'available', requested: 3, complete: 1, partial: 0, notVerified: 2, pending: 0 });
+    expect(service.reviews(plan, runId)!.coverage).toEqual({ state: 'available', requested: 3, complete: 3, partial: 0, notVerified: 0, pending: 0 });
   }, 120_000);
 
   test('a candidate without guidance leaves its design review unavailable, never clean', async () => {

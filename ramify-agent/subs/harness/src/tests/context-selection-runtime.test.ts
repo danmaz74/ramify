@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, rm } from 'node:fs/promises';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Script, ScriptStep } from '../../subs/agent/src/scripted.js';
@@ -295,4 +295,118 @@ test('a fresh selector receives the ordinary work brief, its complete own elemen
   expect(selector.spec.prompt).toContain(`${fixture.root}/subs/workspace/subs/reviews/subs/core/module.ramify`);
   expect(selector.spec.prompt).toContain('Select, by ID, the elements');
   expect(selector.spec.prompt).not.toContain('once you have oriented');
+}, 120_000);
+
+
+test.each(['missing', 'altered'] as const)('%s orientation packet takes the ordinary fresh path without repeating orientation', async loss => {
+  const fixture = await copyFixture(); cleanups.push(fixture.remove); await installTestRunner(fixture.root);
+  const agent = createScriptedAgent(declaringScenarios(byRole({
+    'initial-architect': [submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core')]))],
+    'local-architect': [submit(requestCompletion())],
+  })));
+  const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(),
+    unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001', 'final verification of plan "revision-diff"'],
+    afterWrite: async (write, jobId) => {
+      if (write !== 'work-orientation-recorded') return;
+      const events = await runEventsOnDisk(fixture.root, 'revision-diff', jobId);
+      const recorded = events.find(event => event.type === 'work-orientation-recorded')!;
+      const path = runPath(fixture.root, 'revision-diff', jobId, recorded.data.packet!);
+      if (loss === 'missing') await rm(path); else await writeFile(path, 'altered reusable packet');
+    },
+  }); cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('revision-diff')); await opened.service.settled('revision-diff', receipt.jobId);
+  expect(onlyRun(opened.service, 'revision-diff').state).toBe('completed');
+  expect(agent.sessions.filter(session => session.spec.submission.name === 'submit_work_orientation')).toHaveLength(1);
+  const selector = agent.sessions.find(session => session.spec.role === 'context-selector')!;
+  expect(selector.start.mode).toBe('fresh'); expect(selector.inherited).toEqual([]);
+  expect(selector.spec.prompt).toContain('The plan asks for review-summary-request.');
+  expect(selector.spec.prompt).not.toContain('altered reusable packet');
+  const events = await runEventsOnDisk(fixture.root, 'revision-diff', receipt.jobId);
+  const selection = events.find(event => event.type === 'context-selection-recorded')!;
+  expect((await recordedPackage(fixture.root, receipt.jobId, events, selection)).selection).toMatchObject({ degraded: true, orientationPoint: null });
+}, 120_000);
+
+test.each(['fork', 'continue'] as const)('actual unavailable %s startup creates a new fresh invocation with full ordinary inputs', async mode => {
+  const fixture = await copyFixture(); cleanups.push(fixture.remove); await installTestRunner(fixture.root);
+  const agent = createScriptedAgent(declaringScenarios(byRole({
+    'initial-architect': [submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core')]))],
+    'local-architect': [submit(requestCompletion())],
+  })));
+  let lost = false;
+  const bind = agent.bindSessionStore.bind(agent);
+  agent.bindSessionStore = store => { const operations = bind(store); return { ...operations,
+    async fork(input) {
+      if (mode === 'fork' && !lost) { lost = true; return operations.fork({ ...input, sourcePoint: { ...input.sourcePoint, checkpoint: 'missing-at-actual-fork' } }); }
+      return operations.fork(input);
+    },
+    async continue(input) {
+      if (mode === 'continue' && input.task.submissionTool === 'submit_work_item_result' && !lost) {
+        lost = true; agent.loseSession(input.expectedPoint);
+      }
+      return operations.continue(input);
+    },
+  }; };
+  const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(),
+    unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001', 'final verification of plan "revision-diff"'],
+  }); cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('revision-diff')); await opened.service.settled('revision-diff', receipt.jobId);
+  expect(onlyRun(opened.service, 'revision-diff').state).toBe('completed'); expect(lost).toBe(true);
+  const events = await runEventsOnDisk(fixture.root, 'revision-diff', receipt.jobId);
+  const failed = events.find((event): event is RunEventOf<'invocation-ended'> => event.type === 'invocation-ended' && event.data.ended === 'failed')!;
+  const fresh = events.find((event): event is RunEventOf<'invocation-ended'> => event.type === 'invocation-ended' && event.data.degraded?.requested === mode)!;
+  expect(fresh.data.invocation).not.toBe(failed.data.invocation); expect(fresh.data.degraded?.actual).toBe('fresh');
+  const task = agent.sessions.find(session => session.spec.submission.name === (mode === 'fork' ? contextSelectorToolName : 'submit_work_item_result') && session.start.mode === 'fresh')!;
+  expect(task.inherited).toEqual([]); expect(task.spec.prompt).toContain('The plan asks for review-summary-request.');
+  expect(task.spec.prompt).toContain(`${fixture.root}/subs/workspace/subs/reviews/subs/core/module.ramify`);
+  if (mode === 'fork') expect(task.spec.prompt).toContain('## Local architect orientation');
+}, 120_000);
+
+test('exhausted work orientation proceeds with a fresh selector and architect using ordinary inputs', async () => {
+  const fixture = await copyFixture(); cleanups.push(fixture.remove); await installTestRunner(fixture.root);
+  const ordinary = withDefaultTurns(spec => {
+    if (spec.role === 'initial-architect') return submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core')]));
+    if (spec.role === 'local-architect') return submit({ ...requestCompletion(), reports: [{ id: 'sc-001', judgment: 'done', basedOnRevision: 0 }] });
+    return [];
+  });
+  const agent = createScriptedAgent(spec => spec.submission.name === 'submit_work_orientation' ? [{ kind: 'end', message: 'No orientation submission' }] : typeof ordinary === 'function' ? ordinary(spec) : ordinary);
+  const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(),
+    unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001', 'final verification of plan "revision-diff"'],
+  }); cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('revision-diff')); await opened.service.settled('revision-diff', receipt.jobId);
+  expect(onlyRun(opened.service, 'revision-diff').state).toBe('completed');
+  const events = await runEventsOnDisk(fixture.root, 'revision-diff', receipt.jobId);
+  expect(events.filter(event => event.type === 'work-orientation-recorded')).toEqual([]);
+  const orienting = agent.sessions.filter(session => session.spec.submission.name === 'submit_work_orientation');
+  const policy = runRecordSchema.parse(JSON.parse(await readFile(runPath(fixture.root, 'revision-diff', receipt.jobId, runLayout.record), 'utf8'))).policy;
+  expect(orienting).toHaveLength(policy.limits.forkRetriesPerRequest + 1);
+  const last = events.filter((event): event is RunEventOf<'invocation-started'> => event.type === 'invocation-started' && event.data.role === 'local-architect').at(-2)!;
+  const selection = events.find(event => event.type === 'context-selection-recorded')!;
+  expect((await recordedPackage(fixture.root, receipt.jobId, events, selection)).selection).toMatchObject({ degraded: true, orientationPoint: null, orientationInvocation: last.data.invocation });
+  for (const session of agent.sessions.filter(session => [contextSelectorToolName, 'submit_work_item_result'].includes(session.spec.submission.name))) {
+    expect(session.start.mode).toBe('fresh'); expect(session.spec.prompt).toContain('The plan asks for review-summary-request.');
+  }
+}, 120_000);
+
+
+test.each(['failed', 'unavailable', 'conflict', 'stopped'] as const)('a continued task receipt ending %s without context loss does not start a fresh retry', async status => {
+  const fixture = await copyFixture(); cleanups.push(fixture.remove); await installTestRunner(fixture.root);
+  const agent = createScriptedAgent(declaringScenarios(byRole({
+    'initial-architect': [submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core')]))],
+  })));
+  const bind = agent.bindSessionStore.bind(agent);
+  agent.bindSessionStore = store => { const operations = bind(store); return { ...operations,
+    async continue(input) {
+      if (input.task.submissionTool !== 'submit_work_item_result') return operations.continue(input);
+      const receipt = { runId: input.runId, operationId: input.operationId, sessionId: input.sessionId, turn: null, point: null,
+        status, reason: 'ordinary task/provider/authority outcome', outcome: status === 'stopped' ? { kind: 'stopped' as const } : { kind: 'failed' as const, error: 'ordinary task/provider/authority outcome' } };
+      return { receipt: Promise.resolve(receipt), outcome: Promise.resolve(receipt.outcome), stop: async () => receipt, settled: async () => receipt };
+    },
+  }; };
+  const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(), unchangedCheckpoints: [scenariosCommit('revision-diff')] });
+  cleanups.push(() => opened.service.close()); const receipt = await opened.service.execute(startRun('revision-diff'));
+  await opened.service.settled('revision-diff', receipt.jobId);
+  const events = await runEventsOnDisk(fixture.root, 'revision-diff', receipt.jobId);
+  expect(events.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect')).toHaveLength(2);
+  expect(events.filter(event => event.type === 'invocation-ended' && event.data.degraded?.actual === 'fresh')).toEqual([]);
+  expect(agent.sessions.filter(session => session.spec.submission.name === 'submit_work_item_result')).toEqual([]);
 }, 120_000);

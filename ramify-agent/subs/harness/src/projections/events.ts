@@ -138,6 +138,7 @@ function describe(event: RunEvent): [string, Ref[]] {
       ];
     case 'brief-appended':
       return [`The brief of ${event.data.decision} reached the global architect's context (${event.data.outcome})`, [...ref('decision', event.data.decision), ...ref('session', event.data.session)]];
+    case 'brief-not-appended': return [`Decision ${event.data.decision}: parent briefing unavailable (${event.data.reason})`, ref('decision', event.data.decision)];
     case 'global-context-rebuilt':
       return [`The global architect's context was rebuilt (generation ${event.data.generation}): ${event.data.reason}`, []];
     case 'decision-delivered':

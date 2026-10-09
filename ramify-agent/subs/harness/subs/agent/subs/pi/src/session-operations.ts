@@ -57,7 +57,7 @@ function enrichBindings(bindings: SessionExecutionBindings, declarations: readon
 export function createPiSessionOperations(source: PiRuntimeSource, sessionStore: SessionStore): SessionOperations {
   const operations = createSessionOperations({ sessionStore, driver: { async dispatch(input, runtime) {
     try { return await dispatchPreservingPi(source, input, runtime); }
-    catch (error) { if (runtime.signal.aborted) return { kind: 'stopped' }; throw new SessionDriverUnavailableError(String(error)); }
+    catch (error) { if (runtime.signal.aborted) return { kind: 'stopped' }; throw error; }
   } } });
   async function availability(runId: string, operationId: string, sessionId: string): Promise<SessionOperationHandle | null> {
     const previous = await sessionStore.read(runId, `operation:${operationId}`);
@@ -92,11 +92,15 @@ export function createPiSessionOperations(source: PiRuntimeSource, sessionStore:
 
 async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDriverInvocation, runtime: SessionDriverRuntime): Promise<SessionOutcome> {
   const modelRuntime = await source.runtime(); const chosen = await chooseModel(modelRuntime, source.model);
-  const unsupported = supportedPreservingModel(chosen.model); if (unsupported) throw new SessionDriverUnavailableError(unsupported);
+  const unsupported = supportedPreservingModel(chosen.model); if (unsupported) throw new Error(unsupported);
   let state: PreservedPiTranscript | null = null;
-  for (const entry of input.session.transcript) if (entry.kind === 'provider' && entry.key.includes(':pi-state:')) state = decodePreservedTranscript(await runtime.readPayload(entry.payloadId));
+  for (const entry of input.session.transcript) if (entry.kind === 'provider' && entry.key.includes(':pi-state:')) {
+    const bytes = await runtime.readPayload(entry.payloadId);
+    try { state = decodePreservedTranscript(bytes); }
+    catch (error) { throw new SessionDriverUnavailableError(String(error)); }
+  }
   const modelIdentity = `${chosen.model.provider}/${chosen.model.id}`;
-  if (state && state.model !== modelIdentity) throw new Error('Preserved pi model identity differs');
+  if (state && state.model !== modelIdentity) throw new SessionDriverUnavailableError('Preserved pi model identity differs');
   let messages: PiTranscriptMessage[] = state ? copy([...state.messages]) : [];
   let declarations: PiTranscriptTool[] = state ? copy([...state.declarations]) : [];
   const applied = new Set(state?.appliedAgentKeys ?? []);
@@ -159,13 +163,13 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
     const persistedMessages = copy(captured ?? messages);
     const nextPersistence = persistence.then(async () => {
     const native = await serializeNativePrefix(chosen.model, persistedMessages);
-    if (inherited && (native.instructions !== inherited.instructions || !sameNative(native.tools, inherited.tools) || !sameNative(native.input.slice(0, inherited.input.length), inherited.input))) throw new Error('Restored opaque pi prefix changed before provider dispatch');
+    if (inherited && (native.instructions !== inherited.instructions || !sameNative(native.tools, inherited.tools) || !sameNative(native.input.slice(0, inherited.input.length), inherited.input))) throw new SessionDriverUnavailableError('Restored opaque pi prefix changed before provider dispatch');
     // The installed serializer inserts synthetic outputs for unfinished calls.
     // Persist actual opaque messages immediately, but freeze native input only
     // at complete boundaries; a synthetic missing result was never dispatched.
     const unfinished = persistedMessages.some(message => message.role === 'assistant' && message.content.some(block => block.type === 'toolCall' && !persistedMessages.some(result => result.role === 'toolResult' && result.toolCallId === block.id)));
     if (!unfinished) completeNative = native;
-    if (!completeNative) throw new Error('Opaque transcript has no complete native prefix');
+    if (!completeNative) throw new SessionDriverUnavailableError('Opaque transcript has no complete native prefix');
     const next: PreservedPiTranscript = { schema: 'ramify.pi-transcript/1', packageVersion: '0.87.1', transport: 'sse', model: modelIdentity, messages: persistedMessages, appliedAgentKeys: [...applied], declarations: copy(declarations), additionKeys: [...additions], activeTools: [...activeTools], native: completeNative, sequence: ++sequence, preparedOperationId: input.key.operationId };
     await runtime.persistPayload(`${input.key.operationId}:pi-state:${sequence}`, new TextEncoder().encode(JSON.stringify(next)));
     state = next;
@@ -328,7 +332,7 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
       await persist(); session.agent.state.messages = copy(messages);
     }
     await session.agent.continue();
-    if (fatal) throw new SessionDriverUnavailableError(fatal);
+    if (fatal) throw new Error(fatal);
     if (runtime.signal.aborted) return { kind: 'stopped' };
     if (accepted !== undefined) return { kind: 'submitted', input: accepted };
     if (budget !== undefined) return { kind: 'context-budget-reached', tokens: budget };

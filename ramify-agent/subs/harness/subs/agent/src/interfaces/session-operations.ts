@@ -14,6 +14,8 @@ export interface SessionExecutionIdentity extends SessionOperationKey { readonly
 export interface SessionLineage { readonly sessionId: AgentSessionId; readonly parent: AgentSessionPoint | null; readonly currentPoint: AgentSessionPoint }
 export interface SessionOperationReceipt extends SessionOperationKey {
   readonly sessionId: AgentSessionId; readonly turn: number | null; readonly point: AgentSessionPoint | null;
+  /** True only for missing reusable context; transport/model failure and uncertain effects do not qualify. */
+  readonly contextUnavailable?: boolean;
   readonly status: 'completed' | 'failed' | 'stopped' | 'unavailable' | 'conflict'; readonly outcome: SessionOutcome | null; readonly reason: string | null;
 }
 export interface SessionToolDeclaration { readonly name: string; readonly description: string; readonly inputSchema: JsonSchema; readonly mutating: boolean }

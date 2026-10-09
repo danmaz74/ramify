@@ -177,7 +177,7 @@ describe('Plan 23 installed pi native prefix preservation', () => {
       return { ...body, ...(mutation === 'replace-head' ? { instructions: 'Wrong head.' } : mutation === 'replace-tools' ? { tools: [] } : { input: [] }) };
     }); }]);
     const failed = await (await f.operations.continue(f.next(f.P.sessionId, f.P.point!, 'unsafe'))).receipt;
-    expect(failed).toMatchObject({ status: 'unavailable', point: null }); expect(f.native.dispatches()).toBe(0); expect(f.native.requests).toHaveLength(0);
+    expect(failed).toMatchObject({ status: 'failed', point: null }); expect(failed.contextUnavailable).not.toBe(true); expect(f.native.dispatches()).toBe(0); expect(f.native.requests).toHaveLength(0);
     expect(await (await f.operations.retry({ runId: 'run-A', operationId: 'unsafe', bindings: f.bindings })).receipt).toEqual(failed);
     expect(await f.operations.inspect('run-A', f.P.sessionId)).toBeNull();
     expect((await f.operations.fork({ runId: 'run-A', operationId: 'safe-old', sourcePoint: f.P.point! })).status).toBe('completed'); f.native.verify();
@@ -186,7 +186,7 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     let hooks = 0;
     const f = await fixture([[call('read', {}, 'first')]], [read, orientation], [pi => { pi.on('before_provider_request', () => { if (++hooks === 2) throw new Error('Late swallowed hook'); }); }]);
     const result = await (await f.operations.continue(f.next(f.P.sessionId, f.P.point!, 'late'))).receipt;
-    expect(result).toMatchObject({ status: 'unavailable', point: null }); expect(hooks).toBe(2); expect(f.native.dispatches()).toBe(1); expect(f.reads()).toBe(1); expect(f.accepted()).toBe(0); f.native.verify();
+    expect(result).toMatchObject({ status: 'failed', point: null }); expect(result.contextUnavailable).not.toBe(true); expect(hooks).toBe(2); expect(f.native.dispatches()).toBe(1); expect(f.reads()).toBe(1); expect(f.accepted()).toBe(0); f.native.verify();
   });
   it('S08 refuses inactive inherited mutation and old submission before effects and accepts only the new designated tool', async () => {
     const write: SessionToolDeclaration = { name: 'write_fixture', description: 'Write fixture.', inputSchema: { type: 'object' }, mutating: true };
@@ -258,7 +258,7 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     // Independent corruption fixture bypasses content-addressing to exercise the decoder.
     f.payloads.set(entry.payloadId, new TextEncoder().encode(corruption === 'encoding' ? '{' : JSON.stringify(value)));
     const result = await (await f.operations.continue(f.next(f.P.sessionId, T1.point!, 'corrupt'))).receipt;
-    expect(result).toMatchObject({ status: 'unavailable', point: null }); expect(f.native.dispatches()).toBe(1);
+    expect(result).toMatchObject({ status: 'unavailable', contextUnavailable: true, point: null }); expect(f.native.dispatches()).toBe(1);
     expect(await (await f.operations.retry({ runId: 'run-A', operationId: 'corrupt', bindings: f.bindings })).receipt).toEqual(result);
     expect(await f.operations.inspect('run-A', f.P.sessionId)).toBeNull(); f.native.verify();
   });
@@ -266,7 +266,7 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     const f = await fixture([]); const snapshot = await f.operations.inspect('run-A', f.P.sessionId);
     f.payloads.delete(snapshot!.transcript[0]!.payloadId);
     const result = await (await f.operations.continue(f.next(f.P.sessionId, f.P.point!, 'missing'))).receipt;
-    expect(result).toMatchObject({ status: 'unavailable', point: null }); expect(f.native.dispatches()).toBe(0);
+    expect(result).toMatchObject({ status: 'unavailable', contextUnavailable: true, point: null }); expect(f.native.dispatches()).toBe(0);
     expect(await f.store.read('run-A', 'operation:missing')).toBeNull(); expect(await f.operations.inspect('run-A', f.P.sessionId)).toBeNull(); f.native.verify();
   });
   it('Stop during awaited final transformation fences the actual request and its late callback', async () => {
@@ -340,7 +340,7 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     const f = await fixture([]);
     const P = await f.operations.create({ runId: 'blank', operationId: 'create', initialInstructions: '', declarations: [read, orientation], activate: ['read', orientation.name], policy });
     const receipt = await (await f.operations.continue({ ...f.next(P.sessionId, P.point!, 'blank-task'), runId: 'blank' })).receipt;
-    expect(receipt).toMatchObject({ status: 'unavailable', point: null }); expect(f.native.dispatches()).toBe(0); f.native.verify();
+    expect(receipt).toMatchObject({ status: 'failed', point: null }); expect(receipt.contextUnavailable).not.toBe(true); expect(f.native.dispatches()).toBe(0); f.native.verify();
   });
   it('context budget ends with preserved definitions and no invented submission or compaction request', async () => {
     const f = await fixture([[call('read', {}, 'budget')]]);
@@ -375,6 +375,7 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     const interrupted = await f.store.read('run-A', 'operation:interrupted'); expect(interrupted?.body['receipt']).toBeNull();
     const unsupported = createPiAgentOn({ ...f.source, model: 'openai-codex/gpt-5.4' }).bindSessionStore!(f.store);
     const receipt = await (await unsupported.retry({ runId: 'run-A', operationId: 'interrupted', bindings: f.bindings })).receipt;
+    expect(receipt.contextUnavailable).not.toBe(true);
     expect(receipt).toEqual({ runId: 'run-A', operationId: 'interrupted', sessionId: f.P.sessionId, turn: null, point: null, status: 'unavailable', outcome: null, reason: 'Session preservation supports only openai-codex/gpt-5.6-sol on openai-codex-responses' });
     expect(f.native.dispatches()).toBe(1);
     // Not recorded: the operation record is unchanged, so a supported adapter still completes the same Retry.
@@ -385,4 +386,13 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     expect(missing).toMatchObject({ status: 'unavailable', point: null, reason: 'Operation intent missing' }); expect(await f.store.read('run-A', 'operation:never-started')).toBeNull();
     f.native.verify();
   });
+});
+
+
+it('runtime initialization failure remains transport unavailable without a context-loss indication', async () => {
+  const f = await fixture([]);
+  const unavailable = createPiAgentOn({ ...f.source, runtime: async () => { throw new Error('Provider credentials unavailable'); } }).bindSessionStore!(f.store);
+  const receipt = await (await unavailable.continue(f.next(f.P.sessionId, f.P.point!, 'initialization-failure'))).receipt;
+  expect(receipt).toMatchObject({ status: 'unavailable', reason: expect.stringContaining('Provider credentials unavailable') });
+  expect(receipt.contextUnavailable).not.toBe(true); expect(f.native.dispatches()).toBe(0); f.native.verify();
 });
