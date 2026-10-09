@@ -4872,43 +4872,86 @@ export class RunService {
     if (latest !== undefined) {
       const ended = run.log.all('invocation-ended').find(event => event.data.invocation === latest.data.invocation);
       const outcome = this.committedBody(run, runLayout.outcome(latest.data.invocation)) as InvocationOutcome | null;
-      if (ended?.data.kept && outcome?.session?.ref) {
-        const continued = await (await this.operations(agent)).append(outcome.session.ref, `recover:${activeId}:${latest.data.invocation}`,
-          `Recover capability ${activeId} from the committed plan and task state`);
-        if (continued.outcome !== 'session-lost') { point = continued.ref; session = latest.data.session; }
-      }
-      if (session === undefined) reconstructedFrom = latest.data.session;
-      if (ended?.data.ended === 'submitted' && ended.data.submission !== null) {
+      if (ended?.data.ended === 'submitted') {
         const bytes = await readIfExists(run.path(runLayout.submission(latest.data.invocation)));
-        if (bytes === undefined || sha256(bytes) !== ended.data.submission ||
-          outcome?.submission?.hash !== ended.data.submission || outcome.disposition !== 'applied' ||
-          !outcome.settled.confirmed || !ended.data.kept || !outcome.session?.ref) {
+        const checkedOutcome = invocationOutcomeSchema.safeParse(outcome);
+        const endings = run.log.all('invocation-ended').filter(event => event.data.invocation === latest.data.invocation);
+        const starts = run.log.all('invocation-started').filter(event => event.data.invocation === latest.data.invocation);
+        if (ended.data.submission === null || bytes === undefined || sha256(bytes) !== ended.data.submission || !checkedOutcome.success ||
+          checkedOutcome.data.invocation !== latest.data.invocation || checkedOutcome.data.ended !== 'submitted' ||
+          checkedOutcome.data.submission?.hash !== ended.data.submission || !checkedOutcome.data.settled.confirmed ||
+          endings.length !== 1 || starts.length !== 1 || ended.data.session !== latest.data.session ||
+          ended.sequence <= latest.sequence) {
           await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has an unauthenticated accepted coordinator action`);
           return false;
         }
-        const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+        const authenticated = checkedOutcome.data;
+        let raw: Record<string, unknown>;
+        try { raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>; }
+        catch {
+          await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has an invalid accepted coordinator action`);
+          return false;
+        }
+        if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+          await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has an invalid accepted coordinator action`);
+          return false;
+        }
         const { schema: _schema, ...body } = raw;
         const parsed = capabilityActionSchema.safeParse(body);
         if (raw.schema !== 'ramify-agent.capability-action/1' || !parsed.success || parsed.data.task !== task.id) {
           await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has an invalid accepted coordinator action`);
           return false;
         }
-        const chosen = parsed.data;
-        const effectExists = chosen.kind === 'assign'
-          ? run.log.all('capability-assigned').some(event => event.data.invocation === latest.data.invocation)
-          : chosen.kind === 'consult-consumer'
-            ? run.log.all('capability-exchange-opened').some(event => event.data.invocation === latest.data.invocation)
-            : chosen.kind === 'request-handback'
-              ? run.log.all('capability-verification-started').some(event => event.data.invocation === latest.data.invocation)
-              : true;
-        if (!effectExists && chosen.planRevision !== plan.revision) {
-          await this.fail(run, 'recovery-exhausted', `Capability ${activeId} accepted action names stale plan revision ${chosen.planRevision}`);
-          return false;
+        if (authenticated.disposition === 'superseded') {
+          // Closing the service can race an already accepted agent receipt.
+          // That owning result remains discarded, even though its bytes are
+          // retained. Only the existing bounded, record-backed reconstruction
+          // may continue; no report or action is replayed from this result.
+          const effect = run.log.events.some(event =>
+            (event.type.startsWith('capability-') && 'invocation' in event.data &&
+              event.data.invocation === latest.data.invocation) ||
+            (event.type === 'unresolved-requested' && event.data.invocation === latest.data.invocation) ||
+            ((event.type === 'obligation-reported' || event.type === 'obligation-registered') &&
+              event.data.by === latest.data.invocation));
+          const source = authenticated.session?.ref ? readSessionPointReference(authenticated.session.ref) : null;
+          if (ended.data.kept || ended.data.finished !== 'run-ended' || authenticated.interruption !== undefined ||
+            effect || source === null || source.runId !== run.record.jobId ||
+            authenticated.sessionOperation?.runId !== run.record.jobId ||
+            authenticated.sessionOperation.operationId !== latest.data.invocation ||
+            canonicalJson(authenticated.sessionOperation.point) !== canonicalJson(source.point) ||
+            authenticated.sessionOperation.sessionId !== source.point.sessionId) {
+            await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has an unauthenticated superseded coordinator shutdown`);
+            return false;
+          }
+        } else {
+          if (authenticated.disposition !== 'applied' || !ended.data.kept || !authenticated.session?.ref) {
+            await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has an unauthenticated accepted coordinator action`);
+            return false;
+          }
+          const chosen = parsed.data;
+          const effectExists = chosen.kind === 'assign'
+            ? run.log.all('capability-assigned').some(event => event.data.invocation === latest.data.invocation)
+            : chosen.kind === 'consult-consumer'
+              ? run.log.all('capability-exchange-opened').some(event => event.data.invocation === latest.data.invocation)
+              : chosen.kind === 'request-handback'
+                ? run.log.all('capability-verification-started').some(event => event.data.invocation === latest.data.invocation)
+                : true;
+          if (!effectExists && chosen.planRevision !== plan.revision) {
+            await this.fail(run, 'recovery-exhausted', `Capability ${activeId} accepted action names stale plan revision ${chosen.planRevision}`);
+            return false;
+          }
+          if (!effectExists) replay = { id: latest.data.invocation, ended: 'submitted', value: chosen,
+            ref: authenticated.session.ref, session: latest.data.session, kept: true, outcomeKind: 'submitted' };
         }
-        if (!effectExists) replay = { id: latest.data.invocation, ended: 'submitted', value: chosen,
-          ref: outcome.session.ref, session: latest.data.session, kept: true, outcomeKind: 'submitted' };
       }
+      if (ended?.data.kept && outcome?.session?.ref) {
+        const continued = await (await this.operations(agent)).append(outcome.session.ref, `recover:${activeId}:${latest.data.invocation}`,
+          `Recover capability ${activeId} from the committed plan and task state`);
+        if (continued.outcome !== 'session-lost') { point = continued.ref; session = latest.data.session; }
+      }
+      if (session === undefined) reconstructedFrom = latest.data.session;
     }
+
     if (reconstructedFrom !== undefined) {
       const budgetSessions = new Set(run.log.all('invocation-ended')
         .filter(event => event.data.ended === 'context-budget-reached')

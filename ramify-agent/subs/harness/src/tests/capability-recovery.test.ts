@@ -1,10 +1,13 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
 import { analysis, entry } from './helpers/analysis.js';
-import { RunLog } from '../run/log.js';
+import { RunLog, type RunEvent } from '../run/log.js';
+import { measurementSnapshotSchema, runLayout, snapshotId, type InvocationOutcome } from '../run/records.js';
 import { committedRecords } from '../work/committed.js';
+import { replayCapabilityState } from '../capability/state.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, edit, outline, submit, treeInputs } from './helpers/iterations.js';
 import { freeze, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
@@ -822,3 +825,134 @@ for (const boundary of ['capability-exchange-opened', 'capability-exchange-answe
     await second.service.settled('need', receipt.jobId);
   }, 60_000);
 }
+
+
+test('discarded coordinator shutdown refuses corrupted proof, applied non-kept results and already applied effects before any recovery dispatch', async () => {
+  const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
+  const boundary = recoveryBoundaries(fixture.root, 'a'); answers.push(boundary);
+  let closed: Promise<void> | undefined;
+  let release!: () => void;
+  const closing = new Promise<void>(resolve => { release = resolve; });
+  const script: Script = spec => {
+    if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', 'capability-coordination/a')]));
+    if (spec.submission.name === 'submit_work_item_result') return submit(assign('capability-coordination/a', {}, outline()));
+    if (spec.submission.name === 'submit_capability_qualification') {
+      const ids = [...spec.prompt.matchAll(/Use request (need-\d+) and invocation (inv-\d+)/gu)].at(-1)!;
+      return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: 'capability-coordination/b',
+        placementReason: 'B owns the source', constraints: [], requirementRefs: [] });
+    }
+    if (spec.role === 'engineer') return submit({ kind: 'capability-needed', summary: 'A needs source', request: {
+      need: 'B fact with source', usage: [{ path: 'subs/a/src/caller.ts', use: 'Display source', prospective: false }],
+      constraints: [], knownInterface: { kind: 'none-known' },
+      examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
+    } });
+    if (spec.role === 'capability-architect') {
+      const ids = [...spec.prompt.matchAll(/Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/gu)].at(-1)!;
+      return submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3], kind: 'partial',
+        progress: 'Source inspected', unfinished: ['Assign B'] });
+    }
+    return [];
+  };
+  const opened = await openCapabilityRuns(fixture.root, { ...boundary.options, script, inputs: treeInputs() });
+  cleanups.push(() => opened.service.close());
+  const settle = opened.service['settleSession'].bind(opened.service);
+  opened.service['settleSession'] = async (...args) => {
+    const result = await settle(...args);
+    const invocation = args[0].log.all('invocation-started').find(event => event.data.invocation === args[1]);
+    if (invocation?.data.role === 'capability-architect') {
+      expect(result.confirmed).toBe(true);
+      closed = opened.service.close(); release(); await closing;
+    }
+    return result;
+  };
+  const receipt = await opened.service.execute(startRun('need'));
+  await until(() => closed !== undefined, 30_000); await closed;
+  const run = opened.service['runs'].get(`need/${receipt.jobId}`)!;
+  const events = run.log.events;
+  const original = events.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect').at(-1)!;
+  if (original.type !== 'invocation-started') throw new Error('Missing coordinator');
+  const end = events.find(event => event.type === 'invocation-ended' && event.data.invocation === original.data.invocation)!;
+  if (end.type !== 'invocation-ended') throw new Error('Missing coordinator end');
+  const path = runLayout.outcome(original.data.invocation);
+  const durable = opened.service['committedBody'](run, path) as InvocationOutcome;
+  expect(durable).toMatchObject({ ended: 'submitted', disposition: 'superseded', settled: { confirmed: true } });
+  expect(end.data).toMatchObject({ kept: false, finished: 'run-ended' });
+  const submissionPath = run.path(runLayout.submission(original.data.invocation));
+  const submitted = await readFile(submissionPath);
+  const baseline = measurementSnapshotSchema.parse(JSON.parse(await readFile(run.path(runLayout.measurement(snapshotId(1))), 'utf8')));
+  const body = opened.service['committedBody'].bind(opened.service);
+  const refusals: string[] = [];
+  opened.service['fail'] = async (_run, reason, text) => { refusals.push(`${reason}: ${text}`); };
+  const actorCount = opened.agent!.sessions.length;
+  const cases: Array<{ name: string; outcome?: unknown; bytes?: string; missingBytes?: boolean; ending?: Partial<typeof end.data>; effect?: RunEvent }> = [
+    { name: 'missing outcome', outcome: null },
+    { name: 'missing ended hash', ending: { submission: null } },
+    { name: 'missing outcome hash', outcome: { ...durable, submission: null } },
+    { name: 'missing submitted bytes', missingBytes: true },
+    { name: 'malformed outcome', outcome: { ...durable, settled: null } },
+    { name: 'wrong outcome invocation', outcome: { ...durable, invocation: 'inv-9999' } },
+    { name: 'unconfirmed settlement', outcome: { ...durable, settled: { ...durable.settled, confirmed: false } } },
+    { name: 'applied non-kept result', outcome: { ...durable, disposition: 'applied' } },
+    { name: 'non-shutdown end', ending: { kept: false, finished: 'not-kept' } },
+    { name: 'changed accepted bytes', bytes: submitted.toString().replace('Source inspected', 'Changed after acceptance') },
+    { name: 'wrong operation identity', outcome: { ...durable, sessionOperation: { ...durable.sessionOperation, operationId: 'inv-9999' } } },
+    { name: 'wrong point checkpoint', outcome: { ...durable, sessionOperation: { ...durable.sessionOperation, point: null } } },
+    { name: 'null submission envelope', bytes: 'null' },
+    { name: 'primitive submission envelope', bytes: '7' },
+    { name: 'array submission envelope', bytes: '[]' },
+    { name: 'wrong task', bytes: submitted.toString().replace('cap-001', 'cap-999') },
+    { name: 'discarded plan mutation', effect: { ...end, type: 'capability-plan-revised', data: {
+      task: 'cap-001', revision: 2, basedOn: 1, invocation: original.data.invocation } } },
+    { name: 'discarded obligation registration', effect: { ...end, type: 'obligation-registered', data: {
+      id: 'extra-case', kind: 'test', responsible: { kind: 'capability-task', id: 'cap-001' },
+      by: original.data.invocation, submission: end.data.submission!, description: 'Extra obligation' } } },
+    { name: 'discarded obligation report', effect: { ...end, type: 'obligation-reported', data: {
+      id: 'cap-001', judgment: 'done', basedOnRevision: 0, revision: 1,
+      by: original.data.invocation, submission: end.data.submission! } } },
+  ];
+  for (const fault of cases) {
+    let outcome: unknown = Object.hasOwn(fault, 'outcome') ? fault.outcome : durable;
+    let ending = { ...end, data: { ...end.data, ...fault.ending } } as typeof end;
+    if (fault.missingBytes) await rm(submissionPath);
+    if (fault.bytes !== undefined) {
+      await writeFile(submissionPath, fault.bytes);
+      // Primitive/schema cases retain mutually matching hashes, so shape
+      // authentication, rather than a preceding hash mismatch, must refuse.
+      if (fault.name !== 'changed accepted bytes') {
+        const hash = createHash('sha256').update(fault.bytes).digest('hex');
+        outcome = { ...durable, submission: { hash } };
+        ending = { ...end, data: { ...end.data, submission: hash } };
+      }
+    }
+    const suppliedEvents = events.map(event => event === end ? ending : event).concat(fault.effect ? [fault.effect] : []);
+    if (fault.name === 'discarded plan mutation') {
+      expect(() => replayCapabilityState(suppliedEvents), 'the prestate corrupted plan already lacks authority')
+        .toThrow(/has no coordination authority/u);
+    }
+    // An independently corrupted observation becomes visible after the original
+    // state read, while the submitted bytes are being authenticated. The
+    // final discarded-effect guard must reject it before reconstruction.
+    let effectVisible = fault.effect === undefined;
+    const log = new Proxy(run.log, { get(target, key) {
+      if (key === 'events') return effectVisible ? suppliedEvents : events;
+      if (key === 'all') return (type: string) => suppliedEvents.filter(event => event.type === type);
+      const value = Reflect.get(target, key, target); return typeof value === 'function' ? value.bind(target) : value;
+    } });
+    const captured = new Proxy(run, { get(target, key) { return key === 'log' ? log : Reflect.get(target, key, target); } });
+    opened.service['committedBody'] = (owner, file) => {
+      if (file !== path) return body(owner, file);
+      effectVisible = true;
+      return outcome;
+    };
+    const before = refusals.length;
+    try {
+      expect(await opened.service['resumeCapabilityTask'](captured, opened.agent!, new Map(), baseline), fault.name).toBe(false);
+      expect(refusals.slice(before), fault.name).toHaveLength(1);
+      expect(refusals.at(-1), fault.name).toMatch(/^recovery-exhausted: Capability cap-001 has an (unauthenticated|invalid)/u);
+      expect(opened.agent!.sessions, fault.name).toHaveLength(actorCount);
+      expect(run.log.events, fault.name).toEqual(events);
+    } finally { await writeFile(submissionPath, submitted); }
+  }
+  expect(await readFile(run.path(path), 'utf8')).toBe(`${JSON.stringify(durable, null, 2)}\n`);
+  expect(run.log.events.filter(event => event.type === 'capability-handed-back' || event.type === 'capability-assigned')).toEqual([]);
+}, 60_000);

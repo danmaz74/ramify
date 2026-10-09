@@ -207,6 +207,12 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
     }
     return [];
   };
+  // Hold the already accepted coordinator at confirmed settlement until the
+  // concern review's close has begun. This fixes the race ordering without a
+  // timer or a late result completing an owning action.
+  let coordinatorSettled = false;
+  let releaseCoordinator!: () => void;
+  const coordinatorClosing = new Promise<void>(resolve => { releaseCoordinator = resolve; });
   let closingVerification: Promise<void> | undefined;
   let frozenFault = false;
   let targetGateId: string | undefined;
@@ -297,7 +303,10 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
         if (mode === 'gate-restart' || mode === 'gate-intent-restart' || mode === 'gate-committing-restart' || mode === 'review-restart') {
           frozenFault = true;
           await freeze();
-        } else closingVerification = closeVerification?.();
+        } else {
+          if (mode === 'concern-submission-restart') await until(() => coordinatorSettled, 30_000);
+          closingVerification = closeVerification?.();
+        }
       }
     },
     policy: root => {
@@ -313,7 +322,25 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
     cleanups.push(() => opened.service.close());
   }
   activeService = opened.service;
-  closeVerification = () => opened.service.close();
+  closeVerification = () => {
+    const closed = opened.service.close();
+    releaseCoordinator();
+    return closed;
+  };
+  if (mode === 'concern-submission-restart') {
+    cleanups.push(async () => { releaseCoordinator(); await opened.service.close(); });
+    const settle = opened.service['settleSession'].bind(opened.service);
+    opened.service['settleSession'] = async (...args) => {
+      const result = await settle(...args);
+      const invocation = args[0].log.all('invocation-started').find(event => event.data.invocation === args[1]);
+      if (!coordinatorSettled && planExercised && invocation?.data.role === 'capability-architect') {
+        expect(result.confirmed).toBe(true);
+        coordinatorSettled = true;
+        await coordinatorClosing;
+      }
+      return result;
+    };
+  }
   const receipt = await opened.service.execute(startRun('need'));
   if (mode === 'verify-restart' || mode === 'gate-restart' || mode === 'gate-intent-restart' ||
     mode === 'gate-committing-restart' || mode === 'review-restart' || mode === 'review-submission-restart' ||
@@ -337,6 +364,18 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
       expect(before.some(event => event.type === 'invocation-ended' && event.data.ended === 'submitted' &&
         reviewerInvocations.has(event.data.invocation))).toBe(true);
     }
+    const discarded = mode === 'concern-submission-restart'
+      ? before.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect').at(-1)
+      : undefined;
+    const discardedPath = discarded?.type === 'invocation-started' ? runLayout.outcome(discarded.data.invocation) : undefined;
+    const discardedBytes = discardedPath === undefined ? undefined : await readFile(runPath(fixture.root, 'need', receipt.jobId, discardedPath));
+    if (discarded?.type === 'invocation-started') {
+      expect(coordinatorSettled).toBe(true);
+      expect(JSON.parse(discardedBytes!.toString())).toMatchObject({ invocation: discarded.data.invocation,
+        ended: 'submitted', disposition: 'superseded', settled: { confirmed: true } });
+      expect(before.find(event => event.type === 'invocation-ended' && event.data.invocation === discarded.data.invocation)?.data)
+        .toMatchObject({ kept: false, finished: 'run-ended' });
+    }
     const gates = before.filter(event => event.type === 'gate-attempted').length;
     const committing = before.filter(event => event.type === 'gate-committing' && event.data.gate === targetGateId).length;
     const reviews = before.filter(event => event.type === 'review-attempt-finished').length;
@@ -352,6 +391,27 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
     const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
     expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-15))).toHaveLength(0);
     expect(after.filter(event => event.type === 'capability-handed-back')).toHaveLength(1);
+    if (discarded?.type === 'invocation-started') {
+      expect(await readFile(runPath(fixture.root, 'need', receipt.jobId, discardedPath!))).toEqual(discardedBytes);
+      expect(after.filter(event => event.type === 'capability-coordinator-resumed' && event.data.invocation === discarded.data.invocation)).toEqual([]);
+      expect(after.filter(event => event.type === 'obligation-reported' && event.data.by === discarded.data.invocation)).toEqual([]);
+      const replacement = after.filter(event => event.type === 'session-opened' && event.data.role === 'capability-architect' &&
+        event.data.replaces?.session === discarded.data.session);
+      expect(replacement).toHaveLength(1);
+      const replaced = replacement[0];
+      if (replaced?.type !== 'session-opened') throw new Error('Missing recorded coordinator reconstruction');
+      expect(replaced.data).toMatchObject({ replaces: { reason: 'reconstructed' } });
+      const replacementEnd = after.find(event => event.type === 'invocation-ended' && event.data.session === replaced.data.session);
+      expect(replacementEnd?.data).toMatchObject({ degraded: { requested: 'continue', actual: 'fresh' } });
+      const restoredPrompt = reopened.agent!.sessions.find(session => session.spec.role === 'capability-architect')!.spec.prompt;
+      const planStart = restoredPrompt.indexOf('Current plan: ');
+      const planEnd = restoredPrompt.indexOf('\n\nProvider entry decisions: ', planStart);
+      expect(planStart).toBeGreaterThanOrEqual(0); expect(planEnd).toBeGreaterThan(planStart);
+      expect(JSON.parse(restoredPrompt.slice(planStart + 'Current plan: '.length, planEnd))).toMatchObject({
+        schema: 'ramify-agent.capability-plan/1', task: 'cap-001', revision: 2, basedOn: 1,
+        useCases: [{ id: 'need-001.ex01', expectedBehavior: 'Fresh fact: old from B' }],
+      });
+    }
     const alreadyPassedTaskGate = before.some(event => event.type === 'gate-attempted' &&
       event.data.checkpoint === 'work-item' && event.data.verdict === 'passed');
     const expectedNewGates = mode === 'concern-submission-restart' ? 2 : alreadyPassedTaskGate ? 0 : 1;
