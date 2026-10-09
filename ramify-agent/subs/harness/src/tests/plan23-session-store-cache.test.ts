@@ -77,8 +77,68 @@ const bodyHeader = (item: SessionStoreRecord) => ({ runId: item.runId, id: item.
 const commit = (store: LedgerSessionStore, revision: number, payloads: string[] = [], body?: Record<string, unknown>) => store.commit({
   runId: 'A', expected: [{ id: 'session:s', revision: revision === 1 ? null : revision - 1 }], records: [record(revision, body)], payloads,
 });
+async function storedRawBody(bytes: string) {
+  const { path, store } = await setup(); await store.close();
+  const bodyId = createHash('sha256').update(bytes).digest('hex');
+  await writeFile(join(path, 'record-bodies', `${bodyId}.json`), bytes);
+  const transaction = { sequence: 1, at: '2026-01-01T00:00:00.000Z', event: {
+    type: 'session-store-commit/2', runId: 'A', records: [{ runId: 'A', id: 'session:s', revision: 1, schema: 'ramify-agent.session/1', bodyId }], payloads: [],
+  }, records: [] };
+  await writeFile(join(path, 'session-ledger.jsonl'), `${JSON.stringify(transaction)}\n`);
+  return { path, bodyId, store: (await setup(path)).store };
+}
 
 describe('Plan 23 owned session store replay cache', () => {
+  it('detaches every nested data property across adapters and reopening without prototype setters or shared arrays', async () => {
+    const { path, store } = await setup(); const second = (await setup(path)).store;
+    const body = JSON.parse('{"nested":{"__proto__":{"kind":"data"},"constructor":{"value":"ctor"},"array":[{"value":"first"},{"inner":{"value":"second"}}]}}');
+    expect(await commit(store, 1, [], body)).toEqual({ kind: 'committed' });
+    const first = (await store.read('A', 'session:s'))!.body as typeof body;
+    expect(Object.getPrototypeOf(first)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(first.nested)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(first.nested, '__proto__')).toEqual({ value: { kind: 'data' }, enumerable: true, writable: true, configurable: true });
+    expect(Object.getOwnPropertyDescriptor(first.nested.array, 'length')).toEqual({ value: 2, enumerable: false, writable: true, configurable: false });
+    first.nested.__proto__.kind = 'caller mutation'; first.nested.constructor.value = 'changed';
+    first.nested.array[0].value = 'changed'; first.nested.array[1].inner.value = 'changed'; first.nested.array.push({ added: true });
+    expect((await second.read('A', 'session:s'))!.body).toEqual(body);
+    const another = (await second.read('A', 'session:s'))!.body as typeof body;
+    expect(another.nested).not.toBe(first.nested); expect(another.nested.array).not.toBe(first.nested.array);
+    await store.close(); await second.close(); const fresh = (await setup(path)).store;
+    expect((await fresh.read('A', 'session:s'))!.body).toEqual(body);
+  });
+  it('preserves numeric primitives and ordered own data keys from authenticated noncanonical body bytes', async () => {
+    const bytes = '{"10":"ten","2":"two","negativeZero":-0,"overflow":1e400,"nested":{"__proto__":{"plain":true},"values":[-0,1e400]}}';
+    const { path, bodyId, store } = await storedRawBody(bytes); const second = (await setup(path)).store;
+    const value = (await store.read('A', 'session:s'))!.body;
+    expect(Object.keys(value)).toEqual(['2', '10', 'negativeZero', 'overflow', 'nested']);
+    expect(Object.is(value['negativeZero'], -0)).toBe(true); expect(value['overflow']).toBe(Infinity);
+    const nested = value['nested'] as { __proto__: { plain: boolean }; values: number[] };
+    expect(Object.getPrototypeOf(nested)).toBe(Object.prototype); expect(Object.hasOwn(nested, '__proto__')).toBe(true);
+    expect(Object.is(nested.values[0], -0)).toBe(true); expect(nested.values[1]).toBe(Infinity);
+    nested.__proto__.plain = false; nested.values[0] = 42;
+    const freshCopy = (await second.read('A', 'session:s'))!.body;
+    expect(Object.is(freshCopy['negativeZero'], -0)).toBe(true); expect(freshCopy['overflow']).toBe(Infinity);
+    expect(freshCopy['nested']).toEqual({ ['__proto__']: { plain: true }, values: [-0, Infinity] });
+    await store.close(); await second.close(); const reopened = (await setup(path)).store;
+    const restored = (await reopened.read('A', 'session:s'))!.body;
+    expect(Object.is(restored['negativeZero'], -0)).toBe(true); expect(restored['overflow']).toBe(Infinity);
+    expect(await readFile(join(path, 'record-bodies', `${bodyId}.json`), 'utf8')).toBe(bytes);
+  });
+  it('keeps deeply nested valid JSON readable and detached without recursive traversal limits', async () => {
+    const depth = 12_000;
+    const bytes = `${'{"child":'.repeat(depth)}{"leaf":"unchanged"}${'}'.repeat(depth)}`;
+    const { path, store } = await storedRawBody(bytes);
+    const leaf = (body: Readonly<Record<string, unknown>>) => {
+      let current = body;
+      for (let index = 0; index < depth; index++) current = current['child'] as Readonly<Record<string, unknown>>;
+      return current as Record<string, unknown>;
+    };
+    const first = (await store.read('A', 'session:s'))!.body; expect(leaf(first)['leaf']).toBe('unchanged');
+    leaf(first)['leaf'] = 'caller mutation';
+    expect(leaf((await store.read('A', 'session:s'))!.body)['leaf']).toBe('unchanged');
+    await store.close(); const reopened = (await setup(path)).store;
+    expect(leaf((await reopened.read('A', 'session:s'))!.body)['leaf']).toBe('unchanged');
+  });
   it('persists exact post-validation body JSON with numeric keys, own prototype keys and nested normalization', async () => {
     const { path, store } = await setup();
     const body = JSON.parse('{"__proto__":{"removed":true},"10":"ten","2":"two","nested":{"__proto__":{"kept":true}}}') as Record<string, unknown>;

@@ -33,6 +33,28 @@ export interface LedgerSessionStore extends SessionStore { close(): Promise<void
 type SessionLedger = Awaited<ReturnType<typeof openLedger<z.infer<typeof eventSchema>>>>;
 type Fingerprint = Pick<BigIntStats, 'dev' | 'ino' | 'size' | 'mtimeNs' | 'ctimeNs'>;
 const sameFingerprint = (left: Fingerprint | null, right: Fingerprint | null): boolean => left === right || (left !== null && right !== null && left.dev === right.dev && left.ino === right.ino && left.size === right.size && left.mtimeNs === right.mtimeNs && left.ctimeNs === right.ctimeNs);
+/** Copies private, previously parsed JSON data after authenticating its actual
+ * body file. Traversal is iterative so valid deeply nested JSON stays readable;
+ * own data properties avoid invoking the inherited __proto__ setter. Numeric
+ * primitives are copied directly, including authenticated -0 and Infinity.
+ */
+function detachBody(body: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const detached: Record<string, unknown> = {};
+  const pending: { source: object; target: object }[] = [{ source: body, target: detached }];
+  while (pending.length > 0) {
+    const { source, target } = pending.pop()!;
+    for (const key of Object.keys(source)) {
+      const value = (source as Record<string, unknown>)[key];
+      let copy = value;
+      if (value !== null && typeof value === 'object') {
+        copy = Array.isArray(value) ? new Array(value.length) : {};
+        pending.push({ source: value, target: copy as object });
+      }
+      Object.defineProperty(target, key, { value: copy, enumerable: true, writable: true, configurable: true });
+    }
+  }
+  return detached;
+}
 interface ValidatedState {
   readonly ledger: SessionLedger;
   readonly records: Map<string, SessionStoreRecord>;
@@ -120,7 +142,10 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
     const record = state.records.get(key);
     if (!record) return null;
     const bodyId = state.bodyRefs.get(key);
-    if (bodyId !== undefined) return { runId: record.runId, id: record.id, revision: record.revision, schema: record.schema, body: readBody(bodyId) };
+    if (bodyId !== undefined) {
+      bodyBytes(bodyId);
+      return { runId: record.runId, id: record.id, revision: record.revision, schema: record.schema, body: detachBody(record.body) };
+    }
     return JSON.parse(state.serializedRecords.get(key)!) as SessionStoreRecord;
   }
   const payloadPaths = new Map<string, string>();
