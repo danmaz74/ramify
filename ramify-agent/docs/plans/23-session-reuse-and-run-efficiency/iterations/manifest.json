@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "implementing; iterations 0–13 accepted for recorded scopes; final qualification remains open after retained failed full audit",
+  "status": "completed; iterations 0\u201314 and all 52 acceptance rows qualified",
   "execution": "dependency-ordered; disjoint iterations may run in parallel",
   "iterations": [
     {
@@ -10,7 +10,7 @@
       "cases": [
         "B01"
       ],
-      "status": "accepted; baseline audit failed with retained qualification debt",
+      "status": "completed; owning receipt 00-results.md; final joined qualification in 14-results.md; original failed baseline retained",
       "writeBoundary": "Plan artifacts and integration setup; no production implementation in this iteration.",
       "receipt": "00-results.md"
     },
@@ -28,7 +28,7 @@
         "S05",
         "S06"
       ],
-      "status": "accepted provider; pi/runtime integration remains iterations 7–9",
+      "status": "completed; owning receipt 01-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness/agent port and scripted implementation; new harness session-store adapter and its own tests. Own run/sessions.ts if required; do not edit run/service.ts, pi or shared run records.",
       "receipt": "01-results.md",
       "providerHead": "10fd6f21a1de31d178a22471b450c8ebc2c382a1",
@@ -54,7 +54,7 @@
         "P04",
         "P05"
       ],
-      "status": "accepted provider; runtime consumers remain iterations 8–10",
+      "status": "completed; owning receipt 02-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness src/prompts/ templates/packages and new pure task/brief builders with isolated prompt tests. Do not edit run/service.ts or plan-evidence/scenarios implementations.",
       "receipt": "02-results.md",
       "providerHead": "8dece7e3f1dff9f536505bdf7debbd0bb42357a6",
@@ -88,7 +88,7 @@
         "H03",
         "H04"
       ],
-      "status": "accepted provider; lifecycle wiring remains iteration 10",
+      "status": "completed; owning receipt 03-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness src/hooks/post-write.ts, src/tools/shell.ts and owner-local scheduling helpers/tests. Excludes shell-tests.ts, engineer-equipment.ts and run/service.ts.",
       "receipt": "03-results.md",
       "providerHead": "ce029705a219ec1ec402a3b084e8edc025f8514b",
@@ -112,7 +112,7 @@
         "H05",
         "H06"
       ],
-      "status": "accepted provider; integrated runtime consumers remain iteration 10",
+      "status": "completed; owning receipt 04-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness focused-config builder (new src/work/focused-scenarios.ts), tools/shell-tests.ts, evidence child adapter for effective project configuration if required, and their own tests. Excludes scenario form, run service and scenario-briefing wiring.",
       "receipt": "04-results.md",
       "providerHead": "f666678da51c87a82ed8e8fd707e0ee99b3f98fb",
@@ -136,7 +136,7 @@
         "C02",
         "C03"
       ],
-      "status": "accepted provider; integrated runtime consumers remain iteration 10",
+      "status": "completed; owning receipt 05-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness/plan-evidence catalog interface and tests; harness/scenarios form.ts and tests. Excludes prompt templates, focused command builder and run/service.ts.",
       "receipt": "05-results.md",
       "providerHead": "eb97988755b5c53ff38de39a72d69e2d6e11c4a1",
@@ -162,7 +162,7 @@
         "M04",
         "M05"
       ],
-      "status": "accepted provider; observation/runtime consumers remain iteration 11",
+      "status": "completed; owning receipt 06-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness src/kpi/ calculations and local tests. Excludes run/service.ts, run/observations.ts, run/records.ts, protocol and web. Consume frozen proposed input types through owner-local types until integration.",
       "receipt": "06-results.md",
       "providerHead": "a3b336ae29aea4d1d0b3e7c7268a18c1227f8ff9",
@@ -188,7 +188,7 @@
         "S10",
         "S11"
       ],
-      "status": "accepted provider; ordinary runtime wiring remains iterations 8–9 and live qualification 14",
+      "status": "completed; owning receipt 07-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness/agent/pi implementation and tests only; consume accepted agent/storage contract from 1.",
       "receipt": "07-results.md",
       "providerHead": "d67738425bd248aa06126b1a49c465b285617c36",
@@ -212,7 +212,7 @@
         "W01",
         "W02"
       ],
-      "status": "accepted ordinary runtime; fork policy remains 9 and live/native/full qualification remains 14",
+      "status": "completed; owning receipt 08-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness run/service.ts, run/records.ts, sessions/single.ts, invocation integration and related helpers/tests. No parallel shared runtime writer.",
       "receipt": "08-results.md",
       "providerHead": "9d4a89e12c3e3d23a9911dea9b660f7673ec1380",
@@ -244,7 +244,7 @@
         "W06",
         "W07"
       ],
-      "status": "accepted ordinary fork runtime; native/live/full qualification remains iteration 14",
+      "status": "completed; owning receipt 09-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness run/service.ts and context-selection/review/consultation/recovery orchestration and tests; serial after 8.",
       "receipt": "09-results.md",
       "providerHead": "a7b73fc9c3d78f922626697591b39c88cd287453",
@@ -276,7 +276,7 @@
         "W10",
         "W11"
       ],
-      "status": "accepted ordinary runtime corrections; native/live/full qualification remains iteration14",
+      "status": "completed; owning receipt 10-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness run/service.ts, work/engineer-equipment.ts, work/scenario-briefing.ts, work/session.ts and briefing/submission wiring/tests; serial shared-runtime owner.",
       "receipt": "10-results.md",
       "providerHead": "d4460fda9db110dc2b6411e80ea7fe234bab447b",
@@ -303,7 +303,7 @@
         "M07",
         "M08"
       ],
-      "status": "accepted ordinary capture and plain projections; presentation/final qualification remain12/14",
+      "status": "completed; owning receipt 11-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Harness run/service.ts, run/observations.ts, run/records.ts, interfaces/protocol and projections; agent event enrichment if required by frozen contract. Serial runtime owner; no web/trial edits.",
       "receipt": "11-results.md",
       "providerHead": "1a0627e82a27f4d2178de9d571f000973ef96413",
@@ -337,7 +337,7 @@
         "V01",
         "V02"
       ],
-      "status": "accepted ordinary presentation; final native/live/full qualification remains iteration14",
+      "status": "completed; owning receipt 12-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Web run/session/metrics presentation and web tests only. Harness projection changes require coordination, not independent formula edits.",
       "receipt": "12-results.md",
       "providerHead": "c887f0b5a9b53925c8d50f41df3bbfcfb5ff93d8",
@@ -363,7 +363,7 @@
         "T01",
         "T02"
       ],
-      "status": "accepted ordinary trial corrections; installed native/live/full qualification remains iteration14",
+      "status": "completed; owning receipt 13-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Root scripts/live-trial.ts, trial fixtures/README, fixture-trials.test.ts and dedicated trial-verifier tests. Excludes runtime service, metrics, protocol and web.",
       "receipt": "13-results.md",
       "providerHead": "49a5aa2eb528c4528153541d55ba0133505bc0c8",
@@ -390,7 +390,7 @@
         "Q02",
         "Q03"
       ],
-      "status": "in progress in isolated worktree after accepted iterations12 and13",
+      "status": "completed; owning receipt 14-results.md; final joined qualification in 14-results.md",
       "writeBoundary": "Integration verification, exact native test-boundary registrations/witnesses, final reports and owner-local corrections found by qualification."
     }
   ],
@@ -406,7 +406,7 @@
     "typeCheck": "passed",
     "structure": "passed; partial analysis coverage; 314 analysis limits",
     "logs": "/tmp/ramify-plan23-integrated-scope-repair-*.log",
-    "finalFullAudit": "pending iteration 14"
+    "finalFullAudit": "passed on aac47684aa8f4cfc4e524f6efb04c2de9ef01abc; original baseline failure retained"
   },
   "providerAmendments": {
     "sessionQuiescence": {
@@ -488,8 +488,8 @@
     "auditSource": "637d8ff7eac6c010af8c3517ff42e1c5ef712ca6",
     "failedReport": "41209da07bbf06539523dc31c40afb52faef3aab",
     "writeSets": "../write-sets.json#qualificationRepairs.full-audit-637d8ff7",
-    "status": "focused corrections integrated; original 15-second workflow and fresh final native/live/full qualification remain open",
-    "policy": "Keep exact original task, receipt and mutation authority; no new skips, timeout increases or blanket replay/fresh fallback.",
+    "status": "completed; failed intermediate audits retained; final full audit passed on aac47684aa8f4cfc4e524f6efb04c2de9ef01abc",
+    "policy": "Keep original task, receipt and mutation authority; no new skips, unapproved timeout increases or blanket replay/fresh fallback. The user directly approved the existing contract watchdog change from 15 to 25 seconds.",
     "integratedAmendments": {
       "runtimeAndNativeWorkflow": {
         "providerHead": "b5cd7cea1b0ac7f968de61d01e2a67548596ed6d",
@@ -530,5 +530,64 @@
       "archive": "/home/app/ramify-plan23-evidence/637d8ff7eac6c010af8c3517ff42e1c5ef712ca6",
       "evidenceLimit": "Audit coverage is incomplete; 119 observed failed titles are retained, not an exhaustive terminal result"
     }
+  },
+  "providerAmendmentsStatus": "Historical provider handoffs; earlier successor-pending text is superseded by finalQualification.",
+  "finalQualification": {
+    "sourceCandidate": "aac47684aa8f4cfc4e524f6efb04c2de9ef01abc",
+    "sourceTree": "fce8f7020553d1a0311706cbb2f472c04b58b9e4",
+    "durationSeconds": 653.636,
+    "counts": {
+      "files": {
+        "failed": 0,
+        "passed": 310,
+        "skipped": 1,
+        "total": 311
+      },
+      "tests": {
+        "failed": 0,
+        "passed": 2716,
+        "skipped": 2,
+        "total": 2718
+      }
+    },
+    "coverage": {
+      "contract": "runner-configured-files/1",
+      "source": "ownership-answer",
+      "expected": 311,
+      "run": 311,
+      "missing": [],
+      "status": "complete",
+      "runnerConfigFiles": [
+        "vitest.config.ts"
+      ]
+    },
+    "refs": {
+      "reportCommit": "639b1eb3b379f0ddd37afc054385f2f9c10ef8f0",
+      "runRef": "refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-09T03-52-34Z-aac47684a",
+      "treeRef": "refs/audited/projects/ramify-agent-f25e9a298228/by-tree/fce8f7020553d1a0311706cbb2f472c04b58b9e4"
+    },
+    "status": "passed",
+    "acceptanceRows": 52,
+    "failureLedgerCompleteness": "complete",
+    "outstandingFailures": 0,
+    "nativeFiles": 3,
+    "nativeTests": 14,
+    "nativeDurationSeconds": 12.72,
+    "originalLiveProcessIds": [
+      3867719,
+      3867783
+    ],
+    "originalLivePayloads": 26,
+    "originalLiveRecordBodies": 78,
+    "requiredOriginalVerifierTests": 4,
+    "requiredOriginalVerifierDurationSeconds": 3.28,
+    "evidenceArchive": "/home/app/ramify-plan23-evidence/aac47684aa8f4cfc4e524f6efb04c2de9ef01abc",
+    "supersedesEarlierPendingHandoffNotes": true,
+    "approvedWatchdogMilliseconds": 25000,
+    "watchdogAuthority": "Direct user instruction, 2026-10-09T02:26:22.055Z; qualification archive provenance JSON",
+    "deferredOptionalOptimizations": [
+      "observation batching",
+      "invocation preparation consolidation"
+    ]
   }
 }

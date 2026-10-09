@@ -1,7 +1,7 @@
 # Iteration 10: Integrate command, catalog and briefing corrections
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 3, iteration 4, iteration 5, iteration 9.
-**Status:** accepted for its recorded scope; see [10-results.md](10-results.md).
+**Status:** completed; see [10-results.md](10-results.md) and [final qualification](14-results.md).
 
 ## Owners and write boundary
 

@@ -1,12 +1,14 @@
 # Plan 23: session reuse and real-run corrections
 
-**Date:** 2026-10-08. **Status:** implementation in progress in
-`/home/app/ramify-plan23-session-reuse`, branch `feat/plan23-session-reuse`.
-Iterations 0–13 are accepted for their recorded scopes. Final qualification
-is active; native/live/full acceptance remains pending.
-The failed baseline audit is retained; a focused native
-materializer repair now passes, while final full qualification remains pending. See
-[its receipt](iterations/00-results.md) and [execution manifest](iterations/manifest.json). This plan implements the selected changes in both the
+**Date:** 2026-10-08. **Status:** completed 2026-10-09.
+Iterations 0–14 were implemented in isolated worktrees and integrated on
+`feat/plan23-session-reuse`. Native, authenticated live, original-artifact and
+full configured nested audit qualification pass on the exact committed source
+in [final results](final-results.md). All [52 acceptance rows](acceptance-to-evidence.md)
+have evidence. Failed baseline and intermediate audits remain retained in
+[iteration receipts](iterations/manifest.json) and the qualification archives.
+
+This plan implements the selected changes in both the
 [session-reuse proposal](../../analysis/2026-10-08-session-reuse-and-system-prompts.md)
 and the [status-badge real-run proposals](../../analysis/2026-10-08-status-badge-tone-real-run.md#proposals).
 

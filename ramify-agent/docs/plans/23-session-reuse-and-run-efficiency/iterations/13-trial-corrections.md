@@ -1,7 +1,7 @@
 # Iteration 13: Repair trial verification and fixture inputs
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 10.
-**Status:** accepted for its recorded scope; see [13-results.md](13-results.md).
+**Status:** completed; see [13-results.md](13-results.md) and [final qualification](14-results.md).
 
 ## Owners and write boundary
 

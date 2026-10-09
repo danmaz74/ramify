@@ -1,7 +1,7 @@
 # Iteration 8: Integrate session operations and ordinary continuations
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 2, iteration 7.
-**Status:** accepted for its recorded scope; see [08-results.md](08-results.md).
+**Status:** completed; see [08-results.md](08-results.md) and [final qualification](14-results.md).
 
 ## Owners and write boundary
 

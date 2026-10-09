@@ -1,7 +1,7 @@
 # Iteration 6: Scope-size corrections and exploration calculations
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 0.
-**Status:** accepted for its recorded scope; see [06-results.md](06-results.md).
+**Status:** completed; see [06-results.md](06-results.md) and [final qualification](14-results.md).
 
 ## Owners and write boundary
 

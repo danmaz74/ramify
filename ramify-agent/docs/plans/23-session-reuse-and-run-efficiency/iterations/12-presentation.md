@@ -1,7 +1,7 @@
 # Iteration 12: Present session and efficiency evidence
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 11.
-**Status:** accepted for its recorded scope; see [12-results.md](12-results.md).
+**Status:** completed; see [12-results.md](12-results.md) and [final qualification](14-results.md).
 
 ## Owners and write boundary
 

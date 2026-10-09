@@ -1,7 +1,7 @@
 # Iteration 1: Durable session operations and scripted behavior
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 0.
-**Status:** accepted for its recorded scope; see [01-results.md](01-results.md).
+**Status:** completed; see [01-results.md](01-results.md) and [final qualification](14-results.md).
 
 ## Owners and write boundary
 

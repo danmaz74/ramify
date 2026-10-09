@@ -1,7 +1,7 @@
 # Iteration 14: Qualify the complete delivery
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 12, iteration 13.
-**Status:** final qualification active; full audit remains open.
+**Status:** completed; see [14-results.md](14-results.md) and [final qualification](14-results.md).
 
 ## Owners and write boundary
 

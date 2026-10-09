@@ -1,7 +1,7 @@
 # Iteration 7: Pi prefix preservation and appended tools
 
 **Plan:** [Plan 23](../main-plan.md). **Prerequisites:** iteration 1.
-**Status:** accepted for its recorded scope; see [07-results.md](07-results.md).
+**Status:** completed; see [07-results.md](07-results.md) and [final qualification](14-results.md).
 
 ## Owners and write boundary
 
