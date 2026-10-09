@@ -29,37 +29,35 @@ const eventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session-store-commit/2'), runId: z.string().min(1), records: z.array(headerSchema), payloads: z.array(contentId) }).strict(),
 ]);
 export interface LedgerSessionStoreOptions { readonly directory: string }
-export interface LedgerSessionStore extends SessionStore { close(): Promise<void> }
+export interface LedgerSessionStore extends SessionStore {
+  /** Fresh independently owned record with the native JSON normalization of read followed by a JSON clone. */
+  readDetached(runId: string, id: string): Promise<SessionStoreRecord | null>;
+  close(): Promise<void>;
+}
 type SessionLedger = Awaited<ReturnType<typeof openLedger<z.infer<typeof eventSchema>>>>;
 type Fingerprint = Pick<BigIntStats, 'dev' | 'ino' | 'size' | 'mtimeNs' | 'ctimeNs'>;
 const sameFingerprint = (left: Fingerprint | null, right: Fingerprint | null): boolean => left === right || (left !== null && right !== null && left.dev === right.dev && left.ino === right.ino && left.size === right.size && left.mtimeNs === right.mtimeNs && left.ctimeNs === right.ctimeNs);
-/** Copies private, previously parsed JSON data after authenticating its actual
- * body file. Traversal is iterative so valid deeply nested JSON stays readable;
- * own data properties avoid invoking the inherited __proto__ setter. Numeric
- * primitives are copied directly, including authenticated -0 and Infinity.
+/** Classified once per validated immutable body, never from a text pattern.
+ * Native JSON cloning changes negative zero and non-finite parsed numbers.
+ * Iteration preserves the existing acceptance of deeply nested JSON.
  */
-function detachBody(body: Readonly<Record<string, unknown>>): Record<string, unknown> {
-  const detached: Record<string, unknown> = {};
-  const pending: { source: object; target: object }[] = [{ source: body, target: detached }];
+function needsJsonNormalization(body: Readonly<Record<string, unknown>>): boolean {
+  const pending: unknown[] = [body];
   while (pending.length > 0) {
-    const { source, target } = pending.pop()!;
-    for (const key of Object.keys(source)) {
-      const value = (source as Record<string, unknown>)[key];
-      let copy = value;
-      if (value !== null && typeof value === 'object') {
-        copy = Array.isArray(value) ? new Array(value.length) : {};
-        pending.push({ source: value, target: copy as object });
-      }
-      Object.defineProperty(target, key, { value: copy, enumerable: true, writable: true, configurable: true });
+    const value = pending.pop();
+    if (typeof value === 'number' && (Object.is(value, -0) || !Number.isFinite(value))) return true;
+    if (value !== null && typeof value === 'object') {
+      for (const key of Object.keys(value)) pending.push((value as Record<string, unknown>)[key]);
     }
   }
-  return detached;
+  return false;
 }
 interface ValidatedState {
   readonly ledger: SessionLedger;
   readonly records: Map<string, SessionStoreRecord>;
   readonly serializedRecords: Map<string, string>;
   readonly bodyRefs: Map<string, string>;
+  readonly bodiesNeedingNormalization: Set<string>;
   readonly payloads: Map<string, Fingerprint>;
   log: Fingerprint | null;
 }
@@ -138,13 +136,17 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
   function readBody(id: string): Record<string, unknown> {
     return z.record(z.string(), z.unknown()).parse(JSON.parse(bodyBytes(id).toString('utf8')));
   }
-  function detachedRecord(state: ValidatedState, key: string): SessionStoreRecord | null {
+  function detachedRecord(state: ValidatedState, key: string, jsonNormalized = false): SessionStoreRecord | null {
     const record = state.records.get(key);
     if (!record) return null;
     const bodyId = state.bodyRefs.get(key);
     if (bodyId !== undefined) {
-      bodyBytes(bodyId);
-      return { runId: record.runId, id: record.id, revision: record.revision, schema: record.schema, body: detachBody(record.body) };
+      // Parse the same physically read and hash-authenticated bytes. The owning
+      // record validator only omits root keys; nested unknown values are intact.
+      let body = JSON.parse(bodyBytes(bodyId).toString('utf8')) as Record<string, unknown>;
+      for (const name of Object.keys(body)) if (!Object.hasOwn(record.body, name)) delete body[name];
+      if (jsonNormalized && state.bodiesNeedingNormalization.has(bodyId)) body = JSON.parse(JSON.stringify(body)) as Record<string, unknown>;
+      return { runId: record.runId, id: record.id, revision: record.revision, schema: record.schema, body };
     }
     return JSON.parse(state.serializedRecords.get(key)!) as SessionStoreRecord;
   }
@@ -225,6 +227,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
     const records = new Map<string, SessionStoreRecord>();
     const bodyRefs = new Map<string, string>();
     const bodies = new Map<string, Record<string, unknown>>();
+    const bodiesNeedingNormalization = new Set<string>();
     const payloadIds = new Set<string>();
     for (const entry of current.replay()) {
       for (const item of entry.transaction.event.records) {
@@ -235,7 +238,11 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
         if (entry.transaction.event.type === 'session-store-commit/2') {
           const header = headerSchema.parse(item);
           let body = bodies.get(header.bodyId);
-          if (body === undefined) { body = readBody(header.bodyId); bodies.set(header.bodyId, body); }
+          if (body === undefined) {
+            body = readBody(header.bodyId);
+            bodies.set(header.bodyId, body);
+            if (needsJsonNormalization(body)) bodiesNeedingNormalization.add(header.bodyId);
+          }
           records.set(id, envelope.parse({ runId: header.runId, id: header.id, revision: header.revision, schema: header.schema, body }));
           bodyRefs.set(id, header.bodyId);
         } else {
@@ -253,7 +260,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
       writer.state = null; writer.unavailable = 'Session ledger changed while validating'; throw new Error(writer.unavailable);
     }
     const serializedRecords = new Map([...records].filter(([id]) => !bodyRefs.has(id)).map(([id, item]) => [id, JSON.stringify(item)]));
-    const loaded: ValidatedState = { ledger: current, records, serializedRecords, bodyRefs, payloads, log: proof.log };
+    const loaded: ValidatedState = { ledger: current, records, serializedRecords, bodyRefs, bodiesNeedingNormalization, payloads, log: proof.log };
     writer.state = loaded;
     return loaded;
   }
@@ -274,6 +281,9 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
       return serialized(logPath, async () => {
         return detachedRecord(await load(), JSON.stringify([runId, id]));
       });
+    },
+    async readDetached(runId, id) {
+      return serialized(logPath, async () => detachedRecord(await load(), JSON.stringify([runId, id]), true));
     },
     async putPayload(bytes) {
       const copy = new Uint8Array(bytes);

@@ -8,7 +8,7 @@ import { openSessionStore, type LedgerSessionStore } from '../run/session-store.
 import type { SessionStoreRecord } from '../../subs/agent/src/interfaces/session-operations.js';
 import type { openLedger as PublicOpenLedger } from '../../subs/ledger/src/ledger.js';
 
-const observed = vi.hoisted(() => ({ opens: 0, replays: 0, journalReads: [] as string[], payloadReads: [] as string[], metadataChecks: [] as string[], failAppend: null as 'before' | 'after' | null, failBodyWrite: false, frozenLog: null as { path: string; metadata: BigIntStats } | null, duringAppend: null as (() => Promise<void>) | null, afterOpen: null as (() => Promise<void>) | null }));
+const observed = vi.hoisted(() => ({ opens: 0, replays: 0, journalReads: [] as string[], bodyReads: [] as string[], payloadReads: [] as string[], metadataChecks: [] as string[], failAppend: null as 'before' | 'after' | null, failBodyWrite: false, frozenLog: null as { path: string; metadata: BigIntStats } | null, duringAppend: null as (() => Promise<void>) | null, afterOpen: null as (() => Promise<void>) | null }));
 vi.mock('node:fs/promises', async original => {
   const fs = await original<typeof import('node:fs/promises')>();
   return { ...fs, readFile: (...args: Parameters<typeof fs.readFile>) => {
@@ -26,6 +26,7 @@ vi.mock('node:fs', async original => {
   return { ...fs, readFileSync: (...args: Parameters<typeof fs.readFileSync>) => {
     const path = String(args[0]);
     if (path.endsWith('/session-ledger.jsonl')) observed.journalReads.push(path);
+    if (/\/record-bodies\/[a-f0-9]{64}\.json$/.test(path)) observed.bodyReads.push(path);
     return fs.readFileSync(...args);
   }, statSync: (...args: Parameters<typeof fs.statSync>) => {
     const path = String(args[0]);
@@ -60,7 +61,7 @@ vi.mock('../../subs/ledger/src/ledger.js', async original => {
 
 const stores: LedgerSessionStore[] = [];
 const directories: string[] = [];
-beforeEach(() => { observed.opens = 0; observed.replays = 0; observed.journalReads.length = 0; observed.payloadReads.length = 0; observed.metadataChecks.length = 0; observed.failAppend = null; observed.failBodyWrite = false; observed.frozenLog = null; observed.duringAppend = null; observed.afterOpen = null; });
+beforeEach(() => { observed.opens = 0; observed.replays = 0; observed.journalReads.length = 0; observed.bodyReads.length = 0; observed.payloadReads.length = 0; observed.metadataChecks.length = 0; observed.failAppend = null; observed.failBodyWrite = false; observed.frozenLog = null; observed.duringAppend = null; observed.afterOpen = null; });
 afterEach(async () => {
   for (const store of stores.splice(0)) await store.close();
   for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true });
@@ -87,6 +88,81 @@ async function storedRawBody(bytes: string) {
   await writeFile(join(path, 'session-ledger.jsonl'), `${JSON.stringify(transaction)}\n`);
   return { path, bodyId, store: (await setup(path)).store };
 }
+
+describe('owned normalized record reads', () => {
+  it('returns independently owned envelopes and nested bodies while physically authenticating every read', async () => {
+    const { path, store } = await setup(); const second = (await setup(path)).store;
+    const body = { nested: { values: [{ literal: 'original' }] }, date: new Date('2026-01-02T03:04:05.000Z'), omitted: undefined };
+    await commit(store, 1, [], body);
+    const expected = { nested: { values: [{ literal: 'original' }] }, date: '2026-01-02T03:04:05.000Z' };
+    const target = join(path, 'record-bodies', `${bodyHash(expected)}.json`);
+    observed.bodyReads.length = 0; observed.journalReads.length = 0;
+    const first = (await store.readDetached('A', 'session:s'))!;
+    expect(first).toEqual(record(1, expected));
+    (first as { id: string }).id = 'caller mutation';
+    ((first.body['nested'] as typeof expected.nested).values[0]!).literal = 'changed';
+    (first.body['nested'] as typeof expected.nested).values.push({ literal: 'added' });
+    const next = (await second.readDetached('A', 'session:s'))!;
+    expect(next).toEqual(record(1, expected)); expect(next.body).not.toBe(first.body);
+    expect(next.body['nested']).not.toBe(first.body['nested']);
+    expect(observed.bodyReads).toEqual([target, target]);
+    expect(observed.journalReads).toEqual(Array(4).fill(join(path, 'session-ledger.jsonl')));
+    expect(await store.readDetached('A', 'missing')).toBeNull();
+    await store.close(); await second.close();
+    expect(await (await setup(path)).store.readDetached('A', 'session:s')).toEqual(record(1, expected));
+  });
+  it('normalizes authenticated anomalous numbers only for the optional capability and omits only validated root keys', async () => {
+    const bytes = '{"__proto__":{"discarded":true},"10":"ten","2":"two","negativeZero":-0,"overflow":1e400,"nested":{"__proto__":{"kept":true},"constructor":"data","values":[-0,1e400,-1e400]}}';
+    const { path, bodyId, store } = await storedRawBody(bytes);
+    const raw = (await store.read('A', 'session:s'))!;
+    expect(Object.is(raw.body['negativeZero'], -0)).toBe(true); expect(raw.body['overflow']).toBe(Infinity);
+    const normalized = (await store.readDetached('A', 'session:s'))!;
+    const expected = JSON.parse('{"2":"two","10":"ten","negativeZero":0,"overflow":null,"nested":{"__proto__":{"kept":true},"constructor":"data","values":[0,null,null]}}');
+    expect(normalized).toEqual(record(1, expected)); expect(Object.is(normalized.body['negativeZero'], -0)).toBe(false);
+    expect(Object.keys(normalized.body)).toEqual(['2', '10', 'negativeZero', 'overflow', 'nested']);
+    expect(Object.hasOwn(normalized.body, '__proto__')).toBe(false);
+    const nested = normalized.body['nested'] as { __proto__: { kept: boolean }; values: unknown[] };
+    expect(Object.getPrototypeOf(nested)).toBe(Object.prototype); expect(Object.hasOwn(nested, '__proto__')).toBe(true);
+    nested.__proto__.kept = false; nested.values.push('changed');
+    expect(await store.readDetached('A', 'session:s')).toEqual(record(1, expected));
+    expect(Object.is((await store.read('A', 'session:s'))!.body['negativeZero'], -0)).toBe(true);
+    await store.close(); const reopened = (await setup(path)).store;
+    expect(await reopened.readDetached('A', 'session:s')).toEqual(record(1, expected));
+    expect((await reopened.read('A', 'session:s'))!.body['overflow']).toBe(Infinity);
+    expect(await readFile(join(path, 'record-bodies', `${bodyId}.json`), 'utf8')).toBe(bytes);
+  });
+  it('preserves root omission and nested prototype data for raw ordinary JSON without normalizing quoted numeric text', async () => {
+    const { store } = await storedRawBody('{"__proto__":{"number":1e400},"literal":"-0 1e400","nested":{"__proto__":{"text":"unchanged"}}}');
+    const expected = JSON.parse('{"literal":"-0 1e400","nested":{"__proto__":{"text":"unchanged"}}}');
+    expect(await store.read('A', 'session:s')).toEqual(record(1, expected));
+    expect(await store.readDetached('A', 'session:s')).toEqual(record(1, expected));
+  });
+  it.each(['corrupt', 'missing'] as const)('refuses actual immutable body %s through the optional capability and invalidates shared state', async change => {
+    const { path, store } = await setup(); const second = (await setup(path)).store;
+    const original = { value: 'original' }; await commit(store, 1, [], original);
+    const target = join(path, 'record-bodies', `${bodyHash(original)}.json`);
+    if (change === 'corrupt') await writeFile(target, '{"value":"changed"}'); else await rm(target);
+    await expect(store.readDetached('A', 'session:s')).rejects.toThrow(/session record body/);
+    await expect(second.readDetached('A', 'session:s')).rejects.toThrow(/session record body/);
+    await expect(second.read('A', 'session:s')).rejects.toThrow(/session record body/);
+  });
+  it('keeps same-metadata journal rewrites unavailable on optional reads even after original bytes return', async () => {
+    const { path, store } = await setup(); const second = (await setup(path)).store; await commit(store, 1);
+    const log = join(path, 'session-ledger.jsonl'); const original = await readFile(log, 'utf8');
+    observed.frozenLog = { path: log, metadata: statSync(log, { bigint: true }) };
+    await writeFile(log, original.replace('session:s', 'session:x'));
+    await expect(store.readDetached('A', 'session:s')).rejects.toThrow(/changed outside the owned writer/);
+    await writeFile(log, original);
+    await expect(second.readDetached('A', 'session:s')).rejects.toThrow(/changed outside the owned writer/);
+  });
+  it('fences optional reads after ownership loss and after close', async () => {
+    const { path, store } = await setup(); const second = (await setup(path)).store; await commit(store, 1);
+    await rm(join(path, 'plans', '.harness', 'lock'));
+    await expect(store.readDetached('A', 'session:s')).rejects.toThrow(/ownership unavailable/);
+    await expect(second.readDetached('A', 'session:s')).rejects.toThrow(/ownership unavailable/);
+    await store.close(); await expect(store.readDetached('A', 'session:s')).rejects.toThrow(/ownership unavailable/);
+  });
+});
 
 describe('Plan 23 owned session store replay cache', () => {
   it('detaches every nested data property across adapters and reopening without prototype setters or shared arrays', async () => {
