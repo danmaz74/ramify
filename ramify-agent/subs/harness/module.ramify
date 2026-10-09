@@ -71,8 +71,13 @@ expose-test guardedChildProcess, spawnAttempts from "helpers/process-guard.ts" t
 // reads validated plain artifacts; opaque continuation encoding stays in Pi.
 expose-sub readPiNativeRequestArtifact, PiNativeRequestArtifact from agent to parent
 
-// Plain setup-line identity output consumed by the root-owned pure verifier.
+// Exact setup-line attribution: the pure verifier the root's trial scripts
+// run over their own collected Git facts, with the types its signature names,
+// and the one guard every trial's evidence destination passes.
 expose-src HarnessLineIdentities from "kpi/delivered.ts" to parent
+expose-src verifySetupLineIdentities, SetupLineIdentityInput, SetupCandidatePartition, RecordedSetupDelta from "kpi/setup-attribution.ts" to parent
+expose-src SetupSourceLine, SetupLineMappingFacts, SetupAddedLineFact, SetupDeletedLineFact from "kpi/setup-attribution.ts" to parent
+expose-src trialReportDestination from "kpi/trial-report.ts" to parent
 
 // Production ledger reopening belongs to the descendant Pi native witness.
 // Only the store contract and its signature companions cross this boundary.

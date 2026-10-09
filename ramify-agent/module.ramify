@@ -167,12 +167,6 @@ expose-sub StandaloneSessionResponse from harness to descendants
 expose-test SpawnAttempt, ProcessSpawnGuardError, ChildProcess, ProcessGuardRecorder, createProcessGuard from "helpers/process-guard.ts" to descendants
 expose-test guardedChildProcess, spawnAttempts from "helpers/process-guard.ts" to descendants
 
-// Shared plain output for setup attribution; collectors remain owner-local.
-expose-sub HarnessLineIdentities from harness to descendants
-
-// Exact pure line verifier; no Git adapter or provider state crosses this surface.
-expose-src verifySetupLineIdentities, SetupLineIdentityInput, SetupCandidatePartition, RecordedSetupDelta, SetupSourceLine, SetupLineMappingFacts, SetupAddedLineFact, SetupDeletedLineFact from "trial-attribution.ts" to descendants
-
 // Plain observation/metric projections owned by harness protocol/runs.ts.
 expose-sub operationIdentitySchema, OperationIdentity from harness to descendants
 expose-sub deliveredManifestViewSchema, DeliveredManifestView from harness to descendants

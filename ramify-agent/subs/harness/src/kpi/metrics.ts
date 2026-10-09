@@ -180,7 +180,7 @@ function bytesPerChangedLine(inputs: MetricInputs): Metric {
     // Partial known byte-line contributions survive; the denominator is
     // complete-size weight only. No whole-run mean is reported.
     return metric({
-      id, unit, state: 'unavailable', subtotal: known > 0 || hasPartialSubtotal ? numerator + partialSubtotal : null, denominator: known, coverage,
+      id, unit, state: 'unavailable', subtotal: known > 0 || hasPartialSubtotal ? numerator + partialSubtotal : null, denominator: known > 0 ? known : null, coverage,
       evidence: [...unknownSize, ...evidence],
       note: `A writer's scope size is unknown, so the total is unknown. The subtotal retains known byte-line contributions including partial sizes, and the denominator covers complete sizes only: their ${lines(known)} of the ${lines(total + unattributed)} delivered`,
       ...common,

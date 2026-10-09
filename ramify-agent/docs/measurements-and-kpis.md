@@ -147,8 +147,9 @@ follows:
   the selected modules do not already hold, or its bytes on disk when the
   invocation started where Ramify inventories nothing there. An included owned
   nested project is named without bytes: Ramify does not inventory it, and `B`
-  leaves it out too. A contract engineer's provider counts whole. The soft read
-  scope is not part of the declared scope.
+  leaves it out too. A contract engineer's provider counts whole, as an exact
+  owner in the owned-source component's exact bucket. The soft read scope is
+  not part of the declared scope.
 - Sizes are taken from the frozen baseline snapshot rather than from a
   pre-attempt snapshot, so a module created during the run has an unknown size.
 - The snapshot's measurement document and its architect view must have one
@@ -242,8 +243,10 @@ Each added line belongs to the commit `git blame` names for it. Each deleted
 base line belongs to the commit that removed it: the successor of the last
 commit `git blame --reverse` names as still holding it. A commit belongs to the
 writer invocations whose work its gate committed. Where several writers share
-one commit, as an engineer and its repair, each path's lines are split by
-their recorded invocation numstat increases, so a weight can be fractional.
+one commit, as an engineer and its repair, each path's lines are split per
+path and per kind: its added lines by the writers' recorded added lines in
+that path, its deleted lines by their recorded deleted lines there, so a
+weight can be fractional.
 
 The harness's own commits (scratch setup, feature-file materialization and
 rewording) and the run's feature files, whose pending tags gate commits drop,

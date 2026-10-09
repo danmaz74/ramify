@@ -6,7 +6,7 @@ import type { WriteScope } from '../work/iterations.js';
 import { fixtureScratchGit, mockGit } from './helpers/mock-git.js';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { verifySetupLineIdentities, type RecordedSetupDelta, type SetupLineIdentityInput, type SetupLineMappingFacts } from '../../../../src/trial-attribution.js';
+import { verifySetupLineIdentities, type RecordedSetupDelta, type SetupLineIdentityInput, type SetupLineMappingFacts } from '../kpi/setup-attribution.js';
 
 const sha = (bytes: string) => createHash('sha256').update(bytes).digest('hex');
 const rule = sha('src/tmp/\n'); const other = sha('secret-source.ts\n');

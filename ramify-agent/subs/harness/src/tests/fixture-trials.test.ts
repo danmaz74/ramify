@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, test } from 'vitest';
@@ -16,6 +16,7 @@ import { git, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun 
 import { badgeAnalysis, badgeImplementation, badgeStepFile, badgeSteps } from './helpers/badge-scenarios.js';
 import { gitService as productionGit } from '../../subs/evidence/src/git.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
+import { trialReportDestination } from '../kpi/trial-report.js';
 import { privateConfiguredAudit } from './helpers/configured-repository.js';
 
 /*
@@ -146,8 +147,9 @@ async function trial(plan: string, script: Parameters<typeof byRole>[0], check: 
     const snapshot = onlyRun(reopened.service, plan);
     await reopened.service.close();
 
-    if (out !== undefined && (resolve(out) === resolve(project!) || resolve(out).startsWith(`${resolve(project!)}/`))) throw new Error('Trial evidence output must be outside the analyzed prepared copy');
-    if (out !== undefined) await retain(join(out, plan), project!, plan, runId, verified.stdout, report);
+    // The same guard as the scripts: real paths, outside the analyzed copy, no symlink.
+    const destination = out === undefined ? undefined : await trialReportDestination(project!, out);
+    if (destination !== undefined) await retain(join(destination, plan), project!, plan, runId, verified.stdout, report);
 
     const read = async <T>(path: string): Promise<T> => JSON.parse(await readFile(runPath(project!, plan, runId, path), 'utf8')) as T;
     await check({

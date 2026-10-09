@@ -198,7 +198,10 @@ export class PortEventRecorder {
       const requested = action.kind === 'read' ? [this.path(action.path)] : action.kind === 'search' ? [this.path(action.path ?? '.'), ...(action.glob ? [action.glob] : [])] : [];
       await observations.record({ type: 'tool-start', sourceId: `${event.callId}:start`, data: { callId: event.callId, tool: event.tool,
         kind: action.kind === 'read' || action.kind === 'search' ? action.kind : 'other', requestedScope: requested, startedAt } });
-      if (!this.milestone && (event.tool === invocation.submissionTool || (invocation.role.includes('engineer') && action.kind !== 'harness'))) {
+      // The first informed action: the designated submission, or an
+      // engineer's first mutating call (an edit, a write, a mutating shell
+      // command). A read or a search is exploration before it.
+      if (!this.milestone && (event.tool === invocation.submissionTool || (invocation.role.includes('engineer') && action.kind !== 'harness' && event.mutating))) {
         const written = await observations.record({ type: 'milestone', sourceId: 'first-milestone', data: { kind: event.tool === invocation.submissionTool ? 'first-designated-submission' : 'first-engineering-action', at: startedAt } });
         if (written) this.milestone = true;
       }

@@ -152,6 +152,17 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
         { path: 'subs/notes/module.ramify', added: 2, deleted: 0, binary: false, bytes: null },
         { path: 'subs/notes/src/notes.ts', added: 1, deleted: 0, binary: false, bytes: null },
       ]);
+
+      // A project nested in the repository sees its own paths, project-relative,
+      // tracked and untracked alike, and nothing of the enclosing repository.
+      await repository.write('nested/src/inner.ts', 'export const inner = 1;\n');
+      await git.commitAccepted(root, 'nested attempt');
+      await repository.write('nested/src/inner.ts', 'export const inner = 1;\nexport const more = 2;\n');
+      await repository.write('nested/src/loose.ts', 'export const a = 1;\nexport const b = 2;\nexport const c = 3;\n');
+      expect(await git.worktreeLineChanges(join(root, 'nested'), base)).toEqual([
+        { path: 'src/inner.ts', added: 2, deleted: 0, binary: false, bytes: null },
+        { path: 'src/loose.ts', added: 3, deleted: 0, binary: false, bytes: null },
+      ]);
     });
   });
 

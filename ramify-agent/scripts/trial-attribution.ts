@@ -2,9 +2,10 @@ import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { lstat, readFile, realpath } from 'node:fs/promises';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { verifySetupLineIdentities, type SetupAddedLineFact, type SetupDeletedLineFact, type SetupSourceLine } from '../src/trial-attribution.js';
+import { verifySetupLineIdentities, type SetupAddedLineFact, type SetupDeletedLineFact, type SetupSourceLine } from '../subs/harness/src/kpi/setup-attribution.js';
+export { trialReportDestination } from '../subs/harness/src/kpi/trial-report.js';
 
 /** Native adapter owns its command boundary. Ordinary tests inject every raw answer. */
 export type TrialGitCommand = (project: string, args: readonly string[]) => Promise<Uint8Array>;
@@ -202,17 +203,6 @@ export async function collectTrialScratchSetup(input: {
     const nonSetup = { added: direct.added.length - setupAdded, deleted: direct.deleted.length - setupDeleted, bytesChanged: !same(input.currentIgnoreBytes, final.bytes), modeChanged: after.mode !== final.mode || input.currentIgnoreMode !== final.mode };
     return { state: 'verified', reason: null, identities, nonSetup, setupOnly: direct.added.length + direct.deleted.length > 0 && setupAdded === direct.added.length && setupDeleted === direct.deleted.length && same(input.currentIgnoreBytes, final.bytes) && after.mode === final.mode && input.currentIgnoreMode === final.mode, added: setupAdded, deleted: setupDeleted };
   } catch (error) { return unavailable(error instanceof Error ? error.message : String(error)); }
-}
-
-/** Canonical external evidence destination; avoids putting report bytes into analyzed project input. */
-export async function trialReportDestination(project: string, destination: string): Promise<string> {
-  const absolute = resolve(destination); const root = await realpath(project);
-  const parent = await realpath(dirname(absolute)); const target = join(parent, basename(absolute));
-  const relation = relative(root, target);
-  if (relation === '' || (relation !== '..' && !relation.startsWith(`..${sep}`) && !relation.startsWith(sep))) throw new Error('Trial verification output must be outside the analyzed project');
-  const existing = await lstat(target).catch((error: unknown) => { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; });
-  if (existing?.isSymbolicLink()) throw new Error('Trial verification output must not be a symlink');
-  return target;
 }
 
 /** Root-owned native CLI seam for the exact registered Q01 subprocess witness. */

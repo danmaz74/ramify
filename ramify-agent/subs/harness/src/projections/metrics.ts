@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { verifySetupLineIdentities, type RecordedSetupDelta, type SetupAddedLineFact, type SetupCandidatePartition, type SetupDeletedLineFact, type SetupLineMappingFacts } from '../../../../src/trial-attribution.js';
+import { verifySetupLineIdentities, type RecordedSetupDelta, type SetupAddedLineFact, type SetupCandidatePartition, type SetupDeletedLineFact, type SetupLineMappingFacts } from '../kpi/setup-attribution.js';
 import { scratchIgnoreRule } from '../work/scratch.js';
 import type { CandidateSource, ChangeHistory, LineCommit } from '../../subs/evidence/src/git.js';
 import { acceptedCommit } from '../checks/accepted.js';
@@ -191,7 +191,9 @@ export async function setupLineIdentitiesOf(view: RunView, history: RunHistory, 
   const expand = (ranges: readonly (readonly [number, number])[]) => ranges.flatMap(([start, count]) => Array.from({ length: count }, (_, offset) => start + offset));
   const complete = (expected: readonly number[], rows: readonly LineCommit[]) => rows.length === expected.length && new Set(rows.map(row => row.line)).size === rows.length && rows.every(row => expected.includes(row.line) && chain.includes(row.commit));
   for (const file of files) {
-    if (file.binary) throw new Error('Binary direct-diff partition has no exact line identities');
+    // A binary path carries no lines, so it has no partitions to verify; the
+    // delivered change lists it without line weight.
+    if (file.binary) continue;
     const origins = file.after === null || file.added.length === 0 ? [] : await history.changes.lineOrigins(history.projectRoot, base, final, file.after, file.added);
     const seen = file.before === null || file.deleted.length === 0 ? [] : await history.changes.lineLastSeen(history.projectRoot, base, final, file.before, file.deleted);
     if (!complete(expand(file.added), origins) || !complete(expand(file.deleted), seen)) throw new Error('Complete direct-diff line origin identity unavailable');
@@ -223,11 +225,9 @@ export async function setupLineIdentitiesOf(view: RunView, history: RunHistory, 
       const intents = view.events.filter(value => value.type === 'scratch-setting-up' && value.sequence > previousCompletion && value.sequence < event.sequence);
       const original = intents.length === 1 ? intents[0] : undefined;
       setup.push({ id: `scratch:${event.sequence}`, commit: event.data.commit, path: '.gitignore', ...(original?.type === 'scratch-setting-up' ? { original: original.data.originalIgnoreBase64 } : {}) });
-    } else if ((event.type === 'scenarios-materialized' || event.type === 'scenarios-reworded') && event.data.commit !== null) {
-      // Feature setup has no recorded byte delta. Its own partitions stay unknown rather than waive all future edits to a path.
-      const paths = event.type === 'scenarios-materialized' ? event.data.files : view.events.filter(value => value.type === 'scenarios-rewording').flatMap(value => value.data.files);
-      for (const path of paths) setup.push({ id: `scenario:${event.sequence}:${path}`, commit: event.data.commit, path });
     }
+    // The feature-file commits are the harness's alone and are excluded by
+    // their recorded commit ids and paths; they need no line identities.
   }
   for (const item of setup) {
     const beforeRevision = chain[chain.indexOf(item.commit) - 1] ?? '';
@@ -310,13 +310,18 @@ async function deliveredOf(view: RunView, history: RunHistory | undefined, lines
   for (const event of view.events) {
     if (event.type === 'invocation-started') {
       if (view.records.invocations.get(event.data.invocation)?.writer === true) pending.push(event.data.invocation);
-    } else if (event.type === 'scratch-setup-complete' || event.type === 'scenarios-reworded') {
-      // Setup commits may contain other edits; only verified line identities can exclude their setup delta.
-    } else if (event.type === 'scenarios-materialized') {
-      // Setup commits may contain other edits; only verified line identities can exclude their setup delta.
-      // Later edits to the same scenario path retain their ordinary attribution.
+    } else if (event.type === 'scratch-setup-complete') {
+      // The scratch commit may hold other edits beside the appended rule;
+      // only its verified line identities exclude the harness's delta.
+    } else if (event.type === 'scenarios-materialized' || event.type === 'scenarios-reworded') {
+      // The harness alone makes these commits, refusing unrelated changes,
+      // and it records their exact ids.
+      if (event.data.commit !== null) harness.add(event.data.commit);
+      if (event.type === 'scenarios-materialized') for (const path of event.data.files) harnessPaths.add(path);
     } else if (event.type === 'scenarios-rewording') {
-      // Later edits to the same scenario path retain their ordinary attribution.
+      // The feature files are the harness's own: a gate commit re-renders
+      // them when a binding drops a pending tag, which is no writer's work.
+      for (const path of event.data.files) harnessPaths.add(path);
     } else if (event.type === 'gate-attempted' && !seen.has(event.data.gate)) {
       seen.add(event.data.gate);
       // A gate commits what the writers since the previous commit left.
@@ -475,12 +480,18 @@ function efficiencyOf({ invocation, outcome, observations }: EvaluationInputs): 
   const durations = rows.filter(row => row.type === 'tool-duration');
   const starts = rows.filter(row => row.type === 'tool-start');
   const collectionIncomplete = [...coverage].some(reason => /observation-truncated|conflicting/.test(reason));
-  const completeTools = !collectionIncomplete && starts.length > 0 && starts.every(start => durations.some(row => row.data.callId === start.data.callId && row.data.elapsedMs !== null));
+  // Every started call has a known duration: a log of no calls is complete
+  // at 0 ms, while an unreadable or torn log is not.
+  const completeTools = Array.isArray(observations) && !collectionIncomplete && starts.every(start => durations.some(row => row.data.callId === start.data.callId && row.data.elapsedMs !== null));
   const toolSubtotalMs = durations.reduce((sum, row) => sum + (row.data.elapsedMs ?? 0), 0);
-  const timing = invocationTiming({ startedAt: invocation.startedAt ?? '', endedAt: outcome?.settled?.at ?? null,
+  const timed = invocationTiming({ startedAt: invocation.startedAt ?? '', endedAt: outcome?.settled?.at ?? null,
     milestone: milestone?.data.kind ?? null, milestoneAt: milestone?.data.at ?? null,
     modelElapsedMs: !collectionIncomplete && modelValues.length > 0 && modelValues.every(value => value !== null) ? modelValues.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null,
-    checkElapsedMs: null, exploration: exploration.observations, coverage: [...coverage, 'Check durations are not recorded', ...(completeTools ? [] : [`Tool duration: known subtotal ${toolSubtotalMs} ms; total unavailable`])] });
+    checkElapsedMs: null, exploration: exploration.observations, coverage: [...coverage, 'Check durations are not recorded'] });
+  // One entry for the tool duration, over every tool call: the exploration
+  // calls' own subtotal stays with the exploration metrics.
+  const timing = { ...timed, coverage: [...timed.coverage.filter(reason => !reason.startsWith('tool duration: known subtotal')),
+    ...(completeTools ? [] : [`tool duration: known subtotal ${toolSubtotalMs} ms over ${durations.filter(row => row.data.elapsedMs !== null).length} of ${starts.length} tool calls; total unavailable`])] };
   const manifest = deliveredManifestViewSchema.safeParse(invocation.prompt?.manifest);
   const declared = scopeSizeViewSchema.safeParse(invocation.scope?.size);
   const readScope = scopeSizeViewSchema.safeParse(invocation.scope?.readSize);

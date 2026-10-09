@@ -232,7 +232,9 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
       policyVersion: 'kpi/1', measurementPolicy: 'scope-size/2',
       baseline: { state: 'unavailable', reason: 'ramify measure could not be run', subtotal: null },
       metrics: [
-        { id: 'scope-bytes-per-changed-line', unit: 'bytes (change-weighted mean)', policyVersion: 'kpi/1', measurementPolicy: 'scope-size/2', state: 'unavailable', value: null, numerator: null, denominator: 13, subtotal: 10000, coverage: { covered: 1, total: 2 }, evidence: ['inv-0006: owned-source unknown'], note: 'A size component is missing' },
+        { id: 'scope-bytes-per-changed-line', unit: 'bytes (change-weighted mean)', policyVersion: 'kpi/1', measurementPolicy: 'scope-size/2', state: 'unavailable', value: null, numerator: null, denominator: 5, subtotal: 10000, coverage: { covered: 1, total: 2 },
+          evidence: ['inv-0006: w_e = 3 lines, S_e unknown: owned-source unknown: no measured module for shop/new; a module that does not exist yet has an unknown size, not a zero one', `delivered change ${'a'.repeat(12)}..${'f'.repeat(12)}`, 'inv-0005: w_e = 5 lines, S_e = 2000 bytes'],
+          note: 'A writer\'s scope size is unknown, so the total is unknown. The subtotal retains known byte-line contributions including partial sizes, and the denominator covers complete sizes only: their 5 lines of the 8 lines delivered' },
         { id: 'session-count', unit: 'sessions', policyVersion: 'kpi/1', measurementPolicy: null, state: 'measured', value: 6, numerator: 6, denominator: null, subtotal: null, coverage: { covered: 6, total: 6 }, evidence: [], note: null },
       ],
       lineage: {

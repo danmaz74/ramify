@@ -52,9 +52,10 @@ export interface DeclaredScope {
    * project-relative files and directories. Each counts the inventoried
    * files beneath it that the selected modules do not already hold; one
    * Ramify does not inventory counts its bytes on disk when the invocation
-   * started, which are null where nothing was there.
+   * started, which are null where nothing was there. One whose bytes could
+   * not be read carries the error instead, which is a coverage limit.
    */
-  readonly locations?: ReadonlyArray<{ readonly path: string; readonly bytes: number | null; readonly files?: readonly { readonly path: string; readonly bytes: number }[] }> | undefined;
+  readonly locations?: ReadonlyArray<{ readonly path: string; readonly bytes: number | null; readonly files?: readonly { readonly path: string; readonly bytes: number }[]; readonly unreadable?: string }> | undefined;
   /** Owned nested project roots the scope includes. Ramify does not inventory them, so they add no bytes, as in `B`. */
   readonly nestedProjects?: readonly string[] | undefined;
   /** The bytes of the brief the invocation was delivered, a handoff document of its own. */
@@ -132,12 +133,20 @@ export function planSupportPath(planId: string): string {
 export async function invocationScope(
   projectRoot: string, planId: string, declared: DeclaredScope, loaded: LoadedPackage, brief: string, delivered?: DeliveredManifest,
 ): Promise<DeclaredScope> {
-  const locations = [];
+  const locations: NonNullable<DeclaredScope['locations']>[number][] = [];
   for (const location of declared.locations ?? []) {
     const path = join(projectRoot, location.path);
-    const found = await stat(path).catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return null; throw error; });
-    locations.push({ path: location.path, bytes: found === null ? null : found.isDirectory() ? await directoryBytes(path) : found.size,
-      files: found === null ? [] : await locationFiles(projectRoot, path) });
+    // Absent and unreadable are two states: nothing there counts nothing,
+    // while a location that cannot be read has unknown bytes, with the error.
+    try {
+      const found = await stat(path).catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return null; throw error; });
+      if (found === null) { locations.push({ path: location.path, bytes: null, files: [] }); continue; }
+      const measured = found.isDirectory() ? await measuredDirectory(path) : { bytes: found.size };
+      if ('unreadable' in measured) { locations.push({ path: location.path, bytes: null, files: [], unreadable: measured.unreadable }); continue; }
+      locations.push({ path: location.path, bytes: 'bytes' in measured ? measured.bytes : null, files: await locationFiles(projectRoot, path) });
+    } catch (error) {
+      locations.push({ path: location.path, bytes: null, files: [], unreadable: error instanceof Error ? error.message : String(error) });
+    }
   }
   if (delivered !== undefined) return deliveredScopeInputs({ ...declared, locations }, delivered).scope;
   // Legacy consumers still use their captured package; integration replaces these with delivered manifests.
@@ -223,9 +232,14 @@ export function scopeSize(snapshot: MeasurementSnapshot, scope: DeclaredScope): 
   // the view the scope was resolved against must be of one revision.
   const mismatch = snapshot.policy !== scopeSizePolicy ? `snapshot policy ${snapshot.policy} is not comparable with ${scopeSizePolicy}` : revisionMismatch(snapshot);
   if (mismatch !== null) {
+    // A component the scope leaves out is 0 whatever the revisions, so it
+    // stays measured.
+    const selectsNothing = scope.exactOwners.length === 0 && scope.subtrees.length === 0 && (scope.locations ?? []).length === 0 && (scope.nestedProjects ?? []).length === 0;
     for (const [index, component] of components.entries()) {
       if (snapshot.policy === scopeSizePolicy && component.component === 'support-documents') continue;
       if (snapshot.policy === scopeSizePolicy && component.component === 'architect-view' && !scope.architectView) continue;
+      if (snapshot.policy === scopeSizePolicy && component.component === 'api-views' && !scope.apiViews) continue;
+      if (snapshot.policy === scopeSizePolicy && component.component === 'owned-source' && selectsNothing && component.state === 'measured') continue;
       components[index] = { ...component, bytes: null, buckets: {}, state: 'unavailable', reason: mismatch };
     }
   }
@@ -319,6 +333,7 @@ function ownedSource(
     module.id === owner || (bucket === 'subtree' && isDescendant(byId, owner, module.id)));
   const counted = new Set<string>();
   const outside = new Set<string>();
+  const unreadable: string[] = [];
   const outsideAggregateCovered = (path: string): boolean => (scope.locations ?? []).some(other =>
     other.path !== path && other.files === undefined && other.bytes !== null &&
     path.startsWith(`${other.path.replace(/\/+$/, '')}/`) &&
@@ -333,6 +348,11 @@ function ownedSource(
         buckets[bucket] = (buckets[bucket] ?? 0) + file.bytes;
       }
       notes.push(`${location.path} (extra)`);
+    } else if (location.unreadable !== undefined) {
+      // Nothing inventoried beneath it and its bytes on disk unreadable: its
+      // size is unknown, which is a coverage limit, never a zero.
+      unreadable.push(`${location.path}: ${location.unreadable}`);
+      notes.push(`${location.path} (extra, unreadable when the invocation started)`);
     } else if (location.files === undefined && !outside.has(location.path) && !outsideAggregateCovered(location.path)) {
       outside.add(location.path);
       buckets['outside-inventory'] = (buckets['outside-inventory'] ?? 0) + (location.bytes ?? 0);
@@ -359,6 +379,9 @@ function ownedSource(
       reason: `no measured module for ${unresolved.join(', ')}; a module that does not exist yet has an unknown size, not a zero one`,
       buckets,
     };
+  }
+  if (unreadable.length > 0) {
+    return { component: 'owned-source', detail, bytes: null, state: 'unavailable', reason: `the bytes on disk of an extra location could not be read when the invocation started: ${unreadable.join('; ')}`, buckets };
   }
   return { component: 'owned-source', detail, bytes, state: 'measured', buckets };
 }
@@ -450,21 +473,31 @@ function supportDocuments(snapshot: MeasurementSnapshot, document: MeasurementDo
   return { component: 'support-documents', detail, bytes: documents + (scope.brief ?? 0), state: 'measured', buckets };
 }
 
-/** The bytes of a published directory, or null when it is not there. */
+/** The bytes of a published directory, or null when it is not there or cannot be read. */
 export async function directoryBytes(directory: string): Promise<number | null> {
+  const measured = await measuredDirectory(directory);
+  return 'bytes' in measured ? measured.bytes : null;
+}
+
+/** The bytes of a directory's files: absent at ENOENT, otherwise unreadable with the error. */
+async function measuredDirectory(directory: string): Promise<{ bytes: number } | { absent: true } | { unreadable: string }> {
   let entries;
   try {
     entries = await readdir(directory, { withFileTypes: true });
-  } catch {
-    return null;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { absent: true };
+    return { unreadable: error instanceof Error ? error.message : String(error) };
   }
   let total = 0;
   for (const entry of entries) {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) { const bytes = await directoryBytes(path); if (bytes === null) return null; total += bytes; }
-    else if (entry.isFile()) total += (await stat(path)).size;
+    if (entry.isDirectory()) {
+      const nested = await measuredDirectory(path);
+      if ('unreadable' in nested) return nested;
+      if ('bytes' in nested) total += nested.bytes;
+    } else if (entry.isFile()) total += (await stat(path)).size;
   }
-  return total;
+  return { bytes: total };
 }
 
 /** The bytes of one captured input, or null when it cannot be read. */
