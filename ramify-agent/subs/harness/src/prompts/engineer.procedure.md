@@ -1,4 +1,4 @@
-<!-- ramify-agent engineer procedure, version 9. -->
+<!-- ramify-agent engineer procedure, version 10. -->
 Do this, in order:
 
 1. Read the goal, the approach and the completion evidence in the message
@@ -166,3 +166,10 @@ naming such a seam is asking you for this.
 
 The harness resolves who owns the behavior and runs a contract iteration of
 its own. Its outcome is in the run's records, so you need no reply from it.
+
+In `completion-proposed` or `partial`, optionally include `startingPoints`
+for a few useful source, test, support, caller or API-view locations you
+already encountered, each with a short note about what to inspect. Paths
+are literal and project-relative. These hints authorize no writes and
+establish no completion or obligation. No extra discovery turn is required;
+you may omit them.

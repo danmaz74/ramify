@@ -6,6 +6,7 @@ import type { SubmissionError } from '../run/submissions.js';
 import { contextSelectionSchema, type ContextSelection } from './contracts.js';
 import { citePackage } from './delivery.js';
 import { selectableKinds } from './prompts.js';
+import { startingPointsSchema } from '../work/starting-points.js';
 
 const text = z.string().min(1);
 
@@ -14,6 +15,7 @@ export const workOrientationSubmissionSchema = z.object({
   focus: text,
   currentUnderstanding: text,
   questions: z.array(text),
+  startingPoints: startingPointsSchema,
 }).strict();
 export type WorkOrientationSubmission = z.infer<typeof workOrientationSubmissionSchema>;
 export const workOrientationToolName = 'submit_work_orientation';
@@ -50,6 +52,11 @@ export function orientationPacket(input: OrientationPacketInput): { readonly tex
     `Current understanding: ${submission.currentUnderstanding}`,
     'Open questions:',
     ...(submission.questions.length === 0 ? ['None recorded.'] : submission.questions.map(question => `- ${question}`)),
+    ...(submission.startingPoints === undefined ? [] : [
+      '', '## Declared starting points', '',
+      'Optional navigation help; these notes confer no write or completion authority.',
+      ...submission.startingPoints.map(point => JSON.stringify(point)),
+    ]),
   ].join('\n');
   return { text, hash: createHash('sha256').update(text, 'utf8').digest('hex') };
 }

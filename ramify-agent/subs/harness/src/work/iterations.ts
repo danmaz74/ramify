@@ -1,3 +1,4 @@
+import { startingPointsSchema } from './starting-points.js';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { modulePathSchema } from '../interfaces/protocol/evidence.js';
@@ -84,6 +85,7 @@ export const iterationAssignmentSchema = z.object({
   kind: iterationKindSchema,
   goal: text,
   approach: text,
+  startingPoints: startingPointsSchema,
   scope: writeScopeSchema,
   /**
    * The assignment package: the elements it cites from its work item's
@@ -212,6 +214,7 @@ export const iterationResultSchema = z.object({
   commit: text.nullable(),
   findings: z.array(z.string()),
   changedAssumptions: z.array(z.string()),
+  startingPoints: startingPointsSchema,
   recommendation: z.string().optional(),
   artifacts: z.array(z.string()),
   /**

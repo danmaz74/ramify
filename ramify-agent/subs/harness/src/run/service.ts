@@ -7216,6 +7216,7 @@ export class RunService {
     return iterationAssignmentSchema.parse({
       schema: 'ramify-agent.iteration-assignment/1', id, workItem: item.id, outline: basis, coordination,
       stage: body.stage, kind: body.kind, goal: body.goal, approach: body.approach, scope,
+      ...(body.startingPoints === undefined ? {} : { startingPoints: body.startingPoints }),
       ...(source === undefined ? {} : { source }),
       externalCapabilities: externalCapabilities ?? body.externalCapabilities,
       completionEvidence: body.completionEvidence, evidenceObligations,
@@ -10363,6 +10364,20 @@ export class RunService {
     // The notices are read from the commit itself, never from an agent's
     // words, so a run that repeats the effect derives the same ones.
     const notices = await this.committedModules(run, body.commit, assignment.id, body.gate);
+    const proposalInvocation = body.gate === null ? body.invocations.at(-1)
+      : gateAttemptSchema.parse(this.committedBody(run, runLayout.gate(body.gate))).proposedBy;
+    const submissionBytes = proposalInvocation == null ? undefined
+      : await readIfExists(run.path(runLayout.submission(proposalInvocation)));
+    const retainedSubmission = proposalInvocation == null ? null
+      : committedRecords(run.log.ledger.replay()).outcomes.get(proposalInvocation)?.submission;
+    if (retainedSubmission != null && (submissionBytes === undefined || sha256(submissionBytes) !== retainedSubmission.hash)) {
+      throw new Error(`Engineer ${proposalInvocation} has changed or missing submission bytes`);
+    }
+    const rawSubmission = submissionBytes === undefined ? null : JSON.parse(submissionBytes.toString('utf8')) as Record<string, unknown>;
+    const submitted = rawSubmission?.schema === 'ramify-agent.engineer-submission/1'
+      ? engineerSubmissionSchema.safeParse((({ schema: _schema, ...value }) => value)(rawSubmission)) : null;
+    const startingPoints = submitted?.success && ['completion-proposed', 'partial'].includes(submitted.data.kind)
+      && 'startingPoints' in submitted.data ? submitted.data.startingPoints : undefined;
     const result = iterationResultSchema.parse({
       schema: 'ramify-agent.iteration-result/1',
       iteration: assignment.id,
@@ -10373,6 +10388,7 @@ export class RunService {
       commit: body.commit,
       findings: [...body.findings],
       changedAssumptions: [],
+      ...(startingPoints === undefined ? {} : { startingPoints }),
       ...(body.recommendation === undefined ? {} : { recommendation: body.recommendation }),
       artifacts: [],
       ...(body.failure === undefined ? {} : { failure: body.failure }),

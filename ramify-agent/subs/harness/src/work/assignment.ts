@@ -10,6 +10,7 @@ import { assignedObligationErrors, type ObligationContext, type ObligationRegist
 import type { IntegrationScope } from './integration.js';
 import type { OutlineBody } from './submission.js';
 import type { EngineerBounds } from '../run/policy.js';
+import { startingPointsSchema } from './starting-points.js';
 
 /*
  * The assignment a local architect submits, and the rules the schema cannot
@@ -112,6 +113,7 @@ export const assignmentBodySchema = z.object({
   kind: assignableKindSchema,
   goal: text,
   approach: text,
+  startingPoints: startingPointsSchema,
   scope: scopeBodySchema,
   /**
    * The elements of the work item's package this iteration must honor, by

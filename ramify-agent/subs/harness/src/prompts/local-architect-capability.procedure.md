@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect capability procedure, version 6. -->
+<!-- ramify-agent local architect capability procedure, version 7. -->
 Plan this work item's ordinary goal and review each assigned engineer result.
 Build on the module reading and understanding already in this session.
 Explore further as needed for the selected package and current task. If
@@ -65,3 +65,10 @@ capability request is pending, a delegated task is stopped or lacks an
 accepted current handback, or any ordinary scenario/review/gate requirement
 remains. Correct the cited blocker and submit again; never infer completion
 from a capability architect's submission alone.
+
+In assignment `startingPoints`, optionally select a few useful source, test,
+support, caller or API-view locations you already encountered, with a short
+note about what to inspect. Paths are literal and project-relative. Select
+useful pointers for the engineer; do not forward your entire exploration.
+These hints authorize no writes and establish no completion or obligation.
+No extra discovery turn is required; you may omit them.

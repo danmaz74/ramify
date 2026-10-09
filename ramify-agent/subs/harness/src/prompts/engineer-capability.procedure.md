@@ -1,4 +1,4 @@
-<!-- ramify-agent capability engineer procedure, version 3. -->
+<!-- ramify-agent capability engineer procedure, version 4. -->
 Implement the assigned work and run relevant checks. If blocked by another
 owner's behavior, submit the original need with the source paths that would
 use it and example tests. Report what you already changed in `summary`. A
@@ -29,3 +29,10 @@ to its architect. Only the architect records an authorization, and only on an
 assignment; a guarded file it authorized is listed among the files you may
 write. If the work seems to need one, report it with `partial`, naming the
 file and why, rather than making the change.
+
+In `completion-proposed` or `partial`, optionally include `startingPoints`
+for a few useful source, test, support, caller or API-view locations you
+already encountered, each with a short note about what to inspect. Paths
+are literal and project-relative. These hints authorize no writes and
+establish no completion or obligation. No extra discovery turn is required;
+you may omit them.

@@ -158,11 +158,11 @@ export interface PromptPackageOptions {
 export const initialArchitectPackage = 'initial-architect/3';
 export const catalogExtractorPackage = 'catalog-extractor/1';
 export const globalForkPackage = 'global-fork/4';
-export const localArchitectPackage = 'local-architect/10';
+export const localArchitectPackage = 'local-architect/11';
 export const contextSelectorPackage = 'context-selector/2';
-export const engineerPackage = 'engineer/4';
-export const capabilityEngineerPackage = 'engineer/7';
-export const capabilityArchitectPackage = 'capability-architect/2';
+export const engineerPackage = 'engineer/9';
+export const capabilityEngineerPackage = 'engineer/8';
+export const capabilityArchitectPackage = 'capability-architect/3';
 export const contractEngineerPackage = 'contract-engineer/3';
 export const reviewerPackage = 'reviewer/4';
 export const failureAnalystPackage = 'failure-analyst/1';
@@ -283,7 +283,7 @@ async function loadLocalArchitect(options: PromptPackageOptions): Promise<Loaded
   const workOrientationSchema = `${JSON.stringify(workOrientationJsonSchema, null, 2)}\n`;
   const loaded = await loadPackage({
     role: 'local-architect',
-    name: options.capabilityWorkflow === false ? 'local-architect/8' : localArchitectPackage,
+    name: options.capabilityWorkflow === false ? 'local-architect/12' : localArchitectPackage,
     systemFile: localSystemFile,
     procedureFile: options.capabilityWorkflow === false ? localProcedureFile : capabilityLocalProcedureFile,
     schema: options.capabilityWorkflow === false ? localArchitectJsonSchema : capabilityLocalArchitectJsonSchema,
