@@ -347,6 +347,20 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
       if (stopped || abort.signal.aborted) throw new Error('Operation stopped');
       validateBindings(original.task, original.policy, bindings);
     }
+    async function batchOriginal(): Promise<Omit<ContinueSessionInput, 'bindings'>> {
+      if (stopped || abort.signal.aborted) throw new Error('Operation stopped');
+      const current = await readOperation(key);
+      if (!current || current.body.phase === 'terminal' || current.body.owner?.token !== owner.token) throw new Error('Operation fenced after settlement or execution ownership lost');
+      // This private baseline is captured before any authority callback receives its own copies.
+      return clone(current.body.input) as unknown as Omit<ContinueSessionInput, 'bindings'>;
+    }
+    async function batchAuthority(original: Omit<ContinueSessionInput, 'bindings'>): Promise<void> {
+      if (stopped || abort.signal.aborted) throw new Error('Operation stopped');
+      validateBindings(original.task, original.policy, bindings);
+      if (!await bindings.currentAuthority(clone(original.task), clone(original.policy))) throw new Error('Current authority denied operation');
+      if (stopped || abort.signal.aborted) throw new Error('Operation stopped');
+      validateBindings(original.task, original.policy, bindings);
+    }
     function effect(callId: string, name: string, input: unknown, submission: boolean): Promise<ToolResult | SubmissionVerdict> {
       const cached = calls.get(callId); if (cached) return cached;
       const work = (async (): Promise<ToolResult | SubmissionVerdict> => {
@@ -452,16 +466,22 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
               const captured = entries.map(entry => ({ key: entry.key, bytes: new Uint8Array(entry.bytes) }));
               return admit(async () => {
                 const references: SessionTranscriptEntry[] = [];
+                const original = captured.length > 0 ? await batchOriginal() : null;
+                // Remote owner loss can leave unreferenced immutable bytes; final durable fencing prevents publication.
                 for (const entry of captured) {
-                  await assertLive();
+                  await batchAuthority(original!);
                   const payloadId = await store.putPayload(entry.bytes);
                   references.push({ key: entry.key, payloadId, kind: 'provider' });
                 }
                 // Rebind authority only after this publication owns the queue.
                 await serial(async () => {
-                  await assertLive();
+                  const current = await batchOriginal();
+                  const anchor = original ?? current;
+                  if (!equal(current, anchor)) throw new Error('Batch original input changed');
+                  await batchAuthority(anchor);
                   return updateOperation(key, body => {
                     if (stopped || abort.signal.aborted) throw new Error('Operation stopped');
+                    if (!equal(body.input, anchor)) throw new Error('Batch original input changed');
                     const candidate = [...body.provider];
                     const identities = new Map<string, string>();
                     for (const entry of candidate) {

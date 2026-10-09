@@ -525,6 +525,132 @@ describe('ordered opaque provider payload batches', () => {
   });
 });
 
+describe('batch-local immutable authority with final durable fencing', () => {
+  it('retains every authority call and actual put while reading the full operation only at the batch boundaries and publication', async () => {
+    const store = memoryStore(); const read = store.read; const put = store.putPayload;
+    let inBatch = false; let reads = 0; let authorities = 0; let puts = 0;
+    store.read = async (run, id) => { if (inBatch && id === 'operation:bounded-reads') reads++; return read(run, id); };
+    store.putPayload = async bytes => { if (inBatch) puts++; return put(bytes); };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      const entries = ['A', 'B', 'C', 'D'].map(key => ({ key, bytes: new TextEncoder().encode(key) }));
+      inBatch = true;
+      const ids = await runtime.persistPayloads!(entries);
+      expect(ids).toEqual(['QQ==', 'Qg==', 'Qw==', 'RA==']); expect({ reads, authorities, puts }).toEqual({ reads: 3, authorities: 5, puts: 4 });
+      const first = (await read('run-A', 'operation:bounded-reads'))!;
+      reads = authorities = puts = 0;
+      expect(await runtime.persistPayloads!(entries)).toEqual(ids);
+      expect({ reads, authorities, puts }).toEqual({ reads: 3, authorities: 5, puts: 4 });
+      expect((await read('run-A', 'operation:bounded-reads'))?.revision).toBe(first.revision + 1);
+      reads = authorities = puts = 0;
+      expect(await runtime.persistPayloads!([])).toEqual([]);
+      expect({ reads, authorities, puts }).toEqual({ reads: 2, authorities: 1, puts: 0 });
+      expect((await read('run-A', 'operation:bounded-reads'))?.revision).toBe(first.revision + 2);
+      inBatch = false; return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const bound = bindings({ currentAuthority: async () => { if (inBatch) authorities++; return true; } });
+    expect((await (await operations.continue(continuation(P.sessionId, P.point!, 'bounded-reads', bound))).settled()).status).toBe('completed');
+    expect((await store.read('run-A', 'operation:bounded-reads'))?.body).toMatchObject({ provider: [{ key: 'A' }, { key: 'B' }, { key: 'C' }, { key: 'D' }], effects: [], quiescent: true });
+  });
+  it('refuses an authority callback that changes its argument and bindings together before the first immutable write', async () => {
+    const store = memoryStore(); const put = store.putPayload; let inBatch = false; let puts = 0; let effects = 0;
+    const validator = { literal: 'original' }; const boundPolicy = { ...policy, validator };
+    store.putPayload = async bytes => { if (inBatch) puts++; return put(bytes); };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      inBatch = true; await runtime.persistPayloads!([{ key: 'A', bytes: new TextEncoder().encode('A') }]);
+      await runtime.callTool('forbidden', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create({ ...create, policy: boundPolicy });
+    const bound = bindings({ policy: boundPolicy, currentAuthority: async (_, original) => { if (inBatch) { expect(original.validator).toEqual({ literal: 'original' }); (original.validator as { literal: string }).literal = 'changed'; validator.literal = 'changed'; } return true; }, tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }] });
+    expect(await (await operations.continue(continuation(P.sessionId, P.point!, 'joint-mutation', bound))).settled()).toMatchObject({ status: 'failed', reason: expect.stringContaining('bindings differ') });
+    expect(puts).toBe(0); expect(effects).toBe(0);
+    expect((await store.read('run-A', 'operation:joint-mutation'))?.body).toMatchObject({ input: { policy: { validator: { literal: 'original' } } }, provider: [], effects: [] });
+  });
+  it('supplies independent original callback arguments even when earlier callbacks mutate their copies', async () => {
+    const store = memoryStore(); let inBatch = false; const seenTasks = new Set<SessionTaskInput>(); const seenPolicies = new Set<SessionExecutionPolicy>();
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      inBatch = true; await runtime.persistPayloads!([{ key: 'A', bytes: new TextEncoder().encode('A') }, { key: 'B', bytes: new TextEncoder().encode('B') }]);
+      inBatch = false; return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create);
+    const bound = bindings({ currentAuthority: async (originalTask, originalPolicy) => {
+      if (inBatch) {
+        expect(originalTask).toEqual(task); expect(originalPolicy).toEqual(policy); expect(seenTasks.has(originalTask)).toBe(false); expect(seenPolicies.has(originalPolicy)).toBe(false);
+        seenTasks.add(originalTask); seenPolicies.add(originalPolicy);
+        (originalTask as { message: string }).message = 'callback-only change'; (originalPolicy.validator as { version: number }).version = 999;
+      }
+      return true;
+    } });
+    expect((await (await operations.continue(continuation(P.sessionId, P.point!, 'argument-copies', bound))).settled()).status).toBe('completed');
+    expect(seenTasks.size).toBe(3); expect(seenPolicies.size).toBe(3);
+    expect((await store.read('run-A', 'operation:argument-copies'))?.body).toMatchObject({ input: { task, policy }, provider: [{ key: 'A' }, { key: 'B' }] });
+  });
+  it('rejects a fresh nested binding change between entries while retaining only an orphan first blob', async () => {
+    const store = memoryStore(); const put = store.putPayload; const validator = { version: 1 }; const boundPolicy = { ...policy, validator }; let effects = 0;
+    store.putPayload = async bytes => { const id = await put(bytes); if (new TextDecoder().decode(bytes) === 'first') validator.version = 2; return id; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      await runtime.persistPayloads!([{ key: 'A', bytes: new TextEncoder().encode('first') }, { key: 'B', bytes: new TextEncoder().encode('second') }]);
+      await runtime.callTool('forbidden', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create({ ...create, policy: boundPolicy }); const bound = bindings({ policy: boundPolicy, tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }] });
+    expect(await (await operations.continue(continuation(P.sessionId, P.point!, 'between-entries', bound))).settled()).toMatchObject({ status: 'failed', reason: expect.stringContaining('bindings differ') });
+    expect(await store.getPayload('Zmlyc3Q=')).toEqual(new TextEncoder().encode('first')); expect(await store.getPayload('c2Vjb25k')).toBeNull(); expect(effects).toBe(0);
+    expect((await store.read('run-A', 'operation:between-entries'))?.body).toMatchObject({ provider: [], effects: [] });
+  });
+  it.each(['remote owner', 'remote terminal'])('permits orphan intermediate bytes but refuses all publication after %s loss', async mode => {
+    const store = memoryStore(); const put = store.putPayload; let effects = 0; const events: unknown[] = [];
+    store.putPayload = async bytes => {
+      const id = await put(bytes);
+      if (new TextDecoder().decode(bytes) === 'first') {
+        const prior = (await store.read('run-A', 'operation:remote-loss'))!;
+        const changed = mode === 'remote owner' ? { ...prior.body, owner: { token: 'other-owner', pid: 999999 } } : { ...prior.body, phase: 'terminal', receipt: { runId: 'run-A', operationId: 'remote-loss', sessionId: prior.body['sessionId'], turn: 1, point: null, status: 'stopped', outcome: { kind: 'stopped' }, reason: 'Remote terminal fence' } };
+        expect(await store.commit({ runId: 'run-A', expected: [{ id: prior.id, revision: prior.revision }], records: [{ ...prior, revision: prior.revision + 1, body: changed }], payloads: [] })).toEqual({ kind: 'committed' });
+      }
+      return id;
+    };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      await runtime.persistPayloads!([{ key: 'A', bytes: new TextEncoder().encode('first') }, { key: 'B', bytes: new TextEncoder().encode('second') }]);
+      runtime.onEvent({ type: 'context-observed', tokens: 1, window: 10 }); await runtime.callTool('forbidden', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const bound = bindings({ onEvent: event => events.push(event), tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }] });
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'remote-loss', bound));
+    expect(await handle.receipt).toMatchObject(mode === 'remote owner' ? { status: 'failed', reason: expect.stringContaining('ownership lost') } : { status: 'stopped', point: null, reason: 'Remote terminal fence' });
+    if (mode === 'remote owner') await expect(handle.settled()).rejects.toThrow('Cannot attest quiescence without the original terminal owner');
+    else expect((await handle.settled()).status).toBe('stopped');
+    expect(await store.getPayload('Zmlyc3Q=')).toEqual(new TextEncoder().encode('first')); expect(await store.getPayload('c2Vjb25k')).toEqual(new TextEncoder().encode('second'));
+    expect((await store.read('run-A', 'operation:remote-loss'))?.body).toMatchObject({ provider: [], effects: [] }); expect(events).toEqual([]); expect(effects).toBe(0);
+  });
+  it.each(['before final read', 'during final authority'])('rejects replacement durable input %s rather than publishing under a changed original', async stage => {
+    const store = memoryStore(); const put = store.putPayload; let inBatch = false; let authorities = 0; let effects = 0;
+    const boundTask = { ...task }; const replacement = { ...task, message: 'Unlicensed replacement' };
+    const replace = async () => {
+      const prior = (await store.read('run-A', 'operation:input-swap'))!;
+      await store.commit({ runId: 'run-A', expected: [{ id: prior.id, revision: prior.revision }], records: [{ ...prior, revision: prior.revision + 1, body: { ...prior.body, input: { ...(prior.body['input'] as Record<string, unknown>), task: replacement } } }], payloads: [] });
+    };
+    store.putPayload = async bytes => { const id = await put(bytes); if (new TextDecoder().decode(bytes) === 'last' && stage === 'before final read') { await replace(); boundTask.message = replacement.message; } return id; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      inBatch = true; await runtime.persistPayloads!([{ key: 'A', bytes: new TextEncoder().encode('first') }, { key: 'B', bytes: new TextEncoder().encode('last') }]);
+      await runtime.callTool('forbidden', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const bound = bindings({ task: boundTask, currentAuthority: async () => { if (inBatch && ++authorities === 3 && stage === 'during final authority') await replace(); return true; }, tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }] });
+    expect(await (await operations.continue(continuation(P.sessionId, P.point!, 'input-swap', bound))).settled()).toMatchObject({ status: 'failed', reason: 'Batch original input changed' });
+    expect((await store.read('run-A', 'operation:input-swap'))?.body).toMatchObject({ input: { task: replacement }, provider: [], effects: [] }); expect(effects).toBe(0);
+    expect(authorities).toBe(stage === 'before final read' ? 2 : 3);
+  });
+  it('retains final storage corruption as unavailable settlement evidence without committing references or a fabricated receipt', async () => {
+    const store = memoryStore(); const read = store.read; const put = store.putPayload; let corrupt = false; let effects = 0;
+    store.read = async (run, id) => { if (corrupt && id === 'operation:corrupt-final') throw new Error('Original physical storage corruption'); return read(run, id); };
+    store.putPayload = async bytes => { const id = await put(bytes); if (new TextDecoder().decode(bytes) === 'last') corrupt = true; return id; };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_, runtime) {
+      await runtime.persistPayloads!([{ key: 'A', bytes: new TextEncoder().encode('first') }, { key: 'B', bytes: new TextEncoder().encode('last') }]);
+      await runtime.callTool('forbidden', 'read', {}); return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create); const bound = bindings({ tools: [{ ...tools[0]!, execute: async () => { effects++; return { text: 'unexpected' }; } }] });
+    const handle = await operations.continue(continuation(P.sessionId, P.point!, 'corrupt-final', bound));
+    await expect(handle.receipt).rejects.toThrow('Original physical storage corruption'); await expect(handle.settled()).rejects.toThrow('Original physical storage corruption');
+    expect((await read('run-A', 'operation:corrupt-final'))?.body).toMatchObject({ provider: [], effects: [], phase: 'dispatched', receipt: null }); expect(effects).toBe(0);
+  });
+});
+
 describe('Plan 23 original execution observation identities', () => {
   it('prepares the durable original executing turn before every event and terminal lookup has zero effects', async () => {
     const prepared: unknown[] = []; const events: unknown[] = []; let dispatches = 0; let accepts = 0;
