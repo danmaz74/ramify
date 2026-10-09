@@ -48,6 +48,11 @@ Use those interfaces to understand what your module can already receive
 before proposing new contracts. The views are generated documentation:
 never treat their paths as source imports. Missing evidence or incomplete
 coverage cannot establish that an interface does not exist.
+The views cover project modules only. Installed packages and Node built-ins
+are outside Ramify exposure, so their absence from a view says nothing about
+them. Their manifest and declarations are in `package.json` and
+`node_modules/` at the project root named in the current task, not beneath
+your working directory.
 
 If local evidence leaves an ownership, placement or dependency question,
 search the `.ramify-architect/` directory beneath the project root named in the

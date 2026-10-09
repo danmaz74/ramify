@@ -104,10 +104,23 @@ states materialization or coverage limits; an unavailable or incomplete view
 cannot prove that an interface does not exist. Report missing evidence when
 it prevents the assignment rather than inventing an API.
 
+The views cover project modules only. Installed npm packages and Node
+built-ins are not in them and are outside Ramify exposure: import them by
+package name as usual. Their absence from a view says nothing about whether
+you may use them.
+
+Package files are not under your working directory. The `package.json` at the
+project root named in the current task lists the installed packages. Their
+sources and type declarations are in that root's `node_modules/<package>/`.
+Build these paths from the project root rather than from `../` steps out of
+`src/`. `node_modules/` is ignored, so pass it explicitly as the search path
+to `grep` or `rg`. Read a package's API from its declared `types` entry, or
+from its `.d.ts` files.
+
 The view mirrors project paths, one page per source file with `.md` added.
 Each page lists received symbols with their signatures and documentation.
 Import from the real source file, never from the view. When coverage is
-complete, a symbol
+complete, a project symbol
 with no entry is not importable by your module. That includes a type that
 only appears inside a received symbol's signature: Ramify never exposes it
 automatically, so its owner has to. Where the owner has not, that is an
