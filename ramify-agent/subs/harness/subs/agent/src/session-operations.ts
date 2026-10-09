@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { types } from 'node:util';
 import { SessionDriverUnavailableError } from './interfaces/session-operations.js';
 import type { GuardedCall, SessionOutcome, SubmissionVerdict, ToolResult } from './interfaces/port.js';
 import type {
@@ -25,7 +26,51 @@ const ownerControllers = new Map<string, AbortController>();
 // Persisted owner tokens identify runtime work across factories without conflating stores.
 const ownerRuntimes = new Map<string, Active>();
 const emptyChange: SessionToolChange = { add: [], activate: [], inactivate: [] };
-const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const unsupportedJsonCopy = Symbol('unsupported JSON copy');
+/** Copy plain JSON without encoding its strings; exotic values retain JSON's exact behavior. */
+function clone<T>(value: T): T {
+  const ancestors = new Set<object>();
+  function copy(value: unknown, depth: number): unknown {
+    if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+    if (typeof value === 'number' && Number.isFinite(value)) return value === 0 ? 0 : value;
+    if (typeof value !== 'object' || depth > 512 || types.isProxy(value)) throw unsupportedJsonCopy;
+    const prototype = Object.getPrototypeOf(value);
+    const array = Array.isArray(value);
+    if (array ? prototype !== Array.prototype : prototype !== Object.prototype && prototype !== null) throw unsupportedJsonCopy;
+    // Inspect descriptors, never getters: fallback must invoke custom behavior only once.
+    if (Object.getOwnPropertyDescriptor(value, 'toJSON') || prototype !== null &&
+      (Object.getOwnPropertyDescriptor(Object.prototype, 'toJSON') || array && Object.getOwnPropertyDescriptor(Array.prototype, 'toJSON'))) throw unsupportedJsonCopy;
+    if (ancestors.has(value)) throw unsupportedJsonCopy;
+    ancestors.add(value);
+    try {
+      const keys = Reflect.ownKeys(value);
+      if (array) {
+        const length = (value as unknown[]).length;
+        if (keys.length !== length + 1) throw unsupportedJsonCopy;
+        const result: unknown[] = [];
+        for (let index = 0; index < length; index++) {
+          const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+          if (!descriptor?.enumerable || !('value' in descriptor)) throw unsupportedJsonCopy;
+          Object.defineProperty(result, index, { value: copy(descriptor.value, depth + 1), enumerable: true, configurable: true, writable: true });
+        }
+        return result;
+      }
+      const result: Record<string, unknown> = {};
+      for (const key of keys) {
+        if (typeof key !== 'string') throw unsupportedJsonCopy;
+        const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+        if (!descriptor.enumerable || !('value' in descriptor)) throw unsupportedJsonCopy;
+        Object.defineProperty(result, key, { value: copy(descriptor.value, depth + 1), enumerable: true, configurable: true, writable: true });
+      }
+      return result;
+    } finally { ancestors.delete(value); }
+  }
+  try { return copy(value, 0) as T; }
+  catch (error) {
+    if (error !== unsupportedJsonCopy) throw error;
+    return JSON.parse(JSON.stringify(value)) as T;
+  }
+}
 /** Canonical JSON binds content, rather than trusting caller-supplied identity strings. */
 function canonical(value: unknown): string {
   if (value === null || typeof value !== 'object') {

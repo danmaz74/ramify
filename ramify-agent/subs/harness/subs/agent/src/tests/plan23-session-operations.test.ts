@@ -37,6 +37,93 @@ function observation(promise: Promise<unknown>) { let ended = false; void promis
 async function flush() { for (let index = 0; index < 8; index++) await Promise.resolve(); }
 
 describe('Plan 23 F1 high-level session operations', () => {
+  it('captures fresh JSON policy and declarations without losing literal text or prototype-shaped keys', async () => {
+    const shared = { title: 'quote " slash \\ newline\n emoji 😀 lone \ud800', nested: [null, true, -0, { value: 'original' }] };
+    const dictionary = Object.create(null) as Record<string, unknown>;
+    dictionary['__proto__'] = { safe: true }; dictionary['constructor'] = 'literal';
+    const capturedPolicy = { ...policy, validator: { shared, dictionary } };
+    const declaration = { ...tools[0]!, inputSchema: { shared } };
+    const operations = createSessionOperations({ sessionStore: memoryStore(), driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const P = await operations.create({ ...create, policy: capturedPolicy, declarations: [declaration], activate: ['read'] });
+    expect(P.status).toBe('completed');
+    shared.title = 'changed'; (shared.nested[3] as { value: string }).value = 'changed';
+    (dictionary['__proto__'] as { safe: boolean }).safe = false;
+    const expectedShared = { title: 'quote " slash \\ newline\n emoji 😀 lone \ud800', nested: [null, true, 0, { value: 'original' }] };
+    const snapshot = (await operations.inspect('run-A', P.sessionId))!;
+    expect(snapshot.policy.validator).toEqual({ shared: expectedShared, dictionary: { ['__proto__']: { safe: true }, constructor: 'literal' } });
+    expect(snapshot.declarations[0]?.inputSchema).toEqual({ shared: expectedShared });
+    expect(Object.getPrototypeOf(snapshot.policy.validator['dictionary'])).toBe(Object.prototype);
+    expect(Object.is((snapshot.policy.validator['shared'] as typeof shared).nested[2], -0)).toBe(false);
+    (snapshot.declarations[0]!.inputSchema['shared'] as typeof shared).title = 'returned snapshot changed';
+    expect((await operations.inspect('run-A', P.sessionId))?.declarations[0]?.inputSchema).toEqual({ shared: expectedShared });
+  });
+  it('keeps captured tasks and effect intent separate from driver and handler mutations', async () => {
+    const store = memoryStore(); let calls = 0;
+    const originalTask = { ...task, environment: { ...task.environment, limits: { max: 10 } } };
+    const callInput = { nested: { label: 'before handler' }, values: [1, 2] };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(input, runtime) {
+      expect(input.task).toEqual(originalTask);
+      (input.task.environment['limits'] as { max: number }).max = 999;
+      expect(await runtime.callTool('read-copy', 'read', callInput)).toEqual({ text: 'known result' });
+      return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create);
+    const bound = bindings({ task: originalTask, tools: [{ ...tools[0]!, execute: async () => {
+      calls++; callInput.nested.label = 'handler changed'; callInput.values.push(3); return { text: 'known result' };
+    } }] });
+    const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'copy-task', bound))).settled();
+    expect(end.status).toBe('completed');
+    expect((await store.read('run-A', 'operation:copy-task'))?.body).toMatchObject({ input: { task: { environment: { limits: { max: 10 } } } }, effects: [{ input: { nested: { label: 'before handler' }, values: [1, 2] }, phase: 'completed' }] });
+    expect(await (await operations.retry({ runId: 'run-A', operationId: 'copy-task', bindings: bound })).receipt).toEqual(end);
+    expect(calls).toBe(1);
+  });
+  it('refuses shared policy mutation during current-authority rebinding before dispatch', async () => {
+    const store = memoryStore(); let dispatches = 0;
+    const validator = { version: 1 }; const mutablePolicy = { ...policy, validator };
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; return { kind: 'ended' }; } } });
+    const P = await operations.create({ ...create, policy: mutablePolicy });
+    const bound = bindings({ policy: mutablePolicy, currentAuthority: async () => { validator.version = 2; return true; } });
+    const end = await (await operations.continue(continuation(P.sessionId, P.point!, 'changed-policy', bound))).settled();
+    expect(end).toMatchObject({ status: 'failed', outcome: { kind: 'failed', error: expect.stringContaining('bindings differ') } });
+    expect(dispatches).toBe(0);
+    expect((await store.read('run-A', 'operation:changed-policy'))?.body['input']).toMatchObject({ policy: { validator: { version: 1 } } });
+  });
+  it('preserves JSON normalization and single custom invocations when reading exotic stored policy', async () => {
+    const store = memoryStore(); const base = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const P = await base.create(create); const stored = (await store.read('run-A', `session:${P.sessionId}`))!;
+    let getters = 0; let conversions = 0; let proxyReads = 0;
+    const custom = { toJSON() { conversions++; return { converted: 'once' }; } };
+    const accessor = Object.defineProperty({}, 'value', { enumerable: true, get() { getters++; return 'getter once'; } });
+    const inherited = Object.assign(Object.create({ inherited: true }) as Record<string, unknown>, { own: 'retained' });
+    const proxy = new Proxy({ value: 'proxy once' }, { get(target, name, receiver) { if (name === 'value') proxyReads++; return Reflect.get(target, name, receiver); } });
+    const value = { omitted: undefined, callable: () => 'ignored', symbolic: Symbol('ignored'), sparse: [, undefined, NaN, Infinity, -Infinity], date: new Date('2026-01-02T03:04:05.000Z'), custom, accessor, inherited, proxy, [Symbol('own key')]: 'ignored' };
+    const snapshot = stored.body['snapshot'] as Record<string, unknown>;
+    const reader: SessionStore = { ...store, async read(runId, id) { return id === `session:${P.sessionId}` ? { ...stored, body: { ...stored.body, snapshot: { ...snapshot, policy: { ...policy, validator: value } } } } : store.read(runId, id); } };
+    const restored = createSessionOperations({ sessionStore: reader, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    expect((await restored.inspect('run-A', P.sessionId))?.policy.validator).toEqual({ sparse: [null, null, null, null, null], date: '2026-01-02T03:04:05.000Z', custom: { converted: 'once' }, accessor: { value: 'getter once' }, inherited: { own: 'retained' }, proxy: { value: 'proxy once' } });
+    expect({ getters, conversions, proxyReads }).toEqual({ getters: 1, conversions: 1, proxyReads: 1 });
+  });
+  it('retains original JSON rejection for cyclic or BigInt policy without committing a session', async () => {
+    const store = memoryStore(); const operations = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const cycle: Record<string, unknown> = {}; cycle['self'] = cycle;
+    await expect(operations.create({ ...create, policy: { ...policy, validator: cycle } })).rejects.toThrow(/circular/i);
+    await expect(operations.create({ ...create, policy: { ...policy, validator: { amount: 1n } } })).rejects.toThrow(/BigInt/);
+    expect(await store.read('run-A', 'operation:create')).toBeNull();
+  });
+  it.each([
+    { name: 'getter', make: (called: () => void) => Object.defineProperty({}, 'value', { enumerable: true, get() { called(); return 'original'; } }), expected: { value: 'original' } },
+    { name: 'toJSON', make: (called: () => void) => ({ toJSON() { called(); return { value: 'original' }; } }), expected: { value: 'original' } },
+    { name: 'Proxy', make: (called: () => void) => new Proxy({ value: 'original' }, { getPrototypeOf() { throw new Error('Proxy introspection is not JSON behavior'); }, get(target, name, receiver) { if (name === 'value') called(); return Reflect.get(target, name, receiver); } }), expected: { value: 'original' } },
+  ])('uses original JSON behavior once for a first-position $name in stored policy', async ({ make, expected }) => {
+    const store = memoryStore(); const base = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    const P = await base.create(create); const stored = (await store.read('run-A', `session:${P.sessionId}`))!;
+    let calls = 0; const value = make(() => { calls++; });
+    const snapshot = stored.body['snapshot'] as Record<string, unknown>;
+    const reader: SessionStore = { ...store, async read(runId, id) { return id === `session:${P.sessionId}` ? { ...stored, body: { ...stored.body, snapshot: { ...snapshot, policy: { ...policy, validator: { first: value } } } } } : store.read(runId, id); } };
+    const restored = createSessionOperations({ sessionStore: reader, driver: createScriptedSessionDriver([{ kind: 'end' }]) });
+    expect((await restored.inspect('run-A', P.sessionId))?.policy.validator).toEqual({ first: expected });
+    expect(calls).toBe(1);
+  });
   it('durably fences typed unavailable provider history while leaving historic settled points forkable', async () => {
     let dispatches = 0; const store = memoryStore();
     const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch() { dispatches++; throw new SessionDriverUnavailableError('Opaque request prefix is corrupt'); } } });
