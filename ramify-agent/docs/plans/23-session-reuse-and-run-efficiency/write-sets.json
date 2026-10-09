@@ -449,7 +449,7 @@
         "subs/harness/src/tests/composition-recovery-chains.test.ts",
         "subs/harness/src/tests/composition-recovery-delegation.test.ts",
         "subs/harness/src/tests/helpers/recovery-boundaries.ts",
-        "subs/harness/src/tests/helpers/recovery-boundaries.test.ts"
+        "subs/harness/src/tests/recovery-boundaries.test.ts"
       ],
       "workflowTestWorker": [
         "subs/harness/src/tests/run.test.ts",
