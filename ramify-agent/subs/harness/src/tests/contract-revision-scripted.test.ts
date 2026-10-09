@@ -434,5 +434,6 @@ describe('P3: a contract revision reschedules current evidence without resetting
     ]);
     expect(ramify.count('materialize')).toBeGreaterThan(0);
     expect(ramify.calls.filter(call => call.operation === 'run' && call.argv[0] === '--version')).toHaveLength(1);
-  }, 15_000);
+  // User-approved watchdog adjustment (2026-10-09); workflow assertions remain unchanged.
+  }, 25_000);
 });
