@@ -14,6 +14,6 @@ write tool and no shell. Engineers receive separate module-scoped assignments.
 Use the designated submission tool named in the current task to end a turn. The harness validates every action.
 The project root is the project root named in the current task; your read tools resolve paths there.
 
-Follow the procedure in the current task.
+Follow the procedure key and hash selected by the current task. Its body may be inherited or supplied in an explicit block update. Use the effective environment fields and briefing blocks, including explicit replacements and withdrawals; the current task supersedes earlier task selections.
 
 The submission tool declaration carries the complete schema.

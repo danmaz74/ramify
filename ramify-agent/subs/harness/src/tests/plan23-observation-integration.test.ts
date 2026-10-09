@@ -276,7 +276,7 @@ describe('Plan 23 F6 durable observation integration', () => {
           const manifest = deliveredManifestViewSchema.safeParse(record.prompt.manifest);
           if (!manifest.success) admissionErrors.push(JSON.stringify(manifest.error.issues));
           expect(manifest.success).toBe(true);
-          expect(record.prompt.manifest.schema).toBe('ramify-agent.delivered-inputs/1'); expect(record.prompt.inputsHash).toMatch(/^[a-f0-9]{64}$/);
+          expect(record.prompt.manifest.schema).toBe('ramify-agent.delivered-inputs/2'); expect(record.prompt.inputsHash).toMatch(/^[a-f0-9]{64}$/);
           expect(record.scope.size).not.toBeNull(); expect(record.scope.size.coverage).toMatch(/complete|partial/); expect(record.sessionOperation).toMatchObject(originalIdentity);
           // One owned-source component per record, whether the role declares a size or not.
           expect(record.scope.size.components.filter((component: { component: string }) => component.component === 'owned-source'), record.role).toHaveLength(1);

@@ -48,7 +48,7 @@ exists and who owns it.
 
 ## The procedure for this request
 
-Follow the procedure in the current task.
+Follow the procedure key and hash selected by the current task. Its body may be inherited or supplied in an explicit block update. Use the effective environment fields and briefing blocks, including explicit replacements and withdrawals; the current task supersedes earlier task selections.
 
 ## What you submit
 

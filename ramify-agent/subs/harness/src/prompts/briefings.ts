@@ -5,12 +5,12 @@ export interface BriefingRevision {
   readonly revision: string;
   readonly contentHash?: string;
   /** In delivery order, with stable section keys. */
-  readonly sections: readonly { readonly key: string; readonly text: string; readonly source?: string | null }[];
+  readonly sections: readonly { readonly key: string; readonly text: string; readonly source?: string | null; readonly effect?: 'set' | 'remove' }[];
 }
 
 /** Canonical structured bodies, before model-visible block framing. */
 export function briefingContentHash(sections: BriefingRevision['sections']): string {
-  return exactInputHash(JSON.stringify(sections.map(section => ({ key: section.key, text: section.text, source: section.source ?? null }))));
+  return exactInputHash(JSON.stringify(sections.map(section => ({ key: section.key, text: section.text, source: section.source ?? null, ...(section.effect ? { effect: section.effect } : {}) }))));
 }
 
 /** Capture this value in an immutable intent; retries use the retained occurrence. */
@@ -66,8 +66,8 @@ export function buildBriefingDelivery(input: {
   let previous = old;
   const updates = input.mode === 'fork' ? timeline.slice(inheritedIndex + 1, currentIndex + 1) : [input.current];
   const additions = updates.flatMap(brief => {
-    const changed = brief.sections.filter(section => !previous.some(prior => prior.key === section.key && prior.text === section.text && (prior.source ?? null) === (section.source ?? null)))
-      .map(section => ({ key: `brief:${section.key}`, kind: 'brief' as const, text: section.text, source: section.source ?? null, revision: brief.revision }));
+    const changed = brief.sections.filter(section => !previous.some(prior => prior.key === section.key && prior.text === section.text && (prior.source ?? null) === (section.source ?? null) && (prior.effect ?? 'set') === (section.effect ?? 'set')))
+      .map(section => ({ key: `brief:${section.key}`, kind: 'brief' as const, text: section.text, source: section.source ?? null, revision: brief.revision, ...(section.effect ? { block: { key: `brief:${section.key}`, effect: section.effect } } : {}) }));
     previous = brief.sections;
     return changed;
   });

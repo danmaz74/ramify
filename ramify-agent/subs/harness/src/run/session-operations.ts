@@ -2,12 +2,13 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { AgentPort, AgentSession, AppendOutcome, SessionSpec } from '../../subs/agent/src/interfaces/port.js';
-import type { AgentSessionPoint, SessionExecutionIdentity, SessionExecutionBindings, SessionExecutionPolicy, SessionOperations, SessionTaskInput, SessionToolDeclaration } from '../../subs/agent/src/interfaces/session-operations.js';
+import type { AppendSessionContextInput, AgentSessionPoint, SessionExecutionIdentity, SessionExecutionBindings, SessionExecutionPolicy, SessionOperations, SessionTaskInput, SessionToolDeclaration } from '../../subs/agent/src/interfaces/session-operations.js';
 import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-operations.js';
 import { writeFileExclusive } from '../../subs/ledger/src/atomic.js';
 import { openSessionStore, type LedgerSessionStore } from './session-store.js';
 import { buildTaskPacket, type TaskEnvironment, type TaskKind, type TaskPacket } from '../prompts/tasks.js';
-import { buildBriefingDelivery, taskBriefingRevision, type BriefingRevision } from '../prompts/briefings.js';
+import { buildBriefingDelivery, createBriefingOccurrence, taskBriefingRevision, type BriefingRevision } from '../prompts/briefings.js';
+import { renderBlockSet } from '../prompts/blocks.js';
 import { exactInputHash, type DeliveredInput } from '../prompts/delivered-manifest.js';
 import type { LoadedPackage } from '../prompts/packages.js';
 import { deliveredManifestViewSchema } from '../interfaces/protocol/runs.js';
@@ -57,6 +58,7 @@ interface Intent {
   readonly policy: SessionExecutionPolicy;
   readonly task: SessionTaskInput;
   readonly declarations: readonly SessionToolDeclaration[];
+  readonly requestHash?: string;
 }
 
 const retainedText = z.string().min(1);
@@ -66,7 +68,7 @@ const inputSchema = z.object({ key: retainedText, kind: z.enum(['role-instructio
   text: z.string(), source: z.string().nullable(), revision: z.string().nullable(), sources: z.array(retainedSource).optional() }).strict();
 const annotatedInputSchema = inputSchema.extend({ block: z.object({ key: retainedText, effect: z.enum(['set', 'remove']) }).strict().optional() }).strict();
 const revisionSchema = z.object({ revision: retainedText, sections: z.array(z.object({ key: retainedText, text: z.string(), source: z.string().nullable().optional() }).strict()) }).strict();
-const occurrenceSchema = revisionSchema.extend({ contentHash: retainedText.optional() }).strict();
+const occurrenceSchema = revisionSchema.extend({ contentHash: retainedText.optional(), sections: z.array(z.object({ key: retainedText, text: z.string(), source: z.string().nullable().optional(), effect: z.enum(['set', 'remove']).optional() }).strict()) }).strict();
 const jsonRecord = z.record(z.string(), z.unknown());
 const declarationSchema = z.object({ name: retainedText, description: z.string(), inputSchema: jsonRecord, mutating: z.boolean() }).strict();
 const packetFields = { roleInstructions: z.string(), message: z.string(), submissionTool: retainedText,
@@ -83,7 +85,7 @@ const intentSchema = z.discriminatedUnion('schema', [
     packet: z.object({ ...packetFields, additions: z.array(inputSchema) }).strict(),
     context: z.object({ inherited: z.array(inputSchema), history: z.array(revisionSchema), revision: retainedText }).strict(),
   }).strict(),
-  z.object({ schema: z.literal('ramify-agent.harness-operation/2'), ...intentFields,
+  z.object({ schema: z.literal('ramify-agent.harness-operation/2'), ...intentFields, requestHash: retainedText.optional(),
     packet: z.object({ ...packetFields, additions: z.array(annotatedInputSchema) }).strict(),
     context: z.object({ inherited: z.array(annotatedInputSchema), history: z.array(occurrenceSchema), revision: retainedText }).strict(),
   }).strict(),
@@ -174,7 +176,7 @@ export class HarnessSessionOperations {
     const previous = raw === null ? null : readHarnessOperationIntent(raw);
     if (previous && (previous.runId !== runId || previous.operationId !== operationId)) throw new Error('Invalid harness operation identity');
     if (input.restore && !previous) throw new Error('Original operation correlation unavailable');
-    const spec = input.restore && previous ? { ...input.spec, scope: { workingDirectory: previous.task.environment.workingDirectory },
+    const spec = previous ? { ...input.spec, scope: { workingDirectory: previous.task.environment.workingDirectory },
       session: previous.mode === 'fresh' ? { mode: 'fresh' as const } : previous.mode === 'continue'
         ? { mode: 'continue' as const, ref: sessionPointReference(runId, previous.source!) } : { mode: 'fork' as const, from: sessionPointReference(runId, previous.source!) } } : input.spec;
     const settleMs = input.brief.environment.limits['stopSettleMs'];
@@ -183,33 +185,48 @@ export class HarnessSessionOperations {
     if (sourceRef && sourceRef.runId !== runId) throw new Error('The requested point belongs to another run');
     if (spec.session.mode !== 'fresh' && !sourceRef) throw new ReusableSessionUnavailableError('The requested session point is unavailable');
     const prior = sourceRef ? await this.context(runId, sourceRef.point) : null;
+    // Retried packets and occurrences are immutable, including the legacy wire form.
+    if (previous?.requestHash && !input.restore && previous.requestHash !== exactInputHash(JSON.stringify(input.brief))) throw new Error('Conflicting harness session correlation');
+    if (previous && !input.restore) {
+      const requestedSource = input.spec.session.mode === 'fresh' ? null : readSessionPointReference(input.spec.session.mode === 'continue' ? input.spec.session.ref : input.spec.session.from)?.point;
+      if (input.session !== previous.session || input.spec.session.mode !== previous.mode || input.spec.scope.workingDirectory !== previous.task.environment.workingDirectory ||
+        JSON.stringify(requestedSource) !== JSON.stringify(previous.source)) throw new Error('Conflicting harness session correlation');
+      const retained = previous.context.history.find(entry => entry.revision === previous.context.revision);
+      const canonical = taskBriefingRevision({ revision: 'validation', goal: input.brief.goal, requirements: input.brief.requirements, sections: [] });
+      const originalTask = previous.packet.additions.find(item => item.key === 'task' && item.kind === 'task');
+      const legacyTask = [`# Current task: ${input.brief.kind}`, input.brief.objective, '', 'Submit only through `' + previous.packet.submissionTool + '`. Only an accepted submission completes this task.'].join('\n');
+      if (previous.schema === 'ramify-agent.harness-operation/1' && originalTask?.text !== legacyTask) throw new Error('Conflicting harness session correlation');
+      if (!retained || canonical.sections.some(section => !retained.sections.some(old => old.key === section.key && old.text === section.text)) ||
+        !previous.packet.message.includes(input.brief.objective) || input.brief.sections.some(section => !retained.sections.some(old => old.key === section.key && old.text === section.text && (old.source ?? null) === (section.source ?? null)))) throw new Error('Conflicting harness session correlation');
+    }
     const originalSections = input.brief.sections;
-    // Selector forks retain known facts; other removed support sections get an explicit replacement.
-    // The recorded revision is never inferred from text.
-    const sections = [...originalSections, ...(prior?.history.at(-1)?.sections ?? []).filter(section => !['goal', 'requirements'].includes(section.key) && !originalSections.some(current => current.key === section.key))
+    const selected = prior?.history.find(entry => entry.revision === prior.revision) ?? null;
+    // Selector forks retain known facts; other callers declare structural withdrawals.
+    const sections = [...originalSections, ...(selected?.sections ?? []).filter(section => !['goal', 'requirements'].includes(section.key) && !originalSections.some(current => current.key === section.key))
       .map(section => input.brief.retainInheritedSections && spec.role === 'context-selector' && spec.session.mode === 'fork'
-        ? section : { key: section.key, text: `# Current briefing update\n${section.key} no longer applies to this task.` })];
-    const revision = exactInputHash(JSON.stringify([input.brief.goal, input.brief.requirements, sections]));
-    const current = taskBriefingRevision({ revision, goal: input.brief.goal, requirements: input.brief.requirements, sections });
-    const history = [...(prior?.history ?? [])];
+        ? section : { key: section.key, text: '', effect: 'remove' as const })];
+    const current = previous ? previous.context.history.find(entry => entry.revision === previous.context.revision)! : createBriefingOccurrence({ previous: selected,
+      operationId, sections: taskBriefingRevision({ revision: 'construction', goal: input.brief.goal, requirements: input.brief.requirements, sections }).sections });
+    const revision = current.revision;
+    const history = previous ? [...previous.context.history] : [...(prior?.history ?? [])];
     if (!history.some(entry => entry.revision === revision)) history.push(current);
     const builtins = input.spec.builtinTools;
     const builtinDeclarations = this.agent.builtinDeclarations?.(builtins, spec.scope.workingDirectory) ?? piBuiltinDeclarations(builtins, spec.scope.workingDirectory);
-    const packet = input.restore && previous ? previous.packet : buildTaskPacket({ loaded: input.loaded, ...input.brief,
-      environment: { ...input.brief.environment, availableTools: [...builtinDeclarations.map(tool => tool.name), ...spec.tools.map(tool => tool.name), spec.submission.name] },
+    const packet = previous ? previous.packet : buildTaskPacket({ loaded: input.loaded, ...input.brief,
+      environment: { ...input.brief.environment, workingDirectory: spec.scope.workingDirectory, availableTools: [...builtinDeclarations.map(tool => tool.name), ...spec.tools.map(tool => tool.name), spec.submission.name] },
       briefing: buildBriefingDelivery({ mode: spec.session.mode, current, inheritedRevision: prior?.revision ?? null, history }),
       inheritedPoint: sourceRef ? sessionPointReference(runId, sourceRef.point) : null, inherited: prior?.inherited ?? [],
       supplyRoleInstructions: !prior?.inherited.some(item => item.key === `role:${input.loaded.role}` && item.kind === 'role-instructions'),
     });
     if (packet.submissionTool !== spec.submission.name) throw new Error(`Task packet ${packet.submissionTool} does not bind current validator ${spec.submission.name}`);
     const policy: SessionExecutionPolicy = { context: spec.context, authority: input.authority, validator: input.validator, destination: input.destination };
-    const task: SessionTaskInput = input.restore && previous ? previous.task : { role: spec.role, message: packet.message, submissionTool: packet.submissionTool,
+    const task: SessionTaskInput = previous ? previous.task : { role: spec.role, message: packet.message, submissionTool: packet.submissionTool,
       environment: { workingDirectory: spec.scope.workingDirectory, candidate: input.brief.environment.candidate, snapshot: input.brief.environment.snapshot, limits: input.brief.environment.limits },
       policyIdentity: exactInputHash(JSON.stringify(policy)), validatorIdentity: exactInputHash(JSON.stringify(input.validator)), destinationIdentity: exactInputHash(JSON.stringify(input.destination)) };
     const declarations = [...builtinDeclarations, ...spec.tools.map(({ name, description, inputSchema, mutating }) => ({ name, description, inputSchema, mutating: mutating ?? false })), packet.declaration];
-    if (input.restore && previous && (JSON.stringify(policy) !== JSON.stringify(previous.policy) || JSON.stringify(declarations) !== JSON.stringify(previous.declarations) || spec.role !== previous.task.role)) throw new Error('Restored authority, validator, destination or declarations differ from original operation');
-    const intent: Intent = input.restore && previous ? previous : { schema: 'ramify-agent.harness-operation/1', runId, operationId, session: input.session, source: sourceRef?.point ?? null,
-      mode: spec.session.mode, packet, context: { inherited: [...(prior?.inherited ?? []), ...packet.additions], history, revision }, policy, task, declarations };
+    if (previous && (JSON.stringify(policy) !== JSON.stringify(previous.policy) || JSON.stringify(declarations) !== JSON.stringify(previous.declarations) || spec.role !== previous.task.role)) throw new Error('Restored authority, validator, destination or declarations differ from original operation');
+    const intent: Intent = previous ? previous : { schema: 'ramify-agent.harness-operation/2', runId, operationId, session: input.session, source: sourceRef?.point ?? null,
+      requestHash: exactInputHash(JSON.stringify(input.brief)), mode: spec.session.mode, packet, context: { inherited: [...(prior?.inherited ?? []), ...packet.additions], history, revision }, policy, task, declarations };
     await this.retain(path, intent);
     await input.prepared?.(packet);
     let identified: string | null = null;
@@ -265,7 +282,7 @@ export class HarnessSessionOperations {
     let unavailableReason: string | undefined;
     const outcome = handle.receipt.then(async receipt => {
       if (spec.session.mode !== 'fresh' && receipt.status === 'unavailable' && receipt.contextUnavailable === true) unavailableReason = receipt.reason ?? 'Retained session unavailable';
-      if (receipt.point) { await this.retain(this.path('points', [runId, receipt.point]), { ...intent.context, point: receipt.point }); ref = sessionPointReference(runId, receipt.point); }
+      if (receipt.point && await this.operations.inspect(runId, receipt.point.sessionId, receipt.point)) { await this.retain(this.path('points', [runId, receipt.point]), { ...intent.context, point: receipt.point }); ref = sessionPointReference(runId, receipt.point); }
       else ref = '';
       return receipt.outcome ?? { kind: 'failed' as const, error: receipt.reason ?? `Session operation ${receipt.status}` };
     });
@@ -297,33 +314,70 @@ export class HarnessSessionOperations {
     try { context = await this.context(runId, point); }
     catch (error) { if (error instanceof ReusableSessionUnavailableError) return { outcome: 'session-lost' }; throw error; }
     const operationId = `append:${sessionId}:${key}`;
-    const additions = [{ key, kind: 'brief' as const, text, revision: null }];
+    const appendPath = this.path('appends', [runId, operationId]);
+    type AppendIntent = { point: AgentSessionPoint; context: Context; input: DeliveredInput; text: string; sectionKey: string | null };
+    let retained = await this.read<AppendIntent>(appendPath);
+    if (retained && (retained.text !== text || retained.sectionKey !== (briefingSectionKey ?? null))) throw new Error('Conflicting harness session correlation');
     const snapshot = await this.operations.inspect(runId, sessionId);
     const wasPresent = snapshot?.additions.some(addition => addition.key === key) === true;
-    let receipt = await this.operations.appendContext({ runId, operationId, sessionId, expectedPoint: point, additions });
-    if (receipt.status === 'conflict') {
+    // The durable engine record also covers pre-migration appends and a crash before
+    // the harness recorded completion. Replay its original admitted bytes and point.
+    const original = await this.store.read(runId, `operation:${operationId}`);
+    const originalInput = original?.body['input'] as AppendSessionContextInput | undefined;
+    if (!retained && originalInput) {
+      if (originalInput.runId !== runId || originalInput.operationId !== operationId || originalInput.sessionId !== sessionId || originalInput.additions.length !== 1) throw new Error('Invalid original append identity');
+      const addition = originalInput.additions[0]!;
+      if (addition.key !== key || (addition.text !== text && addition.text !== renderBlockSet(`brief:${briefingSectionKey}`, text))) throw new Error('Conflicting harness session correlation');
+      const replay = await this.operations.appendContext(originalInput);
+      if (replay.status !== 'completed' || !replay.point) throw new Error(replay.reason ?? `Context append ${replay.status}`);
+      const recorded = await this.read<Context>(this.path('points', [runId, replay.point]));
+      if (recorded) return { outcome: 'already-present', ref: sessionPointReference(runId, replay.point) };
+      point = originalInput.expectedPoint;
+      context = await this.context(runId, point);
+    }
+    const prepare = (base: Context): AppendIntent => {
+      let history = base.history; let revision = base.revision;
+      if (briefingSectionKey !== undefined) {
+        const previous = history.find(item => item.revision === revision);
+        if (!previous) throw new Error('Appended briefing section has no captured revision');
+        const existing = previous.sections.findIndex(section => section.key === briefingSectionKey);
+        const sections = [...previous.sections];
+        const section = { key: briefingSectionKey, text };
+        if (existing === -1) sections.push(section); else sections[existing] = section;
+        const current = createBriefingOccurrence({ previous, operationId, sections });
+        revision = current.revision;
+        if (revision !== previous.revision) history = [...history, current];
+      }
+      const delivered: DeliveredInput = { key: `append:${key}`, kind: 'brief', text: originalInput?.additions[0]?.text ?? (briefingSectionKey === undefined ? text : renderBlockSet(`brief:${briefingSectionKey}`, text)), source: null,
+        revision: originalInput ? originalInput.additions[0]!.revision : briefingSectionKey === undefined ? null : revision,
+        ...(briefingSectionKey === undefined || originalInput?.additions[0]?.text === text ? {} : { block: { key: `brief:${briefingSectionKey}`, effect: 'set' as const } }) };
+      return { point: base.point, context: { ...base, history, revision }, input: delivered, text, sectionKey: briefingSectionKey ?? null };
+    };
+    const attempt = async (intent: AppendIntent) => {
+      // A rejected CAS has admitted no append. Each proposal is immutable at its
+      // own source point; only the accepted proposal becomes the replay intent.
+      await this.retain(this.path('append-proposals', [runId, operationId, intent.point]), intent);
+      return this.operations.appendContext({ runId, operationId, sessionId, expectedPoint: intent.point,
+        additions: [{ key, kind: 'brief', text: intent.input.text, revision: intent.input.revision }] });
+    };
+    retained ??= prepare(context);
+    let receipt = await attempt(retained);
+    if (receipt.status === 'conflict' && original === null) {
       const current = await this.operations.inspect(runId, sessionId);
-      if (current && current.activeOperation === null && JSON.stringify(current.currentPoint) !== JSON.stringify(point)) {
-        point = current.currentPoint;
-        try { context = await this.context(runId, point); }
+      if (current && current.activeOperation === null && JSON.stringify(current.currentPoint) !== JSON.stringify(retained.point)) {
+        try { context = await this.context(runId, current.currentPoint); }
         catch (error) { if (error instanceof ReusableSessionUnavailableError) return { outcome: 'session-lost' }; throw error; }
-        receipt = await this.operations.appendContext({ runId, operationId, sessionId, expectedPoint: point, additions });
+        retained = prepare(context);
+        receipt = await attempt(retained);
       }
     }
     if (receipt.status === 'conflict') return { outcome: 'conflict', reason: receipt.reason ?? 'The session cannot take the addition at this point' };
     if (receipt.status === 'unavailable' && receipt.contextUnavailable === true) return { outcome: 'session-lost' };
     if (receipt.status !== 'completed' || !receipt.point) throw new Error(receipt.reason ?? `Context append ${receipt.status}`);
+    await this.retain(appendPath, retained);
     const already = await this.read<Context>(this.path('points', [runId, receipt.point]));
-    let history = context.history; let revision = context.revision;
-    if (briefingSectionKey !== undefined) {
-      const previous = history.find(item => item.revision === revision);
-      if (!previous) throw new Error('Appended briefing section has no captured revision');
-      const sections = [...previous.sections.filter(section => section.key !== briefingSectionKey), { key: briefingSectionKey, text }];
-      revision = exactInputHash(JSON.stringify(sections));
-      history = [...history, { revision, sections }];
-    }
-    await this.retain(this.path('points', [runId, receipt.point]), { ...context, history, revision, point: receipt.point,
-      inherited: [...context.inherited, { key: `append:${key}`, kind: 'brief', text, source: null, revision: null }] });
+    if (already === null) await this.retain(this.path('points', [runId, receipt.point]), { ...retained.context, point: receipt.point,
+      inherited: [...retained.context.inherited, retained.input] });
     return { outcome: already === null && !wasPresent ? 'appended' : 'already-present', ref: sessionPointReference(runId, receipt.point) };
   }
 }

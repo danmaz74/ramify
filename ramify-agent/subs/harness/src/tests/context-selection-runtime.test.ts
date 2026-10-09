@@ -124,8 +124,9 @@ test('one oriented local context selects once, appends the work-item package onc
   expect(organizing).toHaveLength(1);
   expect(organizing[0]!.start.mode).toBe('continue');
   expect(organizing[0]!.spec.prompt).toContain('Build on the module reading and understanding already in this session.');
-  // The package is in the session once, as its append, byte for byte; the brief names it by hash.
-  expect(organizing[0]!.inherited.filter(text => text === recorded.packageText)).toHaveLength(1);
+  // The appended block preserves the package body once; the current brief selects its content hash.
+  const packageBlock = `# Block brief:support:work-item-package\nCurrent value; replaces any earlier value for this key.\n${recorded.packageText}`;
+  expect(organizing[0]!.inherited.filter(text => text === packageBlock)).toHaveLength(1);
   expect(organizing[0]!.spec.prompt).not.toContain(recorded.packageText);
   const operation = events.find(event => event.type === 'invocation-started' && event.data.role === 'local-architect' && event.data.start === 'continued');
   if (!operation || operation.type !== 'invocation-started') throw new Error('Expected organizing continuation');
@@ -134,7 +135,7 @@ test('one oriented local context selects once, appends the work-item package onc
     const packet = await adapter.packet(receipt.jobId, operation.data.invocation);
     expect(packet!.message).toBe(organizing[0]!.spec.prompt);
     expect(packet!.manifest.currentMessage!.hash).toBe(exactInputHash(packet!.message));
-    expect(packet!.manifest.entries.filter(entry => entry.hash === exactInputHash(recorded.packageText))).toEqual([expect.objectContaining({ delivery: 'inherited' })]);
+    expect(packet!.manifest.entries.filter(entry => entry.hash === exactInputHash(packageBlock))).toEqual([expect.objectContaining({ delivery: 'inherited', block: { key: 'brief:support:work-item-package', effect: 'set' } })]);
     expect(packet!.additions.some(entry => entry.text.includes(recorded.packageText))).toBe(false);
   } finally { expect(await adapter.close()).toBe(true); }
   expect(organizing[0]!.spec.prompt).not.toContain('# Your work-item package');
@@ -180,7 +181,7 @@ test('a selected non-functional element and recommendation reach the runtime pac
   expect(recorded.packageText).toContain('Tentative suggestion.');
   expect(recorded.packageText.indexOf('## Recommendations')).toBeGreaterThan(recorded.packageText.indexOf('## Non-functional requirements of the plan'));
   const organizing = agent.sessions.find(session => session.spec.submission.name === 'submit_work_item_result');
-  expect(organizing?.inherited).toContain(recorded.packageText);
+  expect(organizing?.inherited).toContain(`# Block brief:support:work-item-package\nCurrent value; replaces any earlier value for this key.\n${recorded.packageText}`);
   expect(organizing?.spec.prompt).not.toContain(texts[0]);
 }, 120_000);
 

@@ -158,9 +158,9 @@ describe('P01/P02/P05: stable role and complete current tasks', () => {
     expect(next.message).toContain('"candidate": "C1"');
     expect(next.message).toContain('"snapshot": "S1"');
     expect(next.message).toContain('"commandTimeoutMs": 20');
-    expect(next.message).toContain('support/steps.mjs');
-    expect(next.message).toContain('cucumber.mjs');
-    expect(next.message).toContain('unknown shapes: 1');
+    expect(next.message).not.toContain('support/steps.mjs');
+    expect(next.message).not.toContain('cucumber.mjs');
+    expect(next.message).not.toContain('unknown shapes: 1');
     expect(next.additions.filter(item => item.kind === 'role-instructions')).toEqual([]);
     expect(next.additions.filter(item => item.kind === 'tool-declaration')).toEqual([]);
     // Count the full schema in all model-visible input, including the declaration.
