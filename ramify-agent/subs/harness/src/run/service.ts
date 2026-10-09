@@ -7,7 +7,7 @@ import type { ProvisionalSourceGit } from '../../subs/evidence/src/provisional-g
 import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
 import { lstat, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, posix, relative, resolve, sep } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart, ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
 import { gitCandidateSource, gitChangeHistory, gitService, type CandidateSource, type ChangeHistory, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
@@ -67,7 +67,7 @@ import { orientationMessage, pendingBindingEvidence, reviewMessage } from '../re
 import { collectReviewDiffPayload } from '../reviews/diff-payload.js';
 import { ReviewQueue } from '../reviews/scheduler.js';
 import { candidateModuleIndex, concernModules, groundCredibility } from '../reviews/signals.js';
-import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotTools } from '../reviews/snapshot.js';
+import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotComparison, type SnapshotTools } from '../reviews/snapshot.js';
 import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage } from '../reviews/state.js';
 import {
   orientationJsonSchema, orientationSubmissionDescription, orientationToolName, reviewJsonSchema, reviewSubmissionDescription,
@@ -2625,8 +2625,18 @@ export class RunService {
             report.interrupted.push(run.key);
           } else {
             for (const effect of await this.completeEffects(run)) report.effects.push(`${run.key}: ${effect}`);
-            for (const invocation of await this.closeInterruptedInvocations(run)) report.invocations.push(`${run.key}: ${invocation}`);
             const agent = this.options.agent!;
+            const originalCoordinators = new Set<string>();
+            if (agent.bindSessionStore) for (const started of run.log.all('invocation-started')) {
+              if (started.data.role !== 'nonfunctional-coordinator' || run.log.all('invocation-ended').some(ended => ended.data.invocation === started.data.invocation)) continue;
+              const record = this.invocationRecord(run, started.data.invocation).body;
+              const original = await (await this.operations(agent)).originalOperation(run.record.jobId, started.data.invocation);
+              if (record.writer || record.sessionOperation?.runId !== run.record.jobId || original === null
+                || ![coordinatorAssessmentToolName, coordinatorActionToolName, coordinatorInvestigationToolName].includes(original.packet.submissionTool)) continue;
+              originalCoordinators.add(started.data.invocation);
+            }
+            run.restoring = originalCoordinators.size > 0;
+            for (const invocation of await this.closeInterruptedInvocations(run, originalCoordinators)) report.invocations.push(`${run.key}: ${invocation}`);
             const { packages } = await loadPromptPackages({
               ...(this.options.skillDirectory === undefined ? {} : { skillDirectory: this.options.skillDirectory }),
             });
@@ -2859,12 +2869,12 @@ export class RunService {
    * again, and the tree it left is what that run's engineer reads. Its
    * session is finished with it, as `interrupted`.
    */
-  private async closeInterruptedInvocations(run: Run): Promise<string[]> {
+  private async closeInterruptedInvocations(run: Run, preserved: ReadonlySet<string> = new Set()): Promise<string[]> {
     const closed: string[] = [];
     const ended = new Set(run.log.all('invocation-ended').map(event => event.data.invocation));
     for (const started of run.log.all('invocation-started')) {
       const id = started.data.invocation;
-      if (ended.has(id)) continue;
+      if (ended.has(id) || preserved.has(id)) continue;
       const acquired = run.log.all('writer-acquired').some(event => event.data.invocation === id);
       const released = run.log.all('writer-released').some(event => event.data.invocation === id);
       if (acquired && !released) {
@@ -2926,7 +2936,8 @@ export class RunService {
    * manifest; older and test inputs can be recovered from the first durable
    * invocation or gate before consulting the current checkout.
    */
-  private async runBase(record: RunRecord, log: RunLog): Promise<string> {
+  /** Historical context may use recorded boundaries only, never today's checkout. */
+  private recordedRunBase(record: RunRecord, log: RunLog): string | undefined {
     if (record.manifest.source !== null) return record.manifest.source.commit;
     for (const entry of log.ledger.replay()) {
       for (const stored of entry.transaction.records) {
@@ -2935,7 +2946,11 @@ export class RunService {
         if (body?.schema === 'ramify-agent.gate-attempt/3' && typeof body.head === 'string') return body.head;
       }
     }
-    return this.git.currentHead(this.projectRoot);
+    return undefined;
+  }
+
+  private async runBase(record: RunRecord, log: RunLog): Promise<string> {
+    return this.recordedRunBase(record, log) ?? this.git.currentHead(this.projectRoot);
   }
 
   // Queries
@@ -3732,16 +3747,77 @@ export class RunService {
   }
 
   /** Current immutable source selection; an empty list requires an actual successful diff. */
-  private async nonfunctionalSourceInputs(run: Run, candidate: Candidate, scope: readonly string[] = ['.']): Promise<string> {
-    const base = this.accepted(run);
-    const diff = await this.candidates.diffNameStatus(this.projectRoot, base, candidate.tree);
-    const changedPaths = [...new Map(diff.filter(change => nonfunctionalSourceAllows(change.path, scope)).map(change => [`${change.status}\0${change.path}`, change])).values()]
-      .sort((left, right) => left.path.localeCompare(right.path) || left.status.localeCompare(right.status));
-    return JSON.stringify({ base, head: candidate.head, tree: candidate.tree,
-      comparison: 'prepared-source-versus-current-accepted-boundary',
-      comparisonLimit: 'This diff covers unaccepted prepared-source changes only. An empty diff does not establish that earlier accepted implementation left files unchanged.',
-      changedPaths, readScope: scope,
-      excludedDirectories: ['.git', 'node_modules', '.ramify', '.ramify-architect'], excludedRunOutputs: ['plans/.harness', 'plans/<plan>/.harness'] });
+  /** Exact recorded NFR operations retain their installed declaration and accepted-boundary default. */
+  private async originalNonfunctionalContext(run: Run, agent: AgentPort, toolName: string, candidate: Candidate) {
+    if (!run.restoring) return { originalInvocation: undefined, legacy: false, base: undefined };
+    const matches = [];
+    for (const event of run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator'
+      && !run.log.all('invocation-ended').some(ended => ended.data.invocation === event.data.invocation))) {
+      const original = await (await this.operations(agent)).originalOperation(run.record.jobId, event.data.invocation);
+      if (original === null || original.packet.submissionTool !== toolName) continue;
+      if (original.task.environment.candidate !== candidate.tree || original.task.environment.snapshot !== candidate.tree) throw new Error('Original NFR candidate binding changed');
+      const declaration = original.declarations.find(tool => tool.name === 'snapshot_diff');
+      const legacyDeclaration = boundedNonfunctionalTools({ source: this.candidates, projectRoot: this.projectRoot, candidate: candidate.tree,
+        base: this.accepted(run) }).find(tool => tool.name === 'snapshot_diff')!;
+      const legacy = declaration !== undefined && canonicalJson(declaration) === canonicalJson({ name: legacyDeclaration.name,
+        description: legacyDeclaration.description, inputSchema: legacyDeclaration.inputSchema, mutating: false });
+      const record = invocationSchema.parse(this.committedBody(run, runLayout.invocation(event.data.invocation)));
+      matches.push({ originalInvocation: event.data.invocation, legacy, base: legacy ? record.base : undefined });
+    }
+    if (matches.length > 1) throw new Error('Ambiguous original NFR task correlation');
+    return matches[0] ?? { originalInvocation: undefined, legacy: false, base: undefined };
+  }
+
+  private async nonfunctionalSourceInputs(run: Run, candidate: Candidate, scope: readonly string[] = ['.'], workspace = false,
+    original?: { readonly legacy: boolean; readonly base: string | undefined }) {
+    const base = original?.base ?? this.accepted(run);
+    const runStart = original?.legacy ? undefined : this.recordedRunBase(run.record, run.log);
+    const comparisons: SnapshotComparison[] = [];
+    for (const [name, boundary] of [['run-start', runStart], ['accepted-boundary', base]] as const) {
+      if (boundary === undefined) continue;
+      const diff = await this.candidates.diffNameStatus(this.projectRoot, boundary, candidate.tree);
+      const changes = [...new Map(diff.filter(change => nonfunctionalSourceAllows(change.path, scope)).map(change => [`${change.status}\0${change.path}`, change])).values()]
+        .sort((left, right) => left.path.localeCompare(right.path) || left.status.localeCompare(right.status));
+      comparisons.push({ name, base: boundary, target: candidate.tree, changes });
+    }
+    // Reuse candidate entries for optional hint filtering and the source tools. No live probes.
+    const entries = new Map((await this.candidates.treeEntries(this.projectRoot, candidate.tree))
+      .filter(entry => nonfunctionalSourceAllows(entry.path, scope)).map(entry => [entry.path, entry]));
+    const directories = new Set(['']);
+    for (const path of entries.keys()) for (let directory = posix.dirname(path); directory !== '.' && !directories.has(directory); directory = posix.dirname(directory)) directories.add(directory);
+    const snapshot: CandidateSnapshot = { commit: candidate.tree, base, tree: candidate.tree, entries, directories,
+      changes: comparisons.find(comparison => comparison.name === 'accepted-boundary')!.changes };
+    const groups: StartingPointGroup[] = [];
+    const records = committedRecords(run.log.ledger.replay());
+    for (const result of records.results.values()) {
+      if (result.outcome !== 'accepted') continue;
+      const assignment = records.assignments.get(result.iteration);
+      if (assignment === undefined) continue;
+      const assigned = this.assignmentStartingPoints(run, assignment);
+      const modules = assignment.scope.resolved.ownership.modules.filter(module => {
+        const source = resolve(this.projectRoot, module.directory, 'src');
+        return assignment.scope.resolved.roots.some(root => root === source || isContained(root, source))
+          || assignment.gate.tests.exactOwners.includes(module.id)
+          || assignment.gate.tests.subtrees.some(owner => module.id === owner || module.id.startsWith(`${owner}/`));
+      });
+      groups.push({ origin: { ...assigned.origin, producer: 'assigned module/source/test locations' }, points: modules.flatMap(module => [
+        { path: posix.join(module.directory, 'README.md'), note: `Assigned module ${module.id} purpose` },
+        { path: posix.join(module.directory, 'module.ramify'), note: `Assigned module ${module.id} declaration` },
+        { path: posix.join(module.directory, 'src'), note: `Assigned module ${module.id} source` },
+        { path: posix.join(module.directory, 'src/tests'), note: `Assigned module ${module.id} owned tests` },
+      ]) }, assigned, await this.engineerStartingPoints(run, assignment, result));
+    }
+    const discoveries = startingPointsSection(workspace ? groups.map(group => ({ ...group,
+      points: group.points?.filter(point => resolveSnapshotPath(snapshot, point.path).ok) })) : groups,
+      { projectRoot: this.projectRoot, ...(workspace ? {} : { snapshot }), allows: path => nonfunctionalSourceAllows(path, scope) });
+    const sourceSection = { key: 'support:nonfunctional-source', text: JSON.stringify({ head: candidate.head, tree: candidate.tree,
+      defaultComparison: comparisons[0]!.name,
+      comparisons: comparisons.map(({ changes, ...comparison }) => ({ ...comparison, changedPaths: changes })),
+      originalSource: run.record.manifest.source,
+      comparisonLimit: 'Named comparisons cover net changes at their recorded Git boundaries, not every intermediate edit or affected caller. An empty diff establishes no historical preservation. Dirty original capture excludes uncommitted starting bytes from the starting commit comparison.',
+      readScope: scope, excludedDirectories: ['.git', 'node_modules', '.ramify', '.ramify-architect'], excludedRunOutputs: ['plans/.harness', 'plans/<plan>/.harness'],
+      authority: 'Prepared candidate source is authoritative. Starting points, prior completion claims and green audits do not establish satisfaction. Assess all supplied fixed/NFR obligations independently and explore the whole allowed tree as needed.' }) };
+    return { sections: [sourceSection, ...(discoveries === undefined ? [] : [discoveries])], snapshot, comparisons };
   }
 
   private async nonfunctionalAction(
@@ -3761,8 +3837,10 @@ export class RunService {
     const investigationPaths = run.log.all('nonfunctional-investigated')
       .filter(event => event.data.assessment === assessment.id && event.data.round === assessment.round)
       .map(event => run.path(runLayout.submission(event.data.invocation)));
+    const original = await this.originalNonfunctionalContext(run, agent, coordinatorActionToolName, candidate);
+    const sourceInputs = await this.nonfunctionalSourceInputs(run, candidate, ['.'], false, original);
     const result = await this.runInvocation<CoordinatorAction>(run, agent, {
-      role: 'nonfunctional-coordinator', task: { goal: `Assess the requirements of candidate ${candidate.tree}`, requirements: [this.planPackage(run, catalog)], candidate: candidate.tree, snapshot: candidate.tree, literalSections: [{ key: 'support:nonfunctional-source', text: await this.nonfunctionalSourceInputs(run, candidate) }] }, work: {},
+      originalInvocation: original.originalInvocation, role: 'nonfunctional-coordinator', task: { goal: `Assess the requirements of candidate ${candidate.tree}`, requirements: [this.planPackage(run, catalog)], candidate: candidate.tree, snapshot: candidate.tree, literalSections: sourceInputs.sections }, work: {},
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
       loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot, coordinatorActionToolName),
       prompt: [coordinatorActionPrompt(candidate, unresolved, investigatedNfrs,
@@ -3772,7 +3850,7 @@ export class RunService {
       inputSchema: coordinatorActionJsonSchema, submissionSchema: 'ramify-agent.nonfunctional-action/1',
       validate: input => validateCoordinatorAction(input, context),
       keep: () => finished('work-closed'), scope: { write: null, measurement: null, size: null },
-      equip: () => ({ builtinTools: [], tools: [...boundedNonfunctionalTools({ source: this.candidates, projectRoot: this.projectRoot, candidate: candidate.tree, base: this.accepted(run), scope: undefined })] }),
+      equip: () => ({ builtinTools: [], tools: [...boundedNonfunctionalTools({ source: this.candidates, projectRoot: this.projectRoot, candidate: candidate.tree, base: sourceInputs.snapshot.base, snapshot: sourceInputs.snapshot, comparisons: original.legacy ? undefined : sourceInputs.comparisons, scope: undefined })] }),
     });
     if (result.ended !== 'submitted' || result.value === undefined) {
       await this.fail(run, 'agent-failed', `Non-functional coordinator action ended ${result.ended}`);
@@ -3792,8 +3870,10 @@ export class RunService {
   ): Promise<boolean> {
     const loaded = packages.get('nonfunctional-coordinator');
     if (loaded === undefined) throw new Error('Non-functional coordinator package is unavailable');
+    const original = await this.originalNonfunctionalContext(run, agent, coordinatorInvestigationToolName, assessment.candidate);
+    const sourceInputs = await this.nonfunctionalSourceInputs(run, assessment.candidate, action.scope, false, original);
     const result = await this.runInvocation<CoordinatorInvestigation>(run, agent, {
-      role: 'nonfunctional-coordinator', task: { goal: action.question, requirements: [this.planPackage(run, await this.frozenCatalog(run), action.nfrs)], candidate: assessment.candidate.tree, snapshot: assessment.candidate.tree, literalSections: [{ key: 'support:nonfunctional-source', text: await this.nonfunctionalSourceInputs(run, assessment.candidate, action.scope) }] }, work: {},
+      originalInvocation: original.originalInvocation, role: 'nonfunctional-coordinator', task: { goal: action.question, requirements: [this.planPackage(run, await this.frozenCatalog(run), action.nfrs)], candidate: assessment.candidate.tree, snapshot: assessment.candidate.tree, literalSections: sourceInputs.sections }, work: {},
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
       loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot, coordinatorInvestigationToolName),
       prompt: [`Investigate element IDs ${action.nfrs.join(', ')} for assessment ${assessment.id} of tree ${assessment.candidate.tree}.`,
@@ -3805,7 +3885,7 @@ export class RunService {
       inputSchema: coordinatorInvestigationJsonSchema, submissionSchema: 'ramify-agent.nonfunctional-investigation/1',
       validate: input => validateCoordinatorInvestigation(input, action.nfrs),
       keep: () => finished('work-closed'), scope: { write: null, measurement: null, size: null },
-      equip: () => ({ builtinTools: [], tools: [...boundedNonfunctionalTools({ source: this.candidates, projectRoot: this.projectRoot, candidate: assessment.candidate.tree, base: this.accepted(run), scope: action.scope })] }),
+      equip: () => ({ builtinTools: [], tools: [...boundedNonfunctionalTools({ source: this.candidates, projectRoot: this.projectRoot, candidate: assessment.candidate.tree, base: sourceInputs.snapshot.base, snapshot: sourceInputs.snapshot, comparisons: original.legacy ? undefined : sourceInputs.comparisons, scope: action.scope })] }),
     });
     if (result.ended !== 'submitted' || result.value === undefined) {
       await this.fail(run, 'agent-failed', `Non-functional investigation ended ${result.ended}`);
@@ -3864,10 +3944,12 @@ export class RunService {
     const baseline = await this.baselineSnapshot(run);
     const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
     const { candidate } = await this.readPreparedCandidate(run, assignment.candidate);
+    // Repair reads follow the existing project source authority; writes remain guarded by assignment.scope.
+    const sourceInputs = await this.nonfunctionalSourceInputs(run, candidate, ['.'], true);
     const result = await this.runInvocation<NonfunctionalRepairSubmission>(run, agent, {
       // The repair engineer receives the same changed-path section as the coordinator that assigned it.
-      role: 'nonfunctional-repair-engineer', task: { modules: 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules, goal: assignment.task, requirements: [this.planPackage(run, catalog, assignment.nfrs)],
-        literalSections: [{ key: 'support:nonfunctional-source', text: await this.nonfunctionalSourceInputs(run, candidate) }] }, work: { nonfunctionalRepair: assignment.id },
+      role: 'nonfunctional-repair-engineer', task: { candidate: candidate.tree, modules: 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules, goal: assignment.task, requirements: [this.planPackage(run, catalog, assignment.nfrs)],
+        literalSections: sourceInputs.sections }, work: { nonfunctionalRepair: assignment.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-repair-engineer').length + 1,
       loaded, systemPrompt: renderNonfunctionalRepairPrompt(loaded, this.projectRoot),
       prompt: repairPrompt(assignment.task, candidate,
@@ -4006,11 +4088,13 @@ export class RunService {
         await this.fail(run, 'internal', 'No prompt package is loaded for the non-functional coordinator');
         return null;
       }
+      const original = await this.originalNonfunctionalContext(run, agent, coordinatorAssessmentToolName, prepared.candidate);
+      const sourceInputs = await this.nonfunctionalSourceInputs(run, prepared.candidate, ['.'], false, original);
       const result = await this.runInvocation<CoordinatorAssessmentSubmission>(run, agent, {
-        role: 'nonfunctional-coordinator', task: { goal: `Assess the complete NFR catalog for ${prepared.candidate.tree}`, requirements: [this.planPackage(run, catalog.catalog)], candidate: prepared.candidate.tree, snapshot: prepared.candidate.tree, literalSections: [{ key: 'support:nonfunctional-source', text: await this.nonfunctionalSourceInputs(run, prepared.candidate) }] }, work: {},
+        originalInvocation: original.originalInvocation, role: 'nonfunctional-coordinator', task: { goal: `Assess the complete NFR catalog for ${prepared.candidate.tree}`, requirements: [this.planPackage(run, catalog.catalog)], candidate: prepared.candidate.tree, snapshot: prepared.candidate.tree, literalSections: sourceInputs.sections }, work: {},
         attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
         loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot),
-        prompt: `${coordinatorAssessmentPrompt(this.planPackage(run, catalog.catalog), prepared.candidate, round, phase)}\n\nThe snapshot_diff baseline is the current accepted boundary ${this.accepted(run)}. It covers unaccepted prepared-source changes, excluding earlier accepted implementation. Use current source to judge present behavior; an empty diff establishes no historical preservation. Read the prepared candidate with snapshot_list/read/search/diff. Git metadata and run records are excluded from source inspection.`,
+        prompt: coordinatorAssessmentPrompt(this.planPackage(run, catalog.catalog), prepared.candidate, round, phase),
         start: { mode: 'fresh' }, toolName: coordinatorAssessmentToolName,
         description: 'Submit one evidence-grounded result for every non-functional and fixed requirement.',
         inputSchema: coordinatorAssessmentJsonSchema, submissionSchema: 'ramify-agent.nonfunctional-assessment-submission/1',
@@ -4022,7 +4106,7 @@ export class RunService {
             : checked;
         },
         keep: () => finished('work-closed'), scope: { write: null, measurement: null, size: null },
-        equip: () => ({ builtinTools: [], tools: [...boundedNonfunctionalTools({ source: this.candidates, projectRoot: this.projectRoot, candidate: prepared.candidate.tree, base: this.accepted(run), scope: undefined })] }),
+        equip: () => ({ builtinTools: [], tools: [...boundedNonfunctionalTools({ source: this.candidates, projectRoot: this.projectRoot, candidate: prepared.candidate.tree, base: sourceInputs.snapshot.base, snapshot: sourceInputs.snapshot, comparisons: original.legacy ? undefined : sourceInputs.comparisons, scope: undefined })] }),
       });
       if (result.ended !== 'submitted' || result.value === undefined) {
         await this.fail(run, 'agent-failed', `The non-functional coordinator ended ${result.ended} without a complete assessment`);

@@ -20,6 +20,8 @@ export interface ScriptedCommit {
   /** The base the diff is taken from, and what it changed. */
   readonly base: string;
   readonly changes: ReadonlyArray<{ readonly status: string; readonly path: string }>;
+  /** Additional exact recorded bases for the same candidate (NFR historical comparisons). */
+  readonly comparisons?: Readonly<Record<string, { readonly changes: ScriptedCommit['changes']; readonly patches?: Readonly<Record<string, string>> }>>;
 }
 
 export interface ScriptedCandidates extends CandidateSource {
@@ -70,13 +72,16 @@ export function scriptedCandidates(root: string, commits: Readonly<Record<string
     },
     async diffNameStatus(project, from, to) {
       const scripted = commitOf('diffNameStatus', project, to, from);
-      expect(from).toBe(scripted.base);
-      return [...scripted.changes];
+      const comparison = scripted.comparisons?.[from];
+      if (comparison === undefined) expect(from).toBe(scripted.base);
+      return [...(comparison?.changes ?? scripted.changes)];
     },
     async diffPatch(project, from, to, path) {
       const scripted = commitOf('diffPatch', project, to, path ?? '');
-      expect(from).toBe(scripted.base);
-      const changed = scripted.changes.filter(change => path === undefined || change.path === path);
+      const comparison = scripted.comparisons?.[from];
+      if (comparison === undefined) expect(from).toBe(scripted.base);
+      if (path !== undefined && comparison?.patches?.[path] !== undefined) return comparison.patches[path]!;
+      const changed = (comparison?.changes ?? scripted.changes).filter(change => path === undefined || change.path === path);
       return changed.map(change => {
         const content = text(scripted, change.path) ?? '';
         return `--- a/${change.path}\n+++ b/${change.path}\n${content.split('\n').filter(line => line !== '').map(line => `+${line}`).join('\n')}\n`;

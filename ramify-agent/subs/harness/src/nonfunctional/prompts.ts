@@ -7,6 +7,8 @@ export function coordinatorAssessmentPrompt(assessmentPackage: string, candidate
     'The package below holds every non-functional requirement of the plan and every fixed requirement, with the plan deviations recorded in this run. Carry their wording and stated/inferred conditions forward unchanged.',
     'Submit exactly one result for every element ID of the package.',
     'For each result, name inspected scope, evidence, and uncertainty. Analysis of the source is sufficient evidence, including for requirements about tests or behavior; choose undetermined only when the source cannot settle a requirement or its stated conditions.',
+    'Start from supplied implementation locations and inspect the prepared candidate using snapshot_list/read/search/diff. Use a relevant named comparison when needed; no pathless diff is required before inspection. Explore beyond stale or unhelpful hints across the whole allowed tree.',
+    'Prepared candidate source is authoritative. Pointer notes, earlier completion claims and green audits do not establish fixed/NFR satisfaction. Make your own semantic judgment for every element, including unchanged callers. Git metadata, generated views and run records are excluded from source evidence.',
     'Do not use capability progress or scenario coverage as a substitute for this assessment. Do not edit source.',
     'Submit your assessment using `submit_nonfunctional_assessment`.',
     '',

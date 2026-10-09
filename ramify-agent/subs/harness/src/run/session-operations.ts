@@ -157,12 +157,16 @@ export class HarnessSessionOperations {
     if (JSON.stringify(found.point) !== JSON.stringify(point)) throw new Error('The recorded briefing ancestry names a different session point');
     return found;
   }
-  async packet(runId: string, operationId: string): Promise<TaskPacket | null> {
+  /** The immutable original packet, task binding and tool declarations for exact retries. */
+  async originalOperation(runId: string, operationId: string) {
     const raw = await this.read<unknown>(this.path('operations', [runId, operationId]));
     if (!raw) return null;
     const intent = readHarnessOperationIntent(raw);
     if (intent.runId !== runId || intent.operationId !== operationId) throw new Error('Invalid harness operation identity');
-    return intent.packet;
+    return { packet: intent.packet, task: intent.task, declarations: intent.declarations };
+  }
+  async packet(runId: string, operationId: string): Promise<TaskPacket | null> {
+    return (await this.originalOperation(runId, operationId))?.packet ?? null;
   }
   async acceptance(runId: string, operationId: string): Promise<{ readonly input: unknown; readonly value: unknown; readonly schema: string; readonly submissionHash: string; readonly destination: Readonly<Record<string, unknown>>; readonly validator: Readonly<Record<string, unknown>> } | null> {
     const found = await this.read<{ runId: string; operationId: string; input: unknown; value: unknown; schema: string; submissionHash: string; destination: Readonly<Record<string, unknown>>; validator: Readonly<Record<string, unknown>> }>(this.path('acceptances', [runId, operationId]));

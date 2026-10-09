@@ -101,8 +101,9 @@ test('one authorized repair edits two modules from the chosen src, then reassess
     expect(session.spec.prompt).toContain('- stated: for every audit record');
     expect(session.spec.prompt).not.toContain('rec-001');
     expect(session.spec.prompt).not.toContain(advice);
-    expect(session.spec.prompt).toContain('prepared-source-versus-current-accepted-boundary');
-    expect(session.spec.prompt).toContain('An empty diff does not establish that earlier accepted implementation left files unchanged.');
+    expect(session.spec.prompt).toContain('\"name\":\"run-start\"');
+    expect(session.spec.prompt).toContain('\"name\":\"accepted-boundary\"');
+    expect(session.spec.prompt).toContain('An empty diff establishes no historical preservation.');
   }
   const investigator = agent.sessions.find(session => session.spec.submission.name === coordinatorInvestigationToolName)!;
   expect(investigator.spec.prompt).toMatch(/^Elements: nfr-001$/mu);
