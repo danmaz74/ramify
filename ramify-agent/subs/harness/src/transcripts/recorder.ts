@@ -151,15 +151,15 @@ export class InvocationTranscript implements TranscriptNotes {
     if (this.closed) return;
     if (event.type === 'message') {
       const output = event.role === 'tool-result' ? this.outputs.get(event.callId) : undefined;
-      void this.append(`${event.role} message`, messageEntry(event, this.invocation, output));
+      void this.append(`${event.role} message`, messageEntry(event, this.invocation, output), true);
     } else if (event.type === 'compaction' || event.type === 'retry') {
-      void this.append(event.type, () => ({ ...event, invocation: this.invocation }));
+      void this.append(event.type, () => ({ ...event, invocation: this.invocation }), true);
     }
   }
 
   note(note: HarnessNote): void {
     if (this.closed) return;
-    void this.append(note.kind, harnessEntry(note, this.invocation));
+    void this.append(note.kind, harnessEntry(note, this.invocation), true);
   }
 
   output(callId: string, path: string): void {
@@ -190,8 +190,11 @@ export class InvocationTranscript implements TranscriptNotes {
     await this.gapWrite;
   }
 
-  private append(what: string, build: Build): Promise<void> {
-    return this.writer.append(build).then(() => undefined, (error: unknown) => {
+  private append(what: string, build: Build, independent = false): Promise<void> {
+    // Only event/note builders opt in: they await body storage, never a
+    // previous append's acknowledgement. Starts, ends and points stay fenced.
+    const appended = independent ? this.writer.appendIndependent(build) : this.writer.append(build);
+    return appended.then(() => undefined, (error: unknown) => {
       if (this.gapRecorded) return;
       this.gapRecorded = true;
       this.gapWrite = this.gap(

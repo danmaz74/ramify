@@ -1,6 +1,6 @@
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { noMessageDetail, type AgentEvent } from '../../subs/agent/src/interfaces/port.js';
 import { transcriptEntrySchema, type TranscriptEntry } from '../interfaces/protocol/transcripts.js';
 import { InvocationTranscript, recordAppend, type InvocationStart } from '../transcripts/recorder.js';
@@ -19,7 +19,46 @@ import { blobsIn, portEventsOf, transcribed } from './helpers/transcripts.js';
  */
 
 const cleanups: Array<() => Promise<void>> = [];
+const writes = vi.hoisted(() => ({
+  path: '', opens: 0, lines: [] as string[], syncs: 0, closes: 0,
+  partialAt: 0, syncFailureAt: 0, closeFailureAt: 0,
+  beforeSync: undefined as ((n: number) => Promise<void>) | undefined,
+  beforeClose: undefined as ((n: number) => Promise<void>) | undefined,
+}));
+vi.mock('node:fs/promises', async original => {
+  const fs = await original<typeof import('node:fs/promises')>();
+  return { ...fs, open: async (...args: Parameters<typeof fs.open>) => {
+    const handle = await fs.open(...args);
+    if (String(args[0]) !== writes.path || args[1] !== 'a') return handle;
+    writes.opens++;
+    return new Proxy(handle, { get(target, property) {
+      if (property === 'appendFile') return async (line: string) => {
+        writes.lines.push(line);
+        if (writes.lines.length === writes.partialAt) {
+          await target.appendFile(line.slice(0, 9));
+          throw new Error('injected partial transcript append');
+        }
+        await target.appendFile(line);
+      };
+      if (property === 'datasync') return async () => {
+        const n = ++writes.syncs;
+        await writes.beforeSync?.(n);
+        if (n === writes.syncFailureAt) throw new Error('injected transcript datasync');
+        await target.datasync();
+      };
+      if (property === 'close') return async () => {
+        const n = ++writes.closes;
+        await writes.beforeClose?.(n);
+        await target.close();
+        if (n === writes.closeFailureAt) throw new Error('injected transcript close');
+      };
+      const value = Reflect.get(target, property, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    } });
+  } };
+});
 afterEach(async () => {
+  Object.assign(writes, { path: '', opens: 0, lines: [], syncs: 0, closes: 0, partialAt: 0, syncFailureAt: 0, closeFailureAt: 0, beforeSync: undefined, beforeClose: undefined });
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 
@@ -252,5 +291,161 @@ describe('a transcript', () => {
     transcript.note({ kind: 'read-reminder', callId: null, text: 'late' });
     await transcript.drain();
     expect((await lines(path)).map(entry => entry.type)).toEqual(['ended', 'point']);
+  });
+});
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(done => { resolve = done; });
+  return { promise, resolve };
+}
+const fixedAt = '2026-10-09T01:40:00.000Z';
+const simpleEntry = (text: string) => ({ type: 'message' as const, invocation: 'inv-0001', role: 'user' as const, blocks: [{ type: 'text' as const, body: { stored: 'inline' as const, text, bytes: Buffer.byteLength(text) } }] });
+
+async function observedWriter() {
+  const f = await directory();
+  writes.path = f.path;
+  const writer = new TranscriptWriter({ session: 'ses-0001', path: f.path, root: f.root, store: f.store, inlineBytes, now: () => new Date(fixedAt) });
+  return { ...f, writer };
+}
+
+describe('explicit independent transcript bursts', () => {
+  test('three rows have exact independent bytes, individual flushes, and no acknowledgement or drain before actual close', async () => {
+    const f = await observedWriter(); const closing = deferred(); const release = deferred();
+    writes.beforeClose = async n => { if (n === 1) { closing.resolve(); await release.promise; } };
+    const inputs = ['α\nfirst', 'second', 'third'].map(simpleEntry);
+    let answered = 0; const order: number[] = [];
+    const promises = inputs.map((input, index) => f.writer.appendIndependent(() => { order.push(index); return input; }).then(entry => { answered++; return entry; }));
+    const draining = f.writer.drain(); let drained = false; void draining.then(() => { drained = true; });
+    await closing.promise;
+    expect(order).toEqual([0, 1, 2]); expect(writes.opens).toBe(1); expect(writes.syncs).toBe(3);
+    expect(answered).toBe(0); expect(drained).toBe(false);
+    const expected = inputs.map((input, index) => `${JSON.stringify({ n: index + 1, at: fixedAt, ...input })}\n`).join('');
+    expect(await readFile(f.path, 'utf8')).toBe(expected);
+    release.resolve(); await draining;
+    expect((await Promise.all(promises)).map(entry => entry.n)).toEqual([1, 2, 3]);
+    expect(writes.closes).toBe(1); expect(answered).toBe(3);
+  });
+
+  test('ordinary builders can await an earlier append acknowledgement and remain hard boundaries between independent bursts', async () => {
+    const f = await observedWriter();
+    const first = f.writer.appendIndependent(() => simpleEntry('first'));
+    const ordinary = f.writer.append(async () => { expect((await first).n).toBe(1); return simpleEntry('ordinary'); });
+    const dependent = f.writer.append(async () => { expect((await ordinary).n).toBe(2); return simpleEntry('dependent'); });
+    const last = f.writer.appendIndependent(() => simpleEntry('last'));
+    expect((await Promise.all([first, ordinary, dependent, last])).map(entry => entry.n)).toEqual([1, 2, 3, 4]);
+    expect(writes.opens).toBe(4); expect(writes.closes).toBe(4);
+    expect((await lines(f.path)).map(entry => entry.type === 'message' ? entry.blocks[0] : null)).toEqual(['first', 'ordinary', 'dependent', 'last'].map(text => simpleEntry(text).blocks[0]));
+  });
+
+  test('ordinary acknowledgement callbacks update state before the next builder, including after an independent prefix', async () => {
+    const f = await observedWriter(); let state = 'before-ack';
+    const first = f.writer.append(() => simpleEntry('first'));
+    void first.then(() => { state = 'after-ack'; });
+    const second = f.writer.append(() => { expect(state).toBe('after-ack'); return simpleEntry('second'); });
+    await Promise.all([first, second]);
+    state = 'before-burst-ack';
+    const burst = f.writer.appendIndependent(() => simpleEntry('independent'));
+    void burst.then(() => { state = 'after-burst-ack'; });
+    const fenced = f.writer.append(() => { expect(state).toBe('after-burst-ack'); return simpleEntry('fenced'); });
+    await Promise.all([burst, fenced]);
+    expect(writes.opens).toBe(4); expect(writes.closes).toBe(4);
+  });
+
+  test('a failed first independent builder plus failed scope close leaves later builders untouched until reload', async () => {
+    const f = await observedWriter(); writes.closeFailureAt = 1; let calls = 0;
+    const bad = f.writer.appendIndependent(() => { throw new Error('builder failure before a row'); });
+    const rejected = bad.then(() => 'unexpected success', error => (error as Error).message);
+    const later = f.writer.appendIndependent(() => { calls++; return simpleEntry('later'); });
+    expect(await rejected).toBe('injected transcript close'); expect((await later).n).toBe(1); expect(calls).toBe(1);
+    expect(writes.opens).toBe(2); expect(writes.syncs).toBe(1); expect(writes.closes).toBe(2);
+    expect((await lines(f.path)).map(entry => entry.n)).toEqual([1]);
+  });
+
+  test('a builder and its actual datasync finish before the next independent builder begins', async () => {
+    const f = await observedWriter(); const building = deferred(); const releaseBuild = deferred(); const syncing = deferred(); const releaseSync = deferred();
+    const order: string[] = [];
+    writes.beforeSync = async n => { if (n === 1) { syncing.resolve(); await releaseSync.promise; } };
+    const first = f.writer.appendIndependent(async () => { order.push('first'); building.resolve(); await releaseBuild.promise; return simpleEntry('first'); });
+    const second = f.writer.appendIndependent(() => { order.push('second'); return simpleEntry('second'); });
+    await building.promise; expect(order).toEqual(['first']); expect(writes.lines).toHaveLength(0);
+    releaseBuild.resolve(); await syncing.promise; expect(order).toEqual(['first']); expect(writes.lines).toHaveLength(1);
+    releaseSync.resolve(); await Promise.all([first, second]); expect(order).toEqual(['first', 'second']); expect(writes.syncs).toBe(2);
+  });
+
+  test('already admitted bursts are bounded and a finite drain does not wait for later arrivals', async () => {
+    const f = await observedWriter(); const closing = deferred(); const releaseClose = deferred(); const lateStarted = deferred(); const releaseLate = deferred();
+    writes.beforeClose = async n => { if (n === 1) { closing.resolve(); await releaseClose.promise; } };
+    const early = Array.from({ length: 70 }, (_, index) => f.writer.appendIndependent(() => simpleEntry(`early-${index}`)));
+    const draining = f.writer.drain();
+    await closing.promise; expect(writes.lines).toHaveLength(64); expect(writes.opens).toBe(1);
+    const late = f.writer.appendIndependent(async () => { lateStarted.resolve(); await releaseLate.promise; return simpleEntry('late'); });
+    releaseClose.resolve(); await draining; await lateStarted.promise;
+    expect(writes.lines).toHaveLength(70); expect(writes.opens).toBe(3); expect(writes.closes).toBe(2);
+    expect((await Promise.all(early)).map(entry => entry.n)).toEqual(Array.from({ length: 70 }, (_, index) => index + 1));
+    releaseLate.resolve(); expect((await late).n).toBe(71); await f.writer.drain(); expect(writes.closes).toBe(3);
+  });
+
+  test('a failed builder runs once, earlier rows acknowledge after close, and later unstarted builders retain their place', async () => {
+    const f = await observedWriter(); let failedBuilds = 0; let lastBuilds = 0;
+    const first = f.writer.appendIndependent(() => simpleEntry('first'));
+    const bad = f.writer.appendIndependent(() => { failedBuilds++; throw new Error('independent builder failed'); });
+    const failure = bad.then(() => 'unexpected success', error => (error as Error).message);
+    const last = f.writer.appendIndependent(() => { lastBuilds++; return simpleEntry('last'); });
+    expect((await first).n).toBe(1); expect(await failure).toBe('independent builder failed'); expect((await last).n).toBe(2);
+    expect(failedBuilds).toBe(1); expect(lastBuilds).toBe(1); expect(writes.syncs).toBe(2); expect(writes.closes).toBe(2);
+    expect((await lines(f.path)).map(entry => entry.n)).toEqual([1, 2]);
+  });
+
+  test.each(['partial', 'datasync'] as const)('a %s failure rejects unanswered prefix rows, reloads physical bytes, and preserves the later queued builder', async fault => {
+    const f = await observedWriter(); if (fault === 'partial') writes.partialAt = 2; else writes.syncFailureAt = 2;
+    let lastBuilds = 0;
+    const first = f.writer.appendIndependent(() => simpleEntry('first'));
+    const bad = f.writer.appendIndependent(() => simpleEntry('uncertain'));
+    const prefix = Promise.allSettled([first, bad]);
+    const last = f.writer.appendIndependent(() => { lastBuilds++; return simpleEntry('last'); });
+    expect((await prefix).map(result => result.status)).toEqual(['rejected', 'rejected']);
+    expect((await last).n).toBe(fault === 'partial' ? 2 : 3); expect(lastBuilds).toBe(1);
+    const read = await readTranscript(f.path); expect(read.discardedPartial).toBe(false); expect(read.unreadable).toEqual([]);
+    expect(read.entries.map(entry => entry.n)).toEqual(fault === 'partial' ? [1, 2] : [1, 2, 3]);
+    expect(read.entries[0]).toEqual({ n: 1, at: fixedAt, ...simpleEntry('first') });
+    expect(writes.closes).toBe(2);
+  });
+
+  test('a failed close rejects all staged acknowledgements and reopens after the complete physical prefix', async () => {
+    const f = await observedWriter(); writes.closeFailureAt = 1;
+    const entries = ['first', 'second', 'third'].map(text => f.writer.appendIndependent(() => simpleEntry(text)));
+    expect((await Promise.allSettled(entries)).map(entry => entry.status)).toEqual(['rejected', 'rejected', 'rejected']);
+    const next = await f.writer.appendIndependent(() => simpleEntry('after close failure'));
+    expect(next.n).toBe(4); expect(writes.opens).toBe(2); expect(writes.closes).toBe(2);
+    expect((await lines(f.path)).map(entry => entry.n)).toEqual([1, 2, 3, 4]);
+    const reopened = f.writer; expect((await reopened.append(() => simpleEntry('ordinary after failure'))).n).toBe(5);
+  });
+
+  test('owning event and note admissions group while started, ended and point remain fenced and captured output identity stays original', async () => {
+    const f = await observedWriter(); const observed = invocation(f.writer, 'inv-0001');
+    const original = join(f.root, 'original-output.txt'); const changed = join(f.root, 'later-output.txt');
+    await writeFile(original, 'original'); await writeFile(changed, 'later');
+    await observed.transcript.started(start()); expect(writes.opens).toBe(1); expect(writes.closes).toBe(1);
+    observed.transcript.event(user('first')); observed.transcript.note({ kind: 'read-reminder', callId: null, text: 'Read here.' });
+    observed.transcript.output('c1', original); observed.transcript.event(result('c1', 'result')); observed.transcript.output('c1', changed);
+    await observed.transcript.end({ ended: 'submitted', interruption: null, error: null, actual: { mode: 'fresh', degradedReason: null } });
+    observed.transcript.event(user('too late')); observed.transcript.note({ kind: 'note-appended', text: 'too late' });
+    await observed.transcript.drain();
+    const recorded = await lines(f.path);
+    expect(recorded.map(entry => [entry.n, entry.type])).toEqual([[1, 'started'], [2, 'message'], [3, 'harness'], [4, 'message'], [5, 'ended'], [6, 'point']]);
+    expect(recorded[3]).toMatchObject({ output: { stored: 'file', path: 'original-output.txt', bytes: 8 } });
+    expect(writes.opens).toBe(4); expect(writes.closes).toBe(4); expect(writes.syncs).toBe(6); expect(observed.gaps).toEqual([]);
+  });
+
+  test('an owning independent burst close failure is one coverage gap and later end and point are still recorded', async () => {
+    const f = await observedWriter(); const observed = invocation(f.writer, 'inv-0001'); await observed.transcript.started(start());
+    writes.closeFailureAt = 2;
+    observed.transcript.event(user('first')); observed.transcript.note({ kind: 'note-appended', text: 'note' }); observed.transcript.event(user('second'));
+    await observed.transcript.end({ ended: 'submitted', interruption: null, error: null, actual: { mode: 'fresh', degradedReason: null } });
+    await observed.transcript.drain();
+    expect(observed.gaps).toHaveLength(1); expect(observed.gaps[0]).toContain('injected transcript close');
+    expect((await lines(f.path)).map(entry => entry.type)).toEqual(['started', 'message', 'harness', 'message', 'ended', 'point']);
+    expect(writes.opens).toBe(4); expect(writes.closes).toBe(4); expect(writes.syncs).toBe(6);
   });
 });

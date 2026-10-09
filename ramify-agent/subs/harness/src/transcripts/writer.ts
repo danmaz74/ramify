@@ -1,6 +1,6 @@
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
-import { appendJsonLine, discardPartialLine, readJsonLines } from '../../subs/ledger/src/jsonl.js';
+import { appendJsonLine, discardPartialLine, readJsonLines, withJsonLineAppender } from '../../subs/ledger/src/jsonl.js';
 import {
   transcriptEntrySchema, type TranscriptBody, type TranscriptEntry,
 } from '../interfaces/protocol/transcripts.js';
@@ -17,6 +17,9 @@ import type { ContentStore } from './store.js';
  * in the order they are asked for, and each is numbered one above the last
  * entry in the file, so a number is never reset. A failed append is
  * reported to its caller, and the next append reads the file again first.
+ * Independent recorder builders may share a bounded handle scope, with
+ * each row synced before the next builder. Their answers wait for close;
+ * a scope failure conservatively rejects its unanswered prefix.
  */
 
 /** An entry to append: everything but its number and its time. */
@@ -50,10 +53,21 @@ export interface TranscriptWriterOptions {
 /** How many characters of a stored body's first line its header previews. */
 export const previewCharacters = 120;
 
+type Build = (bodies: TranscriptBodies) => TranscriptEntryInput | Promise<TranscriptEntryInput>;
+type AppendTask = {
+  readonly kind: 'single' | 'independent';
+  readonly build: Build;
+  readonly resolve: (entry: TranscriptEntry) => void;
+  readonly reject: (error: unknown) => void;
+};
+type Task = AppendTask | { readonly kind: 'fence'; readonly resolve: () => void };
+const independentBurstLimit = 64;
+
 export class TranscriptWriter {
   /** The next entry's number; undefined until the file has been read, and again after a failed append. */
   private next: number | undefined;
-  private tail: Promise<unknown> = Promise.resolve();
+  private readonly queue: Task[] = [];
+  private pumping = false;
   private readonly bodies: TranscriptBodies;
 
   constructor(private readonly options: TranscriptWriterOptions) {
@@ -76,15 +90,103 @@ export class TranscriptWriter {
    * runs in turn, so the bodies it stores and the number the entry gets
    * follow the same order. It rejects when the entry could not be written.
    */
-  append(build: (bodies: TranscriptBodies) => TranscriptEntryInput | Promise<TranscriptEntryInput>): Promise<TranscriptEntry> {
-    const task = this.tail.then(() => this.write(build));
-    this.tail = task.catch(() => undefined);
-    return task;
+  append(build: Build): Promise<TranscriptEntry> {
+    return this.admit('single', build);
+  }
+
+  /**
+   * For owning recorder builders that never await another append's answer.
+   * Adjacent admitted entries can share a handle; each line still flushes
+   * before the next builder, and no answer precedes the handle's close.
+   */
+  appendIndependent(build: Build): Promise<TranscriptEntry> {
+    return this.admit('independent', build);
   }
 
   /** Waits for every append asked for so far. */
-  async drain(): Promise<void> {
-    await this.tail;
+  drain(): Promise<void> {
+    return new Promise(resolve => {
+      this.queue.push({ kind: 'fence', resolve });
+      this.schedule();
+    });
+  }
+
+  private admit(kind: AppendTask['kind'], build: Build): Promise<TranscriptEntry> {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ kind, build, resolve, reject });
+      this.schedule();
+    });
+  }
+
+  private schedule(): void {
+    if (this.pumping) return;
+    this.pumping = true;
+    // Collect calls already admitted in this synchronous callback, without
+    // waiting for new arrivals or changing ordinary builder dependencies.
+    void Promise.resolve().then(() => this.pump());
+  }
+
+  private async pump(): Promise<void> {
+    while (this.queue.length > 0) {
+      const first = this.queue[0]!;
+      if (first.kind === 'fence') {
+        this.queue.shift(); first.resolve();
+      } else if (first.kind === 'single') {
+        this.queue.shift();
+        try { first.resolve(await this.write(first.build)); }
+        catch (error) { first.reject(error); }
+        // The original promise tail let the caller's acknowledgement
+        // callbacks run before the next ordinary builder saw its state.
+        await Promise.resolve();
+      } else {
+        await this.writeIndependentBurst();
+      }
+    }
+    this.pumping = false;
+  }
+
+  private async writeIndependentBurst(): Promise<void> {
+    let count = 0;
+    while (count < independentBurstLimit && this.queue[count]?.kind === 'independent') count++;
+    try { this.next ??= await this.load(); }
+    catch (error) {
+      this.next = undefined;
+      (this.queue.shift() as AppendTask).reject(error);
+      return;
+    }
+    const staged: Array<{ task: AppendTask; entry: TranscriptEntry }> = [];
+    let failed: { task: AppendTask; error: unknown } | undefined;
+    try {
+      await withJsonLineAppender(this.options.path, async append => {
+        for (let index = 0; index < count; index++) {
+          const task = this.queue.shift() as AppendTask;
+          let entry: TranscriptEntry;
+          try {
+            const input = await task.build(this.bodies);
+            entry = transcriptEntrySchema.parse({ n: this.next, at: (this.options.now?.() ?? new Date()).toISOString(), ...input });
+          } catch (error) {
+            failed = { task, error };
+            this.next = undefined;
+            // End the scope cleanly; earlier flushed rows can be answered
+            // after close, and later builders have not run yet.
+            return;
+          }
+          try { await append(entry); }
+          catch (error) { failed = { task, error }; throw error; }
+          staged.push({ task, entry });
+          this.next = entry.n + 1;
+        }
+      });
+      for (const { task, entry } of staged) task.resolve(entry);
+      failed?.task.reject(failed.error);
+    } catch (error) {
+      // A rejected scope cannot attest its close. Conservatively fail all
+      // unanswered members, preserve the bytes, and reload before continuing.
+      this.next = undefined;
+      for (const { task } of staged) task.reject(error);
+      if (failed) failed.task.reject(error);
+      else if (staged.length === 0) (this.queue.shift() as AppendTask).reject(error);
+    }
   }
 
   private async write(build: (bodies: TranscriptBodies) => TranscriptEntryInput | Promise<TranscriptEntryInput>): Promise<TranscriptEntry> {
