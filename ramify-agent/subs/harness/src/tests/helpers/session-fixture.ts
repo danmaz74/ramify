@@ -30,9 +30,9 @@ import { fixtureScratchGit } from './mock-git.js';
  * - `lineage` (review-notes, completed): the session scenario, whose
  *   sessions are forked, appended to, continued, requested by a contract
  *   need and, because the executor forgets each engineer session at its
- *   first settled repair-context append, replaced by the owning engineer
- *   reconstruction. The retained local architect continues its original
- *   lineage; unavailable preserving forks are not replaced.
+ *   first settled repair-context append, followed by an ordinary fresh
+ *   engineer task with recorded degradation. The retained local architect
+ *   continues its original lineage; no replacement parent is created.
  * - `interrupted` (reviewer-identity, stopped): an initial architect that
  *   ignores the stop past its grace, so the run ends with the session its log
  *   still says is live.
@@ -79,9 +79,8 @@ async function lineageRun(root: string): Promise<FinishedSessionRuns['lineage']>
       root,
       cleanup: step => { cleanups.push(step); },
       // The executor can no longer read an engineer session once it ends, so
-      // the provider's repair, which asks to continue it, is a reconstruction.
-      // The local architect remains available: its preserving continuation
-      // is not licensed to fall back to a fresh organizing session.
+      // the provider's repair uses an ordinary fresh task with degradation.
+      // The local architect remains available and continues its original session.
       port: scripted => {
         const port: AgentPort = {
           ...scripted,

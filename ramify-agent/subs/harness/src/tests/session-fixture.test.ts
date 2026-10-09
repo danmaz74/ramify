@@ -60,7 +60,7 @@ const sessionsOf = async (run: { planId: string; runId: string }) => (await get(
 const byRole = (sessions: readonly RunSessionView[], role: string) => sessions.filter(session => session.role === role);
 
 describe('the session fixture over HTTP', () => {
-  test('lineage: forks, appends, continuations, a requested session, a replacement and a degraded start, all finished', async () => {
+  test('lineage: forks, appends, continuations, a requested session and a fresh fallback, all finished', async () => {
     expect(runs.lineage.state).toBe('completed');
     const sessions = await sessionsOf(runs.lineage);
     expect(sessions.every(session => session.state === 'finished')).toBe(true);
@@ -73,9 +73,14 @@ describe('the session fixture over HTTP', () => {
     expect(byRole(sessions, 'global-fork')[0]!.lineage.fork).toMatchObject({ from: { session: 'ses-0002' }, reason: 'placement-request' });
     expect(sessions.flatMap(session => session.invocations).some(invocation => invocation.continues?.reason === 'iteration-closed')).toBe(true);
     expect(byRole(sessions, 'contract-engineer')[0]!.lineage.requestedBy).toMatchObject({ reason: 'contract-needed' });
-    const reconstruction = sessions.find(session => session.lineage.replaces !== null)!;
-    expect(reconstruction).toMatchObject({ role: 'engineer', lineage: { replaces: { reason: 'reconstructed' } } });
-    expect(sessions.find(session => session.session === reconstruction.lineage.replaces!.session)).toMatchObject({ finished: 'replaced' });
+    const lost = byRole(sessions, 'engineer').find(session => session.finished === 'lost');
+    expect(lost).toBeDefined();
+    const fresh = byRole(sessions, 'engineer').find(session => session.session !== lost!.session &&
+      session.invocations.some(invocation => invocation.degraded?.requested === 'continue' && invocation.degraded.actual === 'fresh'));
+    expect(fresh).toBeDefined();
+    expect(fresh!.lineage.fork).toBeNull();
+    expect(fresh!.invocations[0]!.start).toBe('opened');
+    expect(sessions.every(session => session.lineage.replaces === null)).toBe(true);
     const degradations = sessions.flatMap(session => session.invocations).flatMap(invocation => invocation.degraded ?? []);
     expect(degradations).toContainEqual(expect.objectContaining({ requested: 'continue', actual: 'fresh' }));
     expect(degradations.filter(degraded => degraded.requested === 'fork')).toEqual([]);
