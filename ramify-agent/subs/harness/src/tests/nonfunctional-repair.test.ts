@@ -126,6 +126,9 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   const repair = agent.sessions.find(session => session.spec.role === 'nonfunctional-repair-engineer');
   expect(repair?.spec.scope.workingDirectory).toBe(firstSrc);
   expect(repair?.spec.prompt).toMatch(/^Elements: nfr-001$/mu);
+  // The repair engineer receives the changed-path section the coordinator received for the same candidate.
+  expect(repair?.spec.prompt).toContain('"changedPaths":[');
+  expect(repair?.spec.prompt).toContain('"readScope":["."]');
   expect(repair?.spec.prompt).toContain(`> ${obligation}`);
   for (const text of [otherObligation, fixed, advice]) expect(repair?.spec.prompt).not.toContain(text);
   const repairStart = events.find(event => event.type === 'invocation-started' && event.data.role === 'nonfunctional-repair-engineer');

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { Role } from '../interfaces/protocol/runs.js';
 import { defaultSkillDirectory, loadPromptPackages, renderNonfunctionalCoordinatorPrompt, renderNonfunctionalRepairPrompt, type LoadedPackage } from '../prompts/packages.js';
-import { buildTaskPacket, renderRequiredSlots, stableRoleInstructions, type TaskKind, type TaskEnvironment } from '../prompts/tasks.js';
+import { buildTaskPacket, deliveredSupportPaths, renderRequiredSlots, stableRoleInstructions, type TaskKind, type TaskEnvironment } from '../prompts/tasks.js';
 import { briefingAdditionKey, buildBriefingDelivery, taskBriefingRevision, type BriefingRevision } from '../prompts/briefings.js';
 import { buildDeliveredManifest, exactInputHash } from '../prompts/delivered-manifest.js';
 import { workOrientationMessage } from '../context-selection/prompts.js';
@@ -23,7 +23,6 @@ const expected: readonly [Role, TaskKind, string, boolean][] = [
   ['local-architect', 'assignment', 'submit_work_item_result', true],
   ['local-architect', 'completion', 'submit_work_item_result', true],
   ['local-architect', 'repair', 'submit_work_item_result', true],
-  ['local-architect', 'qualification', 'submit_work_item_result', true],
   ['local-architect', 'reconciliation', 'submit_reconciliation', true],
   ['context-selector', 'selection', 'submit_context_selection', true],
   ['context-selector', 'reselection', 'submit_context_selection', true],
@@ -31,7 +30,6 @@ const expected: readonly [Role, TaskKind, string, boolean][] = [
   ['capability-architect', 'reconciliation', 'submit_reconciliation', true],
   ['engineer', 'engineering', 'submit_iteration_result', true],
   ['engineer', 'repair', 'submit_iteration_result', true],
-  ['engineer', 'qualification', 'submit_iteration_result', true],
   ['engineer', 'standalone-command', 'submit_iteration_result', true],
   ['engineer', 'engineering', 'submit_iteration_result', false],
   ['contract-engineer', 'contract', 'submit_contract_result', false],
@@ -39,7 +37,6 @@ const expected: readonly [Role, TaskKind, string, boolean][] = [
   ['local-architect', 'assignment', 'submit_work_item_result', false],
   ['local-architect', 'completion', 'submit_work_item_result', false],
   ['local-architect', 'repair', 'submit_work_item_result', false],
-  ['local-architect', 'qualification', 'submit_work_item_result', false],
   ['local-architect', 'reconciliation', 'submit_reconciliation', false],
   ['reviewer', 'code', 'submit_review', true],
   ['reviewer', 'scope', 'submit_review', true],
@@ -188,7 +185,13 @@ describe('P01/P02/P05: stable role and complete current tasks', () => {
     expect(() => renderRequiredSlots('{{submissionTool}}', {}, ['submissionTool'])).toThrow('submissionTool');
     expect(() => renderRequiredSlots('{procedure}', { procedure: 'work' }, [])).toThrow('Malformed');
     expect(() => renderRequiredSlots('{submissionTool}', { submissionTool: 'submit' }, [])).toThrow('Malformed');
+    // Every key of the values map is a declared name, not only the required ones.
+    expect(() => renderRequiredSlots('Role with {skill}', { skill: 'S', skillDirectory: '/skills', contractSkill: '' }, [])).toThrow('Malformed required placeholder {skill}');
+    expect(() => renderRequiredSlots('{{skill}} {skillDirectory}', { skill: 'S', skillDirectory: '/skills', contractSkill: '' }, [])).toThrow('Malformed required placeholder {skillDirectory}');
+    expect(() => renderRequiredSlots('{contractSkill}', { skill: 'S', skillDirectory: '/skills', contractSkill: 'C' }, [])).toThrow('Malformed required placeholder {contractSkill}');
+    expect(() => renderRequiredSlots('Scope: {writeScope}', { writeScope: 'W' }, [])).toThrow('Malformed required placeholder {writeScope}');
     expect(renderRequiredSlots('JSON: {"value": 1}. Code: function f() { return 1; }', {}, [])).toContain('{"value": 1}');
+    expect(renderRequiredSlots('Code: const { skill } = x; {"skill": 1} {{skill}}', { skill: 'S' }, [])).toBe('Code: const { skill } = x; {"skill": 1} S');
     // Slot substitution is a single pass: user data with braces is not reparsed as a template.
     expect(renderRequiredSlots('{{procedure}}', { procedure: 'const object = { value: 1 }; {{quoted}}' }, ['procedure'])).toContain('{{quoted}}');
   });
@@ -214,6 +217,35 @@ describe('P01/P02/P05: stable role and complete current tasks', () => {
     expect(repair).toContain('Read the recorded task');
     expect(`${coordinator}\n${repair}`).not.toMatch(/\{\{?submissionTool\}\}?|\{\{?procedure\}\}?/);
     expect(coordinator).not.toContain(current.get('nonfunctional-coordinator')!.submissionSchema.trim());
+    // W08: the role text and the assessment prompt both leave the temporal condition rule out.
+    expect(coordinator).not.toContain('A temporal condition without observed intermediate evidence is undetermined.');
+    expect(coordinator).not.toContain('temporal');
+  });
+  test('procedure manifest entries and support paths name the embedded section sources and nothing undelivered', () => {
+    const local = current.get('local-architect')!;
+    const writeScope = 'subs/harness/src/prompts/write-scope.procedure.md';
+    const procedureSources = (loaded: LoadedPackage, kind: TaskKind) =>
+      buildTaskPacket(input(loaded, kind)).manifest.entries.filter(entry => entry.kind === 'procedure').flatMap(entry => entry.sources.map(source => source.path));
+    expect(procedureSources(local, 'assignment')).toEqual(['subs/harness/src/prompts/local-architect-capability.procedure.md', writeScope]);
+    expect(procedureSources(ordinary.get('local-architect')!, 'completion')).toEqual(['subs/harness/src/prompts/local-architect.procedure.md', writeScope]);
+    expect(procedureSources(current.get('capability-architect')!, 'capability')).toEqual(['subs/harness/src/prompts/capability-architect.procedure.md', writeScope]);
+    expect(buildTaskPacket(input(local, 'assignment')).message).toContain('An included child module brings its whole subtree:');
+    // A replaced procedure embeds no section, so its entry names only its own file.
+    expect(procedureSources(local, 'orientation')).toEqual(['subs/harness/src/context-selection/orientation.procedure.md']);
+    expect(procedureSources(local, 'reconciliation')).toEqual(['subs/harness/src/prompts/reconciliation.procedure.md']);
+    expect(procedureSources(current.get('engineer')!, 'engineering')).toEqual(['subs/harness/src/prompts/engineer-capability.procedure.md']);
+    // The environment's support paths are the manifest's sources: no synthetic schema file, no unused procedure.
+    const packet = buildTaskPacket(input(local, 'assignment'));
+    const manifestSources = [...new Set(packet.manifest.entries.flatMap(entry => entry.sources.map(source => source.path)))];
+    expect(deliveredSupportPaths(local, 'assignment')).toEqual(manifestSources);
+    // The local architect's role embeds no skill file; the initial architect's does.
+    expect(deliveredSupportPaths(local, 'assignment')).toEqual(['subs/harness/src/prompts/local-architect.system.md',
+      'subs/harness/src/prompts/local-architect-capability.procedure.md', writeScope]);
+    expect(local.files.map(file => file.path)).toEqual(expect.arrayContaining(['local-architect.schema.json', 'subs/harness/src/prompts/reconciliation.procedure.md']));
+    expect(deliveredSupportPaths(local, 'reconciliation')).toEqual(['subs/harness/src/prompts/local-architect.system.md', 'subs/harness/src/prompts/reconciliation.procedure.md']);
+    expect(deliveredSupportPaths(current.get('initial-architect')!, 'initial-analysis')).toEqual(['subs/harness/src/prompts/initial-architect.system.md', 'skills/module-architect/SKILL.md', 'subs/harness/src/prompts/initial-analysis.procedure.md']);
+    expect(deliveredSupportPaths(current.get('engineer')!, 'consultation', '{"type":"object"}')).toEqual(['subs/harness/src/prompts/engineer-capability.system.md']);
+    expect(() => deliveredSupportPaths(current.get('engineer')!, 'consultation')).toThrow('actual caller-owned submission schema');
   });
   test('unchanged canonical goal/requirements are inherited, changed requirements alone are appended', () => {
     const loaded = current.get('local-architect')!;
@@ -293,7 +325,9 @@ describe('P04: manifests reflect supplied/inherited instructions and truthful re
     expect(architect.manifest.entries.flatMap(item => item.sources.map(source => source.path))).toContain('skills/module-architect/SKILL.md');
     expect(architect.roleInstructions).not.toContain('Run `ramify materialize');
     expect(architect.roleInstructions).not.toContain('Before answering, read [report.md]');
-    expect(architect.roleInstructions).toContain('designated submission tool');
+    // The read-only adaptation's own sentence, which the system file does not carry.
+    expect(architect.roleInstructions).toContain('Complete the current task using its designated submission tool. No report.md\nfile or shell command is required.');
+    expect(current.get('initial-architect')!.system).not.toContain('No report.md\nfile or shell command is required.');
     expect(architect.roleInstructions).toContain('placement references only for a real');
     expect(architect.message).toContain('"modules": [');
     expect(architect.message).toContain('unknown shapes: 1');

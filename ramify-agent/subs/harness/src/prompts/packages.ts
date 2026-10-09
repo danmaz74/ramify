@@ -20,7 +20,7 @@ import {
 import { coordinatorAssessmentJsonSchema, coordinatorAssessmentToolName, nonfunctionalRepairJsonSchema, nonfunctionalRepairToolName } from '../nonfunctional/submissions.js';
 import { promptPackageManifestSchema, type PromptPackageManifest, type ReviewKind } from '../run/records.js';
 import { shellMaxTimeoutMs } from '../tools/shell.js';
-import { renderRequiredSlots, stableRoleInstructions } from './tasks.js';
+import { rejectSingleBracePlaceholders, renderRequiredSlots, stableRoleInstructions } from './tasks.js';
 
 /*
  * One prompt package per role, versioned and hashed into the run's
@@ -120,6 +120,8 @@ export interface LoadedPackage {
   readonly extraSkill: string;
   /** Only files expanded into the stable role's skill slots, including custom supplied paths. */
   readonly embeddedSkillPaths?: readonly string[];
+  /** Only the section files filled into the main procedure's `{{name}}` slots, which it therefore delivers. */
+  readonly embeddedProcedurePaths?: readonly string[];
   readonly submissionSchema: string;
   /**
    * The reviewer's texts beyond its system prompt: one procedure per review
@@ -468,6 +470,7 @@ async function loadPackage(request: {
       ...skillFiles.map(path => describe(path, skill, 'skill').path),
       ...(request.extraSkillFile !== undefined && system.includes('{{contractSkill}}') ? [describe(request.extraSkillFile, extraSkill, 'skill').path] : []),
     ],
+    embeddedProcedurePaths: sections.filter(section => procedure.includes(`{{${section.name}}}`)).map(section => describe(section.file, section.text, 'procedure').path),
     submissionSchema,
   };
 }
@@ -526,11 +529,11 @@ export function renderContextSelectorPrompt(loaded: LoadedPackage, projectRoot: 
   return render(loaded, projectRoot, contextSelectorToolName);
 }
 
-/** The rendered system prompt of a local architect's reconciliation fork. It is never stored either. */
-export function renderReconciliationPrompt(loaded: LoadedPackage, projectRoot: string): string {
+/** The rendered system prompt of an architect's reconciliation fork, from the parent's working directory. It is never stored either. */
+export function renderReconciliationPrompt(loaded: LoadedPackage, projectRoot: string, workingDirectory: string = projectRoot): string {
   const reconciliation = loaded.reconciliation;
   if (reconciliation === undefined) throw new Error(`The ${loaded.package} package has no reconciliation procedure`);
-  return render({ ...loaded, procedure: reconciliation.procedure, submissionSchema: reconciliation.submissionSchema }, projectRoot, reconciliationToolName);
+  return render({ ...loaded, procedure: reconciliation.procedure, submissionSchema: reconciliation.submissionSchema }, projectRoot, reconciliationToolName, { workingDirectory });
 }
 
 /**
@@ -601,5 +604,6 @@ export function inputsHash(parts: readonly string[]): string {
 }
 
 function fill(template: string, values: Readonly<Record<string, string>>): string {
+  rejectSingleBracePlaceholders(template, Object.keys(values));
   return template.replace(/\{\{(\w+)\}\}/g, (match, name: string) => values[name] ?? match);
 }

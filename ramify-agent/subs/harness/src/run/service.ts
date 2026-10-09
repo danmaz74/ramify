@@ -246,7 +246,7 @@ import { readBody, readTranscript, TranscriptWriter } from '../transcripts/write
 import { SubmissionJudge, validateAgainst, type SubmissionValidation } from './submissions.js';
 import { nodeProcessGroups, WriterBlockedError, WriterOwnership, type ProcessGroups, type TreeObserver } from './writer.js';
 import { HarnessSessionOperations, readSessionPointReference, settleSessionEquipment, type HarnessTaskBrief } from './session-operations.js';
-import type { TaskEnvironment, TaskKind } from '../prompts/tasks.js';
+import { deliveredSupportPaths, type TaskEnvironment, type TaskKind } from '../prompts/tasks.js';
 import { processGroupIdentity } from '../../subs/evidence/src/run-command.js';
 
 /*
@@ -517,6 +517,8 @@ interface ParentSession {
   session: SessionId | undefined;
   ref: string | undefined;
   readonly undelivered: string[];
+  /** The directory the architect's own session runs from, which a fork of it keeps. */
+  readonly workingDirectory: string;
 }
 
 /**
@@ -2079,8 +2081,10 @@ export class RunService {
       work: owner.role === 'capability-architect' ? { capabilityTask: owner.id, request: owner.request } : { workItem: owner.id },
       attempt: basis.round,
       loaded,
-      systemPrompt: renderReconciliationPrompt(loaded, this.projectRoot),
+      systemPrompt: renderReconciliationPrompt(loaded, this.projectRoot, parent.workingDirectory),
       prompt: reconciliationMessage(this.reconciliationPacket(run, item, owner, basis, state, bounds)),
+      // The fork keeps the parent's working directory: its tools read where the architect read.
+      workingDirectory: parent.workingDirectory,
       start: start.start,
       ...(start.fork === undefined ? {} : { fork: start.fork }),
       ...(start.degraded === undefined ? {} : { degraded: start.degraded }),
@@ -3805,11 +3809,14 @@ export class RunService {
     // its line events from the snapshots around it.
     const baseline = await this.baselineSnapshot(run);
     const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
+    const { candidate } = await this.readPreparedCandidate(run, assignment.candidate);
     const result = await this.runInvocation<NonfunctionalRepairSubmission>(run, agent, {
-      role: 'nonfunctional-repair-engineer', task: { goal: assignment.task, requirements: [this.planPackage(run, catalog, assignment.nfrs)] }, work: { nonfunctionalRepair: assignment.id },
+      // The repair engineer receives the same changed-path section as the coordinator that assigned it.
+      role: 'nonfunctional-repair-engineer', task: { goal: assignment.task, requirements: [this.planPackage(run, catalog, assignment.nfrs)],
+        literalSections: [{ key: 'support:nonfunctional-source', text: await this.nonfunctionalSourceInputs(run, candidate) }] }, work: { nonfunctionalRepair: assignment.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-repair-engineer').length + 1,
       loaded, systemPrompt: renderNonfunctionalRepairPrompt(loaded, this.projectRoot),
-      prompt: repairPrompt(assignment.task, (await this.readPreparedCandidate(run, assignment.candidate)).candidate,
+      prompt: repairPrompt(assignment.task, candidate,
         this.planPackage(run, catalog, assignment.nfrs), assignment.startingModule,
         { evidence: assignment.evidence, uncertainty: assignment.uncertainty }),
       start: { mode: 'fresh' }, toolName: nonfunctionalRepairToolName,
@@ -4506,7 +4513,9 @@ export class RunService {
       environment: { projectRoot: this.projectRoot, workingDirectory: spec.scope.workingDirectory,
         candidate: request.task?.candidate ?? request.candidateBefore ?? null, snapshot: request.task?.snapshot ?? null,
         limits, availableTools: [...spec.builtinTools, ...spec.tools.map(tool => tool.name), spec.submission.name],
-        views: request.task?.views ?? (run.record.manifest.architectView.status === 'materialized' ? [{ path: join(this.projectRoot, '.ramify-architect'), revision: run.record.manifest.architectView.revision, modules: [...(run.index?.modules.keys() ?? [])], coverage: run.record.manifest.architectView.coverageLimits }] : []), supportPaths: request.loaded.files.map(file => file.path), cucumberConfiguration: request.task?.cucumberConfiguration ?? null } };
+        views: request.task?.views ?? (run.record.manifest.architectView.status === 'materialized' ? [{ path: join(this.projectRoot, '.ramify-architect'), revision: run.record.manifest.architectView.revision, modules: [...(run.index?.modules.keys() ?? [])], coverage: run.record.manifest.architectView.coverageLimits }] : []),
+        // Only the sources this task delivers; the package's other files never reach the model.
+        supportPaths: deliveredSupportPaths(request.loaded, kind, request.task?.consultationSubmissionSchema), cucumberConfiguration: request.task?.cucumberConfiguration ?? null } };
   }
 
   // The initial analysis
@@ -6019,7 +6028,7 @@ export class RunService {
       // Before the gate, the work item's reviews settle and what they
       // raised is reconciled; a completion whose basis no longer holds is
       // reconciled again, as often as rounds remain.
-      const parent: ParentSession = { session, ref: sessionRef, undelivered };
+      const parent: ParentSession = { session, ref: sessionRef, undelivered, workingDirectory };
       let gate: GateAttempt | null = null;
       let refusedCompletions = 0;
       for (;;) {
@@ -7808,8 +7817,10 @@ export class RunService {
       })) };
     };
     const tools: ToolDefinition[] = [
-      { name: 'validate_capability_action', description: 'Check an action against the current task without submitting it.',
-        inputSchema: z.toJSONSchema(capabilityActionSchema) as JsonSchema,
+      // The complete action schema reaches the model once, in the submit_capability_action
+      // declaration; this validator takes any object and the harness validates it exactly.
+      { name: 'validate_capability_action', description: 'Check an action against the current task without submitting it. The input is a candidate submit_capability_action input, as that declaration\'s schema describes it.',
+        inputSchema: { type: 'object', description: 'A candidate submit_capability_action input; that declaration carries the complete schema.', additionalProperties: true } as JsonSchema,
         execute: async input => {
           const checked = await validateActionInput(input);
           return { text: JSON.stringify(checked), isError: !checked.valid };
@@ -8140,8 +8151,9 @@ export class RunService {
       guidance: `Reconciliation ${correction} requires an accepted correction assignment before another handback request` };
     const loaded = packages.get('capability-architect');
     if (loaded === undefined) { await this.fail(run, 'internal', 'Capability architect package is absent for reconciliation'); return null; }
+    // The capability architect's own session runs from the project root, so its reconciliation fork does too.
     const parent: ParentSession = { session: completion.kept ? completion.session : undefined,
-      ref: completion.ref || undefined, undelivered: [] };
+      ref: completion.ref || undefined, undelivered: [], workingDirectory: this.projectRoot };
     const reconciled = await this.reconcileWorkItem(run, agent, loaded, item, parent, {
       id: task.id, role: 'capability-architect', request: request.id, provider: task.provider,
       ...(completion.ref ? { completion: { session: completion.session, ref: completion.ref, invocation } } : {}),

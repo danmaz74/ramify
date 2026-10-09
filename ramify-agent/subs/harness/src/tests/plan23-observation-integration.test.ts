@@ -144,15 +144,15 @@ describe('Plan 23 F6 durable observation integration', () => {
       ['context-selector', 'reselection', 'submit_context_selection'], ['capability-architect', 'capability', 'submit_capability_action'],
       ['capability-architect', 'capability-qualification', 'submit_capability_qualification'], ['capability-architect', 'reconciliation', 'submit_reconciliation'],
       ['engineer', 'engineering', 'submit_iteration_result'], ['engineer', 'repair', 'submit_iteration_result'],
-      ['engineer', 'qualification', 'submit_iteration_result'], ['engineer', 'standalone-command', 'submit_iteration_result'],
+      ['engineer', 'standalone-command', 'submit_iteration_result'],
       ['engineer', 'consultation', 'answer_capability_consultation'], ['contract-engineer', 'contract', 'submit_contract_result'],
       ['reviewer', 'code', 'submit_review'], ['reviewer', 'scope', 'submit_review'], ['reviewer', 'design', 'submit_review'],
       ['reviewer', 'design-orientation', 'submit_orientation'], ['failure-analyst', 'failure-analysis', 'submit_failure_analysis'],
       ['nonfunctional-coordinator', 'assessment', 'submit_nonfunctional_assessment'], ['nonfunctional-coordinator', 'action', 'submit_nonfunctional_action'],
       ['nonfunctional-coordinator', 'investigation', 'submit_nonfunctional_investigation'], ['nonfunctional-repair-engineer', 'repair', 'submit_nonfunctional_repair'],
     ];
-  test('the independent role/task table covers all twelve roles and thirty-one bindings', () => {
-    expect(pairs).toHaveLength(31); expect(new Set(pairs.map(pair => pair[0])).size).toBe(12);
+  test('the independent role/task table covers all twelve roles and thirty bindings', () => {
+    expect(pairs).toHaveLength(30); expect(new Set(pairs.map(pair => pair[0])).size).toBe(12);
   });
   test.each(pairs)('%s/%s admits actual manifests and original identity using %s without exploration calls', async (role, kind, tool) => {
     const index = pairs.findIndex(pair => pair[0] === role && pair[1] === kind);

@@ -12,6 +12,8 @@ import { capabilityPolicyFrom } from '../capability/policy.js';
 import { decision, forkDecision } from './helpers/placement.js';
 import type { CapabilityRequest, CapabilityTask } from '../capability/records.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
+import { z } from 'zod';
+import { capabilityActionSchema } from '../capability/submission.js';
 
 vi.mock('node:child_process', async importOriginal => {
   const { guardedChildProcess } = await import('./helpers/process-guard.js');
@@ -329,6 +331,16 @@ for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port
         .filter(result => result.tool === 'validate_capability_action') ?? [];
       expect(preview).toHaveLength(5);
       expect(preview.every(result => result.isError)).toBe(true);
+      // Across the complete declaration set the action schema reaches the model once, in the
+      // submission declaration; the validator declares a compact object that refers to it.
+      const architect = opened.agent!.sessions.find(session => session.spec.role === 'capability-architect')!;
+      const schema = JSON.stringify(z.toJSONSchema(capabilityActionSchema));
+      const declared = [...architect.spec.tools, architect.spec.submission].map(tool => ({ name: tool.name, description: tool.description, inputSchema: JSON.stringify(tool.inputSchema) }));
+      expect(declared.map(tool => tool.name)).toEqual(expect.arrayContaining(['validate_capability_action', 'submit_capability_action']));
+      expect(declared.reduce((count, tool) => count + tool.description.split(schema).length - 1 + tool.inputSchema.split(schema).length - 1, 0)).toBe(1);
+      expect(declared.find(tool => tool.name === 'submit_capability_action')!.description).toContain(schema);
+      expect(architect.spec.tools.find(tool => tool.name === 'validate_capability_action')!.inputSchema).toEqual({
+        type: 'object', description: 'A candidate submit_capability_action input; that declaration carries the complete schema.', additionalProperties: true });
       let stopped = false;
       for (let attempt = 0; attempt < 20; attempt += 1) {
         const version = opened.service.getRun('need', receipt.jobId)!.version;
