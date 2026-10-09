@@ -55,7 +55,7 @@ export default defineConfig(async () => {
           test: {
             name: 'node',
             ...nodeDiscovery,
-            setupFiles: ['src/tests/vitest-test-lock.ts', 'src/tests/vitest-process-guard.ts'],
+            setupFiles: ['src/tests/vitest-test-lock.ts', 'src/tests/vitest-process-guard.ts', 'subs/harness/src/tests/helpers/mock-session-store.setup.ts'],
             exclude: [...nodeDiscovery.exclude, ...paths],
           },
         },

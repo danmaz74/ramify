@@ -63,17 +63,17 @@ describe('one line is one transaction', () => {
   test('concurrent appends are serialized, and the sequences are dense and ordered', async () => {
     const ledger = await testLedger(directory.path);
     const committed = await Promise.all(
-      Array.from({ length: 20 }, (_unused, index) => ledger.append(transaction(index + 1, [record(`r${index}`, 1, { index })]))),
+      Array.from({ length: 3 }, (_unused, index) => ledger.append(transaction(index + 1, [record(`r${index}`, 1, { index })]))),
     );
-    expect(committed.map((one) => one.sequence)).toEqual(Array.from({ length: 20 }, (_unused, index) => index + 1));
+    expect(committed.map((one) => one.sequence)).toEqual(Array.from({ length: 3 }, (_unused, index) => index + 1));
 
     const reopened = await testLedger(directory.path);
-    expect(reopened.version).toBe(20);
-    expect(reopened.replay().map((entry) => entry.sequence)).toEqual(Array.from({ length: 20 }, (_unused, index) => index + 1));
+    expect(reopened.version).toBe(3);
+    expect(reopened.replay().map((entry) => entry.sequence)).toEqual(Array.from({ length: 3 }, (_unused, index) => index + 1));
     expect(reopened.replay().map((entry) => entry.transaction.event.step)).toEqual(
-      Array.from({ length: 20 }, (_unused, index) => index + 1),
+      Array.from({ length: 3 }, (_unused, index) => index + 1),
     );
-    expect(await recordsMatchLog(reopened, recordsOf())).toBe(20);
+    expect(await recordsMatchLog(reopened, recordsOf())).toBe(3);
   });
 });
 

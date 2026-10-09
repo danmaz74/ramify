@@ -259,26 +259,25 @@ describe('CheckFinding lists', () => {
   test('pages are bounded, continue after their cursor in order, and a cursor that names no CheckFinding is refused', () => {
     const stream = new Stream();
     const risks = ['low', 'medium', 'high'] as const;
-    stream.record(Array.from({ length: 100 }, (_, index) => {
+    stream.record(Array.from({ length: 3 }, (_, index) => {
       const bound = concern({ key: `concern-${index}`, summary: `Concern ${index}` });
       return report({ ...bound, judgment: { ...bound.judgment!, risk: risks[index % 3]! } });
     }));
-    stream.record(Array.from({ length: 20 }, (_, index) => report(concern({ attempt: 'rq-0002.a01', key: `concern-${index}`, summary: `Late ${index}` }))), producerCause('rq-0002.a01'));
+    stream.record(Array.from({ length: 2 }, (_, index) => report(concern({ attempt: 'rq-0002.a01', key: `concern-${index}`, summary: `Late ${index}` }))), producerCause('rq-0002.a01'));
     const view = runView(constructedRun(stream.lines, reviewed));
-    const first = checkFindingListOf(view, query());
-    expect(first).toMatchObject({ total: 120, shown: 50 });
+    const first = checkFindingListOf(view, query({ limit: 2 }));
+    expect(first).toMatchObject({ total: 5, shown: 2 });
     expect(first.items[0]!.risk).toBe('high');
     const seen = [...first.items];
     let next = first.next;
     while (next !== null) {
-      const page = checkFindingListOf(view, query({ after: next, limit: 100 }));
-      expect(page.items.length).toBeLessThanOrEqual(100);
+      const page = checkFindingListOf(view, query({ after: next, limit: 2 }));
+      expect(page.items.length).toBeLessThanOrEqual(2);
       seen.push(...page.items);
       next = page.next;
     }
-    expect(seen.map(item => item.id)).toEqual(checkFindingListOf(view, query({ limit: 100 })).items.map(item => item.id).concat(
-      checkFindingListOf(view, query({ limit: 100, after: checkFindingListOf(view, query({ limit: 100 })).next })).items.map(item => item.id)));
-    expect(new Set(seen.map(item => item.id)).size).toBe(120);
+    expect(seen.map(item => item.id)).toEqual(checkFindingListOf(view, query({ limit: 5 })).items.map(item => item.id));
+    expect(new Set(seen.map(item => item.id)).size).toBe(5);
     // Within one risk level the most recent report comes first.
     const highs = seen.filter(item => item.risk === 'high').map(item => Number(item.id.slice(3)));
     expect(highs).toEqual([...highs].sort((a, b) => b - a));

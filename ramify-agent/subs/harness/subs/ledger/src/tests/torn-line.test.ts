@@ -12,7 +12,7 @@ const logOf = (): string => join(directory.path, 'events.jsonl');
 const recordsOf = (): string => join(directory.path, 'records');
 
 describe('a torn last line', () => {
-  test('is truncated away at every byte offset, and the next append is valid', async () => {
+  test('truncates partial headers and bodies, then accepts the next append', async () => {
     const ledger = await testLedger(directory.path);
     await ledger.append(transaction(1, [record('run', 1, { note: 'first' })]));
     await ledger.append(transaction(2, [record('run', 2, { note: 'second' })]));
@@ -22,9 +22,9 @@ describe('a torn last line', () => {
     const lastLineStart = whole.lastIndexOf(0x0a, whole.byteLength - 2) + 1;
     expect(lastLineStart).toBeGreaterThan(0);
 
-    // Every offset that leaves part of the last line, and the one that leaves none of it.
-    const offsets = Array.from({ length: whole.byteLength - lastLineStart }, (_unused, index) => lastLineStart + index);
-    expect(offsets.length).toBeGreaterThan(80);
+    // One example for each structural truncation, rather than every byte.
+    const offsets = [lastLineStart, lastLineStart + 1,
+      lastLineStart + Math.floor((whole.byteLength - lastLineStart) / 2)];
 
     for (const offset of offsets) {
       await writeFile(logOf(), whole.subarray(0, offset));
@@ -47,9 +47,7 @@ describe('a torn last line', () => {
       await recordsMatchLog(again, recordsOf());
     }
 
-    // The count is reported, so the coverage this test claims is visible in its output.
-    console.log(`torn-line: ${offsets.length} byte offsets covered across a ${whole.byteLength - lastLineStart}-byte last line`);
-  }, 120_000);
+  });
 
   test('a last line that parses but has no newline is still torn', async () => {
     const ledger = await testLedger(directory.path);

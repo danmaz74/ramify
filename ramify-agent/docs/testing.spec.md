@@ -1,6 +1,26 @@
 # Testing ramify-agent
 
-Ordinary tests run real services, schemas, files, ledgers and projections in
+Ordinary tests exercise real feature logic with small, meaningful examples.
+Mock long or repeated external operations, including bulk filesystem persistence,
+validation and history scans. Keep inexpensive file checks where the behavior
+needs them. Performance benchmarks, exhaustive input sweeps and arbitrary large
+case counts belong outside the ordinary suite; use a small counterexample for
+each distinct behavior. Checks at a declared maximum use only the minimum input
+needed to cross that boundary. Timing rules use controlled clocks or observable
+ordering, rather than elapsed-speed expectations.
+
+Workflow tests mock the disk-backed session store with a directory-scoped
+in-memory adapter. It preserves detached JSON values, copied payload bytes,
+atomic compare-and-swap and close/reopen state while real session operations and
+workflow logic execute. The small session-store adapter tests explicitly unmock
+their subject to verify actual bytes, corruption and recovery. Registered native
+witnesses keep their actual tool/kernel boundaries.
+
+Performance and exhaustive/scale probes use `*.stress.ts` and the separate,
+opt-in `npm run test:stress` configuration. They are absent from ordinary and
+full-audit discovery, rather than skipped cases in those runs.
+
+Ordinary tests run real services, schemas, small files, ledgers and projections in
 process. They never launch Git, Ramify, audit producers, shells or other external
 commands, including during fixture setup and teardown. Supply explicit scripted
 Git/candidate/provisional-source, command and provider answers. An unstated,
@@ -31,6 +51,7 @@ Run commands from `ramify-agent/`:
 | Command | Selection |
 | --- | --- |
 | `npm run test:quick -- <exact file filters>` | Guarded ordinary Node and web tests |
+| `npm run test:stress -- <exact file filters>` | Optional performance, scale and exhaustive probes, separate from audit discovery |
 | `npm run test:boundaries -- <exact file filters>` | Exact registered native witnesses |
 | `npm test -- <exact file filters>` | Complete configured projects, filtered for focused work |
 | `node_modules/.bin/vitest list --filesOnly --json` | Authoritative configured file discovery |

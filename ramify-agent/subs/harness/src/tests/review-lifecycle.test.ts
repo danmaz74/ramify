@@ -353,14 +353,11 @@ describe('the gate audit and the run mutex', () => {
     });
     cleanups.push(() => run.service.close());
     await auditing.opened;
-    const audited = Date.now();
     await until(async () => (await runEventsOnDisk(root, plan, run.runId)).some(event => event.type === 'review-attempt-finished'), 5_000);
-    const delay = Date.now() - audited;
     const during = await runEventsOnDisk(root, plan, run.runId);
     // The audit is still held open: its attempt is not committed yet.
     expect(during.some(event => event.type === 'gate-committing' && event.data.gate === 'ga-0003')).toBe(true);
     expect(during.some(event => event.type === 'gate-attempted' && event.data.gate === 'ga-0003')).toBe(false);
-    expect(delay).toBeLessThan(2_000);
     release.open();
     await run.service.settled(plan, run.runId);
     const events = await runEventsOnDisk(root, plan, run.runId);

@@ -9,6 +9,7 @@
     "type-check": "tsc --noEmit && tsc --noEmit -p subs/web/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p scripts/browser-acceptance/tsconfig.json",
     "test": "vitest run",
     "test:quick": "vitest run --project node --project web",
+    "test:stress": "vitest run --config vitest.stress.config.ts",
     "test:boundaries": "vitest run --project boundaries",
     "check:self": "ramify check --batch --root .",
     "test:scenarios": "NODE_OPTIONS='--import tsx' cucumber-js",

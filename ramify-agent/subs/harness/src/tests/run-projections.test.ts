@@ -16,25 +16,21 @@ import { at, constructedRun, hash, item, registered, reviews, type Line } from '
 describe('the event page', () => {
   test('at most 500 events a page, with the cursor and whether more follow', () => {
     const lines: Line[] = [{ type: 'job-started', data: {} }];
-    for (let index = 0; index < 1199; index += 1) lines.push({ type: 'hypotheses-delivered', data: { workItem: 'wi-001', refs: [] } });
+    for (let index = 0; index < runQueryLimits.events; index += 1) lines.push({ type: 'hypotheses-delivered', data: { workItem: 'wi-001', refs: [] } });
     const view = runView(constructedRun(lines));
 
     const first = runEventPageSchema.parse(eventPage(view, 0));
     expect(first.events).toHaveLength(runQueryLimits.events);
     expect(first.events[0]!.sequence).toBe(1);
     expect(first).toMatchObject({ cursor: 500, more: true });
-    expect(first.run.version).toBe(1200);
+    expect(first.run.version).toBe(runQueryLimits.events + 1);
 
     const second = eventPage(view, first.cursor);
-    expect(second.events.map(event => event.sequence)).toEqual(Array.from({ length: 500 }, (_, index) => 501 + index));
-    expect(second).toMatchObject({ cursor: 1000, more: true });
-
-    const last = eventPage(view, second.cursor);
-    expect(last.events).toHaveLength(200);
-    expect(last).toMatchObject({ cursor: 1200, more: false });
+    expect(second.events.map(event => event.sequence)).toEqual([runQueryLimits.events + 1]);
+    expect(second).toMatchObject({ cursor: 501, more: false });
 
     // Past the end the cursor stays where it was asked, as Plan 1's did.
-    expect(eventPage(view, 1200)).toMatchObject({ events: [], cursor: 1200, more: false });
+    expect(eventPage(view, 501)).toMatchObject({ events: [], cursor: 501, more: false });
     expect(eventPage(view, 5000)).toMatchObject({ events: [], cursor: 5000, more: false });
   });
 });

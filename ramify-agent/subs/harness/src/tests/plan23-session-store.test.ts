@@ -1,7 +1,8 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+vi.unmock('../run/session-store.js');
 import { openSessionStore, type LedgerSessionStore } from '../run/session-store.js';
 import { HarnessSessionOperations, readSessionPointReference, type HarnessOperationInput } from '../run/session-operations.js';
 import { createSessionOperations } from '../../subs/agent/src/session-operations.js';

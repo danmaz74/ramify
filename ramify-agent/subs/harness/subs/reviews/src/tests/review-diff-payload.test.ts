@@ -66,7 +66,7 @@ describe('precollected candidate review diffs', () => {
   it('stops acquiring patches once the budget is crossed while retaining later names and denials', async () => {
     const changes = [
       { status: 'M', path: 'src/a.ts' }, { status: 'M', path: 'src/b.ts' },
-      ...Array.from({ length: 100 }, (_, index) => ({ status: 'M', path: `src/later-${index}.ts` })),
+      { status: 'M', path: 'src/later.ts' },
       { status: 'D', path: '.ramify-architect/a.json' },
     ];
     const script = replies([{ path: 'src/a.ts', text: 'aaaa' }, { path: 'src/b.ts', text: 'bbbb' }]);
@@ -76,7 +76,7 @@ describe('precollected candidate review diffs', () => {
     expect(result.bytes).toBe(8);
     expect(result.text).toContain('Collected patches exceed the 6-byte inline budget');
     expect(result.text).toContain('may be less than the full diff size');
-    expect(result.text).toContain('src/later-99.ts');
+    expect(result.text).toContain('src/later.ts');
     expect(result.text).toContain('generated view');
     expect(result.text).toContain('snapshot_diff and a path');
     script.assertComplete();

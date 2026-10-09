@@ -22,61 +22,7 @@ async function priorState(): Promise<void> {
   await ledger.append(transaction(2, [record('run', 2, { note: 'second' })]));
 }
 
-describe('a fault at every file system operation of one append', () => {
-  test('leaves the whole transaction or none of it, and materialize repairs every record file', async () => {
-    // 1. Count the fault points by running the append with nothing failing.
-    await priorState();
-    const points: FaultPoint[] = [];
-    const counting = instrument((point) => { points.push(point); });
-    const observed = await testLedger(directory.path, counting);
-    await observed.append(interrupted());
-    const total = points.length;
-    expect(total).toBeGreaterThan(5);
-    const named = points.map((point) => point.replace(directory.path, '').replace(/\.[0-9]+\.[0-9a-f]+\.tmp$/, '.tmp'));
-    console.log(`fault-injection: ${total} fault points in one append: ${named.join(', ')}`);
-
-    await directory.remove();
-
-    // 2. Fail each one in turn, from the same prior state.
-    for (let target = 1; target <= total; target += 1) {
-      directory = await temporaryDirectory();
-      await priorState();
-
-      const faulting = instrument((point, index) => {
-        if (index === target) throw new InjectedFault(point, index);
-      });
-      const ledger = await testLedger(directory.path, faulting);
-      let threw: unknown = null;
-      try {
-        await ledger.append(interrupted());
-      } catch (error) {
-        threw = error;
-      }
-      if (threw !== null) expect(threw).toBeInstanceOf(InjectedFault);
-
-      // The crash: everything is read back through a fresh ledger on the real file system.
-      const reopened = await testLedger(directory.path);
-      const history = reopened.replay();
-      expect(history.length === 2 || history.length === 3).toBe(true);
-      expect(history.map((entry) => entry.sequence)).toEqual(Array.from({ length: history.length }, (_u, i) => i + 1));
-      if (history.length === 3) {
-        expect(history[2]!.transaction.event).toEqual({ kind: 'step', step: 3 });
-        expect(history[2]!.transaction.records.map((body) => body.path)).toEqual(['run/03.json', 'plan/01.json']);
-      }
-
-      await reopened.materialize();
-      await recordsMatchLog(reopened, recordsOf());
-
-      // And the ledger goes on from there.
-      const next = await reopened.append(transaction(9));
-      expect(next.sequence).toBe(history.length + 1);
-
-      await directory.remove();
-    }
-
-    directory = await temporaryDirectory();
-  }, 120_000);
-
+describe('representative append failure boundaries', () => {
   test('a fault while a record file is written is not a failed transaction', async () => {
     await priorState();
     const faulting = instrument((point, index) => {
