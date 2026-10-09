@@ -72,6 +72,8 @@ export function readPiNativeRequestArtifact(bytes: Uint8Array): PiNativeRequestA
 }
 export interface PreservedPiTranscript {
   readonly schema: 'ramify.pi-transcript/1'; readonly packageVersion: '0.87.1'; readonly transport: 'sse'; readonly model: string;
+  /** Shared provider routing identity; absent only in transcripts written before its adoption. */
+  readonly providerSessionId?: string;
   readonly messages: readonly PiTranscriptMessage[]; readonly appliedAgentKeys: readonly string[];
   readonly declarations: readonly PiTranscriptTool[]; readonly additionKeys: readonly string[]; readonly activeTools: readonly string[];
   readonly native: NativePrefix; readonly sequence: number; readonly preparedOperationId: string;
@@ -163,6 +165,6 @@ export function validateNativeRequest(payload: unknown, expected: NativePrefix, 
 }
 export function decodePreservedTranscript(bytes: Uint8Array): PreservedPiTranscript {
   const value = JSON.parse(new TextDecoder().decode(bytes)) as PreservedPiTranscript;
-  if (value.schema !== 'ramify.pi-transcript/1' || value.packageVersion !== '0.87.1' || value.transport !== 'sse' || !Array.isArray(value.messages) || !Array.isArray(value.appliedAgentKeys) || !Array.isArray(value.declarations) || !value.native || !Array.isArray(value.native.input)) throw new Error('Unsupported or corrupt opaque pi transcript');
+  if (value.schema !== 'ramify.pi-transcript/1' || value.packageVersion !== '0.87.1' || value.transport !== 'sse' || !Array.isArray(value.messages) || !Array.isArray(value.appliedAgentKeys) || !Array.isArray(value.declarations) || !value.native || !Array.isArray(value.native.input) || (value.providerSessionId !== undefined && (typeof value.providerSessionId !== 'string' || value.providerSessionId.trim().length === 0))) throw new Error('Unsupported or corrupt opaque pi transcript');
   return value;
 }

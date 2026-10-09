@@ -26,7 +26,7 @@ const schema = { type: 'object', properties: { summary: { type: 'string' } }, re
 const tool = (name: string) => ({ name, description: `Submit using ${name}.`, inputSchema: schema, mutating: false });
 const call = (name: string, summary: string, id: string) => ({ type: 'function_call', id: `fc_${id}`, call_id: `call_${id}`, name, arguments: JSON.stringify({ summary }) });
 const task = (cwd: string, operation: string, submissionTool = 'submit_initial'): SessionTaskInput => ({ role: operation, message: `Native current ${operation}.`, submissionTool, environment: { workingDirectory: cwd, candidate: null, snapshot: null, limits: {} }, policyIdentity: 'native-p/1', validatorIdentity: `native-v:${operation}`, destinationIdentity: `native-d:${operation}` });
-interface Wire { body: Record<string, unknown>; bytes: Uint8Array }
+interface Wire { body: Record<string, unknown>; bytes: Uint8Array; sessionId: string | string[] | undefined; clientRequestId: string | string[] | undefined }
 async function nativeRuntime(directory: string, endpoint: string) {
   await mkdir(directory, { recursive: true });
   const runtime = await ModelRuntime.create({ authPath: join(directory, 'auth.json'), modelsPath: null, modelsStorePath: join(directory, 'models-store.json'), allowModelNetwork: false, refreshOnCreate: false });
@@ -36,7 +36,7 @@ async function nativeRuntime(directory: string, endpoint: string) {
   const token = `fixture.${Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'native-fixture' } })).toString('base64')}.fixture`;
   const stream: Stream = (selected, context, options) => api.streamSimple(selected, context, { ...options, transport: 'sse', maxRetries: 0,
     // The actual installed serializer and parser execute; only URL is redirected to a real local kernel HTTP server.
-    fetch: (_url: unknown, init?: RequestInit) => globalThis.fetch(endpoint, { ...init, headers: { 'content-type': 'application/json', ...(new Headers(init?.headers).get('content-encoding') ? { 'content-encoding': new Headers(init?.headers).get('content-encoding')! } : {}) } }),
+    fetch: (_url: unknown, init?: RequestInit) => globalThis.fetch(endpoint, { ...init, headers: { 'content-type': 'application/json', ...Object.fromEntries(['session-id', 'x-client-request-id'].map(name => [name, new Headers(init?.headers).get(name)!])), ...(new Headers(init?.headers).get('content-encoding') ? { 'content-encoding': new Headers(init?.headers).get('content-encoding')! } : {}) } }),
   } as Parameters<Stream>[2]);
   runtime.registerNativeProvider({ id: 'openai-codex', name: 'Kernel HTTP fixture', auth: { apiKey: { name: 'Fixture', resolve: async () => ({ auth: { apiKey: token } }) } }, getModels: () => [model], stream, streamSimple: stream } as Provider);
   return { runtime, model };
@@ -46,7 +46,7 @@ async function fixture() {
   const outputs: Record<string, unknown>[][] = []; const wire: Wire[] = []; let unexpected = false;
   const server = createServer(async (request, response) => {
     try {
-      const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk)); const original = Buffer.concat(chunks); const bytes = request.headers['content-encoding'] === 'zstd' ? zstdDecompressSync(original) : original; wire.push({ body: JSON.parse(bytes.toString('utf8')), bytes });
+      const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk)); const original = Buffer.concat(chunks); const bytes = request.headers['content-encoding'] === 'zstd' ? zstdDecompressSync(original) : original; wire.push({ body: JSON.parse(bytes.toString('utf8')), bytes, sessionId: request.headers['session-id'], clientRequestId: request.headers['x-client-request-id'] });
       const output = outputs.shift(); if (!output) { unexpected = true; response.writeHead(500); response.end('Unexpected request'); return; }
       const event = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`; let text = event({ type: 'response.created', response: { id: `resp_${wire.length}` } });
       output.forEach((item, output_index) => { text += event({ type: 'response.output_item.added', output_index, item }); text += event({ type: 'response.output_item.done', output_index, item }); });
@@ -82,7 +82,8 @@ it('installed Pi sends the exact final native request to an actual HTTP SSE endp
   const f = await fixture(); f.outputs.push([call('submit_initial', 'INITIAL', 'initial')]); const first = await f.execute(f.created.point!, 'first'); expect(first.receipt.status).toBe('completed'); expect(f.wire).toHaveLength(1);
   const snapshot = (await f.operations.inspect('native', first.receipt.sessionId, first.receipt.point!))!;
   const request = snapshot.transcript.find(entry => entry.kind === 'provider' && entry.key.includes(':pi-request:'))!; const original = (await f.store.getPayload(request.payloadId))!; const artifact = readPiNativeRequestArtifact(original)!;
-  expect(JSON.stringify(artifact.request)).toBe(Buffer.from(f.wire[0]!.bytes).toString('utf8')); expect(artifact.request).toEqual(f.wire[0]!.body); await assertCompleteSource(await f.state(snapshot), f.native.model); expect(f.judged).toEqual([{ summary: 'INITIAL' }]); f.verify();
+  expect(JSON.stringify(artifact.request)).toBe(Buffer.from(f.wire[0]!.bytes).toString('utf8')); expect(artifact.request).toEqual(f.wire[0]!.body); await assertCompleteSource(await f.state(snapshot), f.native.model); expect(f.judged).toEqual([{ summary: 'INITIAL' }]);
+  expect(f.wire[0]).toMatchObject({ sessionId: f.created.sessionId, clientRequestId: f.created.sessionId, body: { prompt_cache_key: f.created.sessionId } }); f.verify();
 }, 30_000);
 it(restoreTitle, async () => {
   if (process.env['PLAN23_NATIVE_RESTORE_INPUT']) {
@@ -107,7 +108,10 @@ it(restoreTitle, async () => {
   // An actual inactive historical call is attempted under new executable bindings; no validator/publication effect may result.
   const inactive = await f.operations.fork({ runId: 'native', operationId: 'fork-inactive', sourcePoint: t1 }); const acceptedBefore = f.judged.length; const publishedBefore = f.published.length; f.outputs.push([call('submit_initial', 'INACTIVE', 'inactive')], [call('submit_later', 'FRESH ONLY', 'fresh-only')]); const refused = await f.execute(inactive.point!, 'inactive', true); expect(refused.receipt.status).toBe('completed'); expect(f.judged.slice(acceptedBefore)).toEqual([{ summary: 'FRESH ONLY' }]); expect(f.published).toHaveLength(publishedBefore + 1); expect(f.events).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'tool-finished', tool: 'submit_initial', isError: true, reachedTool: false })]));
   await f.store.close(); const input = join(f.directory, 'child-input.json'); await writeFile(input, JSON.stringify({ directory: f.directory, endpoint: f.endpoint, sourcePoint: r.receipt.point, task: r.current, receipt: r.receipt, parentPid: process.pid })); f.outputs.push([call('submit_later', 'RESTORED', 'restored')]);
-  const countBeforeChild = f.wire.length; const child = await promisify(execFile)(process.execPath, [join(root, 'node_modules/vitest/vitest.mjs'), 'run', '--project', 'boundaries', ownFile, '-t', restoreTitle, '--maxWorkers', '1'], { cwd: root, env: { ...process.env, PLAN23_NATIVE_RESTORE_INPUT: input }, timeout: 60_000, maxBuffer: 1024 * 1024 }); expect(child.stdout).toContain('1 passed'); const result = JSON.parse(await readFile(join(f.directory, 'child-result.json'), 'utf8')); expect(result.pid).not.toBe(process.pid); expect(f.wire).toHaveLength(countBeforeChild + 1); expect((f.wire.at(-1)!.body['input'] as unknown[]).slice(0, complete.native.input.length)).toEqual(complete.native.input); expect(JSON.stringify(f.wire.at(-1)!.body)).not.toContain('Native C parent only'); f.verify();
+  const countBeforeChild = f.wire.length; const child = await promisify(execFile)(process.execPath, [join(root, 'node_modules/vitest/vitest.mjs'), 'run', '--project', 'boundaries', ownFile, '-t', restoreTitle, '--maxWorkers', '1'], { cwd: root, env: { ...process.env, PLAN23_NATIVE_RESTORE_INPUT: input }, timeout: 60_000, maxBuffer: 1024 * 1024 }); expect(child.stdout).toContain('1 passed'); const result = JSON.parse(await readFile(join(f.directory, 'child-result.json'), 'utf8')); expect(result.pid).not.toBe(process.pid); expect(f.wire).toHaveLength(countBeforeChild + 1); expect((f.wire.at(-1)!.body['input'] as unknown[]).slice(0, complete.native.input.length)).toEqual(complete.native.input); expect(JSON.stringify(f.wire.at(-1)!.body)).not.toContain('Native C parent only');
+  expect(new Set([f.created.sessionId, left.sessionId, right.sessionId, inactive.sessionId]).size).toBe(4);
+  expect(sourceState.providerSessionId).toBe(f.created.sessionId); expect(complete.providerSessionId).toBe(f.created.sessionId);
+  for (const request of f.wire) expect(request).toMatchObject({ sessionId: f.created.sessionId, clientRequestId: f.created.sessionId, body: { prompt_cache_key: f.created.sessionId } }); f.verify();
 }, 90_000);
 it('installed Pi final liveness fence prevents HTTP dispatch and late accepted submission after Stop', async () => {
   const f = await fixture(); let enter!: () => void; let release!: () => void; const entered = new Promise<void>(resolve => { enter = resolve; }); const held = new Promise<void>(resolve => { release = resolve; });

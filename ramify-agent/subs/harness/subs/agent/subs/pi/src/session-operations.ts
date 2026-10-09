@@ -56,7 +56,7 @@ function enrichBindings(bindings: SessionExecutionBindings, declarations: readon
 }
 export function createPiSessionOperations(source: PiRuntimeSource, sessionStore: SessionStore): SessionOperations {
   const operations = createSessionOperations({ sessionStore, driver: { async dispatch(input, runtime) {
-    try { return await dispatchPreservingPi(source, input, runtime); }
+    try { return await dispatchPreservingPi(source, input, runtime, operations); }
     catch (error) { if (runtime.signal.aborted) return { kind: 'stopped' }; throw error; }
   } } });
   async function availability(runId: string, operationId: string, sessionId: string): Promise<SessionOperationHandle | null> {
@@ -90,7 +90,7 @@ export function createPiSessionOperations(source: PiRuntimeSource, sessionStore:
   };
 }
 
-async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDriverInvocation, runtime: SessionDriverRuntime): Promise<SessionOutcome> {
+async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDriverInvocation, runtime: SessionDriverRuntime, operations: SessionOperations): Promise<SessionOutcome> {
   const modelRuntime = await source.runtime(); const chosen = await chooseModel(modelRuntime, source.model);
   const unsupported = supportedPreservingModel(chosen.model); if (unsupported) throw new Error(unsupported);
   let state: PreservedPiTranscript | null = null;
@@ -101,6 +101,16 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
   }
   const modelIdentity = `${chosen.model.provider}/${chosen.model.id}`;
   if (state && state.model !== modelIdentity) throw new SessionDriverUnavailableError('Preserved pi model identity differs');
+  // Forks copy the original creation entry, even before the first provider
+  // request. Its durable operation identity also upgrades older transcripts
+  // without walking mutable parent sessions or changing logical session IDs.
+  let providerSessionId = state?.providerSessionId;
+  if (providerSessionId === undefined) {
+    const creation = input.session.transcript.find(entry => entry.kind === 'agent' && entry.key.startsWith('create:'));
+    const origin = creation && await operations.operationIdentity(input.key.runId, creation.key.slice('create:'.length));
+    if (!origin) throw new Error('Original pi session creation identity unavailable');
+    providerSessionId = origin.sessionId;
+  }
   let messages: PiTranscriptMessage[] = state ? copy([...state.messages]) : [];
   let declarations: PiTranscriptTool[] = state ? copy([...state.declarations]) : [];
   const applied = new Set(state?.appliedAgentKeys ?? []);
@@ -170,7 +180,7 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
     const unfinished = persistedMessages.some(message => message.role === 'assistant' && message.content.some(block => block.type === 'toolCall' && !persistedMessages.some(result => result.role === 'toolResult' && result.toolCallId === block.id)));
     if (!unfinished) completeNative = native;
     if (!completeNative) throw new SessionDriverUnavailableError('Opaque transcript has no complete native prefix');
-    const next: PreservedPiTranscript = { schema: 'ramify.pi-transcript/1', packageVersion: '0.87.1', transport: 'sse', model: modelIdentity, messages: persistedMessages, appliedAgentKeys: [...applied], declarations: copy(declarations), additionKeys: [...additions], activeTools: [...activeTools], native: completeNative, sequence: ++sequence, preparedOperationId: input.key.operationId };
+    const next: PreservedPiTranscript = { schema: 'ramify.pi-transcript/1', packageVersion: '0.87.1', transport: 'sse', model: modelIdentity, providerSessionId, messages: persistedMessages, appliedAgentKeys: [...applied], declarations: copy(declarations), additionKeys: [...additions], activeTools: [...activeTools], native: completeNative, sequence: ++sequence, preparedOperationId: input.key.operationId };
     await runtime.persistPayload(`${input.key.operationId}:pi-state:${sequence}`, new TextEncoder().encode(JSON.stringify(next)));
     state = next;
     });
@@ -250,12 +260,15 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
     // Cached WebSocket transport rewrites input after onPayload. Only the
     // qualified full-payload SSE transport may cross this final fence. The
     // artifact records the options object handed over, not a restatement.
-    const forced = { ...options, transport: 'sse' as const, maxRetries: 0 };
+    // Pi derives both session headers and prompt_cache_key from this option.
+    // Keep session.agent.sessionId independent for SDK branch bookkeeping.
+    const forced = { ...options, sessionId: providerSessionId, transport: 'sse' as const, maxRetries: 0 };
     return stream(model, context, { ...forced, onPayload: async (payload, requestModel) => {
       try {
         const transformed = await transform?.(payload, requestModel); const body = transformed ?? payload;
         if (fatal) throw new Error(fatal);
         if ((body as Record<string, unknown>)['model'] !== chosen.model.id) throw new Error('Final native request changed model identity');
+        if ((body as Record<string, unknown>)['prompt_cache_key'] !== providerSessionId) throw new Error('Final native request changed provider session identity');
         const actual = validateNativeRequest(body, expected, inherited);
         const artifact = nativeRequestArtifact(forced, await installedPiPackageVersion(), modelIdentity, actual, body);
         await runtime.persistPayload(`${input.key.operationId}:pi-request:${sequence}:${++requestCount}`, new TextEncoder().encode(JSON.stringify(artifact)));
