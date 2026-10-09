@@ -105,6 +105,19 @@ describe('Plan 23 installed pi native prefix preservation', () => {
     expect(f.native.transports).toEqual(['sse', 'sse', 'sse', 'sse']);
     f.native.verify();
   });
+  it('a submission declaration that already states its schema is serialized without a second, empty schema statement', async () => {
+    const stated: SessionToolDeclaration = { name: 'submit_orientation', description: `Submit this task using exactly this JSON schema: ${JSON.stringify(schema)}`, inputSchema: { type: 'object' }, mutating: false };
+    const f = await fixture([[call('submit_orientation', { orientation: 'A' }, 'orient')]], [read, stated]);
+    const T1 = await (await f.operations.continue(f.next(f.P.sessionId, f.P.point!, 'orient'))).receipt;
+    expect(T1).toMatchObject({ status: 'completed', turn: 1, outcome: { kind: 'submitted', input: { orientation: 'A' } } });
+    expect(f.accepted()).toBe(1);
+    expect(prefix(f.native, 0).tools).toEqual([
+      { type: 'function', name: 'read', description: 'Read fixture.', parameters: read.inputSchema, strict: null },
+      { type: 'function', name: 'submit_orientation', description: stated.description, parameters: { type: 'object', properties: {} }, strict: null },
+    ]);
+    expect(JSON.stringify(prefix(f.native, 0).tools)).not.toContain('The input must satisfy this JSON Schema');
+    f.native.verify();
+  });
   it('S07/S10/S11 forks exact T1/C1 prefixes, appends native tools and later role instructions once, and isolates the parent', async () => {
     const f = await fixture([[call('submit_orientation', { orientation: 'A' }, 'orient')], [text('Left.')], [text('Right.')], [text('Parent.')]]);
     const T1 = await (await f.operations.continue(f.next(f.P.sessionId, f.P.point!, 'orient'))).receipt;

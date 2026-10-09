@@ -210,6 +210,16 @@ describe('CF02, CF03 and CF12: one routine assessment', () => {
     expect(fork!.spec.submission.name).toBe('submit_reconciliation');
     expect(fork!.spec.prompt).toContain('This is the first round: a correction may be planned for any signal.');
     expect(fork!.spec.prompt).toContain('Risk: high; credibility: ungrounded');
+    // The fork keeps the architect's working directory, the module's `src/`: its task environment names it.
+    const parentTurn = agent!.sessions.find(session => session.spec.role === 'local-architect' && session.spec.submission.name !== 'submit_reconciliation')!;
+    const moduleSource = join(root, notesDirectory, 'src');
+    expect(parentTurn.spec.scope.workingDirectory).toBe(moduleSource);
+    expect(fork!.spec.scope.workingDirectory).toBe(moduleSource);
+    expect(fork!.spec.prompt).toContain(`"workingDirectory": ${JSON.stringify(moduleSource)}`);
+    // Its support paths are the delivered sources, not the package inventory.
+    expect(fork!.spec.prompt).toContain('subs/harness/src/prompts/reconciliation.procedure.md');
+    expect(fork!.spec.prompt).not.toContain('.schema.json');
+    expect(fork!.spec.prompt).not.toContain('orientation.procedure.md');
     const opened = eventsOf(events, 'session-opened').find(event => event.data.fork?.reason === 'reconciliation')!;
     expect(opened.data.fork).toEqual({ from: { session: completion.data.architectRef!.session, invocation: completion.data.invocation }, reason: 'reconciliation', briefs: [] });
 

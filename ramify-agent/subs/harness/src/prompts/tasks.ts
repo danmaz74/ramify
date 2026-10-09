@@ -1,4 +1,4 @@
-import type { LoadedPackage, ExtractionTurn } from './packages.js';
+import type { LoadedPackage, ExtractionTurn, PackageFile } from './packages.js';
 import type { ReviewKind } from '../run/records.js';
 import { z } from 'zod';
 import { qualificationActionSchema } from '../capability/submission.js';
@@ -17,7 +17,7 @@ import { coordinatorActionJsonSchema, coordinatorActionToolName, coordinatorAsse
 import { buildDeliveredManifest, type DeliveredInput, type DeliveredManifest } from './delivered-manifest.js';
 import { taskBriefingRevision, type BriefingDelivery } from './briefings.js';
 
-export type TaskKind = 'initial-analysis' | ExtractionTurn | 'placement' | 'orientation' | 'assignment' | 'completion' | 'repair' | 'qualification'
+export type TaskKind = 'initial-analysis' | ExtractionTurn | 'placement' | 'orientation' | 'assignment' | 'completion' | 'repair'
   | 'selection' | 'reselection' | 'capability' | 'engineering' | 'contract' | 'reconciliation' | ReviewKind | 'design-orientation'
   | 'failure-analysis' | 'assessment' | 'action' | 'investigation' | 'standalone-command' | 'capability-qualification' | 'consultation';
 
@@ -33,14 +33,22 @@ export interface TaskEnvironment {
   readonly cucumberConfiguration: string | null;
 }
 
-/** Required slots are declared, not inferred from arbitrary JSON/code braces. */
-export function renderRequiredSlots(template: string, values: Readonly<Record<string, string>>, required: readonly string[]): string {
-  for (const name of ['procedure', 'submissionTool']) {
+/**
+ * A single-brace misspelling of a declared placeholder name would render
+ * literally, so every declared name is refused in that form. Only declared
+ * names are checked: literal JSON or code braces are not placeholders.
+ */
+export function rejectSingleBracePlaceholders(template: string, names: Iterable<string>): void {
+  for (const name of new Set(names)) {
     if (new RegExp(`(?<!\\{)\\{${name}\\}(?!\\})`).test(template)) throw new Error(`Malformed required placeholder {${name}}`);
   }
+}
+
+/** Required slots are declared, not inferred from arbitrary JSON/code braces. */
+export function renderRequiredSlots(template: string, values: Readonly<Record<string, string>>, required: readonly string[]): string {
+  rejectSingleBracePlaceholders(template, ['procedure', 'submissionTool', ...Object.keys(values), ...required]);
   for (const name of required) {
     if (!(name in values) || !values[name]?.trim()) throw new Error(`Missing required prompt input ${name}`);
-    if (new RegExp(`(?<!\\{)\\{${name}\\}(?!\\})`).test(template)) throw new Error(`Malformed required placeholder {${name}}`);
   }
   for (const match of template.matchAll(/\{\{(\w+)\}\}/g)) if (!(match[1]! in values)) throw new Error(`Unresolved required placeholder {{${match[1]}}}`);
   return template.replace(/\{\{(\w+)\}\}/g, (_, name: string) => values[name]!);
@@ -48,6 +56,30 @@ export function renderRequiredSlots(template: string, values: Readonly<Record<st
 
 export function stableRoleInstructions(loaded: LoadedPackage): string {
   return renderRequiredSlots(loaded.system, { skill: loaded.skill, skillDirectory: loaded.skillDirectory, contractSkill: loaded.extraSkill }, []);
+}
+
+/** The role's delivered sources: its system file and the skills its slots embed. Other package files are not delivered. */
+function roleSources(loaded: LoadedPackage): PackageFile[] {
+  const system = loaded.files.find(file => file.kind === 'system');
+  return loaded.files.filter(file =>
+    file.kind === 'system' && file.path === system?.path ||
+    file.kind === 'skill' && (loaded.embeddedSkillPaths ?? []).includes(file.path));
+}
+
+/** The current procedure's delivered sources: its own file and the section files it embeds. */
+function procedureSources(loaded: LoadedPackage, task: { readonly source: string | null; readonly embedded: readonly string[] }): PackageFile[] {
+  return loaded.files.filter(file => file.path === task.source || task.embedded.includes(file.path));
+}
+
+/**
+ * The package paths a task actually delivers to the model: the role's
+ * sources and the current procedure's, including embedded sections. The
+ * package's synthetic schema files and the procedures other tasks use are
+ * not delivered and are not named.
+ */
+export function deliveredSupportPaths(loaded: LoadedPackage, kind: TaskKind, consultationSubmissionSchema?: string): string[] {
+  const task = taskDefinition(loaded, kind, consultationSubmissionSchema);
+  return [...new Set([...roleSources(loaded), ...procedureSources(loaded, task)].map(file => file.path))];
 }
 
 export interface TaskPacket {
@@ -109,14 +141,12 @@ export function buildTaskPacket(input: {
   const additions: DeliveredInput[] = [
     ...(input.supplyRoleInstructions ? [{ key: `role:${loaded.role}`, kind: 'role-instructions' as const, text: roleInstructions,
       source: loaded.files.find(file => file.kind === 'system')?.path ?? null, revision: loaded.package,
-      sources: loaded.files.filter(file =>
-        file.kind === 'system' && file.path === loaded.files.find(entry => entry.kind === 'system')?.path ||
-        file.kind === 'skill' && (loaded.embeddedSkillPaths ?? []).includes(file.path)) }] : []),
+      sources: roleSources(loaded) }] : []),
     ...(!input.inherited.some(item => item.kind === 'tool-declaration' && item.key === `tool:${task.tool}` && item.text === JSON.stringify(declaration)) ? [{ key: `tool:${task.tool}`, kind: 'tool-declaration' as const, text: JSON.stringify(declaration), source: null, revision: null }] : []),
     { key: 'briefing-state', kind: 'task', text: revisionText, source: null, revision: input.briefing.revision },
     ...input.briefing.additions,
     { key: `procedure:${input.kind}`, kind: 'procedure', text: procedureText, source: task.source, revision: loaded.package,
-      sources: loaded.files.filter(file => file.path === task.source) },
+      sources: procedureSources(loaded, task) },
     { key: 'environment', kind: 'environment', text: envText, source: null, revision: null },
     { key: 'task', kind: 'task', text: taskText, source: null, revision: input.briefing.revision },
   ];
@@ -125,7 +155,7 @@ export function buildTaskPacket(input: {
     manifest: buildDeliveredManifest({ inheritedPoint: input.inheritedPoint, inherited: input.inherited, appended: additions, currentMessage: message }) };
 }
 
-function taskDefinition(loaded: LoadedPackage, kind: TaskKind, consultationSubmissionSchema?: string): { tool: string; schema: string; procedure: string; source: string | null } {
+function taskDefinition(loaded: LoadedPackage, kind: TaskKind, consultationSubmissionSchema?: string): { tool: string; schema: string; procedure: string; source: string | null; embedded: readonly string[] } {
   let tool: string | undefined;
   let schema = loaded.submissionSchema;
   let procedure = loaded.procedure;
@@ -141,14 +171,14 @@ function taskDefinition(loaded: LoadedPackage, kind: TaskKind, consultationSubmi
     source = `subs/harness/src/analysis/${turn}.procedure.md`;
   }
   if (role === 'global-fork' && kind === 'placement') tool = forkToolName;
-  if (role === 'local-architect' && ['assignment', 'completion', 'repair', 'qualification'].includes(kind)) tool = localArchitectToolName;
+  if (role === 'local-architect' && ['assignment', 'completion', 'repair'].includes(kind)) tool = localArchitectToolName;
   if (role === 'local-architect' && kind === 'orientation') {
     if (!loaded.workOrientation) throw new Error('Missing work orientation procedure');
     tool = workOrientationToolName; schema = loaded.workOrientation.submissionSchema; procedure = loaded.workOrientation.procedure;
     source = 'subs/harness/src/context-selection/orientation.procedure.md';
   }
   if (role === 'context-selector' && ['selection', 'reselection'].includes(kind)) tool = contextSelectorToolName;
-  if (role === 'engineer' && ['engineering', 'repair', 'qualification', 'standalone-command'].includes(kind)) tool = engineerToolName;
+  if (role === 'engineer' && ['engineering', 'repair', 'standalone-command'].includes(kind)) tool = engineerToolName;
   if (role === 'engineer' && kind === 'consultation') {
     if (!consultationSubmissionSchema?.trim()) throw new Error('Consultation requires the actual caller-owned submission schema');
     const supplied: unknown = JSON.parse(consultationSubmissionSchema);
@@ -192,5 +222,7 @@ function taskDefinition(loaded: LoadedPackage, kind: TaskKind, consultationSubmi
   }
   if (role === 'nonfunctional-repair-engineer' && kind === 'repair') tool = nonfunctionalRepairToolName;
   if (!tool) throw new Error(`Unsupported role/task pair ${role}/${kind}`);
-  return { tool, schema, procedure, source };
+  // Only the package's main procedure has its section files filled in; a replaced procedure embeds none.
+  const embedded = procedure === loaded.procedure ? loaded.embeddedProcedurePaths ?? [] : [];
+  return { tool, schema, procedure, source, embedded };
 }

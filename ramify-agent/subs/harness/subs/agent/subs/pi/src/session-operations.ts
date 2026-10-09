@@ -102,8 +102,15 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
   let sequence = state?.sequence ?? 0;
   const inherited = state?.native ?? null;
   let completeNative = inherited;
+  // A submission whose description already states its schema, or whose input schema is a bare object
+  // with nothing to state, gets no second schema statement; the harness validates the input either way.
+  const statesOwnSchema = (definition: SessionToolDeclaration): boolean => {
+    const schema = definition.inputSchema;
+    const bare = schema['type'] === 'object' && Object.keys(schema).every(key => key === 'type' || key === 'description');
+    return bare || definition.description.includes(JSON.stringify(schema));
+  };
   const declarationFor = (definition: SessionToolDeclaration): PiTranscriptTool => definition.name === input.task.submissionTool
-    ? { name: definition.name, description: `${definition.description}\n\nThe input must satisfy this JSON Schema; the harness validates it and returns every error:\n${JSON.stringify(definition.inputSchema)}`, parameters: permissiveSchema(definition.inputSchema) }
+    ? { name: definition.name, description: statesOwnSchema(definition) ? definition.description : `${definition.description}\n\nThe input must satisfy this JSON Schema; the harness validates it and returns every error:\n${JSON.stringify(definition.inputSchema)}`, parameters: permissiveSchema(definition.inputSchema) }
     : { name: definition.name, description: definition.description, parameters: copy(definition.inputSchema) };
   function addTools(definitions: readonly SessionToolDeclaration[]): PiTranscriptTool[] {
     const fresh: PiTranscriptTool[] = [];

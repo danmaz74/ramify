@@ -37,8 +37,8 @@ format.
   are refused: the gate's audit runs them. Name test files for a focused run. A command
   still running at its timeout is killed. You receive the end of its output
   and the file holding all of it.
-  A `cd` affects only that command. Run a project-level package command with an explicit
-  `cd 'the current project root named in the task' && <command>` when needed.
+  A `cd` affects only that command. When a project-level package command is needed,
+  change to the project root named in the current task's environment within that same command.
   Nothing checks a command before it runs: what it writes is recorded
   afterwards and reported, not refused. Keep it inside your scope, and change
   the files you are working on with `edit` and `write`.

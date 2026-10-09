@@ -50,8 +50,9 @@ never treat their paths as source imports. Missing evidence or incomplete
 coverage cannot establish that an interface does not exist.
 
 If local evidence leaves an ownership, placement or dependency question,
-search `the current project root named in the task/.ramify-architect/` for that question. This global
-view remains available without requiring an initial survey of the project.
+search the `.ramify-architect/` directory beneath the project root named in the
+current task for that question. This global view remains available without
+requiring an initial survey of the project.
 Read foreign source when a specific question still needs it.
 
 Whether your module may import a symbol is answered by your API view. The
