@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "proposed; implementation not started",
+  "status": "implementation in progress",
   "execution": "serial in dependency order",
   "incorporates": "../../26-instruction-block-delivery/main-plan.md",
   "iterations": [
@@ -16,7 +16,9 @@
         "D04",
         "D05"
       ],
-      "status": "planned",
+      "status": "implemented; focused checks passed",
+      "sourceCommit": "5306bf94b49846b38d99817d05236a46568902e0",
+      "results": "00-results.md",
       "writeBoundary": "Harness block resolver, manifest/intent readers and briefing occurrence model; no runtime writer switch."
     },
     {
