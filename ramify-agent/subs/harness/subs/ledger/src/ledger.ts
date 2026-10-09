@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, normalize, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import type { EffectSpec, PendingEffect } from './effects.js';
@@ -60,6 +60,12 @@ export class LedgerCorruptError extends Error {
 export interface Ledger<E> {
   /** The last sequence in the log; 0 before any. */
   readonly version: number;
+  /** SHA-256 of the exact complete bytes loaded and each successfully flushed
+   * append. This is owned evidence, not a new read of possibly changed bytes.
+   * A failed durable write, sync, or close leaves its publication unchanged
+   * until a fresh replay; later advisory materialization can fail after commit.
+   */
+  readonly committedContentHash: string;
   /** Appends one line holding the whole transaction, flushed before it resolves, then materializes its records. */
   append(transaction: Transaction<E>): Promise<{ readonly sequence: number; readonly at: string }>;
   /** Every complete line, in order. */
@@ -194,6 +200,8 @@ export async function openLedger<E>(options: OpenLedgerOptions<E>): Promise<Ledg
   const loaded = await loadLog<E>(fs, logPath, recordsRoot, eventSchema);
   const lines: Line[] = loaded.lines;
   let logBytes = loaded.completeBytes;
+  const content = createHash('sha256').update(loaded.completeContent);
+  let committedContentHash = content.copy().digest('hex');
 
   /** Appends are serialized here; the chain also carries a failure to its caller only. */
   let queue: Promise<unknown> = Promise.resolve();
@@ -235,6 +243,8 @@ export async function openLedger<E>(options: OpenLedgerOptions<E>): Promise<Ledg
     }
     logBytes += bytes.byteLength;
     lines.push(line);
+    content.update(bytes);
+    committedContentHash = content.copy().digest('hex');
     return line;
   }
 
@@ -269,6 +279,7 @@ export async function openLedger<E>(options: OpenLedgerOptions<E>): Promise<Ledg
   }
 
   const ledger: Ledger<E> = {
+    get committedContentHash() { return committedContentHash; },
     get version() {
       return lines.at(-1)?.sequence ?? 0;
     },
@@ -385,15 +396,15 @@ async function loadLog<E>(
   logPath: string,
   recordsRoot: string,
   eventSchema: z.ZodType<E>,
-): Promise<{ lines: Line[]; completeBytes: number }> {
+): Promise<{ lines: Line[]; completeBytes: number; completeContent: Uint8Array }> {
   let bytes: Uint8Array;
   try {
     bytes = await fs.readFile(logPath);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { lines: [], completeBytes: 0 };
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { lines: [], completeBytes: 0, completeContent: new Uint8Array() };
     throw error;
   }
-  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const buffer = Buffer.from(bytes);
   const end = buffer.lastIndexOf(0x0a) + 1;
   if (end < buffer.byteLength) await fs.truncate(logPath, end);
 
@@ -430,7 +441,7 @@ async function loadLog<E>(
     }
     lines.push({ ...line, event: event.data });
   });
-  return { lines, completeBytes: end };
+  return { lines, completeBytes: end, completeContent: buffer.subarray(0, end) };
 }
 
 function issues(error: z.ZodError): string {

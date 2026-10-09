@@ -1,8 +1,9 @@
-import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { LedgerCorruptError, maximumLineBytes } from '../ledger.js';
-import { record, recordsMatchLog, testLedger, transaction } from './helpers/ledger.js';
+import { instrument, record, recordsMatchLog, testLedger, transaction } from './helpers/ledger.js';
 import { temporaryDirectory } from './helpers/temporary.js';
 
 let directory: Awaited<ReturnType<typeof temporaryDirectory>>;
@@ -18,6 +19,7 @@ describe('one line is one transaction', () => {
     expect(ledger.version).toBe(0);
     expect(ledger.replay()).toEqual([]);
     expect(ledger.pendingEffects()).toEqual([]);
+    expect(ledger.committedContentHash).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
   });
 
   test('an append writes one line holding the event and every record body', async () => {
@@ -33,6 +35,7 @@ describe('one line is one transaction', () => {
     expect(parsed.at).toBe(committed.at);
     expect(parsed.event).toEqual({ kind: 'step', step: 1 });
     expect(parsed.records).toHaveLength(2);
+    expect(ledger.committedContentHash).toBe(createHash('sha256').update(await readFile(logOf())).digest('hex'));
   });
 
   test('the sequence is one more than the last, across a reopen', async () => {
@@ -69,6 +72,50 @@ describe('one line is one transaction', () => {
       Array.from({ length: 20 }, (_unused, index) => index + 1),
     );
     expect(await recordsMatchLog(reopened, recordsOf())).toBe(20);
+  });
+});
+
+describe('owned complete-byte integrity', () => {
+  test('replay hashes original spacing and key order, discards the torn suffix, and extends those exact bytes', async () => {
+    const complete = '{ "records": [], "event": { "step": 1, "kind": "step" }, "at": "source time", "sequence": 1 }\n';
+    await writeFile(logOf(), `${complete}{"sequence":2`);
+    const ledger = await testLedger(directory.path);
+    expect(ledger.version).toBe(1);
+    expect(ledger.committedContentHash).toBe(createHash('sha256').update(complete).digest('hex'));
+    expect(await readFile(logOf(), 'utf8')).toBe(complete);
+    await ledger.append(transaction(2));
+    const bytes = await readFile(logOf());
+    expect(bytes.subarray(0, Buffer.byteLength(complete)).toString()).toBe(complete);
+    expect(ledger.committedContentHash).toBe(createHash('sha256').update(bytes).digest('hex'));
+    expect((await testLedger(directory.path)).committedContentHash).toBe(ledger.committedContentHash);
+  });
+
+  test('a foreign rewrite cannot redefine the writer\'s published expected bytes', async () => {
+    const ledger = await testLedger(directory.path);
+    await ledger.append(transaction(1));
+    const owned = ledger.committedContentHash;
+    const bytes = await readFile(logOf(), 'utf8');
+    const foreign = bytes.replace('"step":1', '"step":2');
+    expect(Buffer.byteLength(foreign)).toBe(Buffer.byteLength(bytes));
+    expect(foreign).not.toBe(bytes);
+    await writeFile(logOf(), foreign);
+    expect(ledger.committedContentHash).toBe(owned);
+    expect(createHash('sha256').update(await readFile(logOf())).digest('hex')).not.toBe(owned);
+  });
+
+  test.each(['write', 'flush'] as const)('a failed %s does not publish speculative bytes; fresh replay owns what was actually left', async phase => {
+    const original = await testLedger(directory.path);
+    await original.append(transaction(1));
+    const owned = original.committedContentHash;
+    const failing = await testLedger(directory.path, instrument(point => {
+      if (point === `${phase}:${logOf()}`) throw new Error(`unknown ${phase} completion`);
+    }));
+    await expect(failing.append(transaction(2))).rejects.toThrow(`unknown ${phase} completion`);
+    expect(failing.committedContentHash).toBe(owned);
+    expect(failing.version).toBe(1);
+    const recovered = await testLedger(directory.path);
+    expect(recovered.version).toBe(phase === 'write' ? 1 : 2);
+    expect(recovered.committedContentHash).toBe(createHash('sha256').update(await readFile(logOf())).digest('hex'));
   });
 });
 
