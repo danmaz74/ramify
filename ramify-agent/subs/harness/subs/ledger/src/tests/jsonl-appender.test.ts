@@ -112,6 +112,13 @@ describe('an ordered scoped JSON line appender', () => {
     expect(fs.close).toHaveBeenCalledTimes(1);
   });
 
+  test('an unawaited invalid admission is observed by the scope without an unhandled rejection', async () => {
+    prepare();
+    await expect(withJsonLineAppender('rows', async append => { void append(undefined); })).rejects.toThrow('no JSON representation');
+    expect(fs.append).not.toHaveBeenCalled();
+    expect(fs.close).toHaveBeenCalledTimes(1);
+  });
+
   test('close failure rejects the scope after actual individual flushes', async () => {
     prepare(); const error = new Error('close failed'); fs.close.mockRejectedValueOnce(error);
     await expect(withJsonLineAppender('rows', async append => { await append({ n: 1 }); })).rejects.toBe(error);

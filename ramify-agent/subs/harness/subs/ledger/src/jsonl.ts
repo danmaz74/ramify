@@ -76,9 +76,16 @@ export async function withJsonLineAppender<T>(
   let failed = false;
   let failure: unknown;
   let tail: Promise<void> = Promise.resolve();
+  const rejected = (error: unknown): Promise<void> => {
+    const task = Promise.reject<void>(error);
+    // The enclosing scope reports admitted failures even if use does not
+    // await the individual answer. Preserve rejection for callers that do.
+    void task.catch(() => undefined);
+    return task;
+  };
   const append = (record: unknown): Promise<void> => {
-    if (!accepting) return Promise.reject(new Error('JSON line append scope is closed'));
-    if (failed) return Promise.reject(failure);
+    if (!accepting) return rejected(new Error('JSON line append scope is closed'));
+    if (failed) return rejected(failure);
     let line: string;
     try {
       const encoded = JSON.stringify(record);
@@ -87,7 +94,7 @@ export async function withJsonLineAppender<T>(
     } catch (error) {
       failed = true;
       failure = error;
-      return Promise.reject(error);
+      return rejected(error);
     }
     const task = tail.then(async () => {
       if (failed) throw failure;
