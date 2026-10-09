@@ -93,6 +93,22 @@ that keep scratch out of builds.
 The launcher supplies the module description, relevant documentation and
 permitted contracts as initial context.
 
+Each ordinary task brief supplies the task's current goal, applicable cited elements,
+known module/API/test pointers and declared check/configuration
+pointers from the caller's existing records. Relevance follows the role, task
+and assigned scope in the existing briefing constructors. The agent decides
+what to read and explores for additional information. Inapplicable or unavailable
+optional information is omitted; there is no required-input matrix or new
+completeness gate. Review pointers use the candidate snapshot; module tasks
+use their working-directory conventions.
+
+Work orientation receives the work item's own functional, acceptance and context
+elements, then asks the local architect to explore its module before submitting.
+The context selector forks that point with selectable elements and its current
+instruction, retaining inherited support sections without redelivering them.
+The assignment turn continues with the selected package and explores further
+as needed. A fresh selector or architect receives the ordinary full task inputs.
+
 ### Fakes Are Explicitly Named
 
 Fake implementation files use a `.fake` suffix before the language extension,
@@ -151,6 +167,28 @@ do not necessarily reduce total tokens or latency.
 
 Each request supplies relevant new findings; context reuse does not
 automatically reveal changes in the repository.
+
+If reusable context is unavailable, the workflow uses the ordinary fresh task
+brief. An actual unavailable fork or continuation closes its original invocation
+and permits one new fresh invocation with the full inputs and recorded degradation
+reason. Only known missing reusable session/history/payload inputs license that
+fallback; the operation receipt's optional `contextUnavailable` indication does
+not classify arbitrary provider, task, authorization, cancellation or conflict
+failures as context loss. Uncertain effects do not license replay.
+
+After the existing work-orientation attempt bound, fresh selection and assignment
+proceed from authoritative work-item records. Recorded attempts preserve that
+bound across restart; already accepted orientation still recovers. Failed or
+unreadable design orientation leads to an ordinary fresh review with captured
+guidance and candidate tools. Global requests use current requests, registry,
+hypotheses and decisions when the retained parent is unavailable. New losses
+create no rebuild generation or replacement parent. An unavailable append records
+`brief-not-appended`; later work starts fresh. Historical rebuild readers remain.
+
+Existing invocation records, observations and projections expose timing, provider
+usage, start modes and exploration. [Session observations](metrics/session-observations.md)
+describes access and coverage. These are inputs for Dan's benefit assessment;
+implementation and qualification require no benefit trial or performance gate.
 
 ### Principles And Specifications Are Captured And Sealed
 

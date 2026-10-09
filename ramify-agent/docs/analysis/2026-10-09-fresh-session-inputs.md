@@ -15,6 +15,12 @@ The original analysis states a rule, inventories fresh-session inputs and briefs
 No code changed; nothing here is evidence of implementation. Inspected at
 `1b052e74`; line references drift, the named functions are authoritative.
 
+Implementation outcomes are recorded in the
+[Plan 24 iteration receipts](../plans/24-orientation-for-context-selection/main-plan.md#implementation-sequence).
+[Session observations](../metrics/session-observations.md) documents the existing
+metrics available for Dan's assessment. The inventory below describes the inspected
+base, not the later implementation.
+
 ## Summary
 
 - The [orientation analysis](2026-10-09-orientation.md#d2-reused-context-falls-back-to-a-plain-fresh-session)

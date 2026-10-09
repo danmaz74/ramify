@@ -432,8 +432,10 @@ hiding or measured complexity justifies it.
     committed outcomes — its generation, the point its history has reached,
     the briefs it holds and the decisions not appended yet. A brief appended
     to it causes no model call; it reaches a model when the next fork
-    inherits it. A rebuilt parent is oriented from the hypotheses, the
-    registry and the decisions, which is what `orientation` renders.
+    inherits it. Historical rebuilt parents remain readable. New context
+    losses use an ordinary fresh request with the current hypotheses, registry
+    and decisions; they create no rebuild or replacement parent. An unavailable
+    append records `brief-not-appended`.
   - `session.ts`: what one fork is given — the focused request, the
     refreshed view's identity, the registry and the decision log. It is not
     given the view's contents: the fork reads what it needs itself.
@@ -850,9 +852,12 @@ commits a completion request records the point after it. Design review
 binds a small selection of guidance from the candidate (its principles
 documents and the READMEs on the way to what changed) and forks the one
 orientation session of that selection, made once by a reviewer that read
-it; a changed selection is another orientation. A missing or unsupported fork point makes the review explicitly unavailable;
-a failed orientation is not a reason to silently create a fresh review. The
-attempt records its exact source and current candidate snapshot. The
+it; a changed selection is another orientation. Failed or unreadable design
+orientation, or unavailable scope/design context, leads to a fresh review with
+its ordinary guidance, assignment and candidate inputs. A known unavailable
+actual fork closes that invocation and permits one new fresh invocation;
+authoritative point mismatches and active-source conflicts retain their errors.
+The attempt records its exact source and current candidate snapshot. The
 queue drains waiting requests in the order they were recorded, overflows
 beyond its bound, retries once, and finishes at once a request no attempt
 of which could finish before its work item's deadline; a writer's start
@@ -1493,3 +1498,25 @@ A test that needs the owner-to-directory mapping and no analysis uses
 own `module.ramify` declarations. The tests that must prove the refresh
 itself — a module created mid-run, and the selection a gate resolves from a
 refreshed view — use the installed Ramify.
+
+
+## Useful starting briefs and orientation reuse
+
+Task briefs carry useful known facts and pointers for their role and scope,
+including declared project check setup, module/API/test areas and candidate
+snapshot pointers. Agents explore for anything else. No optional-input matrix,
+configuration cache or completeness preflight is introduced.
+
+Work orientation receives its own item elements and explores the module. Its
+selector fork inherits that reading and receives only the new selection inputs;
+assignment continues with the selected package. Existing named briefing sections
+and deltas keep inherited support facts without duplicate delivery. Fresh starts
+receive ordinary task inputs, including when orientation attempts are
+exhausted or a retained point is unavailable. Selection provenance may name the
+last unsuccessful orientation attempt with a null point and degraded selection.
+
+[Session observations](../../docs/metrics/session-observations.md) describes the
+existing records and projections for timing, usage, start modes, fallback reasons
+and exploration. Benefit assessment belongs to Dan; these changes add no trial
+or performance threshold. [Plan 24](../../docs/plans/24-orientation-for-context-selection/main-plan.md)
+records implementation and qualification.

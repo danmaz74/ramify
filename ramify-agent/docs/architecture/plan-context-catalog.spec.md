@@ -167,8 +167,14 @@ in this module. These rules govern that judgement:
   requirements and recommendations and selects the relevant ones, each with its reason,
   its conditions and its uncertainty. The fork sees what the parent read
   and discards what it read itself, so the parent pays only for the
-  package. A fresh selector started from the recorded orientation is the
-  degraded fallback when the fork point is lost.
+  package. Orientation receives the work item's own functional, acceptance
+  and context elements and explores the module before submitting. The fork
+  receives selectable elements and the selection instruction without repeating
+  the inherited work brief; reselection also receives the new placement decision.
+  A fresh selector receives the ordinary work-item brief and elements, plus a
+  recorded orientation submission when available, if orientation exhausts its
+  existing attempts or the point cannot be reused. Assignment continues the
+  architect with its selected package or starts fresh with ordinary task inputs.
 - **It selects over elements, never over documents.** The selector reads
   element text with IDs and answers with IDs. It may open a captured
   document to settle a doubt, but nothing it says is resolved by the
@@ -195,6 +201,11 @@ in this module. These rules govern that judgement:
   list of IDs, with the run's plan deviations rendered after the elements
   they amend. There is no second route by which source text reaches a
   prompt.
+
+Selection provenance names the last orientation attempt in
+`orientationInvocation`; that attempt need not have submitted successfully.
+A fresh selection records `orientationPoint: null` and `degraded: true`. This
+records how selection started without inventing a successful orientation.
 
 ## What a consumer may rely on
 

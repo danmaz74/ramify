@@ -234,6 +234,20 @@ describe('ST13: the lineage measurements of a scripted run', () => {
     expect(find(lineage.metrics, 'degraded-starts.fork')).toMatchObject({ state: 'measured', numerator: 1, denominator: 3 });
   });
 
+  test('separate fresh fallback invocations retain their requested start without a fork relation', async () => {
+    const { lineage } = await run([
+      ...open({ id: 'inv-0010', session: 'ses-0010', role: 'global-fork', kept: false,
+        usage: use(10, 0, 0, 1), degraded: { requested: 'fork', actual: 'fresh', reason: 'retained parent unavailable' } }),
+      ...open({ id: 'inv-0011', session: 'ses-0011', role: 'engineer', kept: false,
+        usage: use(20, 0, 0, 2), degraded: { requested: 'continue', actual: 'fresh', reason: 'retained work session unavailable' } }),
+    ], { 'inv-0010': [context(100)], 'inv-0011': [context(200)] });
+    expect(find(lineage.metrics, 'degraded-starts')).toMatchObject({ state: 'measured', value: 1, numerator: 2, denominator: 2 });
+    expect(find(lineage.metrics, 'degraded-starts.fork')).toMatchObject({ state: 'measured', value: 1, numerator: 1, denominator: 1 });
+    expect(find(lineage.metrics, 'degraded-starts.continue')).toMatchObject({ state: 'measured', value: 1, numerator: 1, denominator: 1 });
+    expect(find(lineage.metrics, 'fresh-fork.input')).toMatchObject({ state: 'measured', value: 10 });
+    expect(find(lineage.metrics, 'fresh-engineer.input')).toMatchObject({ state: 'measured', value: 20 });
+  });
+
   test('the same degraded starts are counted by each session of the project\'s list and by the run\'s snapshot', () => {
     const view = runView(constructedRun([{ type: 'job-started', data: {} }, ...lines]));
     const counted = runSessionViews(view).map(session => runSessionEntry('review-notes', view.record.jobId, session))

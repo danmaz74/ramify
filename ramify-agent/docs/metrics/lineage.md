@@ -15,11 +15,16 @@ serves. It is versioned apart from `kpi/1` and reads no scope size.
 
 | Input | Record |
 | --- | --- |
-| Requested start | `session-opened` (`fork`, `replaces`) and `invocation-started` (`start`, `continues`) in the run log |
+| Requested start | `invocation-ended.degraded.requested` when present; otherwise `session-opened.fork` and `invocation-started.start`/`continues` |
 | Actual start | The requested start, or the `degraded` relation of `invocation-ended`; unknown where the outcome records no start |
 | Context generation | A fork's `fork.generation`; generation 1 with the initial architect, and each `global-context-rebuilt` generation |
 | Starting context size | The first `context` observation of the invocation's observation log |
 | Usage | The input, cache-read, cache-write and output tokens of `outcome.json` |
+
+A separate fresh fallback preserves its intended fork/continue request in the
+existing degradation relation while its actual operation remains fresh. It has
+no inherited fork generation. Historical rebuild/replacement records remain
+inputs; Plan 24 creates no new replacement parent after context loss.
 
 No executor ref is read. A running segment is in no measurement until it
 ends, since its actual start is known only then.
@@ -32,7 +37,7 @@ start where the actual one is unknown.
 | Group | Segments |
 | --- | --- |
 | `fork.generation-<g>` | Forks of context generation `g` |
-| `fresh-fork` | Global-fork segments whose start was fresh: the fork that rebuilds the context, and a fork the executor made fresh |
+| `fresh-fork` | Global-fork segments whose start was fresh, including ordinary fallback and historical rebuild starts |
 | `repair` | Continued segments whose reason is `repair` |
 | `fresh-engineer` | Engineer segments whose start was fresh, reconstructions included |
 

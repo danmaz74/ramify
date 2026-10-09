@@ -25,7 +25,12 @@ complete the current task.
 The caller-owned `SessionStore` provides compare-and-swap committed records and
 immutable content-addressed payload bytes. Display events never reconstruct
 provider history. Missing or corrupt payloads and unsupported drivers return an
-explicit unavailable or failed outcome. `operationIdentity` reads original
+explicit unavailable or failed outcome. The optional receipt indication
+`contextUnavailable: true` identifies known missing reusable session/history/payload
+inputs without uncertain effects. Missing operation intent, unsupported runtime,
+initialization/provider failures and authority conflicts do not set it. The
+harness may then start a separate ordinary fresh invocation; the owning operation
+never changes its input or creates a replacement. `operationIdentity` reads original
 admitted identity without dispatch; `inspect` returns a validated available
 snapshot. Unfinished recovery requires the original execution identity and
 current bound authority; source-backed fresh recovery belongs to the harness.

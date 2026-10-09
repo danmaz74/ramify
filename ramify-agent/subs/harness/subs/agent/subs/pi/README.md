@@ -19,7 +19,10 @@ historical inactive tools cannot execute or submit for a current task.
 `AgentPort`. Continue, exact-point Fork, model-free context/tool additions,
 terminal Retry, Stop and actual settlement use the generic committed operation
 engine. Source-backed fresh recovery belongs to the harness; this adapter makes
-no fallback decision. There are no public provider-file references, file-history
+no fallback decision. Known retained-history decode/compatibility losses use the
+owning context-unavailable indication. Arbitrary provider or initialization
+exceptions remain ordinary failures and do not license fresh retry. There are
+no public provider-file references, file-history
 readers or compaction/settlement-threshold options.
 
 Opaque Pi state and original final-request artifacts are immutable payloads in

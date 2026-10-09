@@ -17,6 +17,12 @@ The harness implemented several things called "orientation" before the term
 had a definition. This document records the definition, reviews each
 implementation against it and records what was decided.
 
+Implementation outcomes are recorded in the
+[Plan 24 iteration receipts](../plans/24-orientation-for-context-selection/main-plan.md#implementation-sequence).
+[Session observations](../metrics/session-observations.md) documents the existing
+metrics available for Dan's assessment. The inventory below describes the inspected
+base, not the later implementation.
+
 ## Summary
 
 - **Orientation** is the exploration a fresh session performs to understand the

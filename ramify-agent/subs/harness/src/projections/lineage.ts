@@ -53,10 +53,11 @@ export function lineageInputsOf(view: RunView, logs: ObservationLogs): LineageIn
     const relation = opened.get(session);
     const previous = last.get(session) ?? null;
     last.set(session, invocation);
-    const requested: StartKind = event.data.start === 'continued' ? 'continue' : relation?.fork ? 'fork' : 'fresh';
     const end = ends.get(invocation);
     const outcome = view.records.outcomes.get(invocation);
     const degraded = end?.degraded ?? null;
+    // A separate fresh fallback retains the logical request in its degradation.
+    const requested: StartKind = degraded?.requested ?? (event.data.start === 'continued' ? 'continue' : relation?.fork ? 'fork' : 'fresh');
     const known = end !== undefined && outcome?.session !== undefined;
     const unknown = end === undefined
       ? 'it is still running'
@@ -75,7 +76,7 @@ export function lineageInputsOf(view: RunView, logs: ObservationLogs): LineageIn
       unknown,
       degraded,
       continues: continues?.reason ?? null,
-      generation: requested === 'fork' ? relation!.fork!.generation ?? null : null,
+      generation: requested === 'fork' ? relation?.fork?.generation ?? null : null,
       previous,
       startContext: startContextOf(logs.get(invocation)),
       usage: outcome === undefined
