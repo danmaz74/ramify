@@ -1,6 +1,6 @@
 # Plan 25 instruction-block contracts
 
-**Status:** proposed. [Main plan](main-plan.md). Incorporates former Plan 26
+**Status:** implemented and qualified; see [final results](iterations/05-results.md). [Main plan](main-plan.md). Incorporates former Plan 26
 with the briefing-occurrence and invariant-framing corrections from review.
 
 ## C1. Identity and effective version

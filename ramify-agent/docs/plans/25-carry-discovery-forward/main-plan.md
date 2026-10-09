@@ -1,11 +1,14 @@
 # Plan 25: discovery handoffs and instruction delivery
 
-**Date:** 2026-10-09. **Status:** proposed; implementation has not started.
-Source inspected: `90940442`. Consolidated on 2026-10-09 with
+**Date:** 2026-10-09. **Status:** complete; implementation and configured qualification accepted.
+Planning source inspected: `90940442`. Consolidated on 2026-10-09 with
 [former Plan 26](../26-instruction-block-delivery/main-plan.md). This is the single
 implementation plan for discovery handoffs and versioned instruction delivery.
 Both address the [status-badge postmortem](../../analysis/2026-10-09-status-badge-tone-postmortem.md).
-This update consolidates planning artifacts; runtime implementation remains pending.
+Implementation ran serially in the isolated worktree. The qualified source is
+`2df3a6cc2825b3b5e5e9c7e8e61db23544b1ef80`.
+[Final results](iterations/05-results.md) join all 45 cases to owning source,
+focused checks, failed qualification attempts and the passing configured audit.
 
 ## Outcome
 

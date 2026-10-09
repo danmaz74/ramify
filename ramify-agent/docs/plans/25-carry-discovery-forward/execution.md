@@ -1,6 +1,6 @@
 # Plan 25 execution rules
 
-[Main plan](main-plan.md). **Status:** proposed; implementation not started.
+[Main plan](main-plan.md). **Status:** complete; see [final qualification](iterations/05-results.md).
 
 ## Base, ownership and handoff
 
@@ -47,7 +47,11 @@ relevant regressions and joins prior receipts. Tests for block history must pass
 through task/session construction as well as the pure resolver. Run the single
 final audit only after all discovery, NFR and delivery work is integrated.
 
-Current source specifications are implementation deliverables. Plan consolidation
-changes only planning artifacts and the document index. Do not edit runtime code,
-user work or historical trial evidence during this planning task. Product/semantic
-authority, review concurrency and provider cache routing remain unchanged.
+Current source specifications and the six serial iterations are implemented and
+qualified at `2df3a6cc2825b3b5e5e9c7e8e61db23544b1ef80`; the final receipt
+records exact audit identity/coverage and the failed attempts corrected before
+qualification. The earlier planning consolidation changed planning artifacts and
+the document index. Historical receipts/trial evidence remain intact, and no
+source/documentation/receipt writes were made to the concurrent main checkout.
+Product/semantic authority, review concurrency and provider cache routing remain
+unchanged.

@@ -1,6 +1,6 @@
 # Iteration 3: Discovery handoffs through reusable briefing blocks
 
-**Plan:** [Plan 25](../main-plan.md). **Status:** planned.
+**Plan:** [Plan 25](../main-plan.md). **Status:** complete; see [final qualification](05-results.md).
 **Prerequisite:** iteration 2 and its receipt.
 
 ## Owners and write boundary
@@ -54,8 +54,9 @@ npm run type-check
 npm run check:self
 ```
 
-Files beginning `plan25-` above are proposed new focused test files. Existing
-selectors must be reconciled with configured discovery at implementation time.
+The focused `plan25-` files above were introduced by this plan. Selected paths
+were reconciled with configured discovery; exact executed evidence is in
+[final qualification](05-results.md).
 Script Git, CandidateSource, Ramify, audit and process answers under the testing
 specification. No intended intermediate failures remain at handoff.
 
