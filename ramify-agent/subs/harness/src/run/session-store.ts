@@ -268,7 +268,26 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
         await assertWriter();
         const input = captured;
         if (!input.runId) throw new Error('Missing run identity');
-        const records = input.records.map(item => envelope.parse(JSON.parse(JSON.stringify(item))));
+        const prepared = input.records.map(item => {
+          const plain = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+          if (!plain(item) || !plain(item.body)) {
+            // Retain the whole-envelope normalization and validation errors for
+            // unsupported or invalid record/body shapes.
+            const record = envelope.parse(JSON.parse(JSON.stringify(item)));
+            return { record, bytes: JSON.stringify(record.body) };
+          }
+          const encoded = JSON.stringify(item.body);
+          const parsed = JSON.parse(encoded) as Record<string, unknown>;
+          const header = JSON.parse(JSON.stringify({ ...item, body: undefined }));
+          const record = envelope.parse({ ...header, body: parsed });
+          const keys = Object.keys(parsed);
+          const validatedKeys = Object.keys(record.body);
+          // The record parser can omit keys such as __proto__. Reuse bytes only
+          // when validation retained every own key, its order and actual value.
+          const unchanged = keys.length === validatedKeys.length && validatedKeys.every((key, index) => key === keys[index] && record.body[key] === parsed[key]);
+          return { record, bytes: unchanged ? encoded : JSON.stringify(record.body) };
+        });
+        const records = prepared.map(item => item.record);
         const ids = records.map(item => item.id);
         if (new Set(ids).size !== ids.length || new Set(input.expected.map(item => item.id)).size !== input.expected.length) throw new Error('Duplicate CAS record identity');
         const state = await load();
@@ -298,8 +317,7 @@ export async function openSessionStore(options: LedgerSessionStoreOptions): Prom
         // particular, Dates, undefined fields and non-finite numbers must not
         // read differently before and after reopening the authoritative log.
         const headers: z.infer<typeof headerSchema>[] = [];
-        for (const item of records) {
-          const bytes = JSON.stringify(item.body);
+        for (const { record: item, bytes } of prepared) {
           const bodyId = hash(bytes);
           await writeFileExclusive(bodyPath(bodyId), bytes);
           bodyBytes(bodyId);

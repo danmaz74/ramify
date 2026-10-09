@@ -79,6 +79,34 @@ const commit = (store: LedgerSessionStore, revision: number, payloads: string[] 
 });
 
 describe('Plan 23 owned session store replay cache', () => {
+  it('persists exact post-validation body JSON with numeric keys, own prototype keys and nested normalization', async () => {
+    const { path, store } = await setup();
+    const body = JSON.parse('{"__proto__":{"removed":true},"10":"ten","2":"two","nested":{"__proto__":{"kept":true}}}') as Record<string, unknown>;
+    const nested = body['nested'] as Record<string, unknown>;
+    nested['arr'] = [undefined, Number.NaN, Infinity, -Infinity];
+    nested['date'] = new Date('2026-01-02T03:04:05.000Z');
+    body['date'] = new Date('2026-01-02T03:04:05.000Z'); body['nan'] = Number.NaN; body['omitted'] = undefined;
+    const expectedBytes = '{"2":"two","10":"ten","nested":{"__proto__":{"kept":true},"arr":[null,null,null,null],"date":"2026-01-02T03:04:05.000Z"},"date":"2026-01-02T03:04:05.000Z","nan":null}';
+    const expectedBody = JSON.parse(expectedBytes) as Record<string, unknown>;
+    const bodyId = createHash('sha256').update(expectedBytes).digest('hex');
+    const pending = commit(store, 1, [], body);
+    body['nan'] = 123; nested['arr'] = ['caller mutation'];
+    expect(await pending).toEqual({ kind: 'committed' });
+    expect(await readFile(join(path, 'record-bodies', `${bodyId}.json`), 'utf8')).toBe(expectedBytes);
+    const line = JSON.parse(await readFile(join(path, 'session-ledger.jsonl'), 'utf8'));
+    expect(line.event.records).toEqual([{ runId: 'A', id: 'session:s', revision: 1, schema: 'ramify-agent.session/1', bodyId }]);
+    expect(await store.read('A', 'session:s')).toEqual(record(1, expectedBody));
+    await store.close(); const fresh = (await setup(path)).store;
+    expect(await fresh.read('A', 'session:s')).toEqual(record(1, expectedBody));
+    expect(Object.hasOwn((await fresh.read('A', 'session:s'))!.body, '__proto__')).toBe(false);
+  });
+  it.each([undefined, null, [], 'scalar'])('refuses invalid body JSON without publishing or replacing an authenticated transaction: %j', async invalid => {
+    const { path, store } = await setup(); await commit(store, 1, [], { original: true });
+    const original = await readFile(join(path, 'session-ledger.jsonl'), 'utf8');
+    await expect(store.commit({ runId: 'A', expected: [{ id: 'session:s', revision: 1 }], records: [{ ...record(2), body: invalid as unknown as Record<string, unknown> }], payloads: [] })).rejects.toThrow();
+    expect(await readFile(join(path, 'session-ledger.jsonl'), 'utf8')).toBe(original);
+    expect(await store.read('A', 'session:s')).toEqual(record(1, { original: true }));
+  });
   it('shared adapters see successful commits and one competing CAS without reopening or replaying the ledger', async () => {
     const { path, store } = await setup(); const second = (await setup(path)).store;
     const results = await Promise.all([commit(store, 1), commit(second, 1)]);
