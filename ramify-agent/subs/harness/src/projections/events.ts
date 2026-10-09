@@ -62,7 +62,7 @@ function describe(event: RunEvent): [string, Ref[]] {
     case 'invocation-ended': {
       const degraded = event.data.degraded;
       return [
-        `Invocation ${event.data.invocation} ended: ${event.data.ended}; session ${event.data.session} ${event.data.kept ? 'is kept' : `finished (${event.data.finished})`}`
+        `Invocation ${event.data.invocation} ended: ${event.data.ended}; session ${event.data.session} ${event.data.kept ? `is kept${event.data.pointRetained === false ? ', but retained no point to continue from' : ''}` : `finished (${event.data.finished})`}`
           + (degraded === undefined ? '' : `; it started ${degraded.actual} where ${degraded.requested} was requested${degraded.reason === null ? '' : `: ${degraded.reason}`}`),
         [...ref('invocation', event.data.invocation), ...ref('session', event.data.session)],
       ];

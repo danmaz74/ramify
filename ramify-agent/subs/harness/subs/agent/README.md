@@ -42,6 +42,12 @@ for actual driver, tool and publication drainage. The caller retains its
 settlement bound. A stopped interrupted provider operation has no reusable
 current point; previous settled points remain valid.
 
+Each tool or submission call records its intent before it runs and its completion
+after it ends. A handler that throws has completed with its error, and a recovery
+replays that error without running it again. Only an effect whose completion is
+unknown, because execution stopped between intent and end, leaves the new point
+unavailable.
+
 ## Tools and observations
 
 A `ToolDefinition.execute` returns neutral text and declares its mutation and

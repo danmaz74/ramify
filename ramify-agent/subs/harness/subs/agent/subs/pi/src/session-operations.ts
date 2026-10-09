@@ -198,6 +198,8 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
       let result: NativeToolResult; let isError = false;
       if (effect?.verdict?.accepted) result = nativeToolResult({ text: effect.verdict.text ?? 'The submission was accepted and recorded.' });
       else if (effect?.verdict?.accepted === false) { result = nativeToolResult({ text: `The submission was rejected:\n${effect.verdict.errors.join('\n')}` }); isError = true; }
+      // A recorded thrown handler replays as its error, which pi encodes as an error tool result.
+      else if (effect?.thrown) { result = nativeToolResult({ text: await runtime.callTool(call.id, call.name, effect.input).then(value => value.text, (error: unknown) => error instanceof Error ? error.message : String(error)) }); isError = true; }
       else if (effect?.result) { const value = await runtime.callTool(call.id, call.name, effect.input); result = nativeToolResult(value); isError = value.isError ?? false; }
       else { result = nativeToolResult({ text: 'Tool was not executed: task submission already accepted.' }); isError = true; }
       messages.push({ role: 'toolResult', toolCallId: call.id, toolName: call.name, content: result.content, details: result.details, usage: result.usage, isError, timestamp: Date.now() });

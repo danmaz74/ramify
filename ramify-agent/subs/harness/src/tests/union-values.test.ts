@@ -999,6 +999,13 @@ describe('the run protocol a client reads', () => {
     expect(summary('scenarios-materialized', two)).toBe('The 2 feature files of the plan\'s scenarios are on the run branch');
   });
 
+  test('a kept session whose invocation retained no point is not reported as simply kept', () => {
+    const summary = (data: Record<string, unknown>) => projectEvent(runEventSchema.parse({ sequence: 1, jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z', type: 'invocation-ended',
+      data: { invocation: 'inv-0004', ended: 'submitted', submission: null, session: 'ses-0004', kept: true, ...data } })).summary;
+    expect(summary({})).toBe('Invocation inv-0004 ended: submitted; session ses-0004 is kept');
+    expect(summary({ pointRetained: false })).toBe('Invocation inv-0004 ended: submitted; session ses-0004 is kept, but retained no point to continue from');
+  });
+
   test('every event type of the run log has a projection that names its transition', () => {
     for (const option of runEventSchema.options) {
       const type = option.shape.type.value;

@@ -402,6 +402,10 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         if (old) {
           if (old.tool !== name || !equal(old.input, input)) throw new Error(`Effect call identity conflicts for ${callId}`);
           if (old.phase !== 'completed') throw new Error(`Effect ${callId} completion unknown`);
+          if (old.thrown) {
+            if (!submission) await afterMutation(old.result!, true);
+            throw new Error(old.result!.text);
+          }
           return submission ? old.verdict! : afterMutation(old.result!, old.result!.isError ?? false);
         }
         if (!submission && !tool) return { text: `No fresh handler for ${name}`, isError: true };
@@ -420,11 +424,11 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         catch (error) { executionError = error; answer = { text: errorText(error), isError: true }; }
         await assertLive();
         // Retain known tool completion before running any potentially interrupted mutation check.
-        if (executionError === undefined) {
-          await serial(() => updateOperation(key, body => ({ ...body, effects: body.effects.map(item => item.callId === callId ? { ...item, phase: 'completed', result: submission ? null : clone(answer) as ToolResult, verdict: submission ? clone(answer) as SubmissionVerdict : null } : item) }), owner.token));
-        }
-        const finalAnswer = submission ? answer : await afterMutation(answer as ToolResult, executionError !== undefined || ((answer as ToolResult).isError ?? false));
-        if (executionError !== undefined) throw executionError;
+        // A handler that threw has finished: its failure is recorded as its known result.
+        const thrown = executionError !== undefined;
+        await serial(() => updateOperation(key, body => ({ ...body, effects: body.effects.map(item => item.callId === callId ? { ...item, phase: 'completed', result: submission && !thrown ? null : clone(answer) as ToolResult, verdict: submission && !thrown ? clone(answer) as SubmissionVerdict : null, ...(thrown ? { thrown: true as const } : {}) } : item) }), owner.token));
+        const finalAnswer = submission ? answer : await afterMutation(answer as ToolResult, thrown || ((answer as ToolResult).isError ?? false));
+        if (thrown) throw executionError;
         return finalAnswer;
       })();
       calls.set(callId, work); return work;

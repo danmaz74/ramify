@@ -10815,12 +10815,15 @@ export class RunService {
       invocation: id, ended: outcome.ended, submission: outcome.submission?.hash ?? null, session,
       ...(degraded === undefined ? {} : { degraded }),
     };
+    // A session operation that settled without a point leaves nothing to
+    // continue; the kept session says so rather than implying it can resume.
+    const pointRetained = outcome.sessionOperation?.point === null && outcome.session?.ref === '' ? { pointRetained: false as const } : {};
     const packet = this.sessionOperations === undefined ? null : await this.sessionOperations.then(operations => operations.packet(run.record.jobId, id), () => null);
     const latest = packet === null ? null : this.invocationRecord(run, id);
     const invocation = latest?.body ?? null;
     const written = await this.write(run, {
       type: 'invocation-ended',
-      data: keeping.kept ? { ...ended, kept: true } : { ...ended, kept: false, finished: keeping.finished },
+      data: keeping.kept ? { ...ended, kept: true, ...pointRetained } : { ...ended, kept: false, finished: keeping.finished },
     }, [
       { path: runLayout.outcome(id), id, revision: 1, body: outcome },
       ...(invocation === null || packet === null ? [] : [{ path: runLayout.invocation(id), id, revision: latest!.revision + 1, body: { ...invocation, prompt: { ...invocation.prompt, inputsHash: inputsHash([packet.roleInstructions, packet.message]), manifest: packet.manifest } } }]),

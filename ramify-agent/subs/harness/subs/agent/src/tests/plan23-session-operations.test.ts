@@ -343,15 +343,57 @@ describe('Plan 23 F1 high-level session operations', () => {
     expect(denied.status).toBe('failed'); expect(calls).toBe(0);
     expect(await (await operations.retry({ runId: 'run-A', operationId: 'denied', bindings: bindings() })).receipt).toEqual(denied);
   });
-  it('checks an executed mutating handler that throws, retaining uncertain completion', async () => {
+  it('checks an executed mutating handler that throws, recording its failed completion', async () => {
     let hooks = 0; const store = memoryStore();
     const operations = createSessionOperations({ sessionStore: store, driver: createScriptedSessionDriver([{ kind: 'tool', tool: 'write', input: {} }]) });
     const P = await operations.create(create);
     const bound = bindings({ tools: [{ ...tools[1]!, execute: async () => { throw new Error('external tool failed'); } }], afterMutation: async call => { hooks++; expect(call.failed).toBe(true); return { text: 'failure check retained' }; } });
     const result = await (await operations.continue(continuation(P.sessionId, P.point!, 'throwing-write', bound))).receipt;
-    expect(hooks).toBe(1); expect(result.status).toBe('unavailable'); expect(result.point).toBeNull();
+    // The scripted driver fails its turn on a thrown tool; the effect itself is known.
+    expect(hooks).toBe(1); expect(result.status).toBe('failed'); expect(result.reason).toBe('external tool failed');
     const record = await store.read('run-A', 'operation:throwing-write');
-    expect(record?.body['effects']).toMatchObject([{ tool: 'write', phase: 'intent' }, { tool: 'afterMutation:write', phase: 'completed', result: { text: 'failure check retained' } }]);
+    expect(record?.body['effects']).toMatchObject([{ tool: 'write', phase: 'completed', result: { text: 'external tool failed', isError: true }, thrown: true }, { tool: 'afterMutation:write', phase: 'completed', result: { text: 'failure check retained' } }]);
+  });
+  it('keeps the point available after a tool call that throws and the provider reports as an error', async () => {
+    const store = memoryStore(); const seen: string[] = []; let hooks = 0;
+    const operations = createSessionOperations({ sessionStore: store, driver: { async dispatch(_input, runtime) {
+      // Like pi, the provider turns a thrown handler into an error tool result and continues.
+      for (const [callId, name] of [['missing-read', 'read'], ['failed-write', 'write']] as const) {
+        try { await runtime.callTool(callId, name, { path: 'missing' }); } catch (error) { seen.push((error as Error).message); }
+      }
+      return { kind: 'ended' };
+    } } });
+    const P = await operations.create(create);
+    const bound = bindings({ tools: [
+      { ...tools[0]!, execute: async () => { throw new Error('ENOENT: no such file or directory'); } },
+      { ...tools[1]!, execute: async () => { throw new Error('Path not found'); } },
+    ], afterMutation: async call => { hooks++; expect(call.failed).toBe(true); return { text: 'nothing changed' }; } });
+    const result = await (await operations.continue(continuation(P.sessionId, P.point!, 'throwing-read', bound))).settled();
+    expect(seen).toEqual(['ENOENT: no such file or directory', 'Path not found']); expect(hooks).toBe(1);
+    expect(result.status).toBe('completed'); expect(result.reason).toBeNull(); expect(result.point).not.toBeNull();
+    expect(await operations.inspect('run-A', P.sessionId, result.point!)).not.toBeNull();
+    expect((await store.read('run-A', 'operation:throwing-read'))?.body['effects']).toMatchObject([
+      { callId: 'missing-read', phase: 'completed', result: { text: 'ENOENT: no such file or directory', isError: true }, thrown: true },
+      { callId: 'failed-write', phase: 'completed', result: { text: 'Path not found', isError: true }, thrown: true },
+      { callId: 'failed-write:afterMutation', phase: 'completed', result: { text: 'nothing changed' } },
+    ]);
+  });
+  it('replays a recorded thrown tool failure as the same error without executing it again', async () => {
+    const store = memoryStore(); const hang = deferred(); const failedOnce = deferred(); let executed = 0; const seen: string[] = [];
+    const call = async (runtime: Parameters<SessionOperationDriver['dispatch']>[1]) => {
+      try { await runtime.callTool('missing-read', 'read', { path: 'missing' }); } catch (error) { seen.push((error as Error).message); }
+    };
+    const first = createSessionOperations({ sessionStore: store, driver: { async dispatch(_input, runtime) { await call(runtime); failedOnce.resolve(); await hang.promise; return { kind: 'ended' }; } } });
+    const P = await first.create(create);
+    const bound = bindings({ tools: [{ ...tools[0]!, execute: async () => { executed++; throw new Error('ENOENT: no such file or directory'); } }] });
+    const original = await first.continue(continuation(P.sessionId, P.point!, 'replayed-read', bound));
+    await failedOnce.promise;
+    // A second server recovers after the original owner is lost.
+    const recovering = createSessionOperations({ sessionStore: store, driver: { async dispatch(_input, runtime) { await call(runtime); return { kind: 'ended' }; } }, isExecutionOwnerAlive: async () => false });
+    const result = await (await recovering.retry({ runId: 'run-A', operationId: 'replayed-read', bindings: bound })).settled();
+    expect(executed).toBe(1); expect(seen).toEqual(['ENOENT: no such file or directory', 'ENOENT: no such file or directory']);
+    expect(result.status).toBe('completed'); expect(result.point).not.toBeNull();
+    hang.resolve(); expect(await original.receipt).toEqual(result);
   });
   it('binds existing Script functions to durable tasks, handlers and designated submission', async () => {
     let scripts = 0; let calls = 0; let accepted = 0;

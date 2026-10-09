@@ -64,7 +64,8 @@ export interface SessionExecutionBindings {
   readonly recoverEffect?: ((effect: SessionEffectRecord) => Promise<ToolResult | null>) | undefined;
 }
 export interface SessionTranscriptEntry { readonly key: string; readonly payloadId: TranscriptPayloadId; readonly kind: 'agent' | 'provider' }
-export interface SessionEffectRecord { readonly callId: string; readonly tool: string; readonly input: unknown; readonly phase: 'intent' | 'completed'; readonly result: ToolResult | null; readonly verdict: SubmissionVerdict | null }
+/** A completed call whose handler threw records its error text as an error `result` and `thrown`, and replays as that error. */
+export interface SessionEffectRecord { readonly callId: string; readonly tool: string; readonly input: unknown; readonly phase: 'intent' | 'completed'; readonly result: ToolResult | null; readonly verdict: SubmissionVerdict | null; readonly thrown?: true }
 export interface AgentSessionSnapshot extends SessionLineage {
   readonly runId: string; readonly initialInstructions: string; readonly policy: SessionExecutionPolicy;
   readonly declarations: readonly SessionToolDeclaration[]; readonly activeTools: readonly string[];

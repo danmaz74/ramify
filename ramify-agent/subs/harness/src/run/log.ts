@@ -115,7 +115,11 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * with the reason.
    */
   event('invocation-ended', z.discriminatedUnion('kept', [
-    z.object({ ...invocationEndedFields, kept: z.literal(true) }).strict(),
+    z.object({
+      ...invocationEndedFields, kept: z.literal(true),
+      /** `false` when the invocation retained no session point: nothing can continue or append to the kept session. */
+      pointRetained: z.literal(false).optional(),
+    }).strict(),
     z.object({ ...invocationEndedFields, kept: z.literal(false), finished: sessionFinishReasonSchema }).strict(),
   ])),
   /**
