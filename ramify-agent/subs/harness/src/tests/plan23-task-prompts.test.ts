@@ -333,6 +333,8 @@ describe('P04: manifests reflect supplied/inherited instructions and truthful re
     expect(architect.roleInstructions).toContain('Complete the current task using its designated submission tool. No report.md\nfile or shell command is required.');
     expect(current.get('initial-architect')!.system).not.toContain('No report.md\nfile or shell command is required.');
     expect(architect.roleInstructions).toContain('placement references only for a real');
+    expect(architect.roleInstructions).toContain(`[references/discovery.md](${join(defaultSkillDirectory, 'references/discovery.md')})`);
+    expect(architect.roleInstructions).not.toMatch(/\]\(references\//);
     expect(architect.message).toContain('"modules": [');
     expect(architect.message).toContain('unknown shapes: 1');
   });

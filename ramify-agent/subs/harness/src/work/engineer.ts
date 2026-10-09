@@ -327,8 +327,10 @@ export interface IterationBriefing {
   readonly projectRoot: string;
   /** The executable cwd of this invocation, usually the first base module's src. */
   readonly workingDirectory?: string | undefined;
-  /** The commit `git diff` compares against: the last accepted boundary. */
+  /** The last accepted boundary, tracked by the harness. */
   readonly base: string;
+  /** Selects the handback supported by this invocation's submission schema. */
+  readonly capabilityWorkflow?: boolean | undefined;
   /** The API views of the modules this iteration writes, or why one has none. */
   readonly views?: readonly IterationApiViews[] | undefined;
   /**
@@ -402,7 +404,9 @@ export function iterationMessage(briefing: IterationBriefing): string {
           : `coverage limits: ${view.coverage}, so absence is not proof`}.`);
       }
     }
-    lines.push('', 'A symbol you need that is not there is reported with `unsuitable`, reason `scope`; it is never imported anyway.', '');
+    lines.push('', briefing.capabilityWorkflow === true
+      ? 'A symbol you need that is not there is reported with `capability-needed`, with the actual calling code and missing behavior; it is never imported anyway.'
+      : 'A symbol you need that is not there is reported with `unsuitable`, reason `scope`; it is never imported anyway.', '');
   }
 
   if (assignment.scope.bootstrap.length > 0) {
@@ -441,7 +445,7 @@ export function iterationMessage(briefing: IterationBriefing): string {
   lines.push(
     '## The tree you start from',
     '',
-    `\`git diff ${briefing.base}\` shows exactly the work since the last accepted boundary, this iteration's included.`,
+    `The last accepted boundary is commit \`${briefing.base}\`. The harness tracks work since that boundary, including this iteration. Inspect the current files; you never run Git.`,
     'Uncommitted changes are that work; the gate commits a candidate before checking it. A candidate commit is not acceptance.',
     '',
   );

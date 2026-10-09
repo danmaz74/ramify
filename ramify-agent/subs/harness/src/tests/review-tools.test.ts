@@ -61,6 +61,13 @@ describe('resolving a path in the audited candidate', () => {
     const { scripted, snapshot: candidate } = await snapshot();
     const tools = snapshotTools(candidate, scripted, root);
     const call = async (name: string, input: unknown) => tools.definitions.find(definition => definition.name === name)!.execute(input, new AbortController().signal);
+    const action = (name: string, input: unknown) => tools.definitions.find(definition => definition.name === name)!.action!(input);
+    expect(action(snapshotToolNames.read, { path: './src/../src/a.ts', startLine: 2 })).toEqual({
+      kind: 'read', path: '/project/src/a.ts', range: { start: 2, count: 2000 },
+    });
+    expect(action(snapshotToolNames.read, { path: 'src/a.ts', lineCount: 9999 })).toMatchObject({ range: { start: 1, count: 2000 } });
+    expect(action(snapshotToolNames.search, { path: 'src', pattern: 'const (a|b)' })).toEqual({ kind: 'search', path: '/project/src', pattern: 'const (a|b)', glob: null });
+    expect(action(snapshotToolNames.read, { path: 'src/a.ts', extra: true })).toEqual({ kind: 'other' });
     expect(tools.definitions.every(definition => definition.mutating === false)).toBe(true);
     expect(await call(snapshotToolNames.list, {})).toEqual({ text: 'README.md\nsrc/\nvendor/' });
     expect(await call(snapshotToolNames.list, { path: 'src' })).toEqual({ text: 'a.ts\nb.ts\nlink (symbolic link, not followed)' });

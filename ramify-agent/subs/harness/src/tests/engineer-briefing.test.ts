@@ -83,6 +83,18 @@ describe('what an engineer is told about the Ramify project it works in', () => 
     expect(text).toContain('no API view, because the API view could not be materialized: daemon down. Absence of a view is not permission');
   });
 
+  test('capability assignments and gate repairs retain the current handback and execution controls', async () => {
+    const text = iterationMessage({ assignment: assignment(), projectRoot: '/p', base: 'abc', capabilityWorkflow: true,
+      views: [{ module: 'app/reviews', views: [{ area: 'ordinary', path: 'subs/reviews/src/.ramify', revision: 'r1', coverage: null }], unavailable: null }],
+      failedGate: { id: 'ga-1', cause: 'check', summary: ['A required check failed.'] } });
+    expect(text).toContain('reported with `capability-needed`');
+    expect(text).not.toContain('reported with `unsuitable`, reason `scope`');
+    expect(text).not.toContain('`git diff');
+    expect(text).toContain('A required check failed.');
+    const { packages } = await loadPromptPackages();
+    expect(renderEngineerPrompt(packages.get('engineer')!, '/p')).not.toContain('one\n  repair round');
+  });
+
   test('the iteration message names the owners\' test areas as text and leaves every test run to the gate\'s audit', () => {
     const text = iterationMessage({
       assignment: assignment(), projectRoot: '/p', base: 'abc',

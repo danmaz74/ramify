@@ -47,6 +47,8 @@ export function reviewMessage(briefing: ReviewBriefing): string {
     '',
     `The audited candidate is commit ${request.key.candidate} (tree ${request.tree}); its gate ${request.gate} passed. The diff is taken from ${request.base}.`,
     '',
+    'The request\'s assignment path identifies a record in the harness run directory. Use the assignment intent below; that record is not a candidate file readable with snapshot tools.',
+    '',
     '## The iteration',
     '',
     ...(assignment === null
@@ -87,7 +89,7 @@ export function reviewMessage(briefing: ReviewBriefing): string {
       : [...new Map(snapshot.changes.map(change => [`${change.status}\0${change.path}`, change])).values()].map(change => `- ${change.status} ${change.path}`)),
     '',
   );
-  lines.push('Read snapshot_diff first, then inspect the changed implementation and the source required to judge it. The audited diff includes harness-produced changes; no feature or pending-tag patch is hidden.', '');
+  lines.push('Use the supplied changed-path list, then read each relevant patch with snapshot_diff and inspect the source required to judge it. List paths with snapshot_diff only if the supplied list is unavailable. The audited diff includes harness-produced changes; no feature or pending-tag patch is hidden.', '');
   if (briefing.setup) lines.push(briefing.setup, '');
   if (assignment !== null && kind !== 'design') {
     const modules = assignment.scope.resolved.ownership.modules.filter(module => assignment.gate.tests.exactOwners.includes(module.id)

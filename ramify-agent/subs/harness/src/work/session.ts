@@ -485,7 +485,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     if (last.scenarios !== undefined && last.scenarios.length > 0) {
       lines.push('', 'The scenarios its gate passed, and the step definition that bound each step:', '');
       lines.push(...last.scenarios);
-      lines.push('', 'A definition outside the owner\'s own step files reached the run through an import, which Ramify verified.');
+      lines.push('', 'Step locations identify loaded definitions; they do not establish import or exposure provenance. Retain unknown locations as unknown.');
     }
     if (last.failure === undefined) {
       lines.push('', 'Assign the next iteration, or request completion and let the work item\'s gate answer.', '');

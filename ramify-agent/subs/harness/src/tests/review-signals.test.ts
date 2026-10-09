@@ -214,6 +214,7 @@ describe('the scope question\'s message', () => {
       workItem: 'wi-001', assignment: 'a.json', base: 'c0', gate: 'ga-0001', tree: 't1', guidance: [], forkPoint: { kind: 'none' },
     };
     const message = (planDocument: string | null) => reviewMessage({ request, snapshot, assignment: null, checkFindings: [], planDocument });
+    expect(message(null)).toContain('that record is not a candidate file readable with snapshot tools');
     expect(message(`plans/${plan}/plan.md`)).toContain(`The candidate holds the plan as \`plans/${plan}/plan.md\`. To name it as a concern's ground, read it with \`snapshot_read\`.`);
     expect(message(null)).toContain('The candidate holds no copy of the plan');
   });

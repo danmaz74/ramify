@@ -3707,7 +3707,10 @@ export class RunService {
     const diff = await this.candidates.diffNameStatus(this.projectRoot, base, candidate.tree);
     const changedPaths = [...new Map(diff.filter(change => nonfunctionalSourceAllows(change.path, scope)).map(change => [`${change.status}\0${change.path}`, change])).values()]
       .sort((left, right) => left.path.localeCompare(right.path) || left.status.localeCompare(right.status));
-    return JSON.stringify({ base, head: candidate.head, tree: candidate.tree, changedPaths, readScope: scope,
+    return JSON.stringify({ base, head: candidate.head, tree: candidate.tree,
+      comparison: 'prepared-source-versus-current-accepted-boundary',
+      comparisonLimit: 'This diff covers unaccepted prepared-source changes only. An empty diff does not establish that earlier accepted implementation left files unchanged.',
+      changedPaths, readScope: scope,
       excludedDirectories: ['.git', 'node_modules', '.ramify', '.ramify-architect'], excludedRunOutputs: ['plans/.harness', 'plans/<plan>/.harness'] });
   }
 
@@ -3977,7 +3980,7 @@ export class RunService {
         role: 'nonfunctional-coordinator', task: { goal: `Assess the complete NFR catalog for ${prepared.candidate.tree}`, requirements: [this.planPackage(run, catalog.catalog)], candidate: prepared.candidate.tree, snapshot: prepared.candidate.tree, literalSections: [{ key: 'support:nonfunctional-source', text: await this.nonfunctionalSourceInputs(run, prepared.candidate) }] }, work: {},
         attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
         loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot),
-        prompt: `${coordinatorAssessmentPrompt(this.planPackage(run, catalog.catalog), prepared.candidate, round, phase)}\n\nSource baseline: ${this.accepted(run)}. Read the prepared candidate with snapshot_list/read/search/diff, starting with snapshot_diff. Git metadata and run records are excluded from source inspection.`,
+        prompt: `${coordinatorAssessmentPrompt(this.planPackage(run, catalog.catalog), prepared.candidate, round, phase)}\n\nThe snapshot_diff baseline is the current accepted boundary ${this.accepted(run)}. It covers unaccepted prepared-source changes, excluding earlier accepted implementation. Use current source to judge present behavior; an empty diff establishes no historical preservation. Read the prepared candidate with snapshot_list/read/search/diff. Git metadata and run records are excluded from source inspection.`,
         start: { mode: 'fresh' }, toolName: coordinatorAssessmentToolName,
         description: 'Submit one evidence-grounded result for every non-functional and fixed requirement.',
         inputSchema: coordinatorAssessmentJsonSchema, submissionSchema: 'ramify-agent.nonfunctional-assessment-submission/1',
@@ -8877,6 +8880,7 @@ export class RunService {
           assignment,
           projectRoot: this.projectRoot,
           workingDirectory,
+          capabilityWorkflow: this.workflow !== null,
           base: this.accepted(run),
           views: invocationViews,
           testAreas: await this.ownedTestAreas(run, assignment.gate.tests),

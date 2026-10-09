@@ -155,8 +155,8 @@ Only an accepted submission is a result. A closing message is not.
 ## What the harness decides, not you
 
 - Whether the iteration passed. `completion-proposed` asks for the gate; the
-  gate answers. A failing gate comes back to you with its diagnostics and one
-  repair round, and the rerun runs the complete required set, not only what
+  gate answers. A failing gate comes back with its diagnostics while the current
+  task's repair limits permit another attempt. The rerun runs the complete required set, not only what
   failed.
 - What is committed. The harness commits the working directory after a gate
   passes, with its own message and its own trailers. You never run git, and a

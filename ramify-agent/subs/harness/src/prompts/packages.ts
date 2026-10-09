@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import type { Role } from '../interfaces/protocol/runs.js';
@@ -439,7 +439,7 @@ async function loadPackage(request: {
   const sections = await Promise.all(Object.entries(request.sections ?? {}).map(async ([name, file]) => ({ name, file, text: await readFile(file, 'utf8') })));
   const usesSkill = system.includes('{{skill}}');
   const skillFiles = usesSkill ? [join(skillDirectory, 'SKILL.md')] : [];
-  const skill = usesSkill ? adaptReadOnlySkill(await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')) : '';
+  const skill = usesSkill ? adaptReadOnlySkill(await readFile(join(skillDirectory, 'SKILL.md'), 'utf8'), skillDirectory) : '';
   const extraSkill = request.extraSkillFile === undefined ? '' : await readFile(request.extraSkillFile, 'utf8');
   const submissionSchema = `${JSON.stringify(request.schema, null, 2)}\n`;
   const schemaName = submissionSchemaNames[request.role as keyof typeof submissionSchemaNames] ?? `${request.role}.schema.json`;
@@ -589,8 +589,9 @@ export function renderOrientationPrompt(loaded: LoadedPackage): string {
 }
 
 /** Materialization and report-file instructions do not apply to harness read-only roles. */
-function adaptReadOnlySkill(skill: string): string {
-  return skill.replace(/1\. Classify[\s\S]*?(?=2\. Read)/,
+function adaptReadOnlySkill(skill: string, skillDirectory: string): string {
+  return skill.replace(/\]\((references\/[^)]+)\)/g, (_match, path: string) => `](${resolve(skillDirectory, path)})`)
+    .replace(/1\. Classify[\s\S]*?(?=2\. Read)/,
     '1. Classify the requested outcomes. Use the already supplied materialized views\n   named in the current task. There is no shell; do not run materialization.\n   Preserve every supplied coverage, revision and unavailable detail.\n')
     .replace(/Before answering, read \[report\.md\][\s\S]*$/,
       'Complete the current task using its designated submission tool. No report.md\nfile or shell command is required. Read placement references only for a real\nownership or placement question, not for a change to an existing symbol.\n')

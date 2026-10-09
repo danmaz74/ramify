@@ -18,6 +18,8 @@ import { ExcursionWatcher } from '../run/excursions.js';
 import { ObservationLog } from '../run/observations.js';
 import { PortEventRecorder } from '../run/port-events.js';
 import { runLayout } from '../run/records.js';
+import { openCandidateSnapshot, snapshotTools } from '../reviews/snapshot.js';
+import { scriptedCandidates } from './helpers/candidates.js';
 import { temporaryDirectory } from './helpers/fixture.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { runSessionScenario } from './helpers/session-scenario.js';
@@ -55,6 +57,49 @@ async function explored(recorder: PortEventRecorder, callId: string, kind: 'read
 }
 
 describe('Plan 23 F6 durable observation integration', () => {
+  test('snapshot inspection reaches exploration metrics with candidate-root paths from a separate reader workspace', async () => {
+    const f = await observed();
+    const source = scriptedCandidates(f.directory.path, { c1: { tree: 't1', base: 'c0',
+      changes: [{ status: 'M', path: 'src/a.ts' }], files: { 'src/a.ts': 'export const a = 1;\n' } } });
+    const snapshot = await openCandidateSnapshot(source, f.directory.path, { commit: 'c1', base: 'c0' });
+    const tools = snapshotTools(snapshot, source, f.directory.path);
+    const recorder = new PortEventRecorder({ projectRoot: f.directory.path, workingDirectory: join(f.directory.path, 'reviews/workspace'),
+      observations: f.observations, invocation: { id: 'inv-1', role: 'reviewer', startedAt: t(0), submissionTool: 'submit_review', declaredPaths: [f.directory.path] },
+      context: { compaction: 'forbidden', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 },
+      excursions: new ExcursionWatcher({ projectRoot: f.directory.path, index: null, scope: undefined }),
+      judge: { countImplementationRejection: () => async () => {} } });
+    recorder.identify(identity);
+    const calls = [
+      ['snapshot_read', { path: 'src/a.ts' }], ['snapshot_read', { path: 'src/a.ts', startLine: 1, lineCount: 1 }],
+      ['snapshot_list', {}], ['snapshot_search', { path: 'src', pattern: 'absent' }],
+      ['snapshot_diff', {}], ['snapshot_diff', { path: 'src/a.ts' }],
+    ] as const;
+    let returnedBytes = 0;
+    for (const [index, [name, input]] of calls.entries()) {
+      const tool = tools.definitions.find(tool => tool.name === name)!;
+      const action = tool.action?.(input) ?? { kind: 'harness' as const };
+      const callId = `snapshot-${index}`;
+      await recorder.record({ type: 'tool-started', tool: name, input, callId, action, mutating: false, execution: identity,
+        observation: { sourceId: `${callId}:start`, at: t(index + 1) } });
+      const result = await tool.execute(input, new AbortController().signal);
+      returnedBytes += Buffer.byteLength(result.text);
+      const target = action.kind === 'read' || action.kind === 'search' ? action.path : null;
+      await recorder.record({ type: 'tool-finished', tool: name, callId, isError: result.isError === true, reachedTool: true, execution: identity,
+        observation: { sourceId: `${callId}:finish`, at: t(index + 2), elapsedMs: 10, returnedBytes: Buffer.byteLength(result.text),
+          resolvedScope: target === null ? null : [target], files: action.kind === 'read' && target ? [target] : null,
+          coverage: action.kind === 'search' ? ['Matched file identities not reported'] : [] } });
+    }
+    await recorder.drain();
+    const projected = evaluationOf({ invocation: { ...invocation, role: 'reviewer', writer: false }, outcome,
+      observations: f.observations.observations, lines: null }).efficiency!;
+    expect(projected.exploration.metrics).toMatchObject({ reads: 3, uniqueFilesRead: 1, repeatedReads: 2,
+      searches: 3, broadSearches: 2, outsideScopeSearches: 0, returnedBytes, toolElapsedMs: 60 });
+    const exploration = f.observations.observations.filter(row => row.type === 'exploration');
+    expect(exploration).toHaveLength(6);
+    expect(exploration.every(row => row.type === 'exploration' && row.data.resolvedScope?.every(path => !path.includes('reviews/workspace')))).toBe(true);
+    expect(exploration[0]).toMatchObject({ data: { requestedScope: ['src/a.ts'], resolvedScope: ['src/a.ts'], files: ['src/a.ts'] } });
+    expect(projected.exploration.metrics.coverage.join('\n')).toContain('matched files unknown');
+  });
   test('captures original identities, exact output bytes, zero matches and recorded-rate estimates once across restoration', async () => {
     const f = await observed();
     await explored(f.recorder, 'r1', 'read', f.directory.path, 7, [join(f.directory.path, 'src/a.ts')], 1);

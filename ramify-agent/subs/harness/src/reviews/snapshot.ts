@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { posix } from 'node:path';
+import { posix, resolve } from 'node:path';
 import { z } from 'zod';
-import type { JsonSchema, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
+import type { JsonSchema, ToolAction, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
 import type { CandidateSource, TreeEntry } from '../../subs/evidence/src/git.js';
 
 /*
@@ -147,11 +147,21 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
     return { text: resolved.text, isError: true };
   };
   const invalid = (error: z.ZodError): ToolResult => ({ text: `Invalid input: ${error.issues.map(issue => `${issue.path.join('.') || '(input)'}: ${issue.message}`).join('; ')}`, isError: true });
-  const tool = <S extends z.ZodType>(name: string, description: string, schema: S, run: (input: z.infer<S>, signal: AbortSignal) => Promise<ToolResult>): ToolDefinition => ({
+  // The reader's workspace is separate from the candidate. Absolute action
+  // paths keep observation identity rooted in the candidate, without changing
+  // the relative-path validation that governs tool execution.
+  const candidatePath = (path = ''): string => resolve(projectRoot, path.replaceAll('\\', '/'));
+  const tool = <S extends z.ZodType>(name: string, description: string, schema: S,
+    action: (input: z.infer<S>) => ToolAction,
+    run: (input: z.infer<S>, signal: AbortSignal) => Promise<ToolResult>): ToolDefinition => ({
     name,
     description,
     inputSchema: z.toJSONSchema(schema) as JsonSchema,
     mutating: false,
+    action(input) {
+      const parsed = schema.safeParse(input);
+      return parsed.success ? action(parsed.data) : { kind: 'other' };
+    },
     async execute(input, signal) {
       const parsed = schema.safeParse(input);
       if (!parsed.success) return invalid(parsed.error);
@@ -163,7 +173,8 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
     },
   });
 
-  const list = tool(snapshotToolNames.list, 'List the files and directories directly beneath a directory of the audited candidate; the root when no path is given.', listInput, async input => {
+  const list = tool(snapshotToolNames.list, 'List the files and directories directly beneath a directory of the audited candidate; the root when no path is given.', listInput,
+    input => ({ kind: 'search', path: candidatePath(input.path), pattern: null, glob: null }), async input => {
     const resolved = resolveSnapshotPath(snapshot, input.path ?? '');
     if (!resolved.ok) return refuse(snapshotToolNames.list, input.path, resolved);
     if (resolved.kind === 'file') return { text: `${resolved.path} is a file` };
@@ -180,7 +191,10 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
     return { text: [...children].sort().join('\n') || '(empty)' };
   });
 
-  const readFile = tool(snapshotToolNames.read, 'Read one file of the audited candidate, with line numbers. startLine counts from 1.', readInput, async (input, signal) => {
+  const readFile = tool(snapshotToolNames.read, 'Read one file of the audited candidate, with line numbers. startLine counts from 1.', readInput,
+    input => ({ kind: 'read', path: candidatePath(input.path),
+      range: input.startLine === undefined && input.lineCount === undefined ? null
+        : { start: input.startLine ?? 1, count: Math.min(input.lineCount ?? snapshotReadLimits.lines, snapshotReadLimits.lines) } }), async (input, signal) => {
     const resolved = resolveSnapshotPath(snapshot, input.path);
     if (!resolved.ok) return refuse(snapshotToolNames.read, input.path, resolved);
     if (resolved.kind === 'directory') return { text: `${resolved.path} is a directory; list it with ${snapshotToolNames.list}`, isError: true };
@@ -200,7 +214,8 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
     return { text: `${shown.map((line, index) => `${String(start + index).padStart(6)}\t${line}`).join('\n')}${more}` };
   });
 
-  const search = tool(snapshotToolNames.search, 'Search the audited candidate\'s text files for an extended regular expression, beneath a path or everywhere.', searchInput, async (input, signal) => {
+  const search = tool(snapshotToolNames.search, 'Search the audited candidate\'s text files for an extended regular expression, beneath a path or everywhere.', searchInput,
+    input => ({ kind: 'search', path: candidatePath(input.path), pattern: input.pattern, glob: null }), async (input, signal) => {
     let paths: string[] = [];
     if (input.path !== undefined) {
       const resolved = resolveSnapshotPath(snapshot, input.path);
@@ -215,7 +230,10 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
     return { text: shown.length === 0 ? 'No match' : `${shown.map(match => `${match.path}:${match.line}: ${match.text}`).join('\n')}${more}` };
   });
 
-  const diff = tool(snapshotToolNames.diff, 'Without a path, list every path the candidate changed from the iteration\'s base. With one, show that path\'s patch.', diffInput, async (input, signal) => {
+  const diff = tool(snapshotToolNames.diff, 'Without a path, list every path the candidate changed from the iteration\'s base. With one, show that path\'s patch.', diffInput,
+    input => input.path === undefined
+      ? { kind: 'search', path: candidatePath(), pattern: null, glob: null }
+      : { kind: 'read', path: candidatePath(input.path), range: null }, async (input, signal) => {
     if (input.path === undefined) {
       return { text: snapshot.changes.length === 0 ? 'The candidate changed nothing' : snapshot.changes.map(change => `${change.status}\t${change.path}`).join('\n') };
     }

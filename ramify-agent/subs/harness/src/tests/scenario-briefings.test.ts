@@ -160,7 +160,8 @@ describe('the local architect\'s briefing', () => {
       },
     }));
     expect(text).toContain('The scenarios its gate passed, and the step definition that bound each step:\n\n- `sc-001` "A shelved book is listed" passed');
-    expect(text).toContain('A definition outside the owner\'s own step files reached the run through an import, which Ramify verified.');
+    expect(text).not.toContain('reached the run through an import, which Ramify verified');
+    expect(text).toContain('Step locations identify loaded definitions; they do not establish import or exposure provenance.');
   });
 });
 

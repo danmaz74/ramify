@@ -111,7 +111,7 @@ reports itself; your proposal never supplies it.
 You cannot finish, and you are handing over rather than guessing. Name what
 is `done` and what is `unfinished`; naming neither reports nothing. The work
 you did stays in the working directory, and whoever continues this iteration
-sees it with `git diff`.
+inspects the files with the harness's recorded result.
 
 This is also the report you write when the harness tells you the context
 budget is reached. It is never a completion.
