@@ -104,7 +104,7 @@ source, resurrect the removed scenario runner, or place durable writes in web.
 | 11 | Capture metrics across all roles and publish projections | 6, 10 | Alongside 13 |
 | 12 | Present session lineage, exploration, time and charges | 11 | Alongside 13 |
 | 13 | Repair trial verification and fixture inputs | 10 | Alongside 11–12 |
-| 14 | Qualify integrated behavior, transport and real-run improvement | 12, 13 | Serial final qualification |
+| 14 | Qualify integrated behavior, transport and native witnesses | 12, 13 | Serial final qualification |
 
 ```mermaid
 flowchart LR

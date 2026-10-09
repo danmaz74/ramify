@@ -48,5 +48,5 @@ V01–V02 pass; existing run/transcript views still render real protocol states.
 
 ## Handoff
 
-UI evidence and focused tests for final integrated browser/real-run assessment. Record exact base/head, changed paths, commands and results in
+UI evidence and focused tests for final integrated qualification. Record exact base/head, changed paths, commands and results in
 `12-results.md`; do not create a passing receipt before executing the work.

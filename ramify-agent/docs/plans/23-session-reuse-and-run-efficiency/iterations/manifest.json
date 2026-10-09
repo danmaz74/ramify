@@ -38,7 +38,7 @@
         "ordinaryTests": 45,
         "typeCheck": "passed",
         "structure": "passed; partial analysis coverage",
-        "logs": "/tmp/ramify-plan23-integrated-sessions-*.log"
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-sessions-*.log"
       }
     },
     {
@@ -64,7 +64,7 @@
         "ordinaryTests": 71,
         "typeCheck": "passed",
         "structure": "passed; partial analysis coverage",
-        "logs": "/tmp/ramify-plan23-integrated-prompts-*.log"
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-prompts-*.log"
       },
       "specializedTaskAmendment": {
         "providerHead": "c74ecaa3177b12e993716a64eea41322f72d98db",
@@ -73,7 +73,7 @@
         "ordinaryTests": 86,
         "typeCheck": "passed",
         "structure": "passed; partial analysis coverage; 314 analysis limits",
-        "logs": "/tmp/ramify-plan23-integrated-specialized-packets-*.log"
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-specialized-packets-*.log"
       }
     },
     {
@@ -98,7 +98,7 @@
         "ordinaryTests": 71,
         "typeCheck": "passed",
         "structure": "passed; partial analysis coverage",
-        "logs": "/tmp/ramify-plan23-integrated-hooks-*.log",
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-hooks-*.log",
         "repair": "Old engineer timeout prose assertion now verifies delivered current environment; corrected file 15/15 passed after 4 other files passed. Initial failure log retained."
       }
     },
@@ -122,7 +122,7 @@
         "ordinaryTests": 124,
         "typeCheck": "passed",
         "structure": "passed; partial analysis coverage; 314 analysis limits",
-        "logs": "/tmp/ramify-plan23-integrated-catalog-focus-*.log"
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-catalog-focus-*.log"
       }
     },
     {
@@ -146,7 +146,7 @@
         "ordinaryTests": 124,
         "typeCheck": "passed",
         "structure": "passed; partial analysis coverage; 314 analysis limits",
-        "logs": "/tmp/ramify-plan23-integrated-catalog-focus-*.log"
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-catalog-focus-*.log"
       }
     },
     {
@@ -172,7 +172,7 @@
         "ordinaryTests": 67,
         "typeCheck": "passed",
         "structure": "passed; partial analysis coverage; 314 analysis limits",
-        "logs": "/tmp/ramify-plan23-integrated-metrics-*.log"
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-metrics-*.log"
       }
     },
     {
@@ -198,7 +198,7 @@
         "ordinaryTests": 72,
         "typeCheck": "passed",
         "structure": "passed; partial analysis coverage; 317 analysis limits",
-        "logs": "/tmp/ramify-plan23-integrated-pi-*.log"
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-pi-*.log"
       }
     },
     {
@@ -226,7 +226,7 @@
         "requiredTests": 43,
         "typeCheck": "passed all four configured scopes after test amendment",
         "structure": "passed; partial analysis coverage; 317 analysis limits",
-        "logs": "/tmp/ramify-plan23-integrated-continuations-*.log",
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-continuations-*.log",
         "repair": "Initial joined109passed1failed retained. Six other files95tests passed; corrected generic file15tests passed with stronger history/current-delivery/retry assertions. Type and structure repeated on repaired source.",
         "pendingHandoff": "Iteration10 fence-aware Markdown heading grouping preserves consecutive literal # comments."
       }
@@ -257,7 +257,7 @@
         "standaloneTests": 13,
         "typeCheck": "passed all four configured scopes after final standalone fix",
         "structure": "passed; partial analysis coverage; 317 analysis limits",
-        "logs": "/tmp/ramify-plan23-integrated-forks-*.log",
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-forks-*.log",
         "limit": "Joined137 and final standalone13 are separate passing commands; historical worker failures retained in receipt. No native/live/full qualification claim."
       }
     },
@@ -287,7 +287,7 @@
         "ordinaryTests": 195,
         "typeCheck": "passed all four configured scopes",
         "structure": "passed; partial analysis coverage; 317 retained analysis limits",
-        "logs": "/tmp/ramify-plan23-integrated-run-corrections-*.log",
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-run-corrections-*.log",
         "limit": "No native, live provider or full configured audit claim."
       }
     },
@@ -321,8 +321,8 @@
         "typeCheck": "passed all four configured scopes on final source",
         "structure": "passed;678sources;0errors/0warnings;326 analysis limits/partial coverage",
         "logs": [
-          "/tmp/ramify-plan23-integrated-observations-*.log",
-          "/tmp/ramify-plan23-integrated-observation-identity-corrected-*.log"
+          "external, not in repository: /tmp/ramify-plan23-integrated-observations-*.log",
+          "external, not in repository: /tmp/ramify-plan23-integrated-observation-identity-corrected-*.log"
         ],
         "limit": "Initial followup31pass1timeout retained; independent role cases corrected with original5sec limits. Final corrected3-file gate passed; no native/live/full audit claim."
       }
@@ -349,7 +349,7 @@
         "typeCheck": "passed all four configured scopes",
         "structure": "passed; partial analysis coverage; 326 retained analysis limits",
         "webBuild": "passed; retained greater-than-500kB chunk warning",
-        "logs": "/tmp/ramify-plan23-integrated-presentation-*.log",
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-presentation-*.log",
         "limit": "JSDOM render evidence only; native/live/full qualification remains iteration14."
       }
     },
@@ -374,7 +374,7 @@
         "ordinaryTests": 101,
         "typeCheck": "passed all four configured scopes",
         "structure": "passed; partial analysis coverage; 317 retained analysis limits",
-        "logs": "/tmp/ramify-plan23-integrated-trial-corrections-*.log",
+        "logs": "external, not in repository: /tmp/ramify-plan23-integrated-trial-corrections-*.log",
         "limit": "No installed Git/CLI, opt-in fixture trial, live provider or full configured audit claim."
       }
     },
@@ -405,7 +405,7 @@
     "ordinaryTests": 10,
     "typeCheck": "passed",
     "structure": "passed; partial analysis coverage; 314 analysis limits",
-    "logs": "/tmp/ramify-plan23-integrated-scope-repair-*.log",
+    "logs": "external, not in repository: /tmp/ramify-plan23-integrated-scope-repair-*.log",
     "finalFullAudit": "passed on aac47684aa8f4cfc4e524f6efb04c2de9ef01abc; original baseline failure retained"
   },
   "providerAmendments": {
@@ -416,7 +416,7 @@
       "ordinaryTests": 78,
       "typeCheck": "passed",
       "structure": "passed; partial analysis coverage; 317 analysis limits",
-      "logs": "/tmp/ramify-plan23-integrated-quiescence-*.log"
+      "logs": "external, not in repository: /tmp/ramify-plan23-integrated-quiescence-*.log"
     },
     "sessionStoreCache": {
       "providerHead": "39486a63fe74b18820b9e38e729355aec0d6c854",
@@ -425,7 +425,7 @@
       "ordinaryTests": 92,
       "typeCheck": "passed",
       "structure": "passed; partial analysis coverage; 317 analysis limits",
-      "logs": "/tmp/ramify-plan23-integrated-store-cache-*.log"
+      "logs": "external, not in repository: /tmp/ramify-plan23-integrated-store-cache-*.log"
     },
     "cucumberConfigPath": {
       "providerHead": "ebe1fd88ac9712dc383e44f62a4906468f7cbdd1",
@@ -434,7 +434,7 @@
       "ordinaryTests": 46,
       "typeCheck": "passed",
       "structure": "passed; partial analysis coverage; 317 analysis limits",
-      "logs": "/tmp/ramify-plan23-integrated-cucumber-path-*.log"
+      "logs": "external, not in repository: /tmp/ramify-plan23-integrated-cucumber-path-*.log"
     },
     "piNativeRequestArtifact": {
       "providerHead": "ac0a5026d41e22d79eca23cb446a64711f641810",
@@ -444,7 +444,7 @@
       "ordinaryTests": 86,
       "typeCheck": "passed",
       "structure": "passed; partial analysis coverage; 317 analysis limits",
-      "logs": "/tmp/ramify-plan23-integrated-native-artifact-*.log"
+      "logs": "external, not in repository: /tmp/ramify-plan23-integrated-native-artifact-*.log"
     },
     "gitLineOriginFacts": {
       "providerHead": "145ba776d90acb1a20bf5515b026e30edae9790d",
@@ -455,7 +455,7 @@
       "nativeTests": 8,
       "typeCheck": "passed all four configured scopes",
       "structure": "passed; partial analysis coverage; 317 analysis limits",
-      "logs": "/tmp/ramify-plan23-integrated-git-line-facts-*.log",
+      "logs": "external, not in repository: /tmp/ramify-plan23-integrated-git-line-facts-*.log",
       "boundaryLimit": "Original source positions and repository-relative filenames retained; arbitrary BASE-to-setup-before mapping still requires exact boundary history and authenticated blob facts; no path/commit/count exemptions."
     },
     "sharedSetupAttributionVerifier": {
@@ -468,7 +468,7 @@
       "ordinaryTests": 60,
       "typeCheck": "passed all four configured scopes",
       "structure": "passed; partial analysis coverage; 317 retained analysis limits",
-      "logs": "/tmp/ramify-plan23-integrated-attribution-helper-*.log",
+      "logs": "external, not in repository: /tmp/ramify-plan23-integrated-attribution-helper-*.log",
       "limit": "Partial pure provider only; full13 collectors/fixtures and nativeGit remain pending."
     },
     "treeBlobObjectFacts": {
@@ -480,7 +480,7 @@
       "nativeTests": 8,
       "typeCheck": "passed all four configured scopes",
       "structure": "passed; partial analysis coverage; 317 retained analysis limits",
-      "logs": "/tmp/ramify-plan23-integrated-blob-object-facts-*.log",
+      "logs": "external, not in repository: /tmp/ramify-plan23-integrated-blob-object-facts-*.log",
       "limit": "Optional original blob IDs authenticate reencoded decoded text; missing metadata remains unknown. Native SHA1 repository verified; SHA256 parser-only controls."
     }
   },
@@ -584,6 +584,11 @@
     "evidenceArchive": "/home/app/ramify-plan23-evidence/aac47684aa8f4cfc4e524f6efb04c2de9ef01abc",
     "supersedesEarlierPendingHandoffNotes": true,
     "approvedWatchdogMilliseconds": 25000,
+    "contractRevisionScriptedTestMilliseconds": 15393,
+    "contractRevisionScriptedTestSource": "639b1eb3b379f0ddd37afc054385f2f9c10ef8f0:reports/audit/agent-tests.txt lines 380-381; exceeds the original 15 s bound, so the pass is conditional on the user-approved 25 s bound",
+    "agentTestsDurationSeconds": 610.707,
+    "agentTestsDurationSource": "639b1eb3b379f0ddd37afc054385f2f9c10ef8f0:reports/audit/summary.json checks.agent-tests.commands.agent-vitest.durationSeconds",
+    "originalLiveEvidenceLocation": "external, not in repository: /home/app/ramify-plan23-evidence/aac47684aa8f4cfc4e524f6efb04c2de9ef01abc/live-originals (26 payload-*.bin files; store/payloads 30 files; store/record-bodies 78 files) and /tmp/plan23-live-aac47684-original-20261009",
     "watchdogAuthority": "Direct user instruction, 2026-10-09T02:26:22.055Z; qualification archive provenance JSON",
     "deferredOptionalOptimizations": [
       "observation batching",
