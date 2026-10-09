@@ -3546,7 +3546,7 @@ export class RunService {
             state.assessment, state.candidateId, action.value)) return null;
           continue;
         }
-        await this.closeNonfunctionalRound(run, state, decision.action === 'repair-or-close' ? decision.closeOutcome : 'exhausted', action.invocation);
+        await this.closeNonfunctionalRound(run, state, 'exhausted', action.invocation);
         continue;
       }
       if (decision.action === 'close') {

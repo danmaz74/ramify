@@ -183,7 +183,7 @@ export function replayNonfunctionalPhase(
             requireFact(!initial?.results.some(item => item.result === 'undetermined')
               || investigationInvocations.length > 0, 'undetermined evidence was closed without investigation');
             const expected = results!.every(item => item.result === 'satisfied')
-              ? 'satisfied' : round === maxRounds ? 'exhausted' : 'continue';
+              ? 'satisfied' : round === maxRounds || repair === null ? 'exhausted' : 'continue';
             requireFact(record.outcome === expected, `round outcome ${record.outcome} disagrees with assessed results`);
           }
           if (record.outcome !== 'unavailable') {

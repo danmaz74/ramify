@@ -85,8 +85,8 @@ test('an NFR-only exhausted run completes pending review with an exact source-bo
   const { fixture, opened, receipt, queries } = await startExhaustedRun();
   expect(onlyRun(opened.service, plan).state).toBe('completed');
   const events = await runEventsOnDisk(fixture.root, plan, receipt.jobId);
-  expect(events.filter(event => event.type === 'nonfunctional-round-closed')).toHaveLength(3);
-  expect(events.filter(event => event.type === 'nonfunctional-assessed')).toHaveLength(3);
+  expect(events.filter(event => event.type === 'nonfunctional-round-closed')).toHaveLength(1);
+  expect(events.filter(event => event.type === 'nonfunctional-assessed')).toHaveLength(1);
   const acceptedCatalog = events.find(event => event.type === 'analysis-accepted');
   const boundCandidate = events.find(event => event.type === 'candidate-bound-to-gate');
   if (acceptedCatalog?.type !== 'analysis-accepted' || !acceptedCatalog.data.evidence
@@ -145,7 +145,7 @@ test('accepting an exhausted NFR cannot waive a failed final test gate', async (
   if (failedGate?.type !== 'gate-attempted') throw new Error('Missing failed final gate attempt');
   expect(failedGate.data.verdict).toBe('failed');
   const durableGate = await queries.gate(plan, receipt.jobId, failedGate.data.gate);
-  expect(events.filter(event => event.type === 'nonfunctional-round-closed')).toHaveLength(3);
+  expect(events.filter(event => event.type === 'nonfunctional-round-closed')).toHaveLength(1);
   expect(events.filter(event => event.type === 'nonfunctional-deviation-recorded')).toHaveLength(1);
   const version = opened.service.getRun(plan, receipt.jobId)!.version;
   expect((await queries.mergeReadiness(plan, receipt.jobId, version)).readiness.status).toBe('gate-failed');

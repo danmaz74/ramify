@@ -72,16 +72,33 @@ describe('committed non-functional phase replay', () => {
   });
 
   it('advances from a committed continuing round without resetting the count', () => {
-    const unresolved = assessment('nfa-001', first, 'initial', 'not-satisfied');
+    const unresolved = assessment('nfa-002', second, 'after-repair', 'not-satisfied');
     const continuation = entry('nonfunctional-round-closed', { round: 1, record: 'nfr-round-001', outcome: 'continue' }, [
       record(runLayout.nonfunctionalRound(1), 'nfr-round-001', {
-        schema: 'ramify-agent.nonfunctional-round/1', number: 1, initial: unresolved.id,
-        investigation: null, repair: null, reassessment: null, outcome: 'continue',
+        schema: 'ramify-agent.nonfunctional-round/1', number: 1, initial: initial.id,
+        investigation: 'inv-investigate', repair: 'nfr-repair-001', reassessment: unresolved.id, outcome: 'continue',
       }),
-    ], 3);
-    const replay = replayNonfunctionalPhase([marker, prepared('cand-001', first, 2), assessed(unresolved, 'cand-001', 3), continuation], nfrIds, 3);
+    ], 9);
+    const replay = replayNonfunctionalPhase([...stream.slice(0, 7), assessed(unresolved, 'cand-002', 8), continuation], nfrIds, 3);
     expect(replay).toMatchObject({ ok: true, value: { input: { closedRounds: [{ number: 1, outcome: 'continue' }] } } });
     if (replay.ok) expect(decideNonfunctionalRound(replay.value.input)).toMatchObject({ action: 'prepare-candidate', round: 2 });
+  });
+
+  it('ends the phase when a round closes without a repair', () => {
+    const unresolved = assessment('nfa-001', first, 'initial', 'not-satisfied');
+    const closure = (outcome: 'continue' | 'exhausted') => entry('nonfunctional-round-closed', { round: 1, record: 'nfr-round-001', outcome }, [
+      record(runLayout.nonfunctionalRound(1), 'nfr-round-001', {
+        schema: 'ramify-agent.nonfunctional-round/1', number: 1, initial: unresolved.id,
+        investigation: null, repair: null, reassessment: null, outcome,
+      }),
+    ], 4);
+    const opened = [marker, prepared('cand-001', first, 2), assessed(unresolved, 'cand-001', 3)];
+    const replay = replayNonfunctionalPhase(opened, nfrIds, 3);
+    if (replay.ok) expect(decideNonfunctionalRound(replay.value.input)).toEqual({ action: 'repair-or-close', round: 1, unresolved: ['nfr-001'] });
+    const exhausted = replayNonfunctionalPhase([...opened, closure('exhausted')], nfrIds, 3);
+    expect(exhausted).toMatchObject({ ok: true, value: { final: { candidateId: 'cand-001' } } });
+    if (exhausted.ok) expect(decideNonfunctionalRound(exhausted.value.input)).toEqual({ action: 'stop', closedRounds: 1, outcome: 'exhausted' });
+    expect(replayNonfunctionalPhase([...opened, closure('continue')], nfrIds, 3)).toMatchObject({ ok: false, reason: expect.stringContaining('disagrees') });
   });
 
   it('rejects missing or conflicting co-committed evidence', () => {

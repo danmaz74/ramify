@@ -37,7 +37,7 @@ describe('nonfunctional round decision', () => {
     expect(decideNonfunctionalRound({ ...base, initial })).toEqual({ action: 'investigate', round: 1, undetermined: ['nfr-001'] });
     expect(() => decideNonfunctionalRound({ ...base, initial, repairCommitted: true })).toThrow('investigation before repair');
     expect(decideNonfunctionalRound({ ...base, initial, investigated: true })).toEqual({
-      action: 'repair-or-close', round: 1, unresolved: ['nfr-001'], closeOutcome: 'continue',
+      action: 'repair-or-close', round: 1, unresolved: ['nfr-001'],
     });
     expect(requireRepairPermitted({ ...base, initial, investigated: true })).toBe(1);
     expect(() => requireRepairPermitted({ ...base, initial })).toThrow('not permitted');
@@ -61,16 +61,16 @@ describe('nonfunctional round decision', () => {
   it('derives the next round from closures and stops at the captured limit', () => {
     const unresolved = [result('nfr-001', 'not-satisfied'), result('nfr-002', 'satisfied')];
     expect(decideNonfunctionalRound({ ...base, initial: assessment(1, 'initial', unresolved) })).toEqual({
-      action: 'repair-or-close', round: 1, unresolved: ['nfr-001'], closeOutcome: 'continue',
+      action: 'repair-or-close', round: 1, unresolved: ['nfr-001'],
     });
     expect(decideNonfunctionalRound({ ...base, closedRounds: [closed(1, 'continue'), closed(2, 'continue')], initial: assessment(3, 'initial', unresolved) })).toEqual({
-      action: 'repair-or-close', round: 3, unresolved: ['nfr-001'], closeOutcome: 'exhausted',
+      action: 'repair-or-close', round: 3, unresolved: ['nfr-001'],
     });
     expect(decideNonfunctionalRound({ ...base, maxRounds: 1, initial: assessment(1, 'initial', unresolved) })).toEqual({
-      action: 'repair-or-close', round: 1, unresolved: ['nfr-001'], closeOutcome: 'exhausted',
+      action: 'repair-or-close', round: 1, unresolved: ['nfr-001'],
     });
     expect(decideNonfunctionalRound({ ...base, maxRounds: 2, closedRounds: [closed(1, 'continue')], initial: assessment(2, 'initial', unresolved) })).toEqual({
-      action: 'repair-or-close', round: 2, unresolved: ['nfr-001'], closeOutcome: 'exhausted',
+      action: 'repair-or-close', round: 2, unresolved: ['nfr-001'],
     });
     expect(decideNonfunctionalRound({ ...base, candidate: null, closedRounds: [closed(1, 'continue'), closed(2, 'continue'), closed(3, 'exhausted')] })).toEqual({
       action: 'stop', closedRounds: 3, outcome: 'exhausted',

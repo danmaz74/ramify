@@ -133,7 +133,7 @@ const core = 'subs/workspace/subs/reviews/subs/core/src/';
 const oneRepair = { [core + 'repair-recovery.ts']: 'export const auditRecord = true;\n' };
 const twoRepair = { [core + 'nonfunctional-repair.ts']: 'export const auditRecord = true;\n',
   'subs/workspace/subs/catalog/src/nonfunctional-repair.ts': 'export const catalogAuditRecord = true;\n' };
-const driftPaths = ['downtime-mutation.ts', 'late-source.ts', 'late-after-round-three.ts', 'changed-after-exhaustion.ts'];
+const driftPaths = ['downtime-mutation.ts', 'late-source.ts', 'late-after-exhaustion.ts', 'changed-after-exhaustion.ts'];
 const scratch = modules.map(module => (module.directory === '.' ? '' : module.directory + '/') + 'src/tmp');
 const owners: Readonly<Record<string, string>> = {
   ...Object.fromEntries(modules.flatMap(module => [[module.directory, module.id]])),

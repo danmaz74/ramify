@@ -26,7 +26,7 @@ export type RoundDecision =
   | { action: 'prepare-candidate'; round: number; phase: Phase }
   | { action: 'assess'; round: number; phase: Phase }
   | { action: 'investigate'; round: number; undetermined: string[] }
-  | { action: 'repair-or-close'; round: number; unresolved: string[]; closeOutcome: 'continue' | 'exhausted' }
+  | { action: 'repair-or-close'; round: number; unresolved: string[] }
   | { action: 'close'; round: number; outcome: 'satisfied' | 'continue' | 'exhausted'; unresolved: string[] }
   | { action: 'unavailable'; round: number };
 
@@ -102,7 +102,8 @@ export function decideNonfunctionalRound(input: RoundDecisionInput): RoundDecisi
   if (repairCommitted) return { action: 'close', round, outcome: closeOutcome, unresolved };
   const undetermined = results.filter((result) => result.result === 'undetermined').map((result) => result.nfr);
   if (undetermined.length > 0 && !investigated) return { action: 'investigate', round, undetermined };
-  return { action: 'repair-or-close', round, unresolved, closeOutcome };
+  // Closing without a repair leaves the tree unchanged, so the close ends the phase as exhausted.
+  return { action: 'repair-or-close', round, unresolved };
 }
 
 /** Call before committing a repair task; a completed batch has no second transition. */

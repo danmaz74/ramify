@@ -39,7 +39,7 @@ const binding = {
 
 function actionContext(overrides: Partial<ActionContext> = {}): ActionContext {
   return {
-    decision: { action: 'repair-or-close', round: 1, unresolved: ['nfr-001', 'fix-001'], closeOutcome: 'continue' },
+    decision: { action: 'repair-or-close', round: 1, unresolved: ['nfr-001', 'fix-001'] },
     results, investigatedNfrs: [], moduleNames: ['app/api'], ...overrides,
   };
 }

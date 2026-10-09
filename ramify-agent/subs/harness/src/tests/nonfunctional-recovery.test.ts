@@ -198,7 +198,7 @@ function exhaustedAgent(obligation: string) {
   }));
 }
 
-test('round three exhausts and a late source change still refuses the final gate', async () => {
+test('a closed round exhausts and a late source change still refuses the final gate', async () => {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   const boundaryAnswers = nfrBoundaries(fixture.root);
@@ -207,8 +207,8 @@ test('round three exhausts and a late source change still refuses the final gate
   const plan = join(fixture.root, 'plans/review-notes/plan.md');
   await writeFile(plan, `${await readFile(plan, 'utf8')}\n${obligation}\n`);
   boundaryAnswers.afterFinalAudit = async () => {
-    await writeFile(join(fixture.root, 'late-after-round-three.ts'), 'export const stale = true;\n');
-    boundaryAnswers.drift('late-after-round-three.ts');
+    await writeFile(join(fixture.root, 'late-after-exhaustion.ts'), 'export const stale = true;\n');
+    boundaryAnswers.drift('late-after-exhaustion.ts');
   };
   const { service } = await openRuns(fixture.root, { ...boundaryAnswers.options,
     agent: exhaustedAgent(obligation) });
@@ -216,11 +216,11 @@ test('round three exhausts and a late source change still refuses the final gate
   const receipt = await service.execute(startRun('review-notes'));
   await service.settled('review-notes', receipt.jobId);
   const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
-  expect(events.filter(event => event.type === 'nonfunctional-assessed')).toHaveLength(3);
-  expect(events.filter(event => event.type === 'nonfunctional-round-closed').map(event => event.data.outcome)).toEqual(['continue', 'continue', 'exhausted']);
+  expect(events.filter(event => event.type === 'nonfunctional-assessed')).toHaveLength(1);
+  expect(events.filter(event => event.type === 'nonfunctional-round-closed').map(event => event.data.outcome)).toEqual(['exhausted']);
   expect(onlyRun(service, 'review-notes').failure?.reason).toBe('inputs-changed');
   expect(events.filter(event => event.type === 'job-completed')).toHaveLength(0);
-  expect(await readFile(join(fixture.root, 'late-after-round-three.ts'), 'utf8')).toBe('export const stale = true;\n');
+  expect(await readFile(join(fixture.root, 'late-after-exhaustion.ts'), 'utf8')).toBe('export const stale = true;\n');
 }, 60_000);
 
 test('an exhausted crash with changed source leaves merge readiness unavailable', async () => {
@@ -237,7 +237,7 @@ test('an exhausted crash with changed source leaves merge readiness unavailable'
       if (write !== 'gate-committing') return;
       const closed = (await runEventsOnDisk(fixture.root, 'review-notes', id))
         .filter(event => event.type === 'nonfunctional-round-closed');
-      if (closed.length === 3) { frozen = true; await freeze(); }
+      if (closed.length === 1) { frozen = true; await freeze(); }
     },
   });
   const receipt = await first.service.execute(startRun('review-notes'));
@@ -251,7 +251,7 @@ test('an exhausted crash with changed source leaves merge readiness unavailable'
   expect(onlyRun(reopened.service, 'review-notes').failure?.reason).toBe('recovery-exhausted');
   const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
   expect(events.filter(event => event.type === 'nonfunctional-round-closed').map(event => event.data.outcome))
-    .toEqual(['continue', 'continue', 'exhausted']);
+    .toEqual(['exhausted']);
   expect(events.filter(event => event.type === 'job-completed')).toHaveLength(0);
   expect(await readFile(join(fixture.root, 'changed-after-exhaustion.ts'), 'utf8')).toBe('export const changed = true;\n');
   const version = reopened.service.getRun('review-notes', receipt.jobId)!.version;
