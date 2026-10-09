@@ -10,22 +10,37 @@ export interface NativePrefix { readonly instructions: string; readonly tools: r
 /** The credential-free final request artifact, not evidence that HTTP dispatch
  * passed the later liveness fence. Input items remain opaque JSON; callers
  * retain the original payload bytes separately when recording byte evidence.
+ * `packageVersion`, `transport` and `maxRetries` are observations: the
+ * installed pi package and the stream options actually handed to it at the
+ * final fence. Qualification compares them with its own expected values.
  */
 export interface PiNativeRequestArtifact {
   readonly schema: 'ramify.pi-native-request/1';
-  readonly packageVersion: '0.87.1';
-  readonly transport: 'sse';
+  readonly packageVersion: string;
+  readonly transport: string;
+  readonly maxRetries: number;
   readonly model: 'openai-codex/gpt-5.6-sol';
   readonly instructions: string;
   readonly tools: readonly unknown[];
   readonly input: readonly unknown[];
   readonly request: Readonly<Record<string, unknown>>;
 }
+/** The stream options whose transport and retry fields the artifact records. */
+export interface RecordedStreamOptions { readonly transport: string; readonly maxRetries: number }
+
+/** Builds the request artifact from what was actually passed: the stream
+ * options handed to the installed stream function, the installed package
+ * version, the validated native prefix and the complete final body.
+ */
+export function nativeRequestArtifact(options: RecordedStreamOptions, packageVersion: string, model: string, native: NativePrefix, body: unknown): PiNativeRequestArtifact {
+  return { schema: 'ramify.pi-native-request/1', packageVersion, transport: options.transport, maxRetries: options.maxRetries, model: model as PiNativeRequestArtifact['model'], ...native, request: copy(body) as Record<string, unknown> };
+}
 
 /** Reads only this owner's final-request artifact. Other JSON artifacts,
  * including opaque provider transcripts, are neither validated nor exposed.
  * Claimed request artifacts must agree with their complete original body,
- * including field order in every native tool and input item.
+ * including field order in every native tool and input item. Recorded
+ * transport, retries and package version are returned as recorded.
  */
 export function readPiNativeRequestArtifact(bytes: Uint8Array): PiNativeRequestArtifact | null {
   let parsed: unknown;
@@ -34,12 +49,14 @@ export function readPiNativeRequestArtifact(bytes: Uint8Array): PiNativeRequestA
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
   const artifact = parsed as Record<string, unknown>;
   if (typeof artifact['schema'] !== 'string' || !artifact['schema'].startsWith('ramify.pi-native-request')) return null;
-  if (artifact['schema'] !== 'ramify.pi-native-request/1' || artifact['packageVersion'] !== '0.87.1' ||
-    artifact['transport'] !== 'sse' || artifact['model'] !== 'openai-codex/gpt-5.6-sol') {
+  if (artifact['schema'] !== 'ramify.pi-native-request/1' || artifact['model'] !== 'openai-codex/gpt-5.6-sol') {
     throw new Error('Unsupported pi native request artifact identity');
   }
   const body = artifact['request'];
-  if (typeof artifact['instructions'] !== 'string' || artifact['instructions'].length === 0 ||
+  if (typeof artifact['packageVersion'] !== 'string' || artifact['packageVersion'].length === 0 ||
+    typeof artifact['transport'] !== 'string' || artifact['transport'].length === 0 ||
+    typeof artifact['maxRetries'] !== 'number' || !Number.isInteger(artifact['maxRetries']) || artifact['maxRetries'] < 0 ||
+    typeof artifact['instructions'] !== 'string' || artifact['instructions'].length === 0 ||
     !Array.isArray(artifact['tools']) || !Array.isArray(artifact['input']) ||
     body === null || typeof body !== 'object' || Array.isArray(body)) {
     throw new Error('Malformed pi native request artifact body');
@@ -91,12 +108,18 @@ export async function installedPiPublicExport(subpath: string): Promise<string> 
   }
   throw new Error(`Installed pi-ai does not export ${subpath}`);
 }
+/** The version the installed pi package declares; read, never assumed. */
+export async function installedPiPackageVersion(): Promise<string> {
+  const manifest = JSON.parse(await readFile(join(dirname(packageEntry), '..', 'package.json'), 'utf8')) as { version?: string };
+  if (typeof manifest.version !== 'string' || manifest.version.length === 0) throw new Error('Installed pi package declares no version');
+  return manifest.version;
+}
 let serialization: Promise<{ serializer: Serializer; transcript: TranscriptUtilities; grammar: GrammarUtilities }> | undefined;
 /** Installed, publicly exported package seams; version changes require qualification. */
 export function installedPiSerialization() {
   serialization ??= (async () => {
-    const version = JSON.parse(await readFile(join(dirname(packageEntry), '..', 'package.json'), 'utf8')) as { version?: string };
-    if (version.version !== '0.87.1') throw new Error(`Unsupported pi package ${version.version ?? 'unknown'}`);
+    const version = await installedPiPackageVersion().catch(() => 'unknown');
+    if (version !== '0.87.1') throw new Error(`Unsupported pi package ${version}`);
     const load = async (subpath: string) => import(await installedPiPublicExport(subpath)) as Promise<unknown>;
     const [serializer, transcript, grammar] = await Promise.all([
       load('./api/openai-responses-shared'),
