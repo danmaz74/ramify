@@ -482,6 +482,16 @@
         "subs/harness/subs/agent/src/interfaces/session-operations.ts",
         "subs/harness/subs/agent/src/scripted.ts",
         "subs/harness/subs/agent/src/tests/scripted.test.ts"
+      ],
+      "transcriptBurstRoot": [
+        "subs/harness/subs/ledger/src/jsonl.ts",
+        "subs/harness/subs/ledger/src/tests/jsonl-appender.test.ts",
+        "subs/harness/subs/ledger/module.ramify"
+      ],
+      "transcriptBurstWorker": [
+        "subs/harness/src/transcripts/writer.ts",
+        "subs/harness/src/transcripts/recorder.ts",
+        "subs/harness/src/tests/transcript-writer.test.ts"
       ]
     }
   }
