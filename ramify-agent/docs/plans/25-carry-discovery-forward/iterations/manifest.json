@@ -83,8 +83,10 @@
         "I03",
         "I04"
       ],
-      "status": "planned",
-      "writeBoundary": "Harness starting-point rendering, architect/engineer/reviewer task callers, snapshot filtering and fresh fallback tests."
+      "status": "implemented; focused checks passed",
+      "writeBoundary": "Harness starting-point rendering, architect/engineer/reviewer task callers, snapshot filtering and fresh fallback tests.",
+      "sourceCommit": "71b084fd0b8c8a9983b3854b0de3c2ac433262b9",
+      "results": "03-results.md"
     },
     {
       "id": "4",
