@@ -6,7 +6,7 @@ export function coordinatorAssessmentPrompt(assessmentPackage: string, candidate
     `Assess the prepared source tree ${candidate.tree} in round ${round} (${phase}).`,
     'The package below holds every non-functional requirement of the plan and every fixed requirement, with the plan deviations recorded in this run. Carry their wording and stated/inferred conditions forward unchanged.',
     'Submit exactly one result for every element ID of the package.',
-    'For each result, name inspected scope, evidence, and uncertainty. If a requirement or its stated conditions lack observed evidence, choose undetermined.',
+    'For each result, name inspected scope, evidence, and uncertainty. Analysis of the source is sufficient evidence, including for requirements about tests or behavior; choose undetermined only when the source cannot settle a requirement or its stated conditions.',
     'Do not use capability progress or scenario coverage as a substitute for this assessment. Do not edit source.',
     'Submit your assessment using `submit_nonfunctional_assessment`.',
     '',

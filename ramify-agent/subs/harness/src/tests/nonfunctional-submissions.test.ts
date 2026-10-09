@@ -113,7 +113,8 @@ describe('non-functional coordinator submissions', () => {
     expect(assessment).toContain('- stated: At every intermediate load step');
     expect(assessment).toContain('- inferred: The system may need a retry bound');
     expect(assessment).not.toContain('rec-001');
-    expect(assessment).toContain('If a requirement or its stated conditions lack observed evidence, choose undetermined.');
+    expect(assessment).toContain('Analysis of the source is sufficient evidence, including for requirements about tests or behavior; choose undetermined only when the source cannot settle a requirement or its stated conditions.');
+    expect(assessment).not.toContain('lack observed evidence');
     expect(assessment).not.toContain('temporal condition lacks observed intermediate evidence');
     expect(assessment).not.toContain('capability progress as evidence');
     expect(coordinatorActionPrompt(candidate, ['nfr-001'], ['nfr-001'])).toContain('one repair batch');
