@@ -19,10 +19,10 @@ import {
   type ProjectResponse,
 } from '../../harness/src/interfaces/protocol/queries.js';
 import {
-  analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
-  mergeReadinessResponseSchema, metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
+  analysisResponseSchema, capabilityListResponseSchema, debugExchangeResponseSchema, debugInspectionResponseSchema, debugStateResponseSchema,
+  decisionListResponseSchema, gateResponseSchema, mergeReadinessResponseSchema, metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
   scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
-  type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateView,
+  type AnalysisResponse, type CapabilityListResponse, type DebugExchangeResponse, type DebugInspectionResponse, type DebugStateResponse, type DecisionListResponse, type GateView,
   type MergeReadinessResponse, type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommandInput, type RunEventPage, type RunListResponse, type RunSnapshot,
   type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
@@ -96,6 +96,12 @@ export interface ProtocolClient {
   /** The run's review requests, of one work item when named, with their coverage. */
   getReviews(planId: string, runId: string, workItem?: string): Promise<ReviewListResponse>;
   getMetrics(planId: string, runId: string): Promise<MetricsResponse>;
+  /** The run's current breakpoint interaction and every intervention of the run, read from the start of its log. */
+  getDebugState(planId: string, runId: string): Promise<DebugStateResponse>;
+  /** The prepared input of a live breakpoint occurrence: a preview, not delivered input. */
+  getDebugInspection(planId: string, runId: string, pauseId: string): Promise<DebugInspectionResponse>;
+  /** One debugger message's exchange, admitted or settled, by its command ID. */
+  getDebugExchange(planId: string, runId: string, commandId: string): Promise<DebugExchangeResponse>;
   /** Every session of the project, live and suspended first; a page of at most 200 from `offset`. */
   listSessions(offset?: number): Promise<SessionListResponse>;
   /** One standalone session: its summary, prompt, outcome and evaluation. */
@@ -220,6 +226,9 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getCheckFindingModules: (planId, runId) => get(protocolPaths.runCheckFindingModules(planId, runId), checkFindingModuleCountsSchema),
     getReviews: (planId, runId, workItem) => get(protocolPaths.runReviews(planId, runId, { workItem }), reviewListResponseSchema),
     getMetrics: (planId, runId) => get(protocolPaths.runMetrics(planId, runId), metricsResponseSchema),
+    getDebugState: (planId, runId) => get(protocolPaths.runDebug(planId, runId, 0), debugStateResponseSchema),
+    getDebugInspection: (planId, runId, pauseId) => get(protocolPaths.runDebugInspect(planId, runId, pauseId), debugInspectionResponseSchema),
+    getDebugExchange: (planId, runId, commandId) => get(protocolPaths.runDebugExchange(planId, runId, commandId), debugExchangeResponseSchema),
     listSessions: (offset = 0) => get(protocolPaths.sessions(offset), sessionListResponseSchema),
     getStandaloneSession: session => get(protocolPaths.standaloneSession(session), standaloneSessionResponseSchema),
     getRunSessions: (planId, runId) => get(protocolPaths.runSessions(planId, runId), runSessionsResponseSchema),

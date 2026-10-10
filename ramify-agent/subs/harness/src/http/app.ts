@@ -22,7 +22,7 @@ import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
   mergeReadinessResponseSchema, metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
   scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
-  debugStateResponseSchema, debugInspectionResponseSchema, debugExchangeResponseSchema, type BreakpointState,
+  debugStateResponseSchema, debugInspectionResponseSchema, debugExchangeResponseSchema, type BreakpointState, type DebugIntervention,
 } from '../interfaces/protocol/runs.js';
 import {
   runSessionIdSchema, runSessionResponseSchema, runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionQueryLimits,
@@ -150,7 +150,21 @@ export function createApp(options: AppOptions): express.Express {
         revision: event.data.revision, state: 'paused', taskState: 'pending',
         summary: `Before ${boundary.data.role}: ${boundary.data.goal}. Resume will ${boundary.data.nextAction}.` });
     }
-    send(response, debugStateResponseSchema, { run: page.run, current: runs.debugState(planId, runId), reached, cursor: page.cursor, more: page.more });
+    // Every intervention of the run, independent of the page window; each message's result is read now.
+    const interventions: DebugIntervention[] = events.flatMap((event): DebugIntervention[] => {
+      if (event.type === 'debug-exchange-admitted') {
+        const { commandId } = event.data.command;
+        return [{ kind: 'message', sequence: event.sequence, at: event.at, pauseId: event.data.pauseId, revision: event.data.revision,
+          commandId, message: event.data.message, exchange: runs.debugResult(planId, runId, commandId) }];
+      }
+      // The resume event records the revision its release produced, one past the revision the command named.
+      if (event.type === 'debug-resumed') {
+        return [{ kind: 'resume', sequence: event.sequence, at: event.at, pauseId: event.data.pauseId, revision: event.data.revision - 1,
+          commandId: event.data.command.commandId, message: event.data.message ?? null, exchange: null }];
+      }
+      return [];
+    });
+    send(response, debugStateResponseSchema, { run: page.run, current: runs.debugState(planId, runId), reached, cursor: page.cursor, more: page.more, interventions });
   });
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/debug/inspect`, async (request: RunRequest, response) => {

@@ -8,7 +8,7 @@ import type { ExecutionCapabilityDetail, ExecutionScenarioDetail } from '../../.
 import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.js';
 import type { PlanDocument, PlanEntry } from '../../../../harness/src/interfaces/protocol/queries.js';
 import type {
-  AnalysisResponse, CapabilityListResponse, DecisionListResponse, GateView, MetricsResponse, ModuleCapabilityComparisonResponse, ProjectedRunEvent,
+  AnalysisResponse, CapabilityListResponse, DebugExchangeResponse, DebugInspectionResponse, DebugStateResponse, DecisionListResponse, GateView, MetricsResponse, ModuleCapabilityComparisonResponse, ProjectedRunEvent,
   MergeReadinessResponse, RunCommandInput, RunEventPage, RunListResponse, RunSnapshot, ScenarioListResponse, WorkItemListResponse, WorkItemResponse,
 } from '../../../../harness/src/interfaces/protocol/runs.js';
 import type {
@@ -45,6 +45,12 @@ export interface StubRun {
   checkFindingModules?: CheckFindingModuleCounts;
   /** Review lists by work item, `` for the run's. */
   reviews?: Record<string, ReviewListResponse>;
+  /** The debug state; absent answers not found. */
+  debug?: DebugStateResponse;
+  /** Inspections by pause ID. */
+  inspections?: Record<string, DebugInspectionResponse>;
+  /** Exchanges by command ID. */
+  exchanges?: Record<string, DebugExchangeResponse>;
 }
 
 /** The key a stub run's CheckFinding list is answered by. */
@@ -196,6 +202,15 @@ export class StubClient implements ProtocolClient {
     return this.answer(runId, current => current.reviews?.[workItem ?? ''], `reviews of ${workItem ?? 'the run'}`);
   }
   async getMetrics(_planId: string, runId: string) { this.calls.push(`getMetrics:${runId}`); return this.answer(runId, run => run.metrics, 'metrics'); }
+  async getDebugState(_planId: string, runId: string) { this.calls.push(`getDebugState:${runId}`); return this.answer(runId, run => run.debug, 'debug state'); }
+  async getDebugInspection(_planId: string, runId: string, pauseId: string) {
+    this.calls.push(`getDebugInspection:${runId}:${pauseId}`);
+    return this.answer(runId, run => run.inspections?.[pauseId], `inspection of pause ${pauseId}`);
+  }
+  async getDebugExchange(_planId: string, runId: string, commandId: string) {
+    this.calls.push(`getDebugExchange:${runId}:${commandId}`);
+    return this.answer(runId, run => run.exchanges?.[commandId], `exchange ${commandId}`);
+  }
 
   async listSessions(offset = 0): Promise<SessionListResponse> {
     this.calls.push(`listSessions:${offset}`);

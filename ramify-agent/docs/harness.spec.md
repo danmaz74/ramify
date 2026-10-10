@@ -237,6 +237,12 @@ settlement, while reviews remain suspended throughout. Stop and server shutdown
 settle the admitted exchange's lifetime before releasing resources. A stopped
 or interrupted exchange cannot be reported as a completed conversation.
 
+The run snapshot names the breakpoint the run was started with, or null
+without one. The debug state query lists every intervention of the run in log
+order, derived from the retained log and independent of its event paging: each
+message with the exchange result the harness derives for it at query time, and
+each resume with its optional message.
+
 ### An Oriented Context Is Reused, Never Required
 
 Fork an oriented session for independent tasks. It starts from the point where

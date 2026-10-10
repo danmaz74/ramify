@@ -68,6 +68,7 @@ export function snapshotOf(view: RunView): RunSnapshot {
     decisionRequests: decisionRequestsOf(view.entries, internal.state === 'running' && !internal.stopRequested),
     planDeviations: planDeviationsOf(view.entries),
     environmentProblems: environmentProblemsOf(view.entries),
+    breakpoint: internal.breakpoint,
   };
 }
 

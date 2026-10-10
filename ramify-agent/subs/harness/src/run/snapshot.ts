@@ -1,5 +1,5 @@
 import type { JobState } from '../interfaces/protocol/jobs.js';
-import type { Role, RunFailureReason, RunPhase, RunReview } from '../interfaces/protocol/runs.js';
+import type { BreakpointSelector, Role, RunFailureReason, RunPhase, RunReview } from '../interfaces/protocol/runs.js';
 import type { RunEvent } from './log.js';
 import type { RunRecord } from './records.js';
 import { scenarioIdOf } from '../../subs/scenarios/src/records.js';
@@ -46,6 +46,8 @@ export interface RunSnapshot {
   readonly review: RunReview;
   /** Things the person must be told, kept for the whole run and after it, resolved or not. */
   readonly notices: readonly RunNotice[];
+  /** The breakpoint the run was started with, or null. */
+  readonly breakpoint: BreakpointSelector | null;
 }
 
 /**
@@ -264,5 +266,6 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
     writer: { held: heldWriter, unsettled },
     review,
     notices: resolvedNotices,
+    breakpoint: record.breakpoint ?? null,
   };
 }

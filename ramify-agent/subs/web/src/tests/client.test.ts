@@ -124,3 +124,43 @@ test('the session queries: each path, and a body fetched only when it is not inl
     'http://h/api/v1/sessions/standalone/s1/files?path=shell%2F001.log',
   ]);
 });
+
+test('U03: the debug queries request their protocol paths, validate the answers and carry harness refusals', async () => {
+  const at = '2026-10-10T12:00:00.000Z';
+  const run = { jobId: 'r1', planId: 'p', agent: 'scripted', version: 10, state: 'running', phase: 'working', stopRequested: false,
+    startedAt: at, updatedAt: at, endedAt: null, failure: null, current: null, waits: [], counts: { workItems: 1, completedWorkItems: 0,
+      openRequirements: 0, invocations: 1, readinessAttempts: 1, gateAttempts: 0, scenarios: { pending: 0, bound: 1, done: 0 }, degradedStarts: 0 },
+    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests: { open: 0, waiting: false, workItems: [] },
+    planDeviations: { recorded: 0, toReview: 0 }, environmentProblems: [], breakpoint: 'before-agent:engineer' };
+  const pause = { kind: 'breakpoint', planId: 'p', runId: 'r1', pauseId: 'p 1', revision: 2, cursor: 10, state: 'paused', role: 'engineer',
+    work: { workItem: 'w1' }, goal: 'Build a thing', nextAction: 'execute the task', taskState: 'pending', summary: 'Prepared task awaits resume.' };
+  const exchange = { ...pause, kind: 'exchange', commandId: 'c/1', status: 'settled', answer: 'Answer', invocation: 'inv-1', session: 's1', point: null,
+    outcome: 'returned', error: null, continuityLoss: null, settlementConfirmed: true, verdicts: [], evidence: [] };
+  const inspection = { ...pause, kind: 'inspection', preview: true, input: { roleInstructions: 'Role', message: 'Task', inherited: [], additions: [], effective: [],
+    tools: [{ name: 'write', description: 'Writes', inputSchema: {}, mutating: true }], source: null, continuity: 'fresh', continuityReason: null, scope: {}, bounds: {} } };
+  const answers: Record<string, unknown> = {
+    'http://h/api/v1/plans/p/runs/r1/debug?after=0': { run, current: pause, reached: [], cursor: 10, more: false, interventions: [
+      { kind: 'message', sequence: 8, at, pauseId: 'p 1', revision: 1, commandId: 'c/1', message: 'Explain.', exchange },
+      { kind: 'resume', sequence: 9, at, pauseId: 'p 1', revision: 2, commandId: 'c2', message: null, exchange: null }] },
+    'http://h/api/v1/plans/p/runs/r1/debug/inspect?pause=p%201': { run, current: pause, inspection },
+    'http://h/api/v1/plans/p/runs/r1/debug/exchanges/c%2F1': { run, current: pause, exchange },
+  };
+  const urls: string[] = [];
+  const client = createProtocolClient('http://h', async input => {
+    urls.push(String(input));
+    return new Response(JSON.stringify(answers[String(input)]), { status: 200 });
+  });
+  const state = await client.getDebugState('p', 'r1');
+  expect(state.run.breakpoint).toBe('before-agent:engineer');
+  expect(state.interventions.map(entry => [entry.kind, entry.exchange?.status ?? null])).toEqual([['message', 'settled'], ['resume', null]]);
+  expect((await client.getDebugInspection('p', 'r1', 'p 1')).inspection.input.tools[0]!.mutating).toBe(true);
+  expect((await client.getDebugExchange('p', 'r1', 'c/1')).exchange?.answer).toBe('Answer');
+  expect(urls).toEqual(Object.keys(answers));
+
+  const { interventions: _required, ...missing } = answers['http://h/api/v1/plans/p/runs/r1/debug?after=0'] as Record<string, unknown>;
+  await expect(createProtocolClient('', respond(200, missing)).getDebugState('p', 'r1')).rejects.toMatchObject({ kind: 'invalid-response' });
+  const refused = createProtocolClient('', respond(409, { error: { code: 'conflict', message: 'This is not a live breakpoint occurrence' } }));
+  for (const read of [refused.getDebugState('p', 'r1'), refused.getDebugInspection('p', 'r1', 'old'), refused.getDebugExchange('p', 'r1', 'c')]) {
+    await expect(read).rejects.toMatchObject({ kind: 'protocol', code: 'conflict', message: 'This is not a live breakpoint occurrence' });
+  }
+});

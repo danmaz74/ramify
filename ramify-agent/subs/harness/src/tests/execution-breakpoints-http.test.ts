@@ -1,11 +1,15 @@
 import { afterEach, expect, test } from 'vitest';
 import { createApp } from '../http/app.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
-import { debugStateResponseSchema, debugExchangeResponseSchema, debugInspectionResponseSchema, startRunCommandSchema } from '../interfaces/protocol/runs.js';
+import {
+  debugStateResponseSchema, debugExchangeResponseSchema, debugInspectionResponseSchema, runListResponseSchema, runResponseSchema, runSnapshotSchema, startRunCommandSchema,
+} from '../interfaces/protocol/runs.js';
+import { runSnapshot } from '../run/snapshot.js';
+import { constructedRecord } from './helpers/constructed.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
 import { assign, byRole, completionProposed, outline, submit, treeInputs } from './helpers/iterations.js';
-import { installTestRunner, startRun, until } from './helpers/runs.js';
+import { installTestRunner, startRun, stopRun, until } from './helpers/runs.js';
 import { openUnchangedRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
 import type { Request, Response } from 'express';
@@ -84,4 +88,72 @@ test('B11/B13: HTTP admits immediately, retries once, retains actual exchange an
   const drained = debugStateResponseSchema.parse((await handle('get', protocolPaths.runDebug(plan, runId, reached.cursor))).body);
   expect(drained.reached).toEqual([]);
   await expect(handle('get', protocolPaths.runDebug('other-plan', runId))).rejects.toMatchObject({ code: 'not-found' });
+});
+
+test('U01: a run snapshot names its breakpoint in the run and run-list queries, and null without one', async () => {
+  const { runId, handle } = await host();
+  const run = runResponseSchema.parse((await handle('get', protocolPaths.run(plan, runId))).body).run;
+  expect(run.breakpoint).toBe('before-agent:engineer');
+  const list = runListResponseSchema.parse((await handle('get', protocolPaths.runs(plan))).body);
+  expect(list.runs.find(entry => entry.jobId === runId)?.breakpoint).toBe('before-agent:engineer');
+  expect(debugStateResponseSchema.parse((await handle('get', protocolPaths.runDebug(plan, runId))).body).run.breakpoint).toBe('before-agent:engineer');
+  expect(runSnapshot(constructedRecord({ breakpoint: 'before-agent:engineer' }), []).breakpoint).toBe('before-agent:engineer');
+  expect(runSnapshot(constructedRecord(), []).breakpoint).toBeNull();
+  const { breakpoint: _omitted, ...legacy } = run;
+  expect(runSnapshotSchema.parse(legacy).breakpoint).toBeNull();
+});
+
+test('U02: interventions list every message with its exchange as the harness derives it, then the resume, whatever the after cursor', async () => {
+  const hosted = await host();
+  const { service, runId, pause, handle } = hosted;
+  const state = async (after = 0) => debugStateResponseSchema.parse((await handle('get', protocolPaths.runDebug(plan, runId, after))).body);
+  expect((await state()).interventions).toEqual([]);
+  const text = 'Explain without editing.\nKeep  the spacing.';
+  await handle('post', protocolPaths.commands, { commandId: 'message-u02', expectedVersion: 0, type: 'debug-message', payload: {
+    planId: plan, jobId: runId, pauseId: pause.pauseId, expectedRevision: pause.revision, message: text } });
+  const admitted = await state();
+  expect(admitted.current).toMatchObject({ state: 'exchanging' });
+  expect(admitted.interventions).toEqual([expect.objectContaining({ kind: 'message', pauseId: pause.pauseId, revision: 1, commandId: 'message-u02',
+    message: text, exchange: expect.objectContaining({ kind: 'exchange', commandId: 'message-u02', status: 'admitted', answer: null }) })]);
+  const [message] = admitted.interventions;
+  expect(service.events(plan, runId)!.find(event => event.sequence === message!.sequence)).toMatchObject({ type: 'debug-exchange-admitted', at: message!.at });
+
+  hosted.release();
+  await until(() => service.debugResult(plan, runId, 'message-u02')?.status === 'settled');
+  const settled = await state();
+  expect(settled.interventions).toHaveLength(1);
+  expect(settled.interventions[0]!.exchange).toEqual(service.debugResult(plan, runId, 'message-u02'));
+  expect(settled.interventions[0]!.exchange).toMatchObject({ status: 'settled', answer: 'I understand the normal task.' });
+  expect(settled.current).toMatchObject({ state: 'paused', revision: 2, taskState: 'pending' });
+  // A cursor beyond the admission event pages `reached` only; the interventions stay complete.
+  expect(settled.cursor).toBeGreaterThan(message!.sequence);
+  const later = await state(settled.cursor);
+  expect(later.reached).toEqual([]);
+  expect(later.interventions).toEqual(settled.interventions);
+
+  await handle('post', protocolPaths.commands, { commandId: 'resume-u02', expectedVersion: 0, type: 'debug-resume', payload: {
+    planId: plan, jobId: runId, pauseId: pause.pauseId, expectedRevision: 2, message: 'Now implement.' } });
+  const resumed = await state(settled.cursor);
+  expect(resumed.interventions.map(entry => [entry.kind, entry.commandId, entry.revision, entry.message, entry.exchange?.status ?? null])).toEqual([
+    ['message', 'message-u02', 1, text, 'settled'],
+    ['resume', 'resume-u02', 2, 'Now implement.', null],
+  ]);
+  expect(resumed.interventions[1]!.sequence).toBeGreaterThan(resumed.interventions[0]!.sequence);
+});
+
+test('U02: a message whose run was stopped before settlement carries the stopped exchange and its error', async () => {
+  const hosted = await host();
+  const { service, runId, pause, handle } = hosted;
+  await handle('post', protocolPaths.commands, { commandId: 'message-stop', expectedVersion: 0, type: 'debug-message', payload: {
+    planId: plan, jobId: runId, pauseId: pause.pauseId, expectedRevision: pause.revision, message: 'Work.' } });
+  const stopping = service.execute(stopRun(plan, runId, service.getRun(plan, runId)!.version));
+  hosted.release();
+  await stopping;
+  await until(() => service.getRun(plan, runId)?.state === 'stopped');
+  const stopped = debugStateResponseSchema.parse((await handle('get', protocolPaths.runDebug(plan, runId))).body);
+  expect(stopped.current).toBeNull();
+  expect(stopped.run.state).toBe('stopped');
+  expect(stopped.interventions).toEqual([expect.objectContaining({ kind: 'message', commandId: 'message-stop', message: 'Work.',
+    exchange: expect.objectContaining({ status: 'stopped', taskState: 'terminal', error: expect.any(String) }) })]);
+  expect(service.events(plan, runId)!.some(event => event.type === 'debug-exchange-settled')).toBe(false);
 });

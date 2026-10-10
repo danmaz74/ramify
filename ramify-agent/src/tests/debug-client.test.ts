@@ -30,7 +30,7 @@ function script(answers: Array<{ path: string; body?: unknown; status?: number; 
   };
   return { fetch: fetcher, calls, done: () => expect(answers).toEqual([]) };
 }
-const state = (current: BreakpointState | null, reached: BreakpointState[] = [], cursor = 10, more = false, snapshot: RunSnapshot = run) => ({ run: snapshot, current, reached, cursor, more });
+const state = (current: BreakpointState | null, reached: BreakpointState[] = [], cursor = 10, more = false, snapshot: RunSnapshot = run) => ({ run: snapshot, current, reached, cursor, more, interventions: [] });
 
 test('B12: attachment arguments require explicit project/plan/break/id and refuse model/owned conflicts', () => {
   const attached = ['--server', 'http://host:4180', '--project', '/project', '--plan', 'p', '--break', 'before-agent:engineer', '--command-id', 'c1', '--json'];
