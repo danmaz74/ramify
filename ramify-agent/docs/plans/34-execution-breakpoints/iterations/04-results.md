@@ -6,8 +6,10 @@
 The controls are implemented and the ordinary/native qualification witnesses
 pass. **B18 remains incomplete: the bounded authenticated real exercise failed
 readiness before its first engineer pause and delivered no useful target change.**
-This handoff does not claim complete acceptance of Plan 34. Coordinator review
-is pending; final configured audit is pending as described below.
+The coordinator independently accepted the implementation and B01–B17
+qualification on source `8b791543441bbacecbf2dfa4daac9436c48c2e67`. Iteration 4 and Plan 34 remain partially
+accepted because B18 is unmet; the final configured audit passed as recorded
+below. This handoff does not claim complete acceptance of Plan 34.
 
 Work used branch `feat/plan34-breakpoints-implementation` in
 `/home/app/ramify-plan34-breakpoints-implementation`, following accepted iteration 3
@@ -119,11 +121,45 @@ npm run test:boundaries -- subs/harness/src/tests/execution-breakpoints-process.
 
 No additional direct whole suite was run. A now-superseded installed audit request against clean committed
 candidate 092b4563 is retained at `/tmp/plan34-04-qualified-audit.json`, with
-`/tmp/plan34-04-qualified-audit-process.json` and `.stderr`, using:
+`/tmp/plan34-04-qualified-audit-process.json` and `.stderr`. It had not executed
+while waiting behind a foreign repository lease; the coordinator canceled only
+that superseded waiting request, preserving its empty outputs as unexecuted
+evidence. No foreign holder was signaled; cancellation was confirmed in
+`/tmp/plan34-04-qualified-audit-cancellation.json`. The actual final clean source
+`8b791543441bbacecbf2dfa4daac9436c48c2e67` includes the completed native
+CLI resume witness. Its fresh released-CLI request eventually acquired the
+repository lease at 21:12:06 UTC and completed successfully, using:
 
 ```sh
 ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent --cwd . --full --nested --json
 ```
+
+The final request and audited source are both
+`8b791543441bbacecbf2dfa4daac9436c48c2e67`. Invocation, project and composition
+verdicts pass, all six configured checks pass, discovery is complete with no
+skipped or unavailable projects, and expected-file coverage is complete at
+**336/336**, with no missing files. Vitest reports **335 passed files and one
+existing skipped file; 3002 passed tests and two existing skipped tests; zero
+failures**. The complete failure ledger is empty, with zero outstanding failures
+and composition chain depth 0. Module checking completes all stages with 13 owners,
+759 source files, 65 resources and 15395 accesses; zero errors/warnings, partial
+coverage and 352 analysis limits. The four declared type checks and web build pass.
+
+Retained final qualification:
+
+- JSON: `/tmp/plan34-04-complete-audit.json`; stderr is empty.
+- Producer receipt: `/tmp/plan34-04-complete-audit-process.json`.
+- Report commit: `f7eefb037d38048b4a57194686782a065477bcf7`.
+- Run ref: `refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-10T21-22-11Z-8b7915434`.
+- Tree ref: `refs/audited/projects/ramify-agent-f25e9a298228/by-tree/fb517c08e7945b7708f88e64ff81b3ad0251a1f7`.
+
+The coordinator independently reviewed the exact source/report and accepted
+B01–B17, including the new native CLI resume path and held-terminal writer
+barrier. B18 remains incomplete. This final receipt/status commit changes only
+ignored `docs/**` paths; a fresh released-CLI applicability request for that
+receipt is retained separately in `/tmp/plan34-04-receipt-audit.json` and its
+process metadata. Any reused evidence remains attributed to source 8b above,
+not described as a new whole-suite execution of a later documentation commit.
 
 The configured Cucumber profile's zero selected scenarios is profile health,
 not behavioral acceptance. Existing skips remain skips. Static partial coverage,

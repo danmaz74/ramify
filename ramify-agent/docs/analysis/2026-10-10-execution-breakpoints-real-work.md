@@ -129,8 +129,8 @@ verifies exact resume retry, one engineer invocation, terminal failure and no
 successor gate. Its correction is committed in `07b78736`/`674f12f5`; the older
 iteration-2 handoff is historical evidence rather than the final contract.
 
-The new final configured audit requests exact clean source `674f12f5` via the
-installed full nested audit CLI. `/tmp/plan34-04-final-audit-process.json` records
+An earlier configured audit requested exact clean source `674f12f5` via the
+installed full nested audit CLI and failed, as diagnosed below. `/tmp/plan34-04-final-audit-process.json` records
 its detached producer; outputs are `/tmp/plan34-04-final-audit.json` and
 `/tmp/plan34-04-final-audit.stderr`. The earlier audit of `07b78736` remains a
 separate superseded request and is not final qualification.
@@ -174,3 +174,30 @@ confirmed in `/tmp/plan34-04-host-cleanup.json`. Real target/run/session and aud
 records remain retained. Completion of B18 requires a separately authorized
 bounded real attempt with a qualified target baseline; it has not been replaced
 by a scripted workflow or the native witnesses.
+
+
+## Final harness qualification and coordinator judgment
+
+The clean final harness candidate `8b791543441bbacecbf2dfa4daac9436c48c2e67`
+includes the corrected explicit command inventory and an additional actual CLI
+resume before host-crash witness. Its released full nested audit passed all six
+configured checks, with complete 336/336 configured coverage, 335 passed files plus
+one existing skipped file, 3002 passed tests plus two existing skipped tests,
+zero failures, complete discovery and an empty complete failure ledger. Module
+checking passed with partial coverage and 352 analysis limits; no complete static
+coverage is claimed. The report is
+`f7eefb037d38048b4a57194686782a065477bcf7`, run ref
+`refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-10T21-22-11Z-8b7915434`,
+with local JSON `/tmp/plan34-04-complete-audit.json`. Source 674's failed report
+remains failed evidence, and the superseded 092 waiting audit was canceled before
+execution without signaling the foreign lease holder.
+
+The coordinator independently reviewed this exact candidate and report and
+accepted the implementation and B01–B17 qualification. Plan 34 and iteration 4
+remain partially accepted because B18's useful target work was not delivered.
+This green harness audit does not qualify the unchanged failed target readiness
+baseline or substitute for real engineer interpretation, resumed implementation,
+project-declared verification and responsible semantic assessment of a useful
+candidate. The final docs receipt changes only declared ignored documentation;
+its fresh CLI applicability result is retained separately, with reused evidence
+attributed to its actual audited source.
