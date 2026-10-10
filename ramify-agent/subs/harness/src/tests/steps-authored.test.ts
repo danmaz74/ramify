@@ -228,6 +228,20 @@ describe('S07: engineer inputs authored with no run', () => {
     expect(rendered.stdout).toContain('State the authored note limit.');
   });
 
+  test('--iteration numbers a later assignment of the work item, which the run would otherwise count', async () => {
+    const result = await runStepCommandWith({
+      command: 'inputs', role: 'engineer', fromRun: undefined, invocation: undefined, projectRoot: project, iteration: 2,
+      authored: { workItem: await file(item), assignment: await file(assign(notes, { goal: 'State the second note limit.' }, outline())) },
+    }, ports());
+    if (result.exitStatus !== 0) throw new Error(result.stderr);
+    expect(result.stderr).toContain('Authored engineer inputs for state-note-limit.i02 with no run');
+    expect(result.stderr).toContain('work turn assigning iteration 2');
+    const inputs = parseStepInputs(result.stdout);
+    if (inputs.role !== 'engineer') throw new Error('unreachable');
+    expect(inputs.assignment.id).toBe('state-note-limit.i02');
+    expect(inputs.work).toEqual({ workItem: 'state-note-limit', iteration: 'state-note-limit.i02' });
+  });
+
   test('a recorded outline from --outline is the assignment\'s basis when the envelope carries none', async () => {
     const recorded = { schema: 'ramify-agent.work-item-outline/1', workItem: item.id, revision: 1, invocation: 'authored', ...outline(), hypothesesSeen: [] };
     const result = await runStepCommandWith({

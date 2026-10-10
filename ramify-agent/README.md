@@ -173,7 +173,7 @@ discard an unsuccessful attempt.
 ### The commands
 
 ```text
-ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--out <file>]
+ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--iteration <n>] [--out <file>]
 ramify-agent step inputs --role <engineer|local-architect|context-selector|reviewer> --from-run <run dir> --invocation <id>
                          [--work-item <file>] [--outline <file>] [--assignment <file>] [--selection <file>] [--review-request <file>] [--out <file>]
 ramify-agent step inputs --role reviewer --from-run <manual run dir> --request <review request id> [--out <file>]

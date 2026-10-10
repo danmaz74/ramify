@@ -175,7 +175,7 @@ describe('step', () => {
   test('usage names the step commands', () => {
     expect(usage).toContain('ramify-agent step inputs --role <engineer|local-architect|context-selector|reviewer> --from-run <run dir> --invocation <id>');
     expect(usage).toContain('[--work-item <file>] [--outline <file>] [--assignment <file>] [--selection <file>] [--review-request <file>] [--out <file>]');
-    expect(usage).toContain('ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--out <file>]');
+    expect(usage).toContain('ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--iteration <n>] [--out <file>]');
     expect(usage).toContain('ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]');
     expect(usage).toContain('ramify-agent step run --inputs <file> --run <project>/plans/<plan>/.harness/jobs/<run>');
     expect(usage).toContain('ramify-agent step inputs --role reviewer --from-run <manual run dir> --request <review request id> [--out <file>]');

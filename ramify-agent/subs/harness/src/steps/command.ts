@@ -36,6 +36,8 @@ export type StepCommandOptions =
       readonly fromRun: string | undefined;
       /** The project engineer inputs are authored against when no run is named. */
       readonly projectRoot?: string | undefined;
+      /** The iteration number of an assignment authored without a run, where it is not the work item's first; a run numbers its own. */
+      readonly iteration?: number | undefined;
       readonly invocation: string | undefined;
       /** A review request a manual run recorded, whose question's inputs are composed; with --from-run and no --invocation. */
       readonly request?: string | undefined;
@@ -199,12 +201,12 @@ async function importInputs(options: Extract<StepCommandOptions, { command: 'inp
       return { exitStatus: 2, stdout: '', stderr: `Refused: ${missingContext(options.role, authored, options.projectRoot)}\n` };
     }
     const result = await authorEngineerInputs({
-      projectRoot: options.projectRoot, files: { workItem, outline, assignment }, ports: authoringPorts ?? installedAuthoringPorts(),
+      projectRoot: options.projectRoot, files: { workItem, outline, assignment }, iteration: options.iteration, ports: authoringPorts ?? installedAuthoringPorts(),
     });
     if (result.status === 'refused') return { exitStatus: 2, stdout: '', stderr: `Refused: ${result.reason}\n` };
     const provenance = result.inputs.provenance;
     const lines = [
-      `Authored engineer inputs for ${result.inputs.assignment.id} with no run, the assignment judged as the output of the local architect's first work turn of ${result.inputs.work.workItem} against the project.`,
+      `Authored engineer inputs for ${result.inputs.assignment.id} with no run, the assignment judged as the output of the local architect's ${options.iteration === undefined || options.iteration === 1 ? 'first work turn' : `work turn assigning iteration ${options.iteration}`} of ${result.inputs.work.workItem} against the project.`,
       `Authored: ${provenance !== undefined && 'origin' in provenance && provenance.origin === 'authored' ? provenance.authored.join(', ') : ''}.`,
     ];
     return written(serializeStepInputs(result.inputs), options.out, lines);

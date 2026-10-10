@@ -102,6 +102,8 @@ function projectRelative(projectRoot: string, absolute: string): string {
 export async function authorEngineerInputs(options: {
   readonly projectRoot: string;
   readonly files: AuthoredEngineerFiles;
+  /** The iteration the assignment opens; the work item's first when absent. A run counts its recorded assignments instead. */
+  readonly iteration?: number | undefined;
   readonly ports: AuthoringPorts;
 }): Promise<AuthoredEngineerResult> {
   const projectRoot = resolve(options.projectRoot);
@@ -190,7 +192,7 @@ export async function authorEngineerInputs(options: {
 
   // Accepted as the run accepts it: the outline revision the envelope
   // carries, the authorized guarded paths, then the assignment record.
-  const number = 1;
+  const number = options.iteration ?? 1;
   if (number > policy.limits.maxIterationsPerWorkItem) return refused(`${item.id} has reached ${policy.limits.maxIterationsPerWorkItem} iterations, which the policy allows`);
   const scope = judged.prepared.scope;
   if (submission.outline !== undefined) {

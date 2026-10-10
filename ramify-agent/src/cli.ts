@@ -37,7 +37,7 @@ export type CommandLine =
       readonly command: 'step';
       readonly step:
         | { readonly command: 'inputs'; readonly role: string; readonly fromRun: string | undefined; readonly invocation: string | undefined; readonly out: string | undefined;
-            readonly projectRoot?: string | undefined; readonly request?: string | undefined; readonly assignmentOf?: string | undefined; readonly authored: AuthoredFiles }
+            readonly projectRoot?: string | undefined; readonly request?: string | undefined; readonly assignmentOf?: string | undefined; readonly iteration?: number | undefined; readonly authored: AuthoredFiles }
         | { readonly command: 'render'; readonly inputs: string; readonly projectRoot: string; readonly invocation: string | undefined }
         | { readonly command: 'run'; readonly inputs: string; readonly run: string; readonly agent: SessionAgent }
         | { readonly command: 'gate'; readonly run: string; readonly checkpoint: StepGateCheckpoint; readonly invocation: string | undefined; readonly noCommit: boolean }
@@ -69,7 +69,7 @@ export const usage = [
   '                       [--work-item <file>] [--outline <file>] [--assignment <file>] [--selection <file>] [--review-request <file>] [--out <file>]',
   '                       Imports one invocation\'s recorded inputs as a fresh start; compares the delivery as a diagnostic.',
   '                       Authored files replace parts of them, each judged as its producing role\'s output with the run\'s context.',
-  '  ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--out <file>]',
+  '  ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--iteration <n>] [--out <file>]',
   '                       Authors engineer inputs with no run: the assignment is judged as the local architect\'s first work turn',
   '                       of the work item against the project and its materialized architect view, which is never materialized.',
   '  ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]',
@@ -200,6 +200,7 @@ function parseStep(rest: readonly string[]): CommandLine {
     let projectRoot: string | undefined;
     let request: string | undefined;
     let assignmentOf: string | undefined;
+    let iteration: number | undefined;
     const authored: { -readonly [K in keyof AuthoredFiles]: AuthoredFiles[K] } = {};
     const files = { '--work-item': 'workItem', '--outline': 'outline', '--assignment': 'assignment', '--selection': 'selection', '--review-request': 'reviewRequest' } as const;
     options(flags, (flag, value, _inline, argument) => {
@@ -210,6 +211,10 @@ function parseStep(rest: readonly string[]): CommandLine {
       else if (flag === '--project') projectRoot = value();
       else if (flag === '--request') request = value();
       else if (flag === '--assignment-of') assignmentOf = value();
+      else if (flag === '--iteration') {
+        iteration = Number(value());
+        if (!Number.isInteger(iteration) || iteration < 1) throw new UsageError('step inputs --iteration takes a positive iteration number');
+      }
       else if (flag in files) authored[files[flag as keyof typeof files]] = value();
       else throw new UsageError(`Unknown option "${argument}"`);
     });
@@ -229,7 +234,8 @@ function parseStep(rest: readonly string[]): CommandLine {
     }
     if (fromRun !== undefined && invocation === undefined) throw new UsageError('step inputs --from-run needs --invocation <id> or --request <id>');
     if (fromRun !== undefined && projectRoot !== undefined) throw new UsageError('step inputs takes its project from the run named by --from-run; --project is for inputs authored without one');
-    return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out, projectRoot, authored } };
+    if (iteration !== undefined && fromRun !== undefined) throw new UsageError('step inputs --iteration numbers an assignment authored without a run; a run numbers its own');
+    return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out, projectRoot, iteration, authored } };
   }
   if (subcommand === 'render') {
     let inputs: string | undefined;
