@@ -294,7 +294,7 @@ test('B14: host shutdown during admitted model exchange retains interruption and
 });
 
 
-test('B08: unconfirmed exchange settlement blocks another exchange, resume and gates', async () => {
+test('B08: unconfirmed settlement blocks exchanges and gates while resume consumes the held failure once without a model', async () => {
   const barrier = gate();
   const scripted = createScriptedAgent(declaringScenarios(byRole({
     'initial-architect': [submit(analysis([entry('review-note', module)]))],
@@ -316,9 +316,15 @@ test('B08: unconfirmed exchange settlement blocks another exchange, resume and g
   await opened.service.execute(message(opened, 'Use normal equipment.'));
   const result = await settled(opened);
   expect(result.taskState).toBe('terminal');
+  expect(result.settlementConfirmed).toBe(false);
   expect(result.summary).toContain('settlement was not confirmed');
   await expect(opened.service.execute(message(opened, 'Again', 'again', 2))).rejects.toMatchObject({ code: 'conflict' });
-  await expect(opened.service.execute(resume(opened, 2))).rejects.toMatchObject({ code: 'busy' });
+  const released = resume(opened, 2);
+  const receipt = await opened.service.execute(released);
+  expect(await opened.service.execute(released)).toEqual(receipt);
+  await until(() => opened.service.getRun(plan, opened.runId)?.state === 'failed');
+  expect(opened.service.debugState(plan, opened.runId)).toBeNull();
+  expect(scripted.sessions.filter(session => session.spec.role === 'engineer')).toHaveLength(1);
   expect(opened.service.events(plan, opened.runId)!.some(event => event.sequence > opened.pause.cursor && event.type === 'gate-started')).toBe(false);
-  await stop(opened);
+  expect(opened.service.getRun(plan, opened.runId)?.writer.unsettled).not.toBeNull();
 });

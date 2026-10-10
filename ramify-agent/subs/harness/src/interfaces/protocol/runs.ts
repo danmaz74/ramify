@@ -104,6 +104,8 @@ export const debugExchangeSchema = breakpointStateSchema.extend({ kind: z.litera
   status: z.enum(['admitted', 'settled', 'stopped', 'interrupted']), answer: z.string().nullable(),
   invocation: z.string().nullable(), session: z.string().nullable(), point: z.string().nullable(),
   outcome: z.string().nullable(), error: z.string().nullable(), continuityLoss: z.string().nullable(),
+  /** Control-command completion does not imply confirmed tool settlement. Legacy receipts omit this. */
+  settlementConfirmed: z.boolean().optional(),
   verdicts: z.array(z.object({ accepted: z.boolean(), answer: z.string() }).strict()), evidence: z.array(z.string()),
 }).strict();
 export type DebugExchange = z.infer<typeof debugExchangeSchema>;

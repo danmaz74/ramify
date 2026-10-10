@@ -219,7 +219,12 @@ ordinary workflow handling on resume. Further messages are refused once an
 outcome is held. Resume consumes it once without another model call; otherwise
 it continues the pending ordinary task, optionally appending new caller prose.
 Tool settlement must be confirmed before another exchange, writer or gate.
-Unconfirmed writer settlement blocks resume as well.
+Unconfirmed writer settlement blocks a resumed model invocation, another writer
+and gates. Resume may return an already held terminal outcome to ordinary
+failure handling without a new model call; it does not clear that barrier.
+An exchange's `settled` status describes completed control-command handling.
+Its `settlementConfirmed` flag separately reports actual tool/session settlement;
+legacy exchange records may omit this flag.
 
 Message admission is serialized before model execution using the occurrence
 revision and stable command ledger. Exact retries return the same admission

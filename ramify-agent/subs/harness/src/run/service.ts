@@ -3121,6 +3121,7 @@ export class RunService {
       taskState: terminal ? 'terminal' : state.taskState,
       answer: null, invocation: invocation?.data.invocation ?? null, session: invocation?.data.session ?? null,
       point: actual?.session?.ref || null, outcome: actual?.ended ?? terminal?.type ?? null,
+      ...(actual === undefined ? {} : { settlementConfirmed: actual.settled.confirmed }),
       error: actual?.error ?? (terminal ? 'message' in terminal.data ? String(terminal.data.message) : `Run ended: ${terminal.type}` : null),
       continuityLoss: null, verdicts: [], evidence: invocation === undefined ? [] : [runLayout.invocation(invocation.data.invocation),
         runLayout.outcome(invocation.data.invocation), runLayout.observations(invocation.data.invocation), runLayout.transcript(invocation.data.session)],
@@ -3175,7 +3176,7 @@ export class RunService {
         : result.settlementConfirmed === false ? 'Engineer outcome retained, but tool settlement was not confirmed; writer, exchanges and gates remain blocked.' : `Engineer ended ${result.ended}; its actual outcome is held until resume.`;
       const exchange: DebugExchange = { ...pause, kind: 'exchange', commandId: command.commandId, cursor: run.log.nextSequence,
         status: 'settled', answer: result.lastText ?? null, invocation: result.id || null, session: result.session || null,
-        point: result.ref || null, outcome: result.ended, error: result.error ?? null,
+        point: result.ref || null, outcome: result.ended, error: result.error ?? null, settlementConfirmed: result.settlementConfirmed !== false,
         continuityLoss: result.actual === 'fresh' && run.log.all('invocation-ended').some(event => event.data.invocation === result.id && event.data.degraded) ? run.log.all('invocation-ended').find(event => event.data.invocation === result.id)?.data.degraded?.reason ?? null : null,
         verdicts: [...result.verdicts ?? []], evidence: result.id === '' ? [] : [runLayout.invocation(result.id), runLayout.outcome(result.id), runLayout.observations(result.id), runLayout.transcript(result.session),
           ...(result.ended === 'submitted' ? [runLayout.submission(result.id)] : [])] };
@@ -3196,7 +3197,9 @@ export class RunService {
       if (!pause || pause.pauseId !== pauseId) throw new CommandRejection('conflict', 'This is not the current breakpoint occurrence');
       if (pause.revision !== expectedRevision) throw new CommandRejection('stale-version', `The pause is at revision ${pause.revision}`, pause.revision);
       if (pause.state !== 'paused') throw new CommandRejection('busy', `The run is ${pause.state}`);
-      if (run.writer.isUnsettled) throw new CommandRejection('busy', run.writer.blocked!);
+      // A held terminal outcome can return to ordinary failure handling without
+      // acquiring a writer or starting a model. The unsettled barrier stays set.
+      if (run.writer.isUnsettled && (pause.taskState !== 'terminal' || !run.debugPrepared?.held())) throw new CommandRejection('busy', run.writer.blocked!);
       const at = this.now();
       const accepted = this.commands.accept(command, contentHash, jobId, run.log.nextSequence, at);
       await run.log.append({ type: 'debug-resumed', data: { pauseId, revision: pause.revision + 1, command: accepted, ...(command.payload.message === undefined ? {} : { message: command.payload.message }) } }, at);
