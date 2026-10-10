@@ -161,9 +161,12 @@ describe('S17: after a completion proposal, with and without its gate', () => {
     gitAtGate.git.createRunBranch.mockImplementation(async (_root, runId) => ({ branch: `ramify-agent-run/${runId}`, created: false }));
     const candidates = scriptedCandidates(root, { 'cand-1': { tree, base: 'base-1', files: { [notesSource]: 'export const noteLimit = 500;\n' },
       changes: [{ status: 'M', path: notesSource }] } });
+    const audit = passingAudit();
     const gated = await runStepGate({ run, checkpoint: 'iteration', invocation: engineer, ramify: new FakeRamifyCli(), git: fixtureScratchGit(gitAtGate.git),
-      candidates, configuredAudit: passingAudit(), refresh: readDeclaredTree });
+      candidates, configuredAudit: audit, refresh: readDeclaredTree });
     expect(gated.exitStatus, gated.lines.join('\n')).toBe(0);
+    expect(audit.requests.map(request => ({ mode: request.mode, nested: request.nested ?? false, commit: request.sourceCommit })))
+      .toEqual([{ mode: 'project-default', nested: false, commit: 'cand-1' }]);
     expect(gated.attempt).toMatchObject({ checkpoint: 'iteration', verdict: 'passed', proposedBy: engineer, audited: 'cand-1',
       subject: { workItem, iteration: `${workItem}.i01` } });
     expect(gitAtGate.messages).toHaveLength(1);
@@ -290,8 +293,11 @@ describe('S15: gate subjects, refusals and the in-place diagnosis', () => {
     // Readiness audits the baseline and commits nothing.
     const gitAtReadiness = gateGit(root, { head: 'base-1', commits: [], previews: [] });
     gitAtReadiness.git.createRunBranch.mockImplementation(async (_root, runId) => ({ branch: `ramify-agent-run/${runId}`, created: false }));
-    const readiness = await gate({ checkpoint: 'readiness', git: fixtureScratchGit(gitAtReadiness.git) });
+    const readinessAudit = passingAudit();
+    const readiness = await gate({ checkpoint: 'readiness', git: fixtureScratchGit(gitAtReadiness.git), configuredAudit: readinessAudit });
     expect(readiness.exitStatus, readiness.lines.join('\n')).toBe(0);
+    expect(readinessAudit.requests.map(request => ({ mode: request.mode, nested: request.nested ?? false, commit: request.sourceCommit })))
+      .toEqual([{ mode: 'full', nested: true, commit: 'base-1' }]);
     expect(readiness.attempt).toMatchObject({ checkpoint: 'readiness', verdict: 'passed', commit: null, proposedBy: null });
     expect(gitAtReadiness.messages).toEqual([]);
     expect((await events(root, 'm-002')).filter(event => event.type === 'readiness-passed')).toHaveLength(1);
@@ -504,8 +510,9 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
       // S15: the work-item gate audits the completion request's candidate; the final gate then audits the run's.
       const gitAtGates = gateGit(source.root, { head: 'base-9', commits: [{ commit: null }, { commit: null }], previews: [] });
       gitAtGates.git.createRunBranch.mockImplementation(async (_root, runId) => ({ branch: `ramify-agent-run/${runId}`, created: false }));
+      const gatesAudit = passingAudit();
       const gateHere = (checkpoint: StepGateOptions['checkpoint'], invocation?: string) => runStepGate({ run, checkpoint, invocation,
-        ramify: new FakeRamifyCli(), git: fixtureScratchGit(gitAtGates.git), configuredAudit: passingAudit(), refresh: readDeclaredTree,
+        ramify: new FakeRamifyCli(), git: fixtureScratchGit(gitAtGates.git), configuredAudit: gatesAudit, refresh: readDeclaredTree,
         candidates: scriptedCandidates(source.root, {}) });
       const workItemGate = await gateHere('work-item', completing);
       expect(workItemGate.exitStatus, workItemGate.lines.join('\n')).toBe(0);
@@ -515,6 +522,8 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
       expect(finalGate.exitStatus, finalGate.lines.join('\n')).toBe(0);
       expect(finalGate.attempt).toMatchObject({ checkpoint: 'final', verdict: 'passed' });
       expect(finalGate.lines).toContain('Not run: the non-functional assessment and its candidate binding, which a run makes before its final gate.');
+      // The work-item gate runs the project's default audit; the final gate the full audit with nested projects.
+      expect(gatesAudit.requests.map(request => `${request.mode}${request.nested === true ? ' nested' : ''}`)).toEqual(['project-default', 'full nested']);
       gitAtGates.assertComplete();
     } finally {
       for (const cleanup of owned.reverse()) await cleanup();
@@ -522,7 +531,27 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
   }, 300_000);
 });
 
-describe('S16: after an engineer needs a capability', () => {
+describe('S25: after an engineer\'s unsuitable report or capability need', () => {
+  test('an unsuitable report closes its iteration; without the assigning turn\'s inputs the next turn\'s inputs are not run', async () => {
+    const { root, scratch } = await project();
+    const inputs = await authoredInputs(root, scratch);
+    const run = runPath(root, planId, 'm-007');
+    const git = stepGit({ head: 'base-1' });
+    const engineer = invocationOf(await step(inputs, run, [{ kind: 'submit', input: unsuitableScope('The limit is owned elsewhere.') }], git));
+    const reported = await after(run, engineer, { git });
+    expect(reported.exitStatus, reported.lines.join('\n')).toBe(0);
+    expect(reported.applied).toEqual([`the result of ${workItem}.i01: unsuitable, ${join(run, iterationLayout.result(workItem, 1))}`]);
+    expect(await json(join(run, iterationLayout.result(workItem, 1)))).toMatchObject({ outcome: 'unsuitable',
+      findings: ['unsuitable (scope): The limit is owned elsewhere.'], gate: null, commit: null });
+    expect(reported.notRun).toEqual([
+      expect.stringMatching(new RegExp(`^the local architect's next-turn inputs: ${workItem}\\.i01 was assigned .*, whose work turn inputs this manual run does not hold$`, 'u')),
+      `the local architect's next turn, which a run continues with ${workItem}.i01's result`,
+    ]);
+    const log = await readFile(join(run, runLayout.events), 'utf8');
+    expect((await after(run, engineer, { git })).applied).toEqual([`nothing more for the close: ${workItem}.i01 was already closed unsuitable`]);
+    expect(await readFile(join(run, runLayout.events), 'utf8')).toBe(log);
+  }, 120_000);
+
   test('captures the provisional source and reports the capability workflow as not run', async () => {
     const { root, scratch } = await project();
     const authored = parseStepInputs(await readFile(await authoredInputs(root, scratch), 'utf8'));
