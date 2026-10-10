@@ -206,11 +206,12 @@ import {
   type ObligationActor, type ObligationBinding, type ObligationProjection, type ObligationRegistration, type ObligationReport,
 } from '../work/obligations.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
-import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
+import { integrationScenarioOf, originKindOf, workLayout, workItemId, type WorkItem } from '../work/records.js';
 import { apiViewsOf, prepareAssignedCucumber, focusedScenarioFacts, defaultWriteScopeSection, iterationApiViews, onboardingOf, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
 import { localArchitectToolName, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, passedScenarioLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
+import { AfterHandling, assignedCount, authorizedScope, evidenceFor, requiredArtifacts, bindingsOf, capabilityBlockersOf, integrationItemsDue, obligationOwedBy, obligationProjection, openRequirementsOf, pendingCorrection, verifiedRequirements, type HandlingHost, type ReviewInputs } from './after-handling.js';
 import { CandidateDriftError, CommittingGates, readinessAuditOutcome, writeScopePaths, type GateHost } from './committing-gate.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
@@ -624,6 +625,30 @@ export class RunService {
     this.changeHistory = options.changeHistory ?? cachedChangeHistory(gitChangeHistory);
     this.runner = new InvocationRunner<Run>(this.runnerHost());
     this.gates = new CommittingGates<Run>(this.gateHost());
+    this.handling = new AfterHandling<Run>(this.handlingHost());
+  }
+
+  /** The handling after an accepted submission, which a manual run's `after` shares. */
+  private readonly handling: AfterHandling<Run>;
+
+  /** What the after-handling asks of an implementation run. */
+  private handlingHost(): HandlingHost<Run> {
+    const service = this;
+    return {
+      get projectRoot() { return service.projectRoot; },
+      get git() { return service.git; },
+      get candidates() { return service.candidates; },
+      get gates() { return service.gates; },
+      write: (run, input, records) => service.write(run, input, records),
+      afterWrite: (write, runId) => service.afterWrite(write, runId),
+      warn: text => service.warn(text),
+      ignoring: run => service.ignoring(run),
+      fail: (run, reason, detail, records) => service.fail(run, reason, detail, records),
+      closeCorrection: (run, workItem, closing) => service.closeCorrection(run, workItem, closing),
+      citeCurrentDeviations: (run, elements) => service.citeCurrentDeviations(run, elements),
+      orientationIdentity: run => ({ packageHash: run.record.prompts.reviewer?.hash ?? null, agent: run.record.agent, model: service.options.model ?? null }),
+      wakeReviews: run => run.reviews?.wake(),
+    };
   }
 
   /** The committing gates of every run, which a manual run's gate shares. */
@@ -889,120 +914,6 @@ export class RunService {
   }
 
   /**
-   * Records every review request owed for one accepted iteration, once per
-   * key, before the driver passes it. The candidate's tree is read first,
-   * outside the mutex; the key is checked and the identifier counted under
-   * it. Answers the requests it recorded: none for a key already recorded,
-   * a run that has ended, or a candidate whose tree cannot be read, which
-   * is warned about.
-   */
-  private async requestReviews(run: Run, closed: { readonly workItem: string; readonly iteration: string; readonly gate: string; readonly commit: string }): Promise<string[]> {
-    const policy = run.record.policy.reviews;
-    if (policy === undefined) return [];
-    let tree: string;
-    try {
-      tree = await this.candidates.commitTree(this.projectRoot, closed.commit);
-    } catch (error) {
-      // A request binds its tree; without one there is nothing to review
-      // against, and the gap is the missing request, stated here.
-      this.warn(`Run ${run.record.jobId}: no review of ${closed.iteration} was requested; the tree of ${closed.commit} could not be read: ${message(error)}`);
-      return [];
-    }
-    const number = Number.parseInt(closed.iteration.slice(closed.iteration.lastIndexOf('.i') + 2), 10);
-    const base = this.gates.acceptedBefore(run, closed.gate);
-    const assignment = iterationLayout.assignment(closed.workItem, number);
-    // Each question's captured inputs are read before the mutex, as the tree is.
-    const inputs = new Map<ReviewKind, ReviewInputs>();
-    for (const kind of policy.kinds) inputs.set(kind, await this.reviewInputs(run, kind, { ...closed, assignment, base }));
-    const recorded: string[] = [];
-    for (const kind of policy.kinds) {
-      const outcome = await run.mutex.run(async () => {
-        if (run.log.terminal) return null;
-        const existing = [...reviewStateOf(run.log.events).values()]
-          .find(request => request.iteration === closed.iteration && request.candidate === closed.commit && request.kind === kind);
-        if (existing !== undefined) return null;
-        const id = reviewRequestId(run.log.count('review-request-recorded') + 1);
-        const request = reviewRequestSchema.parse({
-          schema: 'ramify-agent.review-request/1',
-          id,
-          key: { iteration: closed.iteration, candidate: closed.commit, kind, policy: policy.version },
-          workItem: closed.workItem,
-          assignment,
-          base,
-          gate: closed.gate,
-          tree,
-          ...inputs.get(kind)!,
-        } satisfies ReviewRequest);
-        await commitRecord(run.log.ledger, {
-          event: run.log.next({
-            type: 'review-request-recorded',
-            data: { request: id, workItem: closed.workItem, iteration: closed.iteration, kind, gate: closed.gate, candidate: closed.commit },
-          }),
-          records: [{ path: reviewLayout.request(id), id, revision: 1, body: request }],
-        });
-        return id;
-      });
-      if (outcome !== null) recorded.push(outcome);
-    }
-    run.reviews?.wake();
-    return recorded;
-  }
-
-  /**
-   * What one question of one candidate is given besides the candidate, and
-   * the point its reviewer starts from. Code review needs nothing more and
-   * never forks. Scope review binds the plan excerpts the assignment cites
-   * and the local architect's pinned point at the assignment. Design review
-   * binds the guidance it selects from the candidate and the orientation
-   * key of that selection. An input that cannot be read is recorded as
-   * such: the attempt then says what it lacked.
-   */
-  private async reviewInputs(
-    run: Run,
-    kind: ReviewKind,
-    closed: { readonly workItem: string; readonly iteration: string; readonly commit: string; readonly assignment: string; readonly base: string },
-  ): Promise<ReviewInputs> {
-    const none: ReviewInputs = { guidance: [], forkPoint: { kind: 'none' } };
-    if (kind === 'code' || kind === 'scope') {
-      // Both read the assignment package from its record; scope review adds
-      // the plan deviations recorded by the time it is requested.
-      let source: PackageCitation | undefined;
-      try {
-        const assignment = iterationAssignmentSchema.parse(this.committedBody(run, closed.assignment));
-        source = assignment.source === undefined || kind === 'code' ? assignment.source
-          : await this.citeCurrentDeviations(run, assignment.source.elements);
-      } catch (error) {
-        return { ...none, inputsUnavailable: `The ${kind} review's assignment package could not be cited: ${message(error)}` };
-      }
-      if (kind === 'code') return { ...none, ...(source === undefined ? {} : { source }) };
-      const assigned = run.log.all('iteration-assigned').find(event => event.data.iteration === closed.iteration);
-      const capabilityAssigned = run.log.all('capability-assigned').find(event => event.data.assignment === closed.iteration);
-      const pinned = assigned?.data.architectRef ?? capabilityAssigned?.data.architectRef;
-      const forkPoint: ForkPoint = pinned === undefined || pinned === null
-        ? { kind: 'unavailable', reason: pinned === null ? 'The local architect\'s session was not kept after the assignment' : 'The assignment recorded no pinned point of the local architect' }
-        : { kind: 'session', session: pinned.session, ref: pinned.ref };
-      return { guidance: [], forkPoint, ...(source === undefined ? {} : { source }) };
-    }
-    try {
-      const snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot, { commit: closed.commit, base: closed.base });
-      const guidance = (await readGuidance(this.candidates, this.projectRoot, snapshot)).map(({ ref, hash }) => ({ ref, hash }));
-      if (guidance.length === 0) return { ...none, forkPoint: { kind: 'unavailable', reason: 'The candidate holds no guidance to judge a design against' } };
-      const key = orientationKey({
-        guidance,
-        packageHash: run.record.prompts.reviewer?.hash ?? null,
-        agent: run.record.agent,
-        model: this.options.model ?? null,
-        context: run.record.policy.context.reviewer,
-        scope: { projectRoot: this.projectRoot, workItem: closed.workItem, authority: 'read-only-candidate' },
-        execution: { history: 'complete', compaction: 'forbidden', snapshot: 'current-request-candidate' },
-      });
-      return { guidance, forkPoint: { kind: 'orientation', key } };
-    } catch (error) {
-      return { ...none, forkPoint: { kind: 'unavailable', reason: `The candidate's guidance could not be read: ${message(error)}` } };
-    }
-  }
-
-  /**
    * A package with every plan deviation recorded so far: by default the
    * assessment package, every non-functional and fixed element; otherwise
    * the elements an investigation, a repair or an unresolved fork reads.
@@ -1122,7 +1033,7 @@ export class RunService {
     if (this.closed || this.ignoring(run) || run.reviews?.accepting !== true) return false;
     if (reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
 
-    const pendingBindings = await this.reviewPendingBindings(run, request, snapshot);
+    const pendingBindings = await this.handling.reviewPendingBindings(run, request, snapshot);
     const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, request.assignment));
     const reviewedResult = committedRecords(run.log.ledger.replay()).results.get(request.key.iteration);
     const discovery = assignment.success ? startingPointsSection([
@@ -1736,7 +1647,7 @@ export class RunService {
     if (run.record.policy.reviews === undefined) return [];
     const recovered: string[] = [];
     for (const closed of this.reviewableClosings(run)) {
-      for (const request of await this.requestReviews(run, closed)) recovered.push(`review request ${request} of ${closed.iteration}`);
+      for (const request of await this.handling.requestReviews(run, closed)) recovered.push(`review request ${request} of ${closed.iteration}`);
     }
     const finishedIds = await this.finishUnsettledReviews(run, (_request, running) => (running
       ? { reason: 'execution-failed', detail: 'The harness stopped while this attempt ran; its reader\'s session was lost with it' }
@@ -1823,11 +1734,7 @@ export class RunService {
    * assignment has resolved it yet.
    */
   private pendingCorrection(run: Run, workItem: string): string | undefined {
-    const assessed = run.log.all('reconciliation-assessed').filter(event => event.data.workItem === workItem).at(-1);
-    if (assessed === undefined || assessed.data.next !== 'correct') return undefined;
-    const resolved = run.log.all('iteration-assigned').some(event => event.data.corrects === assessed.data.reconciliation) ||
-      run.log.all('capability-assigned').some(event => event.data.corrects === assessed.data.reconciliation);
-    return resolved ? undefined : assessed.data.reconciliation;
+    return pendingCorrection(run.log, workItem);
   }
 
   /**
@@ -2308,9 +2215,7 @@ export class RunService {
    * CheckFinding left open and why.
    */
   private capabilityBlockers(run: Run, workItem: string): string[] {
-    const accepted = new Set(run.log.all('iteration-closed').filter(event => event.data.outcome === 'accepted')
-      .map(event => event.data.iteration));
-    return capabilityCompletionBlockers(replayCapabilityState(run.log.events), workItem, accepted);
+    return capabilityBlockersOf(run.log, workItem);
   }
 
   /** Shared completion check for a work item or bounded capability task. */
@@ -2514,7 +2419,7 @@ export class RunService {
       // A crash can land after the durable close event and before its
       // filesystem cleanup. Repeat the idempotent cleanup on every load.
       try {
-        await this.cleanupClosedScratch(run);
+        await this.handling.cleanupClosedScratch(run);
       } catch (error) {
         if (!run.log.terminal) await this.fail(run, 'recovery-exhausted', `Closed iteration scratch could not be cleaned: ${message(error)}`);
         else this.warn(`Run ${run.record.jobId}: closed iteration scratch could not be cleaned: ${message(error)}`);
@@ -3419,7 +3324,7 @@ export class RunService {
     // of the run itself has happened yet.
     if (!recovering) await this.afterWrite('job-created', run.record.jobId);
     if (this.ignoring(run)) return;
-    if (recovering) await this.cleanupClosedScratch(run);
+    if (recovering) await this.handling.cleanupClosedScratch(run);
     this.startReviews(run, agent, packages);
     const accepted = await this.analyse(run, agent, packages, baseline);
     if (!accepted || this.ignoring(run)) return;
@@ -5070,22 +4975,7 @@ export class RunService {
    * bind a subject to a work item that already exists.
    */
   private bindingsOf(run: Run): Map<string, string> {
-    const bindings = new Map<string, string>();
-    for (const event of run.log.events) {
-      if (event.type === 'contract-registered') {
-        if (event.data.obligation !== null && event.data.providerWorkItem !== null) {
-          bindings.set(bindingKey(event.data.obligation, event.data.revision), event.data.providerWorkItem);
-        }
-        const consumer = workItemOfIteration(event.data.iteration);
-        if (consumer !== null) {
-          for (const requirement of event.data.requirements) bindings.set(bindingKey(requirement, event.data.revision), consumer);
-        }
-        continue;
-      }
-      if (event.type !== 'evidence-reopened') continue;
-      for (const binding of event.data.bindings) bindings.set(bindingKey(binding.subject.id, binding.subject.revision), binding.workItem);
-    }
-    return bindings;
+    return bindingsOf(run.log);
   }
 
   /** The work item bound to one subject's current revision, or null where nothing binds it. */
@@ -5113,7 +5003,7 @@ export class RunService {
 
   /** The requirement revisions a `requirement-verified` has closed. */
   private verifiedRequirements(run: Run): Set<string> {
-    return new Set(run.log.all('requirement-verified').map(event => verificationKey(event.data.requirement, event.data.revision)));
+    return verifiedRequirements(run.log);
   }
 
   /**
@@ -5123,7 +5013,7 @@ export class RunService {
    * follow-up while its record keeps naming the item it followed.
    */
   private openRequirementsOf(run: Run, records: ReturnType<typeof committedRecords>, workItem: string): ConsumerRequirement[] {
-    return openRequirements(records.requirements, this.verifiedRequirements(run), workItem, this.bindingsOf(run));
+    return openRequirementsOf(run.log, records, workItem);
   }
 
   /**
@@ -5132,12 +5022,7 @@ export class RunService {
    * that a revision rebound elsewhere owes nothing more.
    */
   private obligationOwedBy(run: Run, item: WorkItem, records: ReturnType<typeof committedRecords>): ProviderObligation | null {
-    if (!('obligation' in item.origin)) return null;
-    const obligation = records.obligations.get(item.origin.obligation.id);
-    if (obligation === undefined) return null;
-    const bound = this.boundItem(run, obligation.id, obligation.revision);
-    if (bound !== null) return bound === item.id ? obligation : null;
-    return item.origin.obligation.revision === obligation.revision ? obligation : null;
+    return obligationOwedBy(run.log, item, records);
   }
 
   /** The agreements one work item consumes, which are the ones its architect may revise. */
@@ -5154,8 +5039,7 @@ export class RunService {
 
   /** The count of iterations this work item has been assigned, contract sub-sessions included. */
   private assignedCount(run: Run, workItem: string): number {
-    return run.log.all('iteration-assigned').filter(event => event.data.workItem === workItem).length
-      + run.log.all('contract-requested').filter(event => event.data.workItem === workItem).length;
+    return assignedCount(run.log, workItem);
   }
 
   /** The capability one work item is implementing, whatever its origin. */
@@ -5645,7 +5529,7 @@ export class RunService {
       // its action and whatever the action leads to: reporting continues
       // alongside coordination, and no gate or audit outcome edits them.
       if (result.value.kind !== 'yield-for-providers'
-        && !await this.recordObligations(run, { kind: 'work-item', id: item.id }, result.id, result.value)) return null;
+        && !await this.handling.recordObligations(run, { kind: 'work-item', id: item.id }, result.id, result.value)) return null;
 
       if (result.value.kind === 'unresolved') {
         // The request cannot be met as stated. The global architect answers
@@ -5791,23 +5675,11 @@ export class RunService {
         continue;
       }
 
-      const completedOutline = run.restoring ? run.log.all('outline-revised').find(event =>
-        event.data.workItem === item.id && event.data.invocation === result.id && event.data.architectRef !== undefined) : undefined;
-      if (completedOutline === undefined) {
-        const revision = outlines.length + 1;
-        const outline = workItemOutlineSchema.parse({
-          schema: 'ramify-agent.work-item-outline/1', workItem: item.id, revision,
-          invocation: result.id, ...result.value.outline,
-          hypothesesSeen: hypotheses.map(hypothesis => refOf(hypothesis.id, hypothesis.revision, hypothesis)),
-        } satisfies WorkItemOutline);
-        await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation: result.id, architectRef: architectRefOf(result) } }, [
-          { path: workLayout.outline(item.id, revision), id: item.id, revision, body: outline },
-        ]);
-        await this.afterWrite('outline-revised', run.record.jobId);
-      } else {
-        const outline = workItemOutlineSchema.parse(this.committedBody(run, workLayout.outline(item.id, completedOutline.data.revision)));
-        if (outline.invocation !== result.id) throw new Error('Original completion outline identity changed');
-      }
+      if (await this.handling.reviseOutline(run, {
+        item, invocation: result.id, outline: result.value.outline,
+        hypothesesSeen: hypotheses.map(hypothesis => refOf(hypothesis.id, hypothesis.revision, hypothesis)),
+        architectRef: architectRefOf(result),
+      }) === null) return null;
       run.reviews?.wake();
       if (this.ignoring(run)) return null;
 
@@ -6837,16 +6709,7 @@ export class RunService {
    * authorization for them, because rewriting them is what it is for.
    */
   private requiredArtifacts(committed: ReturnType<typeof committedRecords>): Array<{ path: string; contract: ContractRecord }> {
-    const artifacts: Array<{ path: string; contract: ContractRecord }> = [];
-    for (const contract of committed.contracts.values()) {
-      const paths = [
-        ...contract.artifacts.interface.map(entry => entry.path),
-        ...contract.artifacts.conformance.map(entry => entry.path),
-        ...contract.artifacts.fake.map(entry => entry.path),
-      ];
-      for (const path of paths) artifacts.push({ path, contract });
-    }
-    return artifacts;
+    return requiredArtifacts(committed);
   }
 
   /**
@@ -7031,22 +6894,12 @@ export class RunService {
 
     // The outline revision is committed only once the scope it plans is
     // captured, so a scope the provider refuses leaves no revision behind.
-    if (submission.outline !== undefined && !run.log.all('outline-revised').some(event => event.data.workItem === item.id && event.data.invocation === invocation)) {
-      const revision = outlines.length + 1;
-      const outline = workItemOutlineSchema.parse({
-        schema: 'ramify-agent.work-item-outline/1',
-        workItem: item.id,
-        revision,
-        invocation,
-        ...submission.outline,
-        hypothesesSeen: (delivery?.data.refs ?? []).map(ref => ({ ...ref })),
-      } satisfies WorkItemOutline);
-      await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation } }, [
-        { path: workLayout.outline(item.id, revision), id: item.id, revision, body: outline },
-      ]);
-      await this.afterWrite('outline-revised', run.record.jobId);
-      if (this.ignoring(run)) return null;
-      outlines = [...outlines, outline];
+    if (submission.outline !== undefined) {
+      const revised = await this.handling.reviseOutline(run, {
+        item, invocation, outline: submission.outline, hypothesesSeen: delivery?.data.refs ?? [],
+      });
+      if (revised === null) return null;
+      if (revised.written) outlines = [...outlines, revised.outline];
     }
 
     const outline = outlines.at(-1);
@@ -7058,10 +6911,7 @@ export class RunService {
     // A guarded path this architect authorized is one the engineer may write
     // through the guarded tools: the authorization is the permission, and
     // the assignment records it beside the scope it widens by that one file.
-    for (const authorization of revised === undefined ? submission.assignment.authorizations ?? [] : []) {
-      const target = await resolveRealTarget(this.projectRoot, authorization.path);
-      if (target.ok && !scope.resolved.files.includes(target.resolved)) scope.resolved.files.push(target.resolved);
-    }
+    await authorizedScope(this.projectRoot, scope, revised === undefined ? submission.assignment.authorizations ?? [] : []);
 
     // Registered evidence this iteration must satisfy. It is derived, never
     // submitted: a provider item runs the agreed suite against the real
@@ -7114,37 +6964,28 @@ export class RunService {
       }),
     });
 
-    await this.write(run, revised === undefined
-      ? {
-        type: 'iteration-assigned',
-        // The architect's pinned point that produced this assignment is
-        // committed with it: the iteration's scope review forks it. The
-        // first assignment after a reconciliation chose a correction
-        // resolves that reconciliation's repair intent.
-        data: {
-          workItem: item.id, iteration: id, kind: assignment.kind, scopeRevision: scope.revision, invocation, decisions: localDecisions, architectRef,
-          ...(this.pendingCorrection(run, item.id) === undefined ? {} : { corrects: this.pendingCorrection(run, item.id)! }),
-        },
-      }
-      : {
-        type: 'contract-requested',
-        data: {
-          workItem: item.id,
-          iteration: id,
-          scopeRevision: scope.revision,
-          invocation,
-          capability: revised.capability.id,
-          consumer: item.module,
-          provider: revised.provider,
-          // A direct revision is the architect's own; no engineer asked for it.
-          requestedBy: null,
-          revises: revised.id,
-        },
-      }, [
+    if (revised === undefined) {
+      return this.handling.recordAssignment(run, { item, number, invocation, assignment, decisions: localDecisions, localRecords, architectRef });
+    }
+    await this.write(run, {
+      type: 'contract-requested',
+      data: {
+        workItem: item.id,
+        iteration: id,
+        scopeRevision: scope.revision,
+        invocation,
+        capability: revised.capability.id,
+        consumer: item.module,
+        provider: revised.provider,
+        // A direct revision is the architect's own; no engineer asked for it.
+        requestedBy: null,
+        revises: revised.id,
+      },
+    }, [
       { path: iterationLayout.assignment(item.id, number), id, revision: 1, body: assignment },
       ...localRecords,
     ]);
-    await this.afterWrite(revised === undefined ? 'iteration-assigned' : 'contract-requested', run.record.jobId);
+    await this.afterWrite('contract-requested', run.record.jobId);
     return this.ignoring(run) ? null : assignment;
   }
 
@@ -7204,30 +7045,7 @@ export class RunService {
     kind: IterationAssignment['kind'],
     records: ReturnType<typeof committedRecords>,
   ): IterationAssignment['evidenceObligations'] {
-    const evidence: IterationAssignment['evidenceObligations'] = [];
-    // A provider work item owes its obligation at every iteration of it, so
-    // the agreed suite runs against the real implementation before the item
-    // can complete. A verification of its own requirements does not excuse
-    // it, and a revision binds it to the revision it now owes.
-    const obligation = this.obligationOwedBy(run, item, records);
-    if (obligation !== null) {
-      evidence.push({
-        obligation: refOf(obligation.id, obligation.revision, obligation),
-        suite: [...obligation.evidence.conformance],
-        against: 'real',
-      });
-    }
-    if (kind === 'verification') {
-      for (const requirement of this.openRequirementsOf(run, records, item.id)) {
-        const obligation = records.obligations.get(requirement.obligation);
-        evidence.push({
-          requirement: refOf(requirement.id, requirement.revision, requirement),
-          suite: [...(obligation?.evidence.conformance ?? [])],
-          against: 'real',
-        });
-      }
-    }
-    return evidence;
+    return evidenceFor(run.log, item, kind, records);
   }
 
   /**
@@ -7666,7 +7484,7 @@ export class RunService {
     const chosen = action.value;
     // Registrations and reports apply on acceptance, before the action; a
     // replayed accepted action finds them recorded and applies nothing again.
-    if (!await this.recordObligations(run, capabilityActor(), action.id, chosen)) return null;
+    if (!await this.handling.recordObligations(run, capabilityActor(), action.id, chosen)) return null;
     if (chosen.kind === 'partial') {
       progress = `${chosen.progress}; unfinished: ${chosen.unfinished.join('; ')}`;
       coordinatorPoint = action.ref || undefined;
@@ -8444,7 +8262,7 @@ export class RunService {
 
     // Closing the iteration closes the work of a session still kept for it.
     const close = async (outcome: IterationResult['outcome'], extra: Partial<IterationResult> = {}): Promise<ClosedIterationOutcome> => {
-      const result = await this.closeIteration(run, item, number, assignment, {
+      const result = await this.handling.closeIteration(run, item, number, assignment, {
         outcome, invocations, findings, gate: null, commit: null, ...extra,
       });
       await this.finishSession(run, session, 'work-closed');
@@ -8456,10 +8274,10 @@ export class RunService {
     const passed = [...priorGates].reverse().find(gate => gate.verdict === 'passed' && gate.audited !== null);
     if (passed !== undefined) {
       if (await this.candidates.commitTree(this.projectRoot, passed.audited!) !== (await this.previewCandidateTree()).tree) throw new CandidateDriftError('Original engineer gate candidate changed before handback');
-      const closed = await this.closeIteration(run, item, number, assignment, {
+      const closed = await this.handling.closeIteration(run, item, number, assignment, {
         outcome: 'accepted', invocations, findings: [], gate: passed.id, commit: passed.audited,
       });
-      if (closed.commit !== null) await this.requestReviews(run, { workItem: assignment.coordination?.kind === 'capability-task'
+      if (closed.commit !== null) await this.handling.requestReviews(run, { workItem: assignment.coordination?.kind === 'capability-task'
         ? assignment.coordination.id : item.id, iteration: assignment.id, gate: passed.id, commit: closed.commit });
       await this.finishSession(run, session, 'work-closed');
       if (!await this.dischargeEvidence(run, item, assignment, passed.id, closed)) return null;
@@ -8731,7 +8549,7 @@ export class RunService {
       // The proposal's bindings apply at its acceptance, before the gate:
       // that gate's commit drops a bound scenario's pending tag, and the gate
       // selects it by identity. No gate outcome undoes a binding.
-      if (!await this.recordBindings(run, result.id, proposal.bindings)) return null;
+      if (!await this.handling.recordBindings(run, result.id, proposal.bindings)) return null;
       let infrastructureAttempt = 0;
       for (;;) {
         const gate = await this.gates.iterationGate(run, item, assignment, result.id, repairRound, infrastructureAttempt, proposal.summary);
@@ -8740,7 +8558,7 @@ export class RunService {
 
         if (gate.verdict === 'passed') {
           findings.push(...proposal.findings);
-          const closed = await this.closeIteration(run, item, number, assignment, {
+          const closed = await this.handling.closeIteration(run, item, number, assignment, {
             outcome: 'accepted',
             invocations,
             findings,
@@ -8750,7 +8568,7 @@ export class RunService {
           });
           // The candidate's reviews are requested before the driver passes
           // it; they run beside the next iteration's writer.
-          if (closed.commit !== null) await this.requestReviews(run, { workItem: assignment.coordination?.kind === 'capability-task'
+          if (closed.commit !== null) await this.handling.requestReviews(run, { workItem: assignment.coordination?.kind === 'capability-task'
             ? assignment.coordination.id : item.id, iteration: assignment.id, gate: gate.id, commit: closed.commit });
           await this.finishSession(run, session, 'work-closed');
           // The evidence this acceptance discharges: a provider that ran the
@@ -9265,7 +9083,7 @@ export class RunService {
           item, assignment, number: subject.number, role: 'contract-engineer', result, bounds, lines, after, shellLog: tools.shellLog(),
         });
         if (failure === null) return null;
-        const closed = await this.closeIteration(run, item, subject.number, assignment, {
+        const closed = await this.handling.closeIteration(run, item, subject.number, assignment, {
           outcome: 'partial', invocations, findings, gate: null, commit: null, failure,
         });
         await this.finishSession(run, session, 'work-closed');
@@ -9278,7 +9096,7 @@ export class RunService {
           ...result.value.unfinished.map(entry => `unfinished: ${entry}`),
           ...result.value.findings,
         );
-        const closed = await this.closeIteration(run, item, subject.number, assignment, {
+        const closed = await this.handling.closeIteration(run, item, subject.number, assignment, {
           outcome: 'partial', invocations, findings, gate: null, commit: null,
         });
         return this.ignoring(run) ? null : { findings, result: closed };
@@ -9292,7 +9110,7 @@ export class RunService {
         const registration = await this.registerAgreement(run, item, assignment, gate.id, established);
         if (registration === null) return null;
         findings.push(...registration.findings);
-        const closed = await this.closeIteration(run, item, subject.number, assignment, {
+        const closed = await this.handling.closeIteration(run, item, subject.number, assignment, {
           outcome: 'accepted', invocations, findings, gate: gate.id, commit: gate.audited,
         });
         await this.finishSession(run, session, 'work-closed');
@@ -9306,7 +9124,7 @@ export class RunService {
         continue;
       }
       findings.push(`the contract gate did not pass: ${gate.cause ?? 'unknown'} at gate ${gate.id}; nothing was registered`);
-      const closed = await this.closeIteration(run, item, subject.number, assignment, {
+      const closed = await this.handling.closeIteration(run, item, subject.number, assignment, {
         outcome: gate.next === 'return-to-local-architect' ? 'unsuitable' : 'exhausted',
         invocations, findings, gate: null, commit: null,
       });
@@ -9707,7 +9525,7 @@ export class RunService {
       },
     }, [...registration.records, ...reopening.records]);
     await this.afterWrite('evidence-reopened', run.record.jobId);
-    await this.cleanupClosedScratch(run);
+    await this.handling.cleanupClosedScratch(run);
     if (this.ignoring(run)) return null;
 
     const findings: string[] = [];
@@ -9821,107 +9639,6 @@ export class RunService {
       if (this.ignoring(run)) return false;
     }
     return true;
-  }
-
-  /** Commits the `IterationResult` and closes the iteration. It is the last write of that iteration. */
-  private async closeIteration(
-    run: Run,
-    item: WorkItem,
-    number: number,
-    assignment: IterationAssignment,
-    body: {
-      readonly outcome: IterationResult['outcome'];
-      readonly invocations: readonly string[];
-      readonly findings: readonly string[];
-      readonly gate: string | null;
-      readonly commit: string | null;
-      readonly recommendation?: string | undefined;
-      /** Where an engineer ended without a result: its digest and its analysis. */
-      readonly failure?: IterationResult['failure'] | undefined;
-    },
-  ): Promise<IterationResult> {
-    // The notices are read from the commit itself, never from an agent's
-    // words, so a run that repeats the effect derives the same ones.
-    const notices = await this.gates.committedModules(run, body.commit, assignment.id, body.gate);
-    const proposalInvocation = body.gate === null ? body.invocations.at(-1)
-      : gateAttemptSchema.parse(this.committedBody(run, runLayout.gate(body.gate))).proposedBy;
-    const submissionBytes = proposalInvocation == null ? undefined
-      : await readIfExists(run.path(runLayout.submission(proposalInvocation)));
-    const retainedSubmission = proposalInvocation == null ? null
-      : committedRecords(run.log.ledger.replay()).outcomes.get(proposalInvocation)?.submission;
-    if (retainedSubmission != null && (submissionBytes === undefined || sha256(submissionBytes) !== retainedSubmission.hash)) {
-      throw new Error(`Engineer ${proposalInvocation} has changed or missing submission bytes`);
-    }
-    const rawSubmission = submissionBytes === undefined ? null : JSON.parse(submissionBytes.toString('utf8')) as Record<string, unknown>;
-    const submitted = rawSubmission?.schema === 'ramify-agent.engineer-submission/1'
-      ? engineerSubmissionSchema.safeParse((({ schema: _schema, ...value }) => value)(rawSubmission)) : null;
-    const startingPoints = submitted?.success && ['completion-proposed', 'partial'].includes(submitted.data.kind)
-      && 'startingPoints' in submitted.data ? submitted.data.startingPoints : undefined;
-    const result = iterationResultSchema.parse({
-      schema: 'ramify-agent.iteration-result/1',
-      iteration: assignment.id,
-      ...(assignment.coordination === undefined ? {} : { coordination: assignment.coordination }),
-      outcome: body.outcome,
-      invocations: [...body.invocations],
-      gate: body.gate,
-      commit: body.commit,
-      findings: [...body.findings],
-      changedAssumptions: [],
-      ...(startingPoints === undefined ? {} : { startingPoints }),
-      ...(body.recommendation === undefined ? {} : { recommendation: body.recommendation }),
-      artifacts: [],
-      ...(body.failure === undefined ? {} : { failure: body.failure }),
-    } satisfies IterationResult);
-
-    const data = { workItem: item.id, iteration: assignment.id, outcome: result.outcome, gate: result.gate, commit: result.commit, notices };
-    const recordOwner = assignment.coordination?.kind === 'capability-task' ? assignment.coordination.id : item.id;
-    const record = { path: iterationLayout.result(recordOwner, number), id: assignment.id, revision: 1, body: result };
-    const corrects = assignment.coordination?.kind === 'capability-task'
-      ? run.log.all('capability-assigned').find(event => event.data.assignment === assignment.id)?.data.corrects
-      : run.log.all('iteration-assigned').find(event => event.data.iteration === assignment.id)?.data.corrects;
-    if (result.outcome === 'accepted' && result.gate !== null && result.commit !== null && corrects !== undefined) {
-      await this.closeCorrection(run, recordOwner, { data, record, corrects, gate: result.gate, commit: result.commit, invocation: body.invocations.at(-1) ?? null });
-    } else {
-      await this.write(run, { type: 'iteration-closed', data }, [record]);
-    }
-    await this.afterWrite('iteration-closed', run.record.jobId);
-    await this.cleanupClosedScratch(run);
-    return result;
-  }
-
-  /** A closed assignment releases scratch only when no other assignment in its module remains open. */
-  private async cleanupClosedScratch(run: Run): Promise<void> {
-    const records = committedRecords(run.log.ledger.replay());
-    // Contract revision can supersede an assignment by committing its result
-    // with evidence-reopened, without a separate iteration-closed event.
-    const closed = new Set(records.results.keys());
-    const engineerAssignments = new Set([
-      ...run.log.all('iteration-assigned').map(event => event.data.iteration),
-      ...run.log.all('capability-assigned').map(event => event.data.assignment),
-    ]);
-    const declared = await declaredModuleDirectories(this.projectRoot);
-    const directoriesOf = (scope: WriteScope): string[] => {
-      const captured = scope.resolved.roots.flatMap(root => {
-        const path = relative(this.projectRoot, root).replaceAll('\\', '/');
-        return path === 'src' ? [''] : path.endsWith('/src') ? [path.slice(0, -'/src'.length)] : [];
-      });
-      return [...new Set([...declared, ...captured].filter(directory => {
-        const src = join(this.projectRoot, directory, 'src');
-        return scope.resolved.roots.some(root => root === src || isContained(root, src));
-      }))];
-    };
-    const assignments = [...records.assignments.values()]
-      .filter(assignment => engineerAssignments.has(assignment.id))
-      .map(assignment => ({ id: assignment.id, modules: directoriesOf(assignment.scope) }));
-    for (const iteration of closed) {
-      const removable = releasableScratchModules(iteration, assignments, closed);
-      if (removable.length === 0) continue;
-      const removed = await removeScratchDirectories(this.projectRoot, removable, this.git);
-      if (removed.preservedTracked.length > 0 && !run.log.all('scratch-preserved').some(entry =>
-        entry.data.iteration === iteration && entry.data.paths.join('\0') === removed.preservedTracked.join('\0'))) {
-        await this.write(run, { type: 'scratch-preserved', data: { iteration, paths: [...removed.preservedTracked] } });
-      }
-    }
   }
 
   /**
@@ -10756,8 +10473,7 @@ export class RunService {
   /** The work item's entry or integration scenario and the run's tracked scenarios, which a declaration is judged against. */
   /** The one obligation projection: scenario records, delegated outcomes and the accepted registrations and reports. */
   private obligationProjection(run: Run): ObligationProjection {
-    const lines = run.log.ledger.replay();
-    return obligationsOf({ scenarios: trackedScenarios(lines).records, workItems: committedRecords(lines).workItems, events: run.log.events });
+    return obligationProjection(run.log);
   }
 
   /**
@@ -10774,80 +10490,6 @@ export class RunService {
     const entries = run.log.ledger.replay();
     const source = reportSourceLines(owned, sequence => acceptedCommit(entries.slice(0, sequence), run.base), acceptedCommit(entries, run.base));
     return source.length === 0 ? lines : [...lines, '', ...source];
-  }
-
-  /**
-   * Records an accepted architect submission's registrations and reports,
-   * each as its own event naming the invocation and the submission's hash.
-   * What the same accepted submission already recorded is not recorded
-   * again, so a replayed action applies each effect once.
-   */
-  private async recordObligations(run: Run, actor: ObligationActor, invocation: string,
-    submission: { readonly registrations: readonly ObligationRegistration[]; readonly reports: readonly ObligationReport[] }): Promise<boolean> {
-    if (submission.registrations.length === 0 && submission.reports.length === 0) return true;
-    const hash = run.log.all('invocation-ended').find(event => event.data.invocation === invocation)?.data.submission ?? null;
-    if (hash === null) {
-      await this.fail(run, 'internal', `Invocation ${invocation} reported obligations without a recorded accepted submission`, [runLayout.outcome(invocation)]);
-      return false;
-    }
-    for (const input of obligationEventsToRecord(submission, actor, { by: invocation, submission: hash }, this.obligationProjection(run), run.log.events)) {
-      // A done report that makes every sub-scenario of an integration
-      // scenario done commits that scenario's work item with it.
-      const due = input.type === 'obligation-reported' && input.data.judgment === 'done' ? this.integrationItemsDue(run, input.data.id) : [];
-      if (await this.write(run, input, due) === 'ended') return false;
-      // A crash between two reports of one submission leaves the rest to
-      // the replay, which records each once.
-      if (input.type === 'obligation-reported') await this.afterWrite('obligation-reported', run.record.jobId);
-      if (this.ignoring(run)) return false;
-    }
-    return !this.ignoring(run);
-  }
-
-  /** Attribute only the rendering and accepted bindings preceding this exact candidate gate. */
-  private async reviewPendingBindings(run: Run, request: ReviewRequest, snapshot: CandidateSnapshot) {
-    const lines = run.log.ledger.replay();
-    const gate = lines.findIndex(line => line.transaction.event.type === 'gate-committing' && line.transaction.event.data.gate === request.gate);
-    if (gate < 0) return [];
-    const prefix = lines.slice(0, gate + 1);
-    const tracked = writtenScenarios(prefix);
-    const expected = new Map(expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }).map(file => [file.path, file.content]));
-    const changed = new Set(snapshot.changes.map(change => change.path));
-    const bindings: Array<{ path: string; sha256: string; scenario: string; invocation: string; submission: string }> = [];
-    for (const line of prefix) {
-      const event = line.transaction.event;
-      if (event.type !== 'obligation-bound') continue;
-      const scenario = tracked.records.find(record => record.id === event.data.id);
-      if (!scenario || !changed.has(scenario.file) || snapshot.entries.get(scenario.file)?.kind !== 'file') continue;
-      const end = prefix.find(item => item.transaction.event.type === 'invocation-ended' && item.transaction.event.data.invocation === event.data.by
-        && item.transaction.event.data.submission === event.data.submission);
-      if (!end) continue;
-      const submission = await readIfExists(run.path(runLayout.submission(event.data.by)));
-      if (submission === undefined || sha256(submission) !== event.data.submission) continue;
-      const bytes = await this.candidates.readBlob(this.projectRoot, request.key.candidate, scenario.file);
-      const evidence = pendingBindingEvidence({ path: scenario.file, scenario: scenario.id, invocation: event.data.by, submission: event.data.submission,
-        submissionBytes: submission, candidateBytes: bytes, expectedBytes: expected.get(scenario.file) });
-      if (evidence !== null) bindings.push(evidence);
-    }
-    return bindings;
-  }
-
-  /**
-   * Records an accepted engineer proposal's bindings, each as its own
-   * `obligation-bound` event naming the invocation and the submission's hash.
-   * What the same accepted submission already recorded is not recorded
-   * again, so a replayed action applies each binding once.
-   */
-  private async recordBindings(run: Run, invocation: string, bindings: readonly ObligationBinding[]): Promise<boolean> {
-    if (bindings.length === 0) return true;
-    const hash = run.log.all('invocation-ended').find(event => event.data.invocation === invocation)?.data.submission ?? null;
-    if (hash === null) {
-      await this.fail(run, 'internal', `Invocation ${invocation} bound obligations without a recorded accepted submission`, [runLayout.outcome(invocation)]);
-      return false;
-    }
-    for (const input of bindingEventsToRecord(bindings, { by: invocation, submission: hash }, run.log.events)) {
-      if (await this.write(run, input) === 'ended') return false;
-    }
-    return !this.ignoring(run);
   }
 
   /**
@@ -10926,20 +10568,7 @@ export class RunService {
    * items run one at a time.
    */
   private integrationItemsDue(run: Run, scenario: string): CommitRecord[] {
-    const lines = run.log.ledger.replay();
-    const tracked = trackedScenarios(lines);
-    if (!tracked.states.has(scenario)) return [];
-    const after = new Map(tracked.states);
-    after.set(scenario, 'done');
-    const items = [...committedRecords(lines).workItems];
-    const records: CommitRecord[] = [];
-    for (const integration of dueIntegrations(tracked.records, after, items)) {
-      if (!integration.subScenarios.includes(scenario)) continue;
-      const item = integrationWorkItem(integration, items.length);
-      items.push(item);
-      records.push({ path: workLayout.item(item.id), id: item.id, revision: 1, body: item });
-    }
-    return records;
+    return integrationItemsDue(run.log, scenario);
   }
 
   /**
@@ -11165,7 +10794,6 @@ function rootModuleOf(index: ArchitectIndex | null): string | undefined {
  * outcome, which is written once the session has started.
  */
 /** What a review request binds besides its candidate: its question's captured inputs and its fork point. */
-type ReviewInputs = Pick<ReviewRequest, 'guidance' | 'forkPoint'> & Partial<Pick<ReviewRequest, 'inputsUnavailable' | 'source'>>;
 
 /** What the harness binds to one concern of a valid submission. */
 interface ConcernBinding {
