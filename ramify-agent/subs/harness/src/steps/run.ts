@@ -1,7 +1,7 @@
 import { mkdir, readFile, realpath } from 'node:fs/promises';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import type { AgentPort } from '../../subs/agent/src/interfaces/port.js';
-import { gitService, type GitService } from '../../subs/evidence/src/git.js';
+import { gitCandidateSource, gitService, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
@@ -9,7 +9,6 @@ import { writeFileAtomic } from '../../subs/ledger/src/atomic.js';
 import { readCommittedAuditConfiguration } from '../../subs/audit/src/check-execution.js';
 import { isContained } from '../guard/resolve-contained-path.js';
 import { canonicalJson } from '../jobs/commands.js';
-import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
 import { loadPromptPackages, type LoadedPackage } from '../prompts/packages.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { defaultRunPolicy, withProjectTimeouts } from '../run/policy.js';
@@ -30,8 +29,9 @@ import { constructStep, freshFallback } from './construct.js';
 import { constructEngineerStep } from './engineer.js';
 import { parseStepInputs, StepInputsError, validateStepInputs, type StepInputs } from './inputs.js';
 import { constructOrientationStep, constructSelectorStep, constructWorkTurnStep, judgeWorkTurn } from './local-architect.js';
-import { manualRunner, openManualRun, recordAuthoredInputs, type ManualRun } from './manual.js';
+import { manualRunLocationOf, manualRunner, unsettledWriter, openManualRun, recordAuthoredInputs, type ManualRun } from './manual.js';
 import { constructDesignOrientationStep } from './reviewer.js';
+import { prepareManualReview, ReviewRefusal, type ManualReview } from './review-step.js';
 import { committedBody, finished, kept, type InvocationProgress, type InvocationRequest, type InvocationResult, type InvocationRunner } from './runner.js';
 
 /*
@@ -66,6 +66,8 @@ export interface StepRunOptions {
   readonly ramify: RamifyCli;
   /** Git observations and the branch the run works on. Tests inject scenario answers; production uses Git. */
   readonly git?: GitService | undefined;
+  /** The audited candidates a review reads; production reads them from Git. */
+  readonly candidates?: CandidateSource | undefined;
   /** Shell and scoped-test command execution. Tests inject results; production runs commands. */
   readonly commandExecution?: CommandRunner | undefined;
   /** The architect view as the project stands now; by default the view, materialized. */
@@ -133,6 +135,8 @@ export interface StepRunSummary {
     readonly observations: string;
     readonly transcript: string;
     readonly summary: string;
+    /** A review's terminal attempt record, which settled the manual run's request; absent for other steps. */
+    readonly review?: string | null | undefined;
   };
   readonly error?: string | undefined;
 }
@@ -174,19 +178,7 @@ export type StepRunResult =
 const notStarted = (reason: string, records: string | null = null): StepRunResult => ({ status: 'not-started', reason, records, exitStatus: 2 });
 
 /** The project root and identities a run directory names, or why it names none. */
-export function manualRunLocation(directory: string): { readonly projectRoot: string; readonly planId: string; readonly runId: string } | string {
-  const run = resolve(directory);
-  const jobs = dirname(run);
-  const harness = dirname(jobs);
-  const plan = dirname(harness);
-  const plans = dirname(plan);
-  if (basename(jobs) !== 'jobs' || basename(harness) !== '.harness' || basename(plans) !== 'plans') {
-    return `${run} is not a run directory: expected <project>/plans/<plan>/.harness/jobs/<run>`;
-  }
-  if (!planIdSchema.safeParse(basename(plan)).success) return `${basename(plan)} is not a plan ID`;
-  if (!jobIdSchema.safeParse(basename(run)).success) return `${basename(run)} is not a run ID: letters, digits, "_" and "-"`;
-  return { projectRoot: dirname(plans), planId: basename(plan), runId: basename(run) };
-}
+export const manualRunLocation = manualRunLocationOf;
 
 /** Runs one step from its inputs in a manual run, from the lock to the records. */
 export async function runStep(options: StepRunOptions): Promise<StepRunResult> {
@@ -199,9 +191,6 @@ export async function runStep(options: StepRunOptions): Promise<StepRunResult> {
   catch (error) {
     if (error instanceof StepInputsError) return notStarted(error.message);
     throw error;
-  }
-  if (inputs.role === 'reviewer' && inputs.question !== 'design-orientation') {
-    return notStarted(`a ${inputs.question} review reads a prepared candidate snapshot, which step run does not prepare yet; supported: engineer, local-architect, context-selector and the reviewer's design-orientation`);
   }
   const location = manualRunLocation(options.run);
   if (typeof location === 'string') return notStarted(location);
@@ -269,6 +258,9 @@ async function runLocked(options: StepRunOptions, original: StepInputs, location
   if (opened.status === 'refused') return notStarted(`The manual run cannot be used: ${opened.reason}`);
   const run = opened.run;
   run.index = index;
+  // A writer of an earlier invocation that is not known to be settled may still be writing.
+  const unsettled = unsettledWriter(run.log);
+  if (unsettled !== null) return notStarted(`The manual run cannot be used: ${unsettled}`, run.directory);
 
   // The inputs are the manual run's own; where they came from stays their provenance.
   let inputs: StepInputs;
@@ -300,9 +292,10 @@ async function runLocked(options: StepRunOptions, original: StepInputs, location
     let prepared: Prepared<unknown>;
     try {
       prepared = await prepareRequest(inputs, { projectRoot, packages, git, ramify, run, runner, refresh, index: () => index,
-        commandExecution: options.commandExecution, auditChecks: options.auditChecks });
+        commandExecution: options.commandExecution, auditChecks: options.auditChecks, candidates: options.candidates ?? gitCandidateSource,
+        now: options.now ?? (() => new Date()) });
     } catch (error) {
-      return notStarted(error instanceof Refusal ? error.message : `The ${inputs.role} step cannot be prepared: ${message(error)}`, run.directory);
+      return notStarted(error instanceof Refusal || error instanceof ReviewRefusal ? error.message : `The ${inputs.role} step cannot be prepared: ${message(error)}`, run.directory);
     }
     scratch = prepared.scratch;
 
@@ -334,6 +327,9 @@ async function runLocked(options: StepRunOptions, original: StepInputs, location
 
     const outcome = invocationOutcomeSchema.parse(committedBody(run, runLayout.outcome(result.id)));
     settlementConfirmed = outcome.settled.confirmed;
+    // A review of the manual run's own request ends in its terminal attempt record, which settles it.
+    const reviewRecord = prepared.review === undefined ? undefined
+      : await prepared.review.finish(result, result.actual === undefined ? null : result.actual === 'fork' ? 'fork' : 'fresh');
     const submissionValue = result.value;
     const kind = submissionValue !== null && typeof submissionValue === 'object' && 'kind' in submissionValue && typeof submissionValue.kind === 'string'
       ? submissionValue.kind : null;
@@ -368,6 +364,7 @@ async function runLocked(options: StepRunOptions, original: StepInputs, location
         observations: at(runLayout.observations(result.id)),
         transcript: at(runLayout.transcript(result.session)),
         summary: at(runLayout.stepSummary(result.id)),
+        ...(reviewRecord === undefined ? {} : { review: reviewRecord === null ? null : at(reviewRecord) }),
       },
       ...(result.error === undefined ? {} : { error: result.error }),
     };
@@ -392,6 +389,8 @@ interface Prepared<T> {
   readonly standing?: (() => readonly { readonly code: string; readonly message: string; readonly file: string | null; readonly line: number | null }[]) | undefined;
   /** The module directory whose scratch the engineer was given. */
   readonly scratch?: { readonly directory: string } | undefined;
+  /** A review question's attempt records. */
+  readonly review?: ManualReview | undefined;
 }
 
 interface PrepareContext {
@@ -405,6 +404,8 @@ interface PrepareContext {
   readonly index: () => ArchitectIndex | null;
   readonly commandExecution: CommandRunner | undefined;
   readonly auditChecks: StepRunOptions['auditChecks'];
+  readonly candidates: CandidateSource;
+  readonly now: () => Date;
 }
 
 const readerScope = { write: null, measurement: null, size: null };
@@ -482,7 +483,7 @@ async function prepareRequest(inputs: StepInputs, context: PrepareContext): Prom
       } };
     }
     case 'reviewer': {
-      if (inputs.question !== 'design-orientation') throw new Refusal(`a ${inputs.question} review is not supported by step run yet`);
+      if (inputs.question !== 'design-orientation') return prepareReviewRequest(inputs, context);
       const step = constructDesignOrientationStep(inputs, environment);
       await readerDirectory(context, step.equipment.workingDirectory);
       return { request: {
@@ -497,6 +498,39 @@ async function prepareRequest(inputs: StepInputs, context: PrepareContext): Prom
       } };
     }
   }
+}
+
+/**
+ * A code, scope or design review: the audited candidate opened again, its
+ * patches and validator prepared as a run prepares them, and the attempt
+ * recorded where the request is the manual run's own.
+ */
+async function prepareReviewRequest(inputs: Extract<StepInputs, { role: 'reviewer'; question: 'code' | 'scope' | 'design' }>, context: PrepareContext): Promise<Prepared<unknown>> {
+  const { projectRoot, packages, run } = context;
+  const review = await prepareManualReview(inputs, { projectRoot, packages, run, candidates: context.candidates, now: context.now,
+    warn: () => undefined });
+  const { step, prepared } = review;
+  let fenced = false;
+  return {
+    review,
+    request: {
+      role: step.role, brief: step.brief, context: step.context, stepInputs: step.before.inputs,
+      fallback: fallbackOf(step.inputs, { projectRoot, packages }),
+      work: step.work, attempt: step.attempt, loaded: step.loaded, systemPrompt: step.systemPrompt, prompt: step.prompt,
+      start: step.start.mode === 'fork' ? { mode: 'fork', from: step.start.ref } : { mode: 'fresh' },
+      ...(step.fork === undefined ? {} : { fork: step.fork }),
+      ...(step.start.mode === 'fresh' && step.start.degraded !== undefined ? { degraded: step.start.degraded } : {}),
+      toolName: step.submission.toolName, description: step.submission.description,
+      inputSchema: step.submission.inputSchema, submissionSchema: step.submission.submissionSchema,
+      validate: prepared.validate,
+      keep: () => finished('work-closed'),
+      scope: readerScope, reader: true, workingDirectory: step.equipment.workingDirectory, absoluteMs: step.bounds.absoluteMs,
+      equip: () => ({ builtinTools: [...step.equipment.builtinTools], tools: [...prepared.tools.definitions] }),
+      // The start is recorded only for a request still unsettled; a settled one's reader never starts.
+      onStarted: async (invocation, session) => { fenced = !await review.onStarted(invocation, session); },
+      fenced: () => fenced,
+    },
+  };
 }
 
 /**

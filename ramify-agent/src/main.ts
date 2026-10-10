@@ -46,7 +46,9 @@ async function main(argv: readonly string[]): Promise<number> {
 /** One `step` command: its text on standard output, its diagnostics and refusals on standard error. */
 async function step(commandLine: Extract<CommandLine, { command: 'step' }>): Promise<number> {
   if (commandLine.step.command === 'run') return stepRun(commandLine.step);
-  const result = await runStepCommand(commandLine.step);
+  // A gate or an after-handling prints each transition as it happens.
+  const live = commandLine.step.command === 'gate' || commandLine.step.command === 'after' ? { onLine: (line: string) => console.log(line) } : {};
+  const result = await runStepCommand({ ...commandLine.step, ...live });
   if (result.stdout !== '') process.stdout.write(result.stdout);
   if (result.stderr !== '') process.stderr.write(result.stderr);
   return result.exitStatus;

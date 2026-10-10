@@ -1,5 +1,5 @@
-import { mkdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readFile, realpath, stat } from 'node:fs/promises';
+import { basename, dirname, join, resolve } from 'node:path';
 import type { AgentPort } from '../../subs/agent/src/interfaces/port.js';
 import type { GitService } from '../../subs/evidence/src/git.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
@@ -8,6 +8,9 @@ import { canonicalJson } from '../jobs/commands.js';
 import type { RecordRef as CommitRecord } from '../jobs/commit.js';
 import { Mutex, PriorityMutex } from '../jobs/mutex.js';
 import { jobSchemaVersion } from '../jobs/records.js';
+import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
+import { defaultRunPolicy } from '../run/policy.js';
+import { acquireProjectLock, ProjectLockError, type ProjectLock } from '../store/lock.js';
 import { RunLog } from '../run/log.js';
 import { manualRunRecordSchema, runDirectory, runLayout, type ManualRunRecord, type RunPolicy, type SessionId } from '../run/records.js';
 import { HarnessSessionOperations } from '../run/session-operations.js';
@@ -51,6 +54,8 @@ export class ManualRun implements RunnerRun {
   invocationBase = '';
   /** The limits the next invocation's step inputs carry, which replace the recorded policy's for it. */
   invocationLimits: RunPolicy['limits'] | undefined;
+  /** The commit-and-audit effect of a `step gate` in progress, as a run holds its gate's. */
+  gating: Promise<unknown> | undefined;
 
   constructor(readonly record: ManualRunRecord, readonly directory: string, readonly log: RunLog, readonly writer: WriterOwnership) {
     this.store = new ContentStore(join(directory, runLayout.blobs));
@@ -59,6 +64,8 @@ export class ManualRun implements RunnerRun {
   get jobId(): string { return this.record.jobId; }
   get planId(): string { return this.record.planId; }
   get createdAt(): string { return this.record.createdAt; }
+  /** The commit the manual run was created at: the accepted boundary before its first passing gate. */
+  get base(): string { return this.record.base; }
   get policy(): RunPolicy {
     return this.invocationLimits === undefined ? this.record.policy : { ...this.record.policy, limits: this.invocationLimits };
   }
@@ -166,6 +173,37 @@ export async function openManualRun(options: OpenManualRunOptions): Promise<Open
   return { status: 'opened', run: new ManualRun(record, directory, log, writer), created };
 }
 
+/**
+ * Reads the manual run a directory names, for a command that writes
+ * nothing: no lock, no branch checkout and no creation. A directory that
+ * holds no manual run of this project, plan and run is refused.
+ */
+export async function readManualRun(directory: string): Promise<{ readonly status: 'opened'; readonly run: ManualRun; readonly projectRoot: string } | { readonly status: 'refused'; readonly reason: string }> {
+  const refused = (reason: string) => ({ status: 'refused' as const, reason });
+  const location = manualRunLocationOf(directory);
+  if (typeof location === 'string') return refused(location);
+  let projectRoot: string;
+  try { projectRoot = await realpath(location.projectRoot); }
+  catch (error) { return refused(`The project root ${location.projectRoot} cannot be read: ${message(error)}`); }
+  const runPath = runDirectory(projectRoot, location.planId, location.runId);
+  const recordPath = join(runPath, runLayout.record);
+  let document: unknown;
+  try { document = JSON.parse(await readFile(recordPath, 'utf8')) as unknown; }
+  catch (error) { return refused((error as NodeJS.ErrnoException).code === 'ENOENT' ? `${runPath} holds no manual run` : `${recordPath} cannot be read: ${message(error)}`); }
+  if ((document as { kind?: unknown } | null)?.kind !== 'manual') return refused(`${runPath} is not a manual run`);
+  const parsed = manualRunRecordSchema.safeParse(document);
+  if (!parsed.success) return refused(`${recordPath} is not a manual run record this harness reads`);
+  const record = parsed.data;
+  if (record.jobId !== location.runId || record.planId !== location.planId || record.projectRoot !== projectRoot) {
+    return refused(`${recordPath} names run ${record.planId}/${record.jobId} of ${record.projectRoot}, not its directory`);
+  }
+  let log: RunLog;
+  try { log = await RunLog.open(join(runPath, runLayout.events), record.jobId); }
+  catch (error) { return refused(`the manual run's log cannot be read: ${message(error)}`); }
+  const writer = new WriterOwnership({ settleMs: record.policy.limits.writerSettleMs, tree: { changed: async () => [] }, groups: nodeProcessGroups });
+  return { status: 'opened', run: new ManualRun(record, runPath, log, writer), projectRoot };
+}
+
 /** The invocation runner over manual runs, and the session operations it starts sessions through. */
 export interface ManualRunner {
   readonly runner: InvocationRunner<ManualRun>;
@@ -253,4 +291,97 @@ export async function recordAuthoredInputs(runner: InvocationRunner<ManualRun>, 
   }
   for (const write of pending) await runner.write(run, write.event, [write.record]);
   return null;
+}
+
+/** An existing manual run a `gate` or `after` command works on, under the project lock it holds. */
+export interface LockedManualRun {
+  readonly run: ManualRun;
+  readonly projectRoot: string;
+  /** Releases the project lock. */
+  release(): Promise<void>;
+}
+
+/**
+ * Opens the manual run a directory names for `gate` and `after`, under the
+ * project lock, or refuses with the reason before any effect: a directory
+ * that holds no manual run yet, an implementation run, a manual run of
+ * another project, plan, branch or command, a held lock, and a writer that
+ * has not settled. Nothing is created: `step run` creates a manual run.
+ */
+export async function openLockedManualRun(options: {
+  readonly directory: string;
+  readonly git: GitService;
+  readonly now?: (() => Date) | undefined;
+  readonly groups?: ProcessGroups | undefined;
+}): Promise<{ readonly status: 'opened'; readonly opened: LockedManualRun } | { readonly status: 'refused'; readonly reason: string }> {
+  const refused = (reason: string) => ({ status: 'refused' as const, reason });
+  const location = manualRunLocationOf(options.directory);
+  if (typeof location === 'string') return refused(location);
+  let projectRoot: string;
+  try { projectRoot = await realpath(location.projectRoot); }
+  catch (error) { return refused(`The project root ${location.projectRoot} cannot be read: ${message(error)}`); }
+  const directory = runDirectory(projectRoot, location.planId, location.runId);
+  if (!await stat(join(directory, runLayout.record)).then(() => true, () => false)) {
+    return refused(`${directory} holds no manual run; \`step run\` creates one`);
+  }
+  let lock: ProjectLock;
+  try { lock = await acquireProjectLock(projectRoot); }
+  catch (error) {
+    // A held lock is someone else's and is left exactly as it is.
+    return refused(error instanceof ProjectLockError ? error.message : `The project lock could not be taken: ${message(error)}`);
+  }
+  try {
+    const opened = await openManualRun({
+      projectRoot, planId: location.planId, runId: location.runId, git: options.git, origin: 'step-run', branch: true,
+      // A run that exists keeps its own policy; this one is never recorded.
+      policy: defaultRunPolicy({ projectRoot }), now: options.now, groups: options.groups,
+    });
+    if (opened.status === 'refused') {
+      await lock.release();
+      return refused(`The manual run cannot be used: ${opened.reason}`);
+    }
+    const unsettled = unsettledWriter(opened.run.log);
+    if (unsettled !== null) {
+      await lock.release();
+      return refused(unsettled);
+    }
+    return { status: 'opened', opened: { run: opened.run, projectRoot, release: () => lock.release() } };
+  } catch (error) {
+    await lock.release();
+    throw error;
+  }
+}
+
+/**
+ * Why the manual run's writer is not known to be settled, or null: an
+ * invocation that started and has not ended, or a writer whose release did
+ * not confirm that its processes were gone. A later command never writes
+ * over a writer that may still be writing.
+ */
+export function unsettledWriter(log: RunLog): string | null {
+  const ended = new Set(log.all('invocation-ended').map(event => event.data.invocation));
+  const running = log.all('invocation-started').filter(event => !ended.has(event.data.invocation));
+  if (running.length > 0) return `invocation ${running.map(event => event.data.invocation).join(', ')} of the manual run started and has not ended; its writer is not settled`;
+  const released = new Map(log.all('writer-released').map(event => [event.data.invocation, event.data.confirmed] as const));
+  for (const acquired of log.all('writer-acquired')) {
+    const confirmed = released.get(acquired.data.invocation);
+    if (confirmed === undefined) return `the writer ${acquired.data.invocation} of the manual run was never released`;
+    if (!confirmed) return `the writer ${acquired.data.invocation} of the manual run was released without confirming that its processes ended; its settlement is not known`;
+  }
+  return null;
+}
+
+/** The project root and identities a run directory names, or why it names none. */
+export function manualRunLocationOf(directory: string): { readonly projectRoot: string; readonly planId: string; readonly runId: string } | string {
+  const run = resolve(directory);
+  const jobs = dirname(run);
+  const harness = dirname(jobs);
+  const plan = dirname(harness);
+  const plans = dirname(plan);
+  if (basename(jobs) !== 'jobs' || basename(harness) !== '.harness' || basename(plans) !== 'plans') {
+    return `${run} is not a run directory: expected <project>/plans/<plan>/.harness/jobs/<run>`;
+  }
+  if (!planIdSchema.safeParse(basename(plan)).success) return `${basename(plan)} is not a plan ID`;
+  if (!jobIdSchema.safeParse(basename(run)).success) return `${basename(run)} is not a run ID: letters, digits, "_" and "-"`;
+  return { projectRoot: dirname(plans), planId: basename(plan), runId: basename(run) };
 }

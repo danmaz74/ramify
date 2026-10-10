@@ -12,6 +12,9 @@ import { renderedText, renderStep } from './render.js';
 import { buildAgent } from './agent.js';
 import { createStepProgressText } from './run-text.js';
 import { runStep } from './run.js';
+import { runStepAfter } from './after.js';
+import { runStepGate } from './gate.js';
+import { reviewInputsFromRequest } from './review-step.js';
 
 /*
  * The `step` command's entry. `inputs` imports one invocation's inputs from a
@@ -33,6 +36,8 @@ export type StepCommandOptions =
       /** The project engineer inputs are authored against when no run is named. */
       readonly projectRoot?: string | undefined;
       readonly invocation: string | undefined;
+      /** A review request a manual run recorded, whose question's inputs are composed; with --from-run and no --invocation. */
+      readonly request?: string | undefined;
       /** Where the imported inputs are written; absent, they are printed. */
       readonly out?: string | undefined;
       /** Files that replace parts of the recorded inputs, each judged as its producing role's output. */
@@ -63,6 +68,25 @@ export type StepCommandOptions =
       readonly onLine?: ((line: string) => void) | undefined;
       /** Stops the invocation, as a person interrupting it does. */
       readonly signal?: AbortSignal | undefined;
+    }
+  | {
+      readonly command: 'gate';
+      /** The manual run directory. */
+      readonly run: string;
+      readonly checkpoint: 'iteration' | 'work-item' | 'readiness' | 'final';
+      /** The accepted submission the gate's subject is named by. */
+      readonly invocation?: string | undefined;
+      /** Runs only the in-place diagnosis, which is never audit evidence. */
+      readonly noCommit?: boolean | undefined;
+      readonly onLine?: ((line: string) => void) | undefined;
+      readonly signal?: AbortSignal | undefined;
+    }
+  | {
+      readonly command: 'after';
+      /** The manual run directory. */
+      readonly run: string;
+      readonly invocation: string;
+      readonly onLine?: ((line: string) => void) | undefined;
     };
 
 /**
@@ -86,6 +110,7 @@ export async function runStepCommand(options: StepCommandOptions): Promise<StepC
 /** Runs one `step` command, authoring through the given ports; the installed ones where absent. */
 export async function runStepCommandWith(options: StepCommandOptions, authoringPorts?: AuthoringPorts): Promise<StepCommandResult> {
   if (options.command === 'run') return run(options);
+  if (options.command === 'gate' || options.command === 'after') return gateOrAfter(options);
   return options.command === 'inputs' ? importInputs(options, authoringPorts) : render(options);
 }
 
@@ -110,7 +135,41 @@ async function run(options: Extract<StepCommandOptions, { command: 'run' }>): Pr
   }
 }
 
+/** A `gate` or `after` over a manual run, printed as it happens; its refusals and errors are on standard error. */
+async function gateOrAfter(options: Extract<StepCommandOptions, { command: 'gate' | 'after' }>): Promise<StepCommandResult> {
+  const { ramify, dispose } = await privateRamify();
+  const stderr: string[] = [];
+  const onLine = (text: string) => {
+    if (/^(Refused|Error|Last completed transition|Records):/u.test(text)) stderr.push(text);
+    else try { options.onLine?.(text); } catch { /* A reader that fails does not end the command. */ }
+  };
+  try {
+    const result = options.command === 'gate'
+      ? await runStepGate({ run: options.run, checkpoint: options.checkpoint, invocation: options.invocation, noCommit: options.noCommit,
+        ramify, onLine, signal: options.signal })
+      : await runStepAfter({ run: options.run, invocation: options.invocation, ramify, onLine });
+    return { exitStatus: result.exitStatus, stdout: '', stderr: stderr.length === 0 ? '' : `${stderr.join('\n')}\n` };
+  } finally {
+    await dispose().catch(() => undefined);
+  }
+}
+
+/** A review question's inputs, composed from a review request a manual run recorded. */
+async function requestInputs(options: Extract<StepCommandOptions, { command: 'inputs' }>, request: string): Promise<StepCommandResult> {
+  if (options.role !== 'reviewer') return { exitStatus: 2, stdout: '', stderr: `Refused: --request composes a reviewer's inputs, not ${options.role}'s\n` };
+  if (options.fromRun === undefined || options.invocation !== undefined || Object.values(options.authored ?? {}).some(path => path !== undefined)) {
+    return { exitStatus: 2, stdout: '', stderr: 'Refused: --request takes the manual run that recorded it as --from-run, with no --invocation or authored files\n' };
+  }
+  const result = await reviewInputsFromRequest({ runDirectory: options.fromRun, request });
+  if (result.status === 'refused') return { exitStatus: 2, stdout: '', stderr: `Refused: ${result.reason}\n` };
+  return written(serializeStepInputs(result.inputs), options.out, [
+    `Composed the ${result.inputs.question} review of ${request} (attempt ${result.inputs.attempt}) from the manual run's records and the audited candidate ${result.inputs.request.key.candidate}.`,
+    ...result.notes,
+  ]);
+}
+
 async function importInputs(options: Extract<StepCommandOptions, { command: 'inputs' }>, authoringPorts: AuthoringPorts | undefined): Promise<StepCommandResult> {
+  if (options.request !== undefined) return requestInputs(options, options.request);
   const authored = options.authored ?? {};
   if (options.fromRun === undefined || options.invocation === undefined) {
     const { workItem, outline, assignment, selection, reviewRequest } = authored;

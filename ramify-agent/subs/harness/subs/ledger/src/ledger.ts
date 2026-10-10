@@ -5,7 +5,7 @@ import type { EffectSpec, PendingEffect } from './effects.js';
 import { nodeFileSystem, syncDirectoryThrough, type LedgerFileSystem } from './fs.js';
 
 /** The largest line the log accepts, including its newline. */
-export const maximumLineBytes = 8 * 1024 * 1024;
+export const maximumLineBytes: number = 8 * 1024 * 1024;
 
 /** The body of one record the transition commits, and where it is materialized. */
 export interface RecordBody {

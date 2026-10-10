@@ -37,11 +37,18 @@ export type CommandLine =
       readonly command: 'step';
       readonly step:
         | { readonly command: 'inputs'; readonly role: string; readonly fromRun: string | undefined; readonly invocation: string | undefined; readonly out: string | undefined;
-            readonly projectRoot: string | undefined; readonly authored: AuthoredFiles }
+            readonly projectRoot?: string | undefined; readonly request?: string | undefined; readonly authored: AuthoredFiles }
         | { readonly command: 'render'; readonly inputs: string; readonly projectRoot: string; readonly invocation: string | undefined }
-        | { readonly command: 'run'; readonly inputs: string; readonly run: string; readonly agent: SessionAgent };
+        | { readonly command: 'run'; readonly inputs: string; readonly run: string; readonly agent: SessionAgent }
+        | { readonly command: 'gate'; readonly run: string; readonly checkpoint: StepGateCheckpoint; readonly invocation: string | undefined; readonly noCommit: boolean }
+        | { readonly command: 'after'; readonly run: string; readonly invocation: string };
     }
   | { readonly command: 'help' };
+
+/** The checkpoints `step gate` runs. */
+export const stepGateCheckpoints = ['iteration', 'work-item', 'readiness', 'final'] as const;
+export type StepGateCheckpoint = typeof stepGateCheckpoints[number];
+const isStepGateCheckpoint = (value: string): value is StepGateCheckpoint => (stepGateCheckpoints as readonly string[]).includes(value);
 
 /** Thrown for a command line that cannot be run; the message says why. */
 export class UsageError extends Error {
@@ -72,6 +79,18 @@ export const usage = [
   '                       Runs one invocation from the inputs in a manual run, created where it does not exist, under the project lock.',
   '                       Uses the tree as it stands and records its base commit and whether it was dirty; never commits.',
   '                       Exits 0 for an accepted submission, 1 for any other ending, 2 when refused or not started.',
+  '  ramify-agent step inputs --role reviewer --from-run <manual run dir> --request <review request id> [--out <file>]',
+  '                       Composes a code, scope or design review of a request the manual run recorded; step run runs it',
+  '                       and its terminal attempt settles the request.',
+  '  ramify-agent step gate --run <manual run dir> --checkpoint <iteration|work-item|readiness|final> [--invocation <id>] [--no-commit]',
+  '                       Runs one gate as a run runs it: a committing checkpoint commits the candidate on the run branch and',
+  '                       requests the configured audit; readiness audits the baseline. The subject is the accepted submission',
+  '                       --invocation names, or the only one open. --no-commit runs the in-place diagnosis only, which is never',
+  '                       audit evidence. Exits 0 when the gate passed, 1 otherwise, 2 when refused.',
+  '  ramify-agent step after --run <manual run dir> --invocation <id>',
+  '                       Applies what a run records after the invocation\'s accepted submission and names what it does not run.',
+  '                       Repeating it commits nothing twice. Exits 0 when handled, 1 on an error with the last completed',
+  '                       transition, 2 when refused before any effect.',
 ].join('\n');
 
 /** Reads `--flag value` and `--flag=value` pairs, one argument at a time. */
@@ -176,6 +195,7 @@ function parseStep(rest: readonly string[]): CommandLine {
     let invocation: string | undefined;
     let out: string | undefined;
     let projectRoot: string | undefined;
+    let request: string | undefined;
     const authored: { -readonly [K in keyof AuthoredFiles]: AuthoredFiles[K] } = {};
     const files = { '--work-item': 'workItem', '--outline': 'outline', '--assignment': 'assignment', '--selection': 'selection', '--review-request': 'reviewRequest' } as const;
     options(flags, (flag, value, _inline, argument) => {
@@ -184,14 +204,20 @@ function parseStep(rest: readonly string[]): CommandLine {
       else if (flag === '--invocation') invocation = value();
       else if (flag === '--out') out = value();
       else if (flag === '--project') projectRoot = value();
+      else if (flag === '--request') request = value();
       else if (flag in files) authored[files[flag as keyof typeof files]] = value();
       else throw new UsageError(`Unknown option "${argument}"`);
     });
     if (role === undefined) throw new UsageError('step inputs needs --role <role>');
     // Authored files without a run are judged against the project by the
     // command, which refuses those that need a run's context with what they lack.
+    if (request !== undefined && fromRun === undefined) throw new UsageError('step inputs --request needs --from-run <manual run dir>');
     if (fromRun === undefined && Object.keys(authored).length === 0) throw new UsageError('step inputs needs --from-run <run dir>, or --project <root> with authored files');
-    if (fromRun !== undefined && invocation === undefined) throw new UsageError('step inputs --from-run needs --invocation <id>');
+    if (request !== undefined) {
+      if (invocation !== undefined) throw new UsageError('step inputs --request composes a new review attempt; it takes no --invocation');
+      return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out, request, authored } };
+    }
+    if (fromRun !== undefined && invocation === undefined) throw new UsageError('step inputs --from-run needs --invocation <id> or --request <id>');
     if (fromRun !== undefined && projectRoot !== undefined) throw new UsageError('step inputs takes its project from the run named by --from-run; --project is for inputs authored without one');
     return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out, projectRoot, authored } };
   }
@@ -229,5 +255,34 @@ function parseStep(rest: readonly string[]): CommandLine {
     if (agent === 'fake' && script === undefined) throw new UsageError('--agent fake needs --script <file>');
     return { command: 'step', step: { command: 'run', inputs, run, agent: agent === 'fake' ? { name: 'fake', script: script! } : { name: 'pi', model } } };
   }
-  throw new UsageError(subcommand === undefined ? 'step needs a subcommand: inputs, render or run' : `Unknown step subcommand "${subcommand}"`);
+  if (subcommand === 'gate') {
+    let run: string | undefined;
+    let checkpoint: string | undefined;
+    let invocation: string | undefined;
+    let noCommit = false;
+    options(flags, (flag, value, inline, argument) => {
+      if (flag === '--run') run = value();
+      else if (flag === '--checkpoint') checkpoint = value();
+      else if (flag === '--invocation') invocation = value();
+      else if (flag === '--no-commit' && inline === undefined) noCommit = true;
+      else throw new UsageError(`Unknown option "${argument}"`);
+    });
+    if (run === undefined) throw new UsageError('step gate needs --run <manual run dir>');
+    if (checkpoint === undefined) throw new UsageError(`step gate needs --checkpoint <${stepGateCheckpoints.join('|')}>`);
+    if (!isStepGateCheckpoint(checkpoint)) throw new UsageError(`Unknown checkpoint "${checkpoint}"; expected ${stepGateCheckpoints.join(', ')}`);
+    return { command: 'step', step: { command: 'gate', run, checkpoint, invocation, noCommit } };
+  }
+  if (subcommand === 'after') {
+    let run: string | undefined;
+    let invocation: string | undefined;
+    options(flags, (flag, value, _inline, argument) => {
+      if (flag === '--run') run = value();
+      else if (flag === '--invocation') invocation = value();
+      else throw new UsageError(`Unknown option "${argument}"`);
+    });
+    if (run === undefined) throw new UsageError('step after needs --run <manual run dir>');
+    if (invocation === undefined) throw new UsageError('step after needs --invocation <id>');
+    return { command: 'step', step: { command: 'after', run, invocation } };
+  }
+  throw new UsageError(subcommand === undefined ? 'step needs a subcommand: inputs, render, run, gate or after' : `Unknown step subcommand "${subcommand}"`);
 }
