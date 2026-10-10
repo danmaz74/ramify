@@ -32,7 +32,7 @@
         "C11",
         "C12"
       ],
-      "status": "proposed",
+      "status": "completed",
       "writeBoundary": "Harness consultation tool/executor, prompts, normal/manual binding, cancellation and no-fresh fallback, durable recording; focused tests."
     },
     {
