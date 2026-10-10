@@ -2,11 +2,12 @@ import { z } from 'zod';
 import { join } from 'node:path';
 import { citationSchema, inputManifestSchema, modulePathSchema, sha256Schema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
-import { roleSchema, runAgentSchema, type Role } from '../interfaces/protocol/runs.js';
+import { breakpointSelectorSchema, roleSchema, runAgentSchema, type Role } from '../interfaces/protocol/runs.js';
 import { jobSchemaVersion, jobsDirectory } from '../jobs/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import { planScenarioExtractionSchema } from '../../subs/scenarios/src/extraction.js';
 import { scenarioRecordSchema } from '../../subs/scenarios/src/records.js';
+import { nonBehavioralAcceptanceSchema } from '../../subs/scenarios/src/form.js';
 import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { elementCatalogSchema, elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { assessmentSchema, roundSchema } from '../../subs/nonfunctional/src/interfaces/contracts.js';
@@ -368,6 +369,8 @@ export const runRecordSchema = z.object({
    * `analysis-approved`, never a field here: this record is written once.
    */
   reviewStop: z.boolean(),
+  /** Absent for ordinary and legacy runs. Debug-enabled runs require the same live host. */
+  breakpoint: breakpointSelectorSchema.optional(),
 }).strict();
 export type RunRecord = z.infer<typeof runRecordSchema>;
 
@@ -443,6 +446,7 @@ export const entryAssignmentsSchema = z.object({
     acceptanceRefs: z.array(elementIdSchema),
     contextRefs: z.array(elementIdSchema),
     citations: z.array(citationSchema),
+    nonBehavioralAcceptance: z.array(nonBehavioralAcceptanceSchema).optional(),
   }).strict()),
 }).strict();
 export type EntryAssignments = z.infer<typeof entryAssignmentsSchema>;
@@ -626,7 +630,7 @@ export const globalForkSourceSchema = z.object({
  * resumed the run after its unresolved request was answered with an
  * environment problem.
  */
-export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected', 'capability-qualification', 'capability-returned', 'capability-coordination']);
+export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected', 'capability-qualification', 'capability-returned', 'capability-coordination', 'debugger']);
 export type ContinueReason = z.infer<typeof continueReasonSchema>;
 
 /**

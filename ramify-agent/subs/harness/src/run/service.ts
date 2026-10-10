@@ -68,7 +68,7 @@ import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage }
 import { orientationToolName } from '../../subs/reviews/src/submission.js';
 import type { AcceptedCommand, Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
-import type { FailureAnalysis, Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
+import { breakpointSelectorSchema, type BreakpointState, type DebugExchange, type DebugInspection, type FailureAnalysis, type Role, type RunCommand, type RunFailureReason } from '../interfaces/protocol/runs.js';
 import { CommandLedger, CommandRejection } from '../jobs/commands.js';
 import { commitRecord, readCommitted, recoverCommits, type RecordRef as CommitRecord } from '../jobs/commit.js';
 import { Mutex, PriorityMutex } from '../jobs/mutex.js';
@@ -268,6 +268,7 @@ import { processGroupIdentity } from '../../subs/evidence/src/run-command.js';
 /** One durable boundary a test can freeze the run at, as a crash would. */
 export type RunWrite =
   | 'job-created'
+  | 'debug-exchange-admitted'
   | 'contract-requested'
   | 'contract-registered'
   | 'work-item-yielded'
@@ -514,6 +515,14 @@ class Run implements RunnerRun {
   /** Every invocation the run has open, by ID: at most one writer, and the readers beside it. */
   readonly live = new Map<string, LiveInvocation>();
   stopRequested: boolean;
+  /** The prepared request remains on its driver stack; no invocation or writer exists yet. */
+  debugPause: BreakpointState | undefined;
+  debugPrepared: {
+    inspect(): Promise<DebugInspection['input']>;
+    exchange(text: string): Promise<InvocationResult<unknown>>;
+    resume(text: string | undefined): void;
+    held(): boolean;
+  } | undefined;
   /** Settles when the run's driver has nothing left to do. */
   done: Promise<void> = Promise.resolve();
   /** The run's review readers, once it reviews; undefined for a run whose policy requests none. */
@@ -715,7 +724,7 @@ export class RunService {
     const invocations = run.log.count('invocation-started');
     // The time the run waited for a person at its review stop is not its own.
     const now = this.now().getTime();
-    const age = now - Date.parse(run.record.createdAt) - reviewPauseMs(run.log.events, now);
+    const age = now - Date.parse(run.record.createdAt) - callerPauseMs(run.log.events, now);
     if (invocations + 1 > limits.maxInvocationsPerRun) return `The run has made ${invocations} invocations; the policy allows ${limits.maxInvocationsPerRun}`;
     if (age > limits.runAbsoluteMs) return `The run has run for ${age} ms; the policy allows ${limits.runAbsoluteMs}`;
     return null;
@@ -852,7 +861,7 @@ export class RunService {
       overflow: async request => {
         await this.finishUnsettledReviews(run, () => ({ reason: 'queue-overflow', detail: `More than ${policy.queue} review requests were waiting; this one was not run` }), [request]);
       },
-      deadline: request => this.reviewDeadline(run, request),
+      deadline: request => this.rawReviewDeadline(run, request),
       attemptMs: policy.attemptMs,
       expire: async request => {
         await this.finishUnsettledReviews(run, () => ({
@@ -873,6 +882,10 @@ export class RunService {
    * earlier. Null while neither applies. Read from the log each time.
    */
   private reviewDeadline(run: Run, id: string): number | null {
+    return run.reviews === undefined ? this.rawReviewDeadline(run, id) : run.reviews.deadline(id);
+  }
+
+  private rawReviewDeadline(run: Run, id: string): number | null {
     const policy = run.record.policy.reviews;
     if (policy === undefined) return null;
     const recorded = run.log.all('review-request-recorded').find(event => event.data.request === id);
@@ -2322,6 +2335,17 @@ export class RunService {
 
       const rewritten = await recoverCommits(run.log.ledger);
       if (rewritten.rewritten.length > 0) report.rematerialized.push(`${run.key}: ${rewritten.rewritten.length} record file(s)`);
+      if (!run.log.terminal && run.record.breakpoint !== undefined) {
+        for (const invocation of await this.closeInterruptedInvocations(run)) report.invocations.push(`${run.key}: ${invocation}`);
+        await this.endRun(run, { type: 'job-interrupted', data: {
+          message: 'The live server for this debug-enabled run was lost. Pending debugger and workflow effects were not replayed; start a new run to continue.',
+        } }, 'interrupted');
+        report.interrupted.push(run.key);
+        for (const event of run.log.events) {
+          if (event.type === 'job-started' || event.type === 'stop-requested' || event.type === 'analysis-approved' || event.type === 'debug-resumed' || event.type === 'debug-exchange-admitted') this.commands.remember(event.data.command);
+        }
+        continue;
+      }
       // A crash can land after the durable close event and before its
       // filesystem cleanup. Repeat the idempotent cleanup on every load.
       try {
@@ -2444,7 +2468,7 @@ export class RunService {
       }
 
       for (const event of run.log.events) {
-        if (event.type === 'job-started' || event.type === 'stop-requested' || event.type === 'analysis-approved') {
+        if (event.type === 'job-started' || event.type === 'stop-requested' || event.type === 'analysis-approved' || event.type === 'debug-resumed' || event.type === 'debug-exchange-admitted') {
           this.commands.remember(event.data.command);
         }
         if (event.type === 'check-findings-recorded' && event.data.cause.kind === 'user-command') this.commands.remember(event.data.cause.command);
@@ -2728,6 +2752,14 @@ export class RunService {
     return run && runSnapshot(run.record, run.log.events);
   }
 
+  /** Current debugger state, independent of the ordinary run snapshot. Inspection invokes no model. */
+  debugState(planId: string, runId: string): BreakpointState | null {
+    this.refuseEarlierPolicy(planId, runId);
+    const run = this.runs.get(key(planId, runId));
+    if (!run || run.log.terminal || run.stopRequested || !run.debugPause) return null;
+    return structuredClone({ ...run.debugPause, cursor: run.log.version });
+  }
+
   /** The run's events, exactly as its log holds them. */
   events(planId: string, runId: string) {
     this.refuseEarlierPolicy(planId, runId);
@@ -2846,10 +2878,16 @@ export class RunService {
       if (this.closed) throw new CommandRejection('unavailable', 'The harness is shutting down');
       const admitted = this.commands.admit(command);
       if (admitted.kind === 'repeat') return admitted.receipt;
+      if (command.type !== 'start-run' && command.type !== 'stop-job' && command.type !== 'debug-resume' && command.type !== 'debug-message') {
+        const subject = this.runs.get(key(command.payload.planId, command.payload.jobId));
+        if (subject?.debugPause !== undefined) throw new CommandRejection('busy', 'This run is suspended at an execution breakpoint');
+      }
       switch (command.type) {
         case 'start-run': return this.start(command, admitted.contentHash);
         case 'stop-job': return this.stop(command, admitted.contentHash);
         case 'approve-analysis': return this.approve(command, admitted.contentHash);
+        case 'debug-message': return this.messageDebug(command, admitted.contentHash);
+        case 'debug-resume': return this.resumeDebug(command, admitted.contentHash);
         case 'respond-to-check-finding':
         case 'waive-check-finding':
         case 'revoke-check-finding-waiver':
@@ -2859,7 +2897,10 @@ export class RunService {
   }
 
   private async start(command: Extract<RunCommand, { type: 'start-run' }>, contentHash: string): Promise<Receipt> {
-    const { planId, agent: requested, reviewStop } = command.payload;
+    const { planId, agent: requested, reviewStop, breakpoint } = command.payload;
+    if (breakpoint !== undefined && !breakpointSelectorSchema.safeParse(breakpoint).success) {
+      throw new CommandRejection('conflict', 'Supported breakpoint: before-agent:engineer');
+    }
     if (this.options.policy !== undefined) {
       const policy = this.options.policy(this.projectRoot);
       if (policy.version !== capabilityRunPolicyVersion) throw new CommandRejection('conflict', `Run policy ${policy.version} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
@@ -2947,6 +2988,7 @@ export class RunService {
       // block that does not parse is a limitation, never a refusal.
       planScenarios: extractPlanScenarios(new TextDecoder().decode(captured)),
       reviewStop,
+      ...(breakpoint === undefined ? {} : { breakpoint }),
     });
     await writeOnce(join(directory, runLayout.record), `${JSON.stringify(record, null, 2)}\n`);
 
@@ -3043,6 +3085,133 @@ export class RunService {
       return { reference: { unavailable: snapshot.measure.unavailable }, snapshot, manifest: frozen };
     }
     return { reference: { measurement: { id, revision: 1, hash: sha256(content) } }, snapshot, manifest: frozen };
+  }
+
+  /** Effective input at a live occurrence; no packet is recorded as delivery. */
+  async debugInspect(planId: string, runId: string, pauseId: string): Promise<DebugInspection> {
+    const run = this.runs.get(key(planId, runId));
+    const pause = run?.debugPause;
+    if (!run || this.ignoring(run) || !pause || pause.pauseId !== pauseId || !run.debugPrepared) throw new CommandRejection('conflict', 'This is not a live breakpoint occurrence');
+    const revision = pause.revision;
+    const input = await run.debugPrepared.inspect();
+    if (this.ignoring(run) || run.debugPause !== pause || pause.revision !== revision) throw new CommandRejection('conflict', 'The breakpoint progressed during inspection');
+    return structuredClone({ ...pause, cursor: run.log.version, kind: 'inspection', preview: true, input });
+  }
+
+  /** Durable admitted or settled exchange, even after the occurrence was released. */
+  debugResult(planId: string, runId: string, commandId: string): DebugExchange | null {
+    const run = this.runs.get(key(planId, runId));
+    if (!run) return null;
+    const admission = run.log.all('debug-exchange-admitted').find(event => event.data.command.commandId === commandId);
+    if (!admission) return null;
+    const settled = run.log.all('debug-exchange-settled').find(event => event.data.commandId === commandId);
+    if (settled) return structuredClone(settled.data.result);
+    const boundary = run.log.all('debug-pausing').find(event => event.data.pauseId === admission.data.pauseId)!;
+    const terminal = run.log.terminal;
+    const invocation = terminal ? run.log.all('invocation-started').filter(event => event.sequence > admission.sequence &&
+      event.data.role === boundary.data.role && canonicalJson(event.data.work) === canonicalJson(boundary.data.work)).at(-1) : undefined;
+    const outcome = invocation === undefined ? undefined : invocationOutcomeSchema.safeParse(this.committedBody(run, runLayout.outcome(invocation.data.invocation)));
+    const actual = outcome?.success ? outcome.data : undefined;
+    const state = run.debugPause?.pauseId === admission.data.pauseId ? run.debugPause : {
+      kind: 'breakpoint' as const, planId, runId, pauseId: admission.data.pauseId, revision: admission.data.revision,
+      cursor: run.log.version, state: 'exchanging' as const, role: boundary.data.role, work: boundary.data.work,
+      goal: boundary.data.goal, nextAction: boundary.data.nextAction, taskState: 'pending' as const, summary: 'Exchange admitted; awaiting settlement.',
+    };
+    return structuredClone({ ...state, kind: 'exchange', commandId, cursor: run.log.version,
+      status: terminal ? terminal.type === 'job-stopped' ? 'stopped' : 'interrupted' : 'admitted',
+      taskState: terminal ? 'terminal' : state.taskState,
+      answer: null, invocation: invocation?.data.invocation ?? null, session: invocation?.data.session ?? null,
+      point: actual?.session?.ref || null, outcome: actual?.ended ?? terminal?.type ?? null,
+      ...(actual === undefined ? {} : { settlementConfirmed: actual.settled.confirmed }),
+      error: actual?.error ?? (terminal ? 'message' in terminal.data ? String(terminal.data.message) : `Run ended: ${terminal.type}` : null),
+      continuityLoss: null, verdicts: [], evidence: invocation === undefined ? [] : [runLayout.invocation(invocation.data.invocation),
+        runLayout.outcome(invocation.data.invocation), runLayout.observations(invocation.data.invocation), runLayout.transcript(invocation.data.session)],
+      summary: terminal ? `Exchange was not completed; run ended as ${terminal.type}.` : state.summary });
+  }
+
+  private async messageDebug(command: Extract<RunCommand, { type: 'debug-message' }>, contentHash: string): Promise<Receipt> {
+    const { planId, jobId, pauseId, expectedRevision, message: text } = command.payload;
+    this.refuseEarlierPolicy(planId, jobId);
+    const run = this.runs.get(key(planId, jobId));
+    if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
+    const receipt = await run.mutex.run(async () => {
+      if (this.ignoring(run)) throw new CommandRejection('conflict', 'This run accepts no debugger commands');
+      const pause = run.debugPause;
+      if (!pause || pause.pauseId !== pauseId || !run.debugPrepared) throw new CommandRejection('conflict', 'This is not the current breakpoint occurrence');
+      if (pause.revision !== expectedRevision) throw new CommandRejection('stale-version', `The pause is at revision ${pause.revision}`, pause.revision);
+      if (pause.state !== 'paused') throw new CommandRejection('busy', `The run is ${pause.state}`);
+      if (pause.taskState !== 'pending') throw new CommandRejection('conflict', 'An outcome is held; resume consumes it without another model call');
+      run.writer.requireSettled('Debugger exchange requires settled tools');
+      const at = this.now();
+      const accepted = this.commands.accept(command, contentHash, jobId, run.log.nextSequence, at);
+      await run.log.append({ type: 'debug-exchange-admitted', data: { pauseId, revision: pause.revision, message: text, command: accepted } }, at);
+      this.commands.remember(accepted);
+      pause.state = 'exchanging'; pause.cursor = run.log.version;
+      pause.summary = `Engineer exchange ${command.commandId} admitted; ordinary workflow remains suspended.`;
+      return accepted.receipt;
+    });
+    // The command mutex protects only admission. An independent client can stop
+    // or retrieve this command while its ordinary tools and model are running.
+    const exchange = this.exchangeDebug(run, command).catch(error => this.fail(run, 'internal', `Debugger exchange could not settle: ${message(error)}`));
+    run.done = Promise.all([run.done, exchange]).then(() => undefined);
+    return receipt;
+  }
+
+  private async exchangeDebug(run: Run, command: Extract<RunCommand, { type: 'debug-message' }>): Promise<void> {
+    const pause = run.debugPause!;
+    const prepared = run.debugPrepared!;
+    await this.afterWrite('debug-exchange-admitted', run.jobId);
+    if (this.ignoring(run)) return;
+    const changes = await documentChanges(this.projectRoot, run.planId, run.directory, run.record.manifest);
+    if (changes.length > 0) { await this.fail(run, 'inputs-changed', `Captured documents changed while paused: ${changes.join('; ')}`); return; }
+    if (this.ignoring(run)) return;
+    const result = await prepared.exchange(command.payload.message);
+    if (this.ignoring(run) || run.debugPause !== pause) return;
+    const taskState = result.settlementConfirmed === false ? 'terminal' : result.pending ? 'pending' : result.ended === 'submitted' && result.value !== undefined ? 'accepted' : 'terminal';
+    await run.mutex.run(async () => {
+      if (this.ignoring(run) || run.debugPause !== pause) return;
+      pause.state = 'paused'; pause.revision += 1; pause.taskState = taskState;
+      pause.nextAction = taskState === 'pending' ? 'Resume continues the latest settled engineer session with its ordinary task.' : 'Resume handles the held engineer outcome without another model call.';
+      pause.summary = taskState === 'pending' ? 'Engineer conversation settled; assignment remains pending. Resume continues its ordinary task.'
+        : taskState === 'accepted' ? 'Engineer submitted an accepted action; workflow handling is held until resume.'
+        : result.settlementConfirmed === false ? 'Engineer outcome retained, but tool settlement was not confirmed; writer, exchanges and gates remain blocked.' : `Engineer ended ${result.ended}; its actual outcome is held until resume.`;
+      const exchange: DebugExchange = { ...pause, kind: 'exchange', commandId: command.commandId, cursor: run.log.nextSequence,
+        status: 'settled', answer: result.lastText ?? null, invocation: result.id || null, session: result.session || null,
+        point: result.ref || null, outcome: result.ended, error: result.error ?? null,
+        ...(result.settlementConfirmed === undefined ? {} : { settlementConfirmed: result.settlementConfirmed }),
+        continuityLoss: result.actual === 'fresh' && run.log.all('invocation-ended').some(event => event.data.invocation === result.id && event.data.degraded) ? run.log.all('invocation-ended').find(event => event.data.invocation === result.id)?.data.degraded?.reason ?? null : null,
+        verdicts: [...result.verdicts ?? []], evidence: result.id === '' ? [] : [runLayout.invocation(result.id), runLayout.outcome(result.id), runLayout.observations(result.id), runLayout.transcript(result.session),
+          ...(result.ended === 'submitted' ? [runLayout.submission(result.id)] : [])] };
+      await run.log.append({ type: 'debug-exchange-settled', data: { pauseId: pause.pauseId, revision: pause.revision, commandId: command.commandId, result: exchange } }, this.now());
+      pause.cursor = run.log.version;
+    });
+    run.notify();
+  }
+
+  private async resumeDebug(command: Extract<RunCommand, { type: 'debug-resume' }>, contentHash: string): Promise<Receipt> {
+    const { planId, jobId, pauseId, expectedRevision } = command.payload;
+    this.refuseEarlierPolicy(planId, jobId);
+    const run = this.runs.get(key(planId, jobId));
+    if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
+    const receipt = await run.mutex.run(async () => {
+      if (this.ignoring(run)) throw new CommandRejection('conflict', 'This run accepts no debugger commands');
+      const pause = run.debugPause;
+      if (!pause || pause.pauseId !== pauseId) throw new CommandRejection('conflict', 'This is not the current breakpoint occurrence');
+      if (pause.revision !== expectedRevision) throw new CommandRejection('stale-version', `The pause is at revision ${pause.revision}`, pause.revision);
+      if (pause.state !== 'paused') throw new CommandRejection('busy', `The run is ${pause.state}`);
+      // A held terminal outcome can return to ordinary failure handling without
+      // acquiring a writer or starting a model. The unsettled barrier stays set.
+      if (run.writer.isUnsettled && (pause.taskState !== 'terminal' || !run.debugPrepared?.held())) throw new CommandRejection('busy', run.writer.blocked!);
+      const at = this.now();
+      const accepted = this.commands.accept(command, contentHash, jobId, run.log.nextSequence, at);
+      await run.log.append({ type: 'debug-resumed', data: { pauseId, revision: pause.revision + 1, command: accepted, ...(command.payload.message === undefined ? {} : { message: command.payload.message }) } }, at);
+      run.debugPrepared?.resume(command.payload.message);
+      this.commands.remember(accepted);
+      run.debugPause = undefined;
+      return accepted.receipt;
+    });
+    run.notify();
+    return receipt;
   }
 
   private async stop(command: Extract<RunCommand, { type: 'stop-job' }>, contentHash: string): Promise<Receipt> {
@@ -3725,7 +3894,7 @@ export class RunService {
       keep: () => finished('work-closed'),
       scope: { write: 1, measurement: baseline === null ? null : this.baselineReference(run), size: null },
       ...(baseline === null ? {} : { measured: { snapshot: baseline, scope: writeScopeMeasurement(assignment.scope), readScope: readScopeMeasurement(assignment.scope) } }),
-      writer: true, guarded, readModules: assignment.scope.read, workingDirectory, equip: tools.equip,
+      writer: true, guarded, readModules: assignment.scope.read, workingDirectory, equip: tools.equip, previewEquipment: tools.preview,
     });
     await this.recordLineEvents(run, result.id, before, await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git));
     if (result.ended !== 'submitted' || result.value === undefined) {
@@ -3899,8 +4068,96 @@ export class RunService {
   // Invocations
 
   /** One invocation, through the invocation runner every role shares. */
-  private runInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
+  private async runInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
+    if (run.record.breakpoint !== undefined && ['engineer', 'contract-engineer', 'nonfunctional-repair-engineer'].includes(request.role)) {
+      let current = request;
+      let held: InvocationResult<T> | undefined;
+      run.debugPrepared = {
+        inspect: () => this.runner.preview(run, agent, current),
+        exchange: async text => {
+          const result = await this.runner.runInvocation(run, agent, { ...current, callerText: text, pendingPlainReturn: true });
+          if (result.pending) {
+            // Both the agent point and harness briefing ancestry were retained by
+            // ordinary operations; continue that exact point with current bindings.
+            current = { ...current, start: { mode: 'continue', ref: result.ref }, session: result.session,
+              continuing: 'debugger', fork: undefined, replaces: undefined, degraded: undefined, originalInvocation: undefined, restore: false,
+              callerText: undefined };
+          } else held = result;
+          return result;
+        },
+        held: () => held !== undefined,
+        resume: text => { current = { ...current, callerText: text, pendingPlainReturn: false }; },
+      };
+      if (!await this.pauseEngineer(run, request)) return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session: '', kept: false };
+      if (held !== undefined) return held;
+      return this.runner.runInvocation(run, agent, current);
+    }
     return this.runner.runInvocation(run, agent, request);
+  }
+
+  /** Park before invocation admission, outside all mutexes and invocation cleanup. */
+  private async pauseEngineer<T>(run: Run, request: InvocationRequest<T>): Promise<boolean> {
+    if (this.ignoring(run)) return false;
+    const refusal = this.invocationRefusal(run);
+    if (refusal !== null) { await this.fail(run, 'limit-exceeded', refusal); return false; }
+    const pauseId = `pause-${String(run.log.count('debug-pausing') + 1).padStart(4, '0')}`;
+    const goal = request.task?.goal ?? request.description;
+    const nextAction = `Execute the prepared ${request.role} task with its ordinary tools and submission validator.`;
+    const pause: BreakpointState = { kind: 'breakpoint', planId: run.planId, runId: run.jobId, pauseId, revision: 1,
+      cursor: run.log.version, state: 'pausing', role: request.role, work: { ...request.work }, goal, nextAction,
+      taskState: 'pending', summary: `Settling admitted work before ${request.role}: ${goal}` };
+    run.debugPause = pause;
+    // Attempts already admitted may finish their orientation and review calls.
+    // The barrier is for new attempts, not the calls within those pipelines.
+    const releaseReviews = run.reviews?.suspend();
+    try {
+      if (await this.write(run, { type: 'debug-pausing', data: { pauseId, revision: 1, role: request.role,
+        work: request.work, goal, nextAction } }) === 'ended') return false;
+      await run.reviews?.settled();
+      await run.gating;
+      await run.readiness?.settled;
+      while (run.live.size > 0) await Promise.all([...run.live.values()].map(live => live.done));
+      if (this.ignoring(run)) return false;
+      run.writer.requireSettled('A usable breakpoint requires a settled writer');
+      const unsettledInvocation = run.log.ledger.replay().flatMap(entry => entry.transaction.records).find(record => {
+        if (!record.path.startsWith('invocations/') || !record.path.endsWith('/outcome.json')) return false;
+        const outcome = invocationOutcomeSchema.safeParse(record.body);
+        return !outcome.success || !outcome.data.settled.confirmed;
+      });
+      const operations = this.sessionOperations === undefined ? undefined : await this.sessionOperations;
+      if (unsettledInvocation !== undefined || operations?.settlementConfirmed(run.jobId) === false) {
+        await this.fail(run, 'agent-failed', `Whole-run breakpoint settlement was not confirmed${unsettledInvocation === undefined ? '' : ` for ${unsettledInvocation.id}`}; no usable pause was published.`);
+        return false;
+      }
+      // Settlement is execution time. Only the fully reached caller wait is excluded.
+      const settledRefusal = this.invocationRefusal(run);
+      if (settledRefusal !== null) { await this.fail(run, 'limit-exceeded', settledRefusal); return false; }
+      const reached = await run.mutex.run(async () => {
+        if (this.ignoring(run)) return false;
+        await run.log.append({ type: 'debug-paused', data: { pauseId, revision: 1 } }, this.now());
+        pause.state = 'paused';
+        pause.cursor = run.log.version;
+        pause.summary = `Paused before ${request.role}: ${goal} Assignment prepared; engineer not yet invoked. Resume executes its ordinary task.`;
+        return true;
+      });
+      if (!reached) return false;
+      for (;;) {
+        const changed = run.changed();
+        if (this.ignoring(run)) return false;
+        if (run.debugPause !== pause) break;
+        await changed;
+      }
+      if (!run.debugPrepared?.held()) run.writer.requireSettled('The resumed engineer requires a settled writer');
+      const changes = await documentChanges(this.projectRoot, run.planId, run.directory, run.record.manifest);
+      if (changes.length > 0) { await this.fail(run, 'inputs-changed', `Captured documents changed while paused: ${changes.join('; ')}`); return false; }
+      return !this.ignoring(run);
+    } finally {
+      run.debugPause = undefined;
+      run.debugPrepared = undefined;
+      // Stop/close takes precedence even if it raced with a durable resume.
+      if (this.ignoring(run)) run.reviews?.close();
+      releaseReviews?.();
+    }
   }
 
   /** Restore only an exact owning role/work/request phase; no whole-history cursor or new identity. */
@@ -3912,7 +4169,7 @@ export class RunService {
     const matched = [];
     for (const event of candidates) {
       const record = invocationSchema.parse(this.committedBody(run, runLayout.invocation(event.data.invocation)));
-      if (record.prompt.hash !== request.loaded.hash || request.originalInvocation !== event.data.invocation && record.prompt.requestedInputsHash !== inputsHash([request.systemPrompt, request.prompt])) continue;
+      if (record.prompt.hash !== request.loaded.hash || request.originalInvocation !== event.data.invocation && record.prompt.requestedInputsHash !== inputsHash([request.systemPrompt, request.prompt, ...(request.callerText === undefined ? [] : [request.callerText])])) continue;
       const packet = await (await this.operations(agent)).packet(run.record.jobId, event.data.invocation);
       if (packet && packet.submissionTool !== request.toolName) continue;
       matched.push({ event, record, packet });
@@ -7545,6 +7802,7 @@ export class RunService {
         ...(consumer.session === undefined ? {} : { replaces: { session: consumer.session, reason: 'reconstructed' as const } }),
         degraded: { requested: 'fork' as const, reason: 'The recorded original capability request point is unavailable; current request, suspended source and plan were supplied under the named consumer consultation recovery.' },
       } : { fork: { from: { session: source.session as SessionId, invocation: request.invocation }, reason: 'capability-consultation' as const, briefs: [] } }),
+      previewEquipment: { builtinTools: ['read', 'grep', 'ls'], tools: [] },
       toolName: 'answer_capability_consultation', description: 'Answer the question from the preserved A-engineer session.',
       inputSchema: z.toJSONSchema(responseSchema) as JsonSchema,
       submissionSchema: 'ramify-agent.capability-consultation/1', validate: input => validateAgainst(responseSchema, input),
@@ -8342,7 +8600,7 @@ export class RunService {
         ...(beforeTree === undefined ? {} : { candidateBefore: beforeTree }),
         guarded,
         readModules: assignment.scope.read,
-        equip: tools.equip,
+        equip: tools.equip, previewEquipment: tools.preview,
         bounds: step.bounds,
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
@@ -8943,7 +9201,7 @@ export class RunService {
         writer: true,
         guarded,
         readModules: assignment.scope.read,
-        equip: tools.equip,
+        equip: tools.equip, previewEquipment: tools.preview,
         bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs, commandTimeoutMs: bounds.commandTimeoutMs },
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
@@ -10767,15 +11025,32 @@ function approvalRefusal(run: Run, snapshot: RunSnapshot): string | null {
 }
 
 /**
- * How long the run waited at its review stop: from `review-requested` to
- * `analysis-approved`, or to `now` while it still waits. A run bound reads
- * its age without it.
+ * The union of caller waits at review stops and fully reached breakpoints.
+ * Settlement and model execution are running time; overlapping waits count once.
  */
-function reviewPauseMs(events: readonly RunEvent[], now: number): number {
-  const requested = events.find(event => event.type === 'review-requested');
-  if (requested === undefined) return 0;
-  const approved = events.find(event => event.type === 'analysis-approved');
-  return Math.max(0, (approved === undefined ? now : Date.parse(approved.at)) - Date.parse(requested.at));
+function callerPauseMs(events: readonly RunEvent[], now: number): number {
+  const intervals: Array<[number, number]> = [];
+  let review: number | undefined;
+  let debug: number | undefined;
+  for (const event of events) {
+    const at = Date.parse(event.at);
+    if (event.type === 'review-requested') review = at;
+    if (event.type === 'analysis-approved' && review !== undefined) { intervals.push([review, at]); review = undefined; }
+    if (event.type === 'debug-paused' || event.type === 'debug-exchange-settled') debug ??= at;
+    if ((event.type === 'debug-resumed' || event.type === 'debug-exchange-admitted') && debug !== undefined) { intervals.push([debug, at]); debug = undefined; }
+    if (['job-stopped', 'job-failed', 'job-interrupted', 'job-completed'].includes(event.type)) {
+      if (review !== undefined) intervals.push([review, at]);
+      if (debug !== undefined) intervals.push([debug, at]);
+      review = debug = undefined;
+    }
+  }
+  if (review !== undefined) intervals.push([review, now]);
+  if (debug !== undefined) intervals.push([debug, now]);
+  intervals.sort(([a], [b]) => a - b);
+  let total = 0;
+  let end = Number.NEGATIVE_INFINITY;
+  for (const [from, to] of intervals) { total += Math.max(0, to - Math.max(from, end)); end = Math.max(end, to); }
+  return total;
 }
 
 function analysisMessage(record: RunRecord, plan: string, inputs: ExtractionInputs, planScenarios: PlanScenarioExtraction): string {

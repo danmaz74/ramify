@@ -167,9 +167,10 @@ describe('the command schema', () => {
     }).success).toBe(false);
   });
 
-  test('the run serves start-run, Plan 1\'s stop-job, approve-analysis and the three CheckFinding commands, and nothing else', () => {
+  test('the run serves start-run, stop-job, approve-analysis, the two debugger mutations and the three CheckFinding commands, and nothing else', () => {
     expect(runCommandSchema.options.map(option => option.shape.type.value)).toEqual([
-      'start-run', 'stop-job', 'approve-analysis', 'respond-to-check-finding', 'waive-check-finding', 'revoke-check-finding-waiver',
+      'start-run', 'stop-job', 'approve-analysis', 'debug-resume', 'debug-message',
+      'respond-to-check-finding', 'waive-check-finding', 'revoke-check-finding-waiver',
     ]);
     // There is no command that marks a CheckFinding resolved.
     expect(runCommandSchema.safeParse({

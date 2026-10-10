@@ -126,7 +126,7 @@ export const capabilityRecoveryBoundaries = {
   'capability-assigned': 'capability-recovery.test.ts',
   'capability-verification-started': 'capability-acceptance.integration.test.ts',
 } as const satisfies Partial<Record<RunWrite, string>>;
-type InterruptedRunWrite = Exclude<RunWrite, keyof typeof nonfunctionalRecoveryBoundaries | keyof typeof capabilityRecoveryBoundaries | keyof typeof scratchRecoveryBoundaries>;
+type InterruptedRunWrite = Exclude<RunWrite, 'debug-exchange-admitted' | keyof typeof nonfunctionalRecoveryBoundaries | keyof typeof capabilityRecoveryBoundaries | keyof typeof scratchRecoveryBoundaries>;
 
 /** One row per durable boundary with the interrupted-run recovery contract. */
 export const recoveryTable = {

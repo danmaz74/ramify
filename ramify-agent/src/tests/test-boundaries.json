@@ -557,6 +557,22 @@
         "installed Pi final liveness fence prevents HTTP dispatch and late accepted submission after Stop",
         "original live Pi artifacts preserve complete settled prefixes including terminal submission outputs across fork and new process restore"
       ]
+    },
+    {
+      "file": "subs/harness/src/tests/execution-breakpoints-process.boundary.test.ts",
+      "boundary": "Actual separate CLI clients, hosted protocol process, disconnection and kernel crash/restart",
+      "whyFakeCannotProve": "Only distinct OS processes, actual HTTP commands and retained production ledger bytes establish client exit independence, retry, stop and interruption without replay.",
+      "owningCases": [
+        "B17: actual clients disconnect, retry, stop and reconnect while the native host survives; crash recovery interrupts without replay"
+      ]
+    },
+    {
+      "file": "subs/harness/subs/agent/subs/pi/src/tests/execution-breakpoints-native.boundary.test.ts",
+      "boundary": "Installed Pi serializer and session engine retain fresh and continued debugger-style inputs and native history",
+      "whyFakeCannotProve": "The actual installed adapter and provider request serializer must rebuild retained history and execute current guards and submission verdicts; a scripted agent cannot establish their native behavior. Provider replies are scripted with no remote spend.",
+      "owningCases": [
+        "B17: installed Pi preserves explanatory history, exact caller input, normal guard and judge through resumed submission"
+      ]
     }
   ]
 }

@@ -18,7 +18,7 @@ import { ownerOf } from '../kpi/lines.js';
 import type { ObservationLog } from '../run/observations.js';
 import type { TranscriptNotes } from '../transcripts/recorder.js';
 import { ToolInputJudge, validateAgainst } from '../run/submissions.js';
-import { createShellTool, shellInputSchemaFor, shellMaxTimeoutMs, shellToolName, type ShellTool, type ShellOptions } from '../tools/shell.js';
+import { createShellTool, shellInputSchemaFor, shellMaxTimeoutMs, shellToolName, shellToolDeclaration, type ShellTool, type ShellOptions } from '../tools/shell.js';
 
 /*
  * The equipment of one implementation session: the shell, the write guard and the hook check that runs after each mutating
@@ -132,6 +132,8 @@ export interface EngineerEquipment {
    * recorded against the invocation that did it.
    */
   readonly equip: (session: EquipContext) => Equipment;
+  /** Same declarations as equip, without allocating tool or mutation state. */
+  readonly preview: { readonly builtinTools: typeof engineerBuiltinTools; readonly tools: readonly ReturnType<typeof shellToolDeclaration>[] };
   /** Whether a tool's bound on invalid inputs was reached. */
   readonly exhausted: () => boolean;
   /** The Ramify findings this session's edits introduced that no later check has cleared. */
@@ -415,6 +417,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
 
   return {
     equip,
+    preview: { builtinTools: engineerBuiltinTools, tools: [shellToolDeclaration(maxTimeoutMs)] },
     exhausted: () => shellJudge?.exhausted === true,
     openFindings: () => seen?.open() ?? [],
     findingsAtCompletion,

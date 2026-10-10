@@ -5,6 +5,7 @@ import { openElementCatalog, type ElementCatalog, type SubmittedElement } from '
 import { acceptIntake, acceptPrinciples, applyCheck, correctionSchema, type CheckState, type CheckSubmission, type IntakeSubmission } from '../analysis/extraction.js';
 import { acceptArchitectElements, validateInitialAnalysis, type AnalysisEvidence } from '../analysis/submission.js';
 import { analysis, entry } from './helpers/analysis.js';
+import { entryAssignmentsSchema } from '../run/records.js';
 
 /*
  * The catalog extractor's turns, as pure acceptances: the intake adds the
@@ -234,6 +235,11 @@ describe('Plan23 consumer catalog/form corrections', () => {
     expect(validateInitialAnalysis(submitted, available).ok).toBe(true);
     const accepted = acceptArchitectElements(open, submitted);
     expect(accepted.analysis.entries[0]!.nonBehavioralAcceptance).toEqual([{ kind: 'non-behavioral', ref: 'fr-002', test: 'test-001' }]);
+    const durable = entryAssignmentsSchema.parse({ schema: 'ramify-agent.entry-assignments/1', view: { status: 'placeholder' }, entries: accepted.analysis.entries });
+    expect(durable.entries[0]!.nonBehavioralAcceptance).toEqual(accepted.analysis.entries[0]!.nonBehavioralAcceptance);
+    const legacy = { ...durable.entries[0]! };
+    delete legacy.nonBehavioralAcceptance;
+    expect(entryAssignmentsSchema.parse({ ...durable, entries: [legacy] }).entries[0]!.nonBehavioralAcceptance).toBeUndefined();
     for (const testIdentity of ['src/test.ts', 'sc-001', 'test-999']) {
       const rejected = validateInitialAnalysis({ ...submitted, entries: [{ ...submitted.entries[0], nonBehavioralAcceptance: [{ kind: 'non-behavioral', ref: 'send-email-acceptance', test: testIdentity }] }] }, available);
       expect(rejected.ok).toBe(false); if (!rejected.ok) expect(rejected.errors[0]!.path).toBe('entries.0.nonBehavioralAcceptance.0.test');

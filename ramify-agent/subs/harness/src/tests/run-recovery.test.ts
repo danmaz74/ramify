@@ -195,6 +195,8 @@ async function reached(root: string, runId: string, events: string, write: RunWr
   const types = await eventTypes(events);
   const gateCommits = gitOf(root).commits().filter(call => call.gate !== 'scenarios' && call.commit !== null).length;
   switch (write) {
+    // Debug-enabled recovery is interrupted before this ordinary replay table.
+    case 'debug-exchange-admitted': return types.includes('debug-exchange-admitted');
     case 'job-created': return types.length >= 1;
     case 'session-opened': return types.includes('session-opened');
     case 'invocation-started': return types.includes('invocation-started');

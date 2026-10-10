@@ -1,4 +1,5 @@
 import { consultationTargetSchema } from '../consultations/targets.js';
+import { debugExchangeSchema } from '../interfaces/protocol/runs.js';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 import { jobIdSchema } from '../interfaces/protocol/ids.js';
@@ -76,6 +77,12 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('invocation-prepared', z.object({ invocation: text, recorded: z.enum(['delivered-inputs', 'operation-identity']).optional() }).strict()),
   /** The run's first event, holding the start command. It licenses the initial architect. */
   event('job-started', z.object({ command: acceptedCommandSchema }).strict()),
+  event('debug-pausing', z.object({ pauseId: text, revision: z.int().positive(), role: roleSchema,
+    work: invocationWorkSchema, goal: z.string(), nextAction: z.string() }).strict()),
+  event('debug-paused', z.object({ pauseId: text, revision: z.int().positive() }).strict()),
+  event('debug-exchange-admitted', z.object({ pauseId: text, revision: z.int().positive(), message: z.string(), command: acceptedCommandSchema }).strict()),
+  event('debug-exchange-settled', z.object({ pauseId: text, revision: z.int().positive(), commandId: text, result: debugExchangeSchema }).strict()),
+  event('debug-resumed', z.object({ pauseId: text, revision: z.int().positive(), command: acceptedCommandSchema, message: z.string().optional() }).strict()),
   /**
    * A fresh or forked invocation opens a session, appended just before that
    * invocation's `invocation-started`. It names the role and the work the

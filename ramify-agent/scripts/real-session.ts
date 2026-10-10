@@ -21,16 +21,13 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseRealSessionOptions } from '../src/real-session-options.js';
+import { runAttachedSession, printControlResult } from '../src/debug-client.js';
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const tsx = join(packageRoot, 'node_modules', '.bin', 'tsx');
 
-function option(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] : undefined;
-}
-const model = option('--model');
-const planId = option('--plan') ?? 'review-notes';
+let planId = 'review-notes';
 
 /** The environment a child gets: this one's, without the Node flags this process was started with. */
 function childEnvironment(): NodeJS.ProcessEnv {
@@ -63,7 +60,15 @@ async function prepareCopy(): Promise<string | null> {
 }
 
 async function main(): Promise<number> {
-  const project = option('--project') ?? await prepareCopy();
+  const options = parseRealSessionOptions(process.argv.slice(2));
+  if (options.mode === 'attached') {
+    const result = await runAttachedSession(options.attached);
+    printControlResult(result, options.attached.json);
+    return result.exitStatus;
+  }
+  const { model } = options;
+  planId = options.planId;
+  const project = options.projectRoot ?? await prepareCopy();
   if (project === null) {
     console.error('The fixture copy could not be prepared, so no run can start.');
     return 2;
@@ -128,6 +133,7 @@ async function main(): Promise<number> {
 }
 
 main().then(code => { process.exitCode = code; }, error => {
-  console.error(error);
+  if (process.argv.includes('--json')) printControlResult({ exitStatus: 2, output: { kind: 'error', error: { code: 'invalid-request', message: error instanceof Error ? error.message : String(error) }, summary: 'Attachment was refused before execution.' } }, true);
+  else console.error(error);
   process.exitCode = 2;
 });

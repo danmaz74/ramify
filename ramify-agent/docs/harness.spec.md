@@ -143,6 +143,100 @@ holds, then a model's analysis, so the decision needs no transcript. A bound
 that proves too tight is the architect's to raise, within the policy's
 ceilings.
 
+### Execution Breakpoints Suspend The Whole Run
+
+A start-run command may select `before-agent:engineer`. Unsupported selectors
+are refused before starting. Absence preserves ordinary execution and legacy
+record readability. This selector matches ordinary and capability-task
+`engineer` invocations, repair continuations, `contract-engineer` invocations
+and `nonfunctional-repair-engineer` invocations. Each prepared workflow request
+has one occurrence; internal context-loss fallback does not create a new one.
+
+The harness prepares the ordinary assignment, scope, equipment and task input
+before the boundary. It parks before invocation admission and writer acquisition,
+with no run mutex or ledger transaction held. The server retains its project
+lock. The ordinary job stays nonterminal; debugger state separately identifies
+`pausing`, `paused` or `exchanging`, occurrence ID, interaction revision, actual
+role, work, goal and next action. Read-only inspection consumes no invocation.
+
+At `pausing`, admit no new ordinary operation or review attempt. Already admitted
+review pipelines, including orientation followed by review, finish under their
+normal bounds. Gates and invocation cleanup finish before a usable `paused`
+transition. Every dispatched operation must confirm its session/tool settlement;
+an empty live-invocation map alone is insufficient. Failed or unconfirmed
+settlement retains its ordinary evidence and prevents a usable pause.
+
+Review admission is reversibly suspended. Timer expiry, overflow and
+completion-triggered wakeups cannot affect waiting work while suspended.
+Suspension preserves still-live waiting review budgets, including overlapping
+reasons once; active work keeps its normal bounds and expired work receives no
+new budget. Only fully reached caller waiting is excluded from run execution
+age; settlement and model execution count toward ordinary bounds. Invocation
+counts and each model/tool bound continue to apply.
+
+A resume names the current pause ID and interaction revision and acknowledges
+release without waiting for the next stop. Stable command IDs deduplicate exact
+retries before revision checks; changed content conflicts. A new stale, active
+or already released interaction is refused. Resume without discussion executes
+the prepared ordinary request once, revalidating captured documents, writer
+settlement and the runner's ordinary source/session/authority preconditions.
+A later assignment or repair reaches a new occurrence. Stop takes precedence
+over a pause or admitted resume, settles admitted work through the ordinary
+stop mechanism, and returns the actual terminal run outcome.
+
+This debugger requires the same live server. Client disconnection has no effect
+on the run, its retained records or command admission. On server startup, every
+unfinished debug-enabled run is interrupted before pending effect completion,
+capability source reconciliation or workflow restoration, even before its first
+pause or after resume. Interrupted invocation and session evidence is retained;
+pending effects are not redispatched. Ordinary runs keep their existing
+recovery policy.
+
+Inspection is a read-only preparation preview. It presents effective role,
+procedure, briefing and environment inputs, physical inherited context and
+current additions, current tool declarations, scope, bounds and exact source
+point. It admits no operation, builds no executable tool equipment, retains no
+packet as delivered input and consumes no invocation. Unavailable inherited
+context is identified explicitly; a fresh reconstruction preview cannot claim
+that the earlier conversation is retained.
+
+A debugger message appends caller prose verbatim after the entire ordinary task
+before immutable operation admission. Its packet identity and delivered manifest
+include that prose. Normal tool authority, write guard, post-write hooks,
+submission judge and bounds apply. No discussion role, fork, hidden explain-only
+instruction or substitute assignment is introduced. A settled plain return with
+no accepted submission leaves the task pending only in this explicit exchange
+mode; ordinary invocations retain missing-submission handling. Submission
+rejections, context exhaustion, failures and unconfirmed settlement keep their
+real outcomes and evidence.
+
+Follow-ups continue the latest settled logical session and retain both provider
+history and harness briefing ancestry at its returned point. Known context loss
+uses the ordinary fresh fallback, with current caller text retained and
+conversational continuity loss reported. Accepted actions, including partial
+work and capability requests, and terminal invocation outcomes are held for
+ordinary workflow handling on resume. Further messages are refused once an
+outcome is held. Resume consumes it once without another model call; otherwise
+it continues the pending ordinary task, optionally appending new caller prose.
+Tool settlement must be confirmed before another exchange, writer or gate.
+Unconfirmed writer settlement blocks a resumed model invocation, another writer
+and gates. Resume may return an already held terminal outcome to ordinary
+failure handling without a new model call; it does not clear that barrier.
+An exchange's `settled` status describes completed control-command handling.
+Its `settlementConfirmed` flag separately reports actual tool/session settlement;
+legacy exchange records may omit this flag.
+
+Message admission is serialized before model execution using the occurrence
+revision and stable command ledger. Exact retries return the same admission
+and retained result; a changed payload, stale revision or concurrent new
+message/resume is refused. Admission and settled outcomes remain queryable by
+plan, run and command identity after client reconnection or resume. Model and
+tool execution run outside serialization locks and count against execution
+bounds; caller waiting intervals close at exchange admission and reopen at
+settlement, while reviews remain suspended throughout. Stop and server shutdown
+settle the admitted exchange's lifetime before releasing resources. A stopped
+or interrupted exchange cannot be reported as a completed conversation.
+
 ### An Oriented Context Is Reused, Never Required
 
 Fork an oriented session for independent tasks. It starts from the point where

@@ -137,7 +137,7 @@ export class WriterOwnership {
    * idle within the port's own bound is not idle, whatever it reports, and a
    * group still alive at the harness's bound is not gone.
    */
-  async release(invocation: string, session?: AgentSession | undefined): Promise<Settlement> {
+  async release(invocation: string, session?: Pick<AgentSession, 'settled'> | undefined): Promise<Settlement> {
     if (this.holder !== invocation) throw new Error(`Invocation ${invocation} does not hold the writer`);
     const now = this.options.now ?? (() => new Date());
     const groups = this.options.groups ?? nodeProcessGroups;

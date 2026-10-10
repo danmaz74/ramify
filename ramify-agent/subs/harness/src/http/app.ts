@@ -22,6 +22,7 @@ import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
   mergeReadinessResponseSchema, metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
   scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
+  debugStateResponseSchema, debugInspectionResponseSchema, debugExchangeResponseSchema, type BreakpointState,
 } from '../interfaces/protocol/runs.js';
 import {
   runSessionIdSchema, runSessionResponseSchema, runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionQueryLimits,
@@ -133,6 +134,38 @@ export function createApp(options: AppOptions): express.Express {
     const after = request.query['after'] ?? '0';
     if (typeof after !== 'string' || !/^\d{1,15}$/.test(after)) throw new ProtocolFailure('invalid-request', '"after" must be a sequence number');
     send(response, runEventPageSchema, await projected(() => queries.events(request.params.planId, request.params.runId, Number(after))));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/debug`, async (request: RunRequest, response) => {
+    const { planId, runId } = request.params;
+    const after = counter(request.query['after'], 'after');
+    const page = await projected(() => queries.events(planId, runId, after));
+    const reached: BreakpointState[] = [];
+    const events = runs.events(planId, runId) ?? [];
+    for (const event of events) {
+      if (event.type !== 'debug-paused' || event.sequence <= after || event.sequence > page.cursor) continue;
+      const boundary = events.find(candidate => candidate.type === 'debug-pausing' && candidate.data.pauseId === event.data.pauseId);
+      if (boundary?.type !== 'debug-pausing') continue;
+      reached.push({ ...boundary.data, kind: 'breakpoint', planId, runId, cursor: event.sequence,
+        revision: event.data.revision, state: 'paused', taskState: 'pending',
+        summary: `Before ${boundary.data.role}: ${boundary.data.goal}. Resume will ${boundary.data.nextAction}.` });
+    }
+    send(response, debugStateResponseSchema, { run: page.run, current: runs.debugState(planId, runId), reached, cursor: page.cursor, more: page.more });
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/debug/inspect`, async (request: RunRequest, response) => {
+    const { planId, runId } = request.params;
+    const pause = optionalText(request.query['pause'], 'pause');
+    if (pause === null) throw new ProtocolFailure('invalid-request', '"pause" is required');
+    const inspection = await runs.debugInspect(planId, runId, pause);
+    const { run } = await projected(() => queries.run(planId, runId));
+    send(response, debugInspectionResponseSchema, { run, current: runs.debugState(planId, runId), inspection });
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/debug/exchanges/:commandId`, async (request: Request<{ planId: string; runId: string; commandId: string }>, response) => {
+    const { planId, runId, commandId } = request.params;
+    const { run } = await projected(() => queries.run(planId, runId));
+    send(response, debugExchangeResponseSchema, { run, current: runs.debugState(planId, runId), exchange: runs.debugResult(planId, runId, commandId) });
   });
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/analysis`, async (request: RunRequest, response) => {
@@ -338,7 +371,7 @@ export function createApp(options: AppOptions): express.Express {
   }
 
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
-    const failure = error instanceof ProtocolFailure
+    const failure = error instanceof CommandRejection ? new ProtocolFailure(error.code, error.message, error.currentVersion, error.evidence) : error instanceof ProtocolFailure
       ? error
       : isBodyError(error)
         ? new ProtocolFailure('invalid-request', `The request body is not accepted: ${error.message}`)

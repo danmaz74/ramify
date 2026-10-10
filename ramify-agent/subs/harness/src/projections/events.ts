@@ -34,6 +34,16 @@ export function projectEvent(event: RunEvent): ProjectedRunEvent {
 
 function describe(event: RunEvent): [string, Ref[]] {
   switch (event.type) {
+    case 'debug-pausing':
+      return [`Settling the run before ${event.data.role}: ${event.data.goal}`, workRefs(event.data.work)];
+    case 'debug-paused':
+      return [`Breakpoint ${event.data.pauseId} reached; the prepared engineer awaits resume`, []];
+    case 'debug-exchange-admitted':
+      return [`Breakpoint ${event.data.pauseId}: engineer exchange admitted (${event.data.command.commandId})`, []];
+    case 'debug-exchange-settled':
+      return [event.data.result.summary, ref('invocation', event.data.result.invocation)];
+    case 'debug-resumed':
+      return [`Breakpoint ${event.data.pauseId} released by ${event.data.command.commandId}`, []];
     case 'job-started':
       return ['The run started', []];
     case 'session-opened': {

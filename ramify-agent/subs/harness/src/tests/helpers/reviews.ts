@@ -73,6 +73,7 @@ export function gate() {
 }
 
 export interface ReviewRun {
+  readonly breakpoint?: 'before-agent:engineer';
   readonly reviewers: Readonly<Record<string, readonly ScriptStep[]>>;
   readonly engineer: ReadonlyArray<readonly ScriptStep[]>;
   readonly policy?: Partial<ReviewPolicy>;
@@ -196,7 +197,9 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
   });
   if (opened.agent !== undefined) scenario.agentReady?.(opened.agent);
   if (scenario.detached !== true) cleanups.push(() => opened.service.close());
-  const receipt = await opened.service.execute(startRun(plan));
+  const command = startRun(plan);
+  if (command.type !== 'start-run') throw new Error('Unexpected start command');
+  const receipt = await opened.service.execute({ ...command, payload: { ...command.payload, ...(scenario.breakpoint === undefined ? {} : { breakpoint: scenario.breakpoint }) } });
   if (scenario.detached === true) return { ...opened, runId: receipt.jobId, git, source, events: [] as RunEvent[] };
   await opened.service.settled(plan, receipt.jobId);
   const events = await runEventsOnDisk(root, plan, receipt.jobId);

@@ -38,6 +38,9 @@ export const protocolPaths = {
   runs,
   run,
   runEvents: (planId: string, runId: string, after: number): string => `${run(planId, runId)}/events?after=${after}`,
+  runDebug: (planId: string, runId: string, after = 0): string => `${run(planId, runId)}/debug?after=${after}`,
+  runDebugInspect: (planId: string, runId: string, pauseId: string): string => `${run(planId, runId)}/debug/inspect?pause=${encodeURIComponent(pauseId)}`,
+  runDebugExchange: (planId: string, runId: string, commandId: string): string => `${run(planId, runId)}/debug/exchanges/${encodeURIComponent(commandId)}`,
   runAnalysis: (planId: string, runId: string): string => `${run(planId, runId)}/analysis`,
   runMergeReadiness: (planId: string, runId: string, version: number): string =>
     withQuery(`${run(planId, runId)}/merge-readiness`, { version }),
