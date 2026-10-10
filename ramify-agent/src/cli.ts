@@ -38,7 +38,8 @@ export type CommandLine =
       readonly step:
         | { readonly command: 'inputs'; readonly role: string; readonly fromRun: string | undefined; readonly invocation: string | undefined; readonly out: string | undefined;
             readonly projectRoot: string | undefined; readonly authored: AuthoredFiles }
-        | { readonly command: 'render'; readonly inputs: string; readonly projectRoot: string; readonly invocation: string | undefined };
+        | { readonly command: 'render'; readonly inputs: string; readonly projectRoot: string; readonly invocation: string | undefined }
+        | { readonly command: 'run'; readonly inputs: string; readonly run: string; readonly agent: SessionAgent };
     }
   | { readonly command: 'help' };
 
@@ -66,6 +67,11 @@ export const usage = [
   '                       of the work item against the project and its materialized architect view, which is never materialized.',
   '  ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]',
   '                       Prints what the step\'s session receives. Takes no lock and writes nothing.',
+  '  ramify-agent step run --inputs <file> --run <project>/plans/<plan>/.harness/jobs/<run>',
+  '                       [--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>]',
+  '                       Runs one invocation from the inputs in a manual run, created where it does not exist, under the project lock.',
+  '                       Uses the tree as it stands and records its base commit and whether it was dirty; never commits.',
+  '                       Exits 0 for an accepted submission, 1 for any other ending, 2 when refused or not started.',
 ].join('\n');
 
 /** Reads `--flag value` and `--flag=value` pairs, one argument at a time. */
@@ -202,5 +208,26 @@ function parseStep(rest: readonly string[]): CommandLine {
     if (inputs === undefined) throw new UsageError('step render needs --inputs <file>');
     return { command: 'step', step: { command: 'render', inputs, projectRoot: projectRoot ?? '.', invocation } };
   }
-  throw new UsageError(subcommand === undefined ? 'step needs a subcommand: inputs or render' : `Unknown step subcommand "${subcommand}"`);
+  if (subcommand === 'run') {
+    let inputs: string | undefined;
+    let run: string | undefined;
+    let agent: AgentName | undefined;
+    let model: string | undefined;
+    let script: string | undefined;
+    options(flags, (flag, value, _inline, argument) => {
+      if (flag === '--inputs') inputs = value();
+      else if (flag === '--run') run = value();
+      else if (flag === '--agent') agent = agentName(value());
+      else if (flag === '--model') model = value();
+      else if (flag === '--script') script = value();
+      else throw new UsageError(`Unknown option "${argument}"`);
+    });
+    if (inputs === undefined) throw new UsageError('step run needs --inputs <file>');
+    if (run === undefined) throw new UsageError('step run needs --run <manual run dir>');
+    if (model !== undefined && agent === 'fake') throw new UsageError('--model applies to --agent pi only');
+    if (script !== undefined && agent !== 'fake') throw new UsageError('--script applies to --agent fake only');
+    if (agent === 'fake' && script === undefined) throw new UsageError('--agent fake needs --script <file>');
+    return { command: 'step', step: { command: 'run', inputs, run, agent: agent === 'fake' ? { name: 'fake', script: script! } : { name: 'pi', model } } };
+  }
+  throw new UsageError(subcommand === undefined ? 'step needs a subcommand: inputs, render or run' : `Unknown step subcommand "${subcommand}"`);
 }

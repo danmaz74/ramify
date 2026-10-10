@@ -96,6 +96,8 @@ export interface CliServer {
     readonly effects: string[];
     readonly invocations: string[];
     readonly skipped: string[];
+    /** Manual runs, which the server neither executes nor recovers. */
+    readonly manual: string[];
   };
   close(): Promise<void>;
 }

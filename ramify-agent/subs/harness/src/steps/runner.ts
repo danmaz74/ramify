@@ -245,6 +245,8 @@ export interface InvocationResult<T> {
   readonly inFlight?: readonly CallInFlight[] | undefined;
   /** The text of its last assistant message that had any. */
   readonly lastText?: string | null | undefined;
+  /** A writer's: every path that differed from its base when its session settled. */
+  readonly changed?: readonly string[] | undefined;
 }
 
 /** What the harness does with a session when one of its invocations ends. */
@@ -852,6 +854,7 @@ export class InvocationRunner<R extends RunnerRun> {
     // only observation that sees a write no guard saw, and comparing it with
     // the scope is what fills `outsideScope`. Nothing here blocks anything.
     let outsideScope: string[] = [];
+    let changed: string[] | undefined;
     if (request.writer === true) {
       const snapshot = await recordSettledSnapshot({
         projectRoot: this.projectRoot,
@@ -859,6 +862,7 @@ export class InvocationRunner<R extends RunnerRun> {
         scope: request.guarded,
       }, observations);
       outsideScope = [...snapshot.outsideScope];
+      changed = [...snapshot.paths];
     }
 
     const ended = interruption !== undefined ? 'failed' : request.endedAs?.() ?? endedOf(outcome.kind, judge.boundReached);
@@ -912,6 +916,7 @@ export class InvocationRunner<R extends RunnerRun> {
       elapsedMs,
       inFlight,
       lastText: recorder.lastText,
+      ...(changed === undefined ? {} : { changed }),
     };
   }
 

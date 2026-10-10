@@ -394,6 +394,8 @@ export interface RunRecoveryReport {
   readonly skipped: string[];
   /** Review requests an accepted iteration was owed and recovery recorded, and attempts it finished as not verified. */
   readonly reviews: string[];
+  /** Manual runs, which `step run` and `session` write: neither executed nor recovered, and left exactly as they are. */
+  readonly manual: string[];
 }
 
 const key = (planId: string, runId: string) => `${planId}/${runId}`;
@@ -2432,7 +2434,7 @@ export class RunService {
   }
 
   private async load(): Promise<RunRecoveryReport> {
-    const report: RunRecoveryReport = { interrupted: [], rematerialized: [], effects: [], invocations: [], skipped: [], reviews: [] };
+    const report: RunRecoveryReport = { interrupted: [], rematerialized: [], effects: [], invocations: [], skipped: [], reviews: [], manual: [] };
     for (const { planId, jobId } of await listJobDirectories(this.projectRoot)) {
       const directory = runDirectory(this.projectRoot, planId, jobId);
       const recordPath = join(directory, runLayout.record);
@@ -2441,7 +2443,14 @@ export class RunService {
         const document = await readIfExists(recordPath);
         if (document === undefined) continue;
         const parsed: unknown = JSON.parse(document.toString('utf8'));
-        if ((parsed as { kind?: unknown } | null)?.kind !== 'implementation') continue;
+        const kind = (parsed as { kind?: unknown } | null)?.kind;
+        // A manual run has no drive and no phase progression: nothing of it
+        // is executed or recovered, and its records are not touched.
+        if (kind === 'manual') {
+          report.manual.push(key(planId, jobId));
+          continue;
+        }
+        if (kind !== 'implementation') continue;
         const policy = (parsed as { policy?: { version?: unknown } }).policy?.version;
         if (policy !== capabilityRunPolicyVersion) {
           const recorded = typeof policy === 'string' ? policy : '(missing policy)';

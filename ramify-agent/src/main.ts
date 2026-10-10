@@ -29,10 +29,11 @@ async function main(argv: readonly string[]): Promise<number> {
     ? `Implementation runs start on the ${server.agent} agent.`
     : 'No agent is configured; runs can be read but not started. Pass --agent pi, or --agent fake for the scripted fake.');
   if (server.agentStatus) console.log(server.agentStatus);
-  const { interrupted, rematerialized, effects, invocations, skipped } = server.recovery;
+  const { interrupted, rematerialized, effects, invocations, skipped, manual } = server.recovery;
   if (interrupted.length + rematerialized.length + effects.length + invocations.length + skipped.length > 0) {
     console.log(`Recovered runs: ${interrupted.length} interrupted, ${rematerialized.length} rematerialized, ${effects.length} effects completed, ${invocations.length} invocations closed, ${skipped.length} skipped.`);
   }
+  if (manual.length > 0) console.log(`Manual runs left as they are, neither executed nor recovered: ${manual.length}.`);
   if (!server.servesWebClient) console.log('The web client is not built; run `npm run build:web`. The protocol is served under /api/v1.');
   const stop = () => {
     void server.close().then(() => process.exit(0));
@@ -44,10 +45,30 @@ async function main(argv: readonly string[]): Promise<number> {
 
 /** One `step` command: its text on standard output, its diagnostics and refusals on standard error. */
 async function step(commandLine: Extract<CommandLine, { command: 'step' }>): Promise<number> {
+  if (commandLine.step.command === 'run') return stepRun(commandLine.step);
   const result = await runStepCommand(commandLine.step);
   if (result.stdout !== '') process.stdout.write(result.stdout);
   if (result.stderr !== '') process.stderr.write(result.stderr);
   return result.exitStatus;
+}
+
+/** One `step run`, printed as it happens. The first interrupt stops the invocation; a second one exits at once. */
+async function stepRun(options: Extract<Extract<CommandLine, { command: 'step' }>['step'], { command: 'run' }>): Promise<number> {
+  const controller = new AbortController();
+  const interrupt = () => {
+    console.log('\nStopping the step; interrupt again to exit at once.');
+    controller.abort();
+    process.once('SIGINT', () => process.exit(130));
+  };
+  process.once('SIGINT', interrupt);
+  try {
+    const result = await runStepCommand({ ...options, onLine: line => console.log(line), signal: controller.signal });
+    if (result.stdout !== '') process.stdout.write(result.stdout);
+    if (result.stderr !== '') process.stderr.write(result.stderr);
+    return result.exitStatus;
+  } finally {
+    process.removeListener('SIGINT', interrupt);
+  }
 }
 
 /** One engineer session, printed as it happens. The first interrupt stops the session; a second one exits at once. */

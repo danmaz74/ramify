@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-operations.js';
+import { privateRamify } from '../../subs/evidence/src/ramify-cli.js';
 import { loadPromptPackages } from '../prompts/packages.js';
 import { missingContext } from './authored.js';
 import { authorEngineerInputs, installedAuthoringPorts, type AuthoringPorts } from './authoring.js';
@@ -8,13 +9,18 @@ import { constructStep } from './construct.js';
 import { comparisonText, inputsFromRun } from './from-run.js';
 import { parseStepInputs, serializeStepInputs, StepInputsError } from './inputs.js';
 import { renderedText, renderStep } from './render.js';
+import { buildAgent } from './agent.js';
+import { createStepProgressText } from './run-text.js';
+import { runStep } from './run.js';
 
 /*
  * The `step` command's entry. `inputs` imports one invocation's inputs from a
  * run, or authors an engineer's from a work item and an assignment judged
  * against the project with no run; `render` prints what a step's session would receive. Neither starts a
- * model or takes the project lock, and `render` writes nothing. The root
- * receives only the options it parses and the text it prints.
+ * model or takes the project lock, and `render` writes nothing. `run` runs
+ * one invocation from the inputs in a manual run and prints it as it
+ * happens. The root receives only the options it parses and the text it
+ * prints.
  */
 
 /** What the `step` command does. */
@@ -45,11 +51,26 @@ export type StepCommandOptions =
       readonly projectRoot: string;
       /** The invocation the briefing is identified by, where the inputs name none. */
       readonly invocation?: string | undefined;
+    }
+  | {
+      readonly command: 'run';
+      readonly inputs: string;
+      /** The manual run directory, `<project>/plans/<plan>/.harness/jobs/<run>`; created where it does not exist. */
+      readonly run: string;
+      /** pi with the person's own login and an optional model, or the scripted fake reading a JSON script file. */
+      readonly agent: { readonly name: 'pi'; readonly model?: string | undefined } | { readonly name: 'fake'; readonly script: string };
+      /** Each line of the step as it happens: the agent, its start, tool calls, harness text, submissions and the summary. */
+      readonly onLine?: ((line: string) => void) | undefined;
+      /** Stops the invocation, as a person interrupting it does. */
+      readonly signal?: AbortSignal | undefined;
     };
 
-/** What the command prints and how it exits: 0 done, 2 refused. */
+/**
+ * What the command prints and how it exits: 0 done (for `run`, a submission
+ * was accepted and the session settled), 1 a run that ended otherwise, 2 refused.
+ */
 export interface StepCommandResult {
-  readonly exitStatus: 0 | 2;
+  readonly exitStatus: 0 | 1 | 2;
   readonly stdout: string;
   readonly stderr: string;
 }
@@ -64,7 +85,29 @@ export async function runStepCommand(options: StepCommandOptions): Promise<StepC
 
 /** Runs one `step` command, authoring through the given ports; the installed ones where absent. */
 export async function runStepCommandWith(options: StepCommandOptions, authoringPorts?: AuthoringPorts): Promise<StepCommandResult> {
+  if (options.command === 'run') return run(options);
   return options.command === 'inputs' ? importInputs(options, authoringPorts) : render(options);
+}
+
+async function run(options: Extract<StepCommandOptions, { command: 'run' }>): Promise<StepCommandResult> {
+  const line = (text: string) => { try { options.onLine?.(text); } catch { /* A reader that fails does not end the step. */ } };
+  const chosen = await buildAgent(options.agent);
+  if (!chosen.ok) return { exitStatus: 2, stdout: '', stderr: `The step did not start: ${chosen.reason}\n` };
+  line(`Agent: ${chosen.description}`);
+  const printer = createStepProgressText();
+  const { ramify, dispose } = await privateRamify();
+  try {
+    const result = await runStep({
+      inputs: options.inputs, run: options.run, agent: chosen.agent, model: chosen.model, ramify, signal: options.signal,
+      onProgress: event => { const text = printer(event); if (text !== null) line(text); },
+    });
+    if (result.status === 'not-started') {
+      return { exitStatus: 2, stdout: '', stderr: `The step did not start: ${result.reason}\n${result.records === null ? '' : `Records: ${result.records}\n`}` };
+    }
+    return { exitStatus: result.exitStatus, stdout: '', stderr: '' };
+  } finally {
+    await dispose().catch(() => undefined);
+  }
 }
 
 async function importInputs(options: Extract<StepCommandOptions, { command: 'inputs' }>, authoringPorts: AuthoringPorts | undefined): Promise<StepCommandResult> {

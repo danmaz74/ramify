@@ -105,10 +105,27 @@ describe('step', () => {
     });
   });
 
+  test('run takes an inputs file, a manual run directory and the agent, pi by default', () => {
+    expect(parseCommandLine(['step', 'run', '--inputs', 'i.json', '--run', 'plans/p/.harness/jobs/m-1'])).toEqual({
+      command: 'step', step: { command: 'run', inputs: 'i.json', run: 'plans/p/.harness/jobs/m-1', agent: { name: 'pi', model: undefined } },
+    });
+    expect(parseCommandLine(['step', 'run', '--inputs=i.json', '--run=r', '--agent', 'pi', '--model', 'openai/x'])).toMatchObject({
+      step: { agent: { name: 'pi', model: 'openai/x' } },
+    });
+    expect(parseCommandLine(['step', 'run', '--inputs', 'i.json', '--run', 'r', '--agent', 'fake', '--script', 's.json'])).toMatchObject({
+      step: { agent: { name: 'fake', script: 's.json' } },
+    });
+  });
+
   test('usage errors', () => {
     for (const [argv, message] of [
-      [['step'], /needs a subcommand/],
-      [['step', 'run'], /Unknown step subcommand "run"/],
+      [['step'], /needs a subcommand: inputs, render or run/],
+      [['step', 'nothing'], /Unknown step subcommand "nothing"/],
+      [['step', 'run', '--run', 'r'], /step run needs --inputs/],
+      [['step', 'run', '--inputs', 'i.json'], /step run needs --run/],
+      [['step', 'run', '--inputs', 'i.json', '--run', 'r', '--agent', 'fake'], /--agent fake needs --script/],
+      [['step', 'run', '--inputs', 'i.json', '--run', 'r', '--script', 's.json'], /--script applies to --agent fake only/],
+      [['step', 'run', '--inputs', 'i.json', '--run', 'r', '--agent', 'fake', '--script', 's.json', '--model', 'm'], /--model applies to --agent pi only/],
       [['step', 'inputs', '--from-run', 'r', '--invocation', 'i'], /needs --role/],
       [['step', 'inputs', '--role', 'engineer', '--invocation', 'i'], /needs --from-run/],
       [['step', 'inputs', '--role', 'engineer', '--from-run', 'r'], /needs --invocation/],
@@ -121,10 +138,11 @@ describe('step', () => {
     }
   });
 
-  test('usage names both step commands', () => {
+  test('usage names the step commands', () => {
     expect(usage).toContain('ramify-agent step inputs --role <engineer|local-architect|context-selector|reviewer> --from-run <run dir> --invocation <id>');
     expect(usage).toContain('[--work-item <file>] [--outline <file>] [--assignment <file>] [--selection <file>] [--review-request <file>] [--out <file>]');
     expect(usage).toContain('ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--out <file>]');
     expect(usage).toContain('ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]');
+    expect(usage).toContain('ramify-agent step run --inputs <file> --run <project>/plans/<plan>/.harness/jobs/<run>');
   });
 });

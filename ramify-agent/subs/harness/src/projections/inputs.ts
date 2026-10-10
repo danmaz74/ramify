@@ -251,6 +251,8 @@ export async function unservedRun(projectRoot: string, planId: string, runId: st
   } catch {
     return new ProjectionError('unreadable', `${shown} is not JSON`, [shown]);
   }
+  // A manual run is not served; its records are read from its directory.
+  if ((document as { kind?: unknown } | null)?.kind === 'manual') return null;
   const recordedPolicy = (document as { policy?: { version?: unknown } } | null)?.policy?.version;
   if (recordedPolicy !== runPolicyVersion) {
     return new ProjectionError('unsupported-version', `Run policy ${String(recordedPolicy ?? '(missing policy)')} is refused by ${runPolicyVersion}; a fresh run is required`, [shown]);
