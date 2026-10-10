@@ -82,7 +82,7 @@ test('a caught marker argument mismatch remains a script failure', async () => {
 
 test('a declared command persists its output and cannot be reused after consumption', async () => {
   const directory = await temporaryDirectory(); cleanups.push(directory.remove);
-  const outputFile = join(directory.path, 'plans/.harness/sessions/session/shell/001.log');
+  const outputFile = join(directory.path, 'plans/sessions/.harness/jobs/session/invocations/inv-0001/shell/001.log');
   const command = strictSessionCommand(directory.path, directory.path, 'echo checking', request => commandResult(request, { stdout: 'checking\n' }));
   const request = { argv: ['bash', '-c', 'echo checking'], cwd: directory.path, env: childEnvironment(), timeoutMs: shellDefaultTimeoutMs, outputFile };
   await expect(command.run(request)).resolves.toMatchObject({ stdout: 'checking\n', output: { bytes: 9 } });

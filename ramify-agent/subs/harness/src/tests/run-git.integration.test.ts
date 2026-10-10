@@ -69,7 +69,8 @@ describe('run-to-Git integration', () => {
     cleanups.push(() => opened.service.close());
     const producer = opened.service as unknown as {
       verifyProducerCommit(files: readonly { path: string; content: string }[], commit: string): Promise<void>;
-      renderedFeatureAllowed(path: string, hash: string, answer: Awaited<ReturnType<FakeRamifyCli['queryOwnership']>>): Promise<boolean>;
+      /** The committing gates, which judge a rendered feature file since they moved out of the run service. */
+      gates: { renderedFeatureAllowed(path: string, hash: string, answer: Awaited<ReturnType<FakeRamifyCli['queryOwnership']>>): Promise<boolean> };
       renderProducerFeatures(run: unknown, files: readonly { path: string; content: string }[]): Promise<void>;
     };
     const identity = ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost'];
@@ -86,9 +87,9 @@ describe('run-to-Git integration', () => {
     const exact = await commit('exact producer');
     await expect(producer.verifyProducerCommit(expected, exact)).resolves.toBeUndefined();
     const answer = await ramify.queryOwnership(root, [path]);
-    expect(await producer.renderedFeatureAllowed(path, sha256(content), answer)).toBe(true);
+    expect(await producer.gates.renderedFeatureAllowed(path, sha256(content), answer)).toBe(true);
     await writeFile(join(root, path), 'tampered producer bytes\n');
-    expect(await producer.renderedFeatureAllowed(path, sha256(content), answer)).toBe(false);
+    expect(await producer.gates.renderedFeatureAllowed(path, sha256(content), answer)).toBe(false);
     const stale = await commit('stale producer');
     await expect(producer.verifyProducerCommit(expected, stale)).rejects.toThrow('exact rendered bytes');
     const unchangedStale = await commit('empty commit retaining stale expected bytes');
@@ -101,7 +102,7 @@ describe('run-to-Git integration', () => {
     const external = await counterDirectory(); const externalBytes = 'external content must survive rejected rendering\n';
     await writeFile(join(external, 'target.feature'), externalBytes);
     await rm(join(root, path)); await symlink(join(external, 'target.feature'), join(root, path));
-    expect(await producer.renderedFeatureAllowed(path, sha256(content), answer)).toBe(false);
+    expect(await producer.gates.renderedFeatureAllowed(path, sha256(content), answer)).toBe(false);
     await expect(producer.renderProducerFeatures({}, expected)).rejects.toThrow('outside ordinary ownership');
     expect(await readFile(join(external, 'target.feature'), 'utf8')).toBe(externalBytes);
     await git(root, 'restore', path);

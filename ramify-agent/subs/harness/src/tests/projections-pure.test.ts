@@ -133,8 +133,8 @@ describe('a projection never writes, and no query appends an event', () => {
   test('the projection source calls nothing that writes', async () => {
     // A tripwire beside the behavioral test above: the projections and the
     // KPI projection name no writing primitive of the file system, the
-    // ledger or the run service.
-    const writing = /\b(writeFile|appendFile|appendJsonLine|writeFileAtomic|writeFileExclusive|commitRecord|recoverCommits|mkdir|rm|unlink|truncate|rename)\s*\(|\.append\(|\.write\(|\.execute\(|\.record\(/;
+    // ledger or the run service. Zod's `z.record(` is a schema, not a write.
+    const writing = /\b(writeFile|appendFile|appendJsonLine|writeFileAtomic|writeFileExclusive|commitRecord|recoverCommits|mkdir|rm|unlink|truncate|rename)\s*\(|\.append\(|\.write\(|\.execute\(|(?<!\bz)\.record\(/;
     const directory = fileURLToPath(new URL('../projections/', import.meta.url));
     const files = [
       ...(await readdir(directory)).filter(name => name.endsWith('.ts')).map(name => join(directory, name)),
