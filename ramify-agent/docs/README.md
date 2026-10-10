@@ -2,6 +2,20 @@
 
 Design documents for the separate agent harness:
 
+- [Plan 30: harness steps as a library and a CLI](plans/30-harness-steps/main-plan.md),
+  proposed: step inputs and constructors the run itself uses, and
+  `ramify-agent step` to render, run, gate and apply the after-handling of
+  one step from files, run again after a harness fix; supersedes
+  Plan 15's capture and replay
+- [Plan 31: the operator driver](plans/31-operator-driver/main-plan.md),
+  proposed, after Plan 30: a session operation driver fed by a file mailbox
+  and CLI so a generalist agent or a person plays chosen roles inside a real
+  run, enforced and recorded as pi's turns are
+- [Exercising the harness one step at a time](analysis/2026-10-10-step-wise-dogfooding.md),
+  proposal behind Plans 30 and 31: why scripts alone and MCP are not the
+  answer, and the three layers
+- [Plan 28 self-run](analysis/2026-10-10-plan28-self-run.md), the real-run
+  failures that motivated them
 - [Plan 25: discovery handoffs and instruction delivery](plans/25-carry-discovery-forward/main-plan.md),
   consolidated delivery of effective named blocks, optional recorded source
   pointers and candidate-bound NFR comparisons; [session observations](metrics/session-observations.md)

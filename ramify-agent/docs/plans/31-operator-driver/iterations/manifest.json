@@ -1,0 +1,31 @@
+{
+  "plan": "../main-plan.md",
+  "status": "proposed; implementation not started; requires Plan 30",
+  "execution": "serial in dependency order",
+  "iterations": [
+    {
+      "id": "1",
+      "file": "01-operator-owner.md",
+      "dependsOn": [],
+      "cases": ["O01", "O02", "O03", "O04", "O05", "O06", "O16"],
+      "status": "proposed",
+      "writeBoundary": "New operator owner with driver, active built-ins, complete inherited context, mailbox and tests; agent parent exposures and pi declaration/composition boundary as resolved in R31-2."
+    },
+    {
+      "id": "2",
+      "file": "02-cli-routing-bounds.md",
+      "dependsOn": ["1"],
+      "cases": ["O07", "O08", "O09", "O10", "O11", "O15", "O17"],
+      "status": "proposed",
+      "writeBoundary": "Agent composition and pi adapter as resolved in R31-2; harness lineage selection per R31-1, policy/deadline metadata, compatible agent choices in server/session/step, root CLI with serialized mailbox publication and bounded waits; relevant pi qualification."
+    },
+    {
+      "id": "3",
+      "file": "03-qualify.md",
+      "dependsOn": ["2"],
+      "cases": ["O12", "O13", "O14"],
+      "status": "proposed",
+      "writeBoundary": "Combined scripted workflow test, documentation, real-plan implementation receipts and exact-candidate configured full audit; real implementation stays in the chosen target project's agent-created worktree."
+    }
+  ]
+}
