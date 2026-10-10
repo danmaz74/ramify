@@ -1,6 +1,7 @@
 # Plan 30: harness steps as a library and a CLI
 
-**Date:** 2026-10-10. **Status:** proposed; implementation not started.
+**Date:** 2026-10-10. **Status:** implemented in iterations 1–5 on `feat/plan30-harness-steps`;
+the real-plan exercise is not started and awaits the user's go-ahead.
 Source inspected at `5bd14875d16bf96ae3c8e0de90661aa3d21cf269`.
 **Execution:** authored serial iterations in an isolated checkout, one
 implementing session per iteration.
