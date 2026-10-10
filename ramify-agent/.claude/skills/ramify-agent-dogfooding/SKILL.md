@@ -92,7 +92,33 @@ omit `--model` only when intentionally using the configured default.
   project and plan: their defaults select fixture work. Ignore its fixture-only
   `trial verify` suggestion; verify the real project with its own checks.
 
-- **Step/operator modes:** once implemented in the selected checkout, consult
+- **Engineer breakpoints on a full run:** host the target independently, then
+  attach a short-lived client. The hosting process selects the model; attached
+  clients cannot override it. Use the installed model supported by the selected
+  adapter and its session preservation implementation.
+
+  ```sh
+  npm run serve -- --project "$TARGET" --agent pi --model "$RAMIFY_MODEL" --port 4180
+  npm run --silent real-session -- --project "$TARGET" --plan "$PLAN" --server "$SERVER" --break before-agent:engineer --command-id start-1 --json
+  ./node_modules/.bin/tsx src/main.ts debug inspect --server "$SERVER" --plan "$PLAN" --run "$RUN" --pause "$PAUSE" --json
+  ./node_modules/.bin/tsx src/main.ts debug message --server "$SERVER" --plan "$PLAN" --run "$RUN" --pause "$PAUSE" --expected-revision 1 --command-id explain-1 --message-file /tmp/question.txt --json
+  ./node_modules/.bin/tsx src/main.ts debug resume --server "$SERVER" --plan "$PLAN" --run "$RUN" --pause "$PAUSE" --expected-revision 2 --command-id resume-1 --message-file /tmp/proceed.txt --json
+  ./node_modules/.bin/tsx src/main.ts debug wait --server "$SERVER" --plan "$PLAN" --run "$RUN" --after "$CURSOR" --json
+  ```
+
+  Supply any instruction not to edit or submit in the question itself. The
+  engineer keeps ordinary tools, scope and submission authority. Follow-up
+  messages use the returned current revision and retain the logical session.
+  If chat remains pending, explicitly say “now implement” in the proceed file.
+  An accepted result is held until resume and refuses replacement messages.
+  Each new engineer operation, including repair or capability work, can pause
+  again. Inspect current state before acting on a retained historical receipt.
+  Waiting defaults to 120000 ms; increase `--timeout-ms` deliberately when needed.
+  A timeout or client exit does not cancel the command. Retry the identical
+  command ID and payload, or wait using the returned cursor. Server loss
+  interrupts unfinished debug-enabled runs instead of replaying them.
+
+- **Step/operator modes:** consult
   [Plan 30](../../../docs/plans/30-harness-steps/main-plan.md),
   [Plan 31](../../../docs/plans/31-operator-driver/main-plan.md) and the actual
   help/schema. Until then, use an adequate existing mode and name the limitation;

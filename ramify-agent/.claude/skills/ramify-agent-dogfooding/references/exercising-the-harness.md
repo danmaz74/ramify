@@ -29,6 +29,15 @@ Choose the available surface:
   analysis review stop, but the script does not expose that option; consult the
   [run protocol](../../../../subs/harness/src/interfaces/protocol/runs.ts) if that
   pause is needed. It is an analysis approval boundary, not arbitrary stepping.
+- **Attached engineer breakpoint:** use an independently hosted server and
+  `before-agent:engineer` to inspect the prepared ordinary input, ask for an
+  interpretation, follow up, and resume at the retained logical point. The
+  first version suspends the whole run after admitted work settles. Caller
+  waiting preserves run and queued review budgets; model exchanges still use
+  normal bounds. Inspect the recorded caller text, immutable delivered packet,
+  native request/history and actual submission verdict separately. A preview
+  is not delivery evidence. If context is lost, assess the explicit fresh
+  fallback rather than assuming earlier conversation survived.
 
 Current standalone sessions cannot independently invoke the extractor,
 context selector, architect or reviewer. Follow the main skill's mode guidance
