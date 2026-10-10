@@ -80,6 +80,66 @@ provide:
 Credentials stay in pi's agent directory (`~/.pi/agent/auth.json`, or
 `PI_CODING_AGENT_DIR`).
 
+### Engineer breakpoints on a live server
+
+Prepare a real target worktree and a useful plan under `plans/<plan>/plan.md`
+with its project-declared toolchain and checks. Keep `serve` alive in a separate
+terminal or supervised process; attachment uses its model and validates the
+canonical project path. Closing a debugger client leaves the hosted run alive.
+Server loss interrupts unfinished debug-enabled runs; restarting retains their
+records without automatically continuing them.
+
+From this package directory, with `TARGET`, `PLAN` and `RAMIFY_MODEL` set:
+
+```sh
+npm run serve -- --project "$TARGET" --agent pi --model "$RAMIFY_MODEL" --port 4180
+```
+
+In another terminal (the example uses `jq` to read control identities):
+
+```sh
+SERVER=http://localhost:4180
+npm run --silent real-session -- --project "$TARGET" --plan "$PLAN" --server "$SERVER" --break before-agent:engineer --command-id start-1 --json > /tmp/debug-start.json
+RUN=$(jq -r '.runId' /tmp/debug-start.json)
+PAUSE=$(jq -r '.current.pauseId' /tmp/debug-start.json)
+REV=$(jq -r '.current.revision' /tmp/debug-start.json)
+./node_modules/.bin/tsx src/main.ts debug inspect --server "$SERVER" --plan "$PLAN" --run "$RUN" --pause "$PAUSE" --json
+printf '%s\n' 'Explain your understanding of this assignment and its verification. Do not edit or submit yet.' > /tmp/debug-question.txt
+./node_modules/.bin/tsx src/main.ts debug message --server "$SERVER" --plan "$PLAN" --run "$RUN" --pause "$PAUSE" --expected-revision "$REV" --command-id message-1 --message-file /tmp/debug-question.txt --json > /tmp/debug-answer.json
+REV=$(jq -r '.current.revision' /tmp/debug-answer.json)
+printf '%s\n' 'Now implement the ordinary assignment and submit its result.' > /tmp/debug-proceed.txt
+./node_modules/.bin/tsx src/main.ts debug resume --server "$SERVER" --plan "$PLAN" --run "$RUN" --pause "$PAUSE" --expected-revision "$REV" --command-id resume-1 --message-file /tmp/debug-proceed.txt --json > /tmp/debug-resume.json
+CURSOR=$(jq -r '.cursor' /tmp/debug-resume.json)
+./node_modules/.bin/tsx src/main.ts debug wait --server "$SERVER" --plan "$PLAN" --run "$RUN" --after "$CURSOR" --json
+```
+
+Inspect presents the normal effective input as a preview. Messages use ordinary
+engineer tools and submission validation; a plain explanatory return leaves the
+task pending. An accepted submission or terminal invocation result is held for
+resume, and further messages are refused. Resume handles a held result once or
+executes the pending task; after explanatory chat, supply an explicit instruction
+to implement. A later repair or capability engineer can reach a new occurrence.
+
+Message returns its settled answer, actual submission verdicts and evidence
+references. Resume returns its release acknowledgement immediately. Wait drains
+retained pages before polling and can report a historical reached pause; every
+such result separately presents `current` interaction state and the current run.
+Use current pause/revision identities for a new mutation. A historical receipt
+does not authorize a newer occurrence.
+
+All debugger waits default to 120000 ms and accept `--timeout-ms`. Timeout or a
+lost response preserves command/run identities and the last cursor, without
+cancelling work. Retry an uncertain mutation with the identical command ID and
+payload. Changed payloads, stale revisions and concurrent exchanges are refused.
+JSON mode writes one object to stdout and diagnostics to stderr. Exit 0 means a
+successful control return, 1 an unsuccessful terminal run, and 2 invalid/refused
+input, transport failure or timeout. A rejection verdict in an exchange is data.
+
+Attached `real-session` requires explicit project, plan, selector and command ID.
+It never prepares a fixture, starts or stops a server, and refuses `--model`;
+configure the model on `serve`. Without `--server`, the legacy fixture and
+owned-server launcher remains available; `--break` requires attachment.
+
 `session` runs one engineer session on one module of a project, from a
 prompt a person writes, without planning a run:
 

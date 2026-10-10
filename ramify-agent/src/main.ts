@@ -7,6 +7,7 @@ import type { SessionProgress, SessionSummary } from '../subs/harness/src/sessio
 import { runStepCommand } from '../subs/harness/src/steps/command.js';
 import { isProjectLockError } from '../subs/harness/src/store/lock.js';
 import { parseCommandLine, usage, UsageError, type CommandLine } from './cli.js';
+import { runDebugCommand, printControlResult } from './debug-client.js';
 
 // The web module builds into dist/web beside this package's root; the root
 // composes that build output with the harness's server.
@@ -20,6 +21,11 @@ async function main(argv: readonly string[]): Promise<number> {
   }
   if (commandLine.command === 'session') return session(commandLine);
   if (commandLine.command === 'step') return step(commandLine);
+  if (commandLine.command === 'debug') {
+    const result = await runDebugCommand(commandLine.debug);
+    printControlResult(result, commandLine.debug.json);
+    return result.exitStatus;
+  }
   const server = await startCliServer({
     projectRoot: commandLine.projectRoot, port: commandLine.port, assetsDirectory, agent: commandLine.agent, piModel: commandLine.model,
   });
@@ -190,6 +196,11 @@ function summaryText(summary: SessionSummary): string {
 main(process.argv.slice(2)).then(code => {
   if (code >= 0) process.exitCode = code;
 }, (error: unknown) => {
+  if (process.argv.includes('debug') && process.argv.includes('--json')) {
+    printControlResult({ exitStatus: 2, output: { kind: 'error', error: { code: 'invalid-request', message: error instanceof Error ? error.message : String(error) }, summary: 'Command was refused before execution.' } }, true);
+    process.exitCode = 2;
+    return;
+  }
   if (error instanceof UsageError) console.error(`${error.message}\n${usage}`);
   else if (error instanceof ProjectRootError || (error instanceof Error && isProjectLockError(error))) console.error(error.message);
   else console.error(error);

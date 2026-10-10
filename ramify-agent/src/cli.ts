@@ -23,6 +23,7 @@ export type SessionAgent =
   | { readonly name: 'fake'; readonly script: string };
 
 export type CommandLine =
+  | { readonly command: 'debug'; readonly debug: DebugOptions }
   | { readonly command: 'serve'; readonly projectRoot: string; readonly port: number; readonly agent: AgentName | undefined; readonly model: string | undefined }
   | {
       readonly command: 'session';
@@ -60,6 +61,10 @@ export class UsageError extends Error {
 
 export const usage = [
   'Usage:',
+  '  ramify-agent debug <inspect|message|resume|wait> --server <url> --plan <id> --run <id> [--json] [--timeout-ms <n>]',
+  '                       inspect: --pause <id>; message/resume: --pause <id> --expected-revision <n> --command-id <id>',
+  '                       message: --message-file <UTF-8 file>; resume: optional --message-file; wait: [--after <cursor>]',
+  '                       Default timeout: 120000 ms. Client exit or timeout never cancels the run. Retry the same command ID.',
   '  ramify-agent serve --project <root> [--port <n>] [--agent pi [--model <provider/model>] | --agent fake]',
   '  ramify-agent session --project <root> --module <module-path>',
   '                       (--prompt <text> | --prompt-file <file>)',
@@ -124,7 +129,48 @@ export function parseCommandLine(argv: readonly string[]): CommandLine {
   if (command === 'serve') return parseServe(rest);
   if (command === 'session') return parseSession(rest);
   if (command === 'step') return parseStep(rest);
+  if (command === 'debug') return { command: 'debug', debug: parseDebug(rest) };
   throw new UsageError(`Unknown command "${command}"`);
+}
+
+export interface DebugOptions {
+  readonly action: 'inspect' | 'message' | 'resume' | 'wait';
+  readonly server: string; readonly planId: string; readonly runId: string;
+  readonly pauseId?: string; readonly expectedRevision?: number; readonly commandId?: string;
+  readonly messageFile?: string; readonly after: number; readonly json: boolean; readonly timeoutMs: number;
+}
+
+/** Debug commands have explicit identity and finite waits; ambiguous options are refused. */
+function parseDebug(rest: readonly string[]): DebugOptions {
+  const [action, ...flags] = rest;
+  if (action !== 'inspect' && action !== 'message' && action !== 'resume' && action !== 'wait') throw new UsageError('debug needs inspect, message, resume or wait');
+  const values: Record<string, string> = {};
+  let json = false;
+  options(flags, (flag, value, inline, argument) => {
+    if (flag in values || flag === '--json' && json) throw new UsageError(`Give ${flag} once`);
+    if (flag === '--json' && inline === undefined) json = true;
+    else if (['--server', '--plan', '--run', '--pause', '--expected-revision', '--command-id', '--message-file', '--after', '--timeout-ms'].includes(flag)) values[flag] = value();
+    else throw new UsageError(`Unknown option "${argument}"`);
+  });
+  for (const flag of ['--server', '--plan', '--run']) if (!values[flag]) throw new UsageError(`debug ${action} needs ${flag}`);
+  const number = (flag: string, fallback: number, minimum: number): number => {
+    const text = values[flag]; const n = text === undefined ? fallback : Number(text);
+    if (text !== undefined && !/^\d+$/.test(text) || !Number.isSafeInteger(n) || n < minimum || n > 2147483647) throw new UsageError(`${flag} needs an integer from ${minimum} to 2147483647`);
+    return n;
+  };
+  if (action !== 'wait' && !values['--pause']) throw new UsageError(`debug ${action} needs --pause`);
+  if (action === 'message' || action === 'resume') {
+    if (!values['--command-id'] || !values['--expected-revision']) throw new UsageError(`debug ${action} needs --command-id and --expected-revision`);
+  } else if (values['--command-id'] || values['--expected-revision'] || values['--message-file']) throw new UsageError(`debug ${action} takes no mutation options`);
+  if (action === 'message' && !values['--message-file']) throw new UsageError('debug message needs --message-file');
+  if (action !== 'wait' && values['--after'] || action === 'wait' && values['--pause']) throw new UsageError('--after applies to wait; --pause applies to inspect/message/resume');
+  return { action, server: values['--server']!, planId: values['--plan']!, runId: values['--run']!, json,
+    after: number('--after', 0, 0), timeoutMs: number('--timeout-ms', 120000, 1),
+    ...(values['--pause'] ? { pauseId: values['--pause'] } : {}),
+    ...(values['--command-id'] ? { commandId: values['--command-id'] } : {}),
+    ...(values['--message-file'] ? { messageFile: values['--message-file'] } : {}),
+    ...(values['--expected-revision'] ? { expectedRevision: number('--expected-revision', 1, 1) } : {}),
+  };
 }
 
 function parseServe(rest: readonly string[]): CommandLine {

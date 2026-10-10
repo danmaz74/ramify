@@ -420,6 +420,19 @@ export type RunListResponse = z.infer<typeof runListResponseSchema>;
 export const runResponseSchema = z.object({ run: runSnapshotSchema }).strict();
 export type RunResponse = z.infer<typeof runResponseSchema>;
 
+/** Current interaction is separate from retained reached pauses and exchange results. */
+export const debugStateResponseSchema = z.object({ run: runSnapshotSchema,
+  current: breakpointStateSchema.nullable(), reached: z.array(breakpointStateSchema).max(500),
+  cursor: jobVersionSchema, more: z.boolean(),
+}).strict();
+export type DebugStateResponse = z.infer<typeof debugStateResponseSchema>;
+export const debugInspectionResponseSchema = z.object({ run: runSnapshotSchema,
+  current: breakpointStateSchema.nullable(), inspection: debugInspectionSchema,
+}).strict();
+export const debugExchangeResponseSchema = z.object({ run: runSnapshotSchema,
+  current: breakpointStateSchema.nullable(), exchange: debugExchangeSchema.nullable(),
+}).strict();
+
 /** Read-only, revision-bound merge advice; it never changes run completion. */
 export const mergeReadinessResponseSchema = z.object({
   runId: runIdSchema,
