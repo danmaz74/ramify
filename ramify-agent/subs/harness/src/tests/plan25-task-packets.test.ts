@@ -1,4 +1,4 @@
-import { beforeAll, expect, test } from 'vitest';
+import { afterEach, beforeAll, expect, test } from 'vitest';
 import { createHash } from 'node:crypto';
 import { loadPromptPackages, type LoadedPackage } from '../prompts/packages.js';
 import { assertTaskProcedureSelection, buildTaskPacket, type TaskEnvironment, type TaskKind } from '../prompts/tasks.js';
@@ -6,6 +6,8 @@ import { buildBriefingDelivery, taskBriefingRevision } from '../prompts/briefing
 import { effectiveBlocks } from '../prompts/blocks.js';
 import type { Role } from '../interfaces/protocol/runs.js';
 import type { DeliveredInput } from '../prompts/delivered-manifest.js';
+import { runAcceptedHandback } from './helpers/acceptance-flow.js';
+import { engineerDeliveries } from './helpers/step-equality.js';
 
 let packages: ReadonlyMap<Role, LoadedPackage>;
 let ordinary: ReadonlyMap<Role, LoadedPackage>;
@@ -92,3 +94,20 @@ test.each(families)('P07: %s/%s intentionally selects %s and %s', (role, kind, f
   expect(current.additions.find(item => item.kind === 'procedure')!.key).toBe(`procedure:${role}:${family}`);
   expect(current.additions.filter(item => item.kind === 'tool-declaration')).toHaveLength(1);
 });
+
+const cleanups: Array<() => Promise<void>> = [];
+afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+
+test('S01: a resumed-after-handback engineer delivery equals the constructor\'s render of the inputs the run passed', async () => {
+  const starts: string[] = [];
+  await runAcceptedHandback('revision', cleanups, false, async ({ root, planId, runId }) => {
+    for (const item of await engineerDeliveries(root, planId, runId)) {
+      starts.push(item.inputs.start.kind);
+      expect(item.rendered.fallback).toBeNull();
+      expect(item.rendered.packet).toEqual(item.delivered.packet);
+      expect(item.rendered.declarations).toEqual(item.delivered.declarations);
+    }
+  });
+  expect(starts).toContain('fresh');
+  expect(starts).toContain('resumed-after-handback');
+}, 300_000);

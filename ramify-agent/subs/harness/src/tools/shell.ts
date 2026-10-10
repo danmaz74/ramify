@@ -144,6 +144,32 @@ export interface ShellTool {
   settle(): Promise<void>;
 }
 
+/**
+ * What the session is told of the shell: its name, description, input schema
+ * and that it mutates. It depends on the longest command it allows alone, so
+ * a step's rendering and the tool the session receives declare the same tool.
+ */
+export function shellToolDeclaration(maxTimeoutMs: number = shellMaxTimeoutMs): {
+  readonly name: string; readonly description: string; readonly inputSchema: JsonSchema; readonly mutating: true;
+} {
+  // A command asked for no timeout of its own gets the default, and never
+  // more than the maximum this session was given.
+  const defaultTimeoutMs = Math.min(shellDefaultTimeoutMs, maxTimeoutMs);
+  return {
+    name: shellToolName,
+    description: [
+      'Runs one shell command in the project\'s working directory, in its own process group and with a',
+      'built environment. The complete output is kept in a file; you receive the last 8 KiB of it.',
+      'What this writes passes no write guard: it is observed afterwards, and a change outside your scope is',
+      'reported rather than prevented. Stay inside your scope here as you do with `edit` and `write`.',
+      'Whole-suite Vitest and Cucumber runs are refused: the gate\'s audit runs them. Name test files instead.',
+      `A command runs for ${defaultTimeoutMs} ms unless \`timeoutMs\` asks for more, up to ${maxTimeoutMs} ms.`,
+    ].join(' '),
+    inputSchema: z.toJSONSchema(shellInputSchemaFor(maxTimeoutMs)) as JsonSchema,
+    mutating: true,
+  };
+}
+
 export function createShellTool(options: ShellOptions): ShellTool {
   interface Running {
     readonly controller: AbortController;
@@ -154,22 +180,10 @@ export function createShellTool(options: ShellOptions): ShellTool {
   let stopped = false;
   const maxTimeoutMs = options.maxTimeoutMs ?? shellMaxTimeoutMs;
   const inputSchema = shellInputSchemaFor(maxTimeoutMs);
-  // A command asked for no timeout of its own gets the default, and never
-  // more than the maximum this session was given.
   const defaultTimeoutMs = Math.min(shellDefaultTimeoutMs, maxTimeoutMs);
 
   const definition: ToolDefinition = {
-    name: shellToolName,
-    description: [
-      'Runs one shell command in the project\'s working directory, in its own process group and with a',
-      'built environment. The complete output is kept in a file; you receive the last 8 KiB of it.',
-      'What this writes passes no write guard: it is observed afterwards, and a change outside your scope is',
-      'reported rather than prevented. Stay inside your scope here as you do with `edit` and `write`.',
-      'Whole-suite Vitest and Cucumber runs are refused: the gate\'s audit runs them. Name test files instead.',
-      `A command runs for ${defaultTimeoutMs} ms unless \`timeoutMs\` asks for more, up to ${maxTimeoutMs} ms.`,
-    ].join(' '),
-    inputSchema: z.toJSONSchema(inputSchema) as JsonSchema,
-    mutating: true,
+    ...shellToolDeclaration(maxTimeoutMs),
     // A shell call is a command; its text is the one field of the input read.
     action: input => {
       const command = typeof input === 'object' && input !== null ? (input as { readonly command?: unknown }).command : undefined;

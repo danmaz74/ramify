@@ -115,6 +115,9 @@ import { contextSelectorJsonSchema, contextSelectorSubmissionSchema, contextSele
   orientationPacket, prepareContextSelection, workOrientationJsonSchema, workOrientationSubmissionSchema,
   workOrientationToolName, type ContextSelectorSubmission, type SelectionSource, type WorkOrientationSubmission } from '../context-selection/submissions.js';
 import { documentChanges, readCapturedDocuments } from './document-inputs.js';
+import { composeTaskBrief, type KnownProjectFacts } from './task-brief.js';
+import { constructEngineerStep, type ConstructedEngineerStep } from '../steps/engineer.js';
+import { projectPath, serializeStepInputs, type EngineerStepInputs, type StepInputs } from '../steps/inputs.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderFailureAnalystPrompt, renderGlobalForkPrompt,
   renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
@@ -197,7 +200,7 @@ import {
 } from '../work/failure.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  auditPreparationPaths, scopeConfigurationPaths, captureGuardedFiles, checkWriteScope, checkpointOf, defaultWriteScopeOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
+  auditPreparationPaths, scopeConfigurationPaths, captureGuardedFiles, checkWriteScope, checkpointOf, defaultWriteScopeOf, deniedFiles, guardedScopeOf, protectedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
   type DefaultWriteScope, type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
@@ -220,7 +223,7 @@ import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './lo
 import type { Transaction } from '../../subs/ledger/src/ledger.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder, type CallInFlight } from './port-events.js';
-import { contextPolicyOf, defaultRunPolicy, engineerBoundsOf, withProjectTimeouts, type EngineerBounds } from './policy.js';
+import { contextPolicyOf, defaultRunPolicy, invocationLimits, engineerBoundsOf, withProjectTimeouts, type EngineerBounds } from './policy.js';
 import { captureProjectConfig, moduleTestAreas, type TestArea } from './project-config.js';
 import {
   commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
@@ -414,6 +417,12 @@ interface InvocationRequest<T> {
   /** Exact owning task inputs; headings in the old display brief carry no ancestry authority. */
   readonly task?: { readonly kind?: TaskKind; readonly goal: string; readonly requirements: readonly string[]; readonly omit?: readonly string[]; readonly literalSections?: HarnessTaskBrief['sections']; readonly startingPointGroups?: readonly StartingPointGroup[]; readonly candidate?: string; readonly snapshot?: string; readonly consultationSubmissionSchema?: string; readonly views?: TaskEnvironment['views']; readonly cucumberConfiguration?: string | null; readonly modules?: readonly string[] };
   readonly start: SessionStart;
+  /** The task brief a step constructor composed; the run composes one from its records where absent. */
+  readonly brief?: HarnessTaskBrief | undefined;
+  /** The context policy a step constructor took from its inputs; the run policy's for the role where absent. */
+  readonly context?: RunPolicy['context']['engineer'] | undefined;
+  /** The step inputs this invocation was constructed from, written to its directory before its session starts. */
+  readonly stepInputs?: StepInputs | undefined;
   readonly toolName: string;
   readonly description: string;
   readonly inputSchema: JsonSchema;
@@ -4387,6 +4396,13 @@ export class RunService {
       }, [
         { path: runLayout.invocation(id), id, revision: 1, body: invocation },
       ]);
+      // The inputs the invocation was constructed from, before its session
+      // starts: a step run later builds the same invocation from them.
+      if (request.stepInputs !== undefined) {
+        const target = run.path(runLayout.stepInputs(id));
+        await mkdir(dirname(target), { recursive: true });
+        await writeFileAtomic(target, serializeStepInputs(request.stepInputs));
+      }
       // The transcript's start holds the prompts, and is written before the
       // session starts, so a crash before the first reply still leaves them.
       const transcript = this.invocationTranscript(run, session, id, observations);
@@ -4449,7 +4465,7 @@ export class RunService {
       index: run.index,
       scope: request.guarded,
     });
-    const context = contextPolicyOf(run.record.policy, request.role);
+    const context = request.context ?? contextPolicyOf(run.record.policy, request.role);
     const recorder = new PortEventRecorder({
       projectRoot: this.projectRoot, workingDirectory: request.workingDirectory ?? this.projectRoot, observations, judge, excursions, context, transcript,
       invocation: { id, role: request.role, startedAt: invocationSchema.parse(this.committedBody(run, runLayout.invocation(id))).startedAt, submissionTool: request.toolName, declaredPaths: request.guarded?.roots ?? [] },
@@ -4458,14 +4474,7 @@ export class RunService {
     // A command the equipment runs for the session holds it instead. An
     // engineer's own bounds replace the policy's; a reader's may only be
     // tighter.
-    const policyLimits = run.record.policy.limits;
-    const limits = {
-      ...policyLimits,
-      commandTimeoutMs: request.bounds?.commandTimeoutMs ?? policyLimits.commandTimeoutMs,
-      invocationIdleMs: request.bounds?.idleMs ?? policyLimits.invocationIdleMs,
-      invocationAbsoluteMs: request.bounds?.absoluteMs
-        ?? (request.absoluteMs === undefined ? policyLimits.invocationAbsoluteMs : Math.min(policyLimits.invocationAbsoluteMs, request.absoluteMs)),
-    };
+    const limits = invocationLimits(run.record.policy.limits, request);
     const bounds = new InvocationBounds(limits);
     // What was in flight at the moment a bound fired, before the stop it
     // asks for ends those calls.
@@ -4515,7 +4524,7 @@ export class RunService {
     let agentSession: AgentSession & { readonly unavailableReason?: string | undefined };
     try {
       agentSession = await (await this.operations(agent)).start({ runId: run.record.jobId, operationId: id, session, loaded: request.loaded,
-        brief: await this.taskBrief(run, request, spec, limits), spec, restore: request.restore,
+        brief: request.brief ?? await this.taskBrief(run, request, spec, limits), spec, restore: request.restore,
         authority: { scope: request.guarded === undefined ? null : { revision: request.guarded.revision, projectRoot: request.guarded.projectRoot, roots: request.guarded.roots, files: request.guarded.files, excluded: request.guarded.excluded ?? [], denied: request.guarded.denied ?? [], guarded: request.guarded.guarded ?? [] }, writer: request.writer === true, work: request.work },
         validator: { name: request.toolName, schema: request.inputSchema, submissionSchema: request.submissionSchema, bound: limits.rejectedSubmissionsPerTurn },
         destination: { run: run.record.jobId, invocation: id, submission: runLayout.submission(id) },
@@ -4738,7 +4747,6 @@ export class RunService {
     const item = records.workItems.find(item => item.id === request.work.workItem);
     const goal = request.task?.goal ?? item?.goal ?? `Read the captured plan for ${run.record.planId} and perform the current ${kind} task.`;
     const requirements = request.task?.requirements ?? [new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)))];
-    const sections = [...taskSupportSections(request.prompt, [goal, ...requirements, ...(request.task?.omit ?? [])]), ...(request.task?.literalSections ?? [])];
     const groups = [...request.task?.startingPointGroups ?? []];
     if (request.role === 'engineer' && request.work.iteration !== undefined) {
       const assignment = records.assignments.get(request.work.iteration);
@@ -4754,48 +4762,50 @@ export class RunService {
         if (oriented !== undefined) groups.unshift(oriented.group);
       }
     }
-    const discoveries = startingPointsSection(groups, { projectRoot: this.projectRoot });
-    if (discoveries !== undefined) sections.push(discoveries);
     // Role/task rules deliver known facts; the agent decides what to inspect.
-    if (['initial-architect', 'local-architect', 'capability-architect', 'engineer', 'contract-engineer', 'nonfunctional-repair-engineer'].includes(request.role)
-      || (request.role === 'context-selector' && request.start.mode === 'fresh')) {
-      const setup = await this.checkInputSection(run);
-      if (setup && !request.prompt.includes(setup)) sections.push({ key: 'support:declared-checks', text: setup });
-      const names = request.task?.modules ?? (item === undefined ? [] : [item.module]);
-      const modules = names.flatMap(name => {
-        const module = run.index === null ? undefined : findModule(run.index, name);
-        return module === undefined ? [] : [{ module: module.module, directory: module.dir, apiPaths: [] as string[] }];
-      });
-      for (const module of modules) for (const area of ['src', 'src/tests']) {
-        const path = join(module.directory, area, '.ramify');
-        if ((await stat(join(this.projectRoot, path)).catch(() => null))?.isDirectory()) module.apiPaths.push(path);
-      }
-      const pointers = moduleInputPointers({ projectRoot: this.projectRoot, modules,
-        testAreas: run.index === null ? [] : await moduleTestAreas(this.projectRoot, run.index) });
-      if (pointers) sections.push({ key: 'support:module-pointers', text: pointers });
-      const scenarios = trackedScenarios(run.log.ledger.replay()).records.filter(record => names.includes(record.owner));
-      if (scenarios.length > 0) {
-        const directories = [...new Set(scenarios.map(record => stepDirectoryOf(record.file)))];
-        const observed = await Promise.all(directories.map(async directory => ({ directory, files: await stepFilesIn(this.projectRoot, directory) })));
-        sections.push({ key: 'support:scenario-files', text: ['## Scenario file pointers', '',
-          ...[...new Set(scenarios.map(record => record.file))].map(path => `- Feature: \`${join(this.projectRoot, path)}\`.`),
-          ...observed.map(entry => `- Step directory: \`${join(this.projectRoot, entry.directory)}\`; observed files: ${entry.files.map(path => `\`${join(this.projectRoot, path)}\``).join(', ') || '(none)'}.`),
-          'Observed files do not establish what the runner loads. Inspect its declared configuration.', ''].join('\n') });
-      }
-    }
-    return { kind, objective: `Perform ${kind} for ${JSON.stringify(request.work)}; use the current evidence and designated submission.`, goal, requirements, sections,
-      ...(request.role === 'context-selector' && request.start.mode === 'fork' ? { retainInheritedSections: true } : {}),
-      ...(request.task?.consultationSubmissionSchema === undefined ? {} : { consultationSubmissionSchema: request.task.consultationSubmissionSchema }),
+    const known = ['initial-architect', 'local-architect', 'capability-architect', 'engineer', 'contract-engineer', 'nonfunctional-repair-engineer'].includes(request.role)
+      || (request.role === 'context-selector' && request.start.mode === 'fresh')
+      ? await this.knownProjectFacts(run, request.task?.modules ?? (item === undefined ? [] : [item.module])) : undefined;
+    return composeTaskBrief(this.projectRoot, { kind, work: request.work, goal, requirements, prompt: request.prompt,
+      omit: request.task?.omit ?? [], literalSections: request.task?.literalSections ?? [], startingPointGroups: groups, known,
+      retainInheritedSections: request.role === 'context-selector' && request.start.mode === 'fork',
+      consultationSubmissionSchema: request.task?.consultationSubmissionSchema,
       environment: { projectRoot: this.projectRoot, workingDirectory: spec.scope.workingDirectory,
         candidate: request.task?.candidate ?? request.candidateBefore ?? null, snapshot: request.task?.snapshot ?? null,
         limits, availableTools: [...spec.builtinTools, ...spec.tools.map(tool => tool.name), spec.submission.name],
         views: request.task?.views ?? (run.record.manifest.architectView.status === 'materialized' ? [{ path: join(this.projectRoot, '.ramify-architect'), revision: run.record.manifest.architectView.revision, modules: [...(run.index?.modules.keys() ?? [])], coverage: run.record.manifest.architectView.coverageLimits }] : []),
         // Only the sources this task delivers; the package's other files never reach the model.
-        supportPaths: deliveredSupportPaths(request.loaded, kind, request.task?.consultationSubmissionSchema), cucumberConfiguration: request.task?.cucumberConfiguration ?? null } };
+        supportPaths: deliveredSupportPaths(request.loaded, kind, request.task?.consultationSubmissionSchema), cucumberConfiguration: request.task?.cucumberConfiguration ?? null } });
+  }
+
+  /**
+   * What a role that works in the source is told of the project: its declared
+   * checks, the pointers of the named modules and the scenario files they own.
+   * Every path is project-relative.
+   */
+  private async knownProjectFacts(run: Run, names: readonly string[]): Promise<KnownProjectFacts> {
+    const modules = names.flatMap(name => {
+      const module = run.index === null ? undefined : findModule(run.index, name);
+      return module === undefined ? [] : [{ module: module.module, directory: module.dir, apiPaths: [] as string[] }];
+    });
+    for (const module of modules) for (const area of ['src', 'src/tests']) {
+      const path = join(module.directory, area, '.ramify');
+      if ((await stat(join(this.projectRoot, path)).catch(() => null))?.isDirectory()) module.apiPaths.push(path);
+    }
+    const testAreas = run.index === null ? [] : (await moduleTestAreas(this.projectRoot, run.index)).filter(area => modules.some(module => module.module === area.module));
+    const scenarios = trackedScenarios(run.log.ledger.replay()).records.filter(record => names.includes(record.owner));
+    const directories = [...new Set(scenarios.map(record => stepDirectoryOf(record.file)))];
+    const stepDirectories = scenarios.length === 0 ? [] : await Promise.all(directories.map(async directory => ({ directory, files: await stepFilesIn(this.projectRoot, directory) })));
+    return { declaredChecks: await this.checkInputFacts(run), modules, testAreas, scenarioFeatures: [...new Set(scenarios.map(record => record.file))], stepDirectories };
   }
 
   /** Authored setup pointers only: no effective configuration evaluation or readiness acquisition. */
   private async checkInputSection(run: Run, snapshot?: CandidateSnapshot): Promise<string> {
+    return declaredCheckInputs({ projectRoot: this.projectRoot, ...await this.checkInputFacts(run, snapshot), snapshot: snapshot !== undefined });
+  }
+
+  /** The configured checks and the configuration pointers that exist, in the tree or in the snapshot. */
+  private async checkInputFacts(run: Run, snapshot?: CandidateSnapshot): Promise<KnownProjectFacts['declaredChecks']> {
     const checks = run.record.auditConfiguration && 'config' in run.record.auditConfiguration ? run.record.auditConfiguration.config.checks : [];
     const paths = new Set<string>(['ramify-audit.json', run.record.projectConfig.path]);
     for (const value of checks) {
@@ -4818,7 +4828,7 @@ export class RunService {
     for (const path of paths) {
       if (snapshot ? snapshot.entries.get(path)?.kind === 'file' : (await stat(resolve(this.projectRoot, path)).catch(() => null))?.isFile()) available.push(path);
     }
-    return declaredCheckInputs({ projectRoot: this.projectRoot, checks, paths: available, snapshot: snapshot !== undefined });
+    return { checks, paths: available };
   }
 
   // The initial analysis
@@ -8934,8 +8944,7 @@ export class RunService {
       }
       return { kind: 'closed', result: savedResult };
     }
-    const loaded = packages.get('engineer');
-    if (loaded === undefined) {
+    if (packages.get('engineer') === undefined) {
       await this.fail(run, 'internal', 'No prompt package is loaded for the engineer');
       return null;
     }
@@ -8946,7 +8955,6 @@ export class RunService {
     // longest a command may run.
     const bounds = this.engineerBounds(run, assignment);
     const workingDirectory = await engineerWorkingDirectory(this.projectRoot, assignment.scope, run.index, this.git);
-    const systemPrompt = renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs, workingDirectory);
     // What the assignment gave it to write: its base modules, included
     // subtrees, bootstrapped modules and extra locations.
     const measurementScope = writeScopeMeasurement(assignment.scope);
@@ -9056,7 +9064,6 @@ export class RunService {
       const beforeTree = assignment.coordination?.kind === 'capability-task'
         ? (await this.previewCandidateTree()).tree : undefined;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const guarded = await this.engineerGuard(run, assignment);
       // A capability-task iteration is told only the obligations its
       // assignment names; a work item's iteration also sees its scenarios.
       const briefedScenarios = assignment.coordination?.kind === 'capability-task'
@@ -9078,48 +9085,56 @@ export class RunService {
       const focused = await prepareAssignedCucumber({ projectRoot: this.projectRoot, scratchDirectory: join(workingDirectory, 'tmp', 'ramify-focused', assignment.id),
         featurePaths, checks: run.record.auditConfiguration && 'config' in run.record.auditConfiguration ? run.record.auditConfiguration.config.checks : [],
         runner: this.options.commandExecution ?? runCommand });
+      const invocationViews = replay === undefined ? await this.iterationViews(run, assignment) : [];
+
+      // The invocation is built from its inputs by the engineer step's own
+      // constructor, which `step render` uses too; the inputs are validated
+      // here and written beside the invocation before it starts.
+      let step: ConstructedEngineerStep;
+      try {
+        step = constructEngineerStep(await this.engineerStepInputs(run, {
+          item, assignment, attempt, workingDirectory, bounds, beforeTree, views: invocationViews, scenarios: briefedScenarios,
+          obligations: assignedObligations, assignmentPackage, featurePaths, focused, failedGate,
+          handoff: handoff === undefined ? undefined : { ...handoff, returns: this.budgetReturns(run, assignment.id) },
+          guidance: guidancePending,
+          start: start.mode === 'continue'
+            ? { kind: resume === undefined ? 'repair-continuation' : 'resumed-after-handback', session: session ?? '', point: start.ref }
+            : { kind: 'fresh', ...(degraded === undefined || degraded.requested !== 'continued' ? {} : { degraded: { requested: 'continued', reason: degraded.reason } }) },
+        }), { projectRoot: this.projectRoot, packages });
+      } catch (error) {
+        await this.fail(run, 'internal', `The engineer of ${assignment.id} cannot be constructed from its inputs: ${message(error)}`);
+        return null;
+      }
+      const guarded = await protectedScopeOf(this.projectRoot, assignment.scope, step.equipment.protectedFiles, this.options.ramify);
       const tools = this.implementationTools(run, {
-        workingDirectory,
-        scopeRevision: assignment.scope.revision,
+        workingDirectory: step.equipment.workingDirectory,
+        scopeRevision: step.equipment.scopeRevision,
         guarded,
-        commandTimeoutMs: bounds.commandTimeoutMs,
-        focusedCommands: focused.command.kind === 'available' ? [{ shellCommand: focused.command.shellCommand, selection: focused.command.selection,
-          environment: focused.command.environment, sourceFiles: focused.sourceFiles }] : [],
+        commandTimeoutMs: step.equipment.commandTimeoutMs,
+        submissions: step.equipment.submissions,
+        focusedCommands: step.equipment.focusedCommands,
       });
 
-      const invocationViews = replay === undefined ? await this.iterationViews(run, assignment) : [];
       const result = replay ?? await this.runInvocation<EngineerSubmission>(run, agent, {
-        role: 'engineer',
+        role: step.role,
         originalInvocation: run.restoring && latestStart && !run.log.all('invocation-ended').some(event => event.data.invocation === latestStart.data.invocation) ? latestStart.data.invocation : undefined,
-        task: { kind: start.mode === 'continue' ? 'repair' : 'engineering', modules: 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules, goal: assignment.goal, requirements: [assignment.completionEvidence], cucumberConfiguration: focusedScenarioFacts(focused), omit: assignmentPackage === undefined ? [] : [assignmentPackage],
-          literalSections: assignmentPackage !== undefined ? [{ key: 'support:assignment-package', text: assignmentPackage }] : [],
-          views: invocationViews.flatMap(entry => entry.views.map(view => ({ path: view.path, revision: view.revision, modules: [entry.module], coverage: view.coverage === null ? [] : [`${view.coverage} coverage limits`] }))) },
-        workingDirectory,
-        work: { workItem: item.id, iteration: assignment.id },
-        attempt,
-        loaded,
-        systemPrompt,
-        prompt: `${iterationMessage({
-          assignment,
-          projectRoot: this.projectRoot,
-          workingDirectory,
-          capabilityWorkflow: this.workflow !== null,
-          base: this.accepted(run),
-          views: invocationViews,
-          testAreas: await this.ownedTestAreas(run, assignment.gate.tests),
-          ...(failedGate === undefined ? {} : { failedGate }),
-          ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
-          ...(briefedScenarios === undefined ? {} : { scenarios: briefedScenarios }),
-          ...(assignedObligations.length === 0 ? {} : { obligations: assignedObligations }),
-          ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
-        })}${featurePaths.length === 0 ? '' : focused.command.kind === 'available' ? `\n\n# Exact focused scenario command\n\n${focused.command.shellCommand}\nSupport/world/loader: ${JSON.stringify(focused.command.support)}\nEnvironment names: ${Object.keys(focused.command.environment).sort().join(', ')}. Config SHA-256 ${focused.command.configurationIdentity}; current generated and source bytes are revalidated at dispatch.\n${focusedCommandPendingNote}` : `\n\nFocused scenario command unavailable: ${focused.command.reason}. Do not combine CLI feature paths with the broad default profile.`}${guidancePending === undefined ? '' : `\n\n# Qualified existing behavior\n\n${guidancePending}`}`,
-        start,
+        task: step.task,
+        brief: step.brief,
+        context: step.context,
+        stepInputs: step.before.inputs,
+        workingDirectory: step.equipment.workingDirectory,
+        work: step.work,
+        attempt: step.attempt,
+        loaded: step.loaded,
+        systemPrompt: step.systemPrompt,
+        prompt: step.prompt,
+        start: step.start.mode === 'continue' ? { mode: 'continue', ref: step.start.ref } : { mode: 'fresh' },
         session,
         // The engineer is kept only after a proposed completion, and
         // continued only for the repair its failing gate asks for. The
         // harness point is its previous invocation's end: the note appended
         // before it is the executor's, and no other session starts from it.
-        continuing: resume === undefined ? 'repair' : 'capability-returned',
+        continuing: step.start.mode === 'continue' ? step.start.continuing : resume === undefined ? 'repair' : 'capability-returned',
         ...(replacing === undefined ? {} : { replaces: { session: replacing, reason: 'reconstructed' } }),
         ...(degraded === undefined ? {} : { degraded }),
         // A proposed completion is kept for the repair its gate may ask
@@ -9132,28 +9147,27 @@ export class RunService {
           return value.kind === 'completion-proposed' || (value.kind === 'capability-needed' && this.workflow !== null)
             ? kept : finished('work-closed');
         },
-        toolName: engineerToolName,
-        description: engineerSubmissionDescription,
-        inputSchema: this.workflow === null ? engineerJsonSchema : capabilityEngineerJsonSchema,
-        submissionSchema: 'ramify-agent.engineer-submission/1',
+        toolName: step.submission.toolName,
+        description: step.submission.description,
+        inputSchema: step.submission.inputSchema,
+        submissionSchema: step.submission.submissionSchema,
         // A claimed completion is checked afresh over the write scope
         // before it is judged, because the hook checks saw only the
         // mutations they covered.
         beforeSubmission: async (input, signal) => { await tools.findingsAtCompletion(input, signal); },
         validate: async input => {
           const validated = validateEngineer(input, {
-          capabilityWorkflow: this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion,
-          obligation: assignment.evidenceObligations
-            .find(evidence => evidence.obligation !== undefined && evidence.against === 'real')?.obligation ?? null,
-          kind: assignment.kind,
-          openFindings: tools.openFindings(),
-          submissions: tools.submissions,
-          assigned: assignment.obligations ?? [],
-          seams: {
-            index: run.index,
-            consumer: item.module,
-            providerOf: capability => committedRecords(run.log.ledger.replay()).registry.find(entry => entry.capability === capability)?.owner,
-          },
+            capabilityWorkflow: step.validator.capabilityWorkflow,
+            obligation: step.validator.obligation,
+            kind: step.validator.kind,
+            openFindings: tools.openFindings(),
+            submissions: tools.submissions,
+            assigned: step.validator.assigned,
+            seams: {
+              index: run.index,
+              consumer: step.validator.consumer,
+              providerOf: capability => committedRecords(run.log.ledger.replay()).registry.find(entry => entry.capability === capability)?.owner,
+            },
           });
           // A capability-needed submission captures a provisional candidate
           // immediately after this invocation. Refuse unsafe scratch here so
@@ -9180,7 +9194,7 @@ export class RunService {
         ...(beforeTree === undefined ? {} : { candidateBefore: beforeTree }),
         guarded,
         equip: tools.equip,
-        bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs, commandTimeoutMs: bounds.commandTimeoutMs },
+        bounds: step.bounds,
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
       const replayed = replay !== undefined;
@@ -10727,6 +10741,79 @@ export class RunService {
     return summary;
   }
 
+  /**
+   * The inputs of one engineer invocation, collected from the run's records
+   * and the project as they stand: everything the engineer step is built
+   * from, with every path project-relative.
+   */
+  private async engineerStepInputs(run: Run, collected: {
+    readonly item: WorkItem;
+    readonly assignment: IterationAssignment;
+    readonly attempt: number;
+    readonly workingDirectory: string;
+    readonly bounds: EngineerBounds;
+    readonly beforeTree: string | undefined;
+    readonly views: readonly IterationApiViews[];
+    readonly scenarios: EngineerScenarios | undefined;
+    readonly obligations: readonly AssignedObligation[];
+    readonly assignmentPackage: string | undefined;
+    readonly featurePaths: readonly string[];
+    readonly focused: Awaited<ReturnType<typeof prepareAssignedCucumber>>;
+    readonly failedGate: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
+    readonly handoff: { readonly done: readonly string[]; readonly unfinished: readonly string[]; readonly returns: number } | undefined;
+    readonly guidance: string | undefined;
+    readonly start: EngineerStepInputs['start'];
+  }): Promise<EngineerStepInputs> {
+    const { item, assignment } = collected;
+    const contained = (absolute: string) => {
+      const path = relative(this.projectRoot, absolute).split(sep).join('/');
+      if (join(this.projectRoot, path) !== absolute) throw new Error(`${absolute} is not beneath the project root ${this.projectRoot}`);
+      return projectPath(path);
+    };
+    const record = committedRecords(run.log.ledger.replay()).assignments.get(assignment.id);
+    const known = await this.knownProjectFacts(run, 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules);
+    const protectedFiles = await this.protectedFiles(run, assignment);
+    // Captured JSON facts, without the undefined members JSON never carries.
+    const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+    return {
+      schema: 'ramify-agent.step-inputs/1',
+      role: 'engineer',
+      run: { planId: run.record.planId, runId: run.record.jobId },
+      work: { workItem: item.id, iteration: assignment.id },
+      attempt: collected.attempt,
+      consumer: item.module,
+      assignment,
+      base: this.accepted(run),
+      ...(collected.beforeTree === undefined ? {} : { candidateBefore: collected.beforeTree }),
+      capabilityWorkflow: this.workflow !== null,
+      capabilityPolicy: run.record.policy.version === capabilityRunPolicyVersion,
+      workingDirectory: contained(collected.workingDirectory),
+      views: collected.views.map(entry => ({ module: entry.module, unavailable: entry.unavailable,
+        views: entry.views.map(view => ({ area: view.area, path: projectPath(view.path), revision: view.revision, coverage: view.coverage })) })),
+      testAreas: (await this.ownedTestAreas(run, assignment.gate.tests)).map(area => ({ module: area.module, area: projectPath(area.area) })),
+      ...(collected.scenarios === undefined ? {} : { scenarios: plain(collected.scenarios) }),
+      obligations: collected.obligations.map(obligation => ({ id: obligation.id, text: obligation.text })),
+      ...(collected.assignmentPackage === undefined ? {} : { assignmentPackage: collected.assignmentPackage }),
+      focused: { featurePaths: collected.featurePaths.map(projectPath), command: plain(collected.focused.command), sourceFiles: { ...collected.focused.sourceFiles } },
+      ...(collected.failedGate === undefined ? {} : { failedGate: { id: collected.failedGate.id, cause: collected.failedGate.cause, summary: [...collected.failedGate.summary] } }),
+      ...(collected.handoff === undefined ? {} : { handoff: { done: [...collected.handoff.done], unfinished: [...collected.handoff.unfinished], returns: collected.handoff.returns } }),
+      ...(collected.guidance === undefined ? {} : { guidance: collected.guidance }),
+      startingPoints: record === undefined ? null : plain(this.assignmentStartingPoints(run, record)),
+      known: {
+        declaredChecks: { checks: plain(known.declaredChecks.checks) as EngineerStepInputs['known']['declaredChecks']['checks'], paths: known.declaredChecks.paths.map(projectPath) },
+        modules: known.modules.map(module => ({ module: module.module, directory: projectPath(module.directory), apiPaths: module.apiPaths.map(projectPath) })),
+        testAreas: known.testAreas.map(area => ({ module: area.module, area: projectPath(area.area) })),
+        scenarioFeatures: known.scenarioFeatures.map(projectPath),
+        stepDirectories: known.stepDirectories.map(entry => ({ directory: projectPath(entry.directory), files: entry.files.map(projectPath) })),
+      },
+      protectedFiles: { harness: protectedFiles.harness.map(projectPath), unauthorized: protectedFiles.unauthorized.map(projectPath) },
+      bounds: { idleMs: collected.bounds.idleMs, absoluteMs: collected.bounds.absoluteMs, commandTimeoutMs: collected.bounds.commandTimeoutMs },
+      limits: run.record.policy.limits,
+      context: contextPolicyOf(run.record.policy, 'engineer'),
+      start: collected.start,
+    } as EngineerStepInputs;
+  }
+
   /** The bounds one iteration's engineers run under: the policy's, and what its assignment raised. */
   private engineerBounds(run: Run, assignment: IterationAssignment): EngineerBounds {
     const { defaults } = engineerBoundsOf(run.record.policy.limits);
@@ -11917,16 +12004,24 @@ export class RunService {
    * that an architect's authorization would open them.
    */
   private async engineerGuard(run: Run, assignment: IterationAssignment) {
-    const harness = await this.deniedFiles(run);
-    const unauthorized = assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path);
-    const guarded = (await deniedFiles(this.projectRoot, unauthorized)).filter(path => !harness.includes(path));
-    return { ...guardedScopeOf(assignment.scope, await deniedFiles(this.projectRoot, [...harness, ...unauthorized]), this.options.ramify), guarded };
+    return protectedScopeOf(this.projectRoot, assignment.scope, await this.protectedFiles(run, assignment), this.options.ramify);
+  }
+
+  /** The project-relative files one assignment's engineer may never write: the run's own, and the guarded files no authorization opened. */
+  private async protectedFiles(run: Run, assignment: IterationAssignment): Promise<{ harness: string[]; unauthorized: string[] }> {
+    return { harness: await this.harnessFiles(run),
+      unauthorized: assignment.guarded.filter(file => !assignment.authorizations.some(entry => entry.path === file.path)).map(file => file.path) };
+  }
+
+  /** The project-relative files only the harness writes: the tracked feature files and the captured documents. */
+  private async harnessFiles(run: Run): Promise<string[]> {
+    const features = trackedScenarios(run.log.ledger.replay()).records.map(record => record.file);
+    const documents = (await readCapturedDocuments(run.directory, run.record.manifest)).manifest.documents.map(document => document.path);
+    return [...features, ...documents];
   }
 
   private async deniedFiles(run: Run): Promise<string[]> {
-    const features = trackedScenarios(run.log.ledger.replay()).records.map(record => record.file);
-    const documents = (await readCapturedDocuments(run.directory, run.record.manifest)).manifest.documents.map(document => document.path);
-    return deniedFiles(this.projectRoot, [...features, ...documents]);
+    return deniedFiles(this.projectRoot, await this.harnessFiles(run));
   }
 
   /** Committed audit preparation inputs, converted to paths in this project. */

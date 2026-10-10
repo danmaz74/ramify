@@ -40,12 +40,7 @@ export interface HarnessOperationInput {
   readonly restore?: boolean;
   readonly accepted?: () => { readonly value: unknown; readonly schema: string; readonly submissionHash: string };
 }
-interface Context {
-  readonly point: AgentSessionPoint;
-  readonly inherited: readonly DeliveredInput[];
-  readonly history: readonly BriefingRevision[];
-  readonly revision: string;
-}
+type Context = PointContext;
 interface Intent {
   readonly schema: 'ramify-agent.harness-operation/1' | 'ramify-agent.harness-operation/2';
   readonly runId: string;
@@ -116,6 +111,94 @@ export function readSessionPointReference(ref: string): { readonly runId: string
   } catch { return null; }
 }
 
+/** The correlation path of one key, under the session operations directory. */
+function correlationPath(directory: string, kind: string, key: unknown): string {
+  return join(directory, 'correlations', kind, `${exactInputHash(JSON.stringify(key))}.json`);
+}
+
+/** The briefing ancestry recorded at one session point, as a continued or forked start inherits it. */
+export interface PointContext {
+  readonly point: AgentSessionPoint;
+  readonly inherited: readonly DeliveredInput[];
+  readonly history: readonly BriefingRevision[];
+  readonly revision: string;
+}
+
+/**
+ * Reads the briefing ancestry recorded at one session point, beneath the
+ * session operations directory. A point with none is unavailable for reuse.
+ */
+export async function readPointContext(directory: string, runId: string, point: AgentSessionPoint): Promise<PointContext> {
+  let found: PointContext;
+  try { found = JSON.parse(await readFile(correlationPath(directory, 'points', [runId, point]), 'utf8')) as PointContext; }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new ReusableSessionUnavailableError('The named session point has no recorded briefing ancestry');
+    throw error;
+  }
+  if (JSON.stringify(found.point) !== JSON.stringify(point)) throw new Error('The recorded briefing ancestry names a different session point');
+  return found;
+}
+
+/** Reads the immutable recorded operation of one invocation, beneath the session operations directory; null where none was recorded. */
+export async function readRecordedOperation(directory: string, runId: string, operationId: string): Promise<{
+  readonly packet: TaskPacket; readonly declarations: readonly SessionToolDeclaration[]; readonly mode: SessionSpec['session']['mode']; readonly source: AgentSessionPoint | null;
+} | null> {
+  let raw: unknown;
+  try { raw = JSON.parse(await readFile(correlationPath(directory, 'operations', [runId, operationId]), 'utf8')); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
+  const intent = readHarnessOperationIntent(raw);
+  if (intent.runId !== runId || intent.operationId !== operationId) throw new Error('Invalid harness operation identity');
+  return { packet: intent.packet, declarations: intent.declarations, mode: intent.mode, source: intent.source };
+}
+
+/** Every declaration an operation's session is given: the built-ins, the harness's tools and the submission tool. */
+export function operationDeclarations(builtins: readonly SessionToolDeclaration[],
+  tools: readonly { readonly name: string; readonly description: string; readonly inputSchema: Readonly<Record<string, unknown>>; readonly mutating?: boolean | undefined }[],
+  packet: Pick<TaskPacket, 'declaration'>): SessionToolDeclaration[] {
+  return [...builtins, ...tools.map(({ name, description, inputSchema, mutating }) => ({ name, description, inputSchema, mutating: mutating ?? false })), packet.declaration];
+}
+
+/**
+ * The packet a new operation delivers: its briefing occurrence over the
+ * inherited ancestry, and the task packet built from the brief. It reads
+ * nothing, so a step renders the packet the delivery builds from the same
+ * inputs.
+ */
+export function composeOperationPacket(input: {
+  readonly runId: string;
+  readonly operationId: string;
+  readonly loaded: LoadedPackage;
+  readonly brief: HarnessTaskBrief;
+  readonly role: string;
+  readonly mode: SessionSpec['session']['mode'];
+  readonly workingDirectory: string;
+  readonly builtinDeclarations: readonly SessionToolDeclaration[];
+  readonly tools: readonly { readonly name: string }[];
+  readonly submissionName: string;
+  /** The point a continued or forked start inherits; null for a fresh one. */
+  readonly source: AgentSessionPoint | null;
+  readonly prior: PointContext | null;
+}): { readonly packet: TaskPacket; readonly current: BriefingRevision; readonly history: BriefingRevision[] } {
+  const { prior } = input;
+  const originalSections = input.brief.sections;
+  const selected = prior?.history.find(entry => entry.revision === prior.revision) ?? null;
+  // Selector forks retain known facts; other callers declare structural withdrawals.
+  const sections = [...originalSections, ...(selected?.sections ?? []).filter(section => !['goal', 'requirements'].includes(section.key) && !originalSections.some(current => current.key === section.key))
+    .map(section => input.brief.retainInheritedSections && input.role === 'context-selector' && input.mode === 'fork'
+      ? section : { key: section.key, text: '', effect: 'remove' as const })];
+  const current = createBriefingOccurrence({ previous: selected,
+    operationId: input.operationId, sections: taskBriefingRevision({ revision: 'construction', goal: input.brief.goal, requirements: input.brief.requirements, sections }).sections });
+  const history = [...(prior?.history ?? [])];
+  if (!history.some(entry => entry.revision === current.revision)) history.push(current);
+  const packet = buildTaskPacket({ loaded: input.loaded, ...input.brief,
+    environment: { ...input.brief.environment, workingDirectory: input.workingDirectory, availableTools: [...input.builtinDeclarations.map(tool => tool.name), ...input.tools.map(tool => tool.name), input.submissionName] },
+    briefing: buildBriefingDelivery({ mode: input.mode, current, inheritedRevision: prior?.revision ?? null, history }),
+    inheritedPoint: input.source ? sessionPointReference(input.runId, input.source) : null, inherited: prior?.inherited ?? [],
+    supplyRoleInstructions: !prior?.inherited.some(item => item.key === `role:${input.loaded.role}` && item.kind === 'role-instructions'),
+  });
+  return { packet, current, history };
+}
+
 /** Harness correlations are immutable; provider bytes and execution intent remain in the injected ledger store. */
 export class HarnessSessionOperations {
   private readonly pending = new Set<Promise<unknown>>();
@@ -132,7 +215,7 @@ export class HarnessSessionOperations {
     if (this.pending.size > 0 || this.unconfirmed.size > 0) return false;
     await this.store.close(); return true;
   }
-  private path(kind: string, key: unknown): string { return join(this.directory, 'correlations', kind, `${exactInputHash(JSON.stringify(key))}.json`); }
+  private path(kind: string, key: unknown): string { return correlationPath(this.directory, kind, key); }
   private async read<T>(path: string): Promise<T | null> {
     try { return JSON.parse(await readFile(path, 'utf8')) as T; }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
@@ -152,10 +235,7 @@ export class HarnessSessionOperations {
   }
 
   private async context(runId: string, point: AgentSessionPoint): Promise<Context> {
-    const found = await this.read<Context>(this.path('points', [runId, point]));
-    if (!found) throw new ReusableSessionUnavailableError('The named session point has no recorded briefing ancestry');
-    if (JSON.stringify(found.point) !== JSON.stringify(point)) throw new Error('The recorded briefing ancestry names a different session point');
-    return found;
+    return readPointContext(this.directory, runId, point);
   }
   /** The immutable original packet, task binding and tool declarations for exact retries. */
   async originalOperation(runId: string, operationId: string) {
@@ -203,31 +283,22 @@ export class HarnessSessionOperations {
       if (!retained || canonical.sections.some(section => !retained.sections.some(old => old.key === section.key && old.text === section.text)) ||
         !previous.packet.message.includes(input.brief.objective) || input.brief.sections.some(section => !retained.sections.some(old => old.key === section.key && old.text === section.text && (old.source ?? null) === (section.source ?? null)))) throw new Error('Conflicting harness session correlation');
     }
-    const originalSections = input.brief.sections;
-    const selected = prior?.history.find(entry => entry.revision === prior.revision) ?? null;
-    // Selector forks retain known facts; other callers declare structural withdrawals.
-    const sections = [...originalSections, ...(selected?.sections ?? []).filter(section => !['goal', 'requirements'].includes(section.key) && !originalSections.some(current => current.key === section.key))
-      .map(section => input.brief.retainInheritedSections && spec.role === 'context-selector' && spec.session.mode === 'fork'
-        ? section : { key: section.key, text: '', effect: 'remove' as const })];
-    const current = previous ? previous.context.history.find(entry => entry.revision === previous.context.revision)! : createBriefingOccurrence({ previous: selected,
-      operationId, sections: taskBriefingRevision({ revision: 'construction', goal: input.brief.goal, requirements: input.brief.requirements, sections }).sections });
-    const revision = current.revision;
-    const history = previous ? [...previous.context.history] : [...(prior?.history ?? [])];
-    if (!history.some(entry => entry.revision === revision)) history.push(current);
     const builtins = input.spec.builtinTools;
     const builtinDeclarations = this.agent.builtinDeclarations?.(builtins, spec.scope.workingDirectory) ?? piBuiltinDeclarations(builtins, spec.scope.workingDirectory);
-    const packet = previous ? previous.packet : buildTaskPacket({ loaded: input.loaded, ...input.brief,
-      environment: { ...input.brief.environment, workingDirectory: spec.scope.workingDirectory, availableTools: [...builtinDeclarations.map(tool => tool.name), ...spec.tools.map(tool => tool.name), spec.submission.name] },
-      briefing: buildBriefingDelivery({ mode: spec.session.mode, current, inheritedRevision: prior?.revision ?? null, history }),
-      inheritedPoint: sourceRef ? sessionPointReference(runId, sourceRef.point) : null, inherited: prior?.inherited ?? [],
-      supplyRoleInstructions: !prior?.inherited.some(item => item.key === `role:${input.loaded.role}` && item.kind === 'role-instructions'),
-    });
+    const composed = previous ? null : composeOperationPacket({ runId, operationId, loaded: input.loaded, brief: input.brief, role: spec.role,
+      mode: spec.session.mode, workingDirectory: spec.scope.workingDirectory, builtinDeclarations, tools: spec.tools, submissionName: spec.submission.name,
+      source: sourceRef?.point ?? null, prior });
+    const current = previous ? previous.context.history.find(entry => entry.revision === previous.context.revision)! : composed!.current;
+    const revision = current.revision;
+    const history = previous ? [...previous.context.history] : composed!.history;
+    if (!history.some(entry => entry.revision === revision)) history.push(current);
+    const packet = previous ? previous.packet : composed!.packet;
     if (packet.submissionTool !== spec.submission.name) throw new Error(`Task packet ${packet.submissionTool} does not bind current validator ${spec.submission.name}`);
     const policy: SessionExecutionPolicy = { context: spec.context, authority: input.authority, validator: input.validator, destination: input.destination };
     const task: SessionTaskInput = previous ? previous.task : { role: spec.role, message: packet.message, submissionTool: packet.submissionTool,
       environment: { workingDirectory: spec.scope.workingDirectory, candidate: input.brief.environment.candidate, snapshot: input.brief.environment.snapshot, limits: input.brief.environment.limits },
       policyIdentity: exactInputHash(JSON.stringify(policy)), validatorIdentity: exactInputHash(JSON.stringify(input.validator)), destinationIdentity: exactInputHash(JSON.stringify(input.destination)) };
-    const declarations = [...builtinDeclarations, ...spec.tools.map(({ name, description, inputSchema, mutating }) => ({ name, description, inputSchema, mutating: mutating ?? false })), packet.declaration];
+    const declarations = operationDeclarations(builtinDeclarations, spec.tools, packet);
     if (previous && (JSON.stringify(policy) !== JSON.stringify(previous.policy) || JSON.stringify(declarations) !== JSON.stringify(previous.declarations) || spec.role !== previous.task.role)) throw new Error('Restored authority, validator, destination or declarations differ from original operation');
     const intent: Intent = previous ? previous : { schema: 'ramify-agent.harness-operation/2', runId, operationId, session: input.session, source: sourceRef?.point ?? null,
       requestHash: exactInputHash(JSON.stringify(input.brief)), mode: spec.session.mode, packet, context: { inherited: [...(prior?.inherited ?? []), ...packet.additions], history, revision }, policy, task, declarations };

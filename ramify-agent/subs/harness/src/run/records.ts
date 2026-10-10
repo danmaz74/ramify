@@ -966,6 +966,8 @@ export const runLayout = {
   outcome: (id: InvocationId): string => join('invocations', id, 'outcome.json'),
   observations: (id: InvocationId): string => join('invocations', id, 'observations.jsonl'),
   lineEvents: (id: InvocationId): string => join('invocations', id, 'lines.json'),
+  /** The step inputs the invocation was built from, written before its session starts. */
+  stepInputs: (id: InvocationId): string => join('invocations', id, 'inputs.json'),
   /** The executor's own session record, such as pi's, which only it reads. */
   /** The complete output of one `shell` call, which the tool answers only the tail of. */
   shellOutput: (id: InvocationId, call: number): string => join('invocations', id, 'shell', `${String(call).padStart(3, '0')}.log`),

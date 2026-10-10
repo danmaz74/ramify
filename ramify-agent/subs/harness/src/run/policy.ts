@@ -129,6 +129,24 @@ export const defaultContextPolicies: Record<Role, NonNullable<RunPolicy['context
  * role existed never invokes it, so a missing entry is a defect, not a
  * default to fall back to.
  */
+/**
+ * The limits one invocation runs under: the policy's, with an engineer's own
+ * bounds in place of its command, idle and absolute bounds, or a reader's
+ * tighter absolute bound.
+ */
+export function invocationLimits(limits: RunPolicy['limits'], own: {
+  readonly bounds?: { readonly idleMs: number; readonly absoluteMs: number; readonly commandTimeoutMs?: number | undefined } | undefined;
+  readonly absoluteMs?: number | undefined;
+}): RunPolicy['limits'] {
+  return {
+    ...limits,
+    commandTimeoutMs: own.bounds?.commandTimeoutMs ?? limits.commandTimeoutMs,
+    invocationIdleMs: own.bounds?.idleMs ?? limits.invocationIdleMs,
+    invocationAbsoluteMs: own.bounds?.absoluteMs
+      ?? (own.absoluteMs === undefined ? limits.invocationAbsoluteMs : Math.min(limits.invocationAbsoluteMs, own.absoluteMs)),
+  };
+}
+
 export function contextPolicyOf(policy: RunPolicy, role: Role): NonNullable<RunPolicy['context'][Role]> {
   const context = policy.context[role];
   if (context === undefined) throw new Error(`The run's policy (${policy.version}) has no context policy for the ${role}`);

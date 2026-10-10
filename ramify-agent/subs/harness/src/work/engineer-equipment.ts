@@ -27,6 +27,9 @@ import { createShellTool, shellInputSchemaFor, shellMaxTimeoutMs, shellToolName,
  * tools, guarded the same way and recorded in the same observations.
  */
 
+/** The implementation's own built-ins an engineer is given: reading, and the guarded `edit` and `write`. */
+export const engineerBuiltinTools = ['read', 'grep', 'ls', 'edit', 'write'] as const satisfies readonly (BuiltinTool | WriteTool)[];
+
 /** What an invocation's equipment is built from. */
 export interface EquipContext {
   readonly invocation: string;
@@ -302,7 +305,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     });
 
     return {
-      builtinTools: ['read', 'grep', 'ls', 'edit', 'write'],
+      builtinTools: [...engineerBuiltinTools],
       settle: async () => {
         stopping = true;
         // Refuse queued guards before awaiting drainage; active guards keep their lease.

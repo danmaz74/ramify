@@ -25,7 +25,9 @@ const p = 'capability-coordination';
 
 export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 'restart' | 'verify-restart' |
   'gate-restart' | 'gate-intent-restart' | 'gate-committing-restart' |
-  'review-restart' | 'review-submission-restart' | 'concern-submission-restart' | 'repair-exhaustion', cleanups: Array<() => Promise<void>>, realBoundary = false): Promise<void> {
+  'review-restart' | 'review-submission-restart' | 'concern-submission-restart' | 'repair-exhaustion', cleanups: Array<() => Promise<void>>, realBoundary = false,
+  /** Inspects the settled run of the full revision flow. */
+  inspect?: (run: { readonly root: string; readonly planId: string; readonly runId: string }) => Promise<void>): Promise<void> {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
   if (realBoundary) {
     await mkdir(join(fixture.root, 'subs/a/src/tests/steps'), { recursive: true });
@@ -651,6 +653,7 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
     event.data.task === 'cap-001')).toHaveLength(1);
   await stopStable(opened.service, receipt.jobId);
   await opened.service.settled('need', receipt.jobId);
+  await inspect?.({ root: fixture.root, planId: 'need', runId: receipt.jobId });
 }
 
 async function stopStable(service: Awaited<ReturnType<typeof openCapabilityRuns>>['service'], jobId: string): Promise<void> {

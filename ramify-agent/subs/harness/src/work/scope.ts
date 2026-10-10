@@ -580,6 +580,19 @@ export async function deniedFiles(projectRoot: string, protectedFiles: readonly 
   return denied;
 }
 
+/**
+ * The guarded scope of one engineer: its write scope, with the files the
+ * harness protects refused outright. `harness` names the run's own files,
+ * `unauthorized` the guarded files no authorization opened; the latter are
+ * marked, so a refusal says that an architect's authorization would open them.
+ */
+export async function protectedScopeOf(projectRoot: string, scope: WriteScope,
+  protectedFiles: { readonly harness: readonly string[]; readonly unauthorized: readonly string[] }, ramify: RamifyCli): Promise<GuardedScope> {
+  const harness = await deniedFiles(projectRoot, protectedFiles.harness);
+  const guarded = (await deniedFiles(projectRoot, protectedFiles.unauthorized)).filter(path => !harness.includes(path));
+  return { ...guardedScopeOf(scope, await deniedFiles(projectRoot, [...harness, ...protectedFiles.unauthorized]), ramify), guarded };
+}
+
 /** The project-relative paths of the scope, for a prompt and for a reader. */
 export function scopePaths(projectRoot: string, scope: WriteScope): { readonly roots: string[]; readonly files: string[] } {
   const shorten = (path: string) => toPosix(relative(projectRoot, path)) || '.';

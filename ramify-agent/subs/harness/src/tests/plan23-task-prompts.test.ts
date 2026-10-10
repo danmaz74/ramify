@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +11,8 @@ import { buildDeliveredManifest, exactInputHash } from '../prompts/delivered-man
 import { workOrientationMessage } from '../context-selection/prompts.js';
 import { repairPrompt } from '../nonfunctional/prompts.js';
 import { qualificationActionSchema } from '../capability/submission.js';
+import { engineerDeliveries } from './helpers/step-equality.js';
+import { repairContinuationRun } from './helpers/repair-run.js';
 
 // Independently named expectations. No renderer/schema selection generates this table.
 const expected: readonly [Role, TaskKind, string, boolean][] = [
@@ -386,4 +388,25 @@ describe('P04: manifests reflect supplied/inherited instructions and truthful re
     expect(() => buildTaskPacket({ ...input(loaded, 'code'), environment: { ...environment(), snapshot: null } })).toThrow('snapshot');
     expect(() => buildTaskPacket({ ...input(loaded, 'code'), changedPaths: [{ path: 'a' }, { path: 'a' }] })).toThrow('unique');
   });
+});
+
+describe('S01: every engineer invocation of a run is the engineer step its recorded inputs construct', () => {
+  const cleanups: Array<() => Promise<void>> = [];
+  afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+
+  test('fresh and repair-continuation deliveries equal the constructor\'s render of the inputs the run passed', async () => {
+    const run = await repairContinuationRun(cleanups);
+    const deliveries = await engineerDeliveries(run.root, run.planId, run.runId);
+    expect(deliveries.map(item => item.inputs.start.kind)).toEqual(['fresh', 'repair-continuation']);
+    for (const item of deliveries) {
+      expect(item.rendered.fallback).toBeNull();
+      expect(item.rendered.rendered).toBe(item.delivered.mode === 'continue' ? 'continuation' : 'fresh');
+      expect(item.rendered.packet).toEqual(item.delivered.packet);
+      expect(item.rendered.declarations).toEqual(item.delivered.declarations);
+    }
+    // The continuation delivered additions to the session it continued, not the role's instructions again.
+    const repair = deliveries[1]!;
+    expect(repair.delivered.packet.additions.some(item => item.kind === 'role-instructions')).toBe(false);
+    expect(repair.inputs.failedGate?.id).toBe('ga-0002');
+  }, 300_000);
 });
