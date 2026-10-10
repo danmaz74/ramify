@@ -6,7 +6,7 @@ import { runDirectory } from '../run/records.js';
 import type { HarnessTaskBrief } from '../run/session-operations.js';
 import type { KnownProjectFacts } from '../run/task-brief.js';
 import type { StepEnvironment } from './engineer.js';
-import type { KnownFactsInputs, ProjectPath, RunPath, StepInputs } from './inputs.js';
+import { projectPath, type KnownFactsInputs, type ProjectPath, type RunPath, type StepInputs } from './inputs.js';
 
 /*
  * What every constructed step has in common, which `step render` and the
@@ -61,7 +61,7 @@ export interface ConstructedStepCommon {
 export const projectLocation = (environment: StepEnvironment, field: ProjectPath): string => join(environment.projectRoot, field.project);
 
 /** The resolved location of a run-relative path field. */
-export function runLocation(environment: StepEnvironment, run: StepInputs['run'], field: RunPath): string {
+export function runLocation(environment: StepEnvironment, run: NonNullable<StepInputs['run']>, field: RunPath): string {
   return join(runDirectory(environment.projectRoot, run.planId, run.runId), field.run);
 }
 
@@ -74,6 +74,17 @@ export function knownFacts(known: KnownFactsInputs): KnownProjectFacts {
     testAreas: known.testAreas.map(area => ({ module: area.module, area: relative(area.area) })),
     scenarioFeatures: known.scenarioFeatures.map(relative),
     stepDirectories: known.stepDirectories.map(entry => ({ directory: relative(entry.directory), files: entry.files.map(relative) })),
+  };
+}
+
+/** The captured form of a brief's project facts, every path project-relative. */
+export function knownFactsInputs(known: KnownProjectFacts): KnownFactsInputs {
+  return {
+    declaredChecks: { checks: JSON.parse(JSON.stringify(known.declaredChecks.checks)) as KnownFactsInputs['declaredChecks']['checks'], paths: known.declaredChecks.paths.map(projectPath) },
+    modules: known.modules.map(module => ({ module: module.module, directory: projectPath(module.directory), apiPaths: module.apiPaths.map(projectPath) })),
+    testAreas: known.testAreas.map(area => ({ module: area.module, area: projectPath(area.area) })),
+    scenarioFeatures: known.scenarioFeatures.map(projectPath),
+    stepDirectories: known.stepDirectories.map(entry => ({ directory: projectPath(entry.directory), files: entry.files.map(projectPath) })),
   };
 }
 

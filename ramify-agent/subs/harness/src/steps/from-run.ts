@@ -118,6 +118,7 @@ export async function inputsFromRun(options: InputsFromRunOptions): Promise<Inpu
     if (error instanceof StepInputsError) return refused(`incomplete task records: ${runLayout.stepInputs(options.invocation)} is not valid step inputs: ${error.errors.join('; ')}`);
     return refused(`${runLayout.stepInputs(options.invocation)} cannot be read: ${message(error)}`);
   }
+  if (recorded.run === null) return refused('the recorded step inputs name no run, so they were not recorded by one');
   if (recorded.run.planId !== location.planId || recorded.run.runId !== location.runId) return refused(`the recorded step inputs name run ${recorded.run.planId}/${recorded.run.runId}, not ${location.planId}/${location.runId}`);
   const { start, provenance: _earlier, ...fields } = recorded;
   // A work turn keeps why it continued its session, which its task kind follows.
@@ -148,6 +149,7 @@ export async function inputsFromRun(options: InputsFromRunOptions): Promise<Inpu
 /** Renders the recorded start with the current harness and compares it, section by section, with the recorded delivery. */
 async function compareDelivery(projectRoot: string, recorded: StepInputs, options: InputsFromRunOptions, packageHash: string): Promise<DeliveryComparison> {
   const sessionOperations = join(projectRoot, 'plans', '.harness', 'session-operations');
+  if (recorded.run === null) return { status: 'not-compared', reason: 'the inputs name no run, so no delivery of one is recorded' };
   const delivered = await readRecordedOperation(sessionOperations, recorded.run.runId, options.invocation);
   if (delivered === null) return { status: 'not-compared', reason: `no delivery is recorded for invocation ${options.invocation}` };
   let rendered: RenderedStep;

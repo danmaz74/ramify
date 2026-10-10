@@ -20,8 +20,12 @@ export function assignedModuleDirectory(scope: WriteScope, index: ArchitectIndex
 }
 
 /** The first recorded base module is where an ordinary engineer starts. */
-export async function engineerWorkingDirectory(projectRoot: string, scope: WriteScope, index: ArchitectIndex | null,
-  git: GitService = gitService): Promise<string> {
+/**
+ * The source directory an assignment's engineer works in, checked against
+ * its captured write authority, and whether it exists yet: only a
+ * bootstrapped module's may not. Nothing is created.
+ */
+export async function assignedSourceDirectory(projectRoot: string, scope: WriteScope, index: ArchitectIndex | null): Promise<{ readonly path: string; readonly exists: boolean }> {
   const module = 'module' in scope.base ? scope.base.module : scope.base.modules[0]!;
   const directory = assignedModuleDirectory(scope, index);
   const bootstrap = scope.bootstrap.find(entry => entry.directory === directory);
@@ -37,11 +41,21 @@ export async function engineerWorkingDirectory(projectRoot: string, scope: Write
   const exists = await stat(src).catch(() => null);
   if (exists === null) {
     if (bootstrap?.directory !== directory) throw new Error(`The assigned base module ${module} has no src directory at ${src}`);
-    await mkdir(src, { recursive: true });
-  } else if (!exists.isDirectory()) {
-    throw new Error(`The assigned base module ${module} has no src directory at ${src}`);
+    return { path: src, exists: false };
   }
+  if (!exists.isDirectory()) throw new Error(`The assigned base module ${module} has no src directory at ${src}`);
   const canonical = await realpath(src);
+  if (!scope.resolved.roots.some(root => root === canonical || isContained(root, canonical))) {
+    throw new Error(`The source directory ${canonical} is outside the assigned write scope`);
+  }
+  return { path: canonical, exists: true };
+}
+
+export async function engineerWorkingDirectory(projectRoot: string, scope: WriteScope, index: ArchitectIndex | null,
+  git: GitService = gitService): Promise<string> {
+  const source = await assignedSourceDirectory(projectRoot, scope, index);
+  if (!source.exists) await mkdir(source.path, { recursive: true });
+  const canonical = await realpath(source.path);
   if (!scope.resolved.roots.some(root => root === canonical || isContained(root, canonical))) {
     throw new Error(`The source directory ${canonical} is outside the assigned write scope`);
   }

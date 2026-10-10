@@ -110,8 +110,18 @@ export const knownFactsSchema = z.object({
 }).strict();
 
 /** Where an imported step came from: the source invocation and the start it originally had. */
-const provenanceSchema = z.object({
-  run: z.object({ planId: text, runId: text }).strict(),
+/** The run whose records an invocation's inputs belong to. */
+const runIdentitySchema = z.object({ planId: text, runId: text }).strict();
+
+/**
+ * The run identity of inputs that may be authored without a run: null until
+ * the manual run that executes them supplies its own.
+ */
+const optionalRunSchema = runIdentitySchema.nullable();
+
+/** Inputs imported from one invocation of a run, with what an author replaced. */
+const runProvenanceSchema = z.object({
+  run: runIdentitySchema,
   invocation: text,
   record: runPathSchema,
   originalStart: z.enum(['fresh', 'repair-continuation', 'resumed-after-handback', 'continued', 'fork']),
@@ -121,11 +131,29 @@ const provenanceSchema = z.object({
   authored: z.array(z.enum(['work-item', 'outline', 'selection', 'assignment', 'review-request'])).optional(),
 }).strict();
 
+/**
+ * Inputs authored without a run: the work item, the outline revisions and
+ * the assignment an author supplied, each judged as the local architect's
+ * output. The assignment is the inputs' own; the work item and the outlines
+ * are carried here, so the manual run that executes the inputs records all
+ * three before its invocation starts.
+ */
+const authoredProvenanceSchema = z.object({
+  origin: z.literal('authored'),
+  authored: z.array(z.enum(['work-item', 'outline', 'assignment'])).min(1),
+  workItem: workItemSchema,
+  outlines: z.array(workItemOutlineSchema),
+}).strict();
+
+const provenanceSchema = z.union([runProvenanceSchema, authoredProvenanceSchema]);
+export type StepProvenance = z.infer<typeof provenanceSchema>;
+export type RunProvenance = z.infer<typeof runProvenanceSchema>;
+
 /** The fields every engineer start shares: the fresh inputs. */
 const engineerFields = {
   schema: z.literal(stepInputsSchemaId),
   role: z.literal('engineer'),
-  run: z.object({ planId: text, runId: text }).strict(),
+  run: optionalRunSchema,
   work: z.object({ workItem: text, iteration: text }).strict(),
   /** The count of engineer invocations of this iteration, this one included. */
   attempt: z.int().positive(),
@@ -200,7 +228,7 @@ const sectionSchema = z.object({ key: text, text: z.string() }).strict();
 /** The fields every role's inputs share besides its own. */
 const commonFields = {
   schema: z.literal(stepInputsSchemaId),
-  run: z.object({ planId: text, runId: text }).strict(),
+  run: runIdentitySchema,
   attempt: z.int().positive(),
   /** Whether the run coordinates capability needs, which selects its prompt packages and submission schemas. */
   capabilityWorkflow: z.boolean(),
@@ -288,6 +316,8 @@ const selectorForkSchema = z.object({ ...selectorFields,
 
 const workTurnFields = {
   ...commonFields,
+  /** A work turn's inputs are built without a run when an authored assignment is judged. */
+  run: optionalRunSchema,
   role: z.literal('local-architect'),
   phase: z.literal('work-turn'),
   work: z.object({ workItem: text }).strict(),
@@ -467,6 +497,26 @@ export function validateStepInputs(value: unknown): StepInputs {
   if (canonical(JSON.parse(bytes) as unknown) !== canonical(parsed.data)) throw new StepInputsError(['(root): the inputs do not survive JSON unchanged']);
   return parsed.data as StepInputs;
 }
+
+/** Validates inputs that must be one role's and variant's, refusing any other. */
+function validateAs<R extends StepInputs>(value: unknown, matches: (inputs: StepInputs) => inputs is R, what: string): R {
+  const inputs = validateStepInputs(value);
+  if (!matches(inputs)) throw new StepInputsError([`(root): these are not ${what} inputs`]);
+  return inputs;
+}
+
+export const validateEngineerInputs = (value: unknown): EngineerStepInputs =>
+  validateAs(value, (inputs): inputs is EngineerStepInputs => inputs.role === 'engineer', 'engineer');
+export const validateWorkTurnInputs = (value: unknown): WorkTurnStepInputs =>
+  validateAs(value, (inputs): inputs is WorkTurnStepInputs => inputs.role === 'local-architect' && inputs.phase === 'work-turn', 'local architect work-turn');
+export const validateSelectorInputs = (value: unknown): SelectorStepInputs =>
+  validateAs(value, (inputs): inputs is SelectorStepInputs => inputs.role === 'context-selector', 'context selector');
+export const validateReviewInputs = (value: unknown): ReviewStepInputs =>
+  validateAs(value, (inputs): inputs is ReviewStepInputs => inputs.role === 'reviewer' && inputs.question !== 'design-orientation', 'review');
+export const validateDesignOrientationInputs = (value: unknown): DesignOrientationStepInputs =>
+  validateAs(value, (inputs): inputs is DesignOrientationStepInputs => inputs.role === 'reviewer' && inputs.question === 'design-orientation', 'design orientation');
+export const validateOrientationInputs = (value: unknown): OrientationStepInputs =>
+  validateAs(value, (inputs): inputs is OrientationStepInputs => inputs.role === 'local-architect' && inputs.phase === 'orientation', 'local architect orientation');
 
 /** The bytes step inputs are written as. */
 export function serializeStepInputs(inputs: StepInputs): string {

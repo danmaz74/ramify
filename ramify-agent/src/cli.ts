@@ -37,7 +37,7 @@ export type CommandLine =
       readonly command: 'step';
       readonly step:
         | { readonly command: 'inputs'; readonly role: string; readonly fromRun: string | undefined; readonly invocation: string | undefined; readonly out: string | undefined;
-            readonly authored: AuthoredFiles }
+            readonly projectRoot: string | undefined; readonly authored: AuthoredFiles }
         | { readonly command: 'render'; readonly inputs: string; readonly projectRoot: string; readonly invocation: string | undefined };
     }
   | { readonly command: 'help' };
@@ -61,6 +61,9 @@ export const usage = [
   '                       [--work-item <file>] [--outline <file>] [--assignment <file>] [--selection <file>] [--review-request <file>] [--out <file>]',
   '                       Imports one invocation\'s recorded inputs as a fresh start; compares the delivery as a diagnostic.',
   '                       Authored files replace parts of them, each judged as its producing role\'s output with the run\'s context.',
+  '  ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--out <file>]',
+  '                       Authors engineer inputs with no run: the assignment is judged as the local architect\'s first work turn',
+  '                       of the work item against the project and its materialized architect view, which is never materialized.',
   '  ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]',
   '                       Prints what the step\'s session receives. Takes no lock and writes nothing.',
 ].join('\n');
@@ -166,6 +169,7 @@ function parseStep(rest: readonly string[]): CommandLine {
     let fromRun: string | undefined;
     let invocation: string | undefined;
     let out: string | undefined;
+    let projectRoot: string | undefined;
     const authored: { -readonly [K in keyof AuthoredFiles]: AuthoredFiles[K] } = {};
     const files = { '--work-item': 'workItem', '--outline': 'outline', '--assignment': 'assignment', '--selection': 'selection', '--review-request': 'reviewRequest' } as const;
     options(flags, (flag, value, _inline, argument) => {
@@ -173,14 +177,17 @@ function parseStep(rest: readonly string[]): CommandLine {
       else if (flag === '--from-run') fromRun = value();
       else if (flag === '--invocation') invocation = value();
       else if (flag === '--out') out = value();
+      else if (flag === '--project') projectRoot = value();
       else if (flag in files) authored[files[flag as keyof typeof files]] = value();
       else throw new UsageError(`Unknown option "${argument}"`);
     });
     if (role === undefined) throw new UsageError('step inputs needs --role <role>');
-    // Authored files without a run are refused by the command, with the context they lack.
-    if (fromRun === undefined && Object.keys(authored).length === 0) throw new UsageError('step inputs needs --from-run <run dir>');
+    // Authored files without a run are judged against the project by the
+    // command, which refuses those that need a run's context with what they lack.
+    if (fromRun === undefined && Object.keys(authored).length === 0) throw new UsageError('step inputs needs --from-run <run dir>, or --project <root> with authored files');
     if (fromRun !== undefined && invocation === undefined) throw new UsageError('step inputs --from-run needs --invocation <id>');
-    return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out, authored } };
+    if (fromRun !== undefined && projectRoot !== undefined) throw new UsageError('step inputs takes its project from the run named by --from-run; --project is for inputs authored without one');
+    return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out, projectRoot, authored } };
   }
   if (subcommand === 'render') {
     let inputs: string | undefined;

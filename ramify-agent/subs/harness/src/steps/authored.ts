@@ -55,20 +55,28 @@ const replaces = {
   reviewRequest: 'a code, scope or design review',
 } as const;
 
-/** The context each authored file is judged with, which only a run records. */
-const contextOf = {
-  workItem: 'the work item\'s recorded briefing, which the authored work item replaces',
-  outline: 'the work item\'s recorded briefing and outlines',
-  assignment: 'the producing work turn\'s registry, hypotheses, decisions, open requirements, obligations, guarded paths, view and scope revision, and the engineer inputs the assignment is given with',
-  selection: 'the element catalog, plan deviations and work-item elements of the work item\'s recorded selection',
-  reviewRequest: 'the audited candidate\'s captured briefing that the request is asked of',
+/** The context the files that need a run are judged with, which only a run records. */
+const runContextOf = {
+  selection: 'the element catalog, plan deviations and work-item elements of a recorded selection, which only a run records',
+  reviewRequest: 'the audited candidate\'s captured briefing that the request is asked of, which only a run records',
 } as const;
 
-/** The refusal of authored files given without a recorded invocation whose context judges them. */
-export function missingContext(files: AuthoredFiles): string {
-  const named = (Object.keys(authoredOptions) as (keyof AuthoredFiles)[]).filter(key => files[key] !== undefined);
-  return `authored inputs are judged as their producing role's output, with the context a run records for that role; name the run and an invocation with --from-run and --invocation. Missing: ${
-    named.map(key => `${authoredOptions[key]} needs ${contextOf[key]}`).join('; ')}`;
+/**
+ * The refusal of a `step inputs` command that names no recorded invocation
+ * and is not the authoring of engineer inputs from the project: an engineer
+ * role, a project, a work item and an assignment.
+ */
+export function missingContext(role: string, files: AuthoredFiles, projectRoot: string | undefined): string {
+  const named = (Object.keys(runContextOf) as (keyof typeof runContextOf)[]).filter(key => files[key] !== undefined);
+  const without = 'without --from-run and --invocation, only engineer inputs are authored: --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file>';
+  const missing = [
+    ...(role === 'engineer' ? [] : [`the role is ${role}`]),
+    ...(projectRoot === undefined ? ['--project names no project'] : []),
+    ...named.map(key => `${authoredOptions[key]} needs ${runContextOf[key]}`),
+    ...(files.workItem === undefined ? ['--work-item is absent'] : []),
+    ...(files.assignment === undefined ? ['--assignment is absent'] : []),
+  ];
+  return `${without}. Missing: ${missing.join('; ')}`;
 }
 
 const refused = (reason: string): AuthoredResult => ({ status: 'refused', reason });

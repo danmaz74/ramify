@@ -15,8 +15,15 @@ import {
 import { engineerBuiltinTools } from '../work/engineer-equipment.js';
 import { focusedScenarioFacts } from '../work/session.js';
 import type { StartingPointGroup } from '../work/starting-inputs.js';
-import { knownFacts } from './constructed.js';
-import { validateStepInputs, type EngineerStepInputs, type ProjectPath } from './inputs.js';
+import { knownFacts, knownFactsInputs } from './constructed.js';
+import { projectPath, validateEngineerInputs, validateStepInputs, type EngineerStepInputs, type ProjectPath } from './inputs.js';
+import type { EngineerBounds } from '../run/policy.js';
+import type { TestArea } from '../run/project-config.js';
+import type { AssignedObligation } from '../work/engineer.js';
+import type { IterationAssignment } from '../work/iterations.js';
+import type { WorkItem } from '../work/records.js';
+import type { EngineerScenarios } from '../work/scenario-briefing.js';
+import type { prepareAssignedCucumber } from '../work/session.js';
 
 /*
  * The engineer step: one engineer invocation of an iteration, built from its
@@ -201,4 +208,77 @@ export function constructEngineerStep(value: unknown, environment: StepEnvironme
     },
     before: { inputs },
   };
+}
+
+/**
+ * What one engineer invocation's inputs are collected from: the run's
+ * records and the project as they stand, or, for inputs authored without a
+ * run, the project and the authored records alone.
+ */
+export interface EngineerInputFacts {
+  readonly run: EngineerStepInputs['run'];
+  readonly item: WorkItem;
+  readonly assignment: IterationAssignment;
+  readonly attempt: number;
+  readonly base: string;
+  readonly beforeTree: string | undefined;
+  readonly capabilityWorkflow: boolean;
+  readonly capabilityPolicy: boolean;
+  readonly workingDirectory: ProjectPath;
+  readonly views: readonly IterationApiViews[];
+  readonly testAreas: readonly TestArea[];
+  readonly scenarios: EngineerScenarios | undefined;
+  readonly obligations: readonly AssignedObligation[];
+  readonly assignmentPackage: string | undefined;
+  readonly featurePaths: readonly string[];
+  readonly focused: Awaited<ReturnType<typeof prepareAssignedCucumber>>;
+  readonly failedGate: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
+  readonly handoff: { readonly done: readonly string[]; readonly unfinished: readonly string[]; readonly returns: number } | undefined;
+  readonly guidance: string | undefined;
+  readonly startingPoints: StartingPointGroup | null;
+  readonly known: KnownProjectFacts;
+  readonly protectedFiles: { readonly harness: readonly string[]; readonly unauthorized: readonly string[] };
+  readonly bounds: EngineerBounds;
+  readonly limits: RunPolicy['limits'];
+  readonly context: RunPolicy['context']['engineer'];
+  readonly start: EngineerStepInputs['start'];
+  readonly provenance?: EngineerStepInputs['provenance'] | undefined;
+}
+
+/** One engineer invocation's inputs from its collected facts, every path project-relative, validated. */
+export function engineerStepInputsOf(facts: EngineerInputFacts): EngineerStepInputs {
+  // Captured JSON facts, without the undefined members JSON never carries.
+  const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+  return validateEngineerInputs({
+    schema: 'ramify-agent.step-inputs/1',
+    role: 'engineer',
+    run: facts.run,
+    work: { workItem: facts.item.id, iteration: facts.assignment.id },
+    attempt: facts.attempt,
+    consumer: facts.item.module,
+    assignment: facts.assignment,
+    base: facts.base,
+    ...(facts.beforeTree === undefined ? {} : { candidateBefore: facts.beforeTree }),
+    capabilityWorkflow: facts.capabilityWorkflow,
+    capabilityPolicy: facts.capabilityPolicy,
+    workingDirectory: facts.workingDirectory,
+    views: facts.views.map(entry => ({ module: entry.module, unavailable: entry.unavailable,
+      views: entry.views.map(view => ({ area: view.area, path: projectPath(view.path), revision: view.revision, coverage: view.coverage })) })),
+    testAreas: facts.testAreas.map(area => ({ module: area.module, area: projectPath(area.area) })),
+    ...(facts.scenarios === undefined ? {} : { scenarios: plain(facts.scenarios) }),
+    obligations: facts.obligations.map(obligation => ({ id: obligation.id, text: obligation.text })),
+    ...(facts.assignmentPackage === undefined ? {} : { assignmentPackage: facts.assignmentPackage }),
+    focused: { featurePaths: facts.featurePaths.map(projectPath), command: plain(facts.focused.command), sourceFiles: { ...facts.focused.sourceFiles } },
+    ...(facts.failedGate === undefined ? {} : { failedGate: { id: facts.failedGate.id, cause: facts.failedGate.cause, summary: [...facts.failedGate.summary] } }),
+    ...(facts.handoff === undefined ? {} : { handoff: { done: [...facts.handoff.done], unfinished: [...facts.handoff.unfinished], returns: facts.handoff.returns } }),
+    ...(facts.guidance === undefined ? {} : { guidance: facts.guidance }),
+    startingPoints: facts.startingPoints === null ? null : plain(facts.startingPoints),
+    known: knownFactsInputs(facts.known),
+    protectedFiles: { harness: facts.protectedFiles.harness.map(projectPath), unauthorized: facts.protectedFiles.unauthorized.map(projectPath) },
+    bounds: { idleMs: facts.bounds.idleMs, absoluteMs: facts.bounds.absoluteMs, commandTimeoutMs: facts.bounds.commandTimeoutMs },
+    limits: facts.limits,
+    context: facts.context,
+    start: facts.start,
+    ...(facts.provenance === undefined ? {} : { provenance: facts.provenance }),
+  });
 }

@@ -77,21 +77,21 @@ describe('session', () => {
 describe('step', () => {
   test('inputs imports one invocation of a run by role', () => {
     expect(parseCommandLine(['step', 'inputs', '--role', 'engineer', '--from-run', 'plans/p/.harness/jobs/r', '--invocation', 'inv-0007', '--out', 'inputs.json'])).toEqual({
-      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: 'plans/p/.harness/jobs/r', invocation: 'inv-0007', out: 'inputs.json', authored: {} },
+      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: 'plans/p/.harness/jobs/r', invocation: 'inv-0007', out: 'inputs.json', projectRoot: undefined, authored: {} },
     });
     expect(parseCommandLine(['step', 'inputs', '--role=engineer', '--from-run=run', '--invocation=inv-0001'])).toEqual({
-      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: 'run', invocation: 'inv-0001', out: undefined, authored: {} },
+      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: 'run', invocation: 'inv-0001', out: undefined, projectRoot: undefined, authored: {} },
     });
   });
 
-  test('inputs takes authored files, which the command refuses without a run', () => {
+  test('inputs takes authored files, from a run or against a project', () => {
     expect(parseCommandLine(['step', 'inputs', '--role', 'engineer', '--from-run', 'r', '--invocation', 'inv-0003', '--assignment', 'a.json', '--work-item=w.json',
       '--outline', 'o.json', '--selection', 's.json', '--review-request', 'q.json'])).toEqual({
-      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: 'r', invocation: 'inv-0003', out: undefined,
+      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: 'r', invocation: 'inv-0003', out: undefined, projectRoot: undefined,
         authored: { assignment: 'a.json', workItem: 'w.json', outline: 'o.json', selection: 's.json', reviewRequest: 'q.json' } },
     });
-    expect(parseCommandLine(['step', 'inputs', '--role', 'engineer', '--work-item', 'wi.json', '--assignment', 'assignment.json'])).toEqual({
-      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: undefined, invocation: undefined, out: undefined,
+    expect(parseCommandLine(['step', 'inputs', '--role', 'engineer', '--project', '/p', '--work-item', 'wi.json', '--assignment', 'assignment.json'])).toEqual({
+      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: undefined, invocation: undefined, out: undefined, projectRoot: '/p',
         authored: { workItem: 'wi.json', assignment: 'assignment.json' } },
     });
   });
@@ -112,6 +112,7 @@ describe('step', () => {
       [['step', 'inputs', '--from-run', 'r', '--invocation', 'i'], /needs --role/],
       [['step', 'inputs', '--role', 'engineer', '--invocation', 'i'], /needs --from-run/],
       [['step', 'inputs', '--role', 'engineer', '--from-run', 'r'], /needs --invocation/],
+      [['step', 'inputs', '--role', 'engineer', '--from-run', 'r', '--invocation', 'i', '--project', '/p'], /takes its project from the run/],
       [['step', 'inputs', '--role', 'engineer', '--from-run', 'r', '--invocation', 'i', '--agent', 'pi'], /Unknown option "--agent"/],
       [['step', 'render'], /needs --inputs/],
       [['step', 'render', '--inputs'], /--inputs needs a value/],
@@ -123,6 +124,7 @@ describe('step', () => {
   test('usage names both step commands', () => {
     expect(usage).toContain('ramify-agent step inputs --role <engineer|local-architect|context-selector|reviewer> --from-run <run dir> --invocation <id>');
     expect(usage).toContain('[--work-item <file>] [--outline <file>] [--assignment <file>] [--selection <file>] [--review-request <file>] [--out <file>]');
+    expect(usage).toContain('ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--out <file>]');
     expect(usage).toContain('ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]');
   });
 });

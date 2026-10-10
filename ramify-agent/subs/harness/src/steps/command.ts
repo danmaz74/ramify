@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-operations.js';
 import { loadPromptPackages } from '../prompts/packages.js';
 import { missingContext } from './authored.js';
+import { authorEngineerInputs, installedAuthoringPorts, type AuthoringPorts } from './authoring.js';
 import { constructStep } from './construct.js';
 import { comparisonText, inputsFromRun } from './from-run.js';
 import { parseStepInputs, serializeStepInputs, StepInputsError } from './inputs.js';
@@ -10,7 +11,8 @@ import { renderedText, renderStep } from './render.js';
 
 /*
  * The `step` command's entry. `inputs` imports one invocation's inputs from a
- * run; `render` prints what a step's session would receive. Neither starts a
+ * run, or authors an engineer's from a work item and an assignment judged
+ * against the project with no run; `render` prints what a step's session would receive. Neither starts a
  * model or takes the project lock, and `render` writes nothing. The root
  * receives only the options it parses and the text it prints.
  */
@@ -22,6 +24,8 @@ export type StepCommandOptions =
       readonly role: string;
       /** The run whose records the inputs, and the context authored files are judged with, come from. */
       readonly fromRun: string | undefined;
+      /** The project engineer inputs are authored against when no run is named. */
+      readonly projectRoot?: string | undefined;
       readonly invocation: string | undefined;
       /** Where the imported inputs are written; absent, they are printed. */
       readonly out?: string | undefined;
@@ -55,30 +59,59 @@ export const defaultRenderInvocation = 'step-render';
 
 /** Runs one `step` command. */
 export async function runStepCommand(options: StepCommandOptions): Promise<StepCommandResult> {
-  return options.command === 'inputs' ? importInputs(options) : render(options);
+  return runStepCommandWith(options);
 }
 
-async function importInputs(options: Extract<StepCommandOptions, { command: 'inputs' }>): Promise<StepCommandResult> {
+/** Runs one `step` command, authoring through the given ports; the installed ones where absent. */
+export async function runStepCommandWith(options: StepCommandOptions, authoringPorts?: AuthoringPorts): Promise<StepCommandResult> {
+  return options.command === 'inputs' ? importInputs(options, authoringPorts) : render(options);
+}
+
+async function importInputs(options: Extract<StepCommandOptions, { command: 'inputs' }>, authoringPorts: AuthoringPorts | undefined): Promise<StepCommandResult> {
   const authored = options.authored ?? {};
   if (options.fromRun === undefined || options.invocation === undefined) {
-    return { exitStatus: 2, stdout: '', stderr: `Refused: ${missingContext(authored)}\n` };
+    const { workItem, outline, assignment, selection, reviewRequest } = authored;
+    if (options.fromRun !== undefined || options.invocation !== undefined) {
+      return { exitStatus: 2, stdout: '', stderr: 'Refused: --from-run and --invocation name a recorded invocation together; give both or neither\n' };
+    }
+    if (options.role !== 'engineer' || options.projectRoot === undefined || workItem === undefined || assignment === undefined
+      || selection !== undefined || reviewRequest !== undefined) {
+      return { exitStatus: 2, stdout: '', stderr: `Refused: ${missingContext(options.role, authored, options.projectRoot)}\n` };
+    }
+    const result = await authorEngineerInputs({
+      projectRoot: options.projectRoot, files: { workItem, outline, assignment }, ports: authoringPorts ?? installedAuthoringPorts(),
+    });
+    if (result.status === 'refused') return { exitStatus: 2, stdout: '', stderr: `Refused: ${result.reason}\n` };
+    const provenance = result.inputs.provenance;
+    const lines = [
+      `Authored engineer inputs for ${result.inputs.assignment.id} with no run, the assignment judged as the output of the local architect's first work turn of ${result.inputs.work.workItem} against the project.`,
+      `Authored: ${provenance !== undefined && 'origin' in provenance ? provenance.authored.join(', ') : ''}.`,
+    ];
+    return written(serializeStepInputs(result.inputs), options.out, lines);
   }
   const result = await inputsFromRun({
     role: options.role, runDirectory: options.fromRun, invocation: options.invocation, builtinDeclarations: piBuiltinDeclarations, authored,
   });
   if (result.status === 'refused') return { exitStatus: 2, stdout: '', stderr: `Refused: ${result.reason}\n` };
   const bytes = serializeStepInputs(result.inputs);
-  const original = result.inputs.provenance?.originalStart ?? 'fresh';
-  const replaced = result.inputs.provenance?.authored ?? [];
+  const provenance = result.inputs.provenance;
+  const fromRun = provenance === undefined || 'origin' in provenance ? undefined : provenance;
+  const original = fromRun?.originalStart ?? 'fresh';
+  const replaced = fromRun?.authored ?? [];
   const lines = [
     `Imported ${options.role} invocation ${options.invocation} (original start ${original}) as a fresh start with the complete briefing; no provider history is imported.`,
     ...(replaced.length === 0 ? [] : [`Authored, each judged as its producing role's output: ${replaced.join(', ')}.`]),
     comparisonText(result.comparison),
   ];
-  if (options.out === undefined) return { exitStatus: 0, stdout: bytes, stderr: `${lines.join('\n')}\n` };
-  const out = resolve(options.out);
-  await writeFile(out, bytes);
-  return { exitStatus: 0, stdout: `Wrote ${out}\n`, stderr: `${lines.join('\n')}\n` };
+  return written(bytes, options.out, lines);
+}
+
+/** Prints the inputs, or writes them where `out` names, with the lines that describe them. */
+async function written(bytes: string, out: string | undefined, lines: readonly string[]): Promise<StepCommandResult> {
+  if (out === undefined) return { exitStatus: 0, stdout: bytes, stderr: `${lines.join('\n')}\n` };
+  const path = resolve(out);
+  await writeFile(path, bytes);
+  return { exitStatus: 0, stdout: `Wrote ${path}\n`, stderr: `${lines.join('\n')}\n` };
 }
 
 async function render(options: Extract<StepCommandOptions, { command: 'render' }>): Promise<StepCommandResult> {
@@ -97,7 +130,7 @@ async function render(options: Extract<StepCommandOptions, { command: 'render' }
   const step = constructStep(inputs, { projectRoot, packages });
   const rendered = await renderStep(step, {
     projectRoot, packages, builtinDeclarations: piBuiltinDeclarations,
-    operationId: options.invocation ?? inputs.provenance?.invocation ?? defaultRenderInvocation,
+    operationId: options.invocation ?? (inputs.provenance !== undefined && 'invocation' in inputs.provenance ? inputs.provenance.invocation : undefined) ?? defaultRenderInvocation,
     sessionOperations: join(projectRoot, 'plans', '.harness', 'session-operations'),
   });
   return { exitStatus: 0, stdout: renderedText(rendered), stderr: '' };

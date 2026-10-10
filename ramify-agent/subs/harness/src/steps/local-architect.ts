@@ -61,7 +61,7 @@ export function workBriefing(environment: StepEnvironment, inputs: { readonly ru
     ...(inputs.briefing as unknown as WorkItemBriefing),
     projectRoot: environment.projectRoot,
     workingDirectory: projectLocation(environment, inputs.workingDirectory),
-    runDirectory: runDirectory(environment.projectRoot, inputs.run.planId, inputs.run.runId),
+    ...(inputs.run === null ? {} : { runDirectory: runDirectory(environment.projectRoot, inputs.run.planId, inputs.run.runId) }),
   };
 }
 

@@ -47,12 +47,14 @@ export interface RenderedStep {
 /** Renders a constructed step as its session would receive it. Nothing is written. */
 export async function renderStep(constructed: ConstructedStepCommon, environment: RenderEnvironment): Promise<RenderedStep> {
   let step = constructed;
-  const runId = step.inputs.run.runId;
+  // Inputs authored without a run start fresh: they name no run, and no session point.
+  const runId = step.inputs.run?.runId ?? null;
   let source: { readonly point: PointContext['point']; readonly prior: PointContext } | null = null;
   let fallback: string | null = null;
   if (step.start.mode !== 'fresh') {
     const reference = readSessionPointReference(step.start.ref);
-    if (reference === null) fallback = 'the session point reference cannot be read';
+    if (runId === null) fallback = 'the inputs name no run, so no session point of one can be read';
+    else if (reference === null) fallback = 'the session point reference cannot be read';
     else if (reference.runId !== runId) fallback = `the session point belongs to run ${reference.runId}, not ${runId}`;
     else if (environment.sessionOperations === undefined) fallback = 'no session operations directory was given to read the point\'s recorded ancestry from';
     else {
@@ -69,7 +71,8 @@ export async function renderStep(constructed: ConstructedStepCommon, environment
   const workingDirectory = step.equipment.workingDirectory;
   const builtins = environment.builtinDeclarations(step.equipment.builtinTools, workingDirectory);
   const { packet } = composeOperationPacket({
-    runId, operationId: environment.operationId, loaded: step.loaded, brief: step.brief, role: step.role,
+    // The run identity names only an inherited point, which a start without a run never has.
+    runId: runId ?? '', operationId: environment.operationId, loaded: step.loaded, brief: step.brief, role: step.role,
     mode: source === null ? 'fresh' : step.start.mode, workingDirectory, builtinDeclarations: builtins, tools: step.equipment.tools,
     submissionName: step.submission.toolName, source: source?.point ?? null, prior: source?.prior ?? null,
   });
