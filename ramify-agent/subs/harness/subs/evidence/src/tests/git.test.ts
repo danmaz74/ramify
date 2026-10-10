@@ -128,6 +128,31 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
     });
   });
 
+  it('names a nested project\'s changes as the project does, and leaves the rest of the repository out', async () => {
+    await withRepository(async repository => {
+      await repository.write('nested/project/src/kept.ts', 'export const kept = 1;\n');
+      await repository.write('elsewhere/tracked.ts', 'export const elsewhere = 1;\n');
+      await repository.git('add', '--all');
+      await repository.git('-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--message', 'nested source');
+      const project = join(repository.root, 'nested/project');
+      await repository.write('nested/project/src/kept.ts', 'export const kept = 2;\n');
+      await repository.write('nested/project/src/added.ts', 'export const added = true;\n');
+      await repository.write('elsewhere/tracked.ts', 'export const elsewhere = 2;\n');
+      await repository.write('elsewhere/untracked.ts', 'export const stray = true;\n');
+      expect(await git.changedPaths(project)).toEqual(['src/added.ts', 'src/kept.ts']);
+      expect(await git.changedEntries(project)).toEqual([{ status: 'M', path: 'src/kept.ts' }, { status: '??', path: 'src/added.ts' }]);
+      expect((await git.worktreeLineChanges(project)).map(change => change.path)).toEqual(['src/added.ts', 'src/kept.ts']);
+      // The repository root still sees everything, under its own names.
+      expect(await git.changedPaths(repository.root)).toEqual(['elsewhere/tracked.ts', 'elsewhere/untracked.ts', 'nested/project/src/added.ts', 'nested/project/src/kept.ts']);
+      // A gate's commit from the nested project stages the project's tree alone.
+      await git.createRunBranch(project, 'nested-commit');
+      const committed = await git.commitAccepted(project, 'nested candidate');
+      expect(committed).not.toBeNull();
+      expect((await repository.git('show', '--name-only', '--format=', committed!)).trim().split('\n').sort()).toEqual(['nested/project/src/added.ts', 'nested/project/src/kept.ts']);
+      expect(await git.changedPaths(repository.root)).toEqual(['elsewhere/tracked.ts', 'elsewhere/untracked.ts']);
+    });
+  });
+
   it('reads path and line changes relative to the accepted revision even after a failed attempt commits', async () => {
     await withRepository(async repository => {
       const root = repository.root;

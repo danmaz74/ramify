@@ -7,10 +7,11 @@ import { writeFileAtomic } from '../../subs/ledger/src/atomic.js';
 import { canonicalJson } from '../jobs/commands.js';
 import type { RecordRef as CommitRecord } from '../jobs/commit.js';
 import { Mutex, PriorityMutex } from '../jobs/mutex.js';
-import { jobSchemaVersion } from '../jobs/records.js';
+import { jobSchemaVersion, planStateDirectory } from '../jobs/records.js';
 import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
 import { defaultRunPolicy } from '../run/policy.js';
 import { acquireProjectLock, ProjectLockError, type ProjectLock } from '../store/lock.js';
+import { ensureStateDirectory } from '../store/state-directory.js';
 import { RunLog } from '../run/log.js';
 import { manualRunRecordSchema, runDirectory, runLayout, type ManualRunRecord, type RunPolicy, type SessionId } from '../run/records.js';
 import { HarnessSessionOperations } from '../run/session-operations.js';
@@ -157,6 +158,10 @@ export async function openManualRun(options: OpenManualRunOptions): Promise<Open
       schema: jobSchemaVersion, jobId: runId, planId, kind: 'manual', createdAt: (options.now?.() ?? new Date()).toISOString(),
       projectRoot, base, branch, origin: options.origin, policy: options.policy,
     } satisfies ManualRunRecord);
+    // The plan's state directory, with its marker and its `.gitignore`, as a
+    // run creates it: the manual run's records are never a change of the tree
+    // its gates compare and commit, and never Ramify's input.
+    await ensureStateDirectory(planStateDirectory(projectRoot, planId), { gitignore: true });
     await mkdir(directory, { recursive: true });
     await writeFileAtomic(recordPath, `${JSON.stringify(record, null, 2)}\n`);
     created = true;

@@ -12,6 +12,7 @@ import { parseStepInputs, serializeStepInputs, type StepInputs } from '../steps/
 import { runStep, type StepRunOptions, type StepRunProgress, type StepRunResult } from '../steps/run.js';
 import { createStepProgressText } from '../steps/run-text.js';
 import { acquireProjectLock } from '../store/lock.js';
+import { stateGitignore, stateMarker } from '../store/state-directory.js';
 import { passingAudit } from './helpers/direct-check-execution.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -193,6 +194,10 @@ describe('S09/S12: one engineer step in a manual run', () => {
     expect(manualRunRecordSchema.parse(await json(join(run, 'job.json')))).toMatchObject({
       kind: 'manual', planId, jobId: 'm-001', origin: 'step-run', base: 'base-1', branch: 'ramify-agent-run/m-001',
     });
+    // The plan's state directory is a run's: its records are ignored by Git and left out of Ramify's inputs.
+    const stateDirectory = join(root, 'plans', planId, '.harness');
+    expect(await readFile(join(stateDirectory, '.gitignore'), 'utf8')).toBe(stateGitignore);
+    expect(await readFile(join(stateDirectory, 'tsconfig.json'), 'utf8')).toBe(stateMarker);
     const invocation = invocationSchema.parse(await json(summary.records.invocation));
     expect(invocation).toMatchObject({ id: summary.invocation, role: 'engineer', base: 'base-1', startingTree: { dirty: false, changed: [] } });
     const outcome = invocationOutcomeSchema.parse(await json(summary.records.outcome));

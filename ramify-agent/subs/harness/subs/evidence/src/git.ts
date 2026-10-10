@@ -255,7 +255,10 @@ export async function commitAccepted(root: string, message: string, signal?: Abo
     });
   }
 
-  await gitOk(root, ['add', '--all'], signal);
+  // The project's tree alone: without a pathspec, `git add --all` stages the
+  // whole repository, which a nested project shares with files that are not
+  // its own.
+  await gitOk(root, ['add', '--all', '--', '.'], signal);
   const staged = await git(root, ['diff', '--cached', '--quiet'], signal);
   if (staged.exitCode === 0) return null;
   if (staged.exitCode !== 1) {
@@ -324,11 +327,14 @@ export async function findCommitByTrailer(root: string, key: string, value: stri
 
 /**
  * Every path the working directory changed against the supplied accepted
- * boundary, tracked or not, with both names of a rename. This is the only
- * place the harness learns what changed.
+ * boundary, tracked or not, with both names of a rename, as the project names
+ * them: a nested project's paths lose the repository prefix, and a change
+ * outside the project is not its change. This is the only place the harness
+ * learns what changed.
  */
 export async function changedPaths(root: string, base: string = 'HEAD', signal?: AbortSignal): Promise<string[]> {
-  const changed = await gitOk(root, ['diff', '--name-only', '-z', '--no-renames', base], signal);
+  const prefix = await projectPrefix(root, signal);
+  const changed = await gitOk(root, ['diff', '--name-only', '-z', '--no-renames', '--relative', base], signal);
   const paths = changed.stdout.split('\0').filter(Boolean);
   const run = await gitOk(root, ['status', '--porcelain', '-z', '--untracked-files=all'], signal);
   const fields = run.stdout.split('\0');
@@ -336,14 +342,35 @@ export async function changedPaths(root: string, base: string = 'HEAD', signal?:
     const entry = fields[index];
     if (entry === undefined || entry === '') continue;
     const status = entry.slice(0, 2);
-    if (status === '??') paths.push(entry.slice(3));
-    if (status.startsWith('R') || status.startsWith('C')) {
-      const original = fields[index + 1];
-      index += 1;
-      if (status === '??' && original !== undefined && original !== '') paths.push(original);
+    if (status === '??') {
+      const path = projectPath(prefix, entry.slice(3));
+      if (path !== null) paths.push(path);
     }
+    if (status.startsWith('R') || status.startsWith('C')) index += 1;
   }
   return [...new Set(paths)].sort();
+}
+
+/**
+ * The project's directory within the repository, as `git rev-parse
+ * --show-prefix` names it: empty at the repository root, `nested/project/`
+ * beneath it. Only the command's terminating newline is removed; spaces and
+ * newlines can belong to directory names.
+ */
+async function projectPrefix(root: string, signal?: AbortSignal): Promise<string> {
+  const shown = (await gitOk(root, ['rev-parse', '--show-prefix'], signal)).stdout;
+  return shown.endsWith('\n') ? shown.slice(0, -1) : shown;
+}
+
+/**
+ * A status path, which Git gives relative to the repository root, as the
+ * project names it, or null for a file outside the project: that change is
+ * not the project's.
+ */
+function projectPath(prefix: string, repositoryPath: string): string | null {
+  if (!repositoryPath.startsWith(prefix)) return null;
+  const path = repositoryPath.slice(prefix.length);
+  return path === '' ? null : path;
 }
 
 /**
@@ -356,7 +383,8 @@ export async function changedEntries(
   base: string = 'HEAD',
   signal?: AbortSignal,
 ): Promise<Array<{ readonly status: string; readonly path: string }>> {
-  const changed = await gitOk(root, ['diff', '--name-status', '-z', '--no-renames', base], signal);
+  const prefix = await projectPrefix(root, signal);
+  const changed = await gitOk(root, ['diff', '--name-status', '-z', '--no-renames', '--relative', base], signal);
   const entries = nameStatusEntries(changed.stdout);
   const run = await gitOk(root, ['status', '--porcelain', '-z', '--untracked-files=all'], signal);
   const fields = run.stdout.split('\0');
@@ -364,7 +392,10 @@ export async function changedEntries(
     const entry = fields[index];
     if (entry === undefined || entry === '') continue;
     const status = entry.slice(0, 2);
-    if (status === '??') entries.push({ status: status.trim(), path: entry.slice(3) });
+    if (status === '??') {
+      const path = projectPath(prefix, entry.slice(3));
+      if (path !== null) entries.push({ status: status.trim(), path });
+    }
     if (status.startsWith('R') || status.startsWith('C')) index += 1;
   }
   return entries;
@@ -467,8 +498,7 @@ export async function worktreeLineChanges(
   base: string = 'HEAD',
   signal?: AbortSignal,
 ): Promise<Array<{ readonly path: string; readonly added: number; readonly deleted: number; readonly binary: boolean; readonly bytes: number | null }>> {
-  const shown = (await gitOk(root, ['rev-parse', '--show-prefix'], signal)).stdout;
-  const prefix = shown.endsWith('\n') ? shown.slice(0, -1) : shown;
+  const prefix = await projectPrefix(root, signal);
   const tracked = await gitOk(root, ['diff', '--relative', '--numstat', '-z', base], signal);
   const changes = new Map<string, { path: string; added: number; deleted: number; binary: boolean; bytes: number | null }>();
   const fields = tracked.stdout.split('\0');
@@ -498,10 +528,8 @@ export async function worktreeLineChanges(
   const status = await gitOk(root, ['status', '--porcelain', '-z', '--untracked-files=all'], signal);
   for (const entry of status.stdout.split('\0')) {
     if (entry === undefined || !entry.startsWith('?? ')) continue;
-    const repositoryPath = entry.slice(3);
-    if (!repositoryPath.startsWith(prefix)) continue;
-    const path = repositoryPath.slice(prefix.length);
-    if (path === '' || changes.has(path)) continue;
+    const path = projectPath(prefix, entry.slice(3));
+    if (path === null || changes.has(path)) continue;
     changes.set(path, { path, ...(await fileLines(join(root, path))) });
   }
   return [...changes.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
