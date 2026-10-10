@@ -1,3 +1,4 @@
+import { consultationInputsSchema } from '../consultations/targets.js';
 import { posix } from 'node:path';
 import { z } from 'zod';
 import { elementCatalogSchema, packageDeviationSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
@@ -163,6 +164,7 @@ export type RunProvenance = z.infer<typeof runProvenanceSchema>;
 
 /** The fields every engineer start shares: the fresh inputs. */
 const engineerFields = {
+  consultation: consultationInputsSchema.nullable().optional(),
   schema: z.literal(stepInputsSchemaId),
   role: z.literal('engineer'),
   run: optionalRunSchema,
@@ -283,6 +285,7 @@ export const workBriefingSchema = z.object({
 export type WorkBriefingInputs = z.infer<typeof workBriefingSchema>;
 
 const orientationFields = {
+  consultation: consultationInputsSchema.nullable().optional(),
   ...commonFields,
   role: z.literal('local-architect'),
   phase: z.literal('orientation'),
@@ -328,6 +331,7 @@ const selectorForkSchema = z.object({ ...selectorFields,
   start: z.object({ kind: z.literal('fork'), session: sessionIdSchema, invocation: text, point: pointReferenceSchema }).strict() }).strict();
 
 const workTurnFields = {
+  consultation: consultationInputsSchema.nullable().optional(),
   ...commonFields,
   /** A work turn's inputs are built without a run when an authored assignment is judged. */
   run: optionalRunSchema,

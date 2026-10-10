@@ -1,3 +1,4 @@
+import { consultationAvailability, consultationContext } from '../consultations/targets.js';
 import { contextSelectorMessage, workOrientationMessage } from '../context-selection/prompts.js';
 import {
   contextSelectorJsonSchema, contextSelectorSubmissionSchema, contextSelectorToolName, prepareContextSelection, workOrientationJsonSchema,
@@ -74,6 +75,7 @@ export function workBriefingInputs(briefing: WorkItemBriefing): WorkBriefingInpu
 // The orientation
 
 export interface ConstructedOrientationStep extends ConstructedStepCommon {
+  readonly consultation: ReturnType<typeof consultationAvailability>;
   readonly role: 'local-architect';
   readonly inputs: OrientationStepInputs;
   /** The orientation briefing: the work item's briefing, its goal and its requirements, which the orientation packet records. */
@@ -89,7 +91,7 @@ export function constructOrientationStep(value: unknown, environment: StepEnviro
   const workingDirectory = projectLocation(environment, inputs.workingDirectory);
   const goal = inputs.briefing.item.goal;
   const briefingText = [workItemMessage(workBriefing(environment, inputs)), '# Goal', goal, '# Requirements', ...inputs.requirements].join('\n\n');
-  const prompt = workOrientationMessage(briefingText);
+  const prompt = workOrientationMessage(briefingText) + consultationContext(inputs.consultation, inputs.role);
   const limits = invocationLimits(inputs.limits, {});
   const submission = {
     toolName: workOrientationToolName, description: 'Record your orientation before making an assignment.',
@@ -103,7 +105,7 @@ export function constructOrientationStep(value: unknown, environment: StepEnviro
       views: architectViews(environment, inputs.architectView), supportPaths: deliveredSupportPaths(loaded, kind), cucumberConfiguration: null },
   });
   return {
-    role: 'local-architect', inputs, work: inputs.work, attempt: inputs.attempt, loaded,
+    role: 'local-architect', consultation: consultationAvailability(inputs.consultation ?? undefined, inputs.role), inputs, work: inputs.work, attempt: inputs.attempt, loaded,
     systemPrompt: renderWorkOrientationPrompt(loaded, projectRoot, workingDirectory), prompt, briefingText, brief, submission, limits,
     context: inputs.context, start: { mode: 'fresh' },
     equipment: { workingDirectory, builtinTools: [...readers], tools: [] },
@@ -173,6 +175,7 @@ export function constructSelectorStep(value: unknown, environment: StepEnvironme
 // The work turn
 
 export interface ConstructedWorkTurnStep extends ConstructedStepCommon {
+  readonly consultation: ReturnType<typeof consultationAvailability>;
   readonly role: 'local-architect';
   readonly inputs: WorkTurnStepInputs;
   readonly work: { readonly workItem: string };
@@ -198,6 +201,7 @@ export function constructWorkTurnStep(value: unknown, environment: StepEnvironme
   if (selected !== undefined && inputs.packageInPrompt) prompt = `${prompt}\n\n# Your work-item package\n\n${selected.text}`;
   if (inputs.obligationLines.length > 0) prompt = `${prompt}\n\n${inputs.obligationLines.join('\n')}`;
   if (inputs.intervening !== undefined) prompt += `\n\n# Intervening capability work\n\n${inputs.intervening}`;
+  prompt += consultationContext(inputs.consultation, inputs.role);
   const start = inputs.start;
   const continuing = start.kind === 'continued' ? start.continuing : start.continuing;
   const kind = workTurnKind(continuing);
@@ -227,7 +231,7 @@ export function constructWorkTurnStep(value: unknown, environment: StepEnvironme
       supportPaths: deliveredSupportPaths(loaded, kind), cucumberConfiguration: null },
   });
   return {
-    role: 'local-architect', inputs, work: inputs.work, attempt: inputs.attempt, loaded,
+    role: 'local-architect', consultation: consultationAvailability(inputs.consultation ?? undefined, inputs.role), inputs, work: inputs.work, attempt: inputs.attempt, loaded,
     systemPrompt: renderLocalArchitectPrompt(loaded, projectRoot, workingDirectory), prompt, brief, submission, limits, context: inputs.context,
     start: start.kind === 'continued' ? { mode: 'continue', ref: start.point, ...(start.session === undefined ? {} : { session: start.session }) }
       : { mode: 'fresh', ...(start.degraded === undefined ? {} : { degraded: start.degraded }) },

@@ -1,3 +1,4 @@
+import { consultationAvailability, consultationContext, type ConsultationInputs } from '../consultations/targets.js';
 import { join } from 'node:path';
 import type { JsonSchema } from '../../subs/agent/src/interfaces/port.js';
 import type { HookSubmissionPolicy } from '../hooks/post-write.js';
@@ -48,6 +49,7 @@ export type EngineerStepStart =
 /** One engineer invocation as the inputs determine it; the run adds only what exists while it runs. */
 export interface ConstructedEngineerStep {
   readonly role: 'engineer';
+  readonly consultation: ReturnType<typeof consultationAvailability>;
   readonly inputs: EngineerStepInputs;
   readonly work: { readonly workItem: string; readonly iteration: string };
   readonly attempt: number;
@@ -143,7 +145,7 @@ export function constructEngineerStep(value: unknown, environment: StepEnvironme
     ...(inputs.scenarios === undefined ? {} : { scenarios: inputs.scenarios }),
     ...(inputs.obligations.length === 0 ? {} : { obligations: inputs.obligations }),
     ...(inputs.assignmentPackage === undefined ? {} : { package: inputs.assignmentPackage }),
-  })}${focused.featurePaths.length === 0 ? '' : focused.command.kind === 'available' ? `\n\n# Exact focused scenario command\n\n${focused.command.shellCommand}\nSupport/world/loader: ${JSON.stringify(focused.command.support)}\nEnvironment names: ${Object.keys(focused.command.environment).sort().join(', ')}. Config SHA-256 ${focused.command.configurationIdentity}; current generated and source bytes are revalidated at dispatch.\n${focusedCommandPendingNote}` : `\n\nFocused scenario command unavailable: ${focused.command.reason}. Do not combine CLI feature paths with the broad default profile.`}${inputs.guidance === undefined ? '' : `\n\n# Qualified existing behavior\n\n${inputs.guidance}`}`;
+  })}${focused.featurePaths.length === 0 ? '' : focused.command.kind === 'available' ? `\n\n# Exact focused scenario command\n\n${focused.command.shellCommand}\nSupport/world/loader: ${JSON.stringify(focused.command.support)}\nEnvironment names: ${Object.keys(focused.command.environment).sort().join(', ')}. Config SHA-256 ${focused.command.configurationIdentity}; current generated and source bytes are revalidated at dispatch.\n${focusedCommandPendingNote}` : `\n\nFocused scenario command unavailable: ${focused.command.reason}. Do not combine CLI feature paths with the broad default profile.`}${inputs.guidance === undefined ? '' : `\n\n# Qualified existing behavior\n\n${inputs.guidance}`}${consultationContext(inputs.consultation, inputs.role)}`;
   const bounds = { idleMs: inputs.bounds.idleMs, absoluteMs: inputs.bounds.absoluteMs, commandTimeoutMs: inputs.bounds.commandTimeoutMs };
   const limits = invocationLimits(inputs.limits, { bounds });
   const tools = [shellToolDeclaration(bounds.commandTimeoutMs)];
@@ -174,6 +176,7 @@ export function constructEngineerStep(value: unknown, environment: StepEnvironme
   });
   return {
     role: 'engineer',
+    consultation: consultationAvailability(inputs.consultation ?? undefined, inputs.role),
     inputs,
     work: { workItem: inputs.work.workItem, iteration: inputs.work.iteration },
     attempt: inputs.attempt,
@@ -216,6 +219,7 @@ export function constructEngineerStep(value: unknown, environment: StepEnvironme
  * run, the project and the authored records alone.
  */
 export interface EngineerInputFacts {
+  readonly consultation?: ConsultationInputs | undefined;
   readonly run: EngineerStepInputs['run'];
   readonly item: WorkItem;
   readonly assignment: IterationAssignment;
@@ -252,6 +256,7 @@ export function engineerStepInputsOf(facts: EngineerInputFacts): EngineerStepInp
   return validateEngineerInputs({
     schema: 'ramify-agent.step-inputs/1',
     role: 'engineer',
+    consultation: facts.consultation ?? { unavailable: facts.run === null ? 'Standalone inputs have no retained architect history.' : 'These facts recorded no assigning architect point.' },
     run: facts.run,
     work: { workItem: facts.item.id, iteration: facts.assignment.id },
     attempt: facts.attempt,

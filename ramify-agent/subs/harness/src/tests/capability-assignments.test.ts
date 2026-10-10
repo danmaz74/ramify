@@ -10,6 +10,8 @@ import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.
 import { assign, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
 import type { IterationAssignment } from '../work/iterations.js';
+import { parseStepInputs } from '../steps/inputs.js';
+import { runLayout } from '../run/records.js';
 import { decision, forkDecision } from './helpers/placement.js';
 
 vi.mock('node:child_process', async importOriginal => {
@@ -250,6 +252,13 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
     expect(result.coordination).toMatchObject({ kind: 'capability-task', id: 'cap-001', sequence: number });
     const invocation = events.find(event => event.type === 'invocation-started' && event.data.work.iteration === `cap-001.i0${number}` && event.data.role === 'engineer');
     if (invocation?.type !== 'invocation-started') throw new Error('Missing capability engineer');
+    const assigning = events.find(event => event.type === 'capability-assigned' && event.data.assignment === `cap-001.i0${number}`);
+    if (assigning?.type !== 'capability-assigned') throw new Error('Missing assigning coordinator');
+    const inputs = parseStepInputs(await readFile(runPath(fixture.root, 'need', receipt.jobId, runLayout.stepInputs(invocation.data.invocation)), 'utf8'));
+    if (inputs.role !== 'engineer') throw new Error('Not engineer inputs');
+    expect(inputs.consultation?.assigning).toMatchObject({ role: 'capability-architect', task: 'cap-001',
+      session: assigning.data.architectRef!.session, ref: assigning.data.architectRef!.ref, point: { invocation: assigning.data.invocation } });
+    expect(inputs.consultation?.global).toBeUndefined();
     const session = opened.agent!.sessions.find(session => session.spec.role === 'engineer' && session.spec.prompt.includes(`"iteration":"cap-001.i0${number}"`));
     expect(session?.spec.prompt).toContain('## Recorded starting points');
     expect(session?.spec.prompt).toContain(assignmentPoints[0]!.note);

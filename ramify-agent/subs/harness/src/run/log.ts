@@ -1,3 +1,4 @@
+import { consultationTargetSchema } from '../consultations/targets.js';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 import { jobIdSchema } from '../interfaces/protocol/ids.js';
@@ -296,6 +297,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
     module: text,
     origin: z.enum(['entry', 'obligation', 'verification', 'integration']),
     scenario: scenarioIdSchema.optional(),
+    globalTarget: consultationTargetSchema.nullable().optional(),
   }).strict()),
   /**
    * Which hypothesis revisions the work item received, at a coordination
@@ -472,7 +474,10 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * contract revisions. It licenses the consumer's architect to assign
    * verification while the requirements are still open.
    */
-  event('work-item-resumed', z.object({ workItem: text, requirements: z.array(text) }).strict()),
+  event('work-item-resumed', z.object({ workItem: text, requirements: z.array(text), globalTarget: consultationTargetSchema.nullable().optional() }).strict()),
+  event('consultation-started', z.object({ consultation: text, caller: text, toolCall: text, parent: text.nullable() }).strict()),
+  event('consultation-finished', z.object({ consultation: text, status: z.enum(['answered', 'failed', 'cancelled', 'incomplete']), delivery: z.enum(['recorded', 'not-recorded', 'unknown']) }).strict()),
+  event('consultation-delivery-recorded', z.object({ consultation: text, revision: z.int().positive() }).strict()),
   /** The conformance suite passed against the real provider, once per obligation revision. */
   event('provider-conformed', z.object({
     obligation: text,

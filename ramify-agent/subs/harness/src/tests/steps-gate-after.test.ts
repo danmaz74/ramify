@@ -483,6 +483,8 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
         provenance: { origin: 'assignment', run: { planId: source.planId, runId: 'm-arch' }, invocation: architect,
           assignment: { run: iterationLayout.assignment(item, 1) } } });
       expect(engineerInputs.assignment).toEqual(await json(join(run, iterationLayout.assignment(item, 1))));
+      expect(engineerInputs.consultation?.assigning).toMatchObject({ role: 'local-architect', run: { planId: source.planId, runId: 'm-arch' }, point: { invocation: architect } });
+      expect(engineerInputs.consultation?.global).toBeUndefined();
       const rendered = await runStepCommandWith({ command: 'render', inputs: engineerPath, projectRoot: source.root });
       expect(rendered.exitStatus, rendered.stderr).toBe(0);
       expect(rendered.stdout).toContain('Raise the note limit to 500.');
@@ -491,6 +493,8 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
       // The engineer of that iteration reports partial work: its result, and the architect's next-turn inputs.
       const engineer = invocationOf(await stepHere(engineerPath,
         [{ kind: 'submit', input: partialReport(['Read the limit.'], ['Raise it to 500.']) }]));
+      const recordedEngineer = parseStepInputs(await readFile(join(run, runLayout.stepInputs(engineer)), 'utf8'));
+      expect(recordedEngineer.role === 'engineer' && recordedEngineer.consultation).toEqual(engineerInputs.consultation);
       // Once its engineer started, the first inputs are no longer derived.
       expect((await derive(architect, join(scratch, 'again.json'))).stderr).toContain(`the engineer of ${item}.i01 has started already (${engineer})`);
       const reported = await after(run, engineer, { git });
@@ -549,6 +553,23 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
       // The work-item gate runs the project's default audit; the final gate the full audit with nested projects.
       expect(gatesAudit.requests.map(request => `${request.mode}${request.nested === true ? ' nested' : ''}`)).toEqual(['project-default', 'full nested']);
       gitAtGates.assertComplete();
+      // C03: retained targets execute only where their architect session exists.
+      const target = engineerInputs.consultation!.assigning!;
+      const missingSession = 'ses-9999';
+      const missingInputs = await file('missing-architect.json', { ...engineerInputs,
+        consultation: { assigning: { ...target, session: missingSession, point: { session: missingSession, invocation: architect } } } });
+      const missing = invocationOf(await stepHere(missingInputs, [{ kind: 'submit', input: unsuitableScope() }]));
+      const missingRecorded = parseStepInputs(await readFile(join(run, runLayout.stepInputs(missing)), 'utf8'));
+      expect(missingRecorded.role === 'engineer' && missingRecorded.consultation).not.toHaveProperty('assigning');
+      expect(missingRecorded.role === 'engineer' && missingRecorded.consultation).toMatchObject({
+        provenance: { assigning: { session: missingSession } }, unavailable: expect.stringContaining('no retained architect sessions') });
+      const destination = runPath(source.root, source.planId, 'm-cross');
+      const cross = invocationOf(await runStep({ inputs: engineerPath, run: destination, agent: createScriptedAgent([{ kind: 'submit', input: unsuitableScope() }]),
+        ramify: new FakeRamifyCli(), git, refresh: readDeclaredTree }));
+      const crossRecorded = parseStepInputs(await readFile(join(destination, runLayout.stepInputs(cross)), 'utf8'));
+      expect(crossRecorded.role === 'engineer' && crossRecorded.consultation).not.toHaveProperty('assigning');
+      expect(crossRecorded.role === 'engineer' && crossRecorded.consultation).toMatchObject({
+        provenance: { assigning: target }, unavailable: expect.stringContaining('no retained architect sessions') });
     } finally {
       for (const cleanup of owned.reverse()) await cleanup();
     }

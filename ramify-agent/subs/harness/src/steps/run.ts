@@ -1,3 +1,4 @@
+import { unavailableConsultation } from '../consultations/targets.js';
 import { mkdir, readFile, realpath } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import type { AgentPort } from '../../subs/agent/src/interfaces/port.js';
@@ -264,7 +265,13 @@ async function runLocked(options: StepRunOptions, original: StepInputs, location
 
   // The inputs are the manual run's own; where they came from stays their provenance.
   let inputs: StepInputs;
-  try { inputs = validateStepInputs({ ...original, run: { planId: run.planId, runId: run.jobId } }); }
+  try {
+    const sameRun = original.run?.planId === run.planId && original.run.runId === run.jobId;
+    const consultation = 'consultation' in original ? original.consultation : undefined;
+    const targets = [consultation?.assigning, consultation?.global].filter(target => target !== undefined);
+    const retained = sameRun && targets.every(target => target.run.runId === run.jobId && target.run.planId === run.planId && run.log.all('invocation-started').some(event => event.data.session === target.session));
+    inputs = validateStepInputs({ ...original, ...('consultation' in original && !retained ? { consultation: unavailableConsultation(consultation ?? undefined, 'This manual run has no retained architect sessions for these inputs.') } : {}), run: { planId: run.planId, runId: run.jobId } });
+  }
   catch (error) { return notStarted(error instanceof StepInputsError ? error.message : message(error), run.directory); }
   const { runner, close } = manualRunner({ projectRoot, git, model: options.model ?? null, agent, ...(options.now === undefined ? {} : { now: options.now }) });
   const sessionOf = (ref: string, session: string | undefined): string | null => {

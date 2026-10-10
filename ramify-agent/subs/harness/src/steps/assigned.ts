@@ -1,3 +1,4 @@
+import { engineerConsultationInputs } from '../consultations/targets.js';
 import { readFile } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { loadArchitectIndex, type ArchitectIndex } from '../../subs/evidence/src/views.js';
@@ -161,6 +162,7 @@ async function collect(run: ManualRun, projectRoot: string, subject: {
   const modules = 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules;
   const turnRecord = records.invocations.get(invocation);
   return engineerStepInputsOf({
+    consultation: engineerConsultationInputs(run.log.events, { planId: run.planId, runId: run.jobId }, assignment.id),
     run: { planId: run.planId, runId: run.jobId }, item, assignment, attempt: 1, base, beforeTree: undefined,
     capabilityWorkflow: subject.capabilityWorkflow, capabilityPolicy: policy.version === capabilityRunPolicyVersion,
     workingDirectory: projectPath(workingDirectory),

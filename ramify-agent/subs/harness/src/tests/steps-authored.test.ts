@@ -213,6 +213,9 @@ describe('S07: engineer inputs authored with no run', () => {
     const inputs = parseStepInputs(await readFile(out, 'utf8'));
     if (inputs.role !== 'engineer') throw new Error('unreachable');
     expect(inputs.run).toBeNull();
+    expect(inputs.consultation?.assigning).toBeUndefined();
+    expect(inputs.consultation?.global).toBeUndefined();
+    expect(inputs.consultation?.unavailable).toContain('Standalone');
     expect(inputs.base).toBe('base');
     expect(inputs.start).toEqual({ kind: 'fresh' });
     expect(inputs.work).toEqual({ workItem: 'state-note-limit', iteration: inputs.assignment.id });

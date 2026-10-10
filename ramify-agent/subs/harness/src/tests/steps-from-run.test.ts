@@ -62,6 +62,11 @@ describe('S03: inputs from a run', () => {
     expect(result.comparison).toEqual({ status: 'equal' });
     expect(result.recorded).toEqual(parseStepInputs(await readFile(join(directory, runLayout.stepInputs(freshId)), 'utf8')));
     expect(result.inputs.start).toEqual({ kind: 'fresh' });
+    if (result.inputs.role === 'engineer') {
+      expect(result.inputs.consultation?.assigning).toBeUndefined();
+      expect(result.inputs.consultation?.provenance?.assigning).toEqual(result.recorded.role === 'engineer' ? result.recorded.consultation?.assigning : undefined);
+      expect(result.inputs.consultation?.unavailable).toContain('import no architect provider history');
+    }
     expect(result.inputs.provenance).toEqual({ run: result.recorded.run, invocation: freshId, record: { run: runLayout.stepInputs(freshId) }, originalStart: 'fresh' });
   });
 

@@ -1,3 +1,4 @@
+import { captureGlobalTarget, localConsultationInputs, engineerConsultationInputs } from '../consultations/targets.js';
 import { boundedNonfunctionalTools, nonfunctionalSourceAllows } from '../nonfunctional/submissions.js';
 import { capabilityGuardedPolicy, capabilityAuthorizationErrors } from '../capability/authorization.js';
 import { taskSupportSections } from '../work/task-support.js';
@@ -4594,7 +4595,7 @@ export class RunService {
     // The orientation is built from its inputs by the local architect's own
     // constructor, which `step render` uses too.
     const orientationInputs = (attempt: number, known: KnownFactsInputs): OrientationStepInputs => ({
-      schema: stepInputsSchemaId, role: 'local-architect', phase: 'orientation', run: { planId: run.record.planId, runId: run.record.jobId },
+      schema: stepInputsSchemaId, role: 'local-architect', phase: 'orientation', consultation: localConsultationInputs(run.log.events, item.id), run: { planId: run.record.planId, runId: run.record.jobId },
       work: { workItem: item.id }, attempt, capabilityWorkflow: this.workflow !== null, limits: run.record.policy.limits,
       context: contextPolicyOf(run.record.policy, 'local-architect'), workingDirectory: this.projectRelative(workingDirectory),
       briefing: workBriefingInputs(briefing), requirements: orientationRequirements, known, architectView: this.architectViewInputs(run),
@@ -4978,7 +4979,7 @@ export class RunService {
       const integration = integrationScenarioOf(item);
       await this.write(run, {
         type: 'work-item-started',
-        data: { workItem: item.id, module: item.module, origin: originKindOf(item), ...(integration === null ? {} : { scenario: integration }) },
+        data: { globalTarget: captureGlobalTarget({ planId: run.record.planId, runId: run.record.jobId }, this.globalContextOf(run)), workItem: item.id, module: item.module, origin: originKindOf(item), ...(integration === null ? {} : { scenario: integration }) },
       });
       await this.afterWrite('work-item-started', run.record.jobId);
       if (this.ignoring(run)) return null;
@@ -4988,7 +4989,7 @@ export class RunService {
     // that verification replaces the fake and passes, and waiting for them
     // here would wait for this item itself.
     if (resumes !== null) {
-      await this.write(run, { type: 'work-item-resumed', data: { workItem: item.id, requirements: [...resumes] } });
+      await this.write(run, { type: 'work-item-resumed', data: { workItem: item.id, requirements: [...resumes], globalTarget: captureGlobalTarget({ planId: run.record.planId, runId: run.record.jobId }, this.globalContextOf(run)) } });
       await this.afterWrite('work-item-resumed', run.record.jobId);
       if (this.ignoring(run)) return null;
     }
@@ -5311,7 +5312,7 @@ export class RunService {
       let step: ConstructedWorkTurnStep;
       try {
         const turn = validateWorkTurnInputs({
-          schema: stepInputsSchemaId, role: 'local-architect', phase: 'work-turn', run: { planId: run.record.planId, runId: run.record.jobId },
+          schema: stepInputsSchemaId, role: 'local-architect', phase: 'work-turn', consultation: localConsultationInputs(run.log.events, item.id), run: { planId: run.record.planId, runId: run.record.jobId },
           work: { workItem: item.id }, attempt, capabilityWorkflow: this.workflow !== null, limits: run.record.policy.limits,
           context: contextPolicyOf(run.record.policy, 'local-architect'), workingDirectory: this.projectRelative(workingDirectory),
           briefing: workBriefingInputs(briefing),
@@ -9650,6 +9651,7 @@ export class RunService {
     const known = await this.knownProjectFacts(run, 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules);
     return engineerStepInputsOf({
       ...collected,
+      consultation: engineerConsultationInputs(run.log.events, { planId: run.record.planId, runId: run.record.jobId }, assignment.id),
       run: { planId: run.record.planId, runId: run.record.jobId },
       base: this.accepted(run),
       capabilityWorkflow: this.workflow !== null,

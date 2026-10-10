@@ -345,6 +345,12 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Capability task ${event.data.task} handed back`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-stopped':
       return [`Capability task ${event.data.task} stopped`, ref('capability-task', event.data.task)];
+    case 'consultation-started':
+      return [`Consultation ${event.data.consultation} started`, ref('invocation', event.data.caller)];
+    case 'consultation-finished':
+      return [`Consultation ${event.data.consultation}: ${event.data.status}; delivery ${event.data.delivery}`, []];
+    case 'consultation-delivery-recorded':
+      return [`Consultation ${event.data.consultation}: caller result recorded`, []];
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'scratch-setting-up':

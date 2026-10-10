@@ -1,3 +1,4 @@
+import { unavailableConsultation } from '../consultations/targets.js';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { SessionToolDeclaration } from '../../subs/agent/src/interfaces/session-operations.js';
@@ -126,6 +127,7 @@ export async function inputsFromRun(options: InputsFromRunOptions): Promise<Inpu
     ? { continuing: recorded.start.continuing } : {};
   let inputs = validateStepInputs({
     ...fields,
+    ...('consultation' in recorded ? { consultation: unavailableConsultation(recorded.consultation ?? undefined, 'Imported inputs retain provenance, but import no architect provider history.') } : {}),
     start: { kind: 'fresh', ...continuing },
     provenance: {
       run: recorded.run,
