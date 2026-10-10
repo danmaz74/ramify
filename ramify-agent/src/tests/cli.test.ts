@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { defaultPort, parseCommandLine, UsageError } from '../cli.js';
+import { defaultPort, parseCommandLine, usage, UsageError } from '../cli.js';
 
 test('serve takes a project and an optional port', () => {
   expect(parseCommandLine(['serve', '--project', 'fixtures/x'])).toEqual({ command: 'serve', projectRoot: 'fixtures/x', port: defaultPort, agent: undefined, model: undefined });
@@ -71,5 +71,45 @@ describe('session', () => {
       expect(() => parseCommandLine(argv)).toThrow(UsageError);
     }
     expect(() => parseCommandLine([...base, '--prompt', 'x', '--agent', 'pi', '--verbose'])).toThrow(/Unknown option "--verbose"/);
+  });
+});
+
+describe('step', () => {
+  test('inputs imports one invocation of a run by role', () => {
+    expect(parseCommandLine(['step', 'inputs', '--role', 'engineer', '--from-run', 'plans/p/.harness/jobs/r', '--invocation', 'inv-0007', '--out', 'inputs.json'])).toEqual({
+      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: 'plans/p/.harness/jobs/r', invocation: 'inv-0007', out: 'inputs.json' },
+    });
+    expect(parseCommandLine(['step', 'inputs', '--role=engineer', '--from-run=run', '--invocation=inv-0001'])).toEqual({
+      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: 'run', invocation: 'inv-0001', out: undefined },
+    });
+  });
+
+  test('render takes an inputs file, the project defaulting to the current directory', () => {
+    expect(parseCommandLine(['step', 'render', '--inputs', 'inputs.json'])).toEqual({
+      command: 'step', step: { command: 'render', inputs: 'inputs.json', projectRoot: '.', invocation: undefined },
+    });
+    expect(parseCommandLine(['step', 'render', '--inputs', 'i.json', '--project', '/p', '--invocation', 'inv-0002'])).toEqual({
+      command: 'step', step: { command: 'render', inputs: 'i.json', projectRoot: '/p', invocation: 'inv-0002' },
+    });
+  });
+
+  test('usage errors', () => {
+    for (const [argv, message] of [
+      [['step'], /needs a subcommand/],
+      [['step', 'run'], /Unknown step subcommand "run"/],
+      [['step', 'inputs', '--from-run', 'r', '--invocation', 'i'], /needs --role/],
+      [['step', 'inputs', '--role', 'engineer', '--invocation', 'i'], /needs --from-run/],
+      [['step', 'inputs', '--role', 'engineer', '--from-run', 'r'], /needs --invocation/],
+      [['step', 'inputs', '--role', 'engineer', '--from-run', 'r', '--invocation', 'i', '--agent', 'pi'], /Unknown option "--agent"/],
+      [['step', 'render'], /needs --inputs/],
+      [['step', 'render', '--inputs'], /--inputs needs a value/],
+    ] as const) {
+      expect(() => parseCommandLine(argv), argv.join(' ')).toThrow(message);
+    }
+  });
+
+  test('usage names both step commands', () => {
+    expect(usage).toContain('ramify-agent step inputs --role engineer --from-run <run dir> --invocation <id> [--out <file>]');
+    expect(usage).toContain('ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]');
   });
 });

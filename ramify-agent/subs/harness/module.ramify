@@ -21,6 +21,12 @@ expose-src SingleSessionResult, SessionSummary, SessionProgress, SessionGateResu
 expose-src EngineerSubmission, engineerSubmissionSchema from "work/engineer.ts" to parent
 expose-src HookFinding from "hooks/post-write.ts" to parent
 expose-src InvocationOutcome, invocationOutcomeSchema from "run/records.ts" to parent
+
+// The root's `step` command: importing one invocation's recorded inputs from
+// a run, and rendering what a step's session receives. The constructor, the
+// inputs schema and the rendering stay internal; the root receives the plain
+// options it parses and the text it prints.
+expose-src runStepCommand, StepCommandOptions, StepCommandResult from "steps/command.ts" to parent
 expose-test rootDescription from "helpers/root-description.ts" to descendants
 
 // The public contracts of the behavior this module implements: the

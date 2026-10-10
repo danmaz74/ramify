@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { ProjectRootError, startCliServer } from '../subs/harness/src/http/server.js';
 import { runSessionCommand } from '../subs/harness/src/sessions/command.js';
 import type { SessionProgress, SessionSummary } from '../subs/harness/src/sessions/single.js';
+import { runStepCommand } from '../subs/harness/src/steps/command.js';
 import { isProjectLockError } from '../subs/harness/src/store/lock.js';
 import { parseCommandLine, usage, UsageError, type CommandLine } from './cli.js';
 
@@ -18,6 +19,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   if (commandLine.command === 'session') return session(commandLine);
+  if (commandLine.command === 'step') return step(commandLine);
   const server = await startCliServer({
     projectRoot: commandLine.projectRoot, port: commandLine.port, assetsDirectory, agent: commandLine.agent, piModel: commandLine.model,
   });
@@ -38,6 +40,14 @@ async function main(argv: readonly string[]): Promise<number> {
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
   return -1;
+}
+
+/** One `step` command: its text on standard output, its diagnostics and refusals on standard error. */
+async function step(commandLine: Extract<CommandLine, { command: 'step' }>): Promise<number> {
+  const result = await runStepCommand(commandLine.step);
+  if (result.stdout !== '') process.stdout.write(result.stdout);
+  if (result.stderr !== '') process.stderr.write(result.stderr);
+  return result.exitStatus;
 }
 
 /** One engineer session, printed as it happens. The first interrupt stops the session; a second one exits at once. */

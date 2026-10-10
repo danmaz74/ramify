@@ -24,6 +24,12 @@ export type CommandLine =
       readonly write: readonly string[];
       readonly gate: boolean;
     }
+  | {
+      readonly command: 'step';
+      readonly step:
+        | { readonly command: 'inputs'; readonly role: string; readonly fromRun: string; readonly invocation: string; readonly out: string | undefined }
+        | { readonly command: 'render'; readonly inputs: string; readonly projectRoot: string; readonly invocation: string | undefined };
+    }
   | { readonly command: 'help' };
 
 /** Thrown for a command line that cannot be run; the message says why. */
@@ -41,6 +47,10 @@ export const usage = [
   '                       (--prompt <text> | --prompt-file <file>)',
   '                       [--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>]',
   '                       [--write <project-relative path>]... [--gate]',
+  '  ramify-agent step inputs --role engineer --from-run <run dir> --invocation <id> [--out <file>]',
+  '                       Imports one invocation\'s recorded inputs as a fresh start; compares the delivery as a diagnostic.',
+  '  ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]',
+  '                       Prints what the step\'s session receives. Takes no lock and writes nothing.',
 ].join('\n');
 
 /** Reads `--flag value` and `--flag=value` pairs, one argument at a time. */
@@ -70,6 +80,7 @@ export function parseCommandLine(argv: readonly string[]): CommandLine {
   if (command === undefined || command === 'help' || command === '--help' || command === '-h') return { command: 'help' };
   if (command === 'serve') return parseServe(rest);
   if (command === 'session') return parseSession(rest);
+  if (command === 'step') return parseStep(rest);
   throw new UsageError(`Unknown command "${command}"`);
 }
 
@@ -134,4 +145,39 @@ function parseSession(rest: readonly string[]): CommandLine {
     write,
     gate,
   };
+}
+
+function parseStep(rest: readonly string[]): CommandLine {
+  const [subcommand, ...flags] = rest;
+  if (subcommand === 'inputs') {
+    let role: string | undefined;
+    let fromRun: string | undefined;
+    let invocation: string | undefined;
+    let out: string | undefined;
+    options(flags, (flag, value, _inline, argument) => {
+      if (flag === '--role') role = value();
+      else if (flag === '--from-run') fromRun = value();
+      else if (flag === '--invocation') invocation = value();
+      else if (flag === '--out') out = value();
+      else throw new UsageError(`Unknown option "${argument}"`);
+    });
+    if (role === undefined) throw new UsageError('step inputs needs --role <role>');
+    if (fromRun === undefined) throw new UsageError('step inputs needs --from-run <run dir>');
+    if (invocation === undefined) throw new UsageError('step inputs --from-run needs --invocation <id>');
+    return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out } };
+  }
+  if (subcommand === 'render') {
+    let inputs: string | undefined;
+    let projectRoot: string | undefined;
+    let invocation: string | undefined;
+    options(flags, (flag, value, _inline, argument) => {
+      if (flag === '--inputs') inputs = value();
+      else if (flag === '--project') projectRoot = value();
+      else if (flag === '--invocation') invocation = value();
+      else throw new UsageError(`Unknown option "${argument}"`);
+    });
+    if (inputs === undefined) throw new UsageError('step render needs --inputs <file>');
+    return { command: 'step', step: { command: 'render', inputs, projectRoot: projectRoot ?? '.', invocation } };
+  }
+  throw new UsageError(subcommand === undefined ? 'step needs a subcommand: inputs or render' : `Unknown step subcommand "${subcommand}"`);
 }
