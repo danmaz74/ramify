@@ -21,7 +21,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(
 const project = () => writeGuardProject(cleanups);
 function writing(...paths: string[]): ToolAction { return { kind: 'write', paths }; }
 
-/** F1: actual installed Ramify 0.4.1 placement, separate from the scripted lifecycle controls. */
+/** F1: actual installed Ramify placement at the pinned version, separate from the scripted lifecycle controls. */
 async function f1() {
   const directory = await temporaryDirectory(); cleanups.push(directory.remove); const root = directory.path;
   const files: Record<string, string> = {
@@ -65,7 +65,8 @@ test('PB3-S01–S05 S09: F1 whole owners, named physical children, independent t
   const scope = await capture([inclusion(child), inclusion('fixture')], [{ path: 'cache/extra.txt', purpose: 'contract' }, { path: 'fixture/.git/config', purpose: 'fake-injection' }]);
   expect(scope.resolved.included.map(entry => [entry.kind, entry.owner])).toEqual([['child-subtree', 'app/a'], ['owned-nested-project', 'app']]);
   expect(scope.resolved.included[1]!.projectInstructions).toContainEqual({ path: 'fixture/AGENTS.md', text: 'Use this independent project root for verification.' });
-  expect(scope.resolved.ownership.ramifyVersion).toBe('0.4.1');
+  const manifest = JSON.parse(await readFile(new URL('../../../../package.json', import.meta.url), 'utf8')) as { dependencies: Record<string, string> };
+  expect(scope.resolved.ownership.ramifyVersion).toBe(manifest.dependencies['ramify.ts']);
   const allowed = ['README.md', 'scripts/new.ts', 'docs/new.md', 'docs/new.ts', 'docs/new.mts', 'docs/new.mjs', 'docs/module.ramify', 'src/tmp/module.ramify', 'fixture/module.ramify', 'fixture/new.txt', 'dist/ordinary.txt', 'docs/dist/ordinary.txt', `${child}/notes.md`, `${child}/scripts/tool.ts`, `${child}/subs/other/src/new.ts`];
   const blocked = ['subs/physical-b/src/b.ts', `${child}/project/new.txt`, `${child}/cache/new.txt`, 'cache/new.txt', 'cache/back/new.txt', 'src/escape/new.txt', 'src/sibling/src/new.ts', 'fixture/dist/absent.ts', '.git/new', 'node_modules/new', 'src/.ramify/new', 'fixture/.git/config', 'fixture/node_modules/new', 'fixture/src/.ramify/new', 'docs/.git/config', 'docs/node_modules/new', 'docs/src/.ramify/new', 'src/tmp/.git/config', 'src/tmp/node_modules/new', 'src/tmp/src/.ramify/new', 'cache/extra.txt'];
   const guard = guardedScopeOf(scope, [], ramify);
