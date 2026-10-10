@@ -1,6 +1,7 @@
 ramify 1
 root module "ramify-agent"
 owned-unwired "docs"
+owned-unwired "plans"
 
 // The harness owns the formats it implements and exposes them here. This
 // module re-exposes exactly that public contract surface to every descendant,
