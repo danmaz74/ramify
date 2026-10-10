@@ -14,6 +14,7 @@ import { createStepProgressText } from './run-text.js';
 import { runStep } from './run.js';
 import { runStepAfter } from './after.js';
 import { runStepGate } from './gate.js';
+import { engineerInputsFromAssignment } from './assigned.js';
 import { reviewInputsFromRequest } from './review-step.js';
 
 /*
@@ -38,6 +39,8 @@ export type StepCommandOptions =
       readonly invocation: string | undefined;
       /** A review request a manual run recorded, whose question's inputs are composed; with --from-run and no --invocation. */
       readonly request?: string | undefined;
+      /** The local architect invocation of a manual run whose recorded assignment the engineer inputs are derived from; with --from-run. */
+      readonly assignmentOf?: string | undefined;
       /** Where the imported inputs are written; absent, they are printed. */
       readonly out?: string | undefined;
       /** Files that replace parts of the recorded inputs, each judged as its producing role's output. */
@@ -154,6 +157,20 @@ async function gateOrAfter(options: Extract<StepCommandOptions, { command: 'gate
   }
 }
 
+/** An engineer's inputs, derived from the assignment one local architect invocation of a manual run made. */
+async function assignedInputs(options: Extract<StepCommandOptions, { command: 'inputs' }>, invocation: string,
+  authoringPorts: AuthoringPorts | undefined): Promise<StepCommandResult> {
+  if (options.role !== 'engineer') return { exitStatus: 2, stdout: '', stderr: `Refused: --assignment-of derives an engineer's inputs, not ${options.role}'s\n` };
+  if (options.fromRun === undefined || options.invocation !== undefined || Object.values(options.authored ?? {}).some(path => path !== undefined)) {
+    return { exitStatus: 2, stdout: '', stderr: 'Refused: --assignment-of takes the manual run that recorded the assignment as --from-run, with no --invocation or authored files\n' };
+  }
+  const result = await engineerInputsFromAssignment({ runDirectory: options.fromRun, invocation, ports: authoringPorts ?? installedAuthoringPorts() });
+  if (result.status === 'refused') return { exitStatus: 2, stdout: '', stderr: `Refused: ${result.reason}\n` };
+  return written(serializeStepInputs(result.inputs), options.out, [
+    `Derived the engineer inputs of ${result.inputs.assignment.id} (attempt 1, fresh start) from the assignment ${invocation} made, as the manual run recorded it.`,
+  ]);
+}
+
 /** A review question's inputs, composed from a review request a manual run recorded. */
 async function requestInputs(options: Extract<StepCommandOptions, { command: 'inputs' }>, request: string): Promise<StepCommandResult> {
   if (options.role !== 'reviewer') return { exitStatus: 2, stdout: '', stderr: `Refused: --request composes a reviewer's inputs, not ${options.role}'s\n` };
@@ -170,6 +187,7 @@ async function requestInputs(options: Extract<StepCommandOptions, { command: 'in
 
 async function importInputs(options: Extract<StepCommandOptions, { command: 'inputs' }>, authoringPorts: AuthoringPorts | undefined): Promise<StepCommandResult> {
   if (options.request !== undefined) return requestInputs(options, options.request);
+  if (options.assignmentOf !== undefined) return assignedInputs(options, options.assignmentOf, authoringPorts);
   const authored = options.authored ?? {};
   if (options.fromRun === undefined || options.invocation === undefined) {
     const { workItem, outline, assignment, selection, reviewRequest } = authored;
@@ -187,7 +205,7 @@ async function importInputs(options: Extract<StepCommandOptions, { command: 'inp
     const provenance = result.inputs.provenance;
     const lines = [
       `Authored engineer inputs for ${result.inputs.assignment.id} with no run, the assignment judged as the output of the local architect's first work turn of ${result.inputs.work.workItem} against the project.`,
-      `Authored: ${provenance !== undefined && 'origin' in provenance ? provenance.authored.join(', ') : ''}.`,
+      `Authored: ${provenance !== undefined && 'origin' in provenance && provenance.origin === 'authored' ? provenance.authored.join(', ') : ''}.`,
     ];
     return written(serializeStepInputs(result.inputs), options.out, lines);
   }
@@ -232,7 +250,7 @@ async function render(options: Extract<StepCommandOptions, { command: 'render' }
   const step = constructStep(inputs, { projectRoot, packages });
   const rendered = await renderStep(step, {
     projectRoot, packages, builtinDeclarations: piBuiltinDeclarations,
-    operationId: options.invocation ?? (inputs.provenance !== undefined && 'invocation' in inputs.provenance ? inputs.provenance.invocation : undefined) ?? defaultRenderInvocation,
+    operationId: options.invocation ?? (inputs.provenance !== undefined && !('origin' in inputs.provenance) ? inputs.provenance.invocation : undefined) ?? defaultRenderInvocation,
     sessionOperations: join(projectRoot, 'plans', '.harness', 'session-operations'),
   });
   return { exitStatus: 0, stdout: renderedText(rendered), stderr: '' };

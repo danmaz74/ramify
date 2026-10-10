@@ -258,7 +258,7 @@ export function manualRunner(options: {
  */
 export async function recordAuthoredInputs(runner: InvocationRunner<ManualRun>, run: ManualRun, inputs: EngineerStepInputs): Promise<string | null> {
   const provenance = inputs.provenance;
-  if (provenance === undefined || !('origin' in provenance)) return null;
+  if (provenance === undefined || !('origin' in provenance) || provenance.origin !== 'authored') return null;
   const { workItem: item, outlines } = provenance;
   const { assignment } = inputs;
   const number = Number(assignment.id.slice(assignment.id.lastIndexOf('.i') + 2));

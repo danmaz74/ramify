@@ -145,7 +145,19 @@ const authoredProvenanceSchema = z.object({
   outlines: z.array(workItemOutlineSchema),
 }).strict();
 
-const provenanceSchema = z.union([runProvenanceSchema, authoredProvenanceSchema]);
+/**
+ * Engineer inputs derived from an assignment a manual run recorded: the
+ * local architect invocation whose accepted `assign` made it, and the
+ * assignment record `step after` committed for it.
+ */
+const assignmentProvenanceSchema = z.object({
+  origin: z.literal('assignment'),
+  run: runIdentitySchema,
+  invocation: text,
+  assignment: runPathSchema,
+}).strict();
+
+const provenanceSchema = z.union([runProvenanceSchema, authoredProvenanceSchema, assignmentProvenanceSchema]);
 export type StepProvenance = z.infer<typeof provenanceSchema>;
 export type RunProvenance = z.infer<typeof runProvenanceSchema>;
 

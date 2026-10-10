@@ -37,7 +37,7 @@ export type CommandLine =
       readonly command: 'step';
       readonly step:
         | { readonly command: 'inputs'; readonly role: string; readonly fromRun: string | undefined; readonly invocation: string | undefined; readonly out: string | undefined;
-            readonly projectRoot?: string | undefined; readonly request?: string | undefined; readonly authored: AuthoredFiles }
+            readonly projectRoot?: string | undefined; readonly request?: string | undefined; readonly assignmentOf?: string | undefined; readonly authored: AuthoredFiles }
         | { readonly command: 'render'; readonly inputs: string; readonly projectRoot: string; readonly invocation: string | undefined }
         | { readonly command: 'run'; readonly inputs: string; readonly run: string; readonly agent: SessionAgent }
         | { readonly command: 'gate'; readonly run: string; readonly checkpoint: StepGateCheckpoint; readonly invocation: string | undefined; readonly noCommit: boolean }
@@ -82,6 +82,9 @@ export const usage = [
   '  ramify-agent step inputs --role reviewer --from-run <manual run dir> --request <review request id> [--out <file>]',
   '                       Composes a code, scope or design review of a request the manual run recorded; step run runs it',
   '                       and its terminal attempt settles the request.',
+  '  ramify-agent step inputs --role engineer --from-run <manual run dir> --assignment-of <local architect invocation id> [--out <file>]',
+  '                       Derives the first, fresh engineer inputs of the assignment that invocation\'s accepted assign made,',
+  '                       once step after recorded it, as a run derives them on acceptance.',
   '  ramify-agent step gate --run <manual run dir> --checkpoint <iteration|work-item|readiness|final> [--invocation <id>] [--no-commit]',
   '                       Runs one gate as a run runs it: a committing checkpoint commits the candidate on the run branch and',
   '                       requests the configured audit; readiness audits the baseline. The subject is the accepted submission',
@@ -196,6 +199,7 @@ function parseStep(rest: readonly string[]): CommandLine {
     let out: string | undefined;
     let projectRoot: string | undefined;
     let request: string | undefined;
+    let assignmentOf: string | undefined;
     const authored: { -readonly [K in keyof AuthoredFiles]: AuthoredFiles[K] } = {};
     const files = { '--work-item': 'workItem', '--outline': 'outline', '--assignment': 'assignment', '--selection': 'selection', '--review-request': 'reviewRequest' } as const;
     options(flags, (flag, value, _inline, argument) => {
@@ -205,6 +209,7 @@ function parseStep(rest: readonly string[]): CommandLine {
       else if (flag === '--out') out = value();
       else if (flag === '--project') projectRoot = value();
       else if (flag === '--request') request = value();
+      else if (flag === '--assignment-of') assignmentOf = value();
       else if (flag in files) authored[files[flag as keyof typeof files]] = value();
       else throw new UsageError(`Unknown option "${argument}"`);
     });
@@ -212,6 +217,11 @@ function parseStep(rest: readonly string[]): CommandLine {
     // Authored files without a run are judged against the project by the
     // command, which refuses those that need a run's context with what they lack.
     if (request !== undefined && fromRun === undefined) throw new UsageError('step inputs --request needs --from-run <manual run dir>');
+    if (assignmentOf !== undefined) {
+      if (fromRun === undefined) throw new UsageError('step inputs --assignment-of needs --from-run <manual run dir>');
+      if (invocation !== undefined || request !== undefined) throw new UsageError('step inputs --assignment-of names the local architect invocation itself; it takes no --invocation or --request');
+      return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out, assignmentOf, authored } };
+    }
     if (fromRun === undefined && Object.keys(authored).length === 0) throw new UsageError('step inputs needs --from-run <run dir>, or --project <root> with authored files');
     if (request !== undefined) {
       if (invocation !== undefined) throw new UsageError('step inputs --request composes a new review attempt; it takes no --invocation');

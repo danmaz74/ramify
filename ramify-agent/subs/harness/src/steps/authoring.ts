@@ -85,7 +85,7 @@ const issues = (errors: readonly { readonly path: string; readonly message: stri
   errors.map(error => `${error.path || '(root)'}: ${error.message}`).join('; ');
 
 /** A Ramify port that reads the existing materialized views wherever a run would materialize them. */
-function existingViews(ramify: RamifyCli): RamifyCli {
+export function existingViews(ramify: RamifyCli): RamifyCli {
   const reader = Object.create(ramify) as RamifyCli;
   reader.materialize = async () => ({ ok: true, output: 'The existing materialized views are read; nothing is materialized without a run.' });
   return reader;

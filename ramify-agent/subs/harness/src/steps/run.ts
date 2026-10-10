@@ -277,9 +277,7 @@ async function runLocked(options: StepRunOptions, original: StepInputs, location
   };
   const taken = takenStart(inputs, run, sessionOf);
   inputs = taken.inputs;
-  const provenance = inputs.provenance === undefined ? null : 'origin' in inputs.provenance
-    ? `authored (${inputs.provenance.authored.join(', ')})`
-    : `${inputs.provenance.run.planId}/${inputs.provenance.run.runId} ${inputs.provenance.invocation} (original start ${inputs.provenance.originalStart})`;
+  const provenance = provenanceText(inputs.provenance);
   const variant = inputs.role === 'local-architect' ? inputs.phase : inputs.role === 'reviewer' ? inputs.question : null;
 
   const packages = options.loadPackages !== undefined ? await options.loadPackages(inputs.capabilityWorkflow)
@@ -652,4 +650,15 @@ async function prepareEngineer(original: Extract<StepInputs, { role: 'engineer' 
     standing: () => tools.openFindings(),
     scratch,
   };
+}
+
+/** Where the inputs came from, as the step's start names it. */
+function provenanceText(provenance: StepInputs['provenance']): string | null {
+  if (provenance === undefined) return null;
+  if (!('origin' in provenance)) {
+    return `${provenance.run.planId}/${provenance.run.runId} ${provenance.invocation} (original start ${provenance.originalStart})`;
+  }
+  return provenance.origin === 'authored'
+    ? `authored (${provenance.authored.join(', ')})`
+    : `the assignment ${provenance.assignment.run} of ${provenance.run.planId}/${provenance.run.runId} ${provenance.invocation}`;
 }

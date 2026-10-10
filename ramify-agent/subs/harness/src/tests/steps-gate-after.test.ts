@@ -454,6 +454,12 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
 
       // The assignment: the work item and outline the turn was given, the outline and the assignment it submitted.
       const architect = invocationOf(await stepHere(await file('turn.json', turn), [{ kind: 'submit', input: assign(notes, { goal: 'Raise the note limit to 500.' }, outline()) }]));
+      const derive = (invocation: string, out = join(scratch, 'engineer.json')) => runStepCommandWith({
+        command: 'inputs', role: 'engineer', fromRun: run, invocation: undefined, assignmentOf: invocation, out,
+      }, { ramify: new FakeRamifyCli(), git: { currentHead: async () => 'base-9' }, configuredAudit: passingAudit(), index: readDeclaredTree });
+      // Until `after` records the assignment, there is none to derive the engineer's inputs from.
+      expect(await derive(architect)).toMatchObject({ exitStatus: 2,
+        stderr: `Refused: the manual run records no assignment by ${architect}; \`step after --invocation ${architect}\` records it\n` });
       const assigned = await after(run, architect, { git });
       expect(assigned.exitStatus, assigned.lines.join('\n')).toBe(0);
       expect(assigned.applied.join('\n')).toContain(`work-item-started ${workLayout.item(item)}`);
@@ -466,10 +472,27 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
       expect((await after(run, architect, { git })).applied).toEqual([`nothing more: ${item}.i01 was already assigned by ${architect}`]);
       expect(await readFile(join(run, runLayout.events), 'utf8')).toBe(log);
 
+      // The engineer's inputs, derived from the recorded assignment as the run derives them on acceptance.
+      const derived = await derive(architect);
+      expect(derived.exitStatus, derived.stderr).toBe(0);
+      const engineerPath = join(scratch, 'engineer.json');
+      const engineerInputs = parseStepInputs(await readFile(engineerPath, 'utf8'));
+      if (engineerInputs.role !== 'engineer') throw new Error('not engineer inputs');
+      expect(engineerInputs).toMatchObject({ attempt: 1, start: { kind: 'fresh' }, run: { planId: source.planId, runId: 'm-arch' },
+        work: { workItem: item, iteration: `${item}.i01` },
+        provenance: { origin: 'assignment', run: { planId: source.planId, runId: 'm-arch' }, invocation: architect,
+          assignment: { run: iterationLayout.assignment(item, 1) } } });
+      expect(engineerInputs.assignment).toEqual(await json(join(run, iterationLayout.assignment(item, 1))));
+      const rendered = await runStepCommandWith({ command: 'render', inputs: engineerPath, projectRoot: source.root });
+      expect(rendered.exitStatus, rendered.stderr).toBe(0);
+      expect(rendered.stdout).toContain('Raise the note limit to 500.');
+      // The architect's invocation is not an engineer's assignment, and a submission other than assign makes none.
+      expect((await derive(architect.replace(/\d+$/u, '9999'))).stderr).toContain('records no invocation');
       // The engineer of that iteration reports partial work: its result, and the architect's next-turn inputs.
-      const engineerInputs = await imported('engineer', inputs => inputs.role === 'engineer' && inputs.assignment.id === `${item}.i01`);
-      const engineer = invocationOf(await stepHere(await file('engineer.json', engineerInputs),
+      const engineer = invocationOf(await stepHere(engineerPath,
         [{ kind: 'submit', input: partialReport(['Read the limit.'], ['Raise it to 500.']) }]));
+      // Once its engineer started, the first inputs are no longer derived.
+      expect((await derive(architect, join(scratch, 'again.json'))).stderr).toContain(`the engineer of ${item}.i01 has started already (${engineer})`);
       const reported = await after(run, engineer, { git });
       expect(reported.exitStatus, reported.lines.join('\n')).toBe(0);
       expect(reported.applied).toContainEqual(`the result of ${item}.i01: partial, ${join(run, iterationLayout.result(item, 1))}`);
@@ -493,6 +516,7 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
       const completing = invocationOf(completingRun);
       const requested = await after(run, completing, { git });
       expect(requested.exitStatus, requested.lines.join('\n')).toBe(0);
+      expect((await derive(completing, join(scratch, 'completing.json'))).stderr).toContain(`the accepted submission of ${completing} is a request-completion, not an assign`);
       expect(requested.applied).toEqual([`1 obligation transition from the 1 registrations and reports of ${completing}`,
         `the completion outline, revision 2 of ${item}`]);
       expect(requested.notRun).toEqual([`settling ${item}'s reviews, reconciliation, its work-item gate and its completion; \`step gate --checkpoint work-item --invocation ${completing}\` runs the gate once its reviews are settled`]);

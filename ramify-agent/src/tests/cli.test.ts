@@ -58,24 +58,6 @@ describe('session', () => {
     expect(() => parseCommandLine([...base, '--prompt', 'x', '--agent', 'fake'])).toThrow(/needs --script/);
   });
 
-  test('gate takes a manual run, a checkpoint, an optional invocation and --no-commit', () => {
-    expect(parseCommandLine(['step', 'gate', '--run', 'r', '--checkpoint', 'iteration', '--invocation', 'inv-0002'])).toEqual({
-      command: 'step', step: { command: 'gate', run: 'r', checkpoint: 'iteration', invocation: 'inv-0002', noCommit: false },
-    });
-    expect(parseCommandLine(['step', 'gate', '--run=r', '--checkpoint=readiness', '--no-commit'])).toEqual({
-      command: 'step', step: { command: 'gate', run: 'r', checkpoint: 'readiness', invocation: undefined, noCommit: true },
-    });
-  });
-
-  test('after takes a manual run and an invocation; inputs composes a review from a recorded request', () => {
-    expect(parseCommandLine(['step', 'after', '--run', 'r', '--invocation', 'inv-0003'])).toEqual({
-      command: 'step', step: { command: 'after', run: 'r', invocation: 'inv-0003' },
-    });
-    expect(parseCommandLine(['step', 'inputs', '--role', 'reviewer', '--from-run', 'r', '--request', 'rq-0001', '--out', 'q.json'])).toEqual({
-      command: 'step', step: { command: 'inputs', role: 'reviewer', fromRun: 'r', invocation: undefined, out: 'q.json', request: 'rq-0001', authored: {} },
-    });
-  });
-
   test('usage errors', () => {
     for (const argv of [
       ['session', '--module', 'm', '--prompt', 'x', '--agent', 'pi'],
@@ -153,6 +135,12 @@ describe('step', () => {
     });
   });
 
+  test('inputs derives an engineer\'s inputs from the assignment a manual run recorded', () => {
+    expect(parseCommandLine(['step', 'inputs', '--role', 'engineer', '--from-run', 'r', '--assignment-of', 'inv-0001', '--out', 'e.json'])).toEqual({
+      command: 'step', step: { command: 'inputs', role: 'engineer', fromRun: 'r', invocation: undefined, out: 'e.json', assignmentOf: 'inv-0001', authored: {} },
+    });
+  });
+
   test('usage errors', () => {
     for (const [argv, message] of [
       [['step'], /needs a subcommand: inputs, render, run, gate or after/],
@@ -164,6 +152,8 @@ describe('step', () => {
       [['step', 'after', '--invocation', 'i'], /step after needs --run/],
       [['step', 'inputs', '--role', 'reviewer', '--request', 'rq-0001'], /--request needs --from-run/],
       [['step', 'inputs', '--role', 'reviewer', '--from-run', 'r', '--request', 'rq-0001', '--invocation', 'i'], /takes no --invocation/],
+      [['step', 'inputs', '--role', 'engineer', '--assignment-of', 'inv-0001'], /--assignment-of needs --from-run/],
+      [['step', 'inputs', '--role', 'engineer', '--from-run', 'r', '--assignment-of', 'inv-0001', '--invocation', 'i'], /takes no --invocation or --request/],
       [['step', 'nothing'], /Unknown step subcommand "nothing"/],
       [['step', 'run', '--run', 'r'], /step run needs --inputs/],
       [['step', 'run', '--inputs', 'i.json'], /step run needs --run/],
@@ -189,6 +179,7 @@ describe('step', () => {
     expect(usage).toContain('ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]');
     expect(usage).toContain('ramify-agent step run --inputs <file> --run <project>/plans/<plan>/.harness/jobs/<run>');
     expect(usage).toContain('ramify-agent step inputs --role reviewer --from-run <manual run dir> --request <review request id> [--out <file>]');
+    expect(usage).toContain('ramify-agent step inputs --role engineer --from-run <manual run dir> --assignment-of <local architect invocation id> [--out <file>]');
     expect(usage).toContain('ramify-agent step gate --run <manual run dir> --checkpoint <iteration|work-item|readiness|final> [--invocation <id>] [--no-commit]');
     expect(usage).toContain('ramify-agent step after --run <manual run dir> --invocation <id>');
   });
