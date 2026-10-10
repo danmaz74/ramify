@@ -17,8 +17,9 @@
       "file": "02-debugger-area.md",
       "dependsOn": ["1"],
       "cases": ["U04", "U05", "U06", "U07", "U08", "U09", "U10", "U11", "U12"],
-      "status": "planned",
-      "writeBoundary": "Web module: plan page, run page, debugger area, styles and JSDOM tests."
+      "status": "implemented",
+      "writeBoundary": "Web module: plan page, run page, debugger area, styles and JSDOM tests.",
+      "results": "02-results.md"
     },
     {
       "id": "3",
