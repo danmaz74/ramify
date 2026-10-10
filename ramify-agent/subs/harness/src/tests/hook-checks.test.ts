@@ -669,7 +669,7 @@ describe('warnings and analysis limits on the files just written', () => {
       'Not blocking: Ramify reports these for the files you just wrote, and fails no check on them.',
       `- ${ignored}: 1 compiler-selected file in the owned-unwired tree subs/workspace/docs, which Ramify does not analyze [warning compiler-selected-owned-unwired]`,
       `- ${mcp}:163: Cannot establish the accessed source or resource target [analysis limit nonliteral-target]`,
-      'An analysis limit is an import Ramify could not decide: it is neither allowed nor denied.',
+      'An analysis limit is something Ramify could not verify, such as an import it could not decide or a signature it could not follow: neither a pass nor a failure.',
     ].join('\n'));
 
     // Told once: the same warning and limit on a later write is not news.

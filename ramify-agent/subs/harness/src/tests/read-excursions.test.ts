@@ -50,6 +50,19 @@ describe('a read that leaves the assignment\'s scope', () => {
     expect(watch.takeReminders()).toEqual([]);
   });
 
+  test('a module the assignment declares for reading is within the assignment, not an excursion', () => {
+    const watch = new ExcursionWatcher({
+      projectRoot: root,
+      index,
+      scope: { revision: 1, projectRoot: root, placement: async paths => paths.map(path => ({ path, allowed: true })), roots: [join(root, notesDirectory, 'src')], files: [] },
+      readModules: [reviews],
+    });
+    expect(watch.observe(`${reviewsDirectory}/src/router.ts`)).toBeNull();
+    expect(watch.observe('subs/workspace/src/app.tsx')?.module).toBe('collection-review/workspace');
+    expect(watch.modules).toEqual(['collection-review/workspace']);
+    expect(watch.takeReminders()).toHaveLength(1);
+  });
+
   test('a second module entered is its own excursion', () => {
     const watch = watcher();
     expect(watch.observe(`${reviewsDirectory}/src/router.ts`)?.module).toBe(reviews);

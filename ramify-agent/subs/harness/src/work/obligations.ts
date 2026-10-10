@@ -106,8 +106,9 @@ export const fakeNameSchema = text.max(200).refine(carriesFakeDesignation, 'A fa
 
 /** One binding of an engineer's completion proposal: an assigned obligation and the fakes it relies on, none by default. */
 export const obligationBindingSchema = z.object({
-  id: text,
-  fakes: z.array(fakeNameSchema).max(100).default([]),
+  id: text.describe('An obligation id the assignment names, such as sc-003'),
+  fakes: z.array(fakeNameSchema).max(100).default([])
+    .describe('The fake class or export names the binding relies on, as the tests name them, each carrying "Fake" (the fake-naming rule), such as FakeClock; empty where it runs against the real provider'),
 }).strict();
 export type ObligationBinding = z.infer<typeof obligationBindingSchema>;
 

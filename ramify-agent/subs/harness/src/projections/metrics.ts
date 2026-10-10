@@ -207,12 +207,12 @@ export async function setupLineIdentitiesOf(view: RunView, history: RunHistory, 
   }
   const blob = async (revision: string, path: string, prefix: string | undefined) => {
     if (history.candidates === undefined || prefix === undefined || (prefix !== '' && (!prefix.endsWith('/') || prefix.startsWith('/') || prefix.split('/').slice(0, -1).some(part => part === '' || part === '.' || part === '..')))) return null;
-    const repositoryPath = `${prefix}${path}`;
+    // The candidate source names the project's files as the project does.
     const entries = await history.candidates.treeEntries(history.projectRoot, revision);
-    const entry = entries.find(value => value.path === repositoryPath);
+    const entry = entries.find(value => value.path === path);
     if (entry === undefined) return { hash: null, lines: [] as string[], text: null };
     if (entry.kind !== 'file' || entry.objectId === undefined) return null;
-    const text = await history.candidates.readBlob(history.projectRoot, revision, repositoryPath);
+    const text = await history.candidates.readBlob(history.projectRoot, revision, path);
     const authenticated = authenticatedText(text, entry.objectId);
     return authenticated === null ? null : { ...authenticated, text };
   };

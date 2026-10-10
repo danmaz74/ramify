@@ -135,6 +135,7 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       await repository.git('add', '--all');
       await repository.git('-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--message', 'nested source');
       const project = join(repository.root, 'nested/project');
+      const before = (await repository.git('rev-parse', 'HEAD')).trim();
       await repository.write('nested/project/src/kept.ts', 'export const kept = 2;\n');
       await repository.write('nested/project/src/added.ts', 'export const added = true;\n');
       await repository.write('elsewhere/tracked.ts', 'export const elsewhere = 2;\n');
@@ -144,12 +145,19 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       expect((await git.worktreeLineChanges(project)).map(change => change.path)).toEqual(['src/added.ts', 'src/kept.ts']);
       // The repository root still sees everything, under its own names.
       expect(await git.changedPaths(repository.root)).toEqual(['elsewhere/tracked.ts', 'elsewhere/untracked.ts', 'nested/project/src/added.ts', 'nested/project/src/kept.ts']);
-      // A gate's commit from the nested project stages the project's tree alone.
+      // A gate's commit from the nested project commits the repository's tree, as its preview says.
       await git.createRunBranch(project, 'nested-commit');
       const committed = await git.commitAccepted(project, 'nested candidate');
       expect(committed).not.toBeNull();
-      expect((await repository.git('show', '--name-only', '--format=', committed!)).trim().split('\n').sort()).toEqual(['nested/project/src/added.ts', 'nested/project/src/kept.ts']);
-      expect(await git.changedPaths(repository.root)).toEqual(['elsewhere/tracked.ts', 'elsewhere/untracked.ts']);
+      expect(await git.changedPaths(repository.root)).toEqual([]);
+      // The committed candidate is read by the project's names too, and only the project's files are in it.
+      expect(await git.diffNameStatus(project, before, committed!)).toEqual([{ status: 'A', path: 'src/added.ts' }, { status: 'M', path: 'src/kept.ts' }]);
+      expect((await git.diffNumstat(project, before, committed!)).map(change => change.path)).toEqual(['src/added.ts', 'src/kept.ts']);
+      expect(await candidate.diffPatch(project, before, committed!, 'src/kept.ts')).toContain('--- a/src/kept.ts');
+      expect((await candidate.treeEntries(project, committed!)).map(entry => entry.path)).toEqual(['src/added.ts', 'src/kept.ts']);
+      expect(await candidate.readBlob(project, committed!, 'src/kept.ts')).toBe('export const kept = 2;\n');
+      expect(await candidate.grepTree(project, committed!, 'kept = ')).toEqual([{ path: 'src/kept.ts', line: 1, text: 'export const kept = 2;' }]);
+      expect(await candidate.grepTree(project, committed!, 'elsewhere')).toEqual([]);
     });
   });
 

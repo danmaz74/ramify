@@ -640,6 +640,7 @@ async function prepareEngineer(original: Extract<StepInputs, { role: 'engineer' 
     scope: { write: assignment.scope.revision, measurement: null, size: null },
     writer: true,
     guarded,
+    readModules: assignment.scope.read,
     equip: tools.equip,
     bounds: step.bounds,
     endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),

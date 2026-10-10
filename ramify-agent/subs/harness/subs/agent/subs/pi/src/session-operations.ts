@@ -313,7 +313,7 @@ async function dispatchPreservingPi(source: PiRuntimeSource, input: SessionDrive
       runtime.onEvent({ type: 'tool-finished', callId: event.toolCallId, tool: event.toolName, isError: event.isError,
         observation: { sourceId: `pi-call:${event.toolCallId}:finish`, at: observedAt(), elapsedMs: start === undefined ? null : Math.max(0, Date.now() - start),
           returnedBytes: Buffer.byteLength(text), files, resolvedScope: target === null ? null : [target], coverage },
-        reachedTool: input.session.activeTools.includes(event.toolName) });
+        reachedTool: input.session.activeTools.includes(event.toolName), ...(event.isError ? { errorText: text } : {}) });
     }
     if (captured) reportMessage(captured as AgentSessionEvent, runtime, messageSourceId, chosen, modelElapsedMs, new Date(admissionAt).toISOString());
   });

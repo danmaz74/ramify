@@ -255,10 +255,9 @@ export async function commitAccepted(root: string, message: string, signal?: Abo
     });
   }
 
-  // The project's tree alone: without a pathspec, `git add --all` stages the
-  // whole repository, which a nested project shares with files that are not
-  // its own.
-  await gitOk(root, ['add', '--all', '--', '.'], signal);
+  // The whole repository, as `previewCandidateTree` previews it: a nested
+  // project's candidate is the repository's tree, not its directory alone.
+  await gitOk(root, ['add', '--all'], signal);
   const staged = await git(root, ['diff', '--cached', '--quiet'], signal);
   if (staged.exitCode === 0) return null;
   if (staged.exitCode !== 1) {
@@ -408,7 +407,7 @@ export async function diffNameStatus(
   to: string,
   signal?: AbortSignal,
 ): Promise<Array<{ readonly status: string; readonly path: string }>> {
-  const run = await gitOk(root, ['diff', '--name-status', '-z', '--no-renames', from, to], signal);
+  const run = await gitOk(root, ['diff', '--name-status', '-z', '--no-renames', '--relative', from, to], signal);
   return nameStatusEntries(run.stdout);
 }
 
@@ -431,7 +430,7 @@ export async function diffNumstat(
   to: string,
   signal?: AbortSignal,
 ): Promise<Array<{ readonly path: string; readonly added: number; readonly deleted: number; readonly binary: boolean }>> {
-  const run = await gitOk(root, ['diff', '--numstat', '-z', from, to], signal);
+  const run = await gitOk(root, ['diff', '--numstat', '-z', '--relative', from, to], signal);
   const fields = run.stdout.split('\0');
   const changes: Array<{ path: string; added: number; deleted: number; binary: boolean }> = [];
   for (let index = 0; index < fields.length; index += 1) {
@@ -591,9 +590,13 @@ export async function commitTree(root: string, commit: string, signal?: AbortSig
   return run.stdout.trim();
 }
 
-/** Every entry of a commit's tree, recursively, in Git's order. */
+/**
+ * Every entry of a commit's tree beneath the project, recursively, in Git's
+ * order, named as the project names it: a nested project's entries lose the
+ * repository prefix, and the rest of the repository is not listed.
+ */
 export async function treeEntries(root: string, commit: string, signal?: AbortSignal): Promise<TreeEntry[]> {
-  const run = await gitOk(root, ['ls-tree', '-r', '-z', '-l', '--full-tree', commit], signal);
+  const run = await gitOk(root, ['ls-tree', '-r', '-z', '-l', commit], signal);
   return parseTreeEntries(run.stdout);
 }
 
@@ -620,9 +623,14 @@ export function parseTreeEntries(output: string): TreeEntry[] {
   return entries;
 }
 
-/** The content of one blob of a commit, as text. The caller bounds its size from `treeEntries`. */
+/**
+ * The content of one blob of a commit, as text, by the project's name for the
+ * path. The caller bounds its size from `treeEntries`.
+ */
 export async function readBlob(root: string, commit: string, path: string, signal?: AbortSignal): Promise<string> {
-  const run = await gitOk(root, ['cat-file', 'blob', `${commit}:${path}`], signal);
+  // `<commit>:./<path>` names the path from the project's directory, where
+  // `<commit>:<path>` would name it from the repository's root.
+  const run = await gitOk(root, ['cat-file', 'blob', `${commit}:./${path}`], signal);
   return run.stdout;
 }
 
@@ -639,20 +647,23 @@ export async function grepTree(root: string, commit: string, pattern: string, pa
       argv: ['git', 'grep', pattern, commit], outcome: { kind: 'completed', exitCode: run.exitCode }, output: run.stderr.trim().slice(-2000),
     });
   }
-  const prefix = `${commit}:`;
+  // Run from the project's directory, `git grep` searches that directory alone
+  // and names each match `<commit>:<path>` relative to it, which is the project's name.
+  const revision = `${commit}:`;
   const matches: TreeMatch[] = [];
   for (const line of run.stdout.split('\n')) {
     if (line === '') continue;
     const [name, number, ...text] = line.split('\0');
     if (name === undefined || number === undefined) continue;
-    matches.push({ path: name.startsWith(prefix) ? name.slice(prefix.length) : name, line: Number.parseInt(number, 10), text: text.join('\0') });
+    const path = name.startsWith(revision) ? name.slice(revision.length) : name;
+    matches.push({ path, line: Number.parseInt(number, 10), text: text.join('\0') });
   }
   return matches;
 }
 
 /** The unified diff between two commits, of one path or of all of them. */
 export async function diffPatch(root: string, from: string, to: string, path?: string, signal?: AbortSignal): Promise<string> {
-  const run = await gitOk(root, ['--literal-pathspecs', 'diff', '--no-color', '--no-renames', '--no-ext-diff', from, to, '--', ...(path === undefined ? [] : [path])], signal);
+  const run = await gitOk(root, ['--literal-pathspecs', 'diff', '--no-color', '--no-renames', '--no-ext-diff', '--relative', from, to, '--', ...(path === undefined ? [] : [path])], signal);
   return run.stdout;
 }
 
@@ -663,7 +674,7 @@ export async function diffPatch(root: string, from: string, to: string, path?: s
  * names those.
  */
 export async function worktreePatch(root: string, base: string = 'HEAD', signal?: AbortSignal): Promise<string> {
-  const run = await gitOk(root, ['diff', '--no-color', '--no-renames', '--no-ext-diff', base, '--'], signal);
+  const run = await gitOk(root, ['diff', '--no-color', '--no-renames', '--no-ext-diff', '--relative', base, '--'], signal);
   return run.stdout;
 }
 

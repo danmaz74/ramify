@@ -8,9 +8,9 @@ import { ownerOf } from '../kpi/lines.js';
  * Read excursions.
  *
  * Write boundaries are hard and read boundaries are soft. The default is the
- * assignment's own scope, the views Ramify generates and the module's
- * onboarding; reading beyond it is permitted, and what the harness owes is
- * the record. The first read into another module is one `excursion`
+ * assignment's own scope, the modules it declares for reading, the views
+ * Ramify generates and the module's onboarding; reading beyond it is
+ * permitted, and what the harness owes is the record. The first read into another module is one `excursion`
  * observation and one concise reminder; every later read into the same
  * module is neither, because a warning repeated at every line is noise
  * rather than a boundary.
@@ -34,6 +34,8 @@ export interface ExcursionOptions {
   readonly index: ArchitectIndex | null;
   /** The scope the invocation may write, which is also where it reads without leaving anything. */
   readonly scope: GuardedScope | undefined;
+  /** The modules the assignment declares for reading; a read into one of them is within the assignment, not an excursion. */
+  readonly readModules?: readonly string[] | undefined;
 }
 
 /**
@@ -60,7 +62,7 @@ export class ExcursionWatcher {
     if (this.options.scope.roots.some(root => isContained(root, absolute))) return null;
 
     const module = ownerOf(this.options.index, inside);
-    if (module === null) return null;
+    if (module === null || this.options.readModules?.includes(module)) return null;
     const firstEntry = !this.entered.has(module);
     if (!firstEntry) return null;
     this.entered.add(module);

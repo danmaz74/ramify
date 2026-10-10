@@ -3724,7 +3724,7 @@ export class RunService {
       keep: () => finished('work-closed'),
       scope: { write: 1, measurement: baseline === null ? null : this.baselineReference(run), size: null },
       ...(baseline === null ? {} : { measured: { snapshot: baseline, scope: writeScopeMeasurement(assignment.scope), readScope: readScopeMeasurement(assignment.scope) } }),
-      writer: true, guarded, workingDirectory, equip: tools.equip,
+      writer: true, guarded, readModules: assignment.scope.read, workingDirectory, equip: tools.equip,
     });
     await this.recordLineEvents(run, result.id, before, await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git));
     if (result.ended !== 'submitted' || result.value === undefined) {
@@ -8340,6 +8340,7 @@ export class RunService {
         writer: true,
         ...(beforeTree === undefined ? {} : { candidateBefore: beforeTree }),
         guarded,
+        readModules: assignment.scope.read,
         equip: tools.equip,
         bounds: step.bounds,
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
@@ -8940,6 +8941,7 @@ export class RunService {
         measured: { snapshot: baseline, scope: measurementScope, readScope: readScopeMeasurement(assignment.scope) },
         writer: true,
         guarded,
+        readModules: assignment.scope.read,
         equip: tools.equip,
         bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs, commandTimeoutMs: bounds.commandTimeoutMs },
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),

@@ -480,11 +480,20 @@ export interface AssignedObligation {
 }
 
 /**
- * The obligations to bind, and what a binding is. Nothing for an assignment
- * that names none, whose completion proposal binds nothing.
+ * The obligations to bind, and what a binding is. An assignment that names
+ * none says so, since its completion proposal binds nothing and a binding of
+ * anything else is refused.
  */
 export function obligationsToBindSection(obligations: readonly AssignedObligation[]): string[] {
-  if (obligations.length === 0) return [];
+  if (obligations.length === 0) {
+    return [
+      '## Obligations to bind',
+      '',
+      'None: this assignment names no obligation, so your completion proposal\'s `bindings` is empty (`[]`). Anything',
+      'else the text names, such as acceptance cases, is the architect\'s to report on, not yours to bind.',
+      '',
+    ];
+  }
   return [
     '## Obligations to bind',
     '',

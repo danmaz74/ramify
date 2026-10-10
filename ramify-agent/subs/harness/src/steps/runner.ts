@@ -156,6 +156,8 @@ export interface InvocationRequest<T> {
    * left the scope.
    */
   readonly guarded?: GuardedScope | undefined;
+  /** The modules the assignment declares for reading, which a read enters without an excursion. */
+  readonly readModules?: readonly string[] | undefined;
   /**
    * What this role is given beyond reading and its submission tool: the
    * implementation's own mutating built-ins, the harness's own tools, and
@@ -663,6 +665,7 @@ export class InvocationRunner<R extends RunnerRun> {
       projectRoot: this.projectRoot,
       index: run.index,
       scope: request.guarded,
+      readModules: request.readModules,
     });
     const context = request.context ?? contextPolicyOf(run.policy, request.role);
     const recorder = new PortEventRecorder({

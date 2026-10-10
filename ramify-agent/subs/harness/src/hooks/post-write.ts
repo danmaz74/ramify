@@ -699,7 +699,7 @@ function noticeLines(notices: readonly HookNotice[]): string[] {
     lines.push(`- ${at}: ${notice.message} [${notice.kind === 'warning' ? 'warning' : 'analysis limit'} ${notice.code}]`);
   }
   if (notices.some(notice => notice.kind === 'analysis-limit')) {
-    lines.push('An analysis limit is an import Ramify could not decide: it is neither allowed nor denied.');
+    lines.push('An analysis limit is something Ramify could not verify, such as an import it could not decide or a signature it could not follow: neither a pass nor a failure.');
   }
   return lines;
 }

@@ -185,7 +185,8 @@ async function committing(run: ManualRun, context: ManualHostContext, options: S
   const subjectText = Object.entries(attempt.subject).map(([key, value]) => `${key} ${value}`).join(', ') || 'none';
   line(`Gate ${attempt.id}: ${attempt.checkpoint}, ${attempt.verdict}${attempt.cause === null ? '' : ` (${attempt.cause})`}; next: ${attempt.next}.`);
   line(`Subject: ${subjectText}; proposed by: ${attempt.proposedBy ?? 'none'}.`);
-  line(`Candidate: head ${attempt.head}, commit ${attempt.commit ?? 'none (the tree was unchanged)'}, audited ${attempt.audited ?? 'none'}.`);
+  const uncommitted = attempt.verdict === 'passed' ? 'none (the tree was unchanged)' : 'none (a rule failed before the commit)';
+  line(`Candidate: head ${attempt.head}, commit ${attempt.commit ?? uncommitted}, audited ${attempt.audited ?? 'none'}.`);
   line(`Record: ${record}`);
   return { exitStatus: attempt.verdict === 'passed' ? 0 : 1, attempt, record, diagnosis: false, lines };
 }

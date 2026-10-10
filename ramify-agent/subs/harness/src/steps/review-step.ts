@@ -146,7 +146,8 @@ export async function reviewInputsFromRequest(options: ReviewInputsFromRequestOp
  * The start a question takes in a manual run: a scope review forks the
  * local architect's pinned point at the assignment where the manual run
  * recorded it, and starts fresh with the reason otherwise; a design review
- * forks an orientation the manual run recorded for its key. `step run`
+ * forks an orientation the manual run recorded for its key, and starts fresh
+ * with the reason where there is none, its guidance in its packet. `step run`
  * starts fresh, with the reason, where the forked session is not the
  * manual run's.
  */
@@ -157,7 +158,7 @@ function reviewStartOf(run: ManualRun, request: ReviewRequest, notes: string[]):
     return { kind: 'fresh', degraded: { requested: 'fork', reason } };
   };
   if (point.kind === 'none') return { kind: 'fresh' };
-  if (point.kind === 'unavailable') return request.key.kind === 'scope' ? fresh(point.reason) : point.reason;
+  if (point.kind === 'unavailable') return request.key.kind === 'code' ? point.reason : fresh(point.reason);
   const briefsBefore = (session: string, invocation: string) => {
     const ended = run.log.all('invocation-ended').find(event => event.data.invocation === invocation)?.sequence ?? 0;
     return run.log.all('brief-appended').filter(event => event.data.session === session && event.sequence < ended).map(event => event.data.decision);

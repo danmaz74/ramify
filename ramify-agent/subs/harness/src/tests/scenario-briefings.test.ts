@@ -205,7 +205,7 @@ describe('the engineer\'s briefing', () => {
     const open = iterationMessage({ assignment: assignment(), projectRoot: '/p', base: 'abc', scenarios: entry([]) });
     expect(open).toContain('## The scenarios of this work item\n\nEach scenario of its entry that is not done yet:');
     expect(open).not.toContain('## Scenarios to bind');
-    expect(open).not.toContain('## Obligations to bind');
+    expect(open).toContain('## Obligations to bind\n\nNone: this assignment names no obligation, so your completion proposal\'s `bindings` is empty (`[]`).');
     for (const id of ['sc-001', 'sc-002', 'sc-003']) expect(open).toContain(`### ${id} (pending)`);
 
     const done = iterationMessage({

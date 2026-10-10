@@ -105,7 +105,7 @@ export function manualHandling(context: ManualHostContext, gates: CommittingGate
     citeCurrentDeviations: async () => {
       throw new Error('a manual run holds no element catalog, so no plan deviation is cited');
     },
-    orientationIdentity: () => 'a manual run keys no design orientation; run the orientation as its own step, or the review starts fresh',
+    orientationIdentity: () => 'a manual run keys no design orientation, so its design review starts fresh with the guidance in its packet',
     wakeReviews: () => undefined,
   });
 }
