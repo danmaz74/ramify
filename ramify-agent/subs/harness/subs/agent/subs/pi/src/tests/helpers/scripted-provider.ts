@@ -210,7 +210,7 @@ export async function scriptedRuntime(scripted: ScriptedProvider): Promise<{ run
 
 export interface NativeCodexRuntime { readonly runtime: ModelRuntime; readonly model: Model; readonly agentDirectory: string; readonly requests: Record<string, unknown>[]; readonly wireRequests: Record<string, unknown>[]; readonly transports: unknown[]; readonly wireHeaders: Array<{ sessionId: string | null; clientRequestId: string | null }>; dispatches(): number; push(...items: Array<readonly Record<string, unknown>[]>): void; verify(): void; remove(): Promise<void> }
 /** Real installed Codex serializer/parser, with only its HTTP transport intercepted. */
-export async function nativeCodexRuntime(outputs: readonly (readonly Record<string, unknown>[])[]): Promise<NativeCodexRuntime> {
+export async function nativeCodexRuntime(outputs: readonly (readonly Record<string, unknown>[] | null)[]): Promise<NativeCodexRuntime> {
   const agentDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-native-pi-'));
   const runtime = await ModelRuntime.create({ authPath: join(agentDirectory, 'auth.json'), modelsPath: null, modelsStorePath: join(agentDirectory, 'models-store.json'), allowModelNetwork: false, refreshOnCreate: false });
   const model = runtime.getModel('openai-codex', 'gpt-5.6-sol');
@@ -226,10 +226,17 @@ export async function nativeCodexRuntime(outputs: readonly (readonly Record<stri
     },
     fetch: async (_url: string | URL | Request, init?: RequestInit) => {
       const index = ++dispatches; const output = queue.shift();
-      if (!output) { exhausted = true; throw new Error('Unexpected native provider request'); }
+      if (output === undefined) { exhausted = true; throw new Error('Unexpected native provider request'); }
       const wire = typeof init?.body === 'string' ? init.body : zlib.zstdDecompressSync(init?.body as Uint8Array).toString('utf8');
       wireRequests.push(JSON.parse(wire) as Record<string, unknown>);
       const headers = new Headers(init?.headers); wireHeaders.push({ sessionId: headers.get('session-id'), clientRequestId: headers.get('x-client-request-id') });
+      // A null scripted response waits for this request's actual abort signal.
+      // No network, process or elapsed-speed assertion is involved.
+      if (output === null) return await new Promise<Response>((_resolve, reject) => {
+        const aborted = () => reject(new DOMException('Scripted request aborted', 'AbortError'));
+        if (init?.signal?.aborted) aborted();
+        else init?.signal?.addEventListener('abort', aborted, { once: true });
+      });
       const event = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`;
       let sse = event({ type: 'response.created', response: { id: `resp_fixture_${index}` } });
       output.forEach((item, output_index) => {

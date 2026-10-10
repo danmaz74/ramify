@@ -397,7 +397,20 @@ this too. Capability and global consultation forks answer directly. This is
 advice: it changes no assignment or architectural decision. Each call forks the
 recorded delegation point; current files and generated views may differ from
 inherited observations. Missing recorded targets mean no tool; unavailable
-recorded history returns an explicit error, with no fresh substitute.
+recorded history returns an explicit error, with no fresh substitute. Aborted
+calls stop both consultation levels; an uncertain interrupted effect is retained
+without an implicit retry. A completed effect replay uses its existing answer.
+
+Local orientation, assignment, completion and repair turns can consult global.
+Engineers keep their original assigning point through repair and capability
+handback; a nested capability engineer asks its own assigning coordinator.
+Ordinary capability coordinators, contract engineers, reviewers, nonfunctional
+and selector sessions have no consultation tool. Standalone and imported steps
+without same-run architect history explain unavailable consultation. Independent
+questions fork the same recorded point; include earlier exchanges in a follow-up
+message when they matter. The fork reads with read/grep/ls and answers with
+`answer_architect_consultation({ answer })`; it cannot revise a capability plan
+or submit inherited assignment or placement actions.
 
 ```sh
 ramify-agent consultations --run <run-directory>

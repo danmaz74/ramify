@@ -1,13 +1,13 @@
 # Consult architect
 
-**Date:** 2026-10-10. **Status:** initial analysis of a proposed feature;
-consultative intent, ordinary asynchronous tool execution and logging agreed,
-implementation not started.
+**Date:** 2026-10-10. **Status:** implemented on `feat/plan33-consult-architect`;
+iterations 1–3 accepted, integrated scripted workflow and Pi transport witnesses
+pass. Exact-candidate configured full nested qualification is pending iteration 4.
 
 [Plan 33](../plans/33-consult-architect/main-plan.md) translates this proposal
 into four serial implementation iterations. It records the selected simple
-defaults and the decision to include capability-assigned engineers; planning
-does not establish runtime verification.
+defaults and the decision to include capability-assigned engineers; the iteration receipts record actual implementation evidence. The source
+inspection below remains historical provenance, not a current qualification.
 
 ## Purpose
 
@@ -349,7 +349,9 @@ of the proposed feature. Reuse existing recording and projection facilities
 where possible. Automatic parent updates and benefit benchmarks remain outside
 this initial proposal.
 
-No implementation or runtime verification was performed for this analysis.
+No implementation or runtime verification was performed during the initial
+analysis. Plan 33 subsequently implemented the feature: see its iteration
+receipts and final-results.md for exact candidate and qualification outcomes.
 Planning subsequently identified `iteration-assigned.architectRef` as the
 existing exact local assignment point; reuse it. The additional global point
 belongs to the local work dispatch. Plan 33 records these integration choices,

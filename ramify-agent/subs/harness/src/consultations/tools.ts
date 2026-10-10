@@ -51,10 +51,14 @@ export function consultationTool<R extends RunnerRun>(inputs: ConsultationEquipm
     const transcript = await readTranscript(run.path(runLayout.transcript(inputs.caller.session))).catch(() => ({ entries: [] }));
     const request = transcript.entries.find(entry => entry.invocation === context.invocation && entry.type === 'message' && entry.role === 'assistant' && entry.blocks.some(block => block.type === 'tool-call' && block.callId === callId));
     const work = inputs.caller.work;
+    // Capability engineer requests retain their assignment in work.iteration;
+    // the recorded assigning target owns the exact task when that request has
+    // no separate capabilityTask field.
+    const task = work.capabilityTask ?? (inputs.target.role === 'capability-architect' ? inputs.target.task : undefined);
     await run.mutex.run(() => recordConsultationStart(run.log, {
       schema: 'ramify-agent.consultation-start/1', id,
       caller: { invocation: context.invocation, toolCall: callId, session: inputs.caller.session, role: inputs.caller.role,
-        work: { ...(work.workItem === undefined ? {} : { workItem: work.workItem }), ...(work.iteration === undefined ? {} : { iteration: work.iteration }), ...(work.capabilityTask === undefined ? {} : { task: work.capabilityTask }) } },
+        work: { ...(work.workItem === undefined ? {} : { workItem: work.workItem }), ...(work.iteration === undefined ? {} : { iteration: work.iteration }), ...(task === undefined ? {} : { task }) } },
       parent: inputs.parent ?? null, target: inputs.target, globalTarget: inputs.target.role === 'local-architect' ? inputs.global : null,
       startedAt: inputs.now().toISOString(), message: inline(parsed.data.message), request: { session: inputs.caller.session, entry: request?.n ?? null },
     }));

@@ -9,7 +9,7 @@ import { commitCapabilityTransition } from '../../capability/ledger.js';
 import { committedRecords, refOf } from '../../work/committed.js';
 import { replayCapabilityState } from '../../capability/state.js';
 import { capabilityLayout } from '../../capability/records.js';
-import { RunLog } from '../../run/log.js';
+import { RunLog, type RunEvent } from '../../run/log.js';
 import { runLayout } from '../../run/records.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './capability.js';
 import { analysis, entry } from './analysis.js';
@@ -301,7 +301,10 @@ export async function runDependencyDecision(boundary: 'request-placement' | 'unr
   }
 }
 
-export async function runDependencyGate(restartAfterHandback: boolean, realBoundary = false): Promise<void> {
+export async function runDependencyGate(restartAfterHandback: boolean, realBoundary = false, witness?: {
+  readonly script: (original: Script) => Script;
+  readonly inspect: (root: string, runId: string, events: readonly RunEvent[]) => Promise<void>;
+}): Promise<void> {
 
   const fixture = await copyCapabilityFixture(true);
   const cleanups: Array<() => Promise<void>> = [fixture.remove];
@@ -404,7 +407,7 @@ export async function runDependencyGate(restartAfterHandback: boolean, realBound
       }
       return [];
     };
-    const options = { ...(boundaries?.options ?? { git: gitService }), script, inputs: treeInputs(),
+    const options = { ...(boundaries?.options ?? { git: gitService }), script: witness?.script(script) ?? script, inputs: treeInputs(),
       // The boundary witness runs actual B/C tests and type checking; ordinary
       // rows receive labelled synthetic configured-audit answers.
       configuredAudit: boundaries?.options.configuredAudit ?? localCommandAudit({
@@ -483,6 +486,7 @@ export async function runDependencyGate(restartAfterHandback: boolean, realBound
     expect(passed.length).toBeGreaterThan(0);
     expect(events.filter(event => event.type === 'review-request-recorded' && event.data.workItem === 'cap-002').length,
       JSON.stringify(events.filter(event => event.type === 'review-request-recorded' || event.type === 'iteration-closed' || event.type === 'capability-handed-back'))).toBeGreaterThan(0);
+    await witness?.inspect(fixture.root, receipt.jobId, events);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const current = opened.service.events('need', receipt.jobId)!;
       try { await opened.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence)); break; }
