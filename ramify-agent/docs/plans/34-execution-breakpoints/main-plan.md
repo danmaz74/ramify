@@ -5,6 +5,10 @@ R34-1 and R34-2 resolved by the user on 2026-10-10. **Execution:** serial author
 in an isolated checkout. Source inspected at
 `969d8cda574bfc47a1764d052cfd510f95acceab`.
 
+The [integration receipt](merge-results.md) records qualification of the merge
+with Plan 33 and preservation of the target checkout's local work. B18 remains
+incomplete after integration.
+
 ## Outcome
 
 A calling agent launches a real plan, receives control before an engineer
