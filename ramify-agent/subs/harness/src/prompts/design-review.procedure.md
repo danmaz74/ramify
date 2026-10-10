@@ -29,7 +29,9 @@ lists when you believe yours is the same problem, and is otherwise null.
 ## Coverage
 
 Name every changed path once: in `inspected` when you read its patch or
-content, or in `missing` with the reason you could not. The harness checks
+content, or in `missing` with the reason you could not. Both lists hold
+changed paths only; a file the candidate did not change, read for context
+or as a ground, is named in neither. The harness checks
 `inspected` against the complete patches delivered in this message and the
 reads its tools answered. A changed-path list, patch summary or omitted patch
 is not inspection evidence. No concern and nothing
