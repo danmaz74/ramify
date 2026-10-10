@@ -756,7 +756,7 @@ export class InvocationRunner<R extends RunnerRun> {
           recorder.identify(identity);
           await this.prepareInvocation(run, id, undefined, identity);
         },
-        prepared: async packet => {
+        prepared: async (packet, declarations) => {
           await this.prepareInvocation(run, id, { packet, request });
           const recorded = await readTranscript(run.path(runLayout.transcript(session))).catch(error => {
             if (request.restore === true) throw error;
@@ -776,7 +776,8 @@ export class InvocationRunner<R extends RunnerRun> {
           progress({ type: 'started', invocation: id, session, message: packet.message });
           await transcript.started({ role: request.role, work: request.work, start: request.start.mode === 'continue' ? 'continued' : 'opened', requested: request.start.mode,
             continues: request.start.mode === 'continue' ? this.continuationOf(run, session, request.continuing!) : undefined, fork: request.fork, replaces: request.replaces, requestedBy: request.requestedBy,
-            executor: agent.name, model: this.host.model, systemPrompt: packet.roleInstructions, prompt: packet.message });
+            executor: agent.name, model: this.host.model, systemPrompt: packet.roleInstructions, prompt: packet.message,
+            declarations, additions: packet.additions });
         } });
     } catch (error) {
       const keptAs = keeping('failed', undefined);

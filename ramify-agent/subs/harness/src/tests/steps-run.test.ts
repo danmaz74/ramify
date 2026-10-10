@@ -20,6 +20,11 @@ import { fixtureScratchGit, mockGit } from './helpers/mock-git.js';
 import { runPath } from './helpers/runs.js';
 import { iterationLayout } from '../work/iterations.js';
 import { workLayout } from '../work/records.js';
+import { readBody, readTranscript } from '../transcripts/writer.js';
+import { ContentStore } from '../transcripts/store.js';
+import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-operations.js';
+import { constructStep } from '../steps/construct.js';
+import { renderStep } from '../steps/render.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -302,6 +307,55 @@ describe('S13/S14: the tree as it stands, and a second run', () => {
 
 /** The files of one invocation's record directory. */
 const tree_ = async (invocationRecord: string) => tree(join(invocationRecord, '..'));
+
+describe('S20: the recorded start is what render shows', () => {
+  test('the started entry carries the declarations and additions that render shows for the same inputs', async () => {
+    const { root, scratch } = await project();
+    const inputs = await authoredInputs(root, scratch);
+    const git = scriptedGit({ head: 'base-1', changed: [] });
+    const run = manualRun(root, 'm-020');
+    const { result } = await step(root, inputs, run, [{ kind: 'submit', input: unsuitableScope('The limit is owned elsewhere.') }], git);
+    const summary = finished(result);
+
+    const recorded = await readTranscript(summary.records.transcript);
+    expect(recorded.unreadable).toEqual([]);
+    const started = recorded.entries.find(entry => entry.type === 'started' && entry.invocation === summary.invocation);
+    if (started?.type !== 'started') throw new Error('no started entry');
+    if (started.declarations === undefined || started.additions === undefined) throw new Error('the started entry records no declarations or additions');
+    const store = new ContentStore(join(run, runLayout.blobs));
+    const body = async (stored: Parameters<typeof readBody>[2]) => readBody(run, store, stored);
+
+    const stepInputs = parseStepInputs(await readFile(summary.records.inputs, 'utf8'));
+    const { packages } = await loadPromptPackages({ capabilityWorkflow: stepInputs.capabilityWorkflow });
+    const rendered = await renderStep(constructStep(stepInputs, { projectRoot: root, packages }), {
+      projectRoot: root, packages, builtinDeclarations: piBuiltinDeclarations, operationId: summary.invocation,
+    });
+    expect(await body(started.systemPrompt)).toBe(rendered.packet.roleInstructions);
+    expect(await body(started.prompt)).toBe(rendered.packet.message);
+    expect(started.declarations.names).toEqual(rendered.declarations.map(declaration => declaration.name));
+    expect(JSON.parse((await body(started.declarations.body))!)).toEqual(JSON.parse(JSON.stringify(rendered.declarations)));
+    expect(await Promise.all(started.additions.map(async addition => ({ key: addition.key, kind: addition.kind, text: await body(addition.body) }))))
+      .toEqual(rendered.packet.additions.map(addition => ({ key: addition.key, kind: addition.kind, text: addition.text })));
+
+    // The printed render names the same tools and carries the same message.
+    const printed = await runStepCommandWith({ command: 'render', inputs: summary.records.inputs, projectRoot: root, invocation: summary.invocation });
+    expect(printed.exitStatus).toBe(0);
+    expect(printed.stdout).toContain(rendered.packet.message);
+    for (const name of started.declarations.names) expect(printed.stdout).toContain(`--- ${name}`);
+  }, 120_000);
+
+  test('a started entry written before declarations were recorded still parses, and its evidence reads as unavailable', async () => {
+    const { transcriptEntrySchema } = await import('../interfaces/protocol/transcripts.js');
+    const historical = {
+      n: 1, at: '2026-10-01T00:00:00.000Z', type: 'started', invocation: 'inv-0001', role: 'engineer', work: {}, start: 'opened', requested: 'fresh',
+      continues: null, fork: null, replaces: null, requestedBy: null, executor: 'pi', model: null,
+      systemPrompt: { stored: 'inline', text: 'role', bytes: 4 }, prompt: { stored: 'inline', text: 'task', bytes: 4 },
+    };
+    const parsed = transcriptEntrySchema.parse(historical);
+    expect(parsed.type === 'started' && parsed.declarations).toBeUndefined();
+    expect(parsed.type === 'started' && parsed.additions).toBeUndefined();
+  });
+});
 
 describe('S14: where a step starts', () => {
   test('a point of the same manual run continues; a point of another run, or one it does not hold, starts fresh with the reason', async () => {

@@ -165,7 +165,7 @@ for (const mode of ['ordinary', 'restart', 'repair', 'legacy-restart', 'current-
       legacyIntentPath = join(project, 'plans/.harness/session-operations/correlations/operations', `${hash([input.runId, input.operationId])}.json`);
       legacyIntentBytes = JSON.stringify(intent); await mkdir(dirname(legacyIntentPath), { recursive: true }); await writeFile(legacyIntentPath, legacyIntentBytes);
       legacyPrepared = true;
-      return originalOperationStart.call(this, { ...input, restore: true, prepared: async packet => { await input.prepared?.(packet); frozen = true; await freeze(); } });
+      return originalOperationStart.call(this, { ...input, restore: true, prepared: async (packet, declarations) => { await input.prepared?.(packet, declarations); frozen = true; await freeze(); } });
     });
     cleanups.push(async () => { startSpy.mockRestore(); operationSpy.mockRestore(); });
   }
@@ -175,7 +175,7 @@ for (const mode of ['ordinary', 'restart', 'repair', 'legacy-restart', 'current-
       if (input.spec.submission.name !== coordinatorAssessmentToolName) return originalOperationStart.call(this, input);
       const hash = createHash('sha256').update(JSON.stringify([input.runId, input.operationId])).digest('hex');
       legacyIntentPath = join(project, 'plans/.harness/session-operations/correlations/operations', `${hash}.json`);
-      return originalOperationStart.call(this, { ...input, prepared: async packet => { await input.prepared?.(packet); frozen = true; await freeze(); } });
+      return originalOperationStart.call(this, { ...input, prepared: async (packet, declarations) => { await input.prepared?.(packet, declarations); frozen = true; await freeze(); } });
     });
     cleanups.push(async () => { operationSpy.mockRestore(); });
   }

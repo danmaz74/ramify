@@ -218,6 +218,11 @@ const entry = <T extends string, S extends z.ZodRawShape>(type: T, shape: S) =>
   z.object({ n: z.int().positive(), at: z.iso.datetime(), type: z.literal(type), ...shape });
 const ofInvocation = { invocation: text };
 
+/** The tool declarations a `started` entry records. */
+export const transcriptStartedDeclarationsSchema = z.object({ names: z.array(text), body: transcriptBodySchema }).strict();
+/** One delivered input a `started` entry records: its key and kind, and its text as the body. */
+export const transcriptStartedAdditionSchema = z.object({ key: text, kind: text, body: transcriptBodySchema }).strict();
+
 /**
  * An invocation's start, written before its session is started and so
  * before the model is called. A fork's first entry is its first
@@ -238,6 +243,17 @@ const startedEntry = entry('started', {
   model: text.nullable(),
   systemPrompt: transcriptBodySchema,
   prompt: transcriptBodySchema,
+  /**
+   * Every tool the session was declared: the names, and the declarations as
+   * JSON in the body. Absent in entries written before it was recorded, so
+   * absence means the evidence is unavailable, never that no tool was declared.
+   */
+  declarations: transcriptStartedDeclarationsSchema.optional(),
+  /**
+   * The inputs this invocation delivered, in order: for a continued or forked
+   * start, exactly what it appended. Absent where it was not recorded.
+   */
+  additions: z.array(transcriptStartedAdditionSchema).optional(),
 }).strict();
 
 /** Every message of the conversation, once it is complete, as the executor reported it. */

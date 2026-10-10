@@ -35,7 +35,7 @@ export interface HarnessOperationInput {
   readonly validator: Readonly<Record<string, unknown>>;
   readonly destination: Readonly<Record<string, unknown>>;
   readonly currentAuthority: () => Promise<boolean>;
-  readonly prepared?: (packet: TaskPacket) => Promise<void>;
+  readonly prepared?: (packet: TaskPacket, declarations: readonly SessionToolDeclaration[]) => Promise<void>;
   readonly identified?: (identity: SessionExecutionIdentity) => Promise<void>;
   readonly restore?: boolean;
   readonly accepted?: () => { readonly value: unknown; readonly schema: string; readonly submissionHash: string };
@@ -303,7 +303,7 @@ export class HarnessSessionOperations {
     const intent: Intent = previous ? previous : { schema: 'ramify-agent.harness-operation/2', runId, operationId, session: input.session, source: sourceRef?.point ?? null,
       requestHash: exactInputHash(JSON.stringify(input.brief)), mode: spec.session.mode, packet, context: { inherited: [...(prior?.inherited ?? []), ...packet.additions], history, revision }, policy, task, declarations };
     await this.retain(path, intent);
-    await input.prepared?.(packet);
+    await input.prepared?.(packet, intent.declarations);
     let identified: string | null = null;
     const identify = async (identity: SessionExecutionIdentity) => {
       const key = JSON.stringify(identity);

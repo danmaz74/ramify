@@ -94,6 +94,10 @@ export interface InvocationStart {
   readonly model: string | null;
   readonly systemPrompt: string;
   readonly prompt: string;
+  /** Every tool the session is declared, where known. */
+  readonly declarations?: readonly { readonly name: string }[] | undefined;
+  /** The inputs the invocation delivers, where known. */
+  readonly additions?: readonly { readonly key: string; readonly kind: string; readonly text: string }[] | undefined;
 }
 
 /** What an invocation's `ended` entry is written from. */
@@ -143,6 +147,14 @@ export class InvocationTranscript implements TranscriptNotes {
       // stored once by content, whatever its size.
       systemPrompt: await bodies.text(start.systemPrompt, 'stored'),
       prompt: await bodies.text(start.prompt),
+      ...start.declarations === undefined ? {} : { declarations: {
+        names: start.declarations.map(declaration => declaration.name),
+        // Declarations repeat across a role's invocations, so they are stored by content.
+        body: await bodies.text(JSON.stringify(start.declarations), 'stored'),
+      } },
+      ...start.additions === undefined ? {} : { additions: await Promise.all(start.additions.map(async addition => ({
+        key: addition.key, kind: addition.kind, body: await bodies.text(addition.text),
+      }))) },
     }));
   }
 

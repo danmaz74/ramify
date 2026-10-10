@@ -343,6 +343,12 @@ function StartedEntry({ entry }: { readonly entry: TranscriptEntryOf<'started'> 
       </p>
       <BodyBlock label="System prompt" body={entry.systemPrompt} className="block-system-prompt" />
       <BodyBlock label="Prompt" body={entry.prompt} className="block-prompt" />
+      {entry.declarations === undefined
+        ? <p className="muted">Tool declarations: not recorded for this invocation</p>
+        : <BodyBlock label={`Tool declarations (${entry.declarations.names.length}): ${entry.declarations.names.join(', ')}`} body={entry.declarations.body} className="block-declarations" />}
+      {entry.additions === undefined
+        ? <p className="muted">Delivered inputs: not recorded for this invocation</p>
+        : entry.additions.map(addition => <BodyBlock key={addition.key} label={`Delivered ${addition.kind} ${addition.key}`} body={addition.body} className="block-addition" />)}
     </>
   );
 }
