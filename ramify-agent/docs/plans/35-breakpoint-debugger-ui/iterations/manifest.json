@@ -8,8 +8,9 @@
       "file": "01-protocol-and-client.md",
       "dependsOn": [],
       "cases": ["U01", "U02", "U03"],
-      "status": "planned",
-      "writeBoundary": "Harness protocol contracts, run snapshot projection, /debug route, specification sentences; CLI debug client fixtures; web client and stub client."
+      "status": "implemented",
+      "writeBoundary": "Harness protocol contracts, run snapshot projection, /debug route, specification sentences; CLI debug client fixtures; web client and stub client.",
+      "results": "01-results.md"
     },
     {
       "id": "2",
