@@ -1,6 +1,6 @@
 # Plan 31: the operator driver
 
-**Date:** 2026-10-10. **Status:** proposed; implementation not started.
+**Date:** 2026-10-10. **Status:** proposed; implementation not started; review decisions R31-1 and R31-2 resolved 2026-10-10.
 Source inspected at `5bd14875d16bf96ae3c8e0de90661aa3d21cf269`.
 **Prerequisite:** [Plan 30](../30-harness-steps/main-plan.md) complete, for
 the step inputs, the transcript declarations and the manual run layout.
@@ -20,7 +20,7 @@ journal, the post-write hook, the judge, the records and the transcript are
 unchanged. Other roles in the same run keep running on pi.
 
 ```sh
-ramify-agent serve --project <root> --agent pi --operator <closed-role-set>
+ramify-agent serve --project <root> --agent pi --operator local-architect,context-selector,reviewer,capability-architect
 ramify-agent operator pending --project <root>
 ramify-agent operator show    --project <root> --turn <run>/<operation>
 ramify-agent operator call    --project <root> --turn <run>/<operation> --tool read --input '{"path":"..."}'
@@ -35,8 +35,10 @@ The agent creates a worktree in the real target project and performs its
 ordinary documented setup, as in Plan 30. The workflow aims to deliver usable
 implementation for review and integration; unsuccessful work can be discarded.
 There is no fixture-copy or harness-owned preparation step.
-The closed role set and runnable example depend on R31-1 below; selecting
-`local-architect` alone is not valid under the currently proposed rule.
+The operator role set is closed under fork lineage (R31-1). Playing the
+local architect therefore means playing the set `local-architect,
+context-selector, reviewer, capability-architect`, as the example shows;
+`local-architect` alone is refused before the run starts.
 
 ## Why this scope
 
@@ -69,8 +71,8 @@ Suggested in the proposal and adopted here; reversible before implementation.
    declarations pi already publishes, which the harness uses as the fallback
    for any port (`run/session-operations.ts:218`). Sharing implementations
    with pi is a later refactor.
-3. **Roles are routed by a composite driver**, pi or operator per role,
-   chosen at `serve` or `start-run`. The operator role set must be closed
+3. **Roles are routed by a composite session operations port**, pi's port
+   or the operator's port per role, chosen at `serve` or `start-run` (R31-2). The operator role set must be closed
    under fork lineage; a configuration that is not is refused.
 4. **Operator turns have no idle bound**; the absolute invocation bound, the
    review deadlines and the run bound stay.
@@ -81,12 +83,12 @@ Paths are relative to `subs/harness/` unless stated.
 
 | Existing surface | Use in this plan |
 | --- | --- |
-| `subs/agent/src/interfaces/session-operations.ts` `SessionOperationDriver`, `SessionDriverRuntime`, `SessionDriverInvocation` | The engine seam implemented; adapter composition still needs R31-2. |
+| `subs/agent/src/interfaces/session-operations.ts` `SessionOperationDriver`, `SessionDriverRuntime`, `SessionDriverInvocation` | The engine seam implemented; the operator binds it as pi and the scripted fake do, and composition happens above the ports (R31-2). |
 | `subs/agent/src/session-operations.ts` `createSessionOperations` | The engine the operator port binds, as pi and the scripted fake do. |
 | `subs/agent/src/scripted.ts` `createScriptedSessionDriver`, the enrich pattern (`:692-725`) | Template for the operator driver and port wrapper. |
 | `subs/agent/subs/pi/src/session-operations.ts` `piBuiltinDeclarations`, history rebuild (`:96-170`) | Declarations reused; the history rebuild is what the operator renders as text for the operator's fresh context, and what a cross-driver fork must refuse. |
 | `src/run/policy.ts` `invocationIdleMs` (`:36`), `src/run/service.ts:4509` bounds | Operator-role bounds: idle unbounded, absolute kept. |
-| `src/run/service.ts:4672-4673` single cached `HarnessSessionOperations` | Composite driver by `task.role` behind one port. |
+| `src/run/service.ts:4672-4673` single cached `HarnessSessionOperations` | Composite port: each new lineage goes to pi's or the operator's port by `task.role`; continuations, forks, retries and stops follow the lineage's port. |
 | `src/interfaces/protocol/runs.ts` `runAgentSchema` (`:53`), `startRunCommandSchema` | Operator role set in the run agent choice. |
 | Root `src/cli.ts` `agentNames`; harness `src/http/server.ts:27, :167-169`, `src/sessions/command.ts` `SessionAgentChoice` | Wiring of the operator choice for `serve`, `start-run`, `session` and Plan 30's `step run`. |
 | Plan 30 `steps/runner.ts`, transcript declarations, manual runs | `step run --agent operator` reuses the driver; the mailbox turn carries the declarations the transcript now records. |
@@ -187,7 +189,9 @@ a closed/unavailable turn or wait timeout. `end` exits 0 for acknowledged end,
   from the currently running server. Standalone `SessionAgentChoice` and
   step choices are mapped explicitly; they already use `fake`, not the run
   protocol's `scripted` spelling.
-- A composite driver dispatches by `task.role`. The configured operator set
+- A composite session operations port routes each new lineage by `task.role`
+  to pi's port or the operator's port, and every continuation, fork, retry and
+  stop of that lineage to the same port. The configured operator set
   is validated against the fork lineage of the roles: the selector fork of
   the local architect, the scope and design review forks, reconciliation and
   the capability qualification follow their parent's driver. A set that
@@ -235,13 +239,13 @@ results, verdicts and the end. The invocation record names the executor
 
 ## Implementation sequence
 
-Resolve R31-1 and R31-2 before their dependent implementation work; the
-current source does not yet expose the proposed composite-driver seam.
+R31-1 and R31-2 are resolved below; the current source does not yet expose
+the composite port.
 
 | Iteration | Deliverable | Prerequisite |
 | --- | --- | --- |
 | [1: the operator owner](iterations/01-operator-owner.md) | Driver, built-ins, history rendering, mailbox records, port wrapper; in-process tests through the mailbox | Plan 30 complete, baseline full audit |
-| [2: CLI, routing and bounds](iterations/02-cli-routing-bounds.md) | `operator` commands, composite driver, closed-lineage validation, operator bounds, agent choice wiring | 1 |
+| [2: CLI, routing and bounds](iterations/02-cli-routing-bounds.md) | `operator` commands, composite port, closed-lineage validation, operator bounds, agent choice wiring | 1 |
 | [3: qualification](iterations/03-qualify.md) | Scripted whole-work-item test with the operator as local architect, documentation, final audit, real-plan implementation | 2 |
 
 The [manifest](iterations/manifest.json) records dependencies and case
@@ -271,9 +275,34 @@ built-in tool implementations with pi, operator-played analysis and
 nonfunctional roles beyond what routing allows, and any change to the model
 or to prompt composition.
 
-## Open review decisions
+## Review decisions
 
-- **R31-1 — High: how broad should operator selection be?** All three review
+Both were decided by Dan on 2026-10-10, after Plan 30 was implemented.
+
+- **R31-1 resolved: role-level routing with the larger closed set.** The
+  operator set must be closed under fork lineage; no finer selection by task
+  or review kind in v1. Playing the local architect means also playing the
+  context selector, the reviewer and the capability architect, so scope
+  reviews forked from the architect's point are answered through the mailbox,
+  as O12 exercises. Finer selection is reconsidered only if playing just the
+  local architect proves essential.
+- **R31-2 resolved: port composition.** Nothing calls pi directly; everything
+  goes through the session operations abstraction ramify-agent already uses.
+  The composite is a session operations port that delegates each lineage whole
+  to pi's existing port or to the operator's port. Pi's driver stays private
+  and its wrappers stay intact, so a role under test, such as the engineer
+  while the operator plays the local architect, runs as the complete harness
+  role on pi, exactly as in a run without an operator. The operator owner
+  binds the generic engine itself and receives its tool declarations through
+  a legal parent boundary. The composite keeps one authoritative session
+  store, exact-point forks, terminal retry, stop and drain behavior and
+  per-invocation executor attribution; native pi preservation is verified on
+  the final candidate.
+
+The original questions, kept for the record:
+
+
+- **R31-1 (as asked) — how broad should operator selection be?** All three review
   kinds and design orientation use the single `reviewer` role. Scope reviews
   fork either local or capability architect assignment points. With strict
   routing by role and no cross-driver history, choosing local architect
@@ -285,7 +314,7 @@ or to prompt composition.
   is essential. Update the CLI example, lineage matrix and O12 exercise to
   the chosen rule before iteration 2; do not silently fall back fresh merely
   to allow a split lineage.
-- **R31-2 — High: compose drivers or ports?** The pi driver is private to
+- **R31-2 (as asked) — compose drivers or ports?** The pi driver is private to
   `pi/src/session-operations.ts`; its port binds an already constructed engine,
   with private built-in enrichment and model-availability checks around
   continue/retry. A composite `dispatch` cannot call that port as a driver or

@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "proposed; implementation not started; requires Plan 30",
+  "status": "proposed; implementation not started; Plan 30 merged, R31-1 and R31-2 decided 2026-10-10",
   "execution": "serial in dependency order",
   "iterations": [
     {
