@@ -1,6 +1,6 @@
 # Iteration 3 results: consultation inspection
 
-**Status:** C13–C16 verified; pending coordinator acceptance. Iteration 4 integration and exact-candidate full qualification remain pending.
+**Status:** C13–C16 accepted by the coordinator after review of actual behavior, tests, diff and retained final check evidence on source `729ff8484bb594b8f724d468a9a0167d4b8f7ff5`. Iteration 4 integration and exact-candidate full qualification remain pending.
 
 Worktree `/home/app/ramify-plan33-consult-architect`, branch `feat/plan33-consult-architect`. Prerequisite HEAD `5873fc46d6513fe2f2563b039eb21477b3d69285` contains coordinator-accepted iteration 2. Source commit `729ff8484bb594b8f724d468a9a0167d4b8f7ff5` changes only the consultation projection/command, harness parent exposure, root CLI/help/tests and README. No other checkout or dependency installation changed.
 
