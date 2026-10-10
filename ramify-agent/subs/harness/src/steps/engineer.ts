@@ -1,3 +1,4 @@
+import { consultArchitectDeclaration } from '../consultations/submissions.js';
 import { consultationAvailability, consultationContext, type ConsultationInputs } from '../consultations/targets.js';
 import { join } from 'node:path';
 import type { JsonSchema } from '../../subs/agent/src/interfaces/port.js';
@@ -93,7 +94,7 @@ export interface ConstructedEngineerStep {
       readonly environment: Readonly<Record<string, string>>; readonly sourceFiles: Readonly<Record<string, string>> }[];
     readonly builtinTools: readonly (typeof engineerBuiltinTools)[number][];
     /** The harness's own tools, as declared to the session. */
-    readonly tools: readonly ReturnType<typeof shellToolDeclaration>[];
+    readonly tools: readonly (ReturnType<typeof shellToolDeclaration> | typeof consultArchitectDeclaration)[];
     /** Project-relative files refused outright: the run's own, and the guarded files no authorization opened. */
     readonly protectedFiles: { readonly harness: readonly string[]; readonly unauthorized: readonly string[] };
   };
@@ -148,7 +149,8 @@ export function constructEngineerStep(value: unknown, environment: StepEnvironme
   })}${focused.featurePaths.length === 0 ? '' : focused.command.kind === 'available' ? `\n\n# Exact focused scenario command\n\n${focused.command.shellCommand}\nSupport/world/loader: ${JSON.stringify(focused.command.support)}\nEnvironment names: ${Object.keys(focused.command.environment).sort().join(', ')}. Config SHA-256 ${focused.command.configurationIdentity}; current generated and source bytes are revalidated at dispatch.\n${focusedCommandPendingNote}` : `\n\nFocused scenario command unavailable: ${focused.command.reason}. Do not combine CLI feature paths with the broad default profile.`}${inputs.guidance === undefined ? '' : `\n\n# Qualified existing behavior\n\n${inputs.guidance}`}${consultationContext(inputs.consultation, inputs.role)}`;
   const bounds = { idleMs: inputs.bounds.idleMs, absoluteMs: inputs.bounds.absoluteMs, commandTimeoutMs: inputs.bounds.commandTimeoutMs };
   const limits = invocationLimits(inputs.limits, { bounds });
-  const tools = [shellToolDeclaration(bounds.commandTimeoutMs)];
+  const consultation = consultationAvailability(inputs.consultation ?? undefined, inputs.role);
+  const tools = [shellToolDeclaration(bounds.commandTimeoutMs), ...(consultation.target === null ? [] : [consultArchitectDeclaration])];
   const submission = {
     toolName: engineerToolName,
     description: engineerSubmissionDescription,

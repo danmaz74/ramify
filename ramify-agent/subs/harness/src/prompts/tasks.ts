@@ -1,3 +1,4 @@
+import { architectAnswerName, architectAnswerJsonSchema } from '../consultations/submissions.js';
 import type { LoadedPackage, ExtractionTurn, PackageFile } from './packages.js';
 import type { ReviewKind } from '../run/records.js';
 import { z } from 'zod';
@@ -20,7 +21,7 @@ import { taskBriefingRevision, type BriefingDelivery } from './briefings.js';
 
 export type TaskKind = 'initial-analysis' | ExtractionTurn | 'placement' | 'orientation' | 'assignment' | 'completion' | 'repair'
   | 'selection' | 'reselection' | 'capability' | 'engineering' | 'contract' | 'reconciliation' | ReviewKind | 'design-orientation'
-  | 'failure-analysis' | 'assessment' | 'action' | 'investigation' | 'standalone-command' | 'capability-qualification' | 'consultation';
+  | 'failure-analysis' | 'assessment' | 'action' | 'investigation' | 'standalone-command' | 'capability-qualification' | 'consultation' | 'architect-consultation';
 
 export interface TaskEnvironment {
   readonly projectRoot: string;
@@ -39,11 +40,11 @@ export interface TaskEnvironment {
 const procedureFamilies: Readonly<Partial<Record<LoadedPackage['role'], Partial<Record<TaskKind, string>>>>> = {
   'initial-architect': { 'initial-analysis': 'main' },
   'catalog-extractor': { intake: 'intake', principles: 'principles', check: 'check' },
-  'global-fork': { placement: 'main' },
-  'local-architect': { orientation: 'orientation', assignment: 'main', completion: 'main', repair: 'main', reconciliation: 'reconciliation', 'capability-qualification': 'qualification' },
+  'global-fork': { placement: 'main', 'architect-consultation': 'architect-consultation' },
+  'local-architect': { 'architect-consultation': 'architect-consultation', orientation: 'orientation', assignment: 'main', completion: 'main', repair: 'main', reconciliation: 'reconciliation', 'capability-qualification': 'qualification' },
   'context-selector': { selection: 'main', reselection: 'main' },
   engineer: { engineering: 'main', repair: 'main', 'standalone-command': 'main', consultation: 'consultation' },
-  'capability-architect': { capability: 'main', reconciliation: 'reconciliation', 'capability-qualification': 'qualification' },
+  'capability-architect': { 'architect-consultation': 'architect-consultation', capability: 'main', reconciliation: 'reconciliation', 'capability-qualification': 'qualification' },
   'contract-engineer': { contract: 'main' },
   reviewer: { code: 'code', scope: 'scope', design: 'design', 'design-orientation': 'orientation' },
   'failure-analyst': { 'failure-analysis': 'main' },
@@ -219,6 +220,12 @@ function taskDefinition(loaded: LoadedPackage, kind: TaskKind, consultationSubmi
     tool = { intake: intakeToolName, principles: principleToolName, check: checkToolName }[turn];
     schema = extraction.submissionSchema; procedure = extraction.procedure;
     source = `subs/harness/src/analysis/${turn}.procedure.md`;
+  }
+  if (['local-architect', 'capability-architect', 'global-fork'].includes(role) && kind === 'architect-consultation') {
+    tool = architectAnswerName;
+    schema = JSON.stringify(architectAnswerJsonSchema);
+    procedure = 'This is advisory only. Explain, research and advise using inherited context and current source/views, whose revisions and limits may differ from inherited observations. Use read-only tools. Do not change source, assignments, scope, permissions or architectural decisions. The original architect conversation is untouched. A local fork may optionally consult its recorded global architect, carrying relevant new facts in its question. Answer through {{submissionTool}} with a nonblank answer; state uncertainty where evidence is missing.';
+    source = null;
   }
   if (role === 'global-fork' && kind === 'placement') tool = forkToolName;
   if (role === 'local-architect' && ['assignment', 'completion', 'repair'].includes(kind)) tool = localArchitectToolName;

@@ -1,3 +1,4 @@
+import { consultArchitectDeclaration } from '../consultations/submissions.js';
 import { consultationAvailability, consultationContext } from '../consultations/targets.js';
 import { contextSelectorMessage, workOrientationMessage } from '../context-selection/prompts.js';
 import {
@@ -97,18 +98,19 @@ export function constructOrientationStep(value: unknown, environment: StepEnviro
     toolName: workOrientationToolName, description: 'Record your orientation before making an assignment.',
     inputSchema: workOrientationJsonSchema, submissionSchema: 'ramify-agent.work-orientation/1',
   };
+  const tools = consultationAvailability(inputs.consultation ?? undefined, inputs.role).target === null ? [] : [consultArchitectDeclaration];
   const kind = 'orientation' as const;
   const brief = composeTaskBrief(projectRoot, {
     kind, work: inputs.work, goal, requirements: inputs.requirements, prompt, omit: [], literalSections: [], startingPointGroups: [],
     known: knownFacts(inputs.known),
-    environment: { projectRoot, workingDirectory, candidate: null, snapshot: null, limits, availableTools: [...readers, submission.toolName],
+    environment: { projectRoot, workingDirectory, candidate: null, snapshot: null, limits, availableTools: [...readers, ...tools.map(tool => tool.name), submission.toolName],
       views: architectViews(environment, inputs.architectView), supportPaths: deliveredSupportPaths(loaded, kind), cucumberConfiguration: null },
   });
   return {
     role: 'local-architect', consultation: consultationAvailability(inputs.consultation ?? undefined, inputs.role), inputs, work: inputs.work, attempt: inputs.attempt, loaded,
     systemPrompt: renderWorkOrientationPrompt(loaded, projectRoot, workingDirectory), prompt, briefingText, brief, submission, limits,
     context: inputs.context, start: { mode: 'fresh' },
-    equipment: { workingDirectory, builtinTools: [...readers], tools: [] },
+    equipment: { workingDirectory, builtinTools: [...readers], tools },
     validate: input => validateAgainst(workOrientationSubmissionSchema, input),
     before: { inputs },
   };
@@ -212,7 +214,8 @@ export function constructWorkTurnStep(value: unknown, environment: StepEnvironme
   if (inputs.orientation !== undefined && (start.kind === 'fresh' || (start.session ?? null) !== inputs.orientation.session)) groups.unshift(inputs.orientation.group as StartingPointGroup);
   const limits = invocationLimits(inputs.limits, {});
   const git = createGitInspectionTool(projectRoot);
-  const tools = [{ name: git.name, description: git.description, inputSchema: git.inputSchema, mutating: git.mutating ?? false }];
+  const tools = [{ name: git.name, description: git.description, inputSchema: git.inputSchema, mutating: git.mutating ?? false },
+    ...(consultationAvailability(inputs.consultation ?? undefined, inputs.role).target === null ? [] : [consultArchitectDeclaration])];
   const submission = {
     toolName: localArchitectToolName,
     description: 'End this turn with the work item\'s result. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',

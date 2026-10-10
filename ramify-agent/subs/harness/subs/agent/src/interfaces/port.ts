@@ -196,7 +196,8 @@ export interface ToolDefinition {
    */
   readonly action?: ((input: unknown) => ToolAction) | undefined;
   /** Runs the tool. It must end promptly once `signal` is aborted. */
-  execute(input: unknown, signal: AbortSignal): Promise<ToolResult>;
+  /** Stable identity supplied by neutral effect dispatch; old handlers may ignore it. */
+  execute(input: unknown, signal: AbortSignal, callId?: string): Promise<ToolResult>;
 }
 
 /** The harness's verdict on one submission. */

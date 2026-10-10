@@ -316,7 +316,7 @@ async function runLocked(options: StepRunOptions, original: StepInputs, location
       provenance,
     };
     const result: InvocationResult<unknown> = await runner.runInvocation(run, agent, {
-      ...prepared.request,
+      ...prepared.request, consultationPackages: packages,
       startingTree: { dirty: startingChanged.length > 0, changed: [...startingChanged] },
       signal: options.signal,
       progress: event => {

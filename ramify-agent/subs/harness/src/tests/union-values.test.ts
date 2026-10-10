@@ -130,7 +130,7 @@ describe('the run log', () => {
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
     expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected', 'capability-qualification', 'capability-returned', 'capability-coordination']);
-    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection', 'capability-consultation']);
+    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection', 'capability-consultation', 'architect-consultation']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
     expect(requestReasonSchema.options).toEqual(['contract-needed', 'capability-needed']);
     expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);

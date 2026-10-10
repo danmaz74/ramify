@@ -1122,7 +1122,7 @@ export class RunService {
       role: step.role,
       brief: step.brief,
       context: step.context,
-      stepInputs: step.before.inputs,
+      stepInputs: step.before.inputs, consultationPackages: packages,
       fallback: this.stepFallback(step.inputs, packages),
       work: step.work,
       attempt: step.attempt,
@@ -4645,7 +4645,7 @@ export class RunService {
         for (let attempt = attempts.length + 1; attempt <= count && !this.ignoring(run); attempt++) {
           const step = attempt === 1 ? first : await orientationStep(attempt);
           const result = await this.runInvocation<WorkOrientationSubmission>(run, agent, {
-            role: step.role, brief: step.brief, context: step.context, stepInputs: step.before.inputs, work: step.work, attempt: step.attempt, loaded: step.loaded,
+            role: step.role, brief: step.brief, context: step.context, stepInputs: step.before.inputs, consultationPackages: packages, work: step.work, attempt: step.attempt, loaded: step.loaded,
             systemPrompt: step.systemPrompt, prompt: step.prompt, workingDirectory: step.equipment.workingDirectory, start: { mode: 'fresh' },
             toolName: step.submission.toolName, description: step.submission.description,
             inputSchema: step.submission.inputSchema, submissionSchema: step.submission.submissionSchema,
@@ -5363,7 +5363,7 @@ export class RunService {
         originalInvocation: originalLocalInvocation,
         brief: step.brief,
         context: step.context,
-        stepInputs: step.before.inputs,
+        stepInputs: step.before.inputs, consultationPackages: packages,
         fallback: this.stepFallback(step.inputs, packages),
         work: step.work,
         attempt: step.attempt,
@@ -8269,7 +8269,7 @@ export class RunService {
         task: step.task,
         brief: step.brief,
         context: step.context,
-        stepInputs: step.before.inputs,
+        stepInputs: step.before.inputs, consultationPackages: packages,
         workingDirectory: step.equipment.workingDirectory,
         work: step.work,
         attempt: step.attempt,

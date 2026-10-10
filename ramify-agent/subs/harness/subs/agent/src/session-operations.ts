@@ -420,7 +420,7 @@ export function createSessionOperations(options: SessionOperationsOptions): Sess
         await assertLive();
         let executionError: unknown;
         let answer: ToolResult | SubmissionVerdict;
-        try { answer = submission ? await bindings.submission.accept(input, abort.signal) : await tool!.execute(input, abort.signal); }
+        try { answer = submission ? await bindings.submission.accept(input, abort.signal) : await tool!.execute(input, abort.signal, callId); }
         catch (error) { executionError = error; answer = { text: errorText(error), isError: true }; }
         await assertLive();
         // Retain known tool completion before running any potentially interrupted mutation check.

@@ -637,7 +637,7 @@ export type ContinueReason = z.infer<typeof continueReasonSchema>;
  * point after its completion request; an unresolved request forks the
  * architect context, as a placement request does.
  */
-export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection', 'capability-consultation']);
+export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection', 'capability-consultation', 'architect-consultation']);
 
 /** Why a session takes another's place: a lost engineer is reconstructed from records, or the architect context is rebuilt. */
 export const replaceReasonSchema = z.enum(['reconstructed', 'context-rebuilt']);

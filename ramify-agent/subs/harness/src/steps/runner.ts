@@ -1,3 +1,7 @@
+import { consultationAvailability } from '../consultations/targets.js';
+import { consultationTool } from '../consultations/tools.js';
+import { consultationId } from '../consultations/records.js';
+import { consultationOutcome, recordConsultationDelivery } from '../consultations/store.js';
 import { mkdir, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
@@ -99,6 +103,9 @@ export type InvocationProgress =
 
 /** What one invocation is: its role, its work, its prompt and the one submission it may make. */
 export interface InvocationRequest<T> {
+  /** Consultation forks must never silently lose their pinned source. */
+  readonly allowFreshFallback?: boolean;
+  readonly consultationPackages?: ReadonlyMap<string, LoadedPackage>;
   readonly restore?: boolean;
   readonly originalInvocation?: string | undefined;
   readonly role: Role;
@@ -442,8 +449,9 @@ export class InvocationRunner<R extends RunnerRun> {
    * closing event is the last write of the invocation.
    */
   async runInvocation<T>(run: R, agent: AgentPort, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
+    if (request.signal?.aborted === true) return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session: '' as SessionId, kept: false, notStarted: true, error: 'Stopped by the caller before dispatch' };
     const result = await this.invokeOnce(run, agent, request);
-    if (request.start.mode === 'fresh' || result.interruption !== 'session-lost' || this.host.ignoring(run) || request.fenced?.()) return result;
+    if (request.allowFreshFallback === false || Boolean(request.signal?.aborted) || request.start.mode === 'fresh' || result.interruption !== 'session-lost' || this.host.ignoring(run) || request.fenced?.()) return result;
     const reason = result.error ?? 'The retained session is unavailable';
     const fresh = request.fallback?.(reason);
     return this.invokeOnce(run, agent, {
@@ -682,14 +690,21 @@ export class InvocationRunner<R extends RunnerRun> {
     // asks for ends those calls.
     let inFlightAtBound: CallInFlight[] | undefined;
     bounds.onReached(() => { inFlightAtBound = recorder.inFlight(); });
-    const equipment: Equipment = request.equip?.({
+    const equipContext: EquipContext = {
       invocation: id,
       observations,
       callId: tool => recorder.callId(tool),
       reminders: () => excursions.takeReminders(),
       transcript,
       hold: timeoutMs => bounds.hold(timeoutMs),
-    }) ?? {};
+    };
+    const baseEquipment = request.equip?.(equipContext) ?? {};
+    const consultation = consultationAvailability(request.stepInputs !== undefined && 'consultation' in request.stepInputs ? request.stepInputs.consultation ?? undefined : undefined, request.role);
+    const tool = consultation.target === null ? null : consultationTool({ run, runner: this, agent,
+      packages: request.consultationPackages ?? new Map(), target: consultation.target, global: consultation.global,
+      caller: { session, role: request.role, work: request.work }, views: request.brief?.environment.views ?? [],
+      projectRoot: this.projectRoot, now: () => this.host.now(), holdMs: limits.invocationAbsoluteMs }, equipContext);
+    const equipment: Equipment = tool === null ? baseEquipment : { ...baseEquipment, tools: [...baseEquipment.tools ?? [], tool] };
     let budget: InvocationOutcome['budget'] | undefined;
     const { guard, afterMutation } = equipment;
 
@@ -853,6 +868,18 @@ export class InvocationRunner<R extends RunnerRun> {
     // `onEvent` cannot be async at the port boundary. Its ordered writes must
     // still finish before gaps are derived and before this driver can settle.
     await recorder.drain();
+    if (run.log.all('consultation-started').some(event => event.data.caller === id)) {
+      await transcript.drain();
+      const recordedResults = await readTranscript(run.path(runLayout.transcript(session))).catch(error => {
+        this.host.warn(`Run ${run.jobId}: consultation caller transcript unavailable: ${message(error)}`);
+        return { entries: [] };
+      });
+      for (const entry of recordedResults.entries) {
+        if (entry.invocation !== id || entry.type !== 'message' || entry.role !== 'tool-result' || entry.tool !== 'consult_architect') continue;
+        const consultation = consultationId(id, entry.callId);
+        if (consultationOutcome(run.log, consultation)?.delivery !== 'recorded' && consultationOutcome(run.log, consultation) !== null) await run.mutex.run(() => recordConsultationDelivery(run.log, consultation, { session, entry: entry.n }));
+      }
+    }
     await recorder.recordGaps(agent);
     const ref = agentSession.ref;
 

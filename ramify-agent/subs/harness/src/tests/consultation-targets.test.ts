@@ -104,7 +104,7 @@ describe('Plan 33 C01-C03 consultation target derivation', () => {
     const step = constructEngineerStep(inputs[0], { projectRoot: fixture.root, packages });
     expect(step.consultation.target?.ref).toBe(events.find(event => event.type === 'iteration-assigned')?.data.architectRef?.ref);
     expect(step.prompt).toContain('Consultation context: local-architect');
-    expect(step.equipment.tools.map(tool => tool.name)).not.toContain('consult_architect');
+    expect(step.equipment.tools.map(tool => tool.name)).toContain('consult_architect');
     const { consultation: _removed, ...legacy } = inputs[0];
     expect(constructEngineerStep(legacy, { projectRoot: fixture.root, packages }).consultation.target).toBeNull();
     expect(constructEngineerStep(legacy, { projectRoot: fixture.root, packages }).prompt).not.toContain('Consultation context:');

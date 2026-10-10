@@ -1,3 +1,5 @@
+import { consultationOutcome } from '../consultations/store.js';
+import { readTranscript } from '../transcripts/writer.js';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -449,7 +451,7 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
       const run = runPath(source.root, source.planId, 'm-arch');
       const git = stepGit({ head: 'base-9' });
       const answers: string[] = [];
-      const stepHere = (inputs: string, script: readonly ScriptStep[]) => runStep({ inputs, run, agent: createScriptedAgent(script),
+      const stepHere = (inputs: string, script: readonly ScriptStep[]) => runStep({ inputs, run, agent: createScriptedAgent(spec => spec.submission.name === 'answer_architect_consultation' ? [{ kind: 'submit', input: { answer: 'Manual assigning architect advice' } }] : script),
         ramify: new FakeRamifyCli(), git, refresh: readDeclaredTree, onProgress: event => { if (event.type === 'submission') answers.push(event.answer); } });
 
       // The assignment: the work item and outline the turn was given, the outline and the assignment it submitted.
@@ -492,7 +494,16 @@ describe('S16: after a local architect\'s turn, and the inputs of its next turn'
       expect((await derive(architect.replace(/\d+$/u, '9999'))).stderr).toContain('records no invocation');
       // The engineer of that iteration reports partial work: its result, and the architect's next-turn inputs.
       const engineer = invocationOf(await stepHere(engineerPath,
-        [{ kind: 'submit', input: partialReport(['Read the limit.'], ['Raise it to 500.']) }]));
+        [{ kind: 'tool', tool: 'consult_architect', input: { message: 'Manual question to my assigning architect' } }, { kind: 'message', text: 'Manual engineer resumed its assignment' }, { kind: 'submit', input: partialReport(['Read the limit.'], ['Raise it to 500.']) }]));
+      const manualLog = await RunLog.open(join(run, runLayout.events), 'm-arch');
+      const consultation = manualLog.all('consultation-started').find(event => event.data.caller === engineer)!;
+      expect(consultation).toBeDefined();
+      const answered = consultationOutcome(manualLog, consultation.data.consultation)!;
+      expect(answered).toMatchObject({ status: 'answered', delivery: 'recorded', accepted: { answer: { text: 'Manual assigning architect advice' } } });
+      const startedEngineer = manualLog.all('invocation-started').find(event => event.data.invocation === engineer)!;
+      const transcript = await readTranscript(join(run, runLayout.transcript(startedEngineer.data.session)));
+      expect(transcript.entries.find(entry => entry.type === 'started' && entry.invocation === engineer)).toMatchObject({ declarations: { names: expect.arrayContaining(['consult_architect']) } });
+      expect(rendered.stdout).toContain('consult_architect');
       const recordedEngineer = parseStepInputs(await readFile(join(run, runLayout.stepInputs(engineer)), 'utf8'));
       expect(recordedEngineer.role === 'engineer' && recordedEngineer.consultation).toEqual(engineerInputs.consultation);
       // Once its engineer started, the first inputs are no longer derived.
