@@ -227,7 +227,7 @@ describe('the composed runs', () => {
       for (const checkpoint of ['iteration', 'work-item', 'final'] as const) {
         query.mockClear();
         const id = `ga-09${checkpoint === 'iteration' ? '00' : checkpoint === 'work-item' ? '01' : '02'}`;
-        const attempt = await run.service['committingCheckpoint'](active, {
+        const attempt = await run.service['gates'].committingCheckpoint(active, {
           id, runId: run.runId, checkpoint, projectRoot: run.root,
           directory: active.path(`gates/${id}`), head: 'source-01', policy: active.record.policy,
           subject: checkpoint === 'iteration' ? { workItem: 'wi-001', iteration: 'wi-001.i01' }
@@ -269,7 +269,7 @@ describe('the composed runs', () => {
       const bytes = await readFile(join(run.root, config));
       await writeFile(join(external, 'same-config.json'), bytes);
       await rm(join(run.root, config)); await symlink(join(external, 'same-config.json'), join(run.root, config));
-      const feature = run.service['writtenFeatures'](active)[0]!;
+      const feature = run.service['gates'].writtenFeatures(active)[0]!;
       const declaration = join(run.root, 'subs/workspace/subs/reviews/subs/notes/module.ramify');
       const originalDeclaration = await readFile(declaration, 'utf8');
       const variants = [config, feature.path, feature.path, feature.path, capturedPackage];
@@ -292,7 +292,7 @@ describe('the composed runs', () => {
         }
         dirty.mockResolvedValue([path]); query.mockClear();
         const id = `ga-091${index}`;
-        const attempt = await run.service['committingCheckpoint'](active, {
+        const attempt = await run.service['gates'].committingCheckpoint(active, {
           id, runId: run.runId, checkpoint: 'work-item', projectRoot: run.root,
           directory: active.path(`gates/${id}`), head: 'source-01', policy: active.record.policy, subject: { workItem: 'wi-001' },
         });
@@ -347,13 +347,13 @@ describe('the composed runs', () => {
       const query = vi.spyOn(run.service['options'].ramify, 'queryOwnership');
       const request = { checkpoint: 'iteration' as const, subject: { workItem: grandparent.workItem, iteration: child.id } };
       query.mockClear();
-      const denied = await run.service['candidateAuthority'](active, request);
+      const denied = await run.service['gates'].candidateAuthority(active, request);
       expect(denied.rules.find(rule => rule.rule === 'write-scope')?.violations).toContainEqual(expect.objectContaining({ path }));
       expect(query).toHaveBeenCalledTimes(1);
       if (parent.coordination?.kind !== 'capability-task') throw new Error('Missing scripted parent coordination');
       parent.coordination.startingPaths[0]!.hash = currentHash;
       query.mockClear();
-      const permitted = await run.service['candidateAuthority'](active, request);
+      const permitted = await run.service['gates'].candidateAuthority(active, request);
       expect(permitted.rules.find(rule => rule.rule === 'write-scope')?.outcome).toBe('passed');
       expect(query).toHaveBeenCalledTimes(1);
       replay.mockRestore(); dirty.mockRestore(); query.mockRestore();
