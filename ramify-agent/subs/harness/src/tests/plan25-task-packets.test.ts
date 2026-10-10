@@ -8,6 +8,11 @@ import type { Role } from '../interfaces/protocol/runs.js';
 import type { DeliveredInput } from '../prompts/delivered-manifest.js';
 import { runAcceptedHandback } from './helpers/acceptance-flow.js';
 import { engineerDeliveries, stepDeliveries } from './helpers/step-equality.js';
+import { join } from 'node:path';
+import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-operations.js';
+import { readRecordedOperation } from '../run/session-operations.js';
+import { inputsFromRun } from '../steps/from-run.js';
+import { runPath } from './helpers/runs.js';
 
 let packages: ReadonlyMap<Role, LoadedPackage>;
 let ordinary: ReadonlyMap<Role, LoadedPackage>;
@@ -115,7 +120,16 @@ test('S01: a resumed-after-handback engineer delivery equals the constructor\'s 
 test('S05: in a capability run, every local architect orientation, selection and work turn delivery equals the constructor\'s render', async () => {
   const variants: string[] = [];
   await runAcceptedHandback('revision', cleanups, false, async ({ root, planId, runId }) => {
-    const { constructed, undelivered } = await stepDeliveries(root, planId, runId, ['local-architect', 'context-selector']);
+    const { constructed, unconstructed, undelivered } = await stepDeliveries(root, planId, runId, ['local-architect', 'context-selector']);
+    // The capability qualification turns are local architect invocations outside the first set:
+    // the run builds them inline, and an import refuses them with that reason.
+    for (const { invocation } of unconstructed) {
+      const delivered = await readRecordedOperation(join(root, 'plans', '.harness', 'session-operations'), runId, invocation);
+      expect(delivered?.packet.submissionTool, invocation).toBe('submit_capability_qualification');
+      const imported = await inputsFromRun({ role: 'local-architect', runDirectory: runPath(root, planId, runId), invocation, builtinDeclarations: piBuiltinDeclarations });
+      expect(imported, invocation).toEqual({ status: 'refused', reason: expect.stringContaining(`invocation ${invocation} is a local-architect start outside the first set`) });
+    }
+    expect(unconstructed.length).toBeGreaterThan(0);
     // The flow stops the run mid-work: an invocation it stops before its session starts delivers nothing.
     for (const item of undelivered) expect(item.ended === null || item.ended === 'stopped', item.invocation).toBe(true);
     for (const item of constructed) {
