@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "proposed",
+  "status": "implemented",
   "execution": "serial in dependency order",
   "iterations": [
     {
@@ -26,8 +26,9 @@
       "file": "03-qualification.md",
       "dependsOn": ["2"],
       "cases": ["U13"],
-      "status": "planned",
-      "writeBoundary": "Browser-acceptance script and fixture page, the export hook in the HTTP debug test, package script, test registration, README, dogfooding skill, plan results and manifest; other harness or web source only for recorded defects."
+      "status": "implemented",
+      "writeBoundary": "Browser-acceptance script and fixture page, the export hook in the HTTP debug test, package script, test registration, README, dogfooding skill, plan results and manifest; other harness or web source only for recorded defects.",
+      "results": "03-results.md"
     }
   ]
 }

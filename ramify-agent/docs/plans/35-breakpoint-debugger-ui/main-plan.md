@@ -1,8 +1,10 @@
 # Plan 35: the breakpoint debugger in the web UI
 
-**Date:** 2026-10-10. **Status:** proposed. **Execution:** serial authored
-iterations, one subagent per iteration, in an isolated worktree. Source
-inspected at `b6fe1e4b` on `ramify-agent`.
+**Date:** 2026-10-10. **Status:** implemented; the final full audit passes
+at `5a3aa6c9` and the Chromium witness passes; the Pi scenario awaits
+dogfooding. **Execution:** serial authored iterations, one subagent per
+iteration, in an isolated worktree. Source inspected at `b6fe1e4b` on
+`ramify-agent`.
 
 ## Outcome
 
