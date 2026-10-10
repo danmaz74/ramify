@@ -10,19 +10,30 @@ and web source change only for defects the witness exposes, each recorded.
 
 ## Deliverables
 
-- `scripts/browser-acceptance/breakpoint-debugger.ts`: with `serve --agent
-  fake` hosting a prepared fixture copy (as `npm run trial -- prepare` makes
-  one) and the built web UI, drive a real Chromium through `playwright-core`:
-  open the plan, check the breakpoint box, start the run, wait for the pause
-  banner, open the Debugger tab, read the prepared input, send a message, read
-  the answer, resume, and wait for the run's terminal state. Assert each step
-  from the page and from the harness's own debug query. Keep the recorded
-  evidence under this plan's `evidence/` directory. If the fake agent's
-  demonstration script cannot reach an engineer pause, fix the script in the
-  smallest way that keeps its existing demonstrations and record why.
+- An export step: extend the HTTP debug test (or a sibling it shares its host
+  with) so that, when an environment variable names an output file, it writes
+  the actual `/debug` answers at each step (before the pause, paused, after the
+  message is admitted, after it settled, after resume, at the end), the
+  inspection at the pause and the exchange answer, each validated by its
+  protocol schema. Without the variable the test is unchanged. The fake agent
+  `serve` hosts never prepares an engineer, so no hosted run can pause.
+- `subs/web/src/tests/browser-acceptance/plan35-debugger-main.tsx` and its
+  HTML page: the real Plan and Run pages over a stub client that replays the
+  exported answers in order and advances on each `start-run`, `debug-message`
+  and `debug-resume` command it receives, as `plan21-projections-main.tsx`
+  replays exported gate views.
+- `scripts/browser-acceptance/breakpoint-debugger.ts`: run the export, build
+  the fixture page with Vite, drive a real Chromium through `playwright-core`:
+  check the breakpoint box, start, see the pause banner and badge, open the
+  Debugger tab, read the prepared input, send a message, read the answer,
+  resume, and see the terminal state. Assert each step from the page and the
+  commands the stub received. Keep screenshots and the checks list under this
+  plan's `evidence/` directory.
 - A package script `test:browser:breakpoint-debugger` beside the existing
-  browser acceptance scripts. Register the witness where the testing
-  specification requires for a real process and browser.
+  browser acceptance scripts. It is run explicitly and its receipt is reported
+  in the results, apart from the configured audit: the Vitest configuration
+  discovers only `src/tests` and `subs/**/src` test files, so the runner and
+  its fixture page are not registered in the native boundary registry.
 - README: the UI scenario beside the CLI scenario under the breakpoint
   section. Dogfooding skill: the UI as an alternative to the CLI commands.
 - Final configured full audit from the repository root, after a clean commit.

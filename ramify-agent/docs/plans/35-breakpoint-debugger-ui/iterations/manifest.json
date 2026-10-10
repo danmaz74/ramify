@@ -9,7 +9,7 @@
       "dependsOn": [],
       "cases": ["U01", "U02", "U03"],
       "status": "planned",
-      "writeBoundary": "Harness protocol contracts, run snapshot projection, /debug route, specification sentences; web client and stub client."
+      "writeBoundary": "Harness protocol contracts, run snapshot projection, /debug route, specification sentences; CLI debug client fixtures; web client and stub client."
     },
     {
       "id": "2",
@@ -25,7 +25,7 @@
       "dependsOn": ["2"],
       "cases": ["U13"],
       "status": "planned",
-      "writeBoundary": "Browser-acceptance script and fixture page, package script, test registration, README, dogfooding skill, plan results and manifest; harness or web source only for recorded defects."
+      "writeBoundary": "Browser-acceptance script and fixture page, the export hook in the HTTP debug test, package script, test registration, README, dogfooding skill, plan results and manifest; other harness or web source only for recorded defects."
     }
   ]
 }

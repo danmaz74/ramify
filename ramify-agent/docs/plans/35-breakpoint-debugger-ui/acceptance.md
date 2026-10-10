@@ -3,8 +3,8 @@
 [Main plan](main-plan.md) · [Manifest](iterations/manifest.json)
 
 Ordinary cases run on JSDOM with the stub client, or in the harness with
-scripted external operations. U13 runs a real browser against the real server
-and its fake agent.
+scripted external operations. U13 runs a real browser over the built UI, fed
+by actual harness answers a scripted in-process run exported.
 
 ```gherkin
 Feature: The breakpoint debugger in the web UI
@@ -18,9 +18,12 @@ Feature: The breakpoint debugger in the web UI
   Scenario: U02 - The debug state lists interventions in order
     Given a paused run received a message, its answer settled, and a resume with text
     When the debug state is read
-    Then interventions list the message with its settled result, then the resume with its text
-    And an admitted but unsettled message appears with a null result
+    Then interventions list the message with its settled exchange, then the resume with its text
+    And an admitted but unsettled message carries its exchange with status admitted
+    And a message whose run was stopped or interrupted before settlement carries that status and error
+    And the list is complete when the query's after cursor lies beyond the admission event
     And current interaction state is reported beside them
+    And the CLI client's fixtures parse the revised answer and it still drains pages
 
   Scenario: U03 - The client reads the debug queries
     When the web client reads the debug state, an inspection and an exchange
@@ -49,9 +52,9 @@ Feature: The breakpoint debugger in the web UI
   Scenario: U07 - The prepared input is read on request
     Given a paused run
     When the person opens the prepared input
-    Then the inspection is read once and its sections are shown with the revision read
+    Then the inspection is read once and its sections are shown with the pause ID and revision read
     And the panel says the input is a preview, not delivered input
-    And after the revision moves the panel says it is stale and offers to read again
+    And after the revision moves, after a later pause with another ID at revision 1, and after a resume with no current pause, the panel says the preview is historical and offers to read again
     And an inspection refusal is shown with the harness's message
 
   Scenario: U08 - Send a message to the paused engineer
@@ -74,12 +77,14 @@ Feature: The breakpoint debugger in the web UI
     And without text the command carries no message
     And after a held accepted or terminal outcome Send is disabled and Resume stays enabled
 
-  Scenario: U11 - Refusals and lost replies are honest
-    Given the harness refuses a command as a conflict
-    Then the refusal's message is shown and the state is read again
+  Scenario: U11 - Refusals, lost replies and failed reads are honest
+    Given the harness refuses a command as a conflict while the run version is unchanged
+    Then the refusal's message is shown and the state is read again at once
     Given the reply to a command is lost
     Then the page names the command ID and says the command may have been admitted
-    And the next poll shows whether it was
+    And the next interval read shows the admitted message in the conversation
+    Given a read of the debug state fails while the run is paused
+    Then the last state stays shown with the failure and the next interval read recovers
 
   Scenario: U12 - The conversation outlives the pause
     Given a run that was resumed and later ended
@@ -88,7 +93,9 @@ Feature: The breakpoint debugger in the web UI
     And Send and Resume are disabled
 
   Scenario: U13 - A person drives a breakpoint in a real browser
-    Given serve hosts a prepared fixture copy with the fake agent
-    When a real browser starts the plan with the breakpoint, waits for the pause, reads the input, sends a message, reads the answer and resumes
-    Then the run continues to its ordinary end and every step is recorded as evidence
+    Given a scripted in-process run exported its actual debug state, inspection and exchange answers at each step
+    And a real browser shows the built UI over a stub client that replays those answers and advances on each command
+    When the person starts the plan with the breakpoint, waits for the pause, reads the input, sends a message, reads the answer and resumes
+    Then the page shows each state and sends each command as the ordinary tests state
+    And the exported answers were not fabricated and every step is recorded as evidence
 ```

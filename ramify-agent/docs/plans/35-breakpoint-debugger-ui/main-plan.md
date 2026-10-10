@@ -32,21 +32,28 @@ projects what the harness publishes and forwards commands.
   decision banner does for decision waits.
 - **Two small harness projections**, nothing else in the harness: the run
   snapshot names the breakpoint the run was started with, and the debug state
-  query lists the run's interventions (every admitted message with its settled
-  result, and every resume) in log order. Both derive from the run log the
-  harness already keeps; neither adds an event, a command or a record.
-- **Polling, not streaming.** The debug state is read again whenever the run's
-  version moves and after every command the page sends, through the existing
-  run progress poll. Every debugger transition writes a run event, so the
-  version moves with it.
+  query lists the run's interventions (every admitted message with the
+  exchange result the harness already derives for it, and every resume) in
+  log order. Both derive from the run log the harness already keeps; neither
+  adds an event, a command or a record. The intervention list is complete and
+  independent of the query's event paging: a message admitted before the
+  page window is still listed, and its result is read at query time.
+- **Polling, not streaming.** While the run runs, the Debugger area reads the
+  debug state on the same interval the run progress uses, and again right
+  after every command the page sends. A failed read keeps the last state shown
+  and the next tick reads again, so a quiet pause or a lost reply never
+  strands the page. The read stops when the run ends.
 - **No new page, route or module.** The Debugger area links to the existing
   session transcript for the engineer's full exchange. There is no live
   transcript embedding, no message history editing and no per-message retry UI:
   a lost reply is reported with its command ID, and the page's next poll shows
   whether the command was admitted.
 - **Fake and Pi agents alike.** The UI starts runs on the agent the server was
-  configured with; qualification uses the server's fake agent in a real browser
-  so that no model spend is needed, and documents the Pi scenario.
+  configured with. The fake agent that `serve --agent fake` runs submits an analysis
+  with no entries, so it never prepares an engineer and never pauses; the
+  real-browser witness therefore replays actual harness answers that a
+  scripted in-process run exports, as the Plan 21 witness replays exported gate
+  views, and the Pi scenario is documented for dogfooding after the merge.
 
 Outside scope: breakpoints other than `before-agent:engineer`, a selector
 chooser, debugger access from the Plans list, embedded live transcripts, stop
@@ -59,8 +66,9 @@ All paths are relative to `ramify-agent/`.
 
 | Owner and current surface | Planned change |
 | --- | --- |
-| Harness: `src/interfaces/protocol/runs.ts` | `runSnapshotSchema.breakpoint`, nullable with default `null` so legacy answers and existing fixtures parse; `debugStateResponseSchema.interventions`. |
-| Harness: `src/projections/` run snapshot, `src/http/app.ts` debug route | Project `record.breakpoint`; list interventions from `debug-exchange-admitted`, `debug-exchange-settled` and `debug-resumed` events, each settled result through the existing `debugResult`. |
+| Harness: `src/interfaces/protocol/runs.ts` | `runSnapshotSchema.breakpoint`, nullable with default `null` so legacy answers and existing fixtures parse; `debugStateResponseSchema.interventions`, required. |
+| Harness: `src/run/snapshot.ts`, `src/http/app.ts` debug route | Project `record.breakpoint`; list interventions from `debug-exchange-admitted` and `debug-resumed` events over the whole log, each message's result through the existing `debugResult`. |
+| Root: `src/debug-client.ts` and its tests | No behavior change; its fixtures gain the required `interventions` field and keep draining pages. |
 | Web: `subs/web/src/client.ts`, `tests/helpers/stub-client.ts` | `getDebugState`, `getDebugInspection`, `getDebugExchange` over `protocolPaths.runDebug*`; stub answers for tests. |
 | Web: `subs/web/src/plan-page.tsx` | The breakpoint checkbox and its start payload. |
 | Web: `subs/web/src/run-page.tsx`, new `subs/web/src/debugger.tsx`, `styles.css` | The Debugger tab, banner and header badge; the area's panels and composer. |
@@ -68,12 +76,16 @@ All paths are relative to `ramify-agent/`.
 | Root: `scripts/browser-acceptance/`, `subs/web/src/tests/browser-acceptance/` | A real-browser witness of the Debugger area. |
 
 The existing `/debug` query already answers `current` and the reached pauses
-after a cursor; the UI reads `current` and the new `interventions` and ignores
-paging. The `DebugExchange` result the harness retains after settlement already
-carries the answer, verdicts, session, invocation and evidence the conversation
-needs. `chapterHref` already opens a session transcript at an invocation.
-`DecisionBanner` and `DecisionWaitBadge` show the pattern for the pause banner
-and header badge. `useRunQuery` re-reads a query when the run version moves.
+after a cursor; the UI reads `current` and the new `interventions`, which are
+not paged, and leaves `reached` to the CLI. `debugResult` already derives
+each exchange's status (`admitted`, `settled`, `stopped` or `interrupted`),
+answer, verdicts, session, invocation and evidence from the log, before and
+after settlement, so the conversation reuses it rather than interpreting the
+events again. `chapterHref` already opens a session transcript at an
+invocation. `DecisionBanner` and `DecisionWaitBadge` show the pattern for the
+pause banner and header badge. `useRunProgress` shows the interval poll the
+debug state read follows; `useRunQuery` is not enough, since it offers no
+reload and re-reads only when the version moves.
 
 ## Behavior to implement
 
@@ -103,15 +115,18 @@ collapsible sections: role instructions, task message, inherited blocks,
 current additions, effective blocks, tools with their mutating flag,
 continuity and its reason, the source point, scope and bounds. The panel
 states that this is a preview of the prepared input, not evidence of delivery.
-The revision read is named; after the revision moves the panel says it is
-stale and offers to read again. Inspection failures are shown with the
-harness's message. Inspection is never read automatically.
+The preview is bound to the pause ID and revision it was read at and names
+both; once the current pause has another ID or revision, or there is no
+current pause, the panel says the preview is historical and offers to read
+again. Inspection failures are shown with the harness's message. Inspection
+is never read automatically.
 
 ### Converse
 
 The conversation panel lists every intervention in order. A message shows the
-person's text verbatim, then the engineer's answer when settled, or "the
-engineer is answering" while admitted, or the stopped or interrupted status.
+person's text verbatim, then its exchange as the harness derives it: the
+engineer's answer when settled, "the engineer is answering" while admitted,
+or the stopped or interrupted status with the error the harness reports.
 A settled exchange also shows its verdicts, outcome, error, continuity loss
 and settlement confirmation when present, and a link to the invocation's
 transcript chapter when the session and invocation are known. A resume shows
@@ -121,10 +136,11 @@ with a pending task; Resume is enabled while the current pause is `paused`
 with any task state, and sends the text area as its optional message. Each
 click sends one command with a fresh command ID and the current pause ID and
 revision, then refreshes the run and the debug state. A refusal is shown with
-the harness's message and the page re-reads the state, so a stale revision
-corrects itself on the next click. A lost reply shows the command ID and says
-the command may have been admitted; the next poll shows whether it was. The
-text area is cleared only after a command is accepted.
+the harness's message and the page re-reads the state at once, so a stale
+revision corrects itself on the next click. A lost reply shows the command ID
+and says the command may have been admitted; the next poll shows whether it
+was, since an admitted message appears in the interventions. The text area is
+cleared only after a command is accepted.
 
 ### After the pause
 
@@ -137,8 +153,9 @@ stays in the Overview; the Debugger area says so.
 ## Specification compatibility
 
 The harness specification's debugger section gains two sentences: the run
-snapshot names the selected breakpoint, and the debug state query lists
-interventions derived from the retained log. No rule of Plan 34 changes, no
+snapshot names the selected breakpoint, and the debug state query lists every
+intervention of the run, derived from the retained log and independent of
+event paging, each message with the exchange result the harness derives. No rule of Plan 34 changes, no
 principle changes, and the Ramify model is untouched. The web module keeps
 its `[ui, browser]` profile and imports only the protocol contracts it
 receives.
@@ -149,7 +166,7 @@ receives.
 | --- | --- | --- |
 | [1: protocol projections and client](iterations/01-protocol-and-client.md) | Snapshot breakpoint, intervention list, client methods, stub, tests | Clean baseline |
 | [2: the Debugger area](iterations/02-debugger-area.md) | Plan page checkbox, Run page tab, banner, badge, panels, composer, tests | 1 |
-| [3: qualification](iterations/03-qualification.md) | Real-browser witness against the hosted fake agent, documentation, final audit | 2 |
+| [3: qualification](iterations/03-qualification.md) | Real-browser witness over exported harness answers, documentation, final audit | 2 |
 
 The [manifest](iterations/manifest.json) assigns acceptance ownership.
 [Acceptance cases](acceptance.md) are behavioral requirements, not proof. At
@@ -161,8 +178,8 @@ contracts, checks run and remaining failures.
 Focused guarded tests, type checking and `npm run check:self` per iteration.
 Web tests run in the configured `web` project on JSDOM with the stub client;
 harness tests script every external answer. The final iteration runs the
-real-browser witness with the real server, the fake agent and a prepared
-fixture copy, and records its evidence. Take a clean committed baseline and a
+real-browser witness over the debug answers a scripted in-process run exports
+and records its evidence. Take a clean committed baseline and a
 final configured full audit from the repository root:
 
 ```sh
