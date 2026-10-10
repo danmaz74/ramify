@@ -68,7 +68,7 @@ test('a late source mutation changes the preview tree', async () => {
   expect(await commitTree(repo.root, commit!)).toBe(later.tree);
 });
 
-test('nested cwd previews the entire eventual repository tree', async () => {
+test('nested cwd previews the project\'s own tree, leaving the rest of the repository unstaged', async () => {
   const repo = await repository();
   await repo.write('nested/project/owned.txt', 'old\n');
   await repo.git('add', '--all');
@@ -81,6 +81,9 @@ test('nested cwd previews the entire eventual repository tree', async () => {
   expect(preview.repositoryRoot).toBe(repo.root);
   const commit = await commitAccepted(cwd, 'nested preview witness');
   expect(await commitTree(cwd, commit!)).toBe(preview.tree);
+  const committed = (await repo.git('show', '--name-only', '--format=', commit!)).trim().split('\n');
+  expect(committed).toEqual(['nested/project/owned.txt']);
+  expect((await repo.git('status', '--porcelain')).trim()).toBe('M README.md');
 });
 
 test('a repository nested inside another uses its own root and index', async () => {

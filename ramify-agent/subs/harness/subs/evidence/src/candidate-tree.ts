@@ -7,7 +7,7 @@ import { childEnvironment, runCommand } from './run-command.js';
 const timeoutMs = 60_000;
 const treeOid = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 
-/** The exact tree a whole-repository `git add --all` would stage now. */
+/** The exact tree a gate's `git add --all -- .` from the project's directory would stage now. */
 export interface CandidateTreePreview {
   readonly repositoryRoot: string;
   readonly head: string;
@@ -45,13 +45,15 @@ async function git(
  */
 export async function previewCandidateTree(projectRoot: string, signal?: AbortSignal): Promise<CandidateTreePreview> {
   const repositoryRoot = await git(projectRoot, ['rev-parse', '--show-toplevel'], signal);
+  // A nested project stages its own directory alone; `:/` names it from the repository's root.
+  const prefix = await git(projectRoot, ['rev-parse', '--show-prefix'], signal);
   const head = await git(repositoryRoot, ['rev-parse', 'HEAD'], signal);
   if (!treeOid.test(head)) throw new Error(`Git returned an invalid HEAD OID: ${head}`);
   const temporary = await mkdtemp(join(tmpdir(), 'ramify-candidate-index-'));
   const indexFile = join(temporary, 'index');
   try {
     await git(repositoryRoot, ['read-tree', 'HEAD'], signal, indexFile);
-    await git(repositoryRoot, ['add', '--all', '--', ':/'], signal, indexFile);
+    await git(repositoryRoot, ['add', '--all', '--', `:/${prefix}`], signal, indexFile);
     const tree = await git(repositoryRoot, ['write-tree'], signal, indexFile);
     if (!treeOid.test(tree)) throw new Error(`Git returned an invalid tree OID: ${tree}`);
     return { repositoryRoot, head, tree };

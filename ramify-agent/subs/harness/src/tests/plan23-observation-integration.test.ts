@@ -303,8 +303,8 @@ function setupFixture(options: { oid?: boolean; original?: string; sourceLine?: 
     async lineLastSeen(_root, _from, to) { return [{ line: 1, commit: to === 'F' ? 'S' : 'B', boundary: false, sourceLine: 1, sourcePath: `${prefix}.gitignore`, projectPrefix: prefix }]; } };
   const asked: string[] = [];
   const candidates: CandidateSource = { async treeEntries(_root, revision) { const bytes = revision === 'S' && options.bytes ? Buffer.from(options.bytes) : Buffer.from(texts[revision]!);
-      return [{ path: `${prefix}.gitignore`, kind: 'file', bytes: bytes.length, ...(options.oid === false ? {} : { objectId: createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex') }) }]; },
-    async readBlob(_root, revision, path) { asked.push(path); if (path !== `${prefix}.gitignore`) throw new Error('Repository prefix was not authenticated'); return revision === 'S' && options.bytes ? Buffer.from(options.bytes).toString('utf8') : texts[revision]!; },
+      return [{ path: '.gitignore', kind: 'file', bytes: bytes.length, ...(options.oid === false ? {} : { objectId: createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex') }) }]; },
+    async readBlob(_root, revision, path) { asked.push(path); if (path !== '.gitignore') throw new Error('The candidate source names the project\'s files as the project does, not by repository path'); return revision === 'S' && options.bytes ? Buffer.from(options.bytes).toString('utf8') : texts[revision]!; },
     async commitTree() { throw new Error('No extra candidate exploration allowed'); }, async grepTree() { throw new Error('No grep allowed'); }, async diffNameStatus() { throw new Error('No name diff allowed'); }, async diffPatch() { throw new Error('No patch inference allowed'); } };
   const view = { record: { jobId: 'run' }, events: [{ sequence: 1, type: 'scratch-setting-up', data: { originalIgnoreBase64: Buffer.from(before).toString('base64') } }, { sequence: 2, type: 'scratch-setup-complete', data: { commit: 'S', appended: true } }] } as unknown as RunView;
   return { view, history: { projectRoot: '/scripted/nested', changes, candidates }, asked };
@@ -313,7 +313,7 @@ describe('Plan 23 exact setup attribution collection', () => {
   test('uses authenticated nested repository origins and keeps later same-file writer additions/deletions', async () => {
     const f = setupFixture(); const identities = await setupLineIdentitiesOf(f.view, f.history, 'B', 'F');
     expect(identities).toEqual({ base: 'B', final: 'F', entries: [{ commit: 'S', path: '.gitignore', added: [1], deleted: [] }, { commit: 'F', path: '.gitignore', added: [], deleted: [] }] });
-    expect(f.asked.length).toBeGreaterThan(0); expect(new Set(f.asked)).toEqual(new Set(['nested/.gitignore']));
+    expect(f.asked.length).toBeGreaterThan(0); expect(new Set(f.asked)).toEqual(new Set(['.gitignore']));
   });
   test('a binary path in the direct diff has no line partitions and leaves the text identities verified', async () => {
     const f = setupFixture({ binary: true });

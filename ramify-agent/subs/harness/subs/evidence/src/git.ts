@@ -255,9 +255,10 @@ export async function commitAccepted(root: string, message: string, signal?: Abo
     });
   }
 
-  // The whole repository, as `previewCandidateTree` previews it: a nested
-  // project's candidate is the repository's tree, not its directory alone.
-  await gitOk(root, ['add', '--all'], signal);
+  // The project's tree alone, as `previewCandidateTree` previews it: without
+  // a pathspec, `git add --all` would stage the whole repository, which a
+  // nested project shares with files no rule of the gate has seen.
+  await gitOk(root, ['add', '--all', '--', '.'], signal);
   const staged = await git(root, ['diff', '--cached', '--quiet'], signal);
   if (staged.exitCode === 0) return null;
   if (staged.exitCode !== 1) {
