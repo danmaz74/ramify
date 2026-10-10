@@ -572,6 +572,17 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
  * becoming a second copy of the test that owns them.
  */
 const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly file: string; readonly test: string }> = [
+  { union: 'run log.type', values: ['debug-pausing', 'debug-paused', 'debug-exchange-admitted', 'debug-exchange-settled', 'debug-resumed'], file: 'subs/harness/src/tests/execution-breakpoints-workflow.test.ts', test: 'B16: explanatory exchanges resume through gates, reviews, architect handling and a distinct later engineer boundary' },
+  { union: 'run log[debug-exchange-settled].data.result.state', values: ['pausing', 'paused'], file: 'subs/harness/src/tests/execution-breakpoints.test.ts', test: 'B02 B04: pausing settles an admitted %s review pipeline while its queued successor stays suspended' },
+  { union: 'run log[debug-exchange-settled].data.result.state', values: ['exchanging'], file: 'subs/harness/src/tests/execution-breakpoints-conversation.test.ts', test: 'B03 B11: model exchange executes outside command mutex, stale/concurrent commands are refused, caller waits excluded and exchange charged' },
+  { union: 'run log[debug-exchange-settled].data.result.taskState', values: ['pending'], file: 'subs/harness/src/tests/execution-breakpoints-conversation.test.ts', test: 'B05 B06 B07: preview, two plain returns and resumed implementation retain normal task, tools and both histories' },
+  { union: 'run log[debug-exchange-settled].data.result.taskState', values: ['accepted'], file: 'subs/harness/src/tests/execution-breakpoints-capability.test.ts', test: 'B01 B09 B14: a delegated capability engineer parks at a new occurrence and server loss interrupts its stack without reconciliation' },
+  { union: 'run log[debug-exchange-settled].data.result.taskState', values: ['terminal'], file: 'subs/harness/src/tests/execution-breakpoints-conversation.test.ts', test: 'B10: final submission rejection remains terminal, keeps actual verdict and refuses further chat' },
+  { union: 'run log[debug-exchange-settled].data.result.status', values: ['admitted', 'settled'], file: 'subs/harness/src/tests/execution-breakpoints-http.test.ts', test: 'B11/B13: HTTP admits immediately, retries once, retains actual exchange and separates current released state' },
+  { union: 'run log[debug-exchange-settled].data.result.status', values: ['stopped'], file: 'subs/harness/src/tests/execution-breakpoints-conversation.test.ts', test: 'B04 B11: stop cancels active exchange, keeps truthful result and prevents later messages or held release' },
+  { union: 'run log[debug-exchange-settled].data.result.status', values: ['interrupted'], file: 'subs/harness/src/tests/execution-breakpoints-conversation.test.ts', test: 'B14: host shutdown during admitted model exchange retains interruption and never restores workflow or conversation' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['debugger'], file: 'subs/harness/src/tests/execution-breakpoints-conversation.test.ts', test: 'B05 B06 B07: preview, two plain returns and resumed implementation retain normal task, tools and both histories' },
+  { union: 'command.type', values: ['debug-message', 'debug-resume'], file: 'subs/harness/src/tests/execution-breakpoints-workflow.test.ts', test: 'B16: explanatory exchanges resume through gates, reviews, architect handling and a distinct later engineer boundary' },
   { union: 'run log[session-opened].data.fork.reason', values: ['capability-consultation'], file: 'subs/harness/src/tests/capability-consultation.test.ts', test: 'CA04 CA06 CA16: original A request consultation preserves its point or uses named recovery after actual loss (lost=%s)' },
   { union: 'observation log.type', values: ['usage', 'model-duration'], file: 'subs/harness/src/tests/plan23-observation-integration.test.ts', test: 'captures original identities, exact output bytes, zero matches and recorded-rate estimates once across restoration' },
   { union: 'observation log[usage].data.charge.source', values: ['estimated-from-recorded-rates'], file: 'subs/harness/src/tests/plan23-observation-integration.test.ts', test: 'captures original identities, exact output bytes, zero matches and recorded-rate estimates once across restoration' },
@@ -1195,7 +1206,7 @@ describe('every value of every union has a producer', () => {
 
     const cited = new Map<string, Set<string>>();
     for (const entry of producedElsewhere) {
-      expect(byName.has(entry.union), `no union is named ${entry.union}; role sites: ${[...byName.keys()].filter(name => name.endsWith('.role')).join(', ')}`).toBe(true);
+      expect(byName.has(entry.union), `no union is named ${entry.union}`).toBe(true);
       const source = await readFile(join(packageRoot, entry.file), 'utf8');
       expect(titleLine(source, entry.test), `${entry.file} has no test named "${entry.test}"`).toBeDefined();
       for (const value of entry.values) {
