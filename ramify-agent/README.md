@@ -28,8 +28,8 @@ repository later. See [AGENTS.md](AGENTS.md) for the working rules.
   contracts from the root and nothing else from `harness`.
 
 The root owns the command line (`src/cli.ts`, `src/main.ts`), which starts
-the harness's server with the web client's build output and runs single
-engineer sessions.
+the harness's server with the web client's build output, runs single
+engineer sessions and runs one harness step at a time.
 
 ## Commands
 
@@ -107,11 +107,13 @@ run or a server on the same project.
 The command prints each tool call, each text the harness appends to a tool
 result or answers a refused write with, and each submission with its answer.
 It ends with the submission, the violations still standing, the changed
-paths, the token usage and the records directory,
-`plans/.harness/sessions/<session-id>/`, which git ignores. Nothing is
-committed. With `--gate` it then runs the iteration checkpoint over the
-module and prints its verdict; without it, the output says that nothing
-verified the work. An interrupt stops the session; a second one exits at
+paths, the token usage and the records. The session is the one invocation of
+a manual run (see [Steps](#steps)) at
+`plans/sessions/.harness/jobs/<session-id>/`, which git ignores; its summary
+is `invocations/<invocation>/step.json`. Nothing is committed. With `--gate`
+it then runs the in-place diagnosis (setup, type check and complete Ramify
+check) over the current tree and prints its verdict, which is not audit
+evidence; without it, the output says that nothing verified the work. An interrupt stops the session; a second one exits at
 once.
 
 Exit status: 0 when the session submitted and, with `--gate`, the gate
@@ -125,6 +127,215 @@ given to `npm run session` resolve from `ramify-agent/`.
 of its committed state with the trial plan added, and afterwards a comparison
 showing that the run's initial analysis left the clone's source,
 `module.ramify` files and `plan.md` unchanged.
+
+## Steps
+
+An agent, or a person, implementing a real plan can advance it one harness
+step at a time instead of starting a run: render the packet a role would
+receive, run that role once with the harness's own equipment, guard, hook,
+judge and bounds, run the gate the harness would run, and apply what the
+harness records after the submission. Each step reads its inputs from files
+and writes the records a run writes, so it can be run again after a harness
+fix. The usage below is `src/cli.ts`'s; run it from `ramify-agent/` as
+`npx tsx src/main.ts step ...`. Relative paths resolve from the current
+directory, so name the target project's files by absolute path.
+
+### The working checkout
+
+1. Create an ordinary Git worktree of the target project for the plan, and
+   run that project's own documented setup in it (dependencies, builds,
+   configuration). The harness provisions nothing: there is no
+   `step prepare`, no self-run mode and no fixture copy. `trial prepare` is a
+   separate utility for the fixture trial.
+2. Meet the harness's own preconditions, which ordinary project setup does
+   not cover:
+   - the plan at `plans/<plan-id>/plan.md`; the manual run lives beside it
+     at `plans/<plan-id>/.harness/jobs/<run-id>/`;
+   - a committed audit configuration, `ramify-audit.json`, at HEAD:
+     authored inputs and `--assignment-of` read it there, and every
+     committing gate requests the audit it defines;
+   - the project configuration file, `ramify-agent.json`, which readiness
+     requires, with its `setup` commands equal to the audit definition's
+     workspace setup;
+   - a parent commit for HEAD, since the audit's patch check compares
+     `HEAD^` with `HEAD`.
+
+   A gate commits the whole working tree on the run branch, so the project
+   must also ignore its installed dependencies and Ramify's generated views.
+3. Inputs authored without a run read the materialized architect view and
+   never materialize it; run the project's `ramify materialize --view
+   architect` first. `step run` materializes the views it needs itself.
+
+The harness never deletes the worktree or its work. Keep a good result for
+ordinary review and integration; the agent and the user decide whether to
+discard an unsuccessful attempt.
+
+### The commands
+
+```text
+ramify-agent step inputs --role engineer --project <root> --work-item <file> [--outline <file>] --assignment <file> [--out <file>]
+ramify-agent step inputs --role <engineer|local-architect|context-selector|reviewer> --from-run <run dir> --invocation <id>
+                         [--work-item <file>] [--outline <file>] [--assignment <file>] [--selection <file>] [--review-request <file>] [--out <file>]
+ramify-agent step inputs --role reviewer --from-run <manual run dir> --request <review request id> [--out <file>]
+ramify-agent step inputs --role engineer --from-run <manual run dir> --assignment-of <local architect invocation id> [--out <file>]
+ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]
+ramify-agent step run    --inputs <file> --run <project>/plans/<plan>/.harness/jobs/<run>
+                         [--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>]
+ramify-agent step gate   --run <manual run dir> --checkpoint <iteration|work-item|readiness|final> [--invocation <id>] [--no-commit]
+ramify-agent step after  --run <manual run dir> --invocation <id>
+```
+
+`step inputs` writes one `ramify-agent.step-inputs/1` file, to `--out` or
+standard output, and describes it on standard error:
+
+- **Authored** (`--project`): engineer inputs from a work item
+  (`ramify-agent.work-item/1`), an optional first outline and an assignment
+  written as the local architect's `assign` submission envelope. The
+  assignment is judged as the output of the local architect's first work
+  turn of that work item, with the same schema, work-item validation, scope
+  preparation and current view, registry and audit inputs a run uses. A
+  failure is refused with the validator's errors. Without a run there is no
+  element catalog or decision record, so a work item or assignment that
+  cites plan elements or carries local decisions is refused.
+- **From a run** (`--from-run`, `--invocation`): one recorded engineer,
+  local architect, context selector or reviewer invocation, imported as a
+  fresh start with the complete briefing. No provider history is imported;
+  the original start is kept as provenance. Authored files replace parts of
+  the recorded inputs, each judged as its producing role's output. The line
+  `Recorded delivery: equal`, or the differing sections, compares the
+  rendering with the recorded packet as a diagnostic, never as a condition.
+  A role or start outside the supported set, or incomplete task records, is
+  refused with the reason.
+- **A review request** (`--request`): a code, scope or design review of a
+  request the manual run recorded, composed from its records and the
+  audited candidate.
+- **An assignment** (`--assignment-of`): the first, fresh engineer inputs of
+  the assignment a local architect's accepted `assign` made, once
+  `step after` recorded it, derived as a run derives them on acceptance.
+
+`step render` prints the role instructions, the message, each tool
+declaration and the submission schema as the session receives them; a
+continuation or fork prints only its additions, marked as such. It takes no
+lock and writes nothing. `--project` defaults to the current directory.
+
+`step run` takes the project lock and runs one invocation from the inputs in
+a manual run, which it creates where it does not exist. A new manual run
+records its project, plan, base commit and branch, and works on the branch
+`ramify-agent-run/<run-id>`, which it creates and switches to; a reused one
+must still match them. An implementation run's directory is refused. The
+agent is pi, with the person's own pi login and an optional model, unless
+`--agent fake --script <file>` chooses the scripted fake. It uses the tree
+as it stands, records the base commit and whether the tree differed from it,
+and never commits. It prints the tool calls, guard denials, hook findings,
+appended harness text and each submission with its verdict as they happen,
+then a summary with the token usage, the changed paths and a `Records:`
+list. An interrupt stops the invocation; a second one exits at once.
+
+`step gate` runs one checkpoint over the manual run with the checkpoint
+policy a run applies. `iteration` and `work-item` commit the candidate on the
+run branch and request the committed audit in its default mode; `final`
+commits and requests the full nested audit; `readiness` audits the baseline
+in full nested mode without a commit. The subject is the accepted submission
+`--invocation` names, or the only one open; an ambiguous subject or a missing
+prerequisite record is refused. Before an iteration audit, the accepted
+proposal's scenario bindings are recorded as a run records them. The attempt
+is `gates/<gate-id>/attempt.json`. `--no-commit` runs only the in-place
+diagnosis `session --gate` runs (setup, type check, complete Ramify check),
+written to `diagnoses/d-NNNN/` outside the run's log. It is diagnosis only:
+it is never audit evidence, qualifies no candidate and cannot close an
+iteration or request a review.
+
+`step after` applies what a run records after the named invocation's
+accepted submission, as far as that is a function of records. It checks the
+submission against the hash its end recorded. Each line says `Applied:` with
+what it recorded, or `Not run:` with what a run would do next and the step
+that does it:
+
+| Submission | Applied | Not run |
+| --- | --- | --- |
+| local architect `assign` | obligation and scenario reports, the outline and the iteration assignment | the engineer's session |
+| local architect `request-completion` | obligation and scenario reports, completion blockers and the outline revision | review settlement, reconciliation, the work-item gate and completion |
+| engineer `completion-proposed` | the proposal's bindings; after a passing committed iteration gate on the current candidate, its ownership evidence, the iteration's close and the review requests | gates, repair and review sessions; the close and the reviews while no qualifying gate exists, with the next action |
+| engineer `partial`, `unsuitable` | the result and the local architect's next-turn inputs | the architect's session |
+| engineer `capability-needed` | the provisional-source capture | the capability workflow |
+
+A missing, failed, stale or diagnosis-only gate never closes an iteration as
+accepted. Reviewer, global architect and `contract-needed` submissions are
+reported as not run; a reviewer step's terminal attempt settles its request
+during `step run` itself. Repeating `after` for the same invocation commits nothing twice
+and says `nothing more`. An error prints `Error:` with its cause and
+`Last completed transition:`; earlier transitions stay committed.
+
+`run`, `gate` and `after` hold the same project lock and refuse to apply
+anything until the previous writer has settled. Exit statuses:
+
+| Command | 0 | 1 | 2 |
+| --- | --- | --- | --- |
+| `inputs`, `render` | written or printed | — | refused |
+| `run` | a submission was accepted | the invocation ended any other way | refused or not started |
+| `gate` | the gate passed | it did not pass, or an error with the last completed transition | refused |
+| `after` | handled | an error, with the last completed transition | refused before any effect |
+
+### A manual flow
+
+A local architect's work turn imported from a run feeds the engineer:
+
+```sh
+step inputs --role local-architect --from-run <run dir> --invocation <work turn> --out turn.json
+step run    --inputs turn.json --run <project>/plans/<plan>/.harness/jobs/<run> --agent pi
+step after  --run <manual run> --invocation <its invocation>        # records the assignment
+step inputs --role engineer --from-run <manual run> --assignment-of <its invocation> --out engineer.json
+step render --inputs engineer.json --project <project>
+step run    --inputs engineer.json --run <manual run> --agent pi
+step gate   --run <manual run> --checkpoint iteration --invocation <engineer invocation>
+step after  --run <manual run> --invocation <engineer invocation>   # close and review requests
+step inputs --role reviewer --from-run <manual run> --request rq-0001 --out review.json
+step run    --inputs review.json --run <manual run> --agent pi
+```
+
+Authored engineer inputs start the same flow at the engineer's step.
+
+A failed step leaves its edits in the tree, and nothing restores an earlier
+tree. Before retrying a step, reset the tree yourself, for example with
+`git checkout -- . && git clean -fd`; the run's records are ignored files and
+stay. Each execution is a new invocation that records its own base and
+dirty state.
+
+### Manual runs
+
+A manual run is the run layout with `job.json` of kind `manual`, written one
+invocation at a time by the invocation runner a run uses, with the same
+record schemas: `invocations/<id>/` holds `inputs.json`, the invocation,
+outcome, submission, observations and summary; `transcripts/` the
+transcript; `gates/` and `diagnoses/` the gate attempts. It has no drive and
+no phase progression. A server that opens the project neither executes nor
+recovers it and only reports it. The CLI reads the run directory it is
+named; the terminal output and these files are the inspection surfaces, and
+a manual run need not appear, or stay current, in the web client.
+
+What a manual run does not do:
+
+- The final gate makes no non-functional assessment or candidate binding,
+  and reports them as not run.
+- The work-item gate refuses while attention CheckFindings remain, because
+  reconciliation is not run; after a passing work-item gate a manual run
+  cannot complete the work item.
+- Evidence discharge after an accepted close, such as provider conformance
+  and verified requirements, is not run.
+- Readiness has no bounded recovery.
+- A review composes no discovery starting points and refuses a request that
+  cites a package source; a design review without a recorded orientation
+  starts fresh, marked degraded.
+- `after` on an architect turn records the work item and its outlines from
+  the turn's inputs when the manual run lacks them.
+- `--assignment-of` reads the committed audit configuration at HEAD, and its
+  protected harness files are the tracked feature files only, since a manual
+  run captures no plan documents.
+
+`session` runs on the same runner: each session is a manual run under
+`plans/sessions/.harness/jobs/`. `plans/.harness/sessions/` is retired:
+nothing writes it any more, and existing directories are left in place,
+where the Sessions page still reads them.
 
 ## Quick pi tests
 
@@ -158,9 +369,9 @@ to observe what the harness answers: import formatFinding from \
 harness tells you."
 ```
 
-The session's transcript is `transcript.jsonl` in its records directory, and
-pi's own record is under `session/`. The Sessions page of `npm run serve` on
-the copy lists it.
+The session's transcript is under `transcripts/` in its manual run, which
+the summary's `Records:` line names. The web client does not show manual
+runs; read the files.
 Reset the copy between tests with `git checkout -- . && git clean -fd`, or
 prepare another.
 

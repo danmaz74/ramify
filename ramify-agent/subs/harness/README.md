@@ -132,7 +132,9 @@ hiding or measured complexity justifies it.
     it the run's own log, its records and the project lock would be committed
     with the work they describe, and a clean tree would never be clean.
 - `jobs/`: what a job of this harness is, whatever a job turns out to be. An
-  implementation run is the one kind. Every durable write here goes through
+  implementation run is the one kind a server executes; a manual run
+  (`kind: 'manual'`, see `steps/` below) shares its layout and is skipped
+  when the server loads the project. Every durable write here goes through
   the `ledger` child.
   - `records.ts`: where a job lives, `plans/<plan-id>/.harness/jobs/<job-id>/`,
     how its ID is made, and how a directory whose record this harness does not
@@ -385,6 +387,12 @@ hiding or measured complexity justifies it.
     never an excursion, and neither is a path no module owns.
   - `snapshot.ts`: the run's projection, a pure function of its `job.json`
     and its log.
+  - `committing-gate.ts`, `after-handling.ts` and `review-finish.ts`: the
+    committing checkpoints and their audits, the record-only handling after
+    an accepted submission (obligations, bindings, iteration close, review
+    requests, outline revisions and assignments), and review finishing with
+    the completion blockers. `service.ts` calls them through hosts, and a
+    manual run's `step gate` and `step after` call the same code.
 - `analysis/`: the run's initial analysis, which turns the plan into what the
   run needs before any work is assigned.
   - `submission.ts`: the initial architect's submission, its strict schema
@@ -787,7 +795,8 @@ hiding or measured complexity justifies it.
 - `transcripts/`: the harness's transcript of each session, which is raw
   output and never a record.
   - `writer.ts`: one session's file, `transcripts/<session>.jsonl` in a run
-    and `transcript.jsonl` in a standalone session. Each entry is one synced
+    or a manual run, and `transcript.jsonl` in a standalone session recorded
+    before Plan 30. Each entry is one synced
     line numbered one above the last, so a crash keeps every earlier entry,
     a torn last line is discarded, and a number is never reset. A body over
     the policy's inline limit goes to the content store.
@@ -805,26 +814,49 @@ hiding or measured complexity justifies it.
     module in the architect view before any agent starts, and gives the
     engineer the equipment an implementation run gives its engineers
     (`work/engineer-equipment.ts`). The prompt is the iteration's goal; the
-    write scope is the module's own contents plus the extra paths. It reports
-    what it observes through a progress callback, and an accepted submission
-    is answered with what follows in a session, which is a person's review
-    and nothing else. With the gate option it runs the `iteration` checkpoint
-    over the module afterwards. It never commits.
-  - `records.ts`: the session's plain files under
-    `plans/.harness/sessions/<session-id>/`: `session.json`,
-    `observations.jsonl` with the run's observation schema, `submission.json`,
-    `outcome.json`, the shell and hook outputs, the harness's
-    `transcript.jsonl` and its `blobs/`, the executor's own record under
-    `session/`, and the gate attempt under `gate/`. The session is its own
-    one invocation, so its identifier names both.
-    `session.json` names the executor and the model it was asked for; a
-    session with an outcome is finished, and one without was interrupted.
+    write scope is the module's own contents plus the extra paths. It runs on
+    the invocation runner (`steps/runner.ts`) in a manual run at
+    `plans/sessions/.harness/jobs/<session-id>/`, with no branch and its base
+    at HEAD; the session is that run's one invocation, and
+    `invocations/<invocation>/step.json` (`ramify-agent.session-summary/1`)
+    holds its summary and the gate's verdict. It reports what it observes
+    through a progress callback, and an accepted submission is answered with
+    what follows in a session, which is a person's review and nothing else.
+    With the gate option it runs the in-place diagnosis over the current
+    tree afterwards. It never commits.
   - `command.ts`: `runSessionCommand`, the command's entry. It builds the
     agent, pi after its readiness unless the person chose the scripted fake
     with a JSON script file, and a private Ramify daemon, and disposes of both. The
     root receives it with the progress, result, summary and gate types and the
     named types the summary mentions; the agent port, the Ramify command line
     and the run policy stay internal.
+  - `plans/.harness/sessions/` is retired. Nothing writes it any more, and
+    existing directories are left in place.
+    `projections/standalone-records.ts` reads them for the session
+    projections.
+- `steps/`: one harness step at a time, from files, for an agent or a person
+  implementing a plan; the root's `step` command runs it. The root
+  [README](../../README.md#steps) describes the workflow, the command
+  forms, the exit statuses and what a manual run does not do.
+  - `inputs.ts`: `StepInputs`, schema `ramify-agent.step-inputs/1`, a union
+    by role and start whose path fields name their base and are relative to
+    it. `construct.ts` and the role files (`engineer.ts`,
+    `local-architect.ts`, `reviewer.ts`) build a `ConstructedStep` from them,
+    the same constructors `run/service.ts` calls; `render.ts` prints one.
+  - `from-run.ts`, `authored.ts`, `authoring.ts`, `assigned.ts` and
+    `review-step.ts`: inputs imported from a recorded invocation, authored
+    and judged as the producing role's output, derived from an assignment a
+    manual run recorded, or composed from a review request.
+  - `runner.ts`: the invocation runner a run and a manual run share:
+    records, transcript, judge, equipment, bounds and outcome.
+  - `manual.ts`: a manual run, `plans/<plan-id>/.harness/jobs/<run-id>/`
+    with `job.json` of kind `manual` naming its project, plan, base commit
+    and branch, checked on each reuse. An implementation run's directory is
+    refused. `manual-hosts.ts` holds the refusals `run`, `gate` and `after`
+    share: the lock, writer settlement, identity and the submission hash.
+  - `run.ts`, `gate.ts` and `after.ts`: `step run`, `step gate` and
+    `step after`. `command.ts` is the root's entry, with the exit statuses
+    0, 1 and 2.
 
 The child `agent` holds the agent port and the scripted fake, and relays its
 child `pi`. Everything here depends on the port; the caller of

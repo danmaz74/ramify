@@ -3,10 +3,11 @@
 Design documents for the separate agent harness:
 
 - [Plan 30: harness steps as a library and a CLI](plans/30-harness-steps/main-plan.md),
-  proposed: step inputs and constructors the run itself uses, and
-  `ramify-agent step` to render, run, gate and apply the after-handling of
-  one step from files, run again after a harness fix; supersedes
-  Plan 15's capture and replay
+  implemented; the real-plan exercise awaits the user's go-ahead: step
+  inputs and constructors the run itself uses, and `ramify-agent step` to
+  render, run, gate and apply the after-handling of one step from files, run
+  again after a harness fix; the [README](../README.md#steps) describes the
+  workflow; supersedes Plan 15's capture and replay
 - [Plan 31: the operator driver](plans/31-operator-driver/main-plan.md),
   proposed, after Plan 30: a session operation driver fed by a file mailbox
   and CLI so a generalist agent or a person plays chosen roles inside a real
