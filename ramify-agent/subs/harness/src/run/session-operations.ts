@@ -9,7 +9,7 @@ import { openSessionStore, type LedgerSessionStore } from './session-store.js';
 import { buildTaskPacket, type TaskEnvironment, type TaskKind, type TaskPacket } from '../prompts/tasks.js';
 import { buildBriefingDelivery, createBriefingOccurrence, taskBriefingRevision, type BriefingRevision } from '../prompts/briefings.js';
 import { renderBlockSet } from '../prompts/blocks.js';
-import { exactInputHash, type DeliveredInput } from '../prompts/delivered-manifest.js';
+import { buildDeliveredManifest, exactInputHash, type DeliveredInput } from '../prompts/delivered-manifest.js';
 import type { LoadedPackage } from '../prompts/packages.js';
 import { deliveredManifestViewSchema } from '../interfaces/protocol/runs.js';
 
@@ -38,6 +38,7 @@ export interface HarnessOperationInput {
   readonly prepared?: (packet: TaskPacket, declarations: readonly SessionToolDeclaration[]) => Promise<void>;
   readonly identified?: (identity: SessionExecutionIdentity) => Promise<void>;
   readonly restore?: boolean;
+  readonly callerText?: string;
   readonly accepted?: () => { readonly value: unknown; readonly schema: string; readonly submissionHash: string };
 }
 type Context = PointContext;
@@ -178,6 +179,7 @@ export function composeOperationPacket(input: {
   /** The point a continued or forked start inherits; null for a fresh one. */
   readonly source: AgentSessionPoint | null;
   readonly prior: PointContext | null;
+  readonly callerText?: string;
 }): { readonly packet: TaskPacket; readonly current: BriefingRevision; readonly history: BriefingRevision[] } {
   const { prior } = input;
   const originalSections = input.brief.sections;
@@ -190,12 +192,21 @@ export function composeOperationPacket(input: {
     operationId: input.operationId, sections: taskBriefingRevision({ revision: 'construction', goal: input.brief.goal, requirements: input.brief.requirements, sections }).sections });
   const history = [...(prior?.history ?? [])];
   if (!history.some(entry => entry.revision === current.revision)) history.push(current);
-  const packet = buildTaskPacket({ loaded: input.loaded, ...input.brief,
+  const ordinary = buildTaskPacket({ loaded: input.loaded, ...input.brief,
     environment: { ...input.brief.environment, workingDirectory: input.workingDirectory, availableTools: [...input.builtinDeclarations.map(tool => tool.name), ...input.tools.map(tool => tool.name), input.submissionName] },
     briefing: buildBriefingDelivery({ mode: input.mode, current, inheritedRevision: prior?.revision ?? null, history }),
     inheritedPoint: input.source ? sessionPointReference(input.runId, input.source) : null, inherited: prior?.inherited ?? [],
     supplyRoleInstructions: !prior?.inherited.some(item => item.key === `role:${input.loaded.role}` && item.kind === 'role-instructions'),
   });
+  // Caller prose is a separate physical delivery after the entire ordinary task.
+  // It participates in immutable identity and is inherited at the returned point.
+  const caller: DeliveredInput[] = input.callerText === undefined ? [] : [{ key: `caller:${input.operationId}`, kind: 'task',
+    text: input.callerText, source: null, revision: null }];
+  const additions = [...ordinary.additions, ...caller];
+  const message = ordinary.message + (input.callerText === undefined ? '' : `\n\n${input.callerText}`);
+  const packet = { ...ordinary, message, additions,
+    manifest: buildDeliveredManifest({ inheritedPoint: ordinary.manifest.inheritedPoint, inherited: prior?.inherited ?? [],
+      appended: additions, currentMessage: message, schema: 'ramify-agent.delivered-inputs/2' }) };
   return { packet, current, history };
 }
 
@@ -259,6 +270,13 @@ export class HarnessSessionOperations {
     if (found && (found.runId !== runId || found.operationId !== operationId || typeof found.schema !== 'string' || !/^[a-f0-9]{64}$/u.test(found.submissionHash))) throw new Error('Invalid harness acceptance correlation');
     return found;
   }
+  /** Read source ancestry without admitting an operation or writing a packet. */
+  async previewContext(runId: string, ref: string): Promise<PointContext> {
+    const source = readSessionPointReference(ref);
+    if (!source || source.runId !== runId) throw new ReusableSessionUnavailableError('The requested session point is unavailable');
+    if (!await this.operations.inspect(runId, source.point.sessionId, source.point)) throw new ReusableSessionUnavailableError('Retained session state unavailable');
+    return this.context(runId, source.point);
+  }
   async start(input: HarnessOperationInput): Promise<AgentSession & { readonly unavailableReason?: string | undefined }> {
     const { runId, operationId } = input;
     const path = this.path('operations', [runId, operationId]);
@@ -276,7 +294,7 @@ export class HarnessSessionOperations {
     if (spec.session.mode !== 'fresh' && !sourceRef) throw new ReusableSessionUnavailableError('The requested session point is unavailable');
     const prior = sourceRef ? await this.context(runId, sourceRef.point) : null;
     // Retried packets and occurrences are immutable, including the legacy wire form.
-    if (previous?.requestHash && !input.restore && previous.requestHash !== exactInputHash(JSON.stringify(input.brief))) throw new Error('Conflicting harness session correlation');
+    if (previous?.requestHash && !input.restore && previous.requestHash !== exactInputHash(JSON.stringify(input.callerText === undefined ? input.brief : { brief: input.brief, callerText: input.callerText }))) throw new Error('Conflicting harness session correlation');
     if (previous && !input.restore) {
       const requestedSource = input.spec.session.mode === 'fresh' ? null : readSessionPointReference(input.spec.session.mode === 'continue' ? input.spec.session.ref : input.spec.session.from)?.point;
       if (input.session !== previous.session || input.spec.session.mode !== previous.mode || input.spec.scope.workingDirectory !== previous.task.environment.workingDirectory ||
@@ -293,7 +311,7 @@ export class HarnessSessionOperations {
     const builtinDeclarations = this.agent.builtinDeclarations?.(builtins, spec.scope.workingDirectory) ?? piBuiltinDeclarations(builtins, spec.scope.workingDirectory);
     const composed = previous ? null : composeOperationPacket({ runId, operationId, loaded: input.loaded, brief: input.brief, role: spec.role,
       mode: spec.session.mode, workingDirectory: spec.scope.workingDirectory, builtinDeclarations, tools: spec.tools, submissionName: spec.submission.name,
-      source: sourceRef?.point ?? null, prior });
+      source: sourceRef?.point ?? null, prior, ...(input.callerText === undefined ? {} : { callerText: input.callerText }) });
     const current = previous ? previous.context.history.find(entry => entry.revision === previous.context.revision)! : composed!.current;
     const revision = current.revision;
     const history = previous ? [...previous.context.history] : composed!.history;
@@ -307,7 +325,7 @@ export class HarnessSessionOperations {
     const declarations = operationDeclarations(builtinDeclarations, spec.tools, packet);
     if (previous && (JSON.stringify(policy) !== JSON.stringify(previous.policy) || JSON.stringify(declarations) !== JSON.stringify(previous.declarations) || spec.role !== previous.task.role)) throw new Error('Restored authority, validator, destination or declarations differ from original operation');
     const intent: Intent = previous ? previous : { schema: 'ramify-agent.harness-operation/2', runId, operationId, session: input.session, source: sourceRef?.point ?? null,
-      requestHash: exactInputHash(JSON.stringify(input.brief)), mode: spec.session.mode, packet, context: { inherited: [...(prior?.inherited ?? []), ...packet.additions], history, revision }, policy, task, declarations };
+      requestHash: exactInputHash(JSON.stringify(input.callerText === undefined ? input.brief : { brief: input.brief, callerText: input.callerText })), mode: spec.session.mode, packet, context: { inherited: [...(prior?.inherited ?? []), ...packet.additions], history, revision }, policy, task, declarations };
     await this.retain(path, intent);
     await input.prepared?.(packet, intent.declarations);
     let identified: string | null = null;

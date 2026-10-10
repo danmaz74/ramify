@@ -74,9 +74,40 @@ export type BreakpointState = z.infer<typeof breakpointStateSchema>;
 export const debugResumeCommandSchema = z.object({
   commandId: commandIdSchema, expectedVersion: jobVersionSchema.default(0), type: z.literal('debug-resume'),
   payload: z.object({ planId: planIdSchema, jobId: jobIdSchema, pauseId: z.string().min(1),
-    expectedRevision: z.int().positive() }).strict(),
+    expectedRevision: z.int().positive(), message: z.string().optional() }).strict(),
 }).strict();
 export type DebugResumeCommand = z.infer<typeof debugResumeCommandSchema>;
+
+/** Admit one bounded ordinary engineer exchange while keeping its workflow parked. */
+export const debugMessageCommandSchema = z.object({
+  commandId: commandIdSchema, expectedVersion: jobVersionSchema.default(0), type: z.literal('debug-message'),
+  payload: z.object({ planId: planIdSchema, jobId: jobIdSchema, pauseId: z.string().min(1),
+    expectedRevision: z.int().positive(), message: z.string() }).strict(),
+}).strict();
+export type DebugMessageCommand = z.infer<typeof debugMessageCommandSchema>;
+
+const debugInputSchema = z.object({ key: z.string(), kind: z.string(), text: z.string(),
+  source: z.string().nullable(), revision: z.string().nullable(), sources: z.array(z.object({ path: z.string(), hash: z.string(), bytes: z.int().nonnegative() })).readonly().optional(),
+  block: z.object({ key: z.string(), effect: z.enum(['set', 'remove']) }).optional() });
+const debugToolSchema = z.object({ name: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.unknown()), mutating: z.boolean() });
+/** Read-only preparation, explicitly distinct from delivered input. */
+export const debugInspectionSchema = breakpointStateSchema.extend({ kind: z.literal('inspection'), preview: z.literal(true),
+  input: z.object({ roleInstructions: z.string(), message: z.string(), inherited: z.array(debugInputSchema),
+    additions: z.array(debugInputSchema), effective: z.array(debugInputSchema), tools: z.array(debugToolSchema),
+    source: z.string().nullable(), continuity: z.enum(['fresh', 'retained', 'unavailable']), continuityReason: z.string().nullable(),
+    scope: z.record(z.string(), z.unknown()), bounds: z.record(z.string(), z.unknown()),
+  }).strict(),
+}).strict();
+export type DebugInspection = z.infer<typeof debugInspectionSchema>;
+/** Settled command result remains queryable after another exchange or resume. */
+export const debugExchangeSchema = breakpointStateSchema.extend({ kind: z.literal('exchange'), commandId: commandIdSchema,
+  status: z.enum(['admitted', 'settled', 'stopped', 'interrupted']), answer: z.string().nullable(),
+  invocation: z.string().nullable(), session: z.string().nullable(), point: z.string().nullable(),
+  outcome: z.string().nullable(), error: z.string().nullable(), continuityLoss: z.string().nullable(),
+  verdicts: z.array(z.object({ accepted: z.boolean(), answer: z.string() }).strict()), evidence: z.array(z.string()),
+}).strict();
+export type DebugExchange = z.infer<typeof debugExchangeSchema>;
+
 
 /**
  * Starts an implementation run for a plan. It creates the run, so it expects
@@ -120,7 +151,7 @@ export type ApproveAnalysisCommand = z.infer<typeof approveAnalysisCommandSchema
  * revocation, each against a CheckFinding's revision.
  */
 export const runCommandSchema = z.discriminatedUnion('type', [
-  startRunCommandSchema, stopJobCommandSchema, approveAnalysisCommandSchema, debugResumeCommandSchema,
+  startRunCommandSchema, stopJobCommandSchema, approveAnalysisCommandSchema, debugResumeCommandSchema, debugMessageCommandSchema,
   respondToCheckFindingCommandSchema, waiveCheckFindingCommandSchema, revokeCheckFindingWaiverCommandSchema,
 ]);
 /** A command as the harness receives it, with every default applied. */

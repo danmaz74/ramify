@@ -190,9 +190,47 @@ unfinished debug-enabled run is interrupted before pending effect completion,
 capability source reconciliation or workflow restoration, even before its first
 pause or after resume. Interrupted invocation and session evidence is retained;
 pending effects are not redispatched. Ordinary runs keep their existing
-recovery policy. Caller conversation and effective input presentation are
-implemented by the subsequent Plan 34 conversation iteration; their pending
-returns must not change the default missing-submission outcome.
+recovery policy.
+
+Inspection is a read-only preparation preview. It presents effective role,
+procedure, briefing and environment inputs, physical inherited context and
+current additions, current tool declarations, scope, bounds and exact source
+point. It admits no operation, builds no executable tool equipment, retains no
+packet as delivered input and consumes no invocation. Unavailable inherited
+context is identified explicitly; a fresh reconstruction preview cannot claim
+that the earlier conversation is retained.
+
+A debugger message appends caller prose verbatim after the entire ordinary task
+before immutable operation admission. Its packet identity and delivered manifest
+include that prose. Normal tool authority, write guard, post-write hooks,
+submission judge and bounds apply. No discussion role, fork, hidden explain-only
+instruction or substitute assignment is introduced. A settled plain return with
+no accepted submission leaves the task pending only in this explicit exchange
+mode; ordinary invocations retain missing-submission handling. Submission
+rejections, context exhaustion, failures and unconfirmed settlement keep their
+real outcomes and evidence.
+
+Follow-ups continue the latest settled logical session and retain both provider
+history and harness briefing ancestry at its returned point. Known context loss
+uses the ordinary fresh fallback, with current caller text retained and
+conversational continuity loss reported. Accepted actions, including partial
+work and capability requests, and terminal invocation outcomes are held for
+ordinary workflow handling on resume. Further messages are refused once an
+outcome is held. Resume consumes it once without another model call; otherwise
+it continues the pending ordinary task, optionally appending new caller prose.
+Tool settlement must be confirmed before another exchange, writer or gate.
+Unconfirmed writer settlement blocks resume as well.
+
+Message admission is serialized before model execution using the occurrence
+revision and stable command ledger. Exact retries return the same admission
+and retained result; a changed payload, stale revision or concurrent new
+message/resume is refused. Admission and settled outcomes remain queryable by
+plan, run and command identity after client reconnection or resume. Model and
+tool execution run outside serialization locks and count against execution
+bounds; caller waiting intervals close at exchange admission and reopen at
+settlement, while reviews remain suspended throughout. Stop and server shutdown
+settle the admitted exchange's lifetime before releasing resources. A stopped
+or interrupted exchange cannot be reported as a completed conversation.
 
 ### An Oriented Context Is Reused, Never Required
 

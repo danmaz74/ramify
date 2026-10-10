@@ -179,6 +179,9 @@ test.each(['code', 'design'] as const)('B02 B04: pausing settles an admitted %s 
   const root = await reviewTarget(cleanups);
   const active = gate();
   const release = gate();
+  const exchangeStarted = gate();
+  const exchangeRelease = gate();
+  let engineerCalls = 0;
   const opened = await reviewRun(root, cleanups, { breakpoint: 'before-agent:engineer', detached: true,
     commits: Object.fromEntries(Object.entries(reviewCandidates()).map(([id, candidate]) => [id, { ...candidate, files: { ...candidate.files,
       'ramify-agent.json': '{\"schema\":\"ramify-agent.project/1\"}\n',
@@ -186,7 +189,8 @@ test.each(['code', 'design'] as const)('B02 B04: pausing settles an admitted %s 
       [`${notesDirectory}/README.md`]: 'Keep one note per review run.\n',
     } }])),
     policy: { kinds: kind === 'code' ? ['code', 'scope'] : ['design', 'code'], concurrency: 1, retries: 0 },
-    engineer: [submit(completionProposed('Added store'), write('store.ts', 'export const store = new Map(); // v1\n'))],
+    engineer: [[{ kind: 'await', until: async () => { if (++engineerCalls === 2) { exchangeStarted.open(); await exchangeRelease.opened; } } },
+      ...submit(completionProposed('Added store'), write('store.ts', 'export const store = new Map(); // v1\n'))]],
     reviewers: {
       orientation: [{ kind: 'await', until: async () => { active.open(); await release.opened; } }, { kind: 'end', message: 'No orientation submitted' }],
       'rq-0001': kind === 'code'
@@ -214,6 +218,15 @@ test.each(['code', 'design'] as const)('B02 B04: pausing settles an admitted %s 
   expect(events.filter(event => event.type === 'writer-acquired')).toHaveLength(1);
   expect(events.filter(event => event.type === 'writer-released')).toHaveLength(1);
   if (kind === 'design') expect(finished?.data).toMatchObject({ result: 'not-verified', reason: 'invalid-output' });
+  await opened.service.execute({ commandId: 'suspended-review-chat', expectedVersion: 0, type: 'debug-message', payload: {
+    planId: plan, jobId: opened.runId, pauseId: second.pauseId, expectedRevision: second.revision, message: 'Perform the ordinary task.' } });
+  await exchangeStarted.opened;
+  expect(opened.service.debugState(plan, opened.runId)?.state).toBe('exchanging');
+  expect(opened.service.events(plan, opened.runId)!.filter(event => event.type === 'review-attempt-started').map(event => event.data.request)).not.toContain('rq-0002');
+  exchangeRelease.open();
+  await until(() => opened.service.debugResult(plan, opened.runId, 'suspended-review-chat')?.status === 'settled');
+  expect(opened.service.debugResult(plan, opened.runId, 'suspended-review-chat')?.taskState).toBe('accepted');
+  expect(opened.service.events(plan, opened.runId)!.filter(event => event.type === 'review-attempt-started').map(event => event.data.request)).not.toContain('rq-0002');
   await stop(opened.service, opened.runId);
   await expect(opened.service.execute(resume(opened.runId, second.pauseId, 'after-stop'))).rejects.toMatchObject({ code: 'conflict' });
 });

@@ -88,7 +88,7 @@ describe('the run log', () => {
   test('every event type is written and read back, and the terminal ones are named', () => {
     const types = runEventSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
-      'invocation-prepared', 'job-started', 'debug-pausing', 'debug-paused', 'debug-resumed', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
+      'invocation-prepared', 'job-started', 'debug-pausing', 'debug-paused', 'debug-exchange-admitted', 'debug-exchange-settled', 'debug-resumed', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
       'document-manifest-committed', 'work-orientation-recorded', 'context-selection-recorded', 'context-package-append-requested', 'context-package-appended', 'context-package-prompt-bound', 'candidate-prepared', 'nonfunctional-phase-started', 'nonfunctional-assessed', 'nonfunctional-investigated', 'nonfunctional-repair-assigned', 'nonfunctional-repair-committed', 'nonfunctional-round-closed', 'nonfunctional-deviation-recorded', 'candidate-bound-to-gate',
       'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
       'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned',
@@ -129,7 +129,7 @@ describe('the run log', () => {
   });
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
-    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected', 'capability-qualification', 'capability-returned', 'capability-coordination']);
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected', 'capability-qualification', 'capability-returned', 'capability-coordination', 'debugger']);
     expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection', 'capability-consultation']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
     expect(requestReasonSchema.options).toEqual(['contract-needed', 'capability-needed']);
@@ -1083,6 +1083,8 @@ function sampleData(type: RunEvent['type']): unknown {
   const samples: Partial<Record<RunEvent['type'], unknown>> = {
     'debug-pausing': { pauseId: 'pause-0001', revision: 1, role: 'engineer', work: {}, goal: 'Task', nextAction: 'Execute task' },
     'debug-paused': { pauseId: 'pause-0001', revision: 1 },
+    'debug-exchange-admitted': { pauseId: 'pause-0001', revision: 1, message: 'Explain', command },
+    'debug-exchange-settled': { pauseId: 'pause-0001', revision: 2, commandId: command.commandId, result: { kind: 'exchange', planId: 'example', runId: 'r1', pauseId: 'pause-0001', revision: 2, cursor: 1, state: 'paused', role: 'engineer', work: {}, goal: 'Task', nextAction: 'Continue', taskState: 'pending', summary: 'Pending', commandId: command.commandId, status: 'settled', answer: 'Explained', invocation: 'inv-0001', session: 'ses-0001', point: null, outcome: 'ended', error: null, continuityLoss: null, verdicts: [], evidence: [] } },
     'debug-resumed': { pauseId: 'pause-0001', revision: 2, command },
     'invocation-prepared': { invocation: 'inv-0001' },
     'session-opened': { session: 'ses-0001', role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, executor: 'scripted', model: null },

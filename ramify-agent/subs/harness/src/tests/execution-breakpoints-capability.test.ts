@@ -13,7 +13,7 @@ afterEach(async () => {
   for (const answer of answers.splice(0)) answer.assertComplete();
 });
 
-test('B01 B14: a delegated capability engineer parks at a new occurrence and server loss interrupts its stack without reconciliation', async () => {
+test('B01 B09 B14: a delegated capability engineer parks at a new occurrence and server loss interrupts its stack without reconciliation', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   const answer = recoveryBoundaries(fixture.root, 'a');
@@ -47,8 +47,17 @@ test('B01 B14: a delegated capability engineer parks at a new occurrence and ser
   const receipt = await first.service.execute({ ...start, payload: { ...start.payload, breakpoint: 'before-agent:engineer' } });
   await until(() => first.service.debugState('need', receipt.jobId)?.state === 'paused');
   const original = first.service.debugState('need', receipt.jobId)!;
+  const inspected = await first.service.debugInspect('need', receipt.jobId, original.pauseId);
+  expect(inspected.input.tools.map(tool => tool.name)).toContain('write');
+  await first.service.execute({ commandId: 'capability-chat', expectedVersion: 0, type: 'debug-message', payload: {
+    planId: 'need', jobId: receipt.jobId, pauseId: original.pauseId, expectedRevision: 1, message: 'Perform the ordinary task.' } });
+  await until(() => first.service.debugResult('need', receipt.jobId, 'capability-chat')?.status === 'settled');
+  expect(first.service.debugResult('need', receipt.jobId, 'capability-chat')?.taskState).toBe('accepted');
+  expect(first.service.events('need', receipt.jobId)!.some(event => event.type === 'capability-requested')).toBe(false);
+  await expect(first.service.execute({ commandId: 'capability-replace', expectedVersion: 0, type: 'debug-message', payload: {
+    planId: 'need', jobId: receipt.jobId, pauseId: original.pauseId, expectedRevision: 2, message: 'Replace your accepted request.' } })).rejects.toMatchObject({ code: 'conflict' });
   await first.service.execute({ commandId: 'capability-resume', expectedVersion: 0, type: 'debug-resume', payload: {
-    planId: 'need', jobId: receipt.jobId, pauseId: original.pauseId, expectedRevision: 1,
+    planId: 'need', jobId: receipt.jobId, pauseId: original.pauseId, expectedRevision: 2,
   } });
   await until(() => first.service.debugState('need', receipt.jobId)?.state === 'paused');
   const delegated = first.service.debugState('need', receipt.jobId)!;

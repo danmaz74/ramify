@@ -1,3 +1,6 @@
+import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-operations.js';
+import { effectiveBlocks } from '../prompts/blocks.js';
+import type { DebugInspection } from '../interfaces/protocol/runs.js';
 import { mkdir, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
@@ -25,7 +28,7 @@ import {
   type MeasurementSnapshot, type RecordRef, type ReplaceRelation, type RequestRelation, type RunPolicy, type SessionFinishReason, type SessionId,
 } from '../run/records.js';
 import {
-  HarnessSessionOperations, ReusableSessionUnavailableError, readSessionPointReference, settleSessionEquipment, type HarnessTaskBrief,
+  HarnessSessionOperations, ReusableSessionUnavailableError, composeOperationPacket, operationDeclarations, readSessionPointReference, settleSessionEquipment, type HarnessTaskBrief, type PointContext,
 } from '../run/session-operations.js';
 import { reduceSessions, type RunSessions } from '../run/sessions.js';
 import { SubmissionJudge, type SubmissionValidation } from '../run/submissions.js';
@@ -99,6 +102,10 @@ export type InvocationProgress =
 
 /** What one invocation is: its role, its work, its prompt and the one submission it may make. */
 export interface InvocationRequest<T> {
+  /** Only debugger exchanges permit a settled plain return to retain the pending task. */
+  readonly pendingPlainReturn?: boolean;
+  readonly callerText?: string;
+  readonly previewEquipment?: { readonly builtinTools: SessionSpec['builtinTools']; readonly tools: readonly import('../../subs/agent/src/interfaces/session-operations.js').SessionToolDeclaration[] };
   readonly restore?: boolean;
   readonly originalInvocation?: string | undefined;
   readonly role: Role;
@@ -251,6 +258,9 @@ export interface InvocationResult<T> {
   readonly changed?: readonly string[] | undefined;
   /** Whether the agent session could not start, so the invocation ended before any model call. */
   readonly notStarted?: boolean | undefined;
+  readonly pending?: boolean;
+  readonly settlementConfirmed?: boolean;
+  readonly verdicts?: readonly { readonly accepted: boolean; readonly answer: string }[];
 }
 
 /** What the harness does with a session when one of its invocations ends. */
@@ -455,6 +465,42 @@ export class InvocationRunner<R extends RunnerRun> {
     });
   }
 
+  /** Present the effective ordinary input; preview owns no operation, tool or writer. */
+  async preview<T>(run: R, agent: AgentPort, request: InvocationRequest<T>): Promise<DebugInspection['input']> {
+    const source = request.start.mode === 'fresh' ? null : request.start.mode === 'continue' ? request.start.ref : request.start.from;
+    let prior: PointContext | null = null;
+    let continuityReason: string | null = null;
+    if (source !== null) {
+      try { prior = await (await this.host.operations(agent)).previewContext(run.jobId, source); }
+      catch (error) { if (!(error instanceof ReusableSessionUnavailableError)) throw error; continuityReason = message(error); }
+    }
+    const fresh = continuityReason === null ? undefined : request.fallback?.(continuityReason);
+    const current = fresh === undefined ? request : { ...request, prompt: fresh.prompt, brief: fresh.brief, stepInputs: fresh.stepInputs };
+    // Writer constructors expose declarations separately; inspect never calls equip.
+    if (current.writer && !current.previewEquipment) throw new Error('Prepared writer has no read-only tool declarations');
+    const equipment = current.previewEquipment ?? { builtinTools: ['read', 'grep', 'ls'] as const, tools: [] };
+    const workingDirectory = current.workingDirectory ?? this.projectRoot;
+    const builtinDeclarations = agent.builtinDeclarations?.(equipment.builtinTools, workingDirectory) ?? piBuiltinDeclarations(equipment.builtinTools, workingDirectory);
+    const limits = invocationLimits(run.policy.limits, current);
+    const spec: SessionSpec = { role: current.role, scope: { workingDirectory }, systemPrompt: current.systemPrompt,
+      prompt: current.prompt, session: current.start, context: current.context ?? contextPolicyOf(run.policy, current.role),
+      builtinTools: equipment.builtinTools, tools: [], onEvent: () => undefined, submission: { name: current.toolName, description: current.description,
+        inputSchema: current.inputSchema, accept: async () => { throw new Error('Inspection cannot submit'); } } };
+    const brief = current.brief ?? await this.host.taskBrief(run, current, spec, limits);
+    const { packet } = composeOperationPacket({ runId: run.jobId, operationId: invocationId(run.log.count('invocation-started') + 1), loaded: current.loaded, brief,
+      role: current.role, mode: prior === null ? 'fresh' : current.start.mode, workingDirectory, builtinDeclarations,
+      tools: equipment.tools, submissionName: current.toolName, source: prior?.point ?? null, prior,
+      ...(current.callerText === undefined ? {} : { callerText: current.callerText }) });
+    const inherited = [...prior?.inherited ?? []];
+    const history = [...inherited, ...packet.additions];
+    return { roleInstructions: packet.roleInstructions, message: packet.message, inherited, additions: [...packet.additions],
+      effective: [...history.filter(item => !item.block && !['task', 'briefing-state'].includes(item.key)), ...effectiveBlocks(history).values(),
+        ...packet.additions.filter(item => ['task', 'briefing-state'].includes(item.key))],
+      tools: operationDeclarations(builtinDeclarations, equipment.tools, packet), source,
+      continuity: source === null ? 'fresh' : continuityReason === null ? 'retained' : 'unavailable', continuityReason,
+      scope: { ...current.scope, guarded: current.guarded === undefined ? null : { revision: current.guarded.revision, projectRoot: current.guarded.projectRoot, roots: current.guarded.roots, files: current.guarded.files, excluded: current.guarded.excluded ?? [], denied: current.guarded.denied ?? [], guarded: current.guarded.guarded ?? [] }, workingDirectory }, bounds: { ...limits, context: spec.context } };
+  }
+
   private async invokeOnce<T>(run: R, agent: AgentPort, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
     // The start is serialized with every other start, since the identifiers
     // are counted from the log; the session itself runs outside it, so a
@@ -559,7 +605,7 @@ export class InvocationRunner<R extends RunnerRun> {
       work: request.work,
       attempt: request.attempt,
       session: requestedSession(request),
-      prompt: { package: request.loaded.package, hash: request.loaded.hash, requestedInputsHash: inputsHash([request.systemPrompt, request.prompt]) },
+      prompt: { package: request.loaded.package, hash: request.loaded.hash, requestedInputsHash: inputsHash([request.systemPrompt, request.prompt, ...(request.callerText === undefined ? [] : [request.callerText])]) },
       // Actual delivered size is committed by invocation-prepared, before events.
       scope: { ...request.scope, size: null },
       writer: request.writer === true,
@@ -628,7 +674,9 @@ export class InvocationRunner<R extends RunnerRun> {
 
   private async runSession<T>(run: R, agent: AgentPort, started: StartedInvocation, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
     const { id, session, observations, transcript } = started;
+    const verdicts: Array<{ accepted: boolean; answer: string }> = [];
     const progress = (event: InvocationProgress): void => {
+      if (event.type === 'submission') verdicts.push({ accepted: event.accepted, answer: event.answer });
       try { request.progress?.(event); } catch { /* A reader that fails does not end the invocation. */ }
     };
     // What the harness does with the session once this invocation ends. A
@@ -751,6 +799,7 @@ export class InvocationRunner<R extends RunnerRun> {
     try {
       agentSession = await (await this.host.operations(agent)).start({ runId: run.jobId, operationId: id, session, loaded: request.loaded,
         brief: request.brief ?? await this.host.taskBrief(run, request, spec, limits), spec, restore: request.restore,
+        ...(request.callerText === undefined ? {} : { callerText: request.callerText }),
         authority: { scope: request.guarded === undefined ? null : { revision: request.guarded.revision, projectRoot: request.guarded.projectRoot, roots: request.guarded.roots, files: request.guarded.files, excluded: request.guarded.excluded ?? [], denied: request.guarded.denied ?? [], guarded: request.guarded.guarded ?? [] }, writer: request.writer === true, work: request.work },
         validator: { name: request.toolName, schema: request.inputSchema, submissionSchema: request.submissionSchema, bound: limits.rejectedSubmissionsPerTurn },
         destination: { run: run.jobId, invocation: id, submission: runLayout.submission(id) },
@@ -786,12 +835,24 @@ export class InvocationRunner<R extends RunnerRun> {
       const keptAs = keeping('failed', undefined);
       const failure = `The agent session could not start: ${message(error)}`;
       const interruption = error instanceof ReusableSessionUnavailableError && request.start.mode !== 'fresh' ? 'session-lost' as const : 'adapter-fault' as const;
+      // Known reusable-context refusal occurs before dispatch. The ordinary
+      // fresh fallback must first release the writer acquired for that attempt.
+      let preflightSettlement = stoppedOutcome().settled;
+      if (interruption === 'session-lost' && run.writer.held === id) {
+        const toolsSettled = await settleSessionEquipment(equipment.settle, limits.stopSettleMs).catch(() => false);
+        preflightSettlement = await run.writer.release(id, toolsSettled ? undefined : {
+          settled: async () => 'timed-out',
+        });
+        await this.write(run, { type: 'writer-released', data: { invocation: id, confirmed: preflightSettlement.confirmed, groupsKilled: preflightSettlement.groupsKilled } });
+        await this.host.afterWrite('writer-released', run.jobId);
+      }
 
       await this.endInvocation(run, id, session, keptAs, {
         ...stoppedOutcome(),
         ended: 'failed',
         interruption,
         error: failure,
+        settled: preflightSettlement,
       }, undefined, transcript);
       return {
         id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept,
@@ -844,11 +905,11 @@ export class InvocationRunner<R extends RunnerRun> {
     // Whatever the equipment started ends before the writer is released:
     // discarding a reply is not shutdown, and a command still running is a
     // command that can still write.
-    await settleSessionEquipment(equipment.settle, limits.stopSettleMs).catch(error => this.host.warn(`Run ${run.jobId}: ${id} did not settle its own tools: ${message(error)}`));
+    const equipmentSettled = await settleSessionEquipment(equipment.settle, limits.stopSettleMs).catch(error => { this.host.warn(`Run ${run.jobId}: ${id} did not settle its own tools: ${message(error)}`); return false; });
 
     // An architect writes nothing, so it holds no writer; its settlement is
     // still the harness's own observation of the session.
-    const settled = await this.settleSession(run, id, agentSession, request.reader === true);
+    const settled = await this.settleSession(run, id, equipmentSettled ? agentSession : { settled: async () => 'timed-out' as const }, request.reader === true);
     if (settled.confirmed) await equipment.drained?.();
     // `onEvent` cannot be async at the port boundary. Its ordered writes must
     // still finish before gaps are derived and before this driver can settle.
@@ -872,7 +933,8 @@ export class InvocationRunner<R extends RunnerRun> {
     }
 
     const ended = interruption !== undefined ? 'failed' : request.endedAs?.() ?? endedOf(outcome.kind, judge.boundReached);
-    const keptAs = keeping(ended, ended === 'submitted' ? value : undefined);
+    const pending = request.pendingPlainReturn === true && outcome.kind === 'ended' && ended === 'ended' && settled.confirmed && ref !== '' && !this.host.ignoring(run);
+    const keptAs = pending ? kept : keeping(ended, ended === 'submitted' ? value : undefined);
     const scratchAtSettlement = request.candidateBefore === undefined ? null
       : await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.host.git);
     const candidateAfter = scratchAtSettlement?.outcome === 'passed' ? (await this.host.previewCandidateTree()).tree : undefined;
@@ -921,7 +983,8 @@ export class InvocationRunner<R extends RunnerRun> {
       actual: agentSession.start.mode,
       elapsedMs,
       inFlight,
-      lastText: recorder.lastText,
+      lastText: recorder.lastText ?? (outcome.kind === 'ended' ? outcome.message ?? null : null),
+      pending, settlementConfirmed: settled.confirmed, verdicts,
       ...(changed === undefined ? {} : { changed }),
     };
   }
@@ -931,7 +994,7 @@ export class InvocationRunner<R extends RunnerRun> {
    * session idle, and every process group it registered killed and gone.
    * Neither `stop()` resolving nor the agent's word is evidence.
    */
-  async settleSession(run: R, id: string, session: AgentSession, reader = false) {
+  async settleSession(run: R, id: string, session: Pick<AgentSession, 'settled'>, reader = false) {
     if (run.writer.held === id) {
       const released = await run.writer.release(id, session);
       // The release is in the log before anything else may write or check:

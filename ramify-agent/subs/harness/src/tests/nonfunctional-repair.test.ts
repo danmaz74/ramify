@@ -96,8 +96,16 @@ test.each([false, true])('one authorized repair edits two modules from the chose
     expect(pause).toMatchObject({ role: 'nonfunctional-repair-engineer', taskState: 'pending',
       goal: 'Add a cross-module audit record implementation' });
     expect(agent.sessions.some(session => session.spec.role === 'nonfunctional-repair-engineer')).toBe(false);
+    const inspected = await service.debugInspect('review-notes', receipt.jobId, pause.pauseId);
+    expect(inspected.input.tools.map(tool => tool.name)).toEqual(expect.arrayContaining(['write', 'edit', 'shell']));
+    expect(inspected.input.scope.workingDirectory).toBe(firstSrc);
+    await service.execute({ commandId: 'nfr-chat', expectedVersion: 0, type: 'debug-message', payload: {
+      planId: 'review-notes', jobId: receipt.jobId, pauseId: pause.pauseId, expectedRevision: pause.revision, message: 'Perform the authorized repair.' } });
+    await until(() => service.debugResult('review-notes', receipt.jobId, 'nfr-chat')?.status === 'settled');
+    expect(service.debugResult('review-notes', receipt.jobId, 'nfr-chat')?.taskState).toBe('accepted');
+    expect(service.events('review-notes', receipt.jobId)!.some(event => event.type === 'nonfunctional-repair-committed')).toBe(false);
     await service.execute({ commandId: 'nfr-resume', expectedVersion: 0, type: 'debug-resume', payload: {
-      planId: 'review-notes', jobId: receipt.jobId, pauseId: pause.pauseId, expectedRevision: pause.revision,
+      planId: 'review-notes', jobId: receipt.jobId, pauseId: pause.pauseId, expectedRevision: pause.revision + 1,
     } });
   }
   await service.settled('review-notes', receipt.jobId);
