@@ -1,6 +1,6 @@
 # Iteration 1 results: targets and observation records
 
-**Status:** C01–C04 verified; coordinator acceptance pending. R33-1 remains resolved: capability-assigned engineers are included.
+**Status:** C01–C04 verified and accepted by the coordinator after behavior, test, diff and retained exit-code review. R33-1 remains resolved: capability-assigned engineers are included.
 
 Worktree `/home/app/ramify-plan33-consult-architect`, branch `feat/plan33-consult-architect`; starting HEAD `ff371b849e4cca37432c7cc9198a144507230d57`. Source commit `6c56189c1bba895a0f35b5c9835a90a719d62b93` preserves and finishes the interrupted iteration's edits. No other worktree or dependency installation changed.
 
