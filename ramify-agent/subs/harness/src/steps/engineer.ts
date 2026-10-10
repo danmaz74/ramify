@@ -15,6 +15,7 @@ import {
 import { engineerBuiltinTools } from '../work/engineer-equipment.js';
 import { focusedScenarioFacts } from '../work/session.js';
 import type { StartingPointGroup } from '../work/starting-inputs.js';
+import { knownFacts } from './constructed.js';
 import { validateStepInputs, type EngineerStepInputs, type ProjectPath } from './inputs.js';
 
 /*
@@ -96,14 +97,7 @@ const relative = (field: ProjectPath): string => field.project;
 
 /** The project facts the engineer's brief carries, as the brief composes them. */
 export function engineerKnownFacts(inputs: EngineerStepInputs): KnownProjectFacts {
-  const known = inputs.known;
-  return {
-    declaredChecks: { checks: known.declaredChecks.checks, paths: known.declaredChecks.paths.map(relative) },
-    modules: known.modules.map(module => ({ module: module.module, directory: relative(module.directory), apiPaths: module.apiPaths.map(relative) })),
-    testAreas: known.testAreas.map(area => ({ module: area.module, area: relative(area.area) })),
-    scenarioFeatures: known.scenarioFeatures.map(relative),
-    stepDirectories: known.stepDirectories.map(entry => ({ directory: relative(entry.directory), files: entry.files.map(relative) })),
-  };
+  return knownFacts(inputs.known);
 }
 
 /**
@@ -111,7 +105,9 @@ export function engineerKnownFacts(inputs: EngineerStepInputs): KnownProjectFact
  * first; nothing is read or written.
  */
 export function constructEngineerStep(value: unknown, environment: StepEnvironment): ConstructedEngineerStep {
-  const inputs = validateStepInputs(value);
+  const validated = validateStepInputs(value);
+  if (validated.role !== 'engineer') throw new Error(`These step inputs are ${validated.role} inputs, not engineer inputs`);
+  const inputs: EngineerStepInputs = validated;
   const { projectRoot } = environment;
   const loaded = environment.packages.get('engineer');
   if (loaded === undefined) throw new Error('No prompt package is loaded for the engineer');

@@ -63,17 +63,13 @@ import {
   type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
 } from '../reviews/records.js';
 import { orientationKey, readGuidance, type CapturedInput } from '../../subs/reviews/src/inputs.js';
-import { orientationMessage } from '../../subs/reviews/src/message.js';
 import { pendingBindingEvidence } from '../reviews/binding-evidence.js';
 import { prepareReview, type PreparedReview } from '../../subs/reviews/src/preparation.js';
 import { ReviewQueue } from '../reviews/scheduler.js';
 import { candidateModuleIndex, concernModules, groundCredibility } from '../reviews/signals.js';
 import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotComparison, type SnapshotTools } from '../../subs/reviews/src/snapshot.js';
 import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage } from '../reviews/state.js';
-import {
-  orientationJsonSchema, orientationSubmissionDescription, orientationToolName, reviewJsonSchema, reviewSubmissionDescription,
-  reviewToolName, validateOrientation,
-} from '../../subs/reviews/src/submission.js';
+import { orientationToolName } from '../../subs/reviews/src/submission.js';
 import type { AcceptedCommand, Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { FailureAnalysis, Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
@@ -107,24 +103,20 @@ import { assessedElements, bindCoordinatorAssessment, coordinatorAssessmentJsonS
   nonfunctionalRepairSubmissionSchema,
   type CoordinatorAssessmentSubmission, type CoordinatorAction, type CoordinatorInvestigation, type NonfunctionalRepairSubmission } from '../nonfunctional/submissions.js';
 import { coordinatorAssessmentPrompt, coordinatorActionPrompt, repairPrompt } from '../nonfunctional/prompts.js';
-import { contextSelectorMessage, workOrientationMessage } from '../context-selection/prompts.js';
 import { contextSelectionSchema } from '../context-selection/contracts.js';
 import { readRecordedContextSelection } from '../context-selection/recorded.js';
 import { citePackage, deliverPackage } from '../context-selection/delivery.js';
-import { contextSelectorJsonSchema, contextSelectorSubmissionSchema, contextSelectorToolName,
-  orientationPacket, prepareContextSelection, workOrientationJsonSchema, workOrientationSubmissionSchema,
-  workOrientationToolName, type ContextSelectorSubmission, type SelectionSource, type WorkOrientationSubmission } from '../context-selection/submissions.js';
+import { orientationPacket, prepareContextSelection, workOrientationSubmissionSchema, workOrientationToolName, type ContextSelectorSubmission, type SelectionSource, type WorkOrientationSubmission } from '../context-selection/submissions.js';
 import { documentChanges, readCapturedDocuments } from './document-inputs.js';
 import { composeTaskBrief, type KnownProjectFacts } from './task-brief.js';
 import { constructEngineerStep, type ConstructedEngineerStep } from '../steps/engineer.js';
-import { projectPath, serializeStepInputs, type EngineerStepInputs, type StepInputs } from '../steps/inputs.js';
-import {
-  inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderFailureAnalystPrompt, renderGlobalForkPrompt,
-  renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
-  renderContextSelectorPrompt, renderWorkOrientationPrompt, renderNonfunctionalCoordinatorPrompt,
-  renderNonfunctionalRepairPrompt, renderExtractionPrompt, renderCapabilityArchitectPrompt,
-  type ExtractionTurn, type LoadedPackage,
-} from '../prompts/packages.js';
+import { projectPath, serializeStepInputs, stepInputsSchemaId, type EngineerStepInputs, type KnownFactsInputs, type OrientationStepInputs, type ProjectPath,
+  type ReviewStepInputs, type SelectorStepInputs, type StepInputs, type WorkTurnStepInputs } from '../steps/inputs.js';
+import { constructStep, freshFallback } from '../steps/construct.js';
+import { assignmentBootstrap, constructOrientationStep, constructSelectorStep, constructWorkTurnStep, judgeWorkTurn, workBriefingInputs,
+  type ConstructedWorkTurnStep } from '../steps/local-architect.js';
+import { constructDesignOrientationStep, constructReviewStep } from '../steps/reviewer.js';
+import { inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderFailureAnalystPrompt, renderGlobalForkPrompt, renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderReconciliationPrompt, sha256, renderNonfunctionalCoordinatorPrompt, renderNonfunctionalRepairPrompt, renderExtractionPrompt, renderCapabilityArchitectPrompt, type ExtractionTurn, type LoadedPackage } from '../prompts/packages.js';
 import {
   baselineScope, captureSnapshot, deliveredScopeInputs, invocationScope, revisionMismatch, rootModuleOfSnapshot, scopeSize, supportDocument, readScopeMeasurement, writeScopeMeasurement,
   type DeclaredScope,
@@ -177,7 +169,7 @@ import {
 } from '../contracts/submission.js';
 import { remainingInjections } from '../contracts/verification.js';
 import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
-import { assignmentBodySchema, assignmentErrors, creationAuthority, type AssignmentBody } from '../work/assignment.js';
+import { assignmentBodySchema, assignmentErrors, type AssignmentBody } from '../work/assignment.js';
 import {
   engineerEquipment, type EngineerEquipment, type EngineerEquipmentInputs, type EquipContext, type Equipment, type ShellCallRecord,
 } from '../work/engineer-equipment.js';
@@ -210,10 +202,8 @@ import {
 } from '../work/obligations.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
-import { apiViewsOf, prepareAssignedCucumber, focusedScenarioFacts, defaultWriteScopeSection, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
-import {
-  capabilityLocalArchitectJsonSchema, localArchitectJsonSchema, localArchitectToolName, unreportedByCompletion, validateLocalArchitect, type LocalArchitectSubmission,
-} from '../work/submission.js';
+import { apiViewsOf, prepareAssignedCucumber, focusedScenarioFacts, defaultWriteScopeSection, iterationApiViews, onboardingOf, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
+import { localArchitectToolName, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, passedScenarioLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
@@ -423,6 +413,12 @@ interface InvocationRequest<T> {
   readonly context?: RunPolicy['context']['engineer'] | undefined;
   /** The step inputs this invocation was constructed from, written to its directory before its session starts. */
   readonly stepInputs?: StepInputs | undefined;
+  /**
+   * What a fresh start that replaces an unavailable continued or forked
+   * session is given: the step's fresh construction. Without it the fresh
+   * prompt, or the prompt, is sent with the same brief.
+   */
+  readonly fallback?: ((reason: string) => { readonly prompt: string; readonly brief: HarnessTaskBrief; readonly stepInputs: StepInputs } | undefined) | undefined;
   readonly toolName: string;
   readonly description: string;
   readonly inputSchema: JsonSchema;
@@ -1260,6 +1256,17 @@ export class RunService {
     // Binding reads may yield while this request is stopped or settled. Do
     // not register preparation after its cancellation sweep has already run.
     if (this.ignoring(run) || run.reviews?.accepting !== true || reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
+    // The question's message inputs, captured once: the review step is built from these.
+    const intent = assignment.success ? {
+      goal: assignment.data.goal, approach: assignment.data.approach, completionEvidence: assignment.data.completionEvidence,
+      scopeRationale: assignment.data.scope.rationale,
+      testAreas: assignment.data.scope.resolved.ownership.modules.filter(module => assignment.data.gate.tests.exactOwners.includes(module.id)
+        || assignment.data.gate.tests.subtrees.some(owner => module.id === owner || module.id.startsWith(`${owner}/`)))
+        .map(module => posix.join(module.directory, 'src/tests')),
+    } : null;
+    const checkFindings = held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [];
+    const setup = kind === 'design' ? undefined : await this.checkInputSection(run, snapshot);
+    const planDocument = snapshot.entries.get(planPath(run.record.planId))?.kind === 'file' ? planPath(run.record.planId) : null;
     let prepared: PreparedReview;
     const preparation = new AbortController();
     const preparationStarted = Date.now();
@@ -1279,17 +1286,11 @@ export class RunService {
           },
           snapshot,
           pendingBindings,
-          assignment: assignment.success ? {
-            goal: assignment.data.goal, approach: assignment.data.approach, completionEvidence: assignment.data.completionEvidence,
-            scopeRationale: assignment.data.scope.rationale,
-            testAreas: assignment.data.scope.resolved.ownership.modules.filter(module => assignment.data.gate.tests.exactOwners.includes(module.id)
-              || assignment.data.gate.tests.subtrees.some(owner => module.id === owner || module.id.startsWith(`${owner}/`)))
-              .map(module => posix.join(module.directory, 'src/tests')),
-          } : null,
-          checkFindings: held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [],
+          assignment: intent,
+          checkFindings,
           ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
-          ...(kind === 'design' ? {} : { setup: await this.checkInputSection(run, snapshot) }),
-          planDocument: snapshot.entries.get(planPath(run.record.planId))?.kind === 'file' ? planPath(run.record.planId) : null,
+          ...(setup === undefined ? {} : { setup }),
+          planDocument,
         },
       });
     }
@@ -1301,36 +1302,65 @@ export class RunService {
       run.reviewPreparations.delete(id);
     }
     if (this.ignoring(run) || run.reviews?.accepting !== true || reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
-    const workspace = run.path(join(dirname(reviewLayout.attempt(attempt)), 'workspace'));
-    await mkdir(workspace, { recursive: true });
+    const workspace = join(dirname(reviewLayout.attempt(attempt)), 'workspace');
+    await mkdir(run.path(workspace), { recursive: true });
+
+    // The question is built from its inputs by the reviewer step's own
+    // constructor, which `step render` uses too. The prepared patches, tools
+    // and validator are the reviews child's, over the same candidate.
+    let step: ReturnType<typeof constructReviewStep>;
+    try {
+      const reviewInputs = {
+        schema: stepInputsSchemaId, role: 'reviewer', question: kind, run: { planId: run.record.planId, runId: run.record.jobId },
+        work: { workItem: request.workItem, iteration: request.key.iteration }, attempt: state.attempts.length + 1,
+        capabilityWorkflow: this.workflow !== null, limits: run.record.policy.limits, context: contextPolicyOf(run.record.policy, 'reviewer'),
+        request, snapshotTree: snapshot.tree,
+        briefing: {
+          assignment: intent, checkFindings, ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }), planDocument,
+          pendingBindings: JSON.parse(JSON.stringify(pendingBindings)) as unknown[], ...(setup === undefined ? {} : { setup }),
+          diffPayload: prepared.candidateDiff, changes: snapshot.changes.map(change => ({ status: change.status, path: change.path })),
+          directories: (intent?.testAreas ?? []).filter(area => snapshot.directories.has(area)),
+        },
+        ...(discovery === undefined ? {} : { discovery }),
+        workspace: { run: workspace },
+        bounds: { absoluteMs: Math.max(1, policy.attemptMs - (Date.now() - preparationStarted)) },
+        start: start.start.mode === 'fork' && start.fork !== undefined && 'invocation' in start.fork.from
+          ? { kind: 'fork', session: start.fork.from.session, invocation: start.fork.from.invocation, point: start.start.from, reason: start.fork.reason, briefs: [...start.fork.briefs] }
+          : { kind: 'fresh', ...(start.degraded === undefined ? {} : { degraded: start.degraded }) },
+      } as unknown as ReviewStepInputs;
+      step = constructReviewStep(reviewInputs, { projectRoot: this.projectRoot, packages });
+    } catch (error) {
+      return await unavailable(`The ${kind} review cannot be constructed from its inputs: ${message(error)}`) === 'committed';
+    }
 
     let started: { invocation: string; session: SessionId; at: string } | undefined;
     /** Set when the request was settled before this attempt's start could be recorded. */
     let fenced = false;
     const result = await this.runInvocation<ReviewSubmission>(run, agent, {
-      role: 'reviewer', task: { kind, goal: `Review ${request.key.candidate}`, requirements: [JSON.stringify(request)], candidate: request.key.candidate, snapshot: snapshot.tree, views: [],
-        omit: [...(assignmentPackage === undefined ? [] : [assignmentPackage]), prepared.candidateDiff],
-        literalSections: [...(assignmentPackage === undefined ? [] : [{ key: 'support:assignment-package', text: assignmentPackage }]),
-          { key: 'support:candidate-diff', text: prepared.candidateDiff }, ...(discovery === undefined ? [] : [discovery])] },
-      work: { workItem: request.workItem, iteration: request.key.iteration },
-      attempt: state.attempts.length + 1,
-      loaded,
-      systemPrompt: renderReviewerPrompt(loaded, '(no working directory: the audited candidate only)', kind),
-      prompt: prepared.message,
+      role: step.role,
+      brief: step.brief,
+      context: step.context,
+      stepInputs: step.before.inputs,
+      fallback: this.stepFallback(step.inputs, packages),
+      work: step.work,
+      attempt: step.attempt,
+      loaded: step.loaded,
+      systemPrompt: step.systemPrompt,
+      prompt: step.prompt,
       start: start.start,
-      ...(start.fork === undefined ? {} : { fork: start.fork }),
+      ...(step.fork === undefined ? {} : { fork: step.fork }),
       ...(start.degraded === undefined ? {} : { degraded: start.degraded }),
-      toolName: reviewToolName,
-      description: reviewSubmissionDescription,
-      inputSchema: reviewJsonSchema,
-      submissionSchema: 'ramify-agent.review-submission/1',
+      toolName: step.submission.toolName,
+      description: step.submission.description,
+      inputSchema: step.submission.inputSchema,
+      submissionSchema: step.submission.submissionSchema,
       validate: prepared.validate,
       keep: () => finished('work-closed'),
       scope: { write: null, measurement: null, size: null },
       reader: true,
-      workingDirectory: workspace,
-      absoluteMs: Math.max(1, policy.attemptMs - (Date.now() - preparationStarted)),
-      equip: () => ({ builtinTools: [], tools: [...prepared.tools.definitions] }),
+      workingDirectory: step.equipment.workingDirectory,
+      absoluteMs: step.bounds.absoluteMs,
+      equip: () => ({ builtinTools: [...step.equipment.builtinTools], tools: [...prepared.tools.definitions] }),
       // The start is recorded only for a request still unsettled, under the
       // mutex its deadline settles it under; a settled one's reader never starts.
       onStarted: async (invocation, session) => {
@@ -1542,32 +1572,40 @@ export class RunService {
 
   private async orient(run: Run, agent: AgentPort, loaded: LoadedPackage, request: ReviewRequest, key: string, guidance: readonly CapturedInput[]): Promise<ReviewOrientation> {
     const policy = run.record.policy.reviews!;
-    const workspace = run.path(join(dirname(reviewLayout.orientation(key)), key.slice(0, 16)));
-    await mkdir(workspace, { recursive: true });
-    const guidanceMessage = orientationMessage(guidance);
+    const workspace = join(dirname(reviewLayout.orientation(key)), key.slice(0, 16));
+    await mkdir(run.path(workspace), { recursive: true });
+    // The orientation is its own invocation, built from its inputs by its
+    // own constructor, which `step render` uses too.
+    const step = constructDesignOrientationStep({
+      schema: stepInputsSchemaId, role: 'reviewer', question: 'design-orientation', run: { planId: run.record.planId, runId: run.record.jobId },
+      work: { workItem: request.workItem, iteration: request.key.iteration }, attempt: 1, capabilityWorkflow: this.workflow !== null,
+      limits: run.record.policy.limits, context: contextPolicyOf(run.record.policy, 'reviewer'), request: request.id, key,
+      guidance: guidance.map(({ ref, hash, text }) => ({ ref, hash, text })), workspace: { run: workspace }, bounds: { absoluteMs: policy.attemptMs },
+      architectView: this.architectViewInputs(run), start: { kind: 'fresh' },
+    }, { projectRoot: this.projectRoot, packages: new Map([['reviewer', loaded]]) });
     const result = await this.runInvocation<OrientationSubmission>(run, agent, {
-      role: 'reviewer',
-      task: { kind: 'design-orientation', goal: `Read the captured design guidance for ${request.workItem}.`,
-        requirements: ['Name every captured guidance path and summarize what it asks of the design.'],
-        omit: [guidanceMessage], literalSections: [{ key: 'support:design-guidance', text: guidanceMessage }] },
-      work: { workItem: request.workItem, iteration: request.key.iteration },
-      attempt: 1,
-      loaded,
-      systemPrompt: renderOrientationPrompt(loaded),
-      prompt: guidanceMessage,
+      role: step.role,
+      brief: step.brief,
+      context: step.context,
+      stepInputs: step.before.inputs,
+      work: step.work,
+      attempt: step.attempt,
+      loaded: step.loaded,
+      systemPrompt: step.systemPrompt,
+      prompt: step.prompt,
       start: { mode: 'fresh' },
-      toolName: orientationToolName,
-      description: orientationSubmissionDescription,
-      inputSchema: orientationJsonSchema,
-      submissionSchema: 'ramify-agent.orientation-submission/1',
-      validate: input => validateOrientation(input, guidance.map(entry => entry.ref)),
+      toolName: step.submission.toolName,
+      description: step.submission.description,
+      inputSchema: step.submission.inputSchema,
+      submissionSchema: step.submission.submissionSchema,
+      validate: step.validate,
       // The orientation is retained: every design review of its key forks it.
       keep: ended => (ended === 'submitted' ? kept : finished('not-kept')),
       scope: { write: null, measurement: null, size: null },
       reader: true,
-      workingDirectory: workspace,
-      absoluteMs: policy.attemptMs,
-      equip: () => ({ builtinTools: [], tools: [] }),
+      workingDirectory: step.equipment.workingDirectory,
+      absoluteMs: step.bounds.absoluteMs,
+      equip: () => ({ builtinTools: [...step.equipment.builtinTools], tools: [] }),
     });
     const oriented = result.ended === 'submitted' && result.value !== undefined && result.ref !== '';
     const orientation = reviewOrientationSchema.parse({
@@ -4173,11 +4211,14 @@ export class RunService {
   private async runInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
     const result = await this.invokeOnce(run, agent, request);
     if (request.start.mode === 'fresh' || result.interruption !== 'session-lost' || this.ignoring(run) || request.fenced?.()) return result;
+    const reason = result.error ?? 'The retained session is unavailable';
+    const fresh = request.fallback?.(reason);
     return this.invokeOnce(run, agent, {
       ...request, originalInvocation: undefined, restore: false, start: { mode: 'fresh' }, session: undefined,
       continuing: undefined, fork: undefined, replaces: undefined,
-      prompt: request.freshPrompt ?? request.prompt,
-      degraded: { requested: request.start.mode === 'continue' ? 'continued' : 'fork', reason: result.error ?? 'The retained session is unavailable' },
+      prompt: fresh?.prompt ?? request.freshPrompt ?? request.prompt,
+      ...(fresh === undefined ? {} : { brief: fresh.brief, stepInputs: fresh.stepInputs }),
+      degraded: { requested: request.start.mode === 'continue' ? 'continued' : 'fork', reason },
     });
   }
 
@@ -4692,6 +4733,16 @@ export class RunService {
     return { origin: { producer: 'architect assignment', workItem: assignment.workItem, iteration: assignment.id,
       ...(invocation === undefined ? {} : { invocation }), ...(boundary === undefined ? {} : { boundary }),
       ...(assignment.coordination?.kind === 'capability-task' ? { capabilityTask: assignment.coordination.id } : {}) }, points: assignment.startingPoints };
+  }
+
+  /** The fresh construction a step whose session is unavailable falls back to, where its role has one. */
+  private stepFallback(inputs: StepInputs, packages: ReadonlyMap<string, LoadedPackage>) {
+    return (reason: string) => {
+      const fresh = freshFallback(inputs, reason);
+      if (fresh === null) return undefined;
+      const step = constructStep(fresh, { projectRoot: this.projectRoot, packages });
+      return { prompt: step.prompt, brief: step.brief, stepInputs: step.before.inputs };
+    };
   }
 
   private async orientationStartingPoints(run: Run, workItem: string | undefined) {
@@ -5320,7 +5371,7 @@ export class RunService {
   /** One work item's accepted source package, selected before its first assignment. */
   private async orientAndSelectWorkContext(
     run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>,
-    item: WorkItem, local: LoadedPackage, briefing: string, workingDirectory: string,
+    item: WorkItem, briefing: WorkItemBriefing, workingDirectory: string,
   ): Promise<{ readonly kind: 'failed' } | { readonly kind: 'ready'; readonly package: WorkPackage; readonly session: SessionId | undefined; readonly ref: string | undefined }> {
     const sourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
     if (sourceChanges.length > 0) {
@@ -5339,15 +5390,26 @@ export class RunService {
     }
     const orientationRequirements = [this.planPackage(run, evidence.catalog,
       [...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs])];
-    const orientationBriefing = [briefing, '# Goal', item.goal, '# Requirements', ...orientationRequirements].join('\n\n');
-    const orientationStart = workOrientationMessage(orientationBriefing);
+    // The orientation is built from its inputs by the local architect's own
+    // constructor, which `step render` uses too.
+    const orientationInputs = (attempt: number, known: KnownFactsInputs): OrientationStepInputs => ({
+      schema: stepInputsSchemaId, role: 'local-architect', phase: 'orientation', run: { planId: run.record.planId, runId: run.record.jobId },
+      work: { workItem: item.id }, attempt, capabilityWorkflow: this.workflow !== null, limits: run.record.policy.limits,
+      context: contextPolicyOf(run.record.policy, 'local-architect'), workingDirectory: this.projectRelative(workingDirectory),
+      briefing: workBriefingInputs(briefing), requirements: orientationRequirements, known, architectView: this.architectViewInputs(run),
+      start: { kind: 'fresh' },
+    });
+    const orientationStep = async (attempt: number) => constructOrientationStep(
+      orientationInputs(attempt, knownFactsInputs(await this.knownProjectFacts(run, [item.module]))), { projectRoot: this.projectRoot, packages });
+    const first = await orientationStep(1);
+    const orientationBriefing = first.briefingText;
     let orientation = run.log.all('work-orientation-recorded').find(event => event.data.workItem === item.id);
     const attempts: string[] = [];
     for (const started of run.log.all('invocation-started')) {
       if (started.data.role !== 'local-architect' || started.data.work.workItem !== item.id) continue;
       const packet = await (await this.operations(agent)).packet(run.record.jobId, started.data.invocation);
       const record = invocationSchema.parse(this.committedBody(run, runLayout.invocation(started.data.invocation)));
-      if (packet?.submissionTool === workOrientationToolName || record.prompt.requestedInputsHash === inputsHash([renderWorkOrientationPrompt(local, this.projectRoot, workingDirectory), orientationStart])) attempts.push(started.data.invocation);
+      if (packet?.submissionTool === workOrientationToolName || record.prompt.requestedInputsHash === inputsHash([first.systemPrompt, first.prompt])) attempts.push(started.data.invocation);
     }
     if (orientation === undefined) {
       // A completed dedicated orientation may precede its own event if the
@@ -5379,13 +5441,13 @@ export class RunService {
       if (prior === undefined) {
         const count = run.record.policy.limits.forkRetriesPerRequest + 1;
         for (let attempt = attempts.length + 1; attempt <= count && !this.ignoring(run); attempt++) {
+          const step = attempt === 1 ? first : await orientationStep(attempt);
           const result = await this.runInvocation<WorkOrientationSubmission>(run, agent, {
-            role: 'local-architect', task: { kind: 'orientation', goal: item.goal, requirements: orientationRequirements }, work: { workItem: item.id }, attempt, loaded: local,
-            systemPrompt: renderWorkOrientationPrompt(local, this.projectRoot, workingDirectory),
-            prompt: orientationStart, workingDirectory, start: { mode: 'fresh' },
-            toolName: workOrientationToolName, description: 'Record your orientation before making an assignment.',
-            inputSchema: workOrientationJsonSchema, submissionSchema: 'ramify-agent.work-orientation/1',
-            validate: input => validateAgainst(workOrientationSubmissionSchema, input),
+            role: step.role, brief: step.brief, context: step.context, stepInputs: step.before.inputs, work: step.work, attempt: step.attempt, loaded: step.loaded,
+            systemPrompt: step.systemPrompt, prompt: step.prompt, workingDirectory: step.equipment.workingDirectory, start: { mode: 'fresh' },
+            toolName: step.submission.toolName, description: step.submission.description,
+            inputSchema: step.submission.inputSchema, submissionSchema: step.submission.submissionSchema,
+            validate: step.validate, equip: () => ({ builtinTools: [...step.equipment.builtinTools] }),
             scope: { write: null, measurement: null, size: null },
             keep: (ended, value) => ended === 'submitted' && value !== undefined ? kept : finished('not-kept'),
           });
@@ -5545,33 +5607,42 @@ export class RunService {
     const supersedes = run.log.all('context-selection-recorded').filter(event => event.data.workItem === item.id).at(-1)?.data.selection;
     let selectionEvent: RunEventOf<'context-selection-recorded'> | undefined;
     const count = run.record.policy.limits.forkRetriesPerRequest + 1;
+    const workspace = join('work', item.id, 'selector-workspace');
     for (let attempt = 1; attempt <= count && !this.ignoring(run); attempt++) {
       const forked = from.point !== null && from.session !== undefined;
-      const workspace = run.path(join('work', item.id, 'selector-workspace'));
-      await mkdir(workspace, { recursive: true });
+      await mkdir(run.path(workspace), { recursive: true });
+      // The selection is built from its inputs by its own constructor, which
+      // `step render` uses too. A fork inherits the known facts and starting
+      // points the inputs record for the fresh start it may fall back to.
+      const oriented = await this.orientationStartingPoints(run, item.id);
+      const inputs: SelectorStepInputs = {
+        schema: stepInputsSchemaId, role: 'context-selector', run: { planId: run.record.planId, runId: run.record.jobId }, work: { workItem: item.id },
+        attempt, capabilityWorkflow: this.workflow !== null, limits: run.record.policy.limits, context: contextPolicyOf(run.record.policy, 'context-selector'),
+        kind: supersedes === undefined ? 'selection' : 'reselection', goal: item.goal,
+        requirements: [this.planPackage(run, source.catalog, source.workItemElements)],
+        packet: from.packet, ...(from.update === undefined ? {} : { update: from.update }),
+        catalog: source.catalog, planDeviations: [...source.planDeviations], workItemElements: [...source.workItemElements],
+        orientation: { invocation: from.orientationInvocation, point: from.point }, workspace: { run: workspace },
+        known: knownFactsInputs(await this.knownProjectFacts(run, [item.module])),
+        startingPoints: oriented === undefined ? [] : [JSON.parse(JSON.stringify(oriented.group)) as SelectorStepInputs['startingPoints'][number]],
+        architectView: this.architectViewInputs(run),
+        start: forked ? { kind: 'fork', session: from.session!, invocation: from.orientationInvocation, point: from.point! }
+          : { kind: 'fresh', degraded: { requested: 'fork', reason: 'the recorded orientation has no retained session point' } },
+      } as SelectorStepInputs;
+      const step = constructSelectorStep(inputs, { projectRoot: this.projectRoot, packages: new Map([['context-selector', selector]]) });
       const result = await this.runInvocation<ContextSelectorSubmission>(run, agent, {
-        role: 'context-selector', task: { kind: supersedes === undefined ? 'selection' : 'reselection', goal: item.goal,
-          requirements: [this.planPackage(run, source.catalog, source.workItemElements)] },
-        work: { workItem: item.id }, attempt, loaded: selector,
-        systemPrompt: renderContextSelectorPrompt(selector, this.projectRoot),
-        prompt: contextSelectorMessage(forked ? from.update : from.packet, source.catalog),
-        freshPrompt: contextSelectorMessage(from.packet, source.catalog),
-        start: forked ? { mode: 'fork', from: from.point! } : { mode: 'fresh' },
-        ...(forked ? { fork: { from: { session: from.session!, invocation: from.orientationInvocation }, reason: 'context-selection' as const, briefs: [] } } : {}),
-        ...(forked ? {} : { degraded: { requested: 'fork' as const, reason: 'the recorded orientation has no retained session point' } }),
-        toolName: contextSelectorToolName, description: 'Select, by ID, the elements an engineer working this work item must keep in view.',
-        inputSchema: contextSelectorJsonSchema, submissionSchema: 'ramify-agent.context-selector-submission/1',
-        validate: input => {
-          const parsed = validateAgainst(contextSelectorSubmissionSchema, input);
-          if (!parsed.ok) return parsed;
-          const checked = prepareContextSelection(parsed.value, {
-            workItem: item.id, orientationInvocation: from.orientationInvocation,
-            orientationPoint: from.point, selectorInvocation: 'candidate', degraded: !forked,
-          }, source);
-          return checked.status === 'available' ? parsed : { ok: false, errors: checked.errors };
-        },
-        scope: { write: null, measurement: null, size: null }, workingDirectory: workspace,
-        equip: () => ({ builtinTools: ['read', 'grep', 'ls'] }), keep: () => finished('not-kept'),
+        role: step.role, brief: step.brief, context: step.context, stepInputs: step.before.inputs,
+        fallback: this.stepFallback(step.inputs, new Map([['context-selector', selector]])),
+        work: step.work, attempt: step.attempt, loaded: step.loaded,
+        systemPrompt: step.systemPrompt, prompt: step.prompt, freshPrompt: step.freshPrompt,
+        start: step.start.mode === 'fork' ? { mode: 'fork', from: step.start.ref } : { mode: 'fresh' },
+        ...(step.fork === undefined ? {} : { fork: step.fork }),
+        ...(step.start.mode === 'fresh' && step.start.degraded !== undefined ? { degraded: step.start.degraded } : {}),
+        toolName: step.submission.toolName, description: step.submission.description,
+        inputSchema: step.submission.inputSchema, submissionSchema: step.submission.submissionSchema,
+        validate: step.validate,
+        scope: { write: null, measurement: null, size: null }, workingDirectory: step.equipment.workingDirectory,
+        equip: () => ({ builtinTools: [...step.equipment.builtinTools] }), keep: () => finished('not-kept'),
       });
       if (result.ended !== 'submitted' || result.value === undefined) continue;
       const prepared = prepareContextSelection(result.value, {
@@ -5755,7 +5826,6 @@ export class RunService {
     const workingDirectory = moduleSource !== null && (await stat(moduleSource).catch(() => null))?.isDirectory()
       ? moduleSource
       : this.projectRoot;
-    const systemPrompt = renderLocalArchitectPrompt(loaded, this.projectRoot, workingDirectory);
     const scope = baselineScope(item.module, []);
     const integration = await this.integrationOfItem(run, item);
 
@@ -6018,7 +6088,7 @@ export class RunService {
         ...(moduleEntry !== undefined || proposal !== undefined ? { moduleDirectory: moduleEntry?.dir ?? proposal!.directory } : {}),
       };
       if (attempt === 1) {
-        const context = await this.orientAndSelectWorkContext(run, agent, packages, item, loaded, workItemMessage(briefing), workingDirectory);
+        const context = await this.orientAndSelectWorkContext(run, agent, packages, item, briefing, workingDirectory);
         if (context.kind === 'failed') return null;
         if (context.kind === 'ready') {
           contextPackage = context.package;
@@ -6036,30 +6106,59 @@ export class RunService {
       // or carried by the first prompt of a session that lacks it, such as a
       // reconstruction. Every other turn names it by its hash.
       const packageInPrompt = contextPackage !== undefined && (sessionRef === undefined || packageUndelivered);
-      let prompt: string;
-      try {
-        prompt = workItemMessage({ ...briefing, ...(contextPackage === undefined ? {} : {
-          package: { hash: contextPackage.citation.hash, elements: contextPackage.citation.elements },
-          ...this.laterDeviations(run, await this.frozenCatalog(run), contextPackage.citation.deviations),
-        }) });
-      } catch (error) {
-        await this.fail(run, 'inputs-changed', `The work-item package of ${item.id} cannot be rendered: ${message(error)}`);
-        return null;
-      }
-      if (packageInPrompt) prompt = `${prompt}\n\n# Your work-item package\n\n${contextPackage!.text}`;
       const owned = this.obligationBriefing(run, { kind: 'work-item', id: item.id });
-      if (owned.length > 0) prompt = `${prompt}\n\n${owned.join('\n')}`;
+      let intervening: string | undefined;
       if (attempt === 1 && this.workflow !== null) {
-        const intervening = [...current.capabilityHandbacks.values()].flatMap(handback => {
+        const tasks = [...current.capabilityHandbacks.values()].flatMap(handback => {
           const task = current.capabilityTasks.get(handback.task);
           return task?.deferredWorkItems.includes(item.id) ? [{ task, handback }] : [];
         });
-        if (intervening.length > 0) prompt += `\n\n# Intervening capability work\n\n${intervening.map(({ task, handback }) =>
+        if (tasks.length > 0) intervening = tasks.map(({ task, handback }) =>
           `Task ${task.id} returned tree ${handback.returnedTree} at ${handback.sourceRevision}. ` +
           `Plan ${handback.plan.id} revision ${handback.plan.revision}; changed since A suspension: ${handback.deltaFromSuspension.join(', ') || '(none)'}. ` +
           `Interface use: ${handback.interfaces.map(entry => `${entry.symbols.join(', ')} at ${entry.path}: ${entry.use}`).join('; ')}. ` +
           `This task did not complete ${item.id}. Reassess its prior outline, decisions and any unexecuted assignment against the current source before assigning it.`
-        ).join('\n\n')}`;
+        ).join('\n\n');
+      }
+      // The turn is built from its inputs by the local architect's own
+      // constructor, which `step render` uses too.
+      const requirements = contextPackage === undefined
+        ? [this.planPackage(run, await this.frozenCatalog(run), [...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs])] : [];
+      const oriented = await this.orientationStartingPoints(run, item.id);
+      const orientedEvent = run.log.all('work-orientation-recorded').find(event => event.data.workItem === item.id);
+      const projection = this.obligationProjection(run);
+      const plain = <V>(value: V): V => JSON.parse(JSON.stringify(value)) as V;
+      let step: ConstructedWorkTurnStep;
+      try {
+        const turn = {
+          schema: stepInputsSchemaId, role: 'local-architect', phase: 'work-turn', run: { planId: run.record.planId, runId: run.record.jobId },
+          work: { workItem: item.id }, attempt, capabilityWorkflow: this.workflow !== null, limits: run.record.policy.limits,
+          context: contextPolicyOf(run.record.policy, 'local-architect'), workingDirectory: this.projectRelative(workingDirectory),
+          briefing: workBriefingInputs(briefing),
+          ...(contextPackage === undefined ? {} : {
+            package: { hash: contextPackage.citation.hash, elements: [...contextPackage.citation.elements], deviations: [...contextPackage.citation.deviations], text: contextPackage.text },
+            ...this.laterDeviations(run, await this.frozenCatalog(run), contextPackage.citation.deviations),
+          }),
+          packageInPrompt, obligationLines: owned, ...(intervening === undefined ? {} : { intervening }),
+          requirements, known: knownFactsInputs(await this.knownProjectFacts(run, [item.module])),
+          startingPoints: lastResult === undefined || lastAssignment === undefined ? [] : [plain(await this.engineerStartingPoints(run, lastAssignment, lastResult))],
+          ...(oriented === undefined ? {} : { orientation: { group: plain(oriented.group),
+            session: (orientedEvent === undefined ? undefined : run.log.all('invocation-started').find(event => event.data.invocation === orientedEvent.data.invocation)?.data.session) ?? null } }),
+          validation: {
+            hypotheses: plain(current.hypotheses), decisions: plain([...current.decisions.values()]), workItems: current.workItems.map(entry => entry.id),
+            openRequirements: open.map(requirement => requirement.id), contracts: [...this.contractsConsumedBy(run, current, item.id)],
+            guardedPaths: [...guarded], harnessOnly: [...harnessOnly],
+            obligations: { entries: plain([...projection.obligations.entries()]), tests: projection.tests },
+            scope: { view: run.record.manifest.architectView, revision: this.assignedCount(run, item.id) + 1 },
+          },
+          start: sessionRef === undefined
+            ? { kind: 'fresh', ...(continuing === undefined ? {} : { continuing }) }
+            : { kind: 'continued', point: sessionRef, ...(session === undefined ? {} : { session }), ...(continuing === undefined ? {} : { continuing }) },
+        } as unknown as WorkTurnStepInputs;
+        step = constructWorkTurnStep(turn, { projectRoot: this.projectRoot, packages });
+      } catch (error) {
+        await this.fail(run, 'inputs-changed', `The work-item package of ${item.id} cannot be rendered: ${message(error)}`);
+        return null;
       }
       packageUndelivered = false;
       // A finding is delivered once: the next turn of this same architect
@@ -6077,24 +6176,23 @@ export class RunService {
       // A completion request that leaves an obligation of this architect
       // without a done report is rejected in this same turn, under the
       // per-turn bound, before any outline, commit or gate.
-      const localObligations = () => ({ actor: { kind: 'work-item' as const, id: item.id }, projection: this.obligationProjection(run) });
       let unreported: string[] = [];
       const result = await this.runInvocation<LocalArchitectSubmission>(run, agent, {
-        role: 'local-architect',
+        role: step.role,
         originalInvocation: originalLocalInvocation,
-        task: { goal: item.goal, requirements: contextPackage === undefined ? [this.planPackage(run, await this.frozenCatalog(run), [...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs])] : [`Use the accepted work-item package ${contextPackage.citation.hash}, with selected elements ${contextPackage.citation.elements.join(', ') || '(none)'}. Its complete context is supplied once and remains in this session.`], omit: contextPackage === undefined ? [] : [contextPackage.text],
-          literalSections: contextPackage !== undefined ? [{ key: 'support:work-item-package', text: contextPackage.text }] : [],
-          startingPointGroups: lastResult === undefined || lastAssignment === undefined ? [] : [await this.engineerStartingPoints(run, lastAssignment, lastResult)],
-          views: (views.evidence?.views ?? []).map(view => ({ path: view.path, revision: view.revision, modules: [item.module], coverage: view.coverage === null ? [] : [`${view.coverage} coverage limits`] })) },
-        work: { workItem: item.id },
-        attempt,
-        loaded,
-        systemPrompt,
-        prompt,
-        workingDirectory,
-        start: sessionRef === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: sessionRef },
+        brief: step.brief,
+        context: step.context,
+        stepInputs: step.before.inputs,
+        fallback: this.stepFallback(step.inputs, packages),
+        work: step.work,
+        attempt: step.attempt,
+        loaded: step.loaded,
+        systemPrompt: step.systemPrompt,
+        prompt: step.prompt,
+        workingDirectory: step.equipment.workingDirectory,
+        start: step.start.mode === 'continue' ? { mode: 'continue', ref: step.start.ref } : { mode: 'fresh' },
         session,
-        continuing,
+        continuing: step.continuing,
         // The architect is continued after a placement request, an
         // unresolved request the global architect answered, an iteration and
         // a refused or failed completion. A yield ends its use: a resumed
@@ -6102,55 +6200,28 @@ export class RunService {
         keep: (ended, value) => (ended === 'submitted' && value !== undefined && value.kind !== 'yield-for-providers'
           ? kept
           : finished('not-kept')),
-        toolName: localArchitectToolName,
-        description: 'End this turn with the work item\'s result. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
-        inputSchema: this.workflow === null ? localArchitectJsonSchema : capabilityLocalArchitectJsonSchema,
-        submissionSchema: 'ramify-agent.local-architect-submission/1',
-        equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools: [createGitInspectionTool(this.projectRoot)] }),
+        toolName: step.submission.toolName,
+        description: step.submission.description,
+        inputSchema: step.submission.inputSchema,
+        submissionSchema: step.submission.submissionSchema,
+        equip: () => ({ builtinTools: [...step.equipment.builtinTools], tools: [createGitInspectionTool(this.projectRoot)] }),
         ...(!packageInPrompt ? {} : { onStarted: async (invocation: string, destination: SessionId) => {
           await this.write(run, { type: 'context-package-prompt-bound', data: {
             workItem: item.id, selection: contextPackage!.selection, packageHash: contextPackage!.citation.hash,
             invocation, session: destination,
           } });
         } }),
+        // The submission is judged against the step's evidence and the view
+        // as it stands. The scope is captured before the submission is
+        // accepted, so a scope the provider refuses is answered here with its
+        // path and the turn's remaining attempts, and nothing of it is committed.
         validate: async input => {
-          const verdict = this.workflow !== null && typeof input === 'object' && input !== null && (
-            (input as { kind?: unknown }).kind === 'yield-for-providers' ||
-            (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.kind === 'contract' ||
-            (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.revisesContract !== undefined
-          ) ? { ok: false as const, errors: [{ path: 'kind', message: 'The contract and provider-yield workflow is historical; use capability requests and scoped assignments' }] }
-            : validateLocalArchitect(input, {
-              index,
-              registry,
-              outline: outlines.at(-1) ?? null,
-              hypotheses: new Map(current.hypotheses.map(hypothesis => [hypothesis.id, hypothesis])),
-              decisions: current.decisions,
-              workItems: new Set(current.workItems.map(entry => entry.id)),
-              openRequirements: new Set(open.map(requirement => requirement.id)),
-              contracts: this.contractsConsumedBy(run, current, item.id),
-              guardedPaths: guarded,
-              harnessOnly,
-              ...(integration === undefined ? {} : { integration: integration.scope }),
-              bounds: engineerBoundsOf(run.record.policy.limits),
-              ...(contextPackage === undefined ? {} : { package: new Set(contextPackage.citation.elements) }),
-              obligations: localObligations(),
-            });
+          const judged = await judgeWorkTurn(step, input, { index, ramify: this.options.ramify, projectRoot: this.projectRoot });
           // What the last rejected request left unreported, which an
           // exhausted turn's failure names.
-          if (!verdict.ok) unreported = unreportedByCompletion(input, localObligations());
-          // The scope is captured before the submission is accepted, so a
-          // scope the provider refuses is answered here with its path and the
-          // turn's remaining attempts, and nothing of it is committed.
-          if (verdict.ok && verdict.value.kind === 'assign' && verdict.value.assignment.revisesContract === undefined) {
-            const body = verdict.value.assignment;
-            const checked = await checkWriteScope({ ramify: this.options.ramify, projectRoot: this.projectRoot, index,
-              view: run.record.manifest.architectView, revision: this.assignedCount(run, item.id) + 1,
-              base: body.scope.base, extra: body.scope.extra, read: body.scope.read,
-              bootstrap: this.bootstrapOf(index, registry, body), rationale: body.scope.rationale });
-            if (checked.scope === null) return { ok: false as const, errors: checked.errors };
-            this.preparedScopes.set(body, checked.scope);
-          }
-          return verdict;
+          if (judged.unreported !== undefined) unreported = [...judged.unreported];
+          if (judged.prepared !== undefined) this.preparedScopes.set(judged.prepared.body, judged.prepared.scope);
+          return judged.verdict;
         },
         scope: {
           write: null,
@@ -7460,13 +7531,7 @@ export class RunService {
    * being by the exception that isolates a break.
    */
   private bootstrapOf(index: ArchitectIndex | null, registry: ReadonlyMap<string, RegistryEntry>, body: AssignmentBody): WriteScope['bootstrap'] {
-    const owner = 'module' in body.scope.base ? body.scope.base.module : null;
-    const authority = owner === null || (index !== null && findModule(index, owner) !== undefined)
-      ? undefined
-      : creationAuthority(registry, owner);
-    return authority?.proposed === undefined
-      ? []
-      : [{ capability: refOf(authority.capability, authority.revision, authority), owner: authority.owner, parent: authority.proposed.parent, directory: authority.proposed.directory }];
+    return assignmentBootstrap(index, registry, body);
   }
 
   /**
@@ -10765,11 +10830,6 @@ export class RunService {
     readonly start: EngineerStepInputs['start'];
   }): Promise<EngineerStepInputs> {
     const { item, assignment } = collected;
-    const contained = (absolute: string) => {
-      const path = relative(this.projectRoot, absolute).split(sep).join('/');
-      if (join(this.projectRoot, path) !== absolute) throw new Error(`${absolute} is not beneath the project root ${this.projectRoot}`);
-      return projectPath(path);
-    };
     const record = committedRecords(run.log.ledger.replay()).assignments.get(assignment.id);
     const known = await this.knownProjectFacts(run, 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules);
     const protectedFiles = await this.protectedFiles(run, assignment);
@@ -10787,7 +10847,7 @@ export class RunService {
       ...(collected.beforeTree === undefined ? {} : { candidateBefore: collected.beforeTree }),
       capabilityWorkflow: this.workflow !== null,
       capabilityPolicy: run.record.policy.version === capabilityRunPolicyVersion,
-      workingDirectory: contained(collected.workingDirectory),
+      workingDirectory: this.projectRelative(collected.workingDirectory),
       views: collected.views.map(entry => ({ module: entry.module, unavailable: entry.unavailable,
         views: entry.views.map(view => ({ area: view.area, path: projectPath(view.path), revision: view.revision, coverage: view.coverage })) })),
       testAreas: (await this.ownedTestAreas(run, assignment.gate.tests)).map(area => ({ module: area.module, area: projectPath(area.area) })),
@@ -10799,19 +10859,28 @@ export class RunService {
       ...(collected.handoff === undefined ? {} : { handoff: { done: [...collected.handoff.done], unfinished: [...collected.handoff.unfinished], returns: collected.handoff.returns } }),
       ...(collected.guidance === undefined ? {} : { guidance: collected.guidance }),
       startingPoints: record === undefined ? null : plain(this.assignmentStartingPoints(run, record)),
-      known: {
-        declaredChecks: { checks: plain(known.declaredChecks.checks) as EngineerStepInputs['known']['declaredChecks']['checks'], paths: known.declaredChecks.paths.map(projectPath) },
-        modules: known.modules.map(module => ({ module: module.module, directory: projectPath(module.directory), apiPaths: module.apiPaths.map(projectPath) })),
-        testAreas: known.testAreas.map(area => ({ module: area.module, area: projectPath(area.area) })),
-        scenarioFeatures: known.scenarioFeatures.map(projectPath),
-        stepDirectories: known.stepDirectories.map(entry => ({ directory: projectPath(entry.directory), files: entry.files.map(projectPath) })),
-      },
+      known: knownFactsInputs(known),
       protectedFiles: { harness: protectedFiles.harness.map(projectPath), unauthorized: protectedFiles.unauthorized.map(projectPath) },
       bounds: { idleMs: collected.bounds.idleMs, absoluteMs: collected.bounds.absoluteMs, commandTimeoutMs: collected.bounds.commandTimeoutMs },
       limits: run.record.policy.limits,
       context: contextPolicyOf(run.record.policy, 'engineer'),
       start: collected.start,
     } as EngineerStepInputs;
+  }
+
+  /** A location beneath the project root as a project-relative path field. */
+  private projectRelative(absolute: string): ProjectPath {
+    const path = relative(this.projectRoot, absolute).split(sep).join('/');
+    if (join(this.projectRoot, path) !== absolute) throw new Error(`${absolute} is not beneath the project root ${this.projectRoot}`);
+    return projectPath(path);
+  }
+
+  /** The architect view a task names by default: the materialized view of the run, with the modules its index holds now. */
+  private architectViewInputs(run: Run): OrientationStepInputs['architectView'] {
+    const view = run.record.manifest.architectView;
+    return view.status === 'materialized'
+      ? [{ path: projectPath('.ramify-architect'), revision: view.revision, modules: [...(run.index?.modules.keys() ?? [])], coverage: [...view.coverageLimits] }]
+      : [];
   }
 
   /** The bounds one iteration's engineers run under: the policy's, and what its assignment raised. */
@@ -12848,6 +12917,17 @@ function readinessAuditOutcome(gate: GateAttempt) {
 }
 
 /** Mechanical section identities only; goal/requirements are supplied by their owning records. */
+
+/** Known project facts as step inputs: captured JSON, with every path a project-relative field. */
+function knownFactsInputs(known: KnownProjectFacts): KnownFactsInputs {
+  return {
+    declaredChecks: { checks: JSON.parse(JSON.stringify(known.declaredChecks.checks)) as KnownFactsInputs['declaredChecks']['checks'], paths: known.declaredChecks.paths.map(projectPath) },
+    modules: known.modules.map(module => ({ module: module.module, directory: projectPath(module.directory), apiPaths: module.apiPaths.map(projectPath) })),
+    testAreas: known.testAreas.map(area => ({ module: area.module, area: projectPath(area.area) })),
+    scenarioFeatures: known.scenarioFeatures.map(projectPath),
+    stepDirectories: known.stepDirectories.map(entry => ({ directory: projectPath(entry.directory), files: entry.files.map(projectPath) })),
+  };
+}
 
 function taskKindFor(role: Role, tool: string, continuing?: ContinueReason): TaskKind {
   if (tool === 'submit_capability_qualification') return 'capability-qualification';

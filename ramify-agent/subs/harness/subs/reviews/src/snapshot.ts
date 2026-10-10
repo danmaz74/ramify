@@ -275,6 +275,26 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
   };
 }
 
+/** One declaration of a snapshot tool, as a session is told of it. */
+export interface SnapshotToolDeclaration {
+  readonly name: string;
+  readonly description: string;
+  readonly inputSchema: Readonly<Record<string, unknown>>;
+  readonly mutating: boolean;
+}
+
+/**
+ * The declarations of the reviewer's four read tools, without a candidate:
+ * the same definitions `snapshotTools` builds, whose execution alone needs
+ * the snapshot and its source. Building them reads nothing.
+ */
+export function snapshotToolDeclarations(): SnapshotToolDeclaration[] {
+  const none: CandidateSnapshot = { commit: '', base: '', tree: '', entries: new Map(), directories: new Set(['']), changes: [] };
+  const unread = (): never => { throw new Error('A declaration reads nothing'); };
+  const source: CandidateSource = { commitTree: unread, treeEntries: unread, diffNameStatus: unread, readBlob: unread, grepTree: unread, diffPatch: unread };
+  return snapshotTools(none, source, '').definitions.map(({ name, description, inputSchema, mutating }) => ({ name, description, inputSchema, mutating: mutating ?? false }));
+}
+
 /**
  * A path of the candidate diff, deleted ones included, resolved by the same
  * rules as any other path.

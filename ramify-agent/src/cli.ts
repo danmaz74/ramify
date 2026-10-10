@@ -8,6 +8,15 @@ export type AgentName = typeof agentNames[number];
 /** Where a session's prompt comes from: the command line, or a file read when the command runs. */
 export type PromptSource = { readonly text: string } | { readonly file: string };
 
+/** The files `step inputs` reads in place of parts of the recorded inputs, by the option that names each. */
+export interface AuthoredFiles {
+  readonly workItem?: string;
+  readonly outline?: string;
+  readonly assignment?: string;
+  readonly selection?: string;
+  readonly reviewRequest?: string;
+}
+
 /** The agent one session runs on. */
 export type SessionAgent =
   | { readonly name: 'pi'; readonly model: string | undefined }
@@ -27,7 +36,8 @@ export type CommandLine =
   | {
       readonly command: 'step';
       readonly step:
-        | { readonly command: 'inputs'; readonly role: string; readonly fromRun: string; readonly invocation: string; readonly out: string | undefined }
+        | { readonly command: 'inputs'; readonly role: string; readonly fromRun: string | undefined; readonly invocation: string | undefined; readonly out: string | undefined;
+            readonly authored: AuthoredFiles }
         | { readonly command: 'render'; readonly inputs: string; readonly projectRoot: string; readonly invocation: string | undefined };
     }
   | { readonly command: 'help' };
@@ -47,8 +57,10 @@ export const usage = [
   '                       (--prompt <text> | --prompt-file <file>)',
   '                       [--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>]',
   '                       [--write <project-relative path>]... [--gate]',
-  '  ramify-agent step inputs --role engineer --from-run <run dir> --invocation <id> [--out <file>]',
+  '  ramify-agent step inputs --role <engineer|local-architect|context-selector|reviewer> --from-run <run dir> --invocation <id>',
+  '                       [--work-item <file>] [--outline <file>] [--assignment <file>] [--selection <file>] [--review-request <file>] [--out <file>]',
   '                       Imports one invocation\'s recorded inputs as a fresh start; compares the delivery as a diagnostic.',
+  '                       Authored files replace parts of them, each judged as its producing role\'s output with the run\'s context.',
   '  ramify-agent step render --inputs <file> [--project <root>] [--invocation <id>]',
   '                       Prints what the step\'s session receives. Takes no lock and writes nothing.',
 ].join('\n');
@@ -154,17 +166,21 @@ function parseStep(rest: readonly string[]): CommandLine {
     let fromRun: string | undefined;
     let invocation: string | undefined;
     let out: string | undefined;
+    const authored: { -readonly [K in keyof AuthoredFiles]: AuthoredFiles[K] } = {};
+    const files = { '--work-item': 'workItem', '--outline': 'outline', '--assignment': 'assignment', '--selection': 'selection', '--review-request': 'reviewRequest' } as const;
     options(flags, (flag, value, _inline, argument) => {
       if (flag === '--role') role = value();
       else if (flag === '--from-run') fromRun = value();
       else if (flag === '--invocation') invocation = value();
       else if (flag === '--out') out = value();
+      else if (flag in files) authored[files[flag as keyof typeof files]] = value();
       else throw new UsageError(`Unknown option "${argument}"`);
     });
     if (role === undefined) throw new UsageError('step inputs needs --role <role>');
-    if (fromRun === undefined) throw new UsageError('step inputs needs --from-run <run dir>');
-    if (invocation === undefined) throw new UsageError('step inputs --from-run needs --invocation <id>');
-    return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out } };
+    // Authored files without a run are refused by the command, with the context they lack.
+    if (fromRun === undefined && Object.keys(authored).length === 0) throw new UsageError('step inputs needs --from-run <run dir>');
+    if (fromRun !== undefined && invocation === undefined) throw new UsageError('step inputs --from-run needs --invocation <id>');
+    return { command: 'step', step: { command: 'inputs', role, fromRun, invocation, out, authored } };
   }
   if (subcommand === 'render') {
     let inputs: string | undefined;

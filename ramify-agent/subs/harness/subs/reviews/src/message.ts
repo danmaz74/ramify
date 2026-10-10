@@ -54,9 +54,16 @@ export interface ReviewBriefing {
   readonly diffPayload?: string | undefined;
 }
 
+/**
+ * What the message is composed from: the briefing, of whose snapshot only
+ * the changed paths and the directories are read. A captured briefing
+ * supplies those two alone.
+ */
+export type ReviewMessageInputs = Omit<ReviewBriefing, 'snapshot'> & { readonly snapshot: Pick<CandidateSnapshot, 'changes' | 'directories'> };
+
 const questions = { code: 'Code review', scope: 'Scope review', design: 'Design review' } as const;
 
-export function reviewMessage(briefing: ReviewBriefing): string {
+export function reviewMessage(briefing: ReviewMessageInputs): string {
   const { request, snapshot, assignment } = briefing;
   const kind = request.key.kind;
   const lines = [

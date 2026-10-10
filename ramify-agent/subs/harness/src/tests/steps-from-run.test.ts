@@ -7,6 +7,7 @@ import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-oper
 import { loadPromptPackages } from '../prompts/packages.js';
 import { runLayout } from '../run/records.js';
 import { runStepCommand } from '../steps/command.js';
+import { constructStep } from '../steps/construct.js';
 import { constructEngineerStep } from '../steps/engineer.js';
 import { inputsFromRun } from '../steps/from-run.js';
 import { parseStepInputs, serializeStepInputs, type StepInputs } from '../steps/inputs.js';
@@ -73,6 +74,7 @@ describe('S03: inputs from a run', () => {
     if (result.recorded.start.kind === 'fresh') throw new Error('unreachable');
     expect(result.inputs.start).toEqual({ kind: 'fresh' });
     expect(result.inputs.provenance).toMatchObject({ invocation: repairId, originalStart: 'repair-continuation', originalPoint: result.recorded.start.point });
+    if (result.inputs.role !== 'engineer' || result.recorded.role !== 'engineer') throw new Error('unreachable');
     expect(result.inputs.failedGate).toEqual(result.recorded.failedGate);
 
     const { packages } = await loadPromptPackages({ capabilityWorkflow: result.inputs.capabilityWorkflow });
@@ -97,7 +99,7 @@ describe('S03: inputs from a run', () => {
   });
 
   test('other roles, unknown invocations and incomplete task records are refused with the reason', async () => {
-    expect(await imported(freshId, { role: 'reviewer' })).toEqual({ status: 'refused', reason: expect.stringContaining('no step inputs are defined for the role "reviewer"') });
+    expect(await imported(freshId, { role: 'failure-analyst' })).toEqual({ status: 'refused', reason: expect.stringContaining('no step inputs are defined for the role "failure-analyst"') });
     expect(await imported(architectId)).toEqual({ status: 'refused', reason: expect.stringContaining(`invocation ${architectId} is a local-architect invocation, not engineer`) });
     expect(await imported('inv-9999')).toEqual({ status: 'refused', reason: 'the run records no invocation inv-9999' });
     expect(await imported('../inv-0001')).toEqual({ status: 'refused', reason: expect.stringContaining('is not an invocation id') });
@@ -122,8 +124,57 @@ describe('S03: inputs from a run', () => {
     expect(result.stderr).toContain('Recorded delivery: equal');
     const written = parseStepInputs(await readFile(out, 'utf8'));
     expect(written.start.kind).toBe('fresh');
-    const refused = await runStepCommand({ command: 'inputs', role: 'local-architect', fromRun: directory, invocation: architectId });
-    expect(refused).toMatchObject({ exitStatus: 2, stdout: '', stderr: expect.stringMatching(/^Refused: no step inputs are defined for the role "local-architect"/u) });
+    const refused = await runStepCommand({ command: 'inputs', role: 'failure-analyst', fromRun: directory, invocation: architectId });
+    expect(refused).toMatchObject({ exitStatus: 2, stdout: '', stderr: expect.stringMatching(/^Refused: no step inputs are defined for the role "failure-analyst"/u) });
+  });
+});
+
+describe('S08: local architect and reviewer inputs from a run', () => {
+  test('orientation, selection and work turns import as complete fresh starts that keep their original start as provenance', async () => {
+    const started = (await runEventsOnDisk(run.root, run.planId, run.runId)).flatMap(event => event.type === 'invocation-started' ? [event.data] : []);
+    const starts: string[] = [];
+    for (const { invocation, role } of started.filter(item => item.role === 'local-architect' || item.role === 'context-selector')) {
+      const result = await imported(invocation, { role });
+      if (result.status !== 'imported') throw new Error(result.reason);
+      expect(result.comparison, invocation).toEqual({ status: 'equal' });
+      const recorded = result.recorded;
+      starts.push(`${recorded.role}/${'phase' in recorded ? recorded.phase : 'selection'}/${recorded.start.kind}`);
+      expect(result.inputs.start.kind).toBe('fresh');
+      expect(result.inputs.provenance).toMatchObject({ invocation, originalStart: recorded.start.kind,
+        ...(recorded.start.kind === 'fresh' ? {} : { originalPoint: recorded.start.point }) });
+      const { packages } = await loadPromptPackages({ capabilityWorkflow: result.inputs.capabilityWorkflow });
+      const constructed = constructStep(result.inputs, { projectRoot: run.root, packages });
+      const rendered = await renderStep(constructed, {
+        projectRoot: run.root, packages, builtinDeclarations: piBuiltinDeclarations, operationId: invocation,
+        sessionOperations: join(run.root, 'plans', '.harness', 'session-operations'),
+      });
+      // The imported turn delivers the complete briefing, whatever the original start delivered.
+      expect(rendered.rendered).toBe('fresh');
+      expect(rendered.packet.additions.some(item => item.kind === 'role-instructions')).toBe(true);
+      if (recorded.role === 'context-selector' && recorded.start.kind === 'fork') {
+        // A fork's imported start is briefed from the complete packet, not the fork's update.
+        expect(constructed.brief.retainInheritedSections).toBeUndefined();
+        expect(constructed.prompt).toContain((recorded as { packet: string }).packet);
+      }
+    }
+    expect(starts).toEqual(expect.arrayContaining(['local-architect/orientation/fresh', 'context-selector/selection/fork', 'local-architect/work-turn/continued']));
+  });
+
+  test('a role or a start outside the first set is refused with its reason', async () => {
+    const started = (await runEventsOnDisk(run.root, run.planId, run.runId)).flatMap(event => event.type === 'invocation-started' ? [event.data] : []);
+    const initial = started.find(item => item.role === 'initial-architect')!.invocation;
+    expect(await imported(initial, { role: 'initial-architect' })).toEqual({ status: 'refused', reason: expect.stringContaining('no step inputs are defined for the role "initial-architect"') });
+    const orientation = architectId;
+    const path = join(directory, runLayout.stepInputs(orientation));
+    const bytes = await readFile(path, 'utf8');
+    try {
+      // An orientation is a fresh start only.
+      const recorded = JSON.parse(bytes) as { start: unknown };
+      await writeFile(path, JSON.stringify({ ...recorded, start: { kind: 'continued', point: 'not-a-point' } }));
+      expect(await imported(orientation, { role: 'local-architect' })).toEqual({ status: 'refused', reason: expect.stringContaining('start.kind: expected one of "fresh"') });
+    } finally {
+      await writeFile(path, bytes);
+    }
   });
 });
 

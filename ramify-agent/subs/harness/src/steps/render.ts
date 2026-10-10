@@ -5,7 +5,9 @@ import type { DeliveredInput } from '../prompts/delivered-manifest.js';
 import {
   composeOperationPacket, operationDeclarations, readPointContext, readSessionPointReference, ReusableSessionUnavailableError, type PointContext,
 } from '../run/session-operations.js';
-import type { ConstructedEngineerStep, StepEnvironment } from './engineer.js';
+import { constructStep, freshFallback } from './construct.js';
+import type { ConstructedStepCommon } from './constructed.js';
+import type { StepEnvironment } from './engineer.js';
 
 /*
  * What a constructed step delivers, without a model, a lock or a record:
@@ -21,19 +23,19 @@ export interface RenderEnvironment extends StepEnvironment {
   readonly operationId: string;
   /**
    * The session operations directory, whose recorded ancestry a continuation
-   * appends to. Absent, or without the point's ancestry, a continuation is
-   * rendered as the fresh start the run would fall back to.
+   * appends to and a fork inherits. Absent, or without the point's ancestry,
+   * such a start is rendered as the fresh start the run would fall back to.
    */
   readonly sessionOperations?: string | undefined;
 }
 
 export interface RenderedStep {
-  readonly role: 'engineer';
+  readonly role: ConstructedStepCommon['role'];
   /** The start the inputs ask for. */
-  readonly requested: ConstructedEngineerStep['inputs']['start']['kind'];
-  /** What is rendered: the whole fresh packet, or a continuation's additions. */
-  readonly rendered: 'fresh' | 'continuation';
-  /** Why a requested continuation is rendered fresh. */
+  readonly requested: ConstructedStepCommon['inputs']['start']['kind'];
+  /** What is rendered: the whole fresh packet, or what a continuation or a fork adds to the history it inherits. */
+  readonly rendered: 'fresh' | 'continuation' | 'fork';
+  /** Why a requested continuation or fork is rendered fresh. */
   readonly fallback: string | null;
   readonly point: string | null;
   readonly packet: TaskPacket;
@@ -43,13 +45,12 @@ export interface RenderedStep {
 }
 
 /** Renders a constructed step as its session would receive it. Nothing is written. */
-export async function renderStep(step: ConstructedEngineerStep, environment: RenderEnvironment): Promise<RenderedStep> {
+export async function renderStep(constructed: ConstructedStepCommon, environment: RenderEnvironment): Promise<RenderedStep> {
+  let step = constructed;
   const runId = step.inputs.run.runId;
-  const workingDirectory = step.equipment.workingDirectory;
-  const builtins = environment.builtinDeclarations(step.equipment.builtinTools, workingDirectory);
   let source: { readonly point: PointContext['point']; readonly prior: PointContext } | null = null;
   let fallback: string | null = null;
-  if (step.start.mode === 'continue') {
+  if (step.start.mode !== 'fresh') {
     const reference = readSessionPointReference(step.start.ref);
     if (reference === null) fallback = 'the session point reference cannot be read';
     else if (reference.runId !== runId) fallback = `the session point belongs to run ${reference.runId}, not ${runId}`;
@@ -62,18 +63,23 @@ export async function renderStep(step: ConstructedEngineerStep, environment: Ren
       }
     }
   }
+  // A start whose point is unavailable is rendered as the fresh inputs the run falls back to.
+  const fresh = fallback === null ? null : freshFallback(step.inputs, fallback);
+  if (fresh !== null) step = constructStep(fresh, environment);
+  const workingDirectory = step.equipment.workingDirectory;
+  const builtins = environment.builtinDeclarations(step.equipment.builtinTools, workingDirectory);
   const { packet } = composeOperationPacket({
     runId, operationId: environment.operationId, loaded: step.loaded, brief: step.brief, role: step.role,
-    mode: source === null ? 'fresh' : 'continue', workingDirectory, builtinDeclarations: builtins, tools: step.equipment.tools,
+    mode: source === null ? 'fresh' : step.start.mode, workingDirectory, builtinDeclarations: builtins, tools: step.equipment.tools,
     submissionName: step.submission.toolName, source: source?.point ?? null, prior: source?.prior ?? null,
   });
   const described = /^Submit this task using exactly this JSON schema: ([\s\S]*)$/u.exec(packet.declaration.description);
   return {
     role: step.role,
-    requested: step.inputs.start.kind,
-    rendered: source === null ? 'fresh' : 'continuation',
+    requested: constructed.inputs.start.kind,
+    rendered: source === null ? 'fresh' : step.start.mode === 'fork' ? 'fork' : 'continuation',
     fallback,
-    point: step.start.mode === 'continue' ? step.start.ref : null,
+    point: constructed.start.mode === 'fresh' ? null : constructed.start.ref,
     packet,
     declarations: operationDeclarations(builtins, step.equipment.tools, packet),
     submissionSchema: described === null ? null : JSON.parse(described[1]!) as unknown,
@@ -95,9 +101,11 @@ function additionText(addition: DeliveredInput): string {
 export function renderedText(rendered: RenderedStep): string {
   const head = `Step: ${rendered.role}, start ${rendered.requested}${rendered.point === null ? '' : ` from ${rendered.point}`}`;
   const schema = [rule(`Submission schema (${rendered.packet.submissionTool})`), JSON.stringify(rendered.submissionSchema, null, 2)];
-  if (rendered.rendered === 'continuation') {
+  if (rendered.rendered !== 'fresh') {
     return [head, '',
-      rule('Continuation additions only: appended to the continued session, whose inherited instructions, tools and briefing are not repeated'),
+      rule(rendered.rendered === 'fork'
+        ? 'Fork additions only: delivered over the forked point, whose inherited instructions, tools and briefing are not repeated'
+        : 'Continuation additions only: appended to the continued session, whose inherited instructions, tools and briefing are not repeated'),
       ...rendered.packet.additions.map(additionText), '', ...schema, ''].join('\n');
   }
   return [head, ...(rendered.fallback === null ? [] : [`Rendered as the complete fresh start the run falls back to: ${rendered.fallback}.`]), '',

@@ -18,6 +18,10 @@ import {
   attemptRecord, candidates, eventsOf, limit, notes, notesDirectory, plan, reviewRun, reviewTarget, store, tool,
 } from './helpers/reviews.js';
 import { onlyRun, runPath } from './helpers/runs.js';
+import { stepDeliveries } from './helpers/step-equality.js';
+import { piBuiltinDeclarations } from '../../subs/agent/subs/pi/src/session-operations.js';
+import { inputsFromRun } from '../steps/from-run.js';
+import type { StepInputs } from '../steps/inputs.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -270,6 +274,43 @@ describe('three questions over one candidate', () => {
     expect(service.reviews(plan, runId)!.coverage).toEqual({ state: 'available', requested: 9, complete: 9, partial: 0, notVerified: 0, pending: 0 });
     expect(eventsOf(events, 'gate-attempted').every(event => event.data.verdict === 'passed')).toBe(true);
     run.git.assertComplete();
+
+    // S05/S06: the run built every orientation, selection, work turn, review
+    // and design orientation through a step constructor, and each renders, from
+    // the inputs it recorded, as the run delivered it.
+    const { constructed, unconstructed, undelivered } = await stepDeliveries(root, plan, runId, ['local-architect', 'context-selector', 'reviewer']);
+    expect(unconstructed).toEqual([]);
+    expect(undelivered).toEqual([]);
+    const variant = (inputs: StepInputs) => `${inputs.role}/${'phase' in inputs ? inputs.phase : 'question' in inputs ? inputs.question : 'selection'}/${inputs.start.kind}`;
+    expect(new Set(constructed.map(item => variant(item.inputs)))).toEqual(new Set([
+      'local-architect/orientation/fresh', 'context-selector/selection/fork', 'local-architect/work-turn/continued',
+      'reviewer/code/fresh', 'reviewer/scope/fork', 'reviewer/design-orientation/fresh', 'reviewer/design/fork',
+    ]));
+    for (const item of constructed) {
+      expect(item.rendered.fallback, item.invocation).toBeNull();
+      expect(item.rendered.packet, item.invocation).toEqual(item.delivered.packet);
+      expect(item.rendered.declarations, item.invocation).toEqual(item.delivered.declarations);
+    }
+    // A review declares the snapshot tools and its submission, and no built-in.
+    for (const item of constructed.filter(entry => entry.role === 'reviewer' && 'question' in entry.inputs && entry.inputs.question !== 'design-orientation')) {
+      const names = item.rendered.declarations.map(declaration => declaration.name);
+      expect(names.at(-1)).toBe(item.rendered.packet.submissionTool);
+      expect(names.slice(0, -1).sort()).toEqual(Object.values(snapshotToolNames).sort());
+    }
+    // The design orientation is its own invocation and its own step.
+    const oriented = constructed.filter(entry => entry.role === 'reviewer' && 'question' in entry.inputs && entry.inputs.question === 'design-orientation');
+    expect(oriented.map(entry => entry.invocation)).toEqual(orientations.map(event => event.data.invocation));
+
+    // S08: each reviewer invocation imports as a fresh start that keeps its
+    // original start, and its recorded start renders as delivered.
+    const reviewDirectory = runPath(root, plan, runId);
+    for (const item of constructed.filter(entry => entry.role === 'reviewer')) {
+      const result = await inputsFromRun({ role: 'reviewer', runDirectory: reviewDirectory, invocation: item.invocation, builtinDeclarations: piBuiltinDeclarations });
+      if (result.status !== 'imported') throw new Error(result.reason);
+      expect(result.comparison, item.invocation).toEqual({ status: 'equal' });
+      expect(result.inputs.start, item.invocation).toEqual({ kind: 'fresh' });
+      expect(result.inputs.provenance, item.invocation).toMatchObject({ invocation: item.invocation, originalStart: item.inputs.start.kind });
+    }
   }, 120_000);
 });
 

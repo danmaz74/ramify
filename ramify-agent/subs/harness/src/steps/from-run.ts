@@ -5,8 +5,15 @@ import type { TaskPacket } from '../prompts/tasks.js';
 import { loadPromptPackages } from '../prompts/packages.js';
 import { invocationSchema, runLayout, runRecordSchema } from '../run/records.js';
 import { readRecordedOperation } from '../run/session-operations.js';
-import { constructEngineerStep } from './engineer.js';
-import { parseStepInputs, StepInputsError, validateStepInputs, type StepInputs } from './inputs.js';
+import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
+import { loadArchitectIndex } from '../../subs/evidence/src/views.js';
+import { contextSelectorToolName, workOrientationToolName } from '../context-selection/submissions.js';
+import { orientationToolName, reviewToolName } from '../../subs/reviews/src/submission.js';
+import { engineerToolName } from '../work/engineer.js';
+import { localArchitectToolName } from '../work/submission.js';
+import { applyAuthored, type AuthoredFiles, type AuthoringContext } from './authored.js';
+import { constructStep } from './construct.js';
+import { parseStepInputs, StepInputsError, stepRoles, validateStepInputs, type StepInputs } from './inputs.js';
 import { renderStep, type RenderEnvironment, type RenderedStep } from './render.js';
 
 /*
@@ -27,6 +34,10 @@ export interface InputsFromRunOptions {
   readonly builtinDeclarations: RenderEnvironment['builtinDeclarations'];
   /** The skill directory of the prompt packages, for a test that supplies its own. */
   readonly skillDirectory?: string | undefined;
+  /** Files an author supplies in place of parts of the recorded inputs, each judged as its producing role's output. */
+  readonly authored?: AuthoredFiles | undefined;
+  /** The provider and the architect view an authored assignment's scope is prepared with; the installed ones where absent. */
+  readonly authoring?: AuthoringContext | undefined;
 }
 
 /** How the recorded start renders today against what the run delivered. */
@@ -47,7 +58,10 @@ export type InputsFromRunResult =
       readonly comparison: DeliveryComparison;
     };
 
-const supportedRoles = ['engineer'];
+const supportedRoles: readonly string[] = stepRoles;
+
+/** The submission tools of the invocations a step constructor builds: the first set. */
+const constructedSubmissions = [engineerToolName, workOrientationToolName, contextSelectorToolName, localArchitectToolName, reviewToolName, orientationToolName];
 const invocationId = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 
 /** The project root and identities a run directory names, or why it names none. */
@@ -92,15 +106,26 @@ export async function inputsFromRun(options: InputsFromRunOptions): Promise<Inpu
   let recorded: StepInputs;
   try { recorded = parseStepInputs(await readFile(join(run, runLayout.stepInputs(options.invocation)), 'utf8')); }
   catch (error) {
-    if (missing(error)) return refused(`incomplete task records: invocation ${options.invocation} has no recorded step inputs (${runLayout.stepInputs(options.invocation)}); a run recorded before step inputs were captured cannot be imported`);
+    if (missing(error)) {
+      // A role in the first set also makes invocations no step constructor builds yet.
+      const delivered = await readRecordedOperation(join(location.projectRoot, 'plans', '.harness', 'session-operations'), location.runId, options.invocation).catch(() => null);
+      const tool = delivered?.packet.submissionTool;
+      if (tool !== undefined && !constructedSubmissions.includes(tool)) {
+        return refused(`invocation ${options.invocation} is a ${options.role} start outside the first set: it submits through ${tool}, which no step constructor builds; supported submissions: ${constructedSubmissions.join(', ')}`);
+      }
+      return refused(`incomplete task records: invocation ${options.invocation} has no recorded step inputs (${runLayout.stepInputs(options.invocation)}); a run recorded before step inputs were captured cannot be imported`);
+    }
     if (error instanceof StepInputsError) return refused(`incomplete task records: ${runLayout.stepInputs(options.invocation)} is not valid step inputs: ${error.errors.join('; ')}`);
     return refused(`${runLayout.stepInputs(options.invocation)} cannot be read: ${message(error)}`);
   }
   if (recorded.run.planId !== location.planId || recorded.run.runId !== location.runId) return refused(`the recorded step inputs name run ${recorded.run.planId}/${recorded.run.runId}, not ${location.planId}/${location.runId}`);
   const { start, provenance: _earlier, ...fields } = recorded;
-  const inputs = validateStepInputs({
+  // A work turn keeps why it continued its session, which its task kind follows.
+  const continuing = recorded.role === 'local-architect' && recorded.phase === 'work-turn' && recorded.start.continuing !== undefined
+    ? { continuing: recorded.start.continuing } : {};
+  let inputs = validateStepInputs({
     ...fields,
-    start: { kind: 'fresh' },
+    start: { kind: 'fresh', ...continuing },
     provenance: {
       run: recorded.run,
       invocation: options.invocation,
@@ -109,6 +134,13 @@ export async function inputsFromRun(options: InputsFromRunOptions): Promise<Inpu
       ...(start.kind === 'fresh' ? {} : { originalPoint: start.point }),
     },
   });
+  const authored = options.authored ?? {};
+  if (Object.values(authored).some(path => path !== undefined)) {
+    const applied = await applyAuthored(inputs, authored, { directory: run, projectRoot: location.projectRoot },
+      options.authoring ?? { ramify: new RamifyCli(), index: loadArchitectIndex });
+    if (applied.status === 'refused') return refused(applied.reason);
+    inputs = applied.inputs;
+  }
   const comparison = await compareDelivery(location.projectRoot, recorded, options, invocation.data.prompt.hash);
   return { status: 'imported', projectRoot: location.projectRoot, recorded, inputs, comparison };
 }
@@ -121,7 +153,7 @@ async function compareDelivery(projectRoot: string, recorded: StepInputs, option
   let rendered: RenderedStep;
   try {
     const { packages } = await loadPromptPackages({ capabilityWorkflow: recorded.capabilityWorkflow, ...(options.skillDirectory === undefined ? {} : { skillDirectory: options.skillDirectory }) });
-    const step = constructEngineerStep(recorded, { projectRoot, packages });
+    const step = constructStep(recorded, { projectRoot, packages });
     rendered = await renderStep(step, { projectRoot, packages, builtinDeclarations: options.builtinDeclarations, operationId: options.invocation, sessionOperations });
     const sections = differingSections(rendered, delivered);
     if (step.loaded.hash !== packageHash) sections.unshift(`prompt package (recorded ${packageHash}, current ${step.loaded.hash})`);

@@ -1,9 +1,14 @@
 import { posix } from 'node:path';
 import { z } from 'zod';
+import { elementCatalogSchema, packageDeviationSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { scenarioStateSchema } from '../../subs/scenarios/src/states.js';
-import { contextPolicySchema, runPolicySchema } from '../run/records.js';
+import { apiViewEvidenceSchema } from '../interfaces/protocol/jobs.js';
+import { reviewRequestSchema } from '../reviews/records.js';
+import { viewIdentitySchema } from '../interfaces/protocol/evidence.js';
+import { continueReasonSchema, contextPolicySchema, runPolicySchema, sessionIdSchema } from '../run/records.js';
 import { readSessionPointReference } from '../run/session-operations.js';
 import { iterationAssignmentSchema } from '../work/iterations.js';
+import { workItemOutlineSchema, workItemSchema } from '../work/records.js';
 import { startingPointSchema } from '../work/starting-points.js';
 
 /*
@@ -96,7 +101,7 @@ const startingPointGroupSchema = z.object({
 }).strict();
 
 /** What a role that works in the source is told of the project. */
-const knownFactsSchema = z.object({
+export const knownFactsSchema = z.object({
   declaredChecks: z.object({ checks: z.array(jsonValueSchema), paths: z.array(projectPathSchema) }).strict(),
   modules: z.array(z.object({ module: text, directory: projectPathSchema, apiPaths: z.array(projectPathSchema) }).strict()),
   testAreas: z.array(z.object({ module: text, area: projectPathSchema }).strict()),
@@ -109,9 +114,11 @@ const provenanceSchema = z.object({
   run: z.object({ planId: text, runId: text }).strict(),
   invocation: text,
   record: runPathSchema,
-  originalStart: z.enum(['fresh', 'repair-continuation', 'resumed-after-handback']),
-  /** The session point the original start continued, where it continued one. */
+  originalStart: z.enum(['fresh', 'repair-continuation', 'resumed-after-handback', 'continued', 'fork']),
+  /** The session point the original start continued or forked, where it had one. */
   originalPoint: pointReferenceSchema.optional(),
+  /** The inputs an author supplied in place of what the source invocation recorded, each validated as its producing role's output. */
+  authored: z.array(z.enum(['work-item', 'outline', 'selection', 'assignment', 'review-request'])).optional(),
 }).strict();
 
 /** The fields every engineer start shares: the fresh inputs. */
@@ -182,10 +189,246 @@ const resumedEngineerSchema = z.object({
 export const engineerStepInputsSchema = z.union([freshEngineerSchema, repairEngineerSchema, resumedEngineerSchema]);
 export type EngineerStepInputs = z.infer<typeof engineerStepInputsSchema>;
 export type EngineerStart = EngineerStepInputs['start']['kind'];
+export type KnownFactsInputs = z.infer<typeof knownFactsSchema>;
+
+/** A view the task environment names: a path field with the revision, modules and coverage limits the task is told of. */
+const environmentViewSchema = z.object({ path: projectPathSchema, revision: z.string().nullable(), modules: z.array(text), coverage: z.array(z.string()) }).strict();
+
+/** One delivered section of a task brief, as captured text. */
+const sectionSchema = z.object({ key: text, text: z.string() }).strict();
+
+/** The fields every role's inputs share besides its own. */
+const commonFields = {
+  schema: z.literal(stepInputsSchemaId),
+  run: z.object({ planId: text, runId: text }).strict(),
+  attempt: z.int().positive(),
+  /** Whether the run coordinates capability needs, which selects its prompt packages and submission schemas. */
+  capabilityWorkflow: z.boolean(),
+  limits: runPolicySchema.shape.limits,
+  context: contextPolicySchema,
+  provenance: provenanceSchema.optional(),
+};
+
+/**
+ * The local architect's briefing of one work item, as the run collected it:
+ * the work item and its outlines as their records, the rest as captured
+ * facts. The runtime locations it is rendered with are not part of it: the
+ * project root and the run directory come from the environment and the
+ * working directory from the inputs.
+ */
+export const workBriefingSchema = z.object({
+  item: workItemSchema,
+  moduleDirectory: text.optional(),
+  testAreas: z.array(z.object({ module: text, area: text }).strict()).optional(),
+  setup: z.string().optional(),
+  onboarding: z.object({ path: text, purpose: z.string().nullable(), missing: z.string().optional() }).strict(),
+  views: z.object({ evidence: apiViewEvidenceSchema.nullable(), unavailable: z.string().nullable() }).strict(),
+  defaultWriteScope: z.array(jsonValueSchema).optional(),
+  hypotheses: z.array(jsonValueSchema),
+  registry: z.array(jsonValueSchema),
+  decisions: z.array(jsonValueSchema),
+  unresolvedRequest: z.object({ id: text, findings: z.array(z.string()), gaps: z.array(z.string()) }).strict().optional(),
+  deviationRecorded: z.string().optional(),
+  environmentResumed: jsonValueSchema.optional(),
+  outlines: z.array(workItemOutlineSchema),
+  delegation: jsonValueSchema.optional(),
+  failedGate: z.object({ id: text, cause: z.string().nullable(), summary: z.array(z.string()) }).strict().optional(),
+  integration: jsonValueSchema.optional(),
+  scenarios: z.array(jsonValueSchema).optional(),
+  lastIteration: jsonValueSchema.optional(),
+  bounds: jsonValueSchema.optional(),
+  reconciliation: jsonValueSchema.optional(),
+}).strict();
+export type WorkBriefingInputs = z.infer<typeof workBriefingSchema>;
+
+const orientationFields = {
+  ...commonFields,
+  role: z.literal('local-architect'),
+  phase: z.literal('orientation'),
+  work: z.object({ workItem: text }).strict(),
+  workingDirectory: projectPathSchema,
+  briefing: workBriefingSchema,
+  /** The plan elements of the work item, as the package creator rendered them. */
+  requirements: z.array(z.string()),
+  known: knownFactsSchema,
+  architectView: z.array(environmentViewSchema),
+};
+
+/** The local architect's orientation: always a fresh start, before any assignment. */
+const orientationSchema = z.object({ ...orientationFields, start: z.object({ kind: z.literal('fresh') }).strict() }).strict();
+
+const selectorFields = {
+  ...commonFields,
+  role: z.literal('context-selector'),
+  work: z.object({ workItem: text }).strict(),
+  kind: z.enum(['selection', 'reselection']),
+  goal: text,
+  requirements: z.array(z.string()),
+  /** The briefing a fresh selector is given: the orientation packet, or the reselection's own. */
+  packet: z.string(),
+  /** What a fork of a session that holds the briefing is given instead, where it differs. */
+  update: z.string().optional(),
+  catalog: elementCatalogSchema,
+  planDeviations: z.array(packageDeviationSchema),
+  workItemElements: z.array(text),
+  /** The orientation a selection is identified by, and the point the run retained of it. */
+  orientation: z.object({ invocation: text, point: pointReferenceSchema.nullable() }).strict(),
+  workspace: runPathSchema,
+  /** What a fresh selector is told of the project; a fork inherits it. */
+  known: knownFactsSchema,
+  /** The starting points a fresh selector is given; a fork inherits them. */
+  startingPoints: z.array(startingPointGroupSchema),
+  architectView: z.array(environmentViewSchema),
+};
+
+const selectorFreshSchema = z.object({ ...selectorFields,
+  start: z.object({ kind: z.literal('fresh'), degraded: z.object({ requested: z.literal('fork'), reason: text }).strict().optional() }).strict() }).strict();
+const selectorForkSchema = z.object({ ...selectorFields,
+  start: z.object({ kind: z.literal('fork'), session: sessionIdSchema, invocation: text, point: pointReferenceSchema }).strict() }).strict();
+
+const workTurnFields = {
+  ...commonFields,
+  role: z.literal('local-architect'),
+  phase: z.literal('work-turn'),
+  work: z.object({ workItem: text }).strict(),
+  workingDirectory: projectPathSchema,
+  briefing: workBriefingSchema,
+  /** The work item's selected package: its citation, and its text where the message carries it. */
+  package: z.object({ hash: text, elements: z.array(text), deviations: z.array(text), text: z.string() }).strict().optional(),
+  /** Whether the message carries the package text: a session that lacks it receives it once. */
+  packageInPrompt: z.boolean(),
+  /** The plan deviations recorded after the package, rendered by the package creator. */
+  deviations: z.string().optional(),
+  /** The obligation briefing of this work item's architect. */
+  obligationLines: z.array(z.string()),
+  /** Capability work that intervened since this work item was deferred. */
+  intervening: z.string().optional(),
+  /** The plan package of the work item's elements, which a turn without a selected package is given as its requirements. */
+  requirements: z.array(z.string()),
+  known: knownFactsSchema,
+  /** The last iteration's starting points, and the orientation's, which a session without the orientation is given. */
+  startingPoints: z.array(startingPointGroupSchema),
+  orientation: z.object({ session: sessionIdSchema.nullable(), group: startingPointGroupSchema }).strict().optional(),
+  /**
+   * What a submission is judged against besides the briefing: the run's
+   * committed hypotheses, decisions, work items and agreements, this work
+   * item's open requirements, the guarded and harness-only paths, the
+   * obligation projection, and the view and revision a scope is captured with.
+   */
+  validation: z.object({
+    hypotheses: z.array(jsonValueSchema),
+    decisions: z.array(jsonValueSchema),
+    workItems: z.array(text),
+    openRequirements: z.array(text),
+    contracts: z.array(text),
+    guardedPaths: z.array(text),
+    harnessOnly: z.array(text),
+    obligations: z.object({ entries: z.array(z.tuple([text, jsonValueSchema])), tests: z.int().nonnegative() }).strict(),
+    scope: z.object({ view: viewIdentitySchema, revision: z.int().positive() }).strict(),
+  }).strict(),
+};
+
+const workTurnFreshSchema = z.object({ ...workTurnFields, start: z.object({ kind: z.literal('fresh'),
+  /** Why the turn was to continue a session the run no longer holds; the task kind follows it. */
+  continuing: continueReasonSchema.optional(),
+  degraded: z.object({ requested: z.literal('continued'), reason: text }).strict().optional() }).strict() }).strict();
+const workTurnContinuedSchema = z.object({ ...workTurnFields,
+  start: z.object({ kind: z.literal('continued'), point: pointReferenceSchema,
+    /** The session the run holds the point in, where its log names one. */
+    session: sessionIdSchema.optional(),
+    /** Why the turn continues its session, where the run recorded why. */
+    continuing: continueReasonSchema.optional() }).strict() }).strict();
+
+const reviewFields = {
+  ...commonFields,
+  role: z.literal('reviewer'),
+  question: z.enum(['code', 'scope', 'design']),
+  work: z.object({ workItem: text, iteration: text }).strict(),
+  request: reviewRequestSchema,
+  /** The audited candidate's tree, as Git named it when the snapshot was opened. */
+  snapshotTree: text,
+  /**
+   * The question's message inputs, captured from the audited candidate and
+   * the run's records: the iteration's intent, the work item's
+   * CheckFindings, the cited package, the plan document, the pending-tag
+   * bindings, the declared checks, the delivered patches, the changed paths,
+   * and the candidate's test directories the message names.
+   */
+  briefing: z.object({
+    assignment: z.object({ goal: z.string(), approach: z.string(), completionEvidence: z.string(), scopeRationale: z.string(), testAreas: z.array(text) }).strict().nullable(),
+    checkFindings: z.array(z.object({ id: text, standing: text, title: z.string() }).strict()),
+    package: z.string().optional(),
+    planDocument: text.nullable().optional(),
+    pendingBindings: z.array(z.object({ path: text, sha256: text, scenario: text, invocation: text, submission: text }).strict()).optional(),
+    setup: z.string().optional(),
+    diffPayload: z.string(),
+    changes: z.array(z.object({ status: text, path: text }).strict()),
+    directories: z.array(z.string()),
+  }).strict(),
+  /** The starting points the candidate's assignment and engineer declared, rendered against the candidate. */
+  discovery: sectionSchema.optional(),
+  workspace: runPathSchema,
+  bounds: z.object({ absoluteMs: z.int().positive() }).strict(),
+};
+
+const reviewFreshSchema = z.object({ ...reviewFields,
+  start: z.object({ kind: z.literal('fresh'), degraded: z.object({ requested: z.literal('fork'), reason: text }).strict().optional() }).strict() }).strict();
+const reviewForkSchema = z.object({ ...reviewFields,
+  start: z.object({ kind: z.literal('fork'), session: sessionIdSchema, invocation: text, point: pointReferenceSchema,
+    reason: z.enum(['scope-review', 'design-orientation']), briefs: z.array(text) }).strict() }).strict();
+
+/** The design orientation: a reviewer that reads one guidance selection, kept so the design reviews of its key fork it. */
+const designOrientationSchema = z.object({
+  ...commonFields,
+  role: z.literal('reviewer'),
+  question: z.literal('design-orientation'),
+  work: z.object({ workItem: text, iteration: text }).strict(),
+  /** The request whose attempt made the orientation, and the orientation's key. */
+  request: text,
+  key: text,
+  guidance: z.array(z.object({ ref: text, hash: text, text: z.string() }).strict()),
+  workspace: runPathSchema,
+  bounds: z.object({ absoluteMs: z.int().positive() }).strict(),
+  architectView: z.array(environmentViewSchema),
+  start: z.object({ kind: z.literal('fresh') }).strict(),
+}).strict();
+
+export type OrientationStepInputs = z.infer<typeof orientationSchema>;
+export type SelectorStepInputs = z.infer<typeof selectorFreshSchema> | z.infer<typeof selectorForkSchema>;
+export type WorkTurnStepInputs = z.infer<typeof workTurnFreshSchema> | z.infer<typeof workTurnContinuedSchema>;
+export type ReviewStepInputs = z.infer<typeof reviewFreshSchema> | z.infer<typeof reviewForkSchema>;
+export type DesignOrientationStepInputs = z.infer<typeof designOrientationSchema>;
+export type LocalArchitectStepInputs = OrientationStepInputs | WorkTurnStepInputs;
+export type ReviewerStepInputs = ReviewStepInputs | DesignOrientationStepInputs;
 
 /** The inputs of every step this harness can construct, by role and start. */
-export const stepInputsSchema = engineerStepInputsSchema;
-export type StepInputs = z.infer<typeof stepInputsSchema>;
+export type StepInputs = EngineerStepInputs | LocalArchitectStepInputs | SelectorStepInputs | ReviewerStepInputs;
+/** The roles whose steps this harness constructs. */
+export const stepRoles = ['engineer', 'local-architect', 'context-selector', 'reviewer'] as const;
+
+/** Each member's schema, by role, its variant and its start. */
+const members: Readonly<Record<string, z.ZodType>> = {
+  'engineer/fresh': freshEngineerSchema,
+  'engineer/repair-continuation': repairEngineerSchema,
+  'engineer/resumed-after-handback': resumedEngineerSchema,
+  'local-architect/orientation/fresh': orientationSchema,
+  'local-architect/work-turn/fresh': workTurnFreshSchema,
+  'local-architect/work-turn/continued': workTurnContinuedSchema,
+  'context-selector/fresh': selectorFreshSchema,
+  'context-selector/fork': selectorForkSchema,
+  'reviewer/code/fresh': reviewFreshSchema,
+  'reviewer/scope/fresh': reviewFreshSchema,
+  'reviewer/design/fresh': reviewFreshSchema,
+  'reviewer/code/fork': reviewForkSchema,
+  'reviewer/scope/fork': reviewForkSchema,
+  'reviewer/design/fork': reviewForkSchema,
+  'reviewer/design-orientation/fresh': designOrientationSchema,
+};
+
+/** The variant field of a role's inputs, where its inputs have one. */
+const variantField: Readonly<Record<string, 'phase' | 'question' | undefined>> = {
+  engineer: undefined, 'local-architect': 'phase', 'context-selector': undefined, reviewer: 'question',
+};
 
 /** Why a value is not step inputs: each error with its path. */
 export class StepInputsError extends Error {
@@ -196,24 +439,33 @@ export class StepInputsError extends Error {
 }
 
 /**
- * Validates step inputs: the schema of their role and start, and that they
- * survive JSON unchanged. A TypeScript type alone does not establish either.
+ * Validates step inputs: the schema of their role, variant and start, and
+ * that they survive JSON unchanged. A TypeScript type alone does not
+ * establish either.
  */
 export function validateStepInputs(value: unknown): StepInputs {
-  const fields = value !== null && typeof value === 'object' ? value as { schema?: unknown; role?: unknown; start?: { kind?: unknown } } : {};
+  const fields = value !== null && typeof value === 'object' ? value as Record<string, unknown> & { start?: { kind?: unknown } } : {};
   if (fields.schema !== stepInputsSchemaId) throw new StepInputsError([`schema: expected "${stepInputsSchemaId}"`]);
-  if (fields.role !== 'engineer') throw new StepInputsError([`role: no step inputs are defined for ${JSON.stringify(fields.role)}; supported: "engineer"`]);
-  // Each start is judged by its own member, so the errors name what that start lacks.
-  const members: Readonly<Record<string, typeof freshEngineerSchema | typeof repairEngineerSchema | typeof resumedEngineerSchema>> = {
-    fresh: freshEngineerSchema, 'repair-continuation': repairEngineerSchema, 'resumed-after-handback': resumedEngineerSchema,
-  };
-  const member = Object.hasOwn(members, String(fields.start?.kind)) ? members[String(fields.start?.kind)] : undefined;
-  if (member === undefined) throw new StepInputsError([`start.kind: expected one of "fresh", "repair-continuation", "resumed-after-handback"`]);
+  const role = fields.role;
+  if (typeof role !== 'string' || !(stepRoles as readonly string[]).includes(role)) {
+    throw new StepInputsError([`role: no step inputs are defined for ${JSON.stringify(role)}; supported: ${stepRoles.map(name => `"${name}"`).join(', ')}`]);
+  }
+  // Each member is judged by its own schema, so the errors name what that role and start lack.
+  const variant = variantField[role];
+  const prefix = variant === undefined ? role : `${role}/${String(fields[variant])}`;
+  const starts = Object.keys(members).filter(key => key.startsWith(`${prefix}/`)).map(key => key.slice(prefix.length + 1));
+  if (starts.length === 0) {
+    const variants = [...new Set(Object.keys(members).filter(key => key.startsWith(`${role}/`)).map(key => key.split('/')[1]))];
+    throw new StepInputsError([`${variant}: expected one of ${variants.map(name => `"${name}"`).join(', ')}`]);
+  }
+  const kind = String(fields.start?.kind);
+  const member = starts.includes(kind) ? members[`${prefix}/${kind}`] : undefined;
+  if (member === undefined) throw new StepInputsError([`start.kind: expected one of ${starts.map(name => `"${name}"`).join(', ')}`]);
   const parsed = member.safeParse(value);
   if (!parsed.success) throw new StepInputsError(parsed.error.issues.map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`));
   const bytes = JSON.stringify(parsed.data);
   if (canonical(JSON.parse(bytes) as unknown) !== canonical(parsed.data)) throw new StepInputsError(['(root): the inputs do not survive JSON unchanged']);
-  return parsed.data;
+  return parsed.data as StepInputs;
 }
 
 /** The bytes step inputs are written as. */

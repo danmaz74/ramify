@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { runLayout } from '../run/records.js';
-import { parseStepInputs, serializeStepInputs, StepInputsError, stepInputsSchemaId, validateStepInputs, type StepInputs } from '../steps/inputs.js';
+import { parseStepInputs, serializeStepInputs, StepInputsError, stepInputsSchemaId, validateStepInputs, type EngineerStepInputs, type StepInputs } from '../steps/inputs.js';
 import { repairContinuationRun } from './helpers/repair-run.js';
 import { runEventsOnDisk, runPath } from './helpers/runs.js';
 
@@ -14,15 +14,15 @@ import { runEventsOnDisk, runPath } from './helpers/runs.js';
 const cleanups: Array<() => Promise<void>> = [];
 afterAll(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
-let fresh: StepInputs;
-let repair: StepInputs;
+let fresh: EngineerStepInputs;
+let repair: EngineerStepInputs;
 let recordedBytes: string[];
 beforeAll(async () => {
   const run = await repairContinuationRun(cleanups);
   const events = await runEventsOnDisk(run.root, run.planId, run.runId);
   const engineers = events.flatMap(event => event.type === 'invocation-started' && event.data.role === 'engineer' ? [event.data.invocation] : []);
   recordedBytes = await Promise.all(engineers.map(id => readFile(runPath(run.root, run.planId, run.runId, runLayout.stepInputs(id)), 'utf8')));
-  [fresh, repair] = recordedBytes.map(parseStepInputs) as [StepInputs, StepInputs];
+  [fresh, repair] = recordedBytes.map(parseStepInputs) as [EngineerStepInputs, EngineerStepInputs];
 }, 300_000);
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
@@ -83,7 +83,9 @@ describe('S02: step inputs', () => {
       .toMatch(/provenance\.record\.run/u);
     expect(errorsOf(changed(repair, ['failedGate', undefined])).join('\n')).toMatch(/failedGate/u);
     expect(errorsOf(changed(repair, ['start.point', 'not a point'])).join('\n')).toMatch(/start\.point/u);
-    expect(errorsOf(changed(fresh, ['role', 'reviewer']))).toEqual([expect.stringMatching(/no step inputs are defined for "reviewer"/u)]);
+    expect(errorsOf(changed(fresh, ['role', 'global-fork']))).toEqual([expect.stringMatching(/no step inputs are defined for "global-fork"/u)]);
+    // A role this harness constructs is judged by its own variants.
+    expect(errorsOf(changed(fresh, ['role', 'reviewer']))).toEqual([expect.stringMatching(/question: expected one of "code"/u)]);
     expect(errorsOf(changed(fresh, ['schema', 'ramify-agent.step-inputs/0']))).toEqual([expect.stringMatching(/^schema/u)]);
     expect(() => parseStepInputs('{')).toThrow(StepInputsError);
   });

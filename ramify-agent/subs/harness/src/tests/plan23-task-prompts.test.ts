@@ -11,7 +11,7 @@ import { buildDeliveredManifest, exactInputHash } from '../prompts/delivered-man
 import { workOrientationMessage } from '../context-selection/prompts.js';
 import { repairPrompt } from '../nonfunctional/prompts.js';
 import { qualificationActionSchema } from '../capability/submission.js';
-import { engineerDeliveries } from './helpers/step-equality.js';
+import { engineerDeliveries, stepDeliveries } from './helpers/step-equality.js';
 import { repairContinuationRun } from './helpers/repair-run.js';
 
 // Independently named expectations. No renderer/schema selection generates this table.
@@ -388,6 +388,28 @@ describe('P04: manifests reflect supplied/inherited instructions and truthful re
     expect(() => buildTaskPacket({ ...input(loaded, 'code'), environment: { ...environment(), snapshot: null } })).toThrow('snapshot');
     expect(() => buildTaskPacket({ ...input(loaded, 'code'), changedPaths: [{ path: 'a' }, { path: 'a' }] })).toThrow('unique');
   });
+});
+
+describe('S05: every local architect orientation, selection and work turn of a run is the step its recorded inputs construct', () => {
+  const cleanups: Array<() => Promise<void>> = [];
+  afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+
+  test('orientation, selector fork and fresh and continued work-turn deliveries equal the constructors\' renders', async () => {
+    const run = await repairContinuationRun(cleanups);
+    const { constructed, unconstructed, undelivered } = await stepDeliveries(run.root, run.planId, run.runId, ['local-architect', 'context-selector']);
+    expect(unconstructed).toEqual([]);
+    expect(undelivered).toEqual([]);
+    const variants = constructed.map(item => `${item.role}/${'phase' in item.inputs ? item.inputs.phase : 'selection'}/${item.inputs.start.kind}`);
+    expect(variants).toContain('local-architect/orientation/fresh');
+    expect(variants).toContain('context-selector/selection/fork');
+    expect(variants).toContain('local-architect/work-turn/continued');
+    for (const item of constructed) {
+      expect(item.rendered.fallback, item.invocation).toBeNull();
+      expect(item.rendered.rendered).toBe(item.delivered.mode === 'continue' ? 'continuation' : item.delivered.mode === 'fork' ? 'fork' : 'fresh');
+      expect(item.rendered.packet, item.invocation).toEqual(item.delivered.packet);
+      expect(item.rendered.declarations, item.invocation).toEqual(item.delivered.declarations);
+    }
+  }, 300_000);
 });
 
 describe('S01: every engineer invocation of a run is the engineer step its recorded inputs construct', () => {

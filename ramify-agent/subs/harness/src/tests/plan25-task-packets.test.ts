@@ -7,7 +7,7 @@ import { effectiveBlocks } from '../prompts/blocks.js';
 import type { Role } from '../interfaces/protocol/runs.js';
 import type { DeliveredInput } from '../prompts/delivered-manifest.js';
 import { runAcceptedHandback } from './helpers/acceptance-flow.js';
-import { engineerDeliveries } from './helpers/step-equality.js';
+import { engineerDeliveries, stepDeliveries } from './helpers/step-equality.js';
 
 let packages: ReadonlyMap<Role, LoadedPackage>;
 let ordinary: ReadonlyMap<Role, LoadedPackage>;
@@ -110,4 +110,23 @@ test('S01: a resumed-after-handback engineer delivery equals the constructor\'s 
   });
   expect(starts).toContain('fresh');
   expect(starts).toContain('resumed-after-handback');
+}, 300_000);
+
+test('S05: in a capability run, every local architect orientation, selection and work turn delivery equals the constructor\'s render', async () => {
+  const variants: string[] = [];
+  await runAcceptedHandback('revision', cleanups, false, async ({ root, planId, runId }) => {
+    const { constructed, undelivered } = await stepDeliveries(root, planId, runId, ['local-architect', 'context-selector']);
+    // The flow stops the run mid-work: an invocation it stops before its session starts delivers nothing.
+    for (const item of undelivered) expect(item.ended === null || item.ended === 'stopped', item.invocation).toBe(true);
+    for (const item of constructed) {
+      variants.push(`${item.role}/${'phase' in item.inputs ? item.inputs.phase : 'selection'}/${item.inputs.start.kind}`);
+      expect(item.inputs.capabilityWorkflow).toBe(true);
+      expect(item.rendered.fallback, item.invocation).toBeNull();
+      expect(item.rendered.packet, item.invocation).toEqual(item.delivered.packet);
+      expect(item.rendered.declarations, item.invocation).toEqual(item.delivered.declarations);
+    }
+  });
+  expect(variants).toContain('local-architect/orientation/fresh');
+  expect(variants).toContain('local-architect/work-turn/continued');
+  expect(variants.some(variant => variant.startsWith('context-selector/'))).toBe(true);
 }, 300_000);
