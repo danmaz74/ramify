@@ -56,6 +56,8 @@ export interface GuardDecisionRecord {
   readonly denied?: true | undefined;
   /** Set when the refused target is a guarded file an authorization would make writable. */
   readonly guarded?: true | undefined;
+  /** Set when the ownership query threw, so no placement is known; the reason names the error. */
+  readonly placementFailed?: true | undefined;
 }
 
 /**
@@ -109,8 +111,12 @@ export async function decideWrite(
         denied: true,
       };
   }
-  const boundary = await placementDecisions(scope, workingDirectory, [requested]);
-  if (boundary[0] !== true) return { verdict: 'blocked-scope', requested, resolved: target.resolved,
+  const boundary = await placementOutcome(scope, workingDirectory, [requested]);
+  if (boundary.error !== undefined) {
+    return { verdict: 'blocked-unresolved', requested, resolved: target.resolved,
+      reason: `the ownership query failed, so no placement of this target is known: ${boundary.error}`, placementFailed: true };
+  }
+  if (boundary.allowed[0] !== true) return { verdict: 'blocked-scope', requested, resolved: target.resolved,
     reason: 'The current and captured ownership boundaries do not permit this target' };
   if (scope.files.includes(target.resolved)) {
     return { verdict: 'allowed', requested, resolved: target.resolved, reason: 'the write scope names this file' };
@@ -136,18 +142,29 @@ export async function placementPaths(projectRoot: string, paths: readonly string
 
 /** Batch both logical and real targets, including deletions and absent targets, through one provider identity. */
 export async function placementDecisions(scope: GuardedScope, cwd: string, paths: readonly string[]): Promise<boolean[]> {
+  return (await placementOutcome(scope, cwd, paths)).allowed;
+}
+
+/**
+ * The placement of each path, or the error the ownership query threw. A
+ * thrown query permits nothing, and its error is kept so a refusal can name
+ * it rather than report a scope violation.
+ */
+export async function placementOutcome(
+  scope: GuardedScope, cwd: string, paths: readonly string[],
+): Promise<{ readonly allowed: boolean[]; readonly error?: string }> {
   const targets = await Promise.all(paths.map(async path => ({ logical: resolve(cwd, path), target: await resolveRealTarget(cwd, path) })));
   const requested = targets.flatMap(({ logical, target }) => target.ok ? [logical, target.resolved] : []);
-  if (scope.placement === undefined || scope.projectRoot === undefined) return paths.map(() => false);
+  if (scope.placement === undefined || scope.projectRoot === undefined) return { allowed: paths.map(() => false) };
   let answers = new Map<string, boolean>();
   {
-    const relativePaths = [...new Set(requested.map(path => relative(scope.projectRoot!, path).split('\\').join('/') || '.'))];
-    try { answers = new Map((await scope.placement(relativePaths)).map(answer => [resolve(scope.projectRoot!, answer.path), answer.allowed])); }
-    catch { return paths.map(() => false); }
+    const relativePaths = [...new Set(requested.map(path => relative(scope.projectRoot, path).split('\\').join('/') || '.'))];
+    try { answers = new Map((await scope.placement(relativePaths)).map(answer => [resolve(scope.projectRoot, answer.path), answer.allowed])); }
+    catch (error) { return { allowed: paths.map(() => false), error: error instanceof Error ? error.message : String(error) }; }
   }
-  return targets.map(({ logical, target }) => target.ok && [logical, target.resolved].every(path =>
+  return { allowed: targets.map(({ logical, target }) => target.ok && [logical, target.resolved].every(path =>
     !scope.denied?.includes(path) && !scope.excluded?.some(excluded => path === excluded || isContained(excluded, path)) &&
-    answers.get(path) === true));
+    answers.get(path) === true)) };
 }
 
 /**
@@ -177,6 +194,15 @@ export function blockExplanation(decision: GuardDecisionRecord, scope: GuardedSc
       'The project\'s configuration for the harness, ramify-agent.json, is captured when the run starts and no agent changes it.',
       'Captured plan and principles documents are also run inputs; edit source files within the authorized implementation scope instead.',
       'Do not retry the same target, and do not write it another way: a change to it fails the gate as a guarded change.',
+    ].join('\n');
+  }
+  if (decision.placementFailed === true) {
+    return [
+      `The target "${decision.requested}" was refused because ${decision.reason}. Nothing was written.`,
+      '',
+      'This is not a write-scope decision: the project\'s ownership could not be read, so no target can be placed until it is repaired.',
+      'Report the error in your submission, naming the failing module description if the error names one.',
+      'Do not retry the same target: a retry meets the same failure.',
     ].join('\n');
   }
   const head = decision.verdict === 'blocked-unresolved'

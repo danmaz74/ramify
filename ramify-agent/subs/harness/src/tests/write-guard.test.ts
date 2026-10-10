@@ -241,6 +241,24 @@ describe('X5: a resolution failure is not a scope violation', () => {
     expect(violation.resolved).toBe(join(root, 'subs/billing/src/billing.ts'));
   });
 
+  test('S19: a thrown ownership query is refused naming its error, never as outside every location', async () => {
+    const { root, index } = await project([["."]]);
+    const scope = await scopeOf(root, index);
+    const failing: GuardedScope = { ...scope, placement: async () => {
+      throw new Error('subs/orders/module.ramify: line 3: unknown declaration "exposes"');
+    } };
+
+    const decision = await decideWrite(failing, root, writing('subs/orders/src/orders.ts'));
+    const explained = blockExplanation(decision, failing);
+
+    expect(decision).toMatchObject({ verdict: 'blocked-unresolved', placementFailed: true, resolved: join(root, 'subs/orders/src/orders.ts') });
+    expect(decision.reason).toContain('the ownership query failed');
+    expect(decision.reason).toContain('subs/orders/module.ramify: line 3: unknown declaration "exposes"');
+    expect(explained).toContain('unknown declaration "exposes"');
+    expect(explained).toContain('This is not a write-scope decision');
+    expect(`${decision.reason}\n${explained}`).not.toMatch(/outside every location|outside this iteration's write scope/);
+  });
+
   test('a call that is not one write of one path is unresolved, whatever its tool is called', async () => {
     const { root, index } = await project([["."]]);
     const scope = await scopeOf(root, index);
