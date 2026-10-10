@@ -24,7 +24,7 @@ import { ExcursionWatcher } from './excursions.js';
 import { selectCheckFindings } from '../../subs/check-findings/src/queries.js';
 import { decideCheckFindingChange } from '../../subs/check-findings/src/decide.js';
 import type {
-  CheckFindingAt, CheckFindingCommand, CheckFindingGround, CheckFindingId, CheckFindingQueryInput, CheckFindingReportCredibility, CheckFindingRisk,
+  CheckFindingAt, CheckFindingCommand, CheckFindingId, CheckFindingQueryInput, CheckFindingRisk,
   CheckFindingSelection, CheckFindingState, CheckFindingSummary,
 } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import type { CheckFindingCause } from '../check-findings/records.js';
@@ -53,20 +53,18 @@ import { qualificationActionSchema, capabilityActionSchema, capabilityPlanUpdate
   unreportedByHandback, validateCapabilityAction, validateCapabilityPlanUpdate, type QualificationAction, type CapabilityAction } from '../capability/submission.js';
 import { capabilityCompletionBlockers, capabilityHandbackReadiness, replayCapabilityState } from '../capability/state.js';
 import type { CapabilityWorkflow } from '../capability/workflow.js';
-import { reportCommand, type BoundReport } from '../check-findings/report.js';
 import { userCheckFindingChange, userRejectionCode } from '../check-findings/user-commands.js';
 import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findings.js';
 import { canonicalJson } from '../jobs/commands.js';
 import {
-  concernKey, reviewAttemptId, reviewAttemptSchema, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas, reviewSubmissionSchema,
+  reviewAttemptId, reviewAttemptSchema, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas, reviewSubmissionSchema,
   type ForkPoint, type NotVerifiedReason, type OrientationSubmission, type ReviewAttempt, type ReviewOrientation, type ReviewRequest,
-  type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
+  type ReviewResult, type ReviewSubmission,
 } from '../reviews/records.js';
 import { orientationKey, readGuidance, type CapturedInput } from '../../subs/reviews/src/inputs.js';
 import { pendingBindingEvidence } from '../reviews/binding-evidence.js';
 import { prepareReview, type PreparedReview } from '../../subs/reviews/src/preparation.js';
 import { ReviewQueue } from '../reviews/scheduler.js';
-import { candidateModuleIndex, concernModules, groundCredibility } from '../reviews/signals.js';
 import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotComparison, type SnapshotTools } from '../../subs/reviews/src/snapshot.js';
 import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage } from '../reviews/state.js';
 import { orientationToolName } from '../../subs/reviews/src/submission.js';
@@ -211,7 +209,8 @@ import { apiViewsOf, prepareAssignedCucumber, focusedScenarioFacts, defaultWrite
 import { localArchitectToolName, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, passedScenarioLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
-import { AfterHandling, assignedCount, authorizedScope, evidenceFor, requiredArtifacts, bindingsOf, capabilityBlockersOf, integrationItemsDue, obligationOwedBy, obligationProjection, openRequirementsOf, pendingCorrection, verifiedRequirements, type HandlingHost, type ReviewInputs } from './after-handling.js';
+import { concernBindings, finishReview, requestedStartOf, reviewOutcome, sameWorkItem, type ConcernBinding } from './review-finish.js';
+import { AfterHandling, assignedCount, completionBlockers, authorizedScope, evidenceFor, requiredArtifacts, bindingsOf, capabilityBlockersOf, integrationItemsDue, obligationOwedBy, obligationProjection, openRequirementsOf, pendingCorrection, verifiedRequirements, type HandlingHost, type ReviewInputs } from './after-handling.js';
 import { CandidateDriftError, CommittingGates, readinessAuditOutcome, writeScopePaths, type GateHost } from './committing-gate.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
@@ -1255,25 +1254,8 @@ export class RunService {
    * fallback, with a warning.
    */
   private async concernBindings(run: Run, request: ReviewRequest, snapshot: CandidateSnapshot, tools: Pick<SnapshotTools, 'read'>, submission: ReviewSubmission): Promise<ConcernBinding[]> {
-    const index = await candidateModuleIndex(this.candidates, this.projectRoot, snapshot).catch(error => {
-      this.warn(`Run ${run.record.jobId}: the module declarations of ${request.key.candidate} could not be read, so ${request.id}'s concerns name only their work item's module: ${message(error)}`);
-      return null;
-    });
-    const ledger = run.log.ledger.replay();
-    const workItemModule = committedRecords(ledger).workItems.find(item => item.id === request.workItem)?.module ?? null;
-    const provenance = { planId: run.record.planId, featureFiles: new Set(trackedScenarios(ledger).records.map(record => record.file)) };
-    const read = tools.read();
-    return submission.concerns.map(concern => {
-      const resolved = concern.ground === null ? null : resolveSnapshotPath(snapshot, concern.ground.path);
-      const path = resolved?.ok === true ? resolved.path : null;
-      const hash = path === null ? undefined : read.get(path);
-      const ground = path === null || hash === undefined ? null : { ref: path, hash };
-      return {
-        ground,
-        credibility: groundCredibility(ground?.ref ?? null, provenance),
-        modules: concernModules(index, concern.locations, workItemModule),
-      };
-    });
+    return concernBindings(run, { projectRoot: this.projectRoot, planId: run.record.planId, candidates: this.candidates, warn: text => this.warn(text) },
+      request, snapshot, tools, submission);
   }
 
   /**
@@ -1435,76 +1417,7 @@ export class RunService {
     submission?: ReviewSubmission,
     bindings: readonly ConcernBinding[] = [],
   ): Promise<'committed' | 'fenced'> {
-    if ((submission?.concerns.length ?? 0) !== bindings.length) {
-      throw new Error(`${attempt.id} submitted ${submission?.concerns.length ?? 0} concerns, and ${bindings.length} were bound`);
-    }
-    const finishedAt = this.now().toISOString();
-    const record: ReviewSubmissionRecord | undefined = submission === undefined
-      ? undefined
-      : { schema: 'ramify-agent.review-submission/1', attempt: attempt.id, ...submission };
-    const evidenceHash = record === undefined ? null : `sha256:${sha256(canonicalJson(record))}`;
-    const commit = await this.commitCheckFindings(run, ({ log, state }) => {
-      const current = reviewStateOf(log.events).get(request.id);
-      if (current === undefined) return { stale: `No review request ${request.id} is recorded` };
-      if (current.settledBy !== null) return { stale: `${request.id} was settled by ${current.settledBy}; the result of ${attempt.id} is fenced` };
-      if (current.attempts.some(entry => entry.id === attempt.id && entry.finished !== null)) return { stale: `${attempt.id} has already finished; its later result is fenced` };
-      const concerns = record?.concerns ?? [];
-      const commands = concerns.map((concern, index) => reportCommand({
-        producer: `review:${request.key.kind}`,
-        attempt: attempt.id,
-        reportKey: concernKey(index),
-        owner: { kind: 'work-item', workItem: request.workItem },
-        source: { kind: 'tree', id: request.tree },
-        issueKey: null,
-        verification: { kind: 'assessment' },
-        observation: {
-          kind: 'review-concern',
-          summary: concern.summary,
-          evidence: [{ kind: 'review-submission', ref: reviewLayout.submission(attempt.id), hash: evidenceHash }],
-          locations: concern.locations,
-        },
-        judgment: {
-          actor: { kind: 'agent', role: 'reviewer', invocation: attempt.invocation ?? 'none' },
-          consequence: concern.consequence,
-          rationale: concern.rationale,
-          uncertainty: concern.uncertainty,
-          remedy: concern.remedy,
-          risk: concern.risk,
-          ground: bindings[index]!.ground,
-        },
-        // A hint only, and only toward a CheckFinding of the same work item.
-        suggests: concern.suggests !== null && sameWorkItem(state.findings.get(concern.suggests)?.owner, request.workItem) ? concern.suggests : null,
-        credibility: bindings[index]!.credibility,
-        modules: [...bindings[index]!.modules],
-      } satisfies BoundReport));
-      return {
-        commands,
-        compose: decided => {
-          const touched = [...new Set(decided.outcomes.flatMap(outcome => outcome.touched))];
-          const body: ReviewAttempt = { schema: 'ramify-agent.review-attempt/1', ...attempt, finishedAt, result, settles, checkFindings: touched };
-          return {
-            event: {
-              type: 'review-attempt-finished',
-              data: {
-                request: request.id, attempt: attempt.id, result: result.result,
-                reason: result.result === 'not-verified' ? result.reason : null, settles, checkFindings: [...decided.events],
-              },
-            },
-            records: [
-              { path: reviewLayout.attempt(attempt.id), id: attempt.id, revision: 1, body },
-              ...(record === undefined ? [] : [{ path: reviewLayout.submission(attempt.id), id: attempt.id, revision: 1, body: record }]),
-            ],
-          };
-        },
-      };
-    });
-    if (commit.kind === 'committed' || commit.kind === 'replayed') return 'committed';
-    if (commit.refusal.reason === 'run-ended' || commit.refusal.reason === 'stale-basis') return 'fenced';
-    // The concerns could not be promoted as submitted; the attempt covers
-    // nothing then, and says why.
-    return await this.finishReview(run, request, attempt, {
-      result: 'not-verified', reason: 'invalid-output', detail: `Its concerns were refused: ${commit.refusal.message}`,
-    }, settles);
+    return finishReview(run, () => this.now(), request, attempt, result, settles, submission, bindings);
   }
 
   /** Finishes unsettled requests. A durable accepted reader submission is
@@ -5654,21 +5567,12 @@ export class RunService {
       // fake-backed pass never completes a capability, and the gate's verdict
       // on the tests says nothing about which provider ran. Missing done
       // reports never reach here: validation rejected such a request.
-      const owing = this.obligationOwedBy(run, item, current);
-      const owed = owing !== null && !conformed.has(conformanceKey(owing.id, owing.revision)) ? owing : null;
-      const capabilityBlockers = this.workflow === null ? [] : this.capabilityBlockers(run, item.id);
-      if ((this.workflow === null && (open.length > 0 || owed !== null)) || capabilityBlockers.length > 0) {
+      const blockers = completionBlockers(run.log, item, this.workflow !== null);
+      if (blockers.blocked.length > 0) {
         refusals += 1;
-        blocked = [
-          ...(this.workflow === null ? open : []).map(requirement => {
-            const obligation = current.obligations.get(requirement.obligation);
-            return `${requirement.id} is open: ${obligation?.capability ?? requirement.forCapability} is still held by the fake at ${requirement.evidence.fakeInjections.join(', ')}`;
-          }),
-          ...(this.workflow !== null || owed === null ? [] : [`${owed.id} is owed: the agreed conformance suite has not passed against the real provider yet`]),
-          ...capabilityBlockers,
-        ];
+        blocked = blockers.blocked;
         if (refusals > bound) {
-          await this.refuseCompletion(run, item, refusals, blocked, { open: this.workflow === null ? open : [], owed: this.workflow === null && owed !== null });
+          await this.refuseCompletion(run, item, refusals, blocked, { open: blockers.open, owed: blockers.owed !== null });
           return null;
         }
         continuing = 'completion-refused';
@@ -10795,17 +10699,7 @@ function rootModuleOf(index: ArchitectIndex | null): string | undefined {
  */
 /** What a review request binds besides its candidate: its question's captured inputs and its fork point. */
 
-/** What the harness binds to one concern of a valid submission. */
-interface ConcernBinding {
-  readonly ground: CheckFindingGround | null;
-  readonly credibility: CheckFindingReportCredibility;
-  readonly modules: readonly string[];
-}
 
-/** The start a request intends: a fork for every question with a fork point, fresh for code review. */
-function requestedStartOf(request: ReviewRequest): 'fresh' | 'fork' {
-  return request.forkPoint.kind === 'none' ? 'fresh' : 'fork';
-}
 
 /**
  * The inputs a request bound, as read again now: each must be there with
@@ -11006,48 +10900,7 @@ function resultText(result: ReviewResult): string {
   return `not verified (${result.reason}): ${result.detail}`;
 }
 
-function sameWorkItem(owner: { readonly kind: string; readonly workItem?: string } | undefined, workItem: string): boolean {
-  return owner?.kind === 'work-item' && owner.workItem === workItem;
-}
 
-/**
- * What one reviewer invocation's end means for its attempt: covered scope,
- * or why none, and whether another attempt could do better. Invalid output,
- * a failed execution and a timeout may be retried; an unavailable input or
- * a stop may not.
- */
-function reviewOutcome(
-  result: InvocationResult<ReviewSubmission>,
-  stop: NotVerifiedReason | undefined,
-): { readonly result: ReviewResult; readonly retryable: boolean } {
-  const notVerified = (reason: NotVerifiedReason, detail: string, retryable: boolean) => ({ result: { result: 'not-verified' as const, reason, detail }, retryable });
-  if (result.id === '') return notVerified('unavailable', 'The run\'s invocation bounds refused the reviewer', false);
-  switch (result.ended) {
-    case 'submitted': {
-      const submission = result.value;
-      if (submission === undefined) return notVerified('invalid-output', 'The reviewer ended without an accepted submission', true);
-      const inspected = submission.inspected.map(path => ({ path }));
-      return {
-        result: submission.missing.length === 0
-          ? { result: 'complete', inspected, concerns: submission.concerns.length }
-          : { result: 'partial', inspected, missing: submission.missing.map(entry => ({ path: entry.path, reason: entry.reason })), concerns: submission.concerns.length },
-        retryable: false,
-      };
-    }
-    case 'invalid-submission':
-      return notVerified('invalid-output', 'Every submission the reviewer made was invalid, up to the bound', true);
-    case 'ended':
-      return notVerified('invalid-output', 'The reviewer ended without a submission', true);
-    case 'context-budget-reached':
-      return notVerified('execution-failed', 'The reviewer reached its context budget before it submitted', true);
-    case 'failed':
-      return result.interruption === 'idle-timeout' || result.interruption === 'absolute-timeout'
-        ? notVerified('timed-out', `The reviewer met its ${result.interruption === 'idle-timeout' ? 'idle' : 'attempt'} bound`, true)
-        : notVerified('execution-failed', `The reviewer's session failed${result.interruption === undefined ? '' : ` (${result.interruption})`}`, true);
-    case 'stopped':
-      return notVerified(stop ?? 'stopped', stop === 'deadline' ? 'The reviews\' settlement bound passed while this attempt ran' : 'The run stopped its readers while this attempt ran', false);
-  }
-}
 
 /** Mechanical section identities only; goal/requirements are supplied by their owning records. */
 
