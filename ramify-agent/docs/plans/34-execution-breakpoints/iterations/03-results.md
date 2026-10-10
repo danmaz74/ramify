@@ -36,7 +36,7 @@ retained exchange result. Identical retries recover the original admission and
 settled result; changed content conflicts. Resume acknowledges release after
 admission and reading current state, without waiting for the next boundary.
 Wait drains every retained event page before polling or returning an already
-reached pause/terminal result. Each finite wait defaults to 120000 ms; each
+reached pause/terminal result. Each finite wait defaults to 1200000 ms (raised from 120000 after review); each
 request is bounded by the remaining wait and at most 10000 ms. Client timeout,
 transport failure and exit send no cancellation command.
 

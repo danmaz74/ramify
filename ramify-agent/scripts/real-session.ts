@@ -6,6 +6,13 @@
  *
  *   npm run real-session -- [--project <prepared copy>] [--plan <plan-id>] [--model <provider/model>]
  *
+ * Attached to a server that `serve` already hosts, it starts the plan with an
+ * engineer breakpoint and returns at the first pause or terminal result; it
+ * prepares nothing and never starts or stops the server (see the README):
+ *
+ *   npm run real-session -- --project <root> --plan <plan-id> --server <url> --break before-agent:engineer
+ *                           --command-id <id> [--timeout-ms <n>] [--json]
+ *
  * Without `--project` it prepares a copy first, as `npm run trial --
  * prepare` does: the fixture copied, its toolchain installed with `npm ci`,
  * its audit definition written, and one commit, so that readiness can pass. The copy is kept, with the
