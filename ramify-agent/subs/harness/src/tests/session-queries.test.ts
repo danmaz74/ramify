@@ -2,7 +2,7 @@ import { appendFile, readFile, rename, rm } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { createScriptedAgent, type ScriptStep } from '../../subs/agent/src/scripted.js';
+import type { ScriptStep } from '../../subs/agent/src/scripted.js';
 import { createApp } from '../http/app.js';
 import { startServerWith } from '../http/server.js';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
@@ -16,19 +16,17 @@ import {
 import type { TranscriptBody, TranscriptEntry } from '../interfaces/protocol/transcripts.js';
 import { runLayout } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
-import { sessionLayout, sessionsDirectory } from '../sessions/records.js';
-import { runSingleSession } from '../sessions/single.js';
+import { sessionLayout, sessionsDirectory } from '../projections/standalone-records.js';
 import { ContentStore } from '../transcripts/store.js';
 import { readTranscript } from '../transcripts/writer.js';
-import { commandResult } from './helpers/command-result.js';
-import { createDirectCheckExecution } from './helpers/direct-check-execution.js';
 import { expectNoProcesses, forgetExternalTools, openRunsWithoutProcesses } from './helpers/external-tools.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { copyFixture } from './helpers/fixture.js';
-import { readDeclaredTree, shell, treeInputs, unsuitableScope } from './helpers/iterations.js';
+import { treeInputs } from './helpers/iterations.js';
 import { fixtureScratchGit, mockGit } from './helpers/mock-git.js';
-import { emptyAnalysis, runEventsOnDisk, runPath, startRun, stopRun, testPolicy, unscriptedChangeHistory, until } from './helpers/runs.js';
+import { emptyAnalysis, runEventsOnDisk, runPath, startRun, stopRun, unscriptedChangeHistory, until } from './helpers/runs.js';
 import { scriptedGit } from './helpers/scripted-git.js';
+import { installLegacySessions } from './helpers/legacy-sessions.js';
 import { runSessionScenario } from './helpers/session-scenario.js';
 
 vi.mock('node:child_process', async original =>
@@ -73,24 +71,6 @@ async function refused(origin: string, path: string): Promise<[number, string]> 
   return [status, errorResponseSchema.parse(body).error.code];
 }
 
-/** One engineer session on the notes module, on the scripted fake; Git and the commands are answered. */
-async function standaloneSession(root: string, steps: readonly ScriptStep[]): Promise<string> {
-  const result = await runSingleSession({
-    projectRoot: root,
-    module: notes,
-    prompt: 'Raise the note limit to 500.',
-    agent: createScriptedAgent(steps),
-    ramify: new FakeRamifyCli(),
-    git: fixtureScratchGit(mockGit({ currentHead: async () => 'standalone-base', changedPaths: async () => [] })),
-    checkExecution: createDirectCheckExecution({ script: [] }),
-    commandExecution: async request => commandResult(request, { stdout: 'checking\n' }),
-    refresh: readDeclaredTree,
-    policy: testPolicy(root),
-  });
-  if (result.status !== 'finished') throw new Error(`The standalone session did not start: ${result.reason}`);
-  return result.summary.session;
-}
-
 /** Every `file` body an entry names. */
 function fileBodies(entry: TranscriptEntry): string[] {
   const found: string[] = [];
@@ -109,10 +89,11 @@ describe('ST09: the project\'s sessions, a run\'s sessions, their transcripts an
   test('a scripted run and two standalone sessions, one finished and one interrupted, read over HTTP', async () => {
     const scenario = await runSessionScenario({ cleanup: step => { cleanups.push(step); } });
     const { root, runId, events } = scenario;
-    // The standalone sessions take the project lock, as the server does.
+    // The server takes the project lock.
     await scenario.service.close();
-    const finished = await standaloneSession(root, [shell('echo checking'), { kind: 'submit', input: unsuitableScope('The limit lives elsewhere.') }]);
-    const crashed = await standaloneSession(root, [{ kind: 'submit', input: unsuitableScope() }]);
+    // Two sessions an earlier `session` command recorded, one of which ran
+    // `echo checking`; nothing writes this layout any more, and it is still read.
+    const { finished, crashed } = await installLegacySessions(root);
     // The harness died before it wrote the outcome, which it writes last.
     await rm(join(root, sessionsDirectory, crashed, sessionLayout.outcome));
 

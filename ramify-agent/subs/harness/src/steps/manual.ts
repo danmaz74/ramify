@@ -79,6 +79,8 @@ export interface OpenManualRunOptions {
   readonly origin: ManualRunRecord['origin'];
   /** Whether the run works on its own candidate branch, created with it and checked on each reuse. */
   readonly branch: boolean;
+  /** The commit HEAD names, where the caller has read it already; a run created now records it as its base. */
+  readonly base?: string | undefined;
   readonly now?: (() => Date) | undefined;
   readonly groups?: ProcessGroups | undefined;
 }
@@ -143,7 +145,7 @@ export async function openManualRun(options: OpenManualRunOptions): Promise<Open
       try { branch = (await git.createRunBranch(projectRoot, runId)).branch; }
       catch (error) { return refused(`the manual run's candidate branch cannot be created: ${message(error)}`); }
     }
-    const base = await git.currentHead(projectRoot).catch(() => '');
+    const base = options.base ?? await git.currentHead(projectRoot).catch(() => '');
     record = manualRunRecordSchema.parse({
       schema: jobSchemaVersion, jobId: runId, planId, kind: 'manual', createdAt: (options.now?.() ?? new Date()).toISOString(),
       projectRoot, base, branch, origin: options.origin, policy: options.policy,

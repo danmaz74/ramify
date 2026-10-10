@@ -6,7 +6,7 @@ import { terminalRunEvents } from '../run/log.js';
 import { operationIdentitySchema } from '../interfaces/protocol/runs.js';
 import type { SessionId } from '../run/records.js';
 import { InvalidSessionTransitionError, reduceSessions, type RunSession } from '../run/sessions.js';
-import { standaloneSessionState, type SessionOutcomeRecord, type SessionRecord } from '../sessions/records.js';
+import { standaloneSessionState, type SessionOutcomeRecord, type SessionRecord } from './standalone-records.js';
 import { ProjectionError, type RunView } from './inputs.js';
 import { capabilityOfItem } from './work.js';
 

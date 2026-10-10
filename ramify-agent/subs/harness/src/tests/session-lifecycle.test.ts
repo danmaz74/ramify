@@ -6,7 +6,7 @@ import { runSessionScenario } from './helpers/session-scenario.js';
 import type { RunEvent } from '../run/log.js';
 import { runLayout, type Invocation, type InvocationOutcome } from '../run/records.js';
 import { applySessionEvent, pointLabel, reduceSessions, sessionEventTypes, type RunSessions } from '../run/sessions.js';
-import { standaloneSessionState, type SessionOutcomeRecord } from '../sessions/records.js';
+import { standaloneSessionState, type SessionOutcomeRecord } from '../projections/standalone-records.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));

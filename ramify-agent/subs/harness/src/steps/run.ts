@@ -329,6 +329,8 @@ async function runLocked(options: StepRunOptions, original: StepInputs, location
       },
     });
     if (result.id === '') return notStarted(result.error ?? 'The invocation was not started', run.directory);
+    // An agent session that could not start is a step that did not start; its invocation's records name why.
+    if (result.notStarted === true) return notStarted(result.error ?? 'The agent session could not start', run.directory);
 
     const outcome = invocationOutcomeSchema.parse(committedBody(run, runLayout.outcome(result.id)));
     settlementConfirmed = outcome.settled.confirmed;

@@ -1,0 +1,8 @@
+{"n":1,"at":"2026-10-10T08:41:31.185Z","type":"activity","data":{"activity":{"kind":"message","text":"(calls submit_iteration_result)","usage":null}},"sourceId":"20261010T084131Z-725903:event:1"}
+{"n":2,"at":"2026-10-10T08:41:31.190Z","type":"tool-start","data":{"callId":"20261010T084131Z-725903:call-1","tool":"submit_iteration_result","kind":"other","requestedScope":[],"startedAt":"2026-10-10T08:41:31.185Z"},"sourceId":"20261010T084131Z-725903:call-1:start"}
+{"n":3,"at":"2026-10-10T08:41:31.197Z","type":"milestone","data":{"kind":"first-designated-submission","at":"2026-10-10T08:41:31.185Z"},"sourceId":"first-milestone"}
+{"n":4,"at":"2026-10-10T08:41:31.198Z","type":"activity","data":{"activity":{"kind":"tool","callId":"20261010T084131Z-725903:call-1","tool":"submit_iteration_result"}},"sourceId":"20261010T084131Z-725903:event:2"}
+{"n":5,"at":"2026-10-10T08:41:31.198Z","type":"tool-duration","data":{"callId":"20261010T084131Z-725903:call-1","startedAt":"2026-10-10T08:41:31.185Z","endedAt":"2026-10-10T08:41:31.195Z","elapsedMs":10,"coverage":[]},"sourceId":"20261010T084131Z-725903:call-1:duration"}
+{"n":6,"at":"2026-10-10T08:41:31.198Z","type":"coverage-gap","data":{"kind":"context-unavailable","detail":"the session reported no context size at all, so no threshold could fire"}}
+{"n":7,"at":"2026-10-10T08:41:31.199Z","type":"coverage-gap","data":{"kind":"usage-unavailable","detail":"the session reported no usage"}}
+{"n":8,"at":"2026-10-10T08:41:31.206Z","type":"mutation","data":{"callId":null,"paths":[],"added":null,"deleted":null,"observedBy":"snapshot","toolFailed":false,"attributable":false}}

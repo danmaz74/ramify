@@ -1,0 +1,691 @@
+{
+  "schema": "ramify-agent.session/2",
+  "policy": {
+    "version": "run-policy/7",
+    "contract": "plan21-whole-owner-and-architect-reporting/1"
+  },
+  "authority": {
+    "revision": 1,
+    "base": {
+      "module": "collection-review/workspace/reviews/notes",
+      "included": []
+    },
+    "extra": [],
+    "read": [],
+    "bootstrap": [],
+    "rationale": "A single engineer session on this module.",
+    "resolved": {
+      "roots": [
+        "/tmp/ramify-agent-VKSe0w/collection-review/subs/workspace/subs/reviews/subs/notes"
+      ],
+      "files": [],
+      "view": {
+        "status": "materialized",
+        "revision": "declared/1",
+        "input": "declared/1:17",
+        "coverageLimits": []
+      },
+      "ownership": {
+        "provider": "ramify.affected-cli/4",
+        "ramifyVersion": "scripted-lifecycle-only",
+        "inputId": "scripted-lifecycle",
+        "configuration": "tsconfig.json",
+        "root": "/tmp/ramify-agent-VKSe0w/collection-review",
+        "modules": [
+          {
+            "id": "collection-review",
+            "parent": null,
+            "directory": "."
+          },
+          {
+            "id": "collection-review/integration-tests",
+            "parent": "collection-review",
+            "directory": "subs/integration-tests"
+          },
+          {
+            "id": "collection-review/workspace",
+            "parent": "collection-review",
+            "directory": "subs/workspace"
+          },
+          {
+            "id": "collection-review/workspace/catalog",
+            "parent": "collection-review/workspace",
+            "directory": "subs/workspace/subs/catalog"
+          },
+          {
+            "id": "collection-review/workspace/contracts",
+            "parent": "collection-review/workspace",
+            "directory": "subs/workspace/subs/contracts"
+          },
+          {
+            "id": "collection-review/workspace/reviews",
+            "parent": "collection-review/workspace",
+            "directory": "subs/workspace/subs/reviews"
+          },
+          {
+            "id": "collection-review/workspace/shared-ui",
+            "parent": "collection-review/workspace",
+            "directory": "subs/workspace/subs/shared-ui"
+          },
+          {
+            "id": "collection-review/workspace/catalog/core",
+            "parent": "collection-review/workspace/catalog",
+            "directory": "subs/workspace/subs/catalog/subs/core"
+          },
+          {
+            "id": "collection-review/workspace/catalog/ui",
+            "parent": "collection-review/workspace/catalog",
+            "directory": "subs/workspace/subs/catalog/subs/ui"
+          },
+          {
+            "id": "collection-review/workspace/reviews/core",
+            "parent": "collection-review/workspace/reviews",
+            "directory": "subs/workspace/subs/reviews/subs/core"
+          },
+          {
+            "id": "collection-review/workspace/reviews/limits",
+            "parent": "collection-review/workspace/reviews",
+            "directory": "subs/workspace/subs/reviews/subs/limits"
+          },
+          {
+            "id": "collection-review/workspace/reviews/notes",
+            "parent": "collection-review/workspace/reviews",
+            "directory": "subs/workspace/subs/reviews/subs/notes"
+          },
+          {
+            "id": "collection-review/workspace/reviews/ui",
+            "parent": "collection-review/workspace/reviews",
+            "directory": "subs/workspace/subs/reviews/subs/ui"
+          },
+          {
+            "id": "collection-review/workspace/reviews/validation",
+            "parent": "collection-review/workspace/reviews",
+            "directory": "subs/workspace/subs/reviews/subs/validation"
+          },
+          {
+            "id": "collection-review/workspace/reviews/core/controller",
+            "parent": "collection-review/workspace/reviews/core",
+            "directory": "subs/workspace/subs/reviews/subs/core/subs/controller"
+          },
+          {
+            "id": "collection-review/workspace/reviews/core/tasks",
+            "parent": "collection-review/workspace/reviews/core",
+            "directory": "subs/workspace/subs/reviews/subs/core/subs/tasks"
+          },
+          {
+            "id": "collection-review/workspace/reviews/ui/pure-ui",
+            "parent": "collection-review/workspace/reviews/ui",
+            "directory": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui"
+          }
+        ],
+        "exclusions": [
+          {
+            "kind": "owned-unwired",
+            "directory": "plans",
+            "owner": "collection-review"
+          },
+          {
+            "kind": "scratch",
+            "directory": "src/tmp",
+            "owner": "collection-review"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/integration-tests/src/tmp",
+            "owner": "collection-review/integration-tests"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/src/tmp",
+            "owner": "collection-review/workspace"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/catalog/src/tmp",
+            "owner": "collection-review/workspace/catalog"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/contracts/src/tmp",
+            "owner": "collection-review/workspace/contracts"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/reviews/src/tmp",
+            "owner": "collection-review/workspace/reviews"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/shared-ui/src/tmp",
+            "owner": "collection-review/workspace/shared-ui"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/catalog/subs/core/src/tmp",
+            "owner": "collection-review/workspace/catalog/core"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/catalog/subs/ui/src/tmp",
+            "owner": "collection-review/workspace/catalog/ui"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/reviews/subs/core/src/tmp",
+            "owner": "collection-review/workspace/reviews/core"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/reviews/subs/limits/src/tmp",
+            "owner": "collection-review/workspace/reviews/limits"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/reviews/subs/notes/src/tmp",
+            "owner": "collection-review/workspace/reviews/notes"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/reviews/subs/ui/src/tmp",
+            "owner": "collection-review/workspace/reviews/ui"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/reviews/subs/validation/src/tmp",
+            "owner": "collection-review/workspace/reviews/validation"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/reviews/subs/core/subs/controller/src/tmp",
+            "owner": "collection-review/workspace/reviews/core/controller"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tmp",
+            "owner": "collection-review/workspace/reviews/core/tasks"
+          },
+          {
+            "kind": "scratch",
+            "directory": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tmp",
+            "owner": "collection-review/workspace/reviews/ui/pure-ui"
+          }
+        ]
+      },
+      "excluded": [
+        "/tmp/ramify-agent-VKSe0w/collection-review/plans/.harness",
+        "/tmp/ramify-agent-VKSe0w/collection-review/plans/.harness/.harness",
+        "/tmp/ramify-agent-VKSe0w/collection-review/plans/review-notes/.harness",
+        "/tmp/ramify-agent-VKSe0w/collection-review/plans/reviewer-identity/.harness",
+        "/tmp/ramify-agent-VKSe0w/collection-review/plans/revision-diff/.harness",
+        "/tmp/ramify-agent-VKSe0w/collection-review/plans/status-badge-tone/.harness"
+      ],
+      "included": []
+    }
+  },
+  "id": "20261010T084131Z-f82842",
+  "role": "engineer",
+  "module": "collection-review/workspace/reviews/notes",
+  "directory": "subs/workspace/subs/reviews/subs/notes",
+  "prompt": "Raise the note limit to 500.",
+  "agent": "scripted",
+  "model": null,
+  "startedAt": "2026-10-10T08:41:31.030Z",
+  "base": "standalone-base",
+  "scope": {
+    "roots": [
+      "subs/workspace/subs/reviews/subs/notes"
+    ],
+    "files": [],
+    "extra": []
+  },
+  "tests": {
+    "policy": "owned-by-scope",
+    "exactOwners": [
+      "collection-review/workspace/reviews/notes"
+    ],
+    "subtrees": [],
+    "extraSuites": []
+  },
+  "gate": false,
+  "guarded": [
+    {
+      "path": ".gitignore",
+      "hash": "9695ffb1c7edbba234e6b71e24dc80fca82adc4640b55e02d412e85a78774c0f"
+    },
+    {
+      "path": "cucumber.cjs",
+      "hash": null
+    },
+    {
+      "path": "cucumber.js",
+      "hash": "3157070a8b6effa75a5d4c868f3db3065e0749e8f5226e0dbccd58c2f7856013"
+    },
+    {
+      "path": "cucumber.json",
+      "hash": null
+    },
+    {
+      "path": "cucumber.mjs",
+      "hash": null
+    },
+    {
+      "path": "cucumber.yaml",
+      "hash": null
+    },
+    {
+      "path": "cucumber.yml",
+      "hash": null
+    },
+    {
+      "path": "npm-shrinkwrap.json",
+      "hash": null
+    },
+    {
+      "path": "package-lock.json",
+      "hash": "aeecea19d24f59dbf7bfe11ce5874576482c35db836854bc7e73496e2d8e8059"
+    },
+    {
+      "path": "package.json",
+      "hash": "8a5adf849dd8634b31bdafac16a278ae3c35683486740bae28ddf3181d89fcfb"
+    },
+    {
+      "path": "ramify-agent.json",
+      "hash": "76bf7874a21681f45d60f5384fbc7f19185e6625b5b2f777465b5091cea002c9"
+    },
+    {
+      "path": "ramify-audit.json",
+      "hash": null
+    },
+    {
+      "path": "tsconfig.json",
+      "hash": "20a1ec8f29b1085e760eff3a3335e78f0b7049861786ca90212f8b5c2c7dbb42"
+    },
+    {
+      "path": "vite.config.js",
+      "hash": null
+    },
+    {
+      "path": "vite.config.mts",
+      "hash": null
+    },
+    {
+      "path": "vite.config.ts",
+      "hash": "6b19c73fc1516d843b11a70191cff52b611d8840aa27f2d4ef62eda654c2b323"
+    },
+    {
+      "path": "vitest.config.js",
+      "hash": null
+    },
+    {
+      "path": "vitest.config.mts",
+      "hash": null
+    },
+    {
+      "path": "vitest.config.ts",
+      "hash": "39a8918f589dbd06527a4bc14df2c4b11fe988c2b18bb8cd63b40f6dfd98f6cc"
+    }
+  ],
+  "views": [
+    {
+      "module": "collection-review/workspace/reviews/notes",
+      "views": [],
+      "unavailable": "the API view could not be materialized: `ramify materialize --view architect --view api --from subs/workspace/subs/reviews/subs/notes --root /tmp/ramify-agent-VKSe0w/collection-review` was not run: this test's fake command line materializes no view (status unavailable, reason \"stub\")"
+    }
+  ],
+  "prompts": {
+    "package": "engineer/8",
+    "hash": "502a45ae0071c2503f4feba45e66661e141addd807a87a53b1abf34a924be602",
+    "inputsHash": "4dae1c73a7912242aece82e2b8177efbdfdaf3e42de4028a2f974134004fc99e",
+    "manifest": {
+      "schema": "ramify-agent.delivered-inputs/2",
+      "inheritedPoint": null,
+      "entries": [
+        {
+          "key": "role:engineer",
+          "kind": "role-instructions",
+          "source": "subs/harness/src/prompts/engineer-capability.system.md",
+          "revision": "engineer/8",
+          "hash": "181b18f7d751b705d5b1de3bf32ac23ddda812701094f81e04fd6d502d3a7a83",
+          "bytes": 10522,
+          "delivery": "appended",
+          "sources": [
+            {
+              "path": "subs/harness/src/prompts/engineer-capability.system.md",
+              "hash": "3d44dfa6315c42ef987b8339fbb541a6f83661b1b77be18795b141689ff9786e",
+              "kind": "system",
+              "bytes": 10675
+            }
+          ]
+        },
+        {
+          "key": "tool:submit_iteration_result",
+          "kind": "tool-declaration",
+          "source": null,
+          "revision": null,
+          "hash": "459e014bd9fa13c3fa9d029797c7b0ea1f2c90306044cb51312ea6bcc3a5b28d",
+          "bytes": 5581,
+          "delivery": "appended",
+          "sources": []
+        },
+        {
+          "key": "briefing-state",
+          "kind": "task",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "850ecbf825b9af8df88c47831f249d5945ce5bd415fb4ec8a3a16f494abe471e",
+          "bytes": 106,
+          "delivery": "appended",
+          "sources": []
+        },
+        {
+          "key": "brief:goal",
+          "kind": "brief",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "c1a0ba7c671f474e003f087a614c5e0a46ddaca4e873cab80e6bcaf262f3e0e3",
+          "bytes": 110,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "brief:goal",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "brief:requirements",
+          "kind": "brief",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "7ad3e3e8448cf370372778e28b2da81a6fb19077a23463002cd02d61bf541171",
+          "bytes": 111,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "brief:requirements",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "brief:support:## Approach the architect asked for:0",
+          "kind": "brief",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "043d964956085e748eed239e5de6eb45f9ce73c47e7d1fea1f49eb04b027dcf5",
+          "bytes": 402,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "brief:support:## Approach the architect asked for:0",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "brief:support:## What you may write (project-relative paths):0",
+          "kind": "brief",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "077a6e10944febdf5b4c03e84f2c7febc37bac186585f19275621ba725f329e2",
+          "bytes": 476,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "brief:support:## What you may write (project-relative paths):0",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "brief:support:## What you may import:0",
+          "kind": "brief",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "b76e2b98e7c3cdba18bbb8782e430e7663c37b2f4c4914fae03af4c204589e8f",
+          "bytes": 1380,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "brief:support:## What you may import:0",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "brief:support:## Declared project checks:0",
+          "kind": "brief",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "7ff25b0b82b14c64fceb9acf6c680c68535a58724278117f7adcf68936fe1572",
+          "bytes": 567,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "brief:support:## Declared project checks:0",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "brief:support:## The tree you start from:0",
+          "kind": "brief",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "62d8d303c9be1ac7d2ed4322ef26717d918e6b1a4e1c5d54abc6e03dd6e65bde",
+          "bytes": 509,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "brief:support:## The tree you start from:0",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "brief:support:## Module and test pointers:0",
+          "kind": "brief",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "e8f38111b8d6341e7e4459075747746b73499cef7bd99077627f31c166401ba6",
+          "bytes": 605,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "brief:support:## Module and test pointers:0",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "procedure:engineer:main",
+          "kind": "procedure",
+          "source": "subs/harness/src/prompts/engineer-capability.procedure.md",
+          "revision": "engineer/8",
+          "hash": "0d4cb9c33bba836d49debfdebcd19779d3d852021f53d76f7ceb36dbec288655",
+          "bytes": 2418,
+          "delivery": "appended",
+          "sources": [
+            {
+              "path": "subs/harness/src/prompts/engineer-capability.procedure.md",
+              "hash": "b1419820d3a3cc018bb9d8ddac2fd6a0e63d65237d30d69548a53bb58029be43",
+              "kind": "procedure",
+              "bytes": 2375
+            }
+          ],
+          "block": {
+            "key": "procedure:engineer:main",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "environment:projectRoot",
+          "kind": "environment",
+          "source": null,
+          "revision": null,
+          "hash": "051d55e9e6d748a5ca44b001e1d33d9b2dc2b8f9e71fec8bfcdd2826a926ea43",
+          "bytes": 153,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "environment:projectRoot",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "environment:workingDirectory",
+          "kind": "environment",
+          "source": null,
+          "revision": null,
+          "hash": "3364ed2926efeeeac1e40808ded82eca44b5083b5a2636e0f00959e1dcc2440c",
+          "bytes": 206,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "environment:workingDirectory",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "environment:candidate",
+          "kind": "environment",
+          "source": null,
+          "revision": null,
+          "hash": "82932bad45e33ff512afcfb2eb0f5e1b7d0c166f32eb8ee6d4894cf96e16ff77",
+          "bytes": 109,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "environment:candidate",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "environment:snapshot",
+          "kind": "environment",
+          "source": null,
+          "revision": null,
+          "hash": "dd1e81900a3a651c53e408331a53787f6a079d5f90437b98fb4441c8a02170b4",
+          "bytes": 107,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "environment:snapshot",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "environment:limits",
+          "kind": "environment",
+          "source": null,
+          "revision": null,
+          "hash": "7bd86de0abceae25593619bd3918bca6e01a40ab55e45ecc977e038550c99e84",
+          "bytes": 1074,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "environment:limits",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "environment:availableTools",
+          "kind": "environment",
+          "source": null,
+          "revision": null,
+          "hash": "662b35c1ab23443a3e5fd2aed4e54dc37bfa3f3f50a940487ff2ce837a227756",
+          "bytes": 222,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "environment:availableTools",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "environment:views",
+          "kind": "environment",
+          "source": null,
+          "revision": null,
+          "hash": "47a3213d3bc9989b4487b8737e4a2e80daf250ebfe854294882c37e630d451a9",
+          "bytes": 99,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "environment:views",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "environment:supportPaths",
+          "kind": "environment",
+          "source": null,
+          "revision": null,
+          "hash": "9413721e6143f49092baa2a73c29b00883df9eba3391c5ff4f5ca3108726e6f2",
+          "bytes": 242,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "environment:supportPaths",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "environment:cucumberConfiguration",
+          "kind": "environment",
+          "source": null,
+          "revision": null,
+          "hash": "e23e6e9c1ec44f6d0253d9298b6a15e8ae95a71c778d7295284b86b8066d7502",
+          "bytes": 233,
+          "delivery": "appended",
+          "sources": [],
+          "block": {
+            "key": "environment:cucumberConfiguration",
+            "effect": "set"
+          }
+        },
+        {
+          "key": "task",
+          "kind": "task",
+          "source": null,
+          "revision": "8a83b50b46b1cca44440f316e672e5fc55111a992d366dd6a469b5c647402aeb",
+          "hash": "74e678975f487c402cc8c1dea4c514220c78c1a3592a48c993395a8554291dff",
+          "bytes": 399,
+          "delivery": "appended",
+          "sources": []
+        }
+      ],
+      "currentMessage": {
+        "hash": "5c40c024f70f9034778746404d72bd5a9c0b14ccd077513ec2cee31ed7140eb8",
+        "bytes": 9566
+      },
+      "hash": "517f6363dd3b8ad4770e61b2adc1057a9d438d9aebfe9171fe85c14b9a6c445a"
+    }
+  },
+  "scopeSize": {
+    "policy": "scope-size/2",
+    "snapshot": "standalone-unavailable",
+    "bytes": null,
+    "subtotal": 22791,
+    "coverage": "partial",
+    "components": [
+      {
+        "component": "owned-source",
+        "detail": "collection-review/workspace/reviews/notes",
+        "bytes": null,
+        "state": "unavailable",
+        "reason": "Standalone session has no frozen measurement snapshot"
+      },
+      {
+        "component": "support-documents",
+        "detail": "Actual delivered inputs",
+        "bytes": 22791,
+        "state": "measured"
+      }
+    ]
+  },
+  "sessionOperation": {
+    "runId": "standalone:20261010T084131Z-f82842",
+    "operationId": "20261010T084131Z-f82842",
+    "sessionId": "48508c3b-508e-4868-8d6b-b2a46a0c2bdf",
+    "turn": 1,
+    "sourcePoint": {
+      "sessionId": "48508c3b-508e-4868-8d6b-b2a46a0c2bdf",
+      "turn": 0,
+      "kind": "checkpoint",
+      "checkpoint": "973e0797-fe3a-4ed3-8187-af534eb5a607"
+    }
+  }
+}

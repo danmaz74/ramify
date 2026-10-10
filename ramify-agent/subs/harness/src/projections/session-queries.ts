@@ -12,7 +12,7 @@ import { runLayout } from '../run/records.js';
 import {
   sessionLayout, sessionOutcomeSchema, sessionRecordSchema, sessionsDirectory,
   type SessionOutcomeRecord, type SessionRecord,
-} from '../sessions/records.js';
+} from './standalone-records.js';
 import { TranscriptPages, type PageBounds, type TranscriptPageRead } from '../transcripts/pages.js';
 import { readTranscript } from '../transcripts/writer.js';
 import { ProjectionError, runView, type RunView } from './inputs.js';

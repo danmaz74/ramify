@@ -1,0 +1,46 @@
+{
+  "schema": "ramify-agent.session-outcome/1",
+  "session": "20261010T084131Z-725903",
+  "sessionOperation": {
+    "runId": "standalone:20261010T084131Z-725903",
+    "operationId": "20261010T084131Z-725903",
+    "sessionId": "2600dcaa-723d-4411-94cd-1c955d5f5d18",
+    "turn": 1,
+    "sourcePoint": {
+      "sessionId": "2600dcaa-723d-4411-94cd-1c955d5f5d18",
+      "kind": "checkpoint",
+      "turn": 0,
+      "checkpoint": "0acabab1-0633-4738-b778-9189f8fdd0d9"
+    },
+    "point": {
+      "sessionId": "2600dcaa-723d-4411-94cd-1c955d5f5d18",
+      "kind": "turn",
+      "turn": 1,
+      "checkpoint": "e0fa792b-9cae-494e-bf8f-c74585255a93"
+    }
+  },
+  "ended": "submitted",
+  "submission": {
+    "kind": "unsuitable",
+    "hash": "41b31a2e1828c58838f0bd4b0045f149c46e5f3d62a92bacbb16a91ba12eb6fa"
+  },
+  "rejectedSubmissions": 0,
+  "standingViolations": [],
+  "settled": {
+    "confirmed": true,
+    "at": "2026-10-10T08:41:31.199Z",
+    "groupsKilled": 0,
+    "lateWrites": []
+  },
+  "changed": [],
+  "alreadyChanged": [],
+  "harnessChanged": [],
+  "preservedTracked": [],
+  "outsideScope": [],
+  "usage": {
+    "unavailable": "the session reported no usage"
+  },
+  "elapsedMs": 34,
+  "gate": null,
+  "finishedAt": "2026-10-10T08:41:31.213Z"
+}

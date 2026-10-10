@@ -6,12 +6,14 @@ import { capabilityEngineerSubmissionKinds, engineerSubmissionKinds, engineerSub
 import { writeScopeSchema, testSelectionPolicySchema } from '../work/iterations.js';
 
 /*
- * The records of one single engineer session, under
- * `plans/.harness/sessions/<session-id>/`.
+ * The records an earlier `session` command left under
+ * `plans/.harness/sessions/<session-id>/`, which the session projections
+ * still read. Nothing writes them any more: a session now runs on the
+ * invocation runner and records a manual run in a run's own layout.
  *
- * A session is not a job: it has no ledger, no run log and no events, and
- * nothing replays these files. They are plain files written once each. The
- * observation log and the transcript have the run's schemas, so the same
+ * Such a session was not a job: it had no ledger, no run log and no events,
+ * and nothing replays these files. They are plain files written once each.
+ * The observation log and the transcript have the run's schemas, so the same
  * readers work on them. The session is its own one invocation, so its
  * identifier names both.
  */
@@ -19,7 +21,7 @@ import { writeScopeSchema, testSelectionPolicySchema } from '../work/iterations.
 const text = z.string().min(1);
 const timestamp = z.iso.datetime();
 
-/** The directory every session's records go under, relative to the project root. */
+/** The directory an earlier session's records are under, relative to the project root. */
 export const sessionsDirectory = join('plans', '.harness', 'sessions');
 
 /** Where each record of one session lives, relative to its own directory. */

@@ -247,6 +247,8 @@ export interface InvocationResult<T> {
   readonly lastText?: string | null | undefined;
   /** A writer's: every path that differed from its base when its session settled. */
   readonly changed?: readonly string[] | undefined;
+  /** Whether the agent session could not start, so the invocation ended before any model call. */
+  readonly notStarted?: boolean | undefined;
 }
 
 /** What the harness does with a session when one of its invocations ends. */
@@ -789,7 +791,7 @@ export class InvocationRunner<R extends RunnerRun> {
       }, undefined, transcript);
       return {
         id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept,
-        interruption, error: failure, elapsedMs: 0, inFlight: [], lastText: null,
+        interruption, error: failure, elapsedMs: 0, inFlight: [], lastText: null, notStarted: true,
       };
     }
     const live = run.live.get(id);

@@ -11,6 +11,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { addModule, completionProposed, installMiniRunner, readDeclaredTree, shell } from './helpers/iterations.js';
 import { initRepository, testPolicy } from './helpers/runs.js';
+import { recordsOf } from './helpers/session-records.js';
 
 /*
  * Process witness for a standalone session's shell. The shell commands must
@@ -122,7 +123,7 @@ describe('a standalone session process boundary', () => {
     expect(summary.ended).toBe('submitted');
 
     // Both checks at completion name themselves in the observations.
-    const observations = (await readFile(join(summary.records, 'observations.jsonl'), 'utf8'))
+    const observations = (await readFile((await recordsOf(summary.records)).observations, 'utf8'))
       .split('\n').filter(Boolean).map(line => observationSchema.parse(JSON.parse(line)));
     const atCompletion = observations.filter(line => line.type === 'hook-check' && line.data.atCompletion === true);
     expect(atCompletion.map(line => (line.type === 'hook-check' ? line.data.outcome : null))).toEqual(['findings', 'passed']);

@@ -6,6 +6,7 @@ import { gateAttemptSchema } from '../run/records.js';
 import { completionProposed, shell } from './helpers/iterations.js';
 import { commandResult } from './helpers/command-result.js';
 import { notesSource, project, session, checked, passingGate, finished } from './single-session-fixture.js';
+import { recordsOf } from './helpers/session-records.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -38,7 +39,7 @@ describe('the actual session shell write boundary', () => {
       { changed: ['ramify-audit.json', state], commandExecution, command: `mkdir -p '${deniedRoot}/plans/plan/.harness/jobs/run' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/ramify-audit.json' && printf '%s' '{"createdByShell":true}' > '${deniedRoot}/${state}'`, ramify: [checked('changed'), { form: 'complete', outcome: 'not-checked' }], gate: [] });
     expect(await readFile(join(deniedRoot, 'ramify-audit.json'), 'utf8')).toContain('createdByShell');
     expect(finished(denied.result).gate).toMatchObject({ verdict: 'failed' });
-    const attempt = gateAttemptSchema.parse(JSON.parse(await readFile(join(finished(denied.result).records, 'gate/attempt.json'), 'utf8')));
+    const attempt = gateAttemptSchema.parse(JSON.parse(await readFile((await recordsOf(finished(denied.result).records)).diagnosis, 'utf8')));
     expect(attempt.rules?.find(rule => rule.rule === 'write-scope')).toMatchObject({ outcome: 'failed', violations: [{ rule: 'write-scope', path: state, detail: expect.any(String) }, { rule: 'write-scope', path: 'ramify-audit.json', detail: expect.any(String) }] });
     expect(await readFile(join(deniedRoot, state), 'utf8')).toContain('createdByShell');
     expect(attempt.commit).toBeNull();

@@ -1,10 +1,9 @@
 import { taskSupportSections } from '../work/task-support.js';
 import { declaredCheckInputs, moduleInputPointers } from '../work/starting-inputs.js';
-import { deliveredScopeInputs, writeScopeMeasurement } from '../kpi/capture.js';
 import { randomBytes } from 'node:crypto';
 import { mkdir, realpath, stat, writeFile } from 'node:fs/promises';
-import { isAbsolute, join, relative, sep } from 'node:path';
-import type { AgentPort, AgentSession, SessionSpec } from '../../subs/agent/src/interfaces/port.js';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+import type { AgentPort } from '../../subs/agent/src/interfaces/port.js';
 import { gitService, type GitService } from '../../subs/evidence/src/git.js';
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
@@ -15,40 +14,27 @@ import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.
 import { placementDecisions } from '../guard/write-guard.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import type { HookFinding } from '../hooks/post-write.js';
-import { inputsHash, loadPromptPackages, renderEngineerPrompt, sha256 } from '../prompts/packages.js';
+import { loadPromptPackages, renderEngineerPrompt, sha256 } from '../prompts/packages.js';
 import { deliveredSupportPaths } from '../prompts/tasks.js';
-import { HarnessSessionOperations, readSessionPointReference, settleSessionEquipment, type HarnessTaskBrief } from '../run/session-operations.js';
-import { ExcursionWatcher } from '../run/excursions.js';
+import type { HarnessTaskBrief } from '../run/session-operations.js';
 import { runCheckpoint } from '../run/gates.js';
 import { captureProjectConfig } from '../run/project-config.js';
 import { readCommittedAuditConfiguration } from '../../subs/audit/src/check-execution.js';
 import { declaredModuleDirectories, moduleTestAreas } from '../run/project-config.js';
 import { architectRunInputs } from '../run/inputs.js';
-import { recordSettledSnapshot } from '../run/mutations.js';
-import { ObservationLog } from '../run/observations.js';
-import { contextPolicyOf, defaultRunPolicy } from '../run/policy.js';
-import { endedOf, InvocationBounds, PortEventRecorder } from '../run/port-events.js';
-import { gateAttemptId, gateAttemptSchema, type InvocationOutcome, type RunPolicy } from '../run/records.js';
-import { SubmissionJudge } from '../run/submissions.js';
-import { WriterOwnership } from '../run/writer.js';
+import { defaultRunPolicy } from '../run/policy.js';
+import { gateAttemptId, gateAttemptSchema, invocationOutcomeSchema, runLayout, type InvocationOutcome, type RunPolicy } from '../run/records.js';
 import { acquireProjectLock, ProjectLockError, type ProjectLock } from '../store/lock.js';
-import { InvocationTranscript, verdictNote } from '../transcripts/recorder.js';
-import { ContentStore } from '../transcripts/store.js';
-import { TranscriptWriter } from '../transcripts/writer.js';
-import { engineerEquipment } from '../work/engineer-equipment.js';
+import { engineerBuiltinTools, engineerEquipment } from '../work/engineer-equipment.js';
+import { shellToolName } from '../tools/shell.js';
+import { manualRunner, openManualRun } from '../steps/manual.js';
+import { committedBody, finished } from '../steps/runner.js';
 import { engineerWorkingDirectory } from '../work/engineer-directory.js';
 import { ensureScratchRule, removeScratchDirectories, scratchSafetyRule, trackedScratchPaths } from '../work/scratch.js';
-import {
-  capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
-  type EngineerSubmission,
-} from '../work/engineer.js';
+import { capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer, type EngineerSubmission } from '../work/engineer.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import { auditPreparationPaths, scopeConfigurationPaths, captureGuardedFiles, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
 import { iterationApiViews } from '../work/session.js';
-import {
-  sessionLayout, sessionOutcomeSchema, sessionRecordSchema, sessionsDirectory,
-  type SessionOutcomeRecord, type SessionRecord,
-} from './records.js';
 
 /*
  * One engineer session on one module, from a prompt a person writes.
@@ -62,8 +48,12 @@ import {
  * diagnosis runs over the current bytes afterwards, and its verdict is
  * recorded; the changes stay in the working tree either way.
  *
- * Its records are plain files under `plans/.harness/sessions/<id>/`, and
- * its transcript is `transcript.jsonl` beside them, written as a run's is.
+ * It runs on the invocation runner a run uses, and its records are a
+ * manual run's, in a run's own layout, under
+ * `plans/sessions/.harness/jobs/<id>/`: the session is that run's one
+ * invocation, and `invocations/<invocation>/step.json` holds its summary and
+ * the gate's verdict. Earlier sessions' records under
+ * `plans/.harness/sessions/` are left where they are.
  */
 
 /** What starts one single engineer session. */
@@ -131,7 +121,7 @@ export interface SessionSummary {
   readonly outsideScope: readonly string[];
   readonly usage: InvocationOutcome['usage'];
   readonly elapsedMs: number;
-  /** The session's records directory, absolute. */
+  /** The session's manual run directory, absolute: the run's records of its one invocation. */
   readonly records: string;
   /** Null without the gate option: then nothing verified the work. */
   readonly gate: SessionGateResult | null;
@@ -302,7 +292,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
   if (typeof workingDirectory !== 'string') return notStarted(`The engineer cannot start in the module's src directory: ${workingDirectory.error}`);
   let scratchSettled = false;
   let settlementConfirmed = true;
-  let sessions: HarnessSessionOperations | undefined;
+  let closeOperations: (() => Promise<boolean>) | undefined;
   try {
   // A standalone session guards the same committed preparation inputs where a definition exists.
   const head = await git.currentHead(projectRoot);
@@ -331,9 +321,16 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
 
 
   const id = sessionId();
-  const records = join(projectRoot, sessionsDirectory, id);
-  const at = (path: string) => join(records, path);
-  await mkdir(records, { recursive: true });
+  // The session's records are a manual run's, in a run's own layout:
+  // `plans/sessions/.harness/jobs/<id>/`, with the session its one invocation.
+  const opened = await openManualRun({ projectRoot, planId: sessionsPlan, runId: id, git, policy, origin: 'session', branch: false, base: head });
+  if (opened.status === 'refused') return notStarted(`The session's records cannot be created: ${opened.reason}`);
+  const run = opened.run;
+  run.index = initial;
+  run.invocationBase = head;
+  const records = run.directory;
+  const { runner, close } = manualRunner({ projectRoot, git, model: options.model ?? null, agent });
+  closeOperations = close;
 
   // The prompt is the goal; what the person did not give reads "not stated".
   const assignment: IterationAssignment = {
@@ -368,38 +365,6 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
   const prompt = [iterationMessage({ assignment, projectRoot, workingDirectory, base: head, views, testAreas, setup }), modulePointers].filter(Boolean).join('\n\n');
   const shown = scopePaths(projectRoot, scope);
 
-  let record: SessionRecord = sessionRecordSchema.parse({
-    schema: 'ramify-agent.session/2', policy: { version: 'run-policy/7', contract: 'plan21-whole-owner-and-architect-reporting/1' }, authority: scope,
-    id,
-    role: 'engineer',
-    module: entry.module,
-    directory: entry.dir,
-    prompt: options.prompt.trim(),
-    agent: agent.name,
-    model: options.model ?? null,
-    startedAt: new Date().toISOString(),
-    base: head,
-    scope: { roots: shown.roots, files: shown.files, extra },
-    tests,
-    gate: options.gate === true,
-    guarded: guardedFiles,
-    views: views.map(view => ({ module: view.module, views: view.views.map(item => ({ ...item })), unavailable: view.unavailable })),
-    prompts: { package: loaded.package, hash: loaded.hash, inputsHash: inputsHash([systemPrompt, prompt]) },
-  } satisfies SessionRecord);
-  await writeFile(at(sessionLayout.session), `${JSON.stringify(record, null, 2)}\n`);
-
-
-  const observations = await ObservationLog.open(at(sessionLayout.observations));
-  // The session is its own one invocation, so its identifier names both.
-  const transcript = new InvocationTranscript(new TranscriptWriter({
-    session: id,
-    path: at(sessionLayout.transcript),
-    root: records,
-    store: new ContentStore(at(sessionLayout.blobs)),
-    inlineBytes: policy.transcript.inlineBodyBytes,
-  }), id, async detail => {
-    await observations.record({ type: 'coverage-gap', data: { kind: 'transcript-incomplete', detail } });
-  });
   const tools = engineerEquipment({
     commandExecution: options.commandExecution,
     projectRoot,
@@ -412,199 +377,72 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
     guarded,
     scopeRevision: scope.revision,
     submissions: { legalOutcomes: ['completion-proposed', 'partial', 'unsuitable', 'capability-needed'], completionOutcome: 'completion-proposed' },
-    outputPath: (kind, _invocation, number) => at(kind === 'shell' ? sessionLayout.shellOutput(number) : sessionLayout.hookOutput(number)),
+    outputPath: (kind, invocation, number) => run.path(kind === 'shell' ? runLayout.shellOutput(invocation, number) : runLayout.hookOutput(invocation, number)),
   });
+  const brief: HarnessTaskBrief = { kind: 'standalone-command', objective: 'Carry out this standalone module command and submit its observed result.',
+    goal: assignment.goal, requirements: [assignment.completionEvidence],
+    sections: taskSupportSections(prompt, [`## Goal\n\n${assignment.goal}`, `## Completion evidence\n\n${assignment.completionEvidence}`]),
+    environment: { projectRoot, workingDirectory, candidate: null, snapshot: null, limits,
+      availableTools: [...engineerBuiltinTools, shellToolName, engineerToolName],
+      views: views.flatMap(view => view.views.map(item => ({ path: item.path, revision: item.revision, modules: [view.module], coverage: item.coverage === null ? [] : [`${item.coverage} coverage limits`] }))),
+      supportPaths: deliveredSupportPaths(loaded, 'standalone-command'), cucumberConfiguration: JSON.stringify({ kind: 'not-applicable', reason: 'Standalone assignment selects no registered feature files' }) } };
 
-  let accepted: EngineerSubmission | null = null;
-  let submissionHash: string | null = null;
-  const judge = new SubmissionJudge<EngineerSubmission>({
-    target: engineerToolName,
-    bound: limits.rejectedSubmissionsPerTurn,
+  // One invocation through the runner a run uses: its records, transcript,
+  // equipment, bounds and outcome are a run's. Nothing follows its
+  // submission, so the session is not kept.
+  const result = await runner.runInvocation<EngineerSubmission>(run, agent, {
+    role: 'engineer',
+    work: {},
+    attempt: 1,
+    loaded,
+    systemPrompt,
+    prompt,
+    brief,
+    workingDirectory,
+    start: { mode: 'fresh' },
+    toolName: engineerToolName,
+    description: engineerSubmissionDescription,
+    inputSchema: capabilityEngineerJsonSchema,
+    submissionSchema: 'ramify-agent.engineer-submission/1',
     // A claimed completion is checked afresh over the write scope before it
     // is judged: the hook checks saw only the mutations they covered.
-    validate: async input => capabilityEngineerSubmissionSchema.safeParse(input).success
+    beforeSubmission: async (input, signal) => { await tools.findingsAtCompletion(input, signal); },
+    validate: input => capabilityEngineerSubmissionSchema.safeParse(input).success
       ? validateEngineer(input, {
         capabilityWorkflow: true, kind: 'ordinary', obligation: null, openFindings: tools.openFindings(), submissions: tools.submissions,
       })
       : { ok: false, errors: [{ path: 'kind', message: 'This session accepts only the current capability engineer submissions' }] },
-    accept: async value => {
-      const content = `${JSON.stringify({ schema: 'ramify-agent.engineer-submission/1', ...value }, null, 2)}\n`;
-      await writeFileAtomic(at(sessionLayout.submission), content);
-      accepted = value;
-      submissionHash = sha256(content);
-    },
     acceptedText: value => {
       const check = tools.completionCheck();
       return sessionAcceptance(value.kind, options.gate === true, check?.kind === 'not-checked' ? check.reason : null);
     },
-    observations,
-  });
-
-  const excursions = new ExcursionWatcher({ projectRoot, index: initial, scope: guarded });
-  const context = contextPolicyOf(policy, 'engineer');
-  const recorder = new PortEventRecorder({ projectRoot, workingDirectory, observations, judge, excursions, context, transcript,
-    invocation: { id, role: 'engineer', startedAt: record.startedAt, submissionTool: engineerToolName, declaredPaths: shown.roots } });
-  const bounds = new InvocationBounds(limits);
-  const equipment = tools.equip({
-    invocation: id,
-    observations,
-    callId: tool => recorder.callId(tool),
-    reminders: () => excursions.takeReminders(),
-    transcript,
-    hold: timeoutMs => bounds.hold(timeoutMs),
-  });
-  const { guard, afterMutation } = equipment;
-
-  const spec: SessionSpec = {
-    role: 'engineer',
-    scope: { workingDirectory },
-    systemPrompt,
-    prompt,
-    session: { mode: 'fresh' },
-    context,
-    builtinTools: equipment.builtinTools ?? ['read', 'grep', 'ls'],
-    tools: [...(equipment.tools ?? [])],
-    ...(guard === undefined ? {} : {
-      guard: async call => {
-        const decision = await guard(call);
-        if (!decision.allow) progress({ type: 'harness-text', callId: call.callId, tool: call.tool, kind: 'refusal', text: decision.text });
-        return decision;
-      },
-    }),
-    ...(afterMutation === undefined ? {} : {
-      afterMutation: async call => {
-        const appended = await afterMutation(call);
-        if (appended !== null) progress({ type: 'harness-text', callId: call.callId, tool: call.tool, kind: 'appended', text: appended.text });
-        return appended;
-      },
-    }),
-    submission: {
-      name: engineerToolName,
-      description: engineerSubmissionDescription,
-      inputSchema: capabilityEngineerJsonSchema,
-      accept: async (input, signal) => {
-        await tools.findingsAtCompletion(input, signal);
-        signal.throwIfAborted();
-        const verdict = await judge.judge(input);
-        transcript.note(verdictNote(recorder.callId(engineerToolName), engineerToolName, verdict));
-        progress({
-          type: 'submission',
-          input,
-          accepted: verdict.accepted,
-          answer: verdict.accepted ? verdict.text ?? '' : verdict.errors.join('\n'),
-        });
-        return verdict;
-      },
+    scope: { write: scope.revision, measurement: null, size: null },
+    writer: true,
+    guarded,
+    equip: tools.equip,
+    endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
+    keep: () => finished('not-kept'),
+    startingTree: { dirty: alreadyChanged.length > 0, changed: alreadyChanged.map(path => path.split(sep).join('/')).sort() },
+    signal: options.signal,
+    progress: event => {
+      if (event.type === 'started') {
+        progress({ type: 'started', session: id, module: entry.module, directory: entry.dir, records, scope: shown, message: event.message });
+      } else progress(event);
     },
-
-    onEvent: event => {
-      bounds.touch();
-      if (event.type === 'tool-started' && event.tool !== engineerToolName) {
-        progress({ type: 'tool-call', callId: event.callId, tool: event.tool, input: event.input });
-      } else if (event.type === 'tool-finished' && event.isError && event.tool !== engineerToolName) {
-        progress({ type: 'tool-error', callId: event.callId, tool: event.tool, text: event.errorText ?? '' });
-      } else if (event.type === 'message' && event.role === 'assistant' && event.blocks.some(block => block.type === 'text' && block.text.trim() !== '')) {
-        // The assistant's own text; its tool calls are shown as calls.
-        progress({ type: 'message', text: event.text });
-      }
-      void recorder.record(event).catch(() => undefined);
-    },
-  };
-
-  // The session writes, so it holds the writer, and its settlement is the
-  // harness's own observation: the session idle and the tree read around it.
-  const writer = new WriterOwnership({ settleMs: limits.writerSettleMs, tree: { changed: () => git.changedPaths(projectRoot).catch(() => []) } });
-  writer.acquire(id);
-  // The start holds the prompts and is written before the model is called.
-  const started = Date.now();
-  let agentSession: AgentSession;
-  try {
-    sessions = await HarnessSessionOperations.open(join(projectRoot, sessionsDirectory, 'session-operations'), agent);
-    const brief: HarnessTaskBrief = { kind: 'standalone-command', objective: 'Carry out this standalone module command and submit its observed result.',
-      goal: assignment.goal, requirements: [assignment.completionEvidence],
-      sections: taskSupportSections(prompt, [`## Goal\n\n${assignment.goal}`, `## Completion evidence\n\n${assignment.completionEvidence}`]),
-      environment: { projectRoot, workingDirectory, candidate: null, snapshot: null, limits,
-        availableTools: [...spec.builtinTools, ...spec.tools.map(tool => tool.name), engineerToolName],
-        views: views.flatMap(view => view.views.map(item => ({ path: item.path, revision: item.revision, modules: [view.module], coverage: item.coverage === null ? [] : [`${item.coverage} coverage limits`] }))),
-        supportPaths: deliveredSupportPaths(loaded, 'standalone-command'), cucumberConfiguration: JSON.stringify({ kind: 'not-applicable', reason: 'Standalone assignment selects no registered feature files' }) } };
-    agentSession = await sessions.start({ runId: `standalone:${id}`, operationId: id, session: id, loaded, brief, spec,
-      authority: { scope, guarded: guardedFiles }, validator: { name: engineerToolName, schema: capabilityEngineerJsonSchema, submissionSchema: 'ramify-agent.engineer-submission/1', bound: limits.rejectedSubmissionsPerTurn },
-      destination: { session: id, submission: sessionLayout.submission }, currentAuthority: async () => options.signal?.aborted !== true,
-      identified: async identity => {
-        recorder.identify(identity);
-        record = { ...record, sessionOperation: { ...identity } };
-        await writeFileAtomic(at(sessionLayout.session), `${JSON.stringify(record, null, 2)}\n`);
-      },
-      prepared: async packet => {
-        const actual = deliveredScopeInputs(writeScopeMeasurement(scope), packet.manifest);
-        const known = actual.supplementary.reduce((sum, entry) => sum + entry.bytes, 0) + (actual.scope.brief ?? 0);
-        record = { ...record, prompts: { package: loaded.package, hash: loaded.hash, inputsHash: inputsHash([packet.roleInstructions, packet.message]), manifest: { ...packet.manifest } },
-          scopeSize: { policy: 'scope-size/2', snapshot: 'standalone-unavailable', bytes: null, subtotal: known, coverage: 'partial', components: [
-            { component: 'owned-source', detail: entry.module, bytes: null, state: 'unavailable', reason: 'Standalone session has no frozen measurement snapshot' },
-            { component: 'support-documents', detail: 'Actual delivered inputs', bytes: known, state: 'measured' },
-          ] } };
-        await writeFileAtomic(at(sessionLayout.session), `${JSON.stringify(record, null, 2)}\n`);
-        progress({ type: 'started', session: id, module: entry.module, directory: entry.dir, records, scope: shown, message: packet.message });
-        await transcript.started({ role: 'engineer', work: {}, start: 'opened', requested: 'fresh', executor: agent.name, model: options.model ?? null,
-          systemPrompt: packet.roleInstructions, prompt: packet.message });
-      } });
-  } catch (error) {
-    const settled = await writer.release(id);
-    const removed = await removeScratchDirectories(projectRoot, [entry.dir], git);
+  });
+  if (result.id === '' || result.notStarted === true) {
+    await removeScratchDirectories(projectRoot, [entry.dir], git);
     scratchSettled = true;
-    const reason = `The agent session could not start: ${message(error)}`;
-    await transcript.end({ ended: 'failed', interruption: 'adapter-fault', error: reason, actual: null });
-    await writeOutcome(at(sessionLayout.outcome), {
-      session: id, ended: 'failed', interruption: 'adapter-fault', error: reason, submission: null, rejectedSubmissions: 0,
-      standingViolations: [], settled, changed: alreadyChanged, alreadyChanged, harnessChanged,
-      preservedTracked: [...removed.preservedTracked], outsideScope: [],
-      usage: recorder.outcomeUsage(agent), elapsedMs: Date.now() - started, gate: null,
-    });
-    return notStarted(reason, records);
+    return notStarted(result.error ?? 'The agent session could not start', records);
   }
-
-  let stoppedByCaller = false;
-  const stop = () => {
-    stoppedByCaller = true;
-    void agentSession.stop().catch(() => undefined);
-  };
-  if (options.signal?.aborted === true) stop();
-  else options.signal?.addEventListener('abort', stop, { once: true });
-  let outcome: Awaited<AgentSession['outcome']>;
-  try {
-    outcome = await bounds.outcome(agentSession);
-  } finally {
-    options.signal?.removeEventListener('abort', stop);
-  }
-  const elapsedMs = Date.now() - started;
-  await recorder.recordGaps(agent);
-  await settleSessionEquipment(equipment.settle, limits.stopSettleMs).catch(() => false);
-  const settled = await writer.release(id, agentSession);
-  settlementConfirmed = settled.confirmed;
-  if (settlementConfirmed) await equipment.drained?.();
+  const outcome = invocationOutcomeSchema.parse(committedBody(run, runLayout.outcome(result.id)));
+  settlementConfirmed = outcome.settled.confirmed;
   if (!settlementConfirmed) retainProjectLock();
-  const snapshot = await recordSettledSnapshot({ projectRoot, changed: () => git.changedPaths(projectRoot), scope: guarded }, observations);
+  const changed = [...(result.changed ?? [])];
+  const outsideScope = outcome.outsideScope.filter(path => !harnessChanged.includes(path));
   const removed = settlementConfirmed ? await removeScratchDirectories(projectRoot, [entry.dir], git) : { preservedTracked: [] };
   scratchSettled = settlementConfirmed;
   const safety = await scratchSafetyRule(projectRoot, await declaredModuleDirectories(projectRoot), git);
-
-  const interruption = bounds.interruption ?? (stoppedByCaller ? 'stopped-by-caller' as const : undefined);
-  const ended: InvocationOutcome['ended'] = bounds.interruption !== undefined
-    ? 'failed'
-    : tools.exhausted() ? 'invalid-submission' : endedOf(outcome.kind, judge.boundReached);
-  const error = outcome.kind === 'failed' ? outcome.error : bounds.interruption === 'idle-timeout'
-    ? `No port event for ${limits.invocationIdleMs} ms`
-    : bounds.interruption === 'absolute-timeout' ? `The session ran for ${limits.invocationAbsoluteMs} ms, its absolute bound` : undefined;
-  const submission: EngineerSubmission | null = ended === 'submitted' ? accepted : null;
-  if (outcome.kind === 'context-budget-reached') {
-    transcript.note({ kind: 'budget-reached', tokens: outcome.tokens, threshold: context.budgetTokens, reportDelivered: outcome.report !== undefined });
-  }
-  await transcript.end({
-    ended,
-    interruption: interruption ?? null,
-    error: error ?? null,
-    actual: { mode: agentSession.start.mode, degradedReason: agentSession.start.degradedReason ?? null },
-  });
 
   // The gate: an in-place diagnosis of the tree the session left, its
   // setup, type check and Ramify check, with the guarded files as they
@@ -612,7 +450,7 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
   // project's tests run only through its committed audit.
   let gate: SessionGateResult | null = null;
   if (options.gate === true) {
-    if (!settled.confirmed) {
+    if (!settlementConfirmed) {
       gate = { ran: false, reason: 'the session did not settle, so a check of the tree it may still be writing would prove nothing' };
     } else {
       progress({ type: 'gate-started' });
@@ -620,28 +458,30 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
       // every gate of a run.
       const config = await captureProjectConfig(projectRoot);
       const setup = 'config' in config ? config.config.setup : undefined;
+      const attemptPath = run.path(runLayout.diagnosis(result.id));
       const attempt = await runCheckpoint(options.checkExecution ?? inPlaceCheckExecution, {
         id: gateAttemptId(1),
         checkpoint: 'iteration',
         projectRoot,
-        directory: at(sessionLayout.gateOutput),
+        directory: run.path(runLayout.diagnosisOutput(result.id)),
         head: await git.currentHead(projectRoot),
         policy,
-        proposedBy: id,
+        proposedBy: result.id,
         subject: {},
         guarded: guardedFiles,
         authorizations: [],
-        rules: [safety, { rule: 'write-scope', outcome: snapshot.failure !== null || snapshot.outsideScope.length > 0 ? 'failed' : 'passed', violations: snapshot.outsideScope.map(path => ({ rule: 'write-scope', path, detail: 'Candidate change is outside current and captured write authority' })), ...(snapshot.failure === null ? {} : { limits: [snapshot.failure] }) }],
+        rules: [safety, { rule: 'write-scope', outcome: outcome.outsideScope.length > 0 ? 'failed' : 'passed', violations: outcome.outsideScope.map(path => ({ rule: 'write-scope', path, detail: 'Candidate change is outside current and captured write authority' })) }],
         ...(setup === undefined ? {} : { setup }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
       const { auditOverall: _auditOverall, ...durableAttempt } = attempt;
-      await writeFile(at(sessionLayout.gate), `${JSON.stringify(gateAttemptSchema.parse(durableAttempt), null, 2)}\n`);
+      await mkdir(dirname(attemptPath), { recursive: true });
+      await writeFile(attemptPath, `${JSON.stringify(gateAttemptSchema.parse(durableAttempt), null, 2)}\n`);
       gate = {
         ran: true,
         verdict: attempt.verdict,
         cause: attempt.cause,
-        attempt: at(sessionLayout.gate),
+        attempt: attemptPath,
         commands: attempt.commands.map(command => {
           const outcomeText = command.notVerified === 'setup-failed'
             ? 'not run, because a setup command did not pass'
@@ -655,60 +495,42 @@ async function runLocked(options: SingleSessionOptions, retainProjectLock: () =>
   }
 
   const standing = tools.openFindings();
-  await writeOutcome(at(sessionLayout.outcome), {
-    session: id,
-    sessionOperation: { ...record.sessionOperation, runId: `standalone:${id}`, operationId: id, ...(readSessionPointReference(agentSession.ref) === null ? { point: null } : { sessionId: readSessionPointReference(agentSession.ref)!.point.sessionId, point: readSessionPointReference(agentSession.ref)!.point }) },
-    ended,
-    ...(interruption === undefined ? {} : { interruption }),
-    ...(error === undefined ? {} : { error }),
-    submission: submission === null || submissionHash === null
-      ? null : { kind: (submission as EngineerSubmission).kind, hash: submissionHash },
-    rejectedSubmissions: judge.rejections,
-    standingViolations: standing.map(finding => ({ code: finding.code, message: finding.message, file: finding.file, line: finding.line })),
-    settled,
-    changed: [...snapshot.paths],
-    alreadyChanged: alreadyChanged.map(path => path.split(sep).join('/')).sort(),
-    harnessChanged,
-    preservedTracked: [...removed.preservedTracked],
-    outsideScope: snapshot.outsideScope.filter(path => !harnessChanged.includes(path)),
-    usage: recorder.outcomeUsage(agent),
-    elapsedMs,
-    gate: gate === null ? null : gate.ran
-      ? { attempt: relative(records, gate.attempt), verdict: gate.verdict, cause: gate.cause }
-      : { skipped: gate.reason },
-  });
-
   const summary: SessionSummary = {
     session: id,
     module: entry.module,
-    ended,
-    submission,
-    rejectedSubmissions: judge.rejections,
+    ended: result.ended,
+    submission: result.ended === 'submitted' ? result.value ?? null : null,
+    rejectedSubmissions: outcome.rejectedSubmissions,
     standingViolations: standing,
-    changed: [...snapshot.paths],
+    changed,
     harnessChanged,
     preservedTracked: removed.preservedTracked,
-    outsideScope: snapshot.outsideScope.filter(path => !harnessChanged.includes(path)),
-    usage: recorder.outcomeUsage(agent),
-    elapsedMs,
+    outsideScope,
+    usage: outcome.usage,
+    elapsedMs: outcome.elapsedMs,
     records,
     gate,
-    ...(error === undefined ? {} : { error }),
+    ...(result.error === undefined ? {} : { error: result.error }),
   };
+  // What the session's summary states beside the run's records: the paths
+  // the harness and the tree accounted for, and the gate.
+  await writeFileAtomic(run.path(runLayout.stepSummary(result.id)), `${JSON.stringify({
+    schema: 'ramify-agent.session-summary/1', ...summary,
+    alreadyChanged: alreadyChanged.map(path => path.split(sep).join('/')).sort(),
+    gate: gate === null ? null : gate.ran ? { attempt: relative(records, gate.attempt), verdict: gate.verdict, cause: gate.cause } : { skipped: gate.reason },
+  }, null, 2)}\n`);
   progress({ type: 'summary', summary });
-  const passed = settled.confirmed && ended === 'submitted' && (gate === null || (gate.ran && gate.verdict === 'passed'));
+  const passed = settlementConfirmed && result.ended === 'submitted' && (gate === null || (gate.ran && gate.verdict === 'passed'));
   return { status: 'finished', summary, exitStatus: passed ? 0 : 1 };
   } finally {
-    const closed = await sessions?.close();
+    const closed = await closeOperations?.();
     if (closed === false) { settlementConfirmed = false; retainProjectLock(); }
     if (settlementConfirmed && !scratchSettled) await removeScratchDirectories(projectRoot, [entry.dir], git);
   }
 }
 
-async function writeOutcome(path: string, body: Omit<SessionOutcomeRecord, 'schema' | 'finishedAt'>): Promise<void> {
-  const outcome = sessionOutcomeSchema.parse({ schema: 'ramify-agent.session-outcome/1', ...body, finishedAt: new Date().toISOString() });
-  await writeFile(path, `${JSON.stringify(outcome, null, 2)}\n`);
-}
+/** The plan directory every session's manual run is under: `plans/sessions/.harness/jobs/<id>/`. */
+export const sessionsPlan = 'sessions';
 
 /** `20260921T101500Z-a1b2c3`: when it started, and unique beside another started the same second. */
 function sessionId(): string {

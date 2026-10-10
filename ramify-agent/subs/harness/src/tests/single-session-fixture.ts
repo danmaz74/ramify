@@ -5,12 +5,15 @@ import { createScriptedAgent, type ScriptStep } from '../../subs/agent/src/scrip
 import type { RamifyCheckResult } from '../../subs/evidence/src/ramify-cli.js';
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { observationSchema, type Observation } from '../run/observations.js';
-import { sessionOutcomeSchema, type SessionOutcomeRecord } from '../sessions/records.js';
+import { invocationOutcomeSchema, type InvocationOutcome } from '../run/records.js';
 import { runSingleSession, type SessionProgress, type SingleSessionOptions, type SingleSessionResult } from '../sessions/single.js';
 import { completionCheckDeadlineMs } from '../hooks/post-write.js';
 import { copyFixture } from './helpers/fixture.js';
 import { addModule, installMiniRunner } from './helpers/iterations.js';
 import { testPolicy } from './helpers/runs.js';
+import { recordsOf } from './helpers/session-records.js';
+
+export { recordsOf };
 import { literalOwnershipRamify, externalResponseRecorder, strictSessionCommand, sessionHookPaths } from './helpers/settlement-boundaries.js';
 import { fixtureScratchGit, mockGit } from './helpers/mock-git.js';
 import { createDirectCheckExecution, type DirectCheckStep } from './helpers/direct-check-execution.js';
@@ -180,12 +183,17 @@ export function finished(result: SingleSessionResult) {
   return result.summary;
 }
 
-export async function outcomeOf(records: string): Promise<SessionOutcomeRecord> {
-  return sessionOutcomeSchema.parse(JSON.parse(await readFile(join(records, 'outcome.json'), 'utf8')));
+export async function outcomeOf(records: string): Promise<InvocationOutcome> {
+  return invocationOutcomeSchema.parse(JSON.parse(await readFile((await recordsOf(records)).outcome, 'utf8')));
+}
+
+/** What the session's summary record states beside the run's records: the paths, the gate. */
+export async function summaryOf(records: string): Promise<Record<string, unknown>> {
+  return JSON.parse(await readFile((await recordsOf(records)).summary, 'utf8')) as Record<string, unknown>;
 }
 
 export async function observationsOf(records: string): Promise<Observation[]> {
-  return (await readFile(join(records, 'observations.jsonl'), 'utf8'))
+  return (await readFile((await recordsOf(records)).observations, 'utf8'))
     .split('\n').filter(Boolean).map(line => observationSchema.parse(JSON.parse(line)));
 }
 

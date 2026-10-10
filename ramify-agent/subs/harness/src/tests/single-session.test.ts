@@ -5,10 +5,8 @@ import { join, relative } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
-import { gateAttemptSchema } from '../run/records.js';
-import {
-  sessionRecordSchema, sessionsDirectory, sessionSubmissionSchema,
-} from '../sessions/records.js';
+import { gateAttemptSchema, invocationSchema, manualRunRecordSchema } from '../run/records.js';
+import { engineerSubmissionSchema } from '../work/engineer.js';
 import { sessionAcceptance, type SessionProgress } from '../sessions/single.js';
 import { acquireProjectLock, lockPath } from '../store/lock.js';
 import type { AgentPort } from '../../subs/agent/src/interfaces/port.js';
@@ -25,7 +23,12 @@ vi.unmock('../run/session-store.js');
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
-import { cleanups, notes, notesDirectory, notesSource, project, session, checked, passingGate, finished, outcomeOf, observationsOf, exists } from './single-session-fixture.js';
+import { cleanups, notes, notesDirectory, notesSource, project, session, checked, passingGate, finished, outcomeOf, observationsOf, exists, recordsOf, summaryOf } from './single-session-fixture.js';
+
+/** Where every session's manual run is, beneath the project. */
+const sessionRuns = join('plans', 'sessions', '.harness', 'jobs');
+/** Where an earlier session command wrote its own records, which nothing writes any more. */
+const legacySessions = join('plans', '.harness', 'sessions');
 
 describe('a single engineer session', () => {
   test('the prepared standalone packet preserves a multiline literal goal and fenced consecutive headings byte for byte', async () => {
@@ -38,11 +41,10 @@ describe('a single engineer session', () => {
     expect(packet.message).toContain(`# Goal\n${prompt}`);
     expect(packet.message.split(prompt)).toHaveLength(2);
     expect(agent.sessions[0]!.spec.prompt).toBe(packet.message);
-    const recorded = sessionRecordSchema.parse(JSON.parse(await readFile(join(finished(result).records, 'session.json'), 'utf8')));
-    expect(recorded.prompts.manifest).toMatchObject({ schema: 'ramify-agent.delivered-inputs/2', currentMessage: { bytes: Buffer.byteLength(packet.message) } });
-    expect(recorded.scopeSize).toMatchObject({ bytes: null, coverage: 'partial', components: expect.arrayContaining([expect.objectContaining({ component: 'support-documents', state: 'measured' })]) });
-    expect(recorded.scopeSize!.subtotal).toBeGreaterThan(0);
-    expect(recorded.sessionOperation).toMatchObject({ runId: `standalone:${recorded.id}`, operationId: recorded.id, turn: 1, sourcePoint: { turn: 0, kind: 'checkpoint' } });
+    const paths = await recordsOf(finished(result).records);
+    const recorded = invocationSchema.parse(JSON.parse(await readFile(paths.record, 'utf8')));
+    expect(recorded.prompt.manifest).toMatchObject({ schema: 'ramify-agent.delivered-inputs/2', currentMessage: { bytes: Buffer.byteLength(packet.message) } });
+    expect(recorded.sessionOperation).toMatchObject({ runId: finished(result).session, operationId: paths.invocation, turn: 1, sourcePoint: { turn: 0, kind: 'checkpoint' } });
     expect(packet.message).toContain('## Approach the architect asked for\n\nNot stated.');
     expect(packet.message).toContain(`${root}/${notesDirectory}/src/tests/`);
     expect(packet.message).toContain(`${root}/${notesDirectory}/module.ramify`);
@@ -106,7 +108,8 @@ describe('a single engineer session', () => {
     expect(await exists(join(root, sibling))).toBe(false);
     const observations = await observationsOf(summary.records);
     const activities = observations.filter(line => line.type === 'activity').map(line => line.data.activity);
-    expect(activities).toEqual(expect.arrayContaining([{ kind: 'read', callId: `${summary.session}:call-1`, path: notesSource }]));
+    const { invocation } = await recordsOf(summary.records);
+    expect(activities).toEqual(expect.arrayContaining([{ kind: 'read', callId: `${invocation}:call-1`, path: notesSource }]));
     const guards = observations.filter(line => line.type === 'guard');
     expect(guards.map(line => line.data.resolved)).toEqual([
       join(root, notesSource), join(cwd, 'new.ts'), join(root, sibling),
@@ -237,7 +240,8 @@ describe('a single engineer session', () => {
       const summary = finished(result);
       expect(result.exitStatus).toBe(0);
       expect(summary.submission?.kind).toBe(input.kind);
-      expect((await outcomeOf(summary.records)).submission?.kind).toBe(input.kind);
+      expect((await outcomeOf(summary.records)).submission).not.toBeNull();
+      expect(JSON.parse(await readFile((await recordsOf(summary.records)).submission, 'utf8'))).toMatchObject({ kind: input.kind });
       expect(agent.sessions).toHaveLength(1);
       const answer = agent.sessions[0]!.results.at(-1)!.text;
       expect(answer).toBe(sessionAcceptance(input.kind as 'unsuitable', false));
@@ -261,7 +265,8 @@ describe('a single engineer session', () => {
     expect(result.status === 'not-started' ? result.reason : '').toContain('"collection-review/no-such-module" is not a module');
     expect(agent.sessions).toHaveLength(0);
     expect(await exists(join(root, lockPath))).toBe(false);
-    expect(await exists(join(root, sessionsDirectory))).toBe(false);
+    expect(await exists(join(root, sessionRuns))).toBe(false);
+    expect(await exists(join(root, legacySessions))).toBe(false);
   }, 120_000);
 
   test('a declared module with missing src is refused before the agent starts', async () => {
@@ -291,7 +296,7 @@ describe('a single engineer session', () => {
 
 describe('the gate option', () => {
 
-  test('passing work: the iteration checkpoint passes, its attempt is under gate/, and nothing is committed', async () => {
+  test('passing work: the iteration checkpoint passes, its attempt is the invocation\'s diagnosis, and nothing is committed', async () => {
     const root = await project();
 
     const { result, events, git } = await session(root, [
@@ -306,19 +311,20 @@ describe('the gate option', () => {
     const summary = finished(result);
     expect(summary.gate).toMatchObject({ ran: true, verdict: 'passed' });
     expect(result.exitStatus).toBe(0);
-    const attempt = gateAttemptSchema.parse(JSON.parse(await readFile(join(summary.records, 'gate', 'attempt.json'), 'utf8')));
+    const attempt = gateAttemptSchema.parse(JSON.parse(await readFile((await recordsOf(summary.records)).diagnosis, 'utf8')));
     expect(attempt.checkpoint).toBe('iteration');
     expect(attempt.commit).toBeNull();
     // A standalone diagnosis runs the project's type check and Ramify check in
     // place; it selects and runs no test, which a committing gate's audit owns.
     expect(attempt.commands.map(command => command.kind)).toEqual(['type-check', 'ramify-check']);
-    expect((await outcomeOf(summary.records)).gate).toEqual({ attempt: join('gate', 'attempt.json'), verdict: 'passed', cause: attempt.cause });
+    const { invocation } = await recordsOf(summary.records);
+    expect((await summaryOf(summary.records)).gate).toEqual({ attempt: join('invocations', invocation, 'diagnosis', 'attempt.json'), verdict: 'passed', cause: attempt.cause });
     expect(git.commitAccepted).not.toHaveBeenCalled();
     expect(events.map(event => event.type).slice(-3)).toEqual(['gate-started', 'gate', 'summary']);
     expect(events.find(event => event.type === 'submission')).toMatchObject({ answer: sessionAcceptance('completion-proposed', true) });
   }, 120_000);
 
-  test('failing work: the checkpoint fails, its attempt is under gate/, the exit status is 1, and nothing is committed', async () => {
+  test('failing work: the checkpoint fails, its attempt is the invocation\'s diagnosis, the exit status is 1, and nothing is committed', async () => {
     const root = await project();
 
     const { result, git } = await session(root, [
@@ -332,7 +338,7 @@ describe('the gate option', () => {
     expect(summary.ended).toBe('submitted');
     expect(summary.gate).toMatchObject({ ran: true, verdict: 'failed' });
     expect(result.exitStatus).toBe(1);
-    const attempt = gateAttemptSchema.parse(JSON.parse(await readFile(join(summary.records, 'gate', 'attempt.json'), 'utf8')));
+    const attempt = gateAttemptSchema.parse(JSON.parse(await readFile((await recordsOf(summary.records)).diagnosis, 'utf8')));
     expect(attempt.verdict).toBe('failed');
     expect(attempt.commit).toBeNull();
     expect(git.commitAccepted).not.toHaveBeenCalled();
@@ -340,7 +346,7 @@ describe('the gate option', () => {
 });
 
 describe('the session\'s records', () => {
-  test('every record exists and validates against its schema, and git sees nothing under plans/.harness/', async () => {
+  test('every record is a manual run\'s in a run\'s own layout and validates against its schema', async () => {
     const root = await project();
 
     const commandExecution: CommandRunner = request => {
@@ -361,40 +367,46 @@ describe('the session\'s records', () => {
 
     const summary = finished(result);
     const records = summary.records;
-    expect(records.startsWith(join(root, sessionsDirectory))).toBe(true);
+    // A manual run in a run's own layout; nothing is written under plans/.harness/sessions/.
+    expect(records).toBe(join(root, sessionRuns, summary.session));
+    expect(await exists(join(root, legacySessions))).toBe(false);
+    expect(manualRunRecordSchema.parse(JSON.parse(await readFile(join(records, 'job.json'), 'utf8'))))
+      .toMatchObject({ kind: 'manual', planId: 'sessions', jobId: summary.session, origin: 'session', branch: null, base: 'single-session-base' });
+    const paths = await recordsOf(records);
 
-    const record = sessionRecordSchema.parse(JSON.parse(await readFile(join(records, 'session.json'), 'utf8')));
-    expect(record).toMatchObject({ id: summary.session, module: notes, directory: notesDirectory, prompt: 'Raise the note limit to 500.', gate: true });
-    // The session records its executor and the model it was asked for: none, for the fake.
-    expect(record).toMatchObject({ schema: 'ramify-agent.session/2', agent: 'scripted', model: null });
-    expect(record.scope.roots).toEqual([notesDirectory]);
+    const record = invocationSchema.parse(JSON.parse(await readFile(paths.record, 'utf8')));
+    expect(record).toMatchObject({ id: paths.invocation, role: 'engineer', base: 'single-session-base', startingTree: { dirty: false, changed: [] } });
+    // The session's start records its executor and the model it was asked for: none, for the fake.
+    expect((await readTranscript(paths.transcript)).entries[0]).toMatchObject({ type: 'started', executor: 'scripted', model: null });
+    expect(await summaryOf(records)).toMatchObject({ schema: 'ramify-agent.session-summary/1', session: summary.session, module: notes, records });
 
     const observations = await observationsOf(records);
     expect(observations.map(line => line.type)).toEqual(expect.arrayContaining(['activity', 'guard', 'mutation', 'hook-check', 'coverage-gap']));
-    sessionSubmissionSchema.parse(JSON.parse(await readFile(join(records, 'submission.json'), 'utf8')));
+    const { schema, ...submitted } = JSON.parse(await readFile(paths.submission, 'utf8')) as Record<string, unknown>;
+    expect(schema).toBe('ramify-agent.engineer-submission/1');
+    engineerSubmissionSchema.parse(submitted);
     const outcome = await outcomeOf(records);
-    expect(outcome).toMatchObject({ session: summary.session, ended: 'submitted', submission: { kind: 'completion-proposed' } });
+    expect(outcome).toMatchObject({ ended: 'submitted' });
     expect(outcome.settled.confirmed).toBe(true);
-    gateAttemptSchema.parse(JSON.parse(await readFile(join(records, 'gate', 'attempt.json'), 'utf8')));
+    gateAttemptSchema.parse(JSON.parse(await readFile(paths.diagnosis, 'utf8')));
 
-    expect(await readdir(join(records, 'shell'))).toEqual(['001.log']);
+    expect(await readdir(paths.shell)).toEqual(['001.log']);
     // The no-op shell reserves identity 1 without launching a check; the edit and independent completion use 2 and 3.
-    const hooks = await readdir(join(records, 'hooks'));
+    const hooks = await readdir(paths.hooks);
     expect(hooks).toEqual(['002.json', '003.json']);
-    for (const hook of hooks) JSON.parse(await readFile(join(records, 'hooks', hook), 'utf8'));
-    // Durable operations use the shared owned ledger; no per-invocation executor directory.
-    expect(await exists(join(records, 'session'))).toBe(false);
-    const store = join(root, sessionsDirectory, 'session-operations', 'store');
+    for (const hook of hooks) JSON.parse(await readFile(join(paths.hooks, hook), 'utf8'));
+    // Durable operations use the shared owned ledger every run uses.
+    const store = join(root, 'plans', '.harness', 'session-operations', 'store');
     expect((await stat(store)).isDirectory()).toBe(true);
     expect((await stat(join(store, 'session-ledger.jsonl'))).size).toBeGreaterThan(0);
-    expect((await stat(join(records, 'transcript.jsonl'))).isFile()).toBe(true);
+    expect((await stat(paths.transcript)).isFile()).toBe(true);
 
     expect(summary.changed.filter(path => path.includes('plans/.harness'))).toEqual([]);
     expect(summary.changed).toEqual([notesSource]);
     expect(git.commitAccepted).not.toHaveBeenCalled();
   }, 120_000);
 
-  test('its transcript is transcript.jsonl: the start before the model call, the harness\'s decisions, and the shell\'s log by reference', async () => {
+  test('its transcript is a run\'s: the start before the model call, the harness\'s decisions, and the shell\'s log by reference', async () => {
     const root = await project();
     const outside = 'subs/workspace/subs/reviews/src/stray.ts';
     const commandExecution: CommandRunner = request => commandResult(request, { stdout: 'checking\n' });
@@ -412,9 +424,8 @@ describe('the session\'s records', () => {
       bindSessionStore(store) {
         const operations = scripted.bindSessionStore(store);
         return { ...operations, async continue(input) {
-          const folders = await readdir(join(root, sessionsDirectory));
-          const session = folders.find(folder => folder !== 'session-operations')!;
-          const path = join(root, sessionsDirectory, session, 'transcript.jsonl');
+          const [run] = await readdir(join(root, sessionRuns));
+          const path = join(root, sessionRuns, run!, 'transcripts', 'ses-0001.jsonl');
           atStart = existsSync(path) ? readFileSync(path, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as TranscriptEntry) : [];
           return operations.continue(input);
         } };
@@ -428,14 +439,15 @@ describe('the session\'s records', () => {
 
     const summary = finished(result);
     expect(summary.ended).toBe('submitted');
-    const id = summary.session;
+    const paths = await recordsOf(summary.records);
+    const id = paths.invocation;
     expect(atStart?.map(entry => entry.type)).toEqual(['started']);
 
-    const read = await readTranscript(join(summary.records, 'transcript.jsonl'));
+    const read = await readTranscript(paths.transcript);
     expect([read.discardedPartial, read.unreadable]).toEqual([false, []]);
     const entries = read.entries;
     expect(entries.map(entry => entry.n)).toEqual(entries.map((_, index) => index + 1));
-    // The session is its own one invocation, so its identifier names both.
+    // The manual run's one invocation.
     expect(entries.every(entry => entry.invocation === id)).toBe(true);
     expect(entries[0]).toMatchObject({
       type: 'started', role: 'engineer', work: {}, start: 'opened', requested: 'fresh', executor: 'scripted', model: null,
@@ -443,7 +455,7 @@ describe('the session\'s records', () => {
     });
     expect(entries.slice(-2)).toEqual([
       expect.objectContaining({ type: 'ended', ended: 'submitted', interruption: null, error: null, actual: { mode: 'fresh', degradedReason: null } }),
-      expect.objectContaining({ type: 'point', point: { session: id, invocation: id } }),
+      expect.objectContaining({ type: 'point', point: { session: paths.session, invocation: id } }),
     ]);
     const started = entries[0]!;
     if (started.type !== 'started' || started.systemPrompt.stored !== 'blob') throw new Error('Missing stored role prefix');
@@ -451,7 +463,7 @@ describe('the session\'s records', () => {
     if (!user || user.type !== 'message' || user.role !== 'user') throw new Error('Missing task message');
     const taskBody = user.blocks.find(block => block.type === 'text');
     if (!taskBody || taskBody.type !== 'text' || taskBody.body.stored !== 'blob') throw new Error('Missing stored framed task');
-    expect(await blobsIn(join(summary.records, 'blobs'))).toEqual([started.systemPrompt.hash, taskBody.body.hash].sort());
+    expect(await blobsIn(paths.blobs)).toEqual(expect.arrayContaining([started.systemPrompt.hash, taskBody.body.hash]));
     for (const body of [started.systemPrompt, taskBody.body]) {
       const content = await readFile(join(summary.records, 'blobs', body.hash), 'utf8');
       expect(Buffer.byteLength(content)).toBe(body.bytes);
@@ -461,7 +473,7 @@ describe('the session\'s records', () => {
 
     // The shell's result is what the agent saw, and names the complete output.
     const shellResult = entries.find(entry => entry.type === 'message' && entry.role === 'tool-result' && entry.tool === 'shell');
-    expect(shellResult).toMatchObject({ output: { stored: 'file', path: 'shell/001.log', bytes: 9 } });
+    expect(shellResult).toMatchObject({ output: { stored: 'file', path: join('invocations', id, 'shell', '001.log'), bytes: 9 } });
 
     const decisions = entries.flatMap(entry => (entry.type === 'harness' ? [entry.decision] : []));
     expect(decisions.map(decision => decision.kind)).toEqual([
@@ -478,8 +490,7 @@ describe('the session\'s records', () => {
       callId: `${id}:call-4`, verdict: 'accepted', text: { stored: 'inline', text: sessionAcceptance('completion-proposed', false) },
     });
     // The records hold none of it.
-    const recordText = await readFile(join(summary.records, 'session.json'), 'utf8') + await readFile(join(summary.records, 'outcome.json'), 'utf8')
-      + await readFile(join(summary.records, 'observations.jsonl'), 'utf8');
+    const recordText = await readFile(paths.record, 'utf8') + await readFile(paths.outcome, 'utf8') + await readFile(paths.observations, 'utf8');
     expect(recordText).not.toContain(sessionAcceptance('completion-proposed', false));
   }, 120_000);
 });

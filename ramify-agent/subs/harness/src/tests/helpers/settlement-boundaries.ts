@@ -322,7 +322,7 @@ export function strictSessionCommand(root: string, cwd: string, command: string 
     expect(used, 'exhausted session command').toBe(0);
     expect(request.argv).toEqual(['bash', '-c', command]); expect(request.cwd).toBe(cwd);
     expect(request.env).toEqual(childEnvironment()); expect(request.timeoutMs).toBe(shellDefaultTimeoutMs);
-    expect(request.outputFile?.startsWith(join(root, 'plans/.harness/sessions/'))).toBe(true);
+    expect(request.outputFile?.startsWith(join(root, 'plans/sessions/.harness/jobs/'))).toBe(true);
     expect(request.outputFile).toMatch(/\/shell\/001\.log$/u); used++;
     return response!(request);
   });

@@ -430,11 +430,12 @@
     },
     {
       "file": "src/tests/session-command.test.ts",
-      "boundary": "Actual production CLI session input/output and termination",
+      "boundary": "Actual production CLI session and step run input/output and termination",
       "whyFakeCannotProve": "A direct handler cannot establish executable argument, stream and shutdown behavior.",
       "owningCases": [
         "a session on the scripted fake prints its stream, says nothing verified the work, and exits 0 on a submission",
-        "a session that cannot start exits 2 and says why"
+        "a session that cannot start exits 2 and says why",
+        "a step run on the scripted fake prints its stream and records, and exits 0, 1 or 2"
       ]
     },
     {

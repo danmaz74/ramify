@@ -22,6 +22,7 @@ import {
   addModule, assign, completionProposed, edit, failureAnalystFake, installMiniRunner, outline, partialReport, submit, viewedInputs, write,
 } from './helpers/iterations.js';
 import { git, initRepository, openRuns, realRamify, runEventsOnDisk, runPath, startRun, until } from './helpers/runs.js';
+import { recordsOf } from './helpers/session-records.js';
 
 /*
  * F5 and F6 of Plan 21 iteration 11: production-wired workflows with
@@ -631,7 +632,7 @@ describe('F5 standalone work: the same scope, hooks and diagnosis, with no commi
     expect([...summary.changed].sort()).toEqual(expect.arrayContaining(['subs/b/docs/source.md', 'subs/b/src/fact.ts']));
     expect(summary.outsideScope).toEqual([]);
     // The installed Ramify's hook checked the source and named the scratch not analyzed.
-    const transcript = await readFile(join(summary.records, 'transcript.jsonl'), 'utf8');
+    const transcript = await readFile((await recordsOf(summary.records)).transcript, 'utf8');
     expect(transcript).toMatch(/"path":"subs\/b\/src\/fact\.ts","disposition":"checked"/u);
     expect(transcript).toMatch(/"path":"subs\/b\/src\/tmp\/notes\.txt","disposition":"not-analyzed","reason":"scratch"/u);
     // The diagnosis ran in place over the current bytes and passed; it made
