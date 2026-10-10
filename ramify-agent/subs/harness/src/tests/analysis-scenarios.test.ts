@@ -231,15 +231,21 @@ describe('acceptance', () => {
     // sub-scenario created the integration work item at the common ancestor,
     // whose request reported the integration scenario done.
     expect(onlyRun(service, 'review-notes').counts.scenarios).toEqual({ pending: 0, bound: 0, done: 4 });
-    const started = (await runEventsOnDisk(project, 'review-notes', runId)).filter(event => event.type === 'work-item-started').map(event => event.data);
+    const events = await runEventsOnDisk(project, 'review-notes', runId);
+    const global = events.find(event => event.type === 'invocation-started' && event.data.role === 'initial-architect')!;
+    if (global.type !== 'invocation-started') throw new Error('initial architect expected');
+    const outcome = JSON.parse(await readFile(runPath(project, 'review-notes', runId, runLayout.outcome(global.data.invocation)), 'utf8')) as InvocationOutcome;
+    expect(outcome.session?.ref).toEqual(expect.any(String));
+    const globalTarget = { role: 'global-fork', run: { planId: 'review-notes', runId }, session: global.data.session,
+      point: { session: global.data.session, invocation: global.data.invocation }, ref: outcome.session!.ref };
+    const started = events.filter(event => event.type === 'work-item-started').map(event => event.data);
     expect(started).toEqual([
-      { workItem: 'wi-001', module: reviews, origin: 'entry' },
-      { workItem: 'wi-002', module: sharedUi, origin: 'entry' },
-      { workItem: 'wi-003', module: 'collection-review/workspace', origin: 'integration', scenario: 'sc-004' },
+      { workItem: 'wi-001', module: reviews, origin: 'entry', globalTarget },
+      { workItem: 'wi-002', module: sharedUi, origin: 'entry', globalTarget },
+      { workItem: 'wi-003', module: 'collection-review/workspace', origin: 'integration', scenario: 'sc-004', globalTarget },
     ]);
     // The submission is recorded under the analysis's version.
     // inv-0001 is the intake; the architect's is the second invocation.
-    const outcome = JSON.parse(await readFile(runPath(project, 'review-notes', runId, runLayout.outcome('inv-0002')), 'utf8')) as InvocationOutcome;
     expect(outcome.ended).toBe('submitted');
     const submission = JSON.parse(await readFile(runPath(project, 'review-notes', runId, runLayout.submission('inv-0002')), 'utf8')) as { schema: string };
     expect(submission.schema).toBe('ramify-agent.initial-analysis/3');

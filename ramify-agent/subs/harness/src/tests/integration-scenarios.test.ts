@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { workItemListResponseSchema } from '../interfaces/protocol/runs.js';
 import { RunQueries } from '../projections/queries.js';
-import { runLayout } from '../run/records.js';
+import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { assignmentErrors } from '../work/assignment.js';
 import { assignedObligationErrors, obligationsOf } from '../work/obligations.js';
 import { childrenOnPaths, dueIntegrations, integrationScopeOf, integrationWorkItem, stepDirectoryOf } from '../work/integration.js';
@@ -132,10 +132,16 @@ describe('the integration work item', () => {
     // first; the integration work item started after it, with its origin.
     expect(at(log, 'obligation-reported', data => data.id === 'sc-002')).toBeLessThan(at(log, 'work-item-completed', data => data.workItem === 'wi-002'));
     expect(at(log, 'work-item-completed', data => data.workItem === 'wi-002')).toBeLessThan(at(log, 'work-item-started', data => data.workItem === 'wi-003'));
+    const global = log.find(event => event.type === 'invocation-started' && event.data.role === 'initial-architect')!;
+    if (global.type !== 'invocation-started') throw new Error('initial architect expected');
+    const globalOutcome = JSON.parse(await readFile(runPath(root, plan, runId, runLayout.outcome(global.data.invocation)), 'utf8')) as InvocationOutcome;
+    expect(globalOutcome.session?.ref).toEqual(expect.any(String));
+    const globalTarget = { role: 'global-fork', run: { planId: plan, runId }, session: global.data.session,
+      point: { session: global.data.session, invocation: global.data.invocation }, ref: globalOutcome.session!.ref };
     expect(log.filter(event => event.type === 'work-item-started').map(event => event.data)).toEqual([
-      { workItem: 'wi-001', module: notes, origin: 'entry' },
-      { workItem: 'wi-002', module: tags, origin: 'entry' },
-      { workItem: 'wi-003', module: reviews, origin: 'integration', scenario: 'sc-003' },
+      { workItem: 'wi-001', module: notes, origin: 'entry', globalTarget },
+      { workItem: 'wi-002', module: tags, origin: 'entry', globalTarget },
+      { workItem: 'wi-003', module: reviews, origin: 'integration', scenario: 'sc-003', globalTarget },
     ]);
 
     // The briefing: the scenario, its sub-scenarios and their owners, the

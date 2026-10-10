@@ -572,6 +572,15 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
  * becoming a second copy of the test that owns them.
  */
 const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly file: string; readonly test: string }> = [
+  { union: 'run log.type', values: ['consultation-started', 'consultation-finished'], file: 'subs/harness/src/tests/consultation-records.test.ts', test: 'start and outcome commit exact content references and completed replay is one exchange' },
+  { union: 'run log.type', values: ['consultation-delivery-recorded'], file: 'subs/harness/src/tests/consultation-records.test.ts', test: 'answer acceptance and later caller-result observation preserve immutable outcome revisions' },
+  { union: 'run log[session-opened].data.fork.reason', values: ['architect-consultation'], file: 'subs/harness/src/tests/consultation-workflows.test.ts', test: 'C06/C07/C08: engineer → local → global → local → engineer, with distinct isolated identities and unchanged architect parents' },
+  { union: 'run log[consultation-finished].data.status', values: ['answered'], file: 'subs/harness/src/tests/consultation-records.test.ts', test: 'start and outcome commit exact content references and completed replay is one exchange' },
+  { union: 'run log[consultation-finished].data.status', values: ['failed'], file: 'subs/harness/src/tests/consultation-workflows.test.ts', test: 'C09: inner global error is delivered to local, which still answers engineer' },
+  { union: 'run log[consultation-finished].data.status', values: ['cancelled'], file: 'subs/harness/src/tests/consultation-workflows.test.ts', test: 'C10/C11: cancellation during nested wait stops both forks and records unknown delivery without late answer or implicit retry' },
+  { union: 'run log[consultation-finished].data.status', values: ['incomplete'], file: 'subs/harness/src/tests/consultation-records.test.ts', test: 'nested start preserves parent/target; interrupted acceptance has unknown result delivery' },
+  { union: 'run log[consultation-finished].data.delivery', values: ['recorded'], file: 'subs/harness/src/tests/consultation-records.test.ts', test: 'start and outcome commit exact content references and completed replay is one exchange' },
+  { union: 'run log[consultation-finished].data.delivery', values: ['unknown'], file: 'subs/harness/src/tests/consultation-records.test.ts', test: 'nested start preserves parent/target; interrupted acceptance has unknown result delivery' },
   { union: 'run log[session-opened].data.fork.reason', values: ['capability-consultation'], file: 'subs/harness/src/tests/capability-consultation.test.ts', test: 'CA04 CA06 CA16: original A request consultation preserves its point or uses named recovery after actual loss (lost=%s)' },
   { union: 'observation log.type', values: ['usage', 'model-duration'], file: 'subs/harness/src/tests/plan23-observation-integration.test.ts', test: 'captures original identities, exact output bytes, zero matches and recorded-rate estimates once across restoration' },
   { union: 'observation log[usage].data.charge.source', values: ['estimated-from-recorded-rates'], file: 'subs/harness/src/tests/plan23-observation-integration.test.ts', test: 'captures original identities, exact output bytes, zero matches and recorded-rate estimates once across restoration' },
@@ -954,6 +963,8 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  * a producer, so the list can neither hide a new gap nor outlive a closed one.
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
+  { union: 'run log[work-item-started].data.globalTarget.role', values: ['local-architect', 'capability-architect'], reason: 'The shared consultation-target schema represents assigning architects too, but work dispatch captures only a global-fork point. captureGlobalTarget never produces these assigning roles for globalTarget; the recorded dispatch tests verify the exact initial global point.' },
+  { union: 'run log[consultation-finished].data.delivery', values: ['not-recorded'], reason: 'The outcome format can represent confirmed absence, but current consultation execution initially records unknown delivery and upgrades only an actually observed caller result to recorded. It never infers confirmed absence from interruption; no runtime or focused record test produces not-recorded.' },
   {
     union: 'observation log[usage].data.charge.source', values: ['provider-recorded'],
     reason: 'The current Pi producer records SDK usage and captured-rate estimates, never a provider-billed amount. Plain browser fixtures retain this provenance when explicitly supplied, but no actual agent observation producer reports a billed charge; the format must not relabel an SDK estimate as billing.',
