@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "implementation in progress",
+  "status": "completed and qualified",
   "execution": "serial in dependency order",
   "iterations": [
     {
@@ -62,7 +62,7 @@
         "C19",
         "C20"
       ],
-      "status": "proposed",
+      "status": "completed",
       "writeBoundary": "Harness and Pi integration witnesses, narrow corrections, documentation and exact-candidate full audit receipts."
     }
   ]

@@ -1,8 +1,13 @@
 # Consult architect
 
 **Date:** 2026-10-10. **Status:** implemented on `feat/plan33-consult-architect`;
-iterations 1–3 accepted, integrated scripted workflow and Pi transport witnesses
-pass. Exact-candidate configured full nested qualification is pending iteration 4.
+all four serial iterations are complete. Scripted workflow and Pi transport
+witnesses passed, and the released configured full nested audit qualified source
+`7885b9dfb102193f72535f625f422f1261cc17fc` (evidence
+`7b32b969e8b2b34679f87d6e9ffbd95679bb7bba`).
+[Final results](../plans/33-consult-architect/final-results.md) retains all 20 case
+witnesses, existing skips and structural analysis limits. Advice usefulness
+and live provider behavior remain unmeasured.
 
 [Plan 33](../plans/33-consult-architect/main-plan.md) translates this proposal
 into four serial implementation iterations. It records the selected simple

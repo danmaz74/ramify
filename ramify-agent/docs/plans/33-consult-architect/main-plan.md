@@ -1,6 +1,11 @@
 # Plan 33: consult architect
 
-**Date:** 2026-10-10. **Status:** implementation in progress in `feat/plan33-consult-architect`.
+**Date:** 2026-10-10. **Status:** completed and qualified in `feat/plan33-consult-architect`.
+
+All four serial iterations are complete; [final results](final-results.md) records
+all 20 acceptance cases and the released configured full nested audit on source
+`7885b9dfb102193f72535f625f422f1261cc17fc` (evidence
+`7b32b969e8b2b34679f87d6e9ffbd95679bb7bba`), including skips and analysis limits.
 **Execution:** four serial iterations in an isolated checkout.
 **Scope decision:** R33-1 resolved; capability-assigned engineers are included.
 
