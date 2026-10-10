@@ -3176,7 +3176,8 @@ export class RunService {
         : result.settlementConfirmed === false ? 'Engineer outcome retained, but tool settlement was not confirmed; writer, exchanges and gates remain blocked.' : `Engineer ended ${result.ended}; its actual outcome is held until resume.`;
       const exchange: DebugExchange = { ...pause, kind: 'exchange', commandId: command.commandId, cursor: run.log.nextSequence,
         status: 'settled', answer: result.lastText ?? null, invocation: result.id || null, session: result.session || null,
-        point: result.ref || null, outcome: result.ended, error: result.error ?? null, settlementConfirmed: result.settlementConfirmed !== false,
+        point: result.ref || null, outcome: result.ended, error: result.error ?? null,
+        ...(result.settlementConfirmed === undefined ? {} : { settlementConfirmed: result.settlementConfirmed }),
         continuityLoss: result.actual === 'fresh' && run.log.all('invocation-ended').some(event => event.data.invocation === result.id && event.data.degraded) ? run.log.all('invocation-ended').find(event => event.data.invocation === result.id)?.data.degraded?.reason ?? null : null,
         verdicts: [...result.verdicts ?? []], evidence: result.id === '' ? [] : [runLayout.invocation(result.id), runLayout.outcome(result.id), runLayout.observations(result.id), runLayout.transcript(result.session),
           ...(result.ended === 'submitted' ? [runLayout.submission(result.id)] : [])] };
