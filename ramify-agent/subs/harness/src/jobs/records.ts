@@ -11,8 +11,8 @@ import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
  *   .../input/plan.md                                  the captured plan
  *   .../events.jsonl                                   the canonical record
  *
- * An implementation run is the one kind of job, and `run/records.ts` holds
- * its record. What stays here is what a directory of jobs is, whatever a job
+ * An implementation run and a manual run are the kinds of job, and
+ * `run/records.ts` holds their records. What stays here is what a directory of jobs is, whatever a job
  * turns out to be: where it lives, how its ID is made and how a directory
  * whose record this harness does not support is reported rather than served.
  */
@@ -23,8 +23,11 @@ import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
  */
 export const jobSchemaVersion = 'ramify-agent.job/3';
 
-/** The kinds of job a directory under `jobs/` can hold. */
-export const jobKindSchema = z.enum(['implementation']);
+/**
+ * The kinds of job a directory under `jobs/` can hold: an implementation
+ * run, and a manual run, whose invocations a person starts one at a time.
+ */
+export const jobKindSchema = z.enum(['implementation', 'manual']);
 export type JobKind = z.infer<typeof jobKindSchema>;
 
 /** What every `job.json` declares, whatever its kind, before its kind's reader parses it. */

@@ -371,6 +371,30 @@ export const runRecordSchema = z.object({
 }).strict();
 export type RunRecord = z.infer<typeof runRecordSchema>;
 
+/**
+ * A manual run: the records of invocations a person starts one at a time,
+ * with `step run` or `session`, in a run's own layout. It has no drive and
+ * no phase progression, and recovery never resumes it. Its identity is
+ * recorded when it is created and checked each time it is used again.
+ */
+export const manualRunRecordSchema = z.object({
+  schema: z.literal(jobSchemaVersion),
+  jobId: jobIdSchema,
+  planId: planIdSchema,
+  kind: z.literal('manual'),
+  createdAt: timestamp,
+  /** The project's real path when the run was created. */
+  projectRoot: text,
+  /** The commit HEAD named when the run was created; `''` outside Git. */
+  base: z.string(),
+  /** The candidate branch the run's invocations work on, or null where it made none, as a session's does not. */
+  branch: text.nullable(),
+  /** What started it: `step run` or the `session` command. */
+  origin: z.enum(['step-run', 'session']),
+  policy: runPolicySchema,
+}).strict();
+export type ManualRunRecord = z.infer<typeof manualRunRecordSchema>;
+
 // The prompt packages.
 
 export const promptPackageManifestSchema = z.object({
@@ -703,8 +727,15 @@ export const invocationSchema = z.object({
   /** Exact candidate tree before a writer started; absent where the writer was started without one. */
   candidateBefore: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u).optional(),
   supersedes: text.optional(),
-  /** The latest passed committing checkpoint's audited hash when it started, or the run base before one exists. */
+  /** The latest passed committing checkpoint's audited hash when it started, or the run base before one exists. A manual run's is the commit HEAD named when it started. */
   base: z.string(),
+  /**
+   * The tree a manual run's invocation started on: whether it differed from
+   * its base, and the changed paths. A step run uses the tree as it stands
+   * and restores nothing, so this is what tells two runs of the same inputs
+   * apart. Absent from a run's invocations.
+   */
+  startingTree: z.object({ dirty: z.boolean(), changed: z.array(z.string()) }).strict().optional(),
   startedAt: timestamp,
 }).strict();
 export type Invocation = z.infer<typeof invocationSchema>;
@@ -968,6 +999,11 @@ export const runLayout = {
   lineEvents: (id: InvocationId): string => join('invocations', id, 'lines.json'),
   /** The step inputs the invocation was built from, written before its session starts. */
   stepInputs: (id: InvocationId): string => join('invocations', id, 'inputs.json'),
+  /** What a manual run's invocation ended with, as its live output summarized it, written once it ended. */
+  stepSummary: (id: InvocationId): string => join('invocations', id, 'step.json'),
+  /** A manual run's in-place diagnosis after its invocation: the `session --gate` attempt. */
+  diagnosis: (id: InvocationId): string => join('invocations', id, 'diagnosis', 'attempt.json'),
+  diagnosisOutput: (id: InvocationId): string => join('invocations', id, 'diagnosis'),
   /** The executor's own session record, such as pi's, which only it reads. */
   /** The complete output of one `shell` call, which the tool answers only the tail of. */
   shellOutput: (id: InvocationId, call: number): string => join('invocations', id, 'shell', `${String(call).padStart(3, '0')}.log`),

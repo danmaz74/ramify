@@ -331,8 +331,8 @@ export async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift
   };
   if (mode === 'concern-submission-restart') {
     cleanups.push(async () => { releaseCoordinator(); await opened.service.close(); });
-    const settle = opened.service['settleSession'].bind(opened.service);
-    opened.service['settleSession'] = async (...args) => {
+    const settle = opened.service['runner'].settleSession.bind(opened.service['runner']);
+    opened.service['runner'].settleSession = async (...args) => {
       const result = await settle(...args);
       const invocation = args[0].log.all('invocation-started').find(event => event.data.invocation === args[1]);
       if (!coordinatorSettled && planExercised && invocation?.data.role === 'capability-architect') {

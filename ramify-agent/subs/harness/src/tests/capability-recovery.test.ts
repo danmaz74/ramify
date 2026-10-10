@@ -855,8 +855,8 @@ test('discarded coordinator shutdown refuses corrupted proof, applied non-kept r
   };
   const opened = await openCapabilityRuns(fixture.root, { ...boundary.options, script, inputs: treeInputs() });
   cleanups.push(() => opened.service.close());
-  const settle = opened.service['settleSession'].bind(opened.service);
-  opened.service['settleSession'] = async (...args) => {
+  const settle = opened.service['runner'].settleSession.bind(opened.service['runner']);
+  opened.service['runner'].settleSession = async (...args) => {
     const result = await settle(...args);
     const invocation = args[0].log.all('invocation-started').find(event => event.data.invocation === args[1]);
     if (invocation?.data.role === 'capability-architect') {

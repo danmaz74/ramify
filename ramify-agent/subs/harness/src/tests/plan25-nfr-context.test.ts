@@ -15,7 +15,7 @@ import { notes, notesDirectory, reviewTarget, store } from './helpers/reviews.js
 import { freeze, onlyRun, openRuns, runEventsOnDisk, runPath, staleCrashLock, startRun, until } from './helpers/runs.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { runLayout } from '../run/records.js';
-import { RunService } from '../run/service.js';
+import { InvocationRunner } from '../steps/runner.js';
 import { HarnessSessionOperations, type HarnessOperationInput } from '../run/session-operations.js';
 import { buildDeliveredManifest, type DeliveredInput } from '../prompts/delivered-manifest.js';
 import type { TaskPacket } from '../prompts/tasks.js';
@@ -127,7 +127,7 @@ for (const mode of ['ordinary', 'restart', 'repair', 'legacy-restart', 'current-
   const legacySystem = 'Original recorded assessment system bytes.', legacyPrompt = 'Original recorded assessment prompt bytes.';
   if (legacy) {
     type Start = { startInvocation(...args: unknown[]): Promise<unknown> };
-    const prototype = RunService.prototype as unknown as Start;
+    const prototype = InvocationRunner.prototype as unknown as Start;
     const originalStart = prototype.startInvocation;
     const startSpy = vi.spyOn(prototype, 'startInvocation').mockImplementation(async function (this: Start, ...args) {
       const request = args[2] as { toolName: string; systemPrompt: string; prompt: string; equip: () => unknown };
