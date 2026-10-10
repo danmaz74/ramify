@@ -258,7 +258,8 @@ const commonFields = {
  */
 export const workBriefingSchema = z.object({
   item: workItemSchema,
-  moduleDirectory: text.optional(),
+  /** The module's project-relative directory: empty for the root module, whose directory is the project root. */
+  moduleDirectory: z.string().optional(),
   testAreas: z.array(z.object({ module: text, area: text }).strict()).optional(),
   setup: z.string().optional(),
   onboarding: z.object({ path: text, purpose: z.string().nullable(), missing: z.string().optional() }).strict(),
