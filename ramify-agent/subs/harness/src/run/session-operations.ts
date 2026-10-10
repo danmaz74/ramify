@@ -201,7 +201,7 @@ export function composeOperationPacket(input: {
 
 /** Harness correlations are immutable; provider bytes and execution intent remain in the injected ledger store. */
 export class HarnessSessionOperations {
-  private readonly pending = new Set<Promise<unknown>>();
+  private readonly pending = new Map<Promise<unknown>, string>();
   private readonly unconfirmed = new Set<string>();
   private constructor(private readonly directory: string, private readonly store: LedgerSessionStore, readonly operations: SessionOperations, private readonly agent: AgentPort) {}
   static async open(directory: string, agent: AgentPort): Promise<HarnessSessionOperations> {
@@ -210,6 +210,12 @@ export class HarnessSessionOperations {
     try { return new HarnessSessionOperations(directory, store, agent.bindSessionStore(store), agent); }
     catch (error) { await store.close(); throw error; }
   }
+  /** Whether every dispatched operation of this run has confirmed its tool/session barrier. */
+  settlementConfirmed(runId: string): boolean {
+    return ![...this.pending.values()].includes(runId)
+      && ![...this.unconfirmed].some(key => (JSON.parse(key) as string[])[0] === runId);
+  }
+
   /** Refuses to release the store while any dispatched operation still owns its barrier. */
   async close(): Promise<boolean> {
     if (this.pending.size > 0 || this.unconfirmed.size > 0) return false;
@@ -348,7 +354,7 @@ export class HarnessSessionOperations {
     const barrierKey = JSON.stringify([runId, operationId]);
     const observeBarrier = () => {
       const barrier = handle.settled();
-      this.pending.add(barrier);
+      this.pending.set(barrier, runId);
       void barrier.then(() => { this.pending.delete(barrier); this.unconfirmed.delete(barrierKey); }, () => { this.pending.delete(barrier); this.unconfirmed.add(barrierKey); });
       return barrier;
     };

@@ -50,6 +50,10 @@ export class ReviewQueue {
   /** Each waiter of `changed`, woken once when an attempt or a finish ends. */
   private readonly waiters = new Set<() => void>();
   private open = true;
+  private suspensions = 0;
+  /** Credits belong to waiting requests, never to an already admitted attempt. */
+  private readonly credits = new Map<string, { base: number; ms: number }>();
+  private readonly frozen = new Map<string, { base: number; at: number }>();
   /** Wakes the queue when the earliest waiting request's last moment to start has passed. */
   private timer: NodeJS.Timeout | undefined;
 
@@ -60,7 +64,7 @@ export class ReviewQueue {
     return [...this.running.keys()];
   }
 
-  /** Whether new attempts may still start. */
+  /** Whether admitted attempts may continue their pipeline; close is permanent. */
   get accepting(): boolean {
     return this.open;
   }
@@ -72,6 +76,7 @@ export class ReviewQueue {
    */
   wake(): void {
     if (!this.open) return;
+    if (this.suspensions > 0) { this.freezeWaiting(); return; }
     const now = this.options.now?.() ?? Date.now();
     const attemptMs = this.options.attemptMs ?? 0;
     const busy = (request: string) => this.running.has(request) || this.finishing.has(request) || this.parked.has(request);
@@ -79,7 +84,7 @@ export class ReviewQueue {
     let nextStartBy: number | undefined;
     for (const request of this.options.unsettled()) {
       if (busy(request)) continue;
-      const deadline = this.options.deadline?.(request) ?? null;
+      const deadline = this.deadline(request);
       if (deadline !== null && this.options.expire !== undefined && now + attemptMs > deadline) {
         this.finish(request, this.options.expire, 'finished as having no time before its deadline');
         continue;
@@ -114,6 +119,56 @@ export class ReviewQueue {
     if (stillWaiting && nextStartBy !== undefined && Number.isFinite(nextStartBy)) {
       this.timer = setTimeout(() => this.wake(), Math.max(0, nextStartBy - now) + 1);
       this.timer.unref?.();
+    }
+  }
+
+  /** Reversible admission barrier; expiry, overflow and completion wakes stay suspended too. */
+  suspend(): () => void {
+    if (this.suspensions++ === 0) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+      this.freezeWaiting();
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      if (--this.suspensions !== 0) return;
+      const now = this.options.now?.() ?? Date.now();
+      for (const [request, frozen] of this.frozen) {
+        const credit = this.credits.get(request);
+        this.credits.set(request, { base: frozen.base,
+          ms: (credit?.base === frozen.base ? credit.ms : 0) + Math.max(0, now - frozen.at) });
+      }
+      this.frozen.clear();
+      this.wake();
+      this.notify();
+    };
+  }
+
+  /** The current waiting budget, accounting for the union of suspensions. Active work keeps its bounds. */
+  deadline(request: string): number | null {
+    const base = this.options.deadline?.(request) ?? null;
+    if (base === null) return null;
+    const credit = this.credits.get(request);
+    const frozen = this.frozen.get(request);
+    return base + (credit?.base === base ? credit.ms : 0)
+      + (frozen?.base === base ? Math.max(0, (this.options.now?.() ?? Date.now()) - frozen.at) : 0);
+  }
+
+  private freezeWaiting(): void {
+    const now = this.options.now?.() ?? Date.now();
+    const pending = new Set(this.options.unsettled());
+    for (const request of this.credits.keys()) if (!pending.has(request)) this.credits.delete(request);
+    for (const request of this.frozen.keys()) if (!pending.has(request)) this.frozen.delete(request);
+    for (const request of pending) {
+      if (this.running.has(request) || this.finishing.has(request) || this.parked.has(request) || this.frozen.has(request)) continue;
+      const base = this.options.deadline?.(request) ?? null;
+      const deadline = this.deadline(request);
+      // An already expired request never acquires new budget.
+      if (base !== null && deadline !== null && deadline >= now + (this.options.attemptMs ?? 0)) {
+        this.frozen.set(request, { base, at: now });
+      }
     }
   }
 

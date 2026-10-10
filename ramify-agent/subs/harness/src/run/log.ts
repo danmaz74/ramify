@@ -75,6 +75,10 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('invocation-prepared', z.object({ invocation: text, recorded: z.enum(['delivered-inputs', 'operation-identity']).optional() }).strict()),
   /** The run's first event, holding the start command. It licenses the initial architect. */
   event('job-started', z.object({ command: acceptedCommandSchema }).strict()),
+  event('debug-pausing', z.object({ pauseId: text, revision: z.int().positive(), role: roleSchema,
+    work: invocationWorkSchema, goal: z.string(), nextAction: z.string() }).strict()),
+  event('debug-paused', z.object({ pauseId: text, revision: z.int().positive() }).strict()),
+  event('debug-resumed', z.object({ pauseId: text, revision: z.int().positive(), command: acceptedCommandSchema }).strict()),
   /**
    * A fresh or forked invocation opens a session, appended just before that
    * invocation's `invocation-started`. It names the role and the work the

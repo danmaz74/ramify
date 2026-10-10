@@ -67,7 +67,7 @@ import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage }
 import { orientationToolName } from '../../subs/reviews/src/submission.js';
 import type { AcceptedCommand, Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
-import type { FailureAnalysis, Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
+import { breakpointSelectorSchema, type BreakpointState, type FailureAnalysis, type Role, type RunCommand, type RunFailureReason } from '../interfaces/protocol/runs.js';
 import { CommandLedger, CommandRejection } from '../jobs/commands.js';
 import { commitRecord, readCommitted, recoverCommits, type RecordRef as CommitRecord } from '../jobs/commit.js';
 import { Mutex, PriorityMutex } from '../jobs/mutex.js';
@@ -513,6 +513,8 @@ class Run implements RunnerRun {
   /** Every invocation the run has open, by ID: at most one writer, and the readers beside it. */
   readonly live = new Map<string, LiveInvocation>();
   stopRequested: boolean;
+  /** The prepared request remains on its driver stack; no invocation or writer exists yet. */
+  debugPause: BreakpointState | undefined;
   /** Settles when the run's driver has nothing left to do. */
   done: Promise<void> = Promise.resolve();
   /** The run's review readers, once it reviews; undefined for a run whose policy requests none. */
@@ -714,7 +716,7 @@ export class RunService {
     const invocations = run.log.count('invocation-started');
     // The time the run waited for a person at its review stop is not its own.
     const now = this.now().getTime();
-    const age = now - Date.parse(run.record.createdAt) - reviewPauseMs(run.log.events, now);
+    const age = now - Date.parse(run.record.createdAt) - callerPauseMs(run.log.events, now);
     if (invocations + 1 > limits.maxInvocationsPerRun) return `The run has made ${invocations} invocations; the policy allows ${limits.maxInvocationsPerRun}`;
     if (age > limits.runAbsoluteMs) return `The run has run for ${age} ms; the policy allows ${limits.runAbsoluteMs}`;
     return null;
@@ -851,7 +853,7 @@ export class RunService {
       overflow: async request => {
         await this.finishUnsettledReviews(run, () => ({ reason: 'queue-overflow', detail: `More than ${policy.queue} review requests were waiting; this one was not run` }), [request]);
       },
-      deadline: request => this.reviewDeadline(run, request),
+      deadline: request => this.rawReviewDeadline(run, request),
       attemptMs: policy.attemptMs,
       expire: async request => {
         await this.finishUnsettledReviews(run, () => ({
@@ -872,6 +874,10 @@ export class RunService {
    * earlier. Null while neither applies. Read from the log each time.
    */
   private reviewDeadline(run: Run, id: string): number | null {
+    return run.reviews === undefined ? this.rawReviewDeadline(run, id) : run.reviews.deadline(id);
+  }
+
+  private rawReviewDeadline(run: Run, id: string): number | null {
     const policy = run.record.policy.reviews;
     if (policy === undefined) return null;
     const recorded = run.log.all('review-request-recorded').find(event => event.data.request === id);
@@ -2321,6 +2327,17 @@ export class RunService {
 
       const rewritten = await recoverCommits(run.log.ledger);
       if (rewritten.rewritten.length > 0) report.rematerialized.push(`${run.key}: ${rewritten.rewritten.length} record file(s)`);
+      if (!run.log.terminal && run.record.breakpoint !== undefined) {
+        for (const invocation of await this.closeInterruptedInvocations(run)) report.invocations.push(`${run.key}: ${invocation}`);
+        await this.endRun(run, { type: 'job-interrupted', data: {
+          message: 'The live server for this debug-enabled run was lost. Pending debugger and workflow effects were not replayed; start a new run to continue.',
+        } }, 'interrupted');
+        report.interrupted.push(run.key);
+        for (const event of run.log.events) {
+          if (event.type === 'job-started' || event.type === 'stop-requested' || event.type === 'analysis-approved' || event.type === 'debug-resumed') this.commands.remember(event.data.command);
+        }
+        continue;
+      }
       // A crash can land after the durable close event and before its
       // filesystem cleanup. Repeat the idempotent cleanup on every load.
       try {
@@ -2443,7 +2460,7 @@ export class RunService {
       }
 
       for (const event of run.log.events) {
-        if (event.type === 'job-started' || event.type === 'stop-requested' || event.type === 'analysis-approved') {
+        if (event.type === 'job-started' || event.type === 'stop-requested' || event.type === 'analysis-approved' || event.type === 'debug-resumed') {
           this.commands.remember(event.data.command);
         }
         if (event.type === 'check-findings-recorded' && event.data.cause.kind === 'user-command') this.commands.remember(event.data.cause.command);
@@ -2727,6 +2744,14 @@ export class RunService {
     return run && runSnapshot(run.record, run.log.events);
   }
 
+  /** Current debugger state, independent of the ordinary run snapshot. Inspection invokes no model. */
+  debugState(planId: string, runId: string): BreakpointState | null {
+    this.refuseEarlierPolicy(planId, runId);
+    const run = this.runs.get(key(planId, runId));
+    if (!run || run.log.terminal || run.stopRequested || !run.debugPause) return null;
+    return structuredClone({ ...run.debugPause, cursor: run.log.version });
+  }
+
   /** The run's events, exactly as its log holds them. */
   events(planId: string, runId: string) {
     this.refuseEarlierPolicy(planId, runId);
@@ -2845,10 +2870,15 @@ export class RunService {
       if (this.closed) throw new CommandRejection('unavailable', 'The harness is shutting down');
       const admitted = this.commands.admit(command);
       if (admitted.kind === 'repeat') return admitted.receipt;
+      if (command.type !== 'start-run' && command.type !== 'stop-job' && command.type !== 'debug-resume') {
+        const subject = this.runs.get(key(command.payload.planId, command.payload.jobId));
+        if (subject?.debugPause !== undefined) throw new CommandRejection('busy', 'This run is suspended at an execution breakpoint');
+      }
       switch (command.type) {
         case 'start-run': return this.start(command, admitted.contentHash);
         case 'stop-job': return this.stop(command, admitted.contentHash);
         case 'approve-analysis': return this.approve(command, admitted.contentHash);
+        case 'debug-resume': return this.resumeDebug(command, admitted.contentHash);
         case 'respond-to-check-finding':
         case 'waive-check-finding':
         case 'revoke-check-finding-waiver':
@@ -2858,7 +2888,10 @@ export class RunService {
   }
 
   private async start(command: Extract<RunCommand, { type: 'start-run' }>, contentHash: string): Promise<Receipt> {
-    const { planId, agent: requested, reviewStop } = command.payload;
+    const { planId, agent: requested, reviewStop, breakpoint } = command.payload;
+    if (breakpoint !== undefined && !breakpointSelectorSchema.safeParse(breakpoint).success) {
+      throw new CommandRejection('conflict', 'Supported breakpoint: before-agent:engineer');
+    }
     if (this.options.policy !== undefined) {
       const policy = this.options.policy(this.projectRoot);
       if (policy.version !== capabilityRunPolicyVersion) throw new CommandRejection('conflict', `Run policy ${policy.version} is refused by ${capabilityRunPolicyVersion}; a fresh run is required`);
@@ -2946,6 +2979,7 @@ export class RunService {
       // block that does not parse is a limitation, never a refusal.
       planScenarios: extractPlanScenarios(new TextDecoder().decode(captured)),
       reviewStop,
+      ...(breakpoint === undefined ? {} : { breakpoint }),
     });
     await writeOnce(join(directory, runLayout.record), `${JSON.stringify(record, null, 2)}\n`);
 
@@ -3042,6 +3076,28 @@ export class RunService {
       return { reference: { unavailable: snapshot.measure.unavailable }, snapshot, manifest: frozen };
     }
     return { reference: { measurement: { id, revision: 1, hash: sha256(content) } }, snapshot, manifest: frozen };
+  }
+
+  private async resumeDebug(command: Extract<RunCommand, { type: 'debug-resume' }>, contentHash: string): Promise<Receipt> {
+    const { planId, jobId, pauseId, expectedRevision } = command.payload;
+    this.refuseEarlierPolicy(planId, jobId);
+    const run = this.runs.get(key(planId, jobId));
+    if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
+    const receipt = await run.mutex.run(async () => {
+      if (this.ignoring(run)) throw new CommandRejection('conflict', 'This run accepts no debugger commands');
+      const pause = run.debugPause;
+      if (!pause || pause.pauseId !== pauseId) throw new CommandRejection('conflict', 'This is not the current breakpoint occurrence');
+      if (pause.revision !== expectedRevision) throw new CommandRejection('stale-version', `The pause is at revision ${pause.revision}`, pause.revision);
+      if (pause.state !== 'paused') throw new CommandRejection('busy', `The run is ${pause.state}`);
+      const at = this.now();
+      const accepted = this.commands.accept(command, contentHash, jobId, run.log.nextSequence, at);
+      await run.log.append({ type: 'debug-resumed', data: { pauseId, revision: pause.revision + 1, command: accepted } }, at);
+      this.commands.remember(accepted);
+      run.debugPause = undefined;
+      return accepted.receipt;
+    });
+    run.notify();
+    return receipt;
   }
 
   private async stop(command: Extract<RunCommand, { type: 'stop-job' }>, contentHash: string): Promise<Receipt> {
@@ -3898,8 +3954,75 @@ export class RunService {
   // Invocations
 
   /** One invocation, through the invocation runner every role shares. */
-  private runInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
+  private async runInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
+    if (run.record.breakpoint !== undefined && ['engineer', 'contract-engineer', 'nonfunctional-repair-engineer'].includes(request.role)) {
+      if (!await this.pauseEngineer(run, request)) return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session: '', kept: false };
+    }
     return this.runner.runInvocation(run, agent, request);
+  }
+
+  /** Park before invocation admission, outside all mutexes and invocation cleanup. */
+  private async pauseEngineer<T>(run: Run, request: InvocationRequest<T>): Promise<boolean> {
+    if (this.ignoring(run)) return false;
+    const refusal = this.invocationRefusal(run);
+    if (refusal !== null) { await this.fail(run, 'limit-exceeded', refusal); return false; }
+    const pauseId = `pause-${String(run.log.count('debug-pausing') + 1).padStart(4, '0')}`;
+    const goal = request.task?.goal ?? request.description;
+    const nextAction = `Execute the prepared ${request.role} task with its ordinary tools and submission validator.`;
+    const pause: BreakpointState = { kind: 'breakpoint', planId: run.planId, runId: run.jobId, pauseId, revision: 1,
+      cursor: run.log.version, state: 'pausing', role: request.role, work: { ...request.work }, goal, nextAction,
+      taskState: 'pending', summary: `Settling admitted work before ${request.role}: ${goal}` };
+    run.debugPause = pause;
+    // Attempts already admitted may finish their orientation and review calls.
+    // The barrier is for new attempts, not the calls within those pipelines.
+    const releaseReviews = run.reviews?.suspend();
+    try {
+      if (await this.write(run, { type: 'debug-pausing', data: { pauseId, revision: 1, role: request.role,
+        work: request.work, goal, nextAction } }) === 'ended') return false;
+      await run.reviews?.settled();
+      await run.gating;
+      await run.readiness?.settled;
+      while (run.live.size > 0) await Promise.all([...run.live.values()].map(live => live.done));
+      if (this.ignoring(run)) return false;
+      run.writer.requireSettled('A usable breakpoint requires a settled writer');
+      const unsettledInvocation = run.log.ledger.replay().flatMap(entry => entry.transaction.records).find(record => {
+        if (!record.path.startsWith('invocations/') || !record.path.endsWith('/outcome.json')) return false;
+        const outcome = invocationOutcomeSchema.safeParse(record.body);
+        return !outcome.success || !outcome.data.settled.confirmed;
+      });
+      const operations = this.sessionOperations === undefined ? undefined : await this.sessionOperations;
+      if (unsettledInvocation !== undefined || operations?.settlementConfirmed(run.jobId) === false) {
+        await this.fail(run, 'agent-failed', `Whole-run breakpoint settlement was not confirmed${unsettledInvocation === undefined ? '' : ` for ${unsettledInvocation.id}`}; no usable pause was published.`);
+        return false;
+      }
+      // Settlement is execution time. Only the fully reached caller wait is excluded.
+      const settledRefusal = this.invocationRefusal(run);
+      if (settledRefusal !== null) { await this.fail(run, 'limit-exceeded', settledRefusal); return false; }
+      const reached = await run.mutex.run(async () => {
+        if (this.ignoring(run)) return false;
+        await run.log.append({ type: 'debug-paused', data: { pauseId, revision: 1 } }, this.now());
+        pause.state = 'paused';
+        pause.cursor = run.log.version;
+        pause.summary = `Paused before ${request.role}: ${goal} Assignment prepared; engineer not yet invoked. Resume executes its ordinary task.`;
+        return true;
+      });
+      if (!reached) return false;
+      for (;;) {
+        const changed = run.changed();
+        if (this.ignoring(run)) return false;
+        if (run.debugPause !== pause) break;
+        await changed;
+      }
+      run.writer.requireSettled('The resumed engineer requires a settled writer');
+      const changes = await documentChanges(this.projectRoot, run.planId, run.directory, run.record.manifest);
+      if (changes.length > 0) { await this.fail(run, 'inputs-changed', `Captured documents changed while paused: ${changes.join('; ')}`); return false; }
+      return !this.ignoring(run);
+    } finally {
+      run.debugPause = undefined;
+      // Stop/close takes precedence even if it raced with a durable resume.
+      if (this.ignoring(run)) run.reviews?.close();
+      releaseReviews?.();
+    }
   }
 
   /** Restore only an exact owning role/work/request phase; no whole-history cursor or new identity. */
@@ -10765,15 +10888,32 @@ function approvalRefusal(run: Run, snapshot: RunSnapshot): string | null {
 }
 
 /**
- * How long the run waited at its review stop: from `review-requested` to
- * `analysis-approved`, or to `now` while it still waits. A run bound reads
- * its age without it.
+ * The union of caller waits at review stops and fully reached breakpoints.
+ * Settlement and model execution are running time; overlapping waits count once.
  */
-function reviewPauseMs(events: readonly RunEvent[], now: number): number {
-  const requested = events.find(event => event.type === 'review-requested');
-  if (requested === undefined) return 0;
-  const approved = events.find(event => event.type === 'analysis-approved');
-  return Math.max(0, (approved === undefined ? now : Date.parse(approved.at)) - Date.parse(requested.at));
+function callerPauseMs(events: readonly RunEvent[], now: number): number {
+  const intervals: Array<[number, number]> = [];
+  let review: number | undefined;
+  let debug: number | undefined;
+  for (const event of events) {
+    const at = Date.parse(event.at);
+    if (event.type === 'review-requested') review = at;
+    if (event.type === 'analysis-approved' && review !== undefined) { intervals.push([review, at]); review = undefined; }
+    if (event.type === 'debug-paused') debug ??= at;
+    if (event.type === 'debug-resumed' && debug !== undefined) { intervals.push([debug, at]); debug = undefined; }
+    if (['job-stopped', 'job-failed', 'job-interrupted', 'job-completed'].includes(event.type)) {
+      if (review !== undefined) intervals.push([review, at]);
+      if (debug !== undefined) intervals.push([debug, at]);
+      review = debug = undefined;
+    }
+  }
+  if (review !== undefined) intervals.push([review, now]);
+  if (debug !== undefined) intervals.push([debug, now]);
+  intervals.sort(([a], [b]) => a - b);
+  let total = 0;
+  let end = Number.NEGATIVE_INFINITY;
+  for (const [from, to] of intervals) { total += Math.max(0, to - Math.max(from, end)); end = Math.max(end, to); }
+  return total;
 }
 
 function analysisMessage(record: RunRecord, plan: string, inputs: ExtractionInputs, planScenarios: PlanScenarioExtraction): string {

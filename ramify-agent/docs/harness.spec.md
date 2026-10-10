@@ -143,6 +143,57 @@ holds, then a model's analysis, so the decision needs no transcript. A bound
 that proves too tight is the architect's to raise, within the policy's
 ceilings.
 
+### Execution Breakpoints Suspend The Whole Run
+
+A start-run command may select `before-agent:engineer`. Unsupported selectors
+are refused before starting. Absence preserves ordinary execution and legacy
+record readability. This selector matches ordinary and capability-task
+`engineer` invocations, repair continuations, `contract-engineer` invocations
+and `nonfunctional-repair-engineer` invocations. Each prepared workflow request
+has one occurrence; internal context-loss fallback does not create a new one.
+
+The harness prepares the ordinary assignment, scope, equipment and task input
+before the boundary. It parks before invocation admission and writer acquisition,
+with no run mutex or ledger transaction held. The server retains its project
+lock. The ordinary job stays nonterminal; debugger state separately identifies
+`pausing`, `paused` or `exchanging`, occurrence ID, interaction revision, actual
+role, work, goal and next action. Read-only inspection consumes no invocation.
+
+At `pausing`, admit no new ordinary operation or review attempt. Already admitted
+review pipelines, including orientation followed by review, finish under their
+normal bounds. Gates and invocation cleanup finish before a usable `paused`
+transition. Every dispatched operation must confirm its session/tool settlement;
+an empty live-invocation map alone is insufficient. Failed or unconfirmed
+settlement retains its ordinary evidence and prevents a usable pause.
+
+Review admission is reversibly suspended. Timer expiry, overflow and
+completion-triggered wakeups cannot affect waiting work while suspended.
+Suspension preserves still-live waiting review budgets, including overlapping
+reasons once; active work keeps its normal bounds and expired work receives no
+new budget. Only fully reached caller waiting is excluded from run execution
+age; settlement and model execution count toward ordinary bounds. Invocation
+counts and each model/tool bound continue to apply.
+
+A resume names the current pause ID and interaction revision and acknowledges
+release without waiting for the next stop. Stable command IDs deduplicate exact
+retries before revision checks; changed content conflicts. A new stale, active
+or already released interaction is refused. Resume without discussion executes
+the prepared ordinary request once, revalidating captured documents, writer
+settlement and the runner's ordinary source/session/authority preconditions.
+A later assignment or repair reaches a new occurrence. Stop takes precedence
+over a pause or admitted resume, settles admitted work through the ordinary
+stop mechanism, and returns the actual terminal run outcome.
+
+This debugger requires the same live server. Client disconnection has no effect
+on the run, its retained records or command admission. On server startup, every
+unfinished debug-enabled run is interrupted before pending effect completion,
+capability source reconciliation or workflow restoration, even before its first
+pause or after resume. Interrupted invocation and session evidence is retained;
+pending effects are not redispatched. Ordinary runs keep their existing
+recovery policy. Caller conversation and effective input presentation are
+implemented by the subsequent Plan 34 conversation iteration; their pending
+returns must not change the default missing-submission outcome.
+
 ### An Oriented Context Is Reused, Never Required
 
 Fork an oriented session for independent tasks. It starts from the point where

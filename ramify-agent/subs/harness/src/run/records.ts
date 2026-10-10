@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { join } from 'node:path';
 import { citationSchema, inputManifestSchema, modulePathSchema, sha256Schema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
-import { roleSchema, runAgentSchema, type Role } from '../interfaces/protocol/runs.js';
+import { breakpointSelectorSchema, roleSchema, runAgentSchema, type Role } from '../interfaces/protocol/runs.js';
 import { jobSchemaVersion, jobsDirectory } from '../jobs/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import { planScenarioExtractionSchema } from '../../subs/scenarios/src/extraction.js';
@@ -368,6 +368,8 @@ export const runRecordSchema = z.object({
    * `analysis-approved`, never a field here: this record is written once.
    */
   reviewStop: z.boolean(),
+  /** Absent for ordinary and legacy runs. Debug-enabled runs require the same live host. */
+  breakpoint: breakpointSelectorSchema.optional(),
 }).strict();
 export type RunRecord = z.infer<typeof runRecordSchema>;
 

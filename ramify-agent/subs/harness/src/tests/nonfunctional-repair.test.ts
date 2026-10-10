@@ -9,7 +9,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { withDefaultTurns } from './helpers/declarations.js';
 import { analysis } from './helpers/analysis.js';
 import { submit, write } from './helpers/iterations.js';
-import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun, until } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
 
 import { nfrBoundaries } from './helpers/nonfunctional-boundaries.js';
@@ -30,7 +30,7 @@ afterEach(async () => {
   if (errors.length) throw new AggregateError(errors, 'NFR fixture teardown failed');
 });
 
-test('one authorized repair edits two modules from the chosen src, then reassesses every NFR', async () => {
+test.each([false, true])('one authorized repair edits two modules from the chosen src, then reassesses every NFR (breakpoint: %s)', async debug => {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   const boundaryAnswers = nfrBoundaries(fixture.root, { repair: 'two-modules' });
@@ -86,7 +86,20 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   }));
   const { service } = await openRuns(fixture.root, { ...boundaryAnswers.options, agent });
   cleanups.push(() => service.close());
-  const receipt = await service.execute(startRun('review-notes'));
+  const start = startRun('review-notes');
+  if (start.type !== 'start-run') throw new Error('Unexpected command');
+  const receipt = await service.execute({ ...start, payload: { ...start.payload,
+    ...(debug ? { breakpoint: 'before-agent:engineer' as const } : {}) } });
+  if (debug) {
+    await until(() => service.debugState('review-notes', receipt.jobId)?.state === 'paused');
+    const pause = service.debugState('review-notes', receipt.jobId)!;
+    expect(pause).toMatchObject({ role: 'nonfunctional-repair-engineer', taskState: 'pending',
+      goal: 'Add a cross-module audit record implementation' });
+    expect(agent.sessions.some(session => session.spec.role === 'nonfunctional-repair-engineer')).toBe(false);
+    await service.execute({ commandId: 'nfr-resume', expectedVersion: 0, type: 'debug-resume', payload: {
+      planId: 'review-notes', jobId: receipt.jobId, pauseId: pause.pauseId, expectedRevision: pause.revision,
+    } });
+  }
   await service.settled('review-notes', receipt.jobId);
   const run = onlyRun(service, 'review-notes');
   const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);

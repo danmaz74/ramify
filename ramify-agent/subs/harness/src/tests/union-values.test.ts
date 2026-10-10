@@ -88,7 +88,7 @@ describe('the run log', () => {
   test('every event type is written and read back, and the terminal ones are named', () => {
     const types = runEventSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
-      'invocation-prepared', 'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
+      'invocation-prepared', 'job-started', 'debug-pausing', 'debug-paused', 'debug-resumed', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
       'document-manifest-committed', 'work-orientation-recorded', 'context-selection-recorded', 'context-package-append-requested', 'context-package-appended', 'context-package-prompt-bound', 'candidate-prepared', 'nonfunctional-phase-started', 'nonfunctional-assessed', 'nonfunctional-investigated', 'nonfunctional-repair-assigned', 'nonfunctional-repair-committed', 'nonfunctional-round-closed', 'nonfunctional-deviation-recorded', 'candidate-bound-to-gate',
       'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
       'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned',
@@ -1081,6 +1081,9 @@ function sampleData(type: RunEvent['type']): unknown {
   const r = { id: 'x', revision: 1, hash: 'a'.repeat(64) };
   const command = { commandId: 'c', contentHash: 'h', receipt: { commandId: 'c', jobId: 'j', sequence: 1, acceptedAt: '2026-09-20T10:15:00.000Z' } };
   const samples: Partial<Record<RunEvent['type'], unknown>> = {
+    'debug-pausing': { pauseId: 'pause-0001', revision: 1, role: 'engineer', work: {}, goal: 'Task', nextAction: 'Execute task' },
+    'debug-paused': { pauseId: 'pause-0001', revision: 1 },
+    'debug-resumed': { pauseId: 'pause-0001', revision: 2, command },
     'invocation-prepared': { invocation: 'inv-0001' },
     'session-opened': { session: 'ses-0001', role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, executor: 'scripted', model: null },
     'invocation-started': { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' },

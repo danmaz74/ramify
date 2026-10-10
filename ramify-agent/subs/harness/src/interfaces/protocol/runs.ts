@@ -53,6 +53,31 @@ export type Role = z.infer<typeof roleSchema>;
 export const runAgentSchema = z.enum(['pi', 'scripted']);
 export type RunAgent = z.infer<typeof runAgentSchema>;
 
+/** The one supported execution breakpoint selector. */
+export const breakpointSelectorSchema = z.literal('before-agent:engineer');
+export type BreakpointSelector = z.infer<typeof breakpointSelectorSchema>;
+
+/** Debug state is separate from the ordinary job lifecycle. */
+export const breakpointStateSchema = z.object({
+  kind: z.literal('breakpoint'), planId: planIdSchema, runId: runIdSchema,
+  pauseId: z.string().min(1), revision: z.int().positive(), cursor: z.int().nonnegative(),
+  state: z.enum(['pausing', 'paused', 'exchanging']),
+  role: roleSchema,
+  work: z.object({ workItem: z.string().optional(), iteration: z.string().optional(), request: z.string().optional(),
+    capabilityTask: z.string().optional(), nonfunctionalRepair: z.string().optional() }).strict(),
+  goal: z.string(), nextAction: z.string(), taskState: z.enum(['pending', 'accepted', 'terminal']),
+  summary: z.string(),
+}).strict();
+export type BreakpointState = z.infer<typeof breakpointStateSchema>;
+
+/** Release one prepared occurrence; admission uses its interaction revision. */
+export const debugResumeCommandSchema = z.object({
+  commandId: commandIdSchema, expectedVersion: jobVersionSchema.default(0), type: z.literal('debug-resume'),
+  payload: z.object({ planId: planIdSchema, jobId: jobIdSchema, pauseId: z.string().min(1),
+    expectedRevision: z.int().positive() }).strict(),
+}).strict();
+export type DebugResumeCommand = z.infer<typeof debugResumeCommandSchema>;
+
 /**
  * Starts an implementation run for a plan. It creates the run, so it expects
  * version 0. It carries nothing the harness will execute. With `reviewStop`
@@ -63,7 +88,7 @@ export const startRunCommandSchema = z.object({
   commandId: commandIdSchema,
   expectedVersion: jobVersionSchema,
   type: z.literal('start-run'),
-  payload: z.object({ planId: planIdSchema, agent: runAgentSchema, reviewStop: z.boolean().default(false) }).strict(),
+  payload: z.object({ planId: planIdSchema, agent: runAgentSchema, reviewStop: z.boolean().default(false), breakpoint: breakpointSelectorSchema.optional() }).strict(),
 }).strict();
 export type StartRunCommand = z.infer<typeof startRunCommandSchema>;
 
@@ -95,7 +120,7 @@ export type ApproveAnalysisCommand = z.infer<typeof approveAnalysisCommandSchema
  * revocation, each against a CheckFinding's revision.
  */
 export const runCommandSchema = z.discriminatedUnion('type', [
-  startRunCommandSchema, stopJobCommandSchema, approveAnalysisCommandSchema,
+  startRunCommandSchema, stopJobCommandSchema, approveAnalysisCommandSchema, debugResumeCommandSchema,
   respondToCheckFindingCommandSchema, waiveCheckFindingCommandSchema, revokeCheckFindingWaiverCommandSchema,
 ]);
 /** A command as the harness receives it, with every default applied. */
