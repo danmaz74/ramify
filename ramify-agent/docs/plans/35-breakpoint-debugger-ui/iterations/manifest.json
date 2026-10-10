@@ -1,0 +1,31 @@
+{
+  "plan": "../main-plan.md",
+  "status": "proposed",
+  "execution": "serial in dependency order",
+  "iterations": [
+    {
+      "id": "1",
+      "file": "01-protocol-and-client.md",
+      "dependsOn": [],
+      "cases": ["U01", "U02", "U03"],
+      "status": "planned",
+      "writeBoundary": "Harness protocol contracts, run snapshot projection, /debug route, specification sentences; web client and stub client."
+    },
+    {
+      "id": "2",
+      "file": "02-debugger-area.md",
+      "dependsOn": ["1"],
+      "cases": ["U04", "U05", "U06", "U07", "U08", "U09", "U10", "U11", "U12"],
+      "status": "planned",
+      "writeBoundary": "Web module: plan page, run page, debugger area, styles and JSDOM tests."
+    },
+    {
+      "id": "3",
+      "file": "03-qualification.md",
+      "dependsOn": ["2"],
+      "cases": ["U13"],
+      "status": "planned",
+      "writeBoundary": "Browser-acceptance script and fixture page, package script, test registration, README, dogfooding skill, plan results and manifest; harness or web source only for recorded defects."
+    }
+  ]
+}
