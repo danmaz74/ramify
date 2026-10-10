@@ -8,7 +8,7 @@ six configured audit checks. No target check was replaced or weakened.
 ## Source, target and bounds
 
 - Harness checkout: `/home/app/ramify-plan34-breakpoints-implementation`, branch
-  `feat/plan34-breakpoints-implementation`; production execution source
+  `feat/plan34-breakpoints-implementation`; initial host execution source
   `5261c98b21427cf0988028ab36b95d4aa4a8e271` (accepted iteration 3). Qualification
   test/document additions were developed separately while this server ran.
 - Target: `/home/app/ramify-plan34-real-project-option/ramify-agent`, branch
@@ -78,9 +78,10 @@ alone establish delivery of the full harness packet or useful target work.
 
 The registered process witness runs the actual hosting implementation in an
 independent process and actual root CLI clients over HTTP. It kills a client
-after admission, retries its command, tests finite timeout and stop, then kills
-the actual lock-holding host PID and verifies interruption on restart without
-replaying the pending engineer. Git/audit/provider answers remain transparent
+after admission, retries its command, tests finite timeout and stop, explicitly resumes another run from a separate
+CLI client, then kills the actual lock-holding host PID while its resumed
+engineer is admitted but blocked. It verifies interruption on restart without
+replaying that engineer. Git/audit/provider answers remain transparent
 scripts in this native lifetime witness.
 
 ## Useful-work outcome

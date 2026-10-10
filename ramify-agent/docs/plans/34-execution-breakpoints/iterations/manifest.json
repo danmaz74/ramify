@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "controls implemented; iteration 4 qualification in progress",
+  "status": "controls implemented; final qualification pending, B18 incomplete",
   "execution": "serial in dependency order",
   "iterations": [
     {
@@ -63,8 +63,12 @@
         "B17",
         "B18"
       ],
-      "status": "in progress; B18 and final configured audit outstanding",
-      "writeBoundary": "Combined workflow and registered native witnesses, documentation and dogfooding guidance, final audit and real-plan evidence; target implementation remains in its own worktree."
+      "status": "partial; final configured audit pending; B18 incomplete",
+      "writeBoundary": "Combined workflow and registered native witnesses, documentation and dogfooding guidance, final audit and real-plan evidence; target implementation remains in its own worktree.",
+      "results": "04-results.md",
+      "outstandingCases": [
+        "B18"
+      ]
     }
   ]
 }

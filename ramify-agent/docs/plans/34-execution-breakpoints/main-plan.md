@@ -1,6 +1,6 @@
 # Plan 34: execution breakpoints
 
-**Date:** 2026-10-10. **Status:** controls implemented; iteration 4 qualification in progress;
+**Date:** 2026-10-10. **Status:** controls implemented; final qualification pending, B18 incomplete;
 R34-1 and R34-2 resolved by the user on 2026-10-10. **Execution:** serial authored iterations
 in an isolated checkout. Source inspected at
 `969d8cda574bfc47a1764d052cfd510f95acceab`.

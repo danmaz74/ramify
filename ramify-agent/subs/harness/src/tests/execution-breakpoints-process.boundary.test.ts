@@ -1,5 +1,5 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { access, readFile, writeFile } from 'node:fs/promises';
+import { access, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -106,6 +106,22 @@ test(title, async () => {
   expect(terminal.code).toBe(1); expect(JSON.parse(terminal.stdout).run.state).toBe('stopped');
   const secondRun = await start('native-crash-start');
   await until(async () => { const state = await (await fetch(first.url + `/api/v1/plans/${plan}/runs/${secondRun.jobId}/debug`)).json() as { current: { state: string } | null }; return state.current?.state === 'paused'; });
+  const secondPath = `/api/v1/plans/${plan}/runs/${secondRun.jobId}`;
+  const secondPause = await (await fetch(first.url + secondPath + '/debug')).json() as {
+    current: { pauseId: string; revision: number }; run: { counts: { invocations: number } } };
+  // Release through a distinct actual CLI client. Keep the resumed engineer
+  // admitted but blocked, so crash recovery also covers a run after release.
+  await unlink(release);
+  const proceed = join(fixture.root, '..', 'proceed.txt'); await writeFile(proceed, 'Now implement the ordinary assignment.');
+  const resumed = await command(['debug', 'resume', '--server', first.url, '--plan', plan, '--run', secondRun.jobId,
+    '--pause', secondPause.current.pauseId, '--expected-revision', String(secondPause.current.revision),
+    '--command-id', 'native-resume', '--message-file', proceed, '--json']);
+  expect(resumed.code).toBe(0); expect(resumed.stderr).toBe('');
+  expect(JSON.parse(resumed.stdout)).toMatchObject({ kind: 'resumed', runId: secondRun.jobId, pauseId: secondPause.current.pauseId });
+  await until(async () => {
+    const snapshot = await (await fetch(first.url + secondPath)).json() as { run: { counts: { invocations: number } } };
+    return snapshot.run.counts.invocations === secondPause.run.counts.invocations + 1;
+  });
   const beforeCrash = await (await fetch(first.url + `/api/v1/plans/${plan}/runs/${secondRun.jobId}`)).json() as { run: { counts: { invocations: number } } };
   // Vitest may host in a worker process: kill the PID that actually took the lock,
   // then settle our runner. Killing only the runner cannot establish host loss.
