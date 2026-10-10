@@ -13,11 +13,10 @@ import { gitCandidateSource, gitChangeHistory, gitService, type CandidateSource,
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
 import { findModule, type ArchitectIndex } from '../../subs/evidence/src/views.js';
-import type { Checkpoint, GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
+import type { GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
 import { acceptedCommit } from '../checks/accepted.js';
-import type { GateCommandStarted } from '../checks/execution.js';
 import type { ConfiguredAuditPort } from '../../subs/audit/src/check-execution.js';
-import { executeConfiguredGate, type ConfiguredGateAudit, type PreparedGate } from '../checks/gate.js';
+import type { PreparedGate } from '../checks/gate.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { decideWrite } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
@@ -41,7 +40,6 @@ import {
 } from '../reviews/reconciliation.js';
 import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } from '../reviews/reconciliation-message.js';
 import { outsideScope, recordSettledSnapshot } from './mutations.js';
-import { placementPaths } from '../guard/write-guard.js';
 import { captureProvisionalSource } from '../capability/source.js';
 import { capabilityRequestId, capabilityTaskId, capabilityAssignmentId, identifyCapabilityNeed, capabilityLayout,
   type CapabilityNeedInput, type CapabilityRequest, type CapabilityTask, type CapabilityPlan, type CapabilityExchange,
@@ -57,12 +55,11 @@ import { userCheckFindingChange, userRejectionCode } from '../check-findings/use
 import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findings.js';
 import { canonicalJson } from '../jobs/commands.js';
 import {
-  reviewAttemptId, reviewAttemptSchema, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas, reviewSubmissionSchema,
+  reviewAttemptId, reviewAttemptSchema, reviewLayout, reviewOrientationSchema, reviewRequestSchema, reviewSchemas, reviewSubmissionSchema,
   type ForkPoint, type NotVerifiedReason, type OrientationSubmission, type ReviewAttempt, type ReviewOrientation, type ReviewRequest,
   type ReviewResult, type ReviewSubmission,
 } from '../reviews/records.js';
-import { orientationKey, readGuidance, type CapturedInput } from '../../subs/reviews/src/inputs.js';
-import { pendingBindingEvidence } from '../reviews/binding-evidence.js';
+import type { CapturedInput } from '../../subs/reviews/src/inputs.js';
 import { prepareReview, type PreparedReview } from '../../subs/reviews/src/preparation.js';
 import { ReviewQueue } from '../reviews/scheduler.js';
 import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotComparison, type SnapshotTools } from '../../subs/reviews/src/snapshot.js';
@@ -155,7 +152,7 @@ import {
 import { registerContract, registrationNeeded, type AttachedConsumer } from '../contracts/accept.js';
 import { cycleClosedBy, cycleIdentity, type DependencyCycle, type DependencyEdge } from '../contracts/graph.js';
 import { fakeNamingViolations, type NamedFile } from '../contracts/naming.js';
-import { fakeExposureParity, type StandIn } from '../contracts/parity.js';
+import type { StandIn } from '../contracts/parity.js';
 import {
   contractId, contractOfObligation, contractsLayout, obligationId, requirementId,
   type ConsumerRequirement, type ContractRecord, type ProviderObligation,
@@ -184,9 +181,8 @@ import {
   validateEngineer, type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
-  iterationAssignmentSchema, iterationId, iterationLayout, iterationResultSchema, iterationSchemas, moduleNoticeSchema,
-  workItemOfIteration,
-  type FailureDigest, type IterationAssignment, type IterationResult, type ModuleNotice, type WriteScope,
+  iterationAssignmentSchema, iterationId, iterationLayout, iterationSchemas, type FailureDigest, type IterationAssignment, type IterationResult,
+  type WriteScope,
 } from '../work/iterations.js';
 import {
   digestLines, failureAnalysisJsonSchema, failureAnalysisMessage, failureAnalysisSubmissionDescription, failureAnalysisToolName,
@@ -195,40 +191,36 @@ import {
 } from '../work/failure.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  scopeConfigurationPaths, captureGuardedFiles, checkWriteScope, deniedFiles, guardedScopeOf, protectedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
-  type DefaultWriteScope, type GuardedScenarioFiles,
+  scopeConfigurationPaths, captureGuardedFiles, checkWriteScope, deniedFiles, guardedScopeOf, protectedScopeOf, injectionSiteRule, moduleOwning,
+  resolveWriteScope, testPolicyOf, type DefaultWriteScope, type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
 import {
-  bindingEventsToRecord, obligationBriefingLines, obligationEventsToRecord, obligationsOf, obligationsOwnedBy, reportSourceLines,
-  type ObligationActor, type ObligationBinding, type ObligationProjection, type ObligationRegistration, type ObligationReport,
+  obligationBriefingLines, obligationsOwnedBy, reportSourceLines, type ObligationActor, type ObligationProjection,
 } from '../work/obligations.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, type WorkItem } from '../work/records.js';
 import { apiViewsOf, prepareAssignedCucumber, focusedScenarioFacts, defaultWriteScopeSection, iterationApiViews, onboardingOf, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
 import { localArchitectToolName, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, passedScenarioLines, type GateAudience } from '../checks/diagnostics.js';
-import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { concernBindings, finishReview, requestedStartOf, reviewOutcome, sameWorkItem, type ConcernBinding } from './review-finish.js';
-import { AfterHandling, assignedCount, completionBlockers, authorizedScope, evidenceFor, requiredArtifacts, bindingsOf, capabilityBlockersOf, integrationItemsDue, obligationOwedBy, obligationProjection, openRequirementsOf, pendingCorrection, verifiedRequirements, type HandlingHost, type ReviewInputs } from './after-handling.js';
+import { AfterHandling, assignedCount, completionBlockers, authorizedScope, evidenceFor, requiredArtifacts, bindingsOf, capabilityBlockersOf, integrationItemsDue, obligationOwedBy, obligationProjection, openRequirementsOf, pendingCorrection, verifiedRequirements, type HandlingHost } from './after-handling.js';
 import { CandidateDriftError, CommittingGates, readinessAuditOutcome, writeScopePaths, type GateHost } from './committing-gate.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
 import type { RenderedFeatureFile } from '../../subs/scenarios/src/rendering.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
-import type { Transaction } from '../../subs/ledger/src/ledger.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder, type CallInFlight } from './port-events.js';
 import { contextPolicyOf, defaultRunPolicy, invocationLimits, engineerBoundsOf, withProjectTimeouts, type EngineerBounds } from './policy.js';
 import { captureProjectConfig, moduleTestAreas, type TestArea } from './project-config.js';
 import {
-  commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
-  incompleteScenarios, rewordedTrailerValue, rewordingMessage, scenarioNameOf, trackedScenarios,
-  writtenScenarios, type FeatureRerendering,
+  commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes,
+  materializationMessage, rerenderFeatureFiles, incompleteScenarios, rewordedTrailerValue, rewordingMessage, scenarioNameOf, trackedScenarios,
 } from './feature-files.js';
 import type { ScenarioState } from '../../subs/scenarios/src/states.js';
 import { scenarioRecordSchema, scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
-import { dueIntegrations, integrationBriefing, integrationWorkItem, type IntegrationBriefing } from '../work/integration.js';
+import { integrationBriefing, type IntegrationBriefing } from '../work/integration.js';
 import { briefed, entryScenariosOf, type EngineerScenarios } from '../work/scenario-briefing.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import { declaredModuleDirectories } from './project-config.js';
@@ -236,12 +228,12 @@ import {
   assignmentStartingPointsOf, auditPreparationPathsOf, declaredCheckFacts, defaultWriteScopesOf, engineerBoundsFor, iterationAssignmentOf,
   knownProjectFactsOf, obligationBriefingOf, ownedTestAreasOf, unauthorizedGuardedOf, viewIdentityOf as projectViewIdentity,
 } from './project-facts.js';
-import { assertScratchSafe, ensureScratchRule, releasableScratchModules, removeScratchDirectories, scratchSafetyRule, ScratchIgnoreConflictError } from '../work/scratch.js';
-import { globalForkSourceSchema,
-  gateAttemptId, gateAttemptSchema, invocationId, invocationOutcomeSchema, invocationSchema, lineEventSummarySchema,
+import { assertScratchSafe, ensureScratchRule, scratchSafetyRule, ScratchIgnoreConflictError } from '../work/scratch.js';
+import {
+  globalForkSourceSchema, gateAttemptId, gateAttemptSchema, invocationId, invocationOutcomeSchema, invocationSchema, lineEventSummarySchema,
   measurementSnapshotSchema, readinessAttemptSchema, recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
-  type GateOperation, type Invocation, type InvocationOutcome, type LineEventSummary, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
-  type ArchitectRef, type ReviewKind, type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
+  type GateOperation, type Invocation, type InvocationOutcome, type LineEventSummary, type MeasurementSnapshot, type RecordRef, type RunPolicy,
+  type RunRecord, type ArchitectRef, type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
   type RequestRelation, type SessionFinishReason, type SessionId,
 } from './records.js';
 import { reduceSessions, type RunSessions } from './sessions.js';

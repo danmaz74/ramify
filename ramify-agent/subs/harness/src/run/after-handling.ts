@@ -330,30 +330,7 @@ export class AfterHandling<R extends GateRun> {
 
   /** Attribute only the rendering and accepted bindings preceding this exact candidate gate. */
   async reviewPendingBindings(run: R, request: ReviewRequest, snapshot: CandidateSnapshot) {
-    const lines = run.log.ledger.replay();
-    const gate = lines.findIndex(line => line.transaction.event.type === 'gate-committing' && line.transaction.event.data.gate === request.gate);
-    if (gate < 0) return [];
-    const prefix = lines.slice(0, gate + 1);
-    const tracked = writtenScenarios(prefix);
-    const expected = new Map(expectedFeatureFiles(tracked, { planId: run.planId, runId: run.jobId }).map(file => [file.path, file.content]));
-    const changed = new Set(snapshot.changes.map(change => change.path));
-    const bindings: Array<{ path: string; sha256: string; scenario: string; invocation: string; submission: string }> = [];
-    for (const line of prefix) {
-      const event = line.transaction.event;
-      if (event.type !== 'obligation-bound') continue;
-      const scenario = tracked.records.find(record => record.id === event.data.id);
-      if (!scenario || !changed.has(scenario.file) || snapshot.entries.get(scenario.file)?.kind !== 'file') continue;
-      const end = prefix.find(item => item.transaction.event.type === 'invocation-ended' && item.transaction.event.data.invocation === event.data.by
-        && item.transaction.event.data.submission === event.data.submission);
-      if (!end) continue;
-      const submission = await readIfExists(run.path(runLayout.submission(event.data.by)));
-      if (submission === undefined || sha256(submission) !== event.data.submission) continue;
-      const bytes = await this.host.candidates.readBlob(this.host.projectRoot, request.key.candidate, scenario.file);
-      const evidence = pendingBindingEvidence({ path: scenario.file, scenario: scenario.id, invocation: event.data.by, submission: event.data.submission,
-        submissionBytes: submission, candidateBytes: bytes, expectedBytes: expected.get(scenario.file) });
-      if (evidence !== null) bindings.push(evidence);
-    }
-    return bindings;
+    return pendingBindingsOf(run, request, snapshot, this.host);
   }
 
   /**
@@ -446,6 +423,39 @@ export class AfterHandling<R extends GateRun> {
 }
 
 // Ledger-only projections the handling and the run share.
+
+/**
+ * The pending-tag bindings a review of the candidate is told about: each
+ * accepted binding committed before the request's gate whose scenario file
+ * the candidate changed, with its verified provenance.
+ */
+export async function pendingBindingsOf(run: Pick<GateRun, 'log' | 'planId' | 'jobId'> & { path(relative: string): string }, request: ReviewRequest,
+  snapshot: CandidateSnapshot, host: { readonly candidates: CandidateSource; readonly projectRoot: string }) {
+  const lines = run.log.ledger.replay();
+  const gate = lines.findIndex(line => line.transaction.event.type === 'gate-committing' && line.transaction.event.data.gate === request.gate);
+  if (gate < 0) return [];
+  const prefix = lines.slice(0, gate + 1);
+  const tracked = writtenScenarios(prefix);
+  const expected = new Map(expectedFeatureFiles(tracked, { planId: run.planId, runId: run.jobId }).map(file => [file.path, file.content]));
+  const changed = new Set(snapshot.changes.map(change => change.path));
+  const bindings: Array<{ path: string; sha256: string; scenario: string; invocation: string; submission: string }> = [];
+  for (const line of prefix) {
+    const event = line.transaction.event;
+    if (event.type !== 'obligation-bound') continue;
+    const scenario = tracked.records.find(record => record.id === event.data.id);
+    if (!scenario || !changed.has(scenario.file) || snapshot.entries.get(scenario.file)?.kind !== 'file') continue;
+    const end = prefix.find(item => item.transaction.event.type === 'invocation-ended' && item.transaction.event.data.invocation === event.data.by
+      && item.transaction.event.data.submission === event.data.submission);
+    if (!end) continue;
+    const submission = await readIfExists(run.path(runLayout.submission(event.data.by)));
+    if (submission === undefined || sha256(submission) !== event.data.submission) continue;
+    const bytes = await host.candidates.readBlob(host.projectRoot, request.key.candidate, scenario.file);
+    const evidence = pendingBindingEvidence({ path: scenario.file, scenario: scenario.id, invocation: event.data.by, submission: event.data.submission,
+      submissionBytes: submission, candidateBytes: bytes, expectedBytes: expected.get(scenario.file) });
+    if (evidence !== null) bindings.push(evidence);
+  }
+  return bindings;
+}
 
 /**
  * A scope widened by the guarded paths an architect authorized: each one the
