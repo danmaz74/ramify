@@ -13,7 +13,7 @@
         "C03",
         "C04"
       ],
-      "status": "proposed",
+      "status": "verified; coordinator acceptance pending",
       "writeBoundary": "Harness dispatch/step target metadata and consultation records; reuse local and capability assignment architectRef; focused tests."
     },
     {
