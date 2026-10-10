@@ -121,6 +121,28 @@ CURSOR=$(jq -r '.cursor' /tmp/debug-resume.json)
 ./node_modules/.bin/tsx src/main.ts debug wait --server "$SERVER" --plan "$PLAN" --run "$RUN" --after "$CURSOR" --json
 ```
 
+The web UI drives the same breakpoint without a terminal client. Build it once,
+then serve as above:
+
+```sh
+npm run build:web
+npm run serve -- --project "$TARGET" --agent pi --model "$RAMIFY_MODEL" --port 4180
+```
+
+Open the printed address and the plan, check "Stop before each engineer
+starts" and press "Start a run". The Run page polls the run; at the first pause
+a banner and a header badge say "Paused at a breakpoint", and "Open the
+Debugger" opens the Debugger area. There, "Read the prepared input" shows the
+same preview as `debug inspect`; "Send message" sends the text area to the
+paused engineer, and the conversation shows its answer once it settles;
+"Resume" releases the pause, carrying the text area as its message when there
+is any. The UI sends the same commands with the current pause ID and revision,
+and shows each refusal as the harness states it. The live-server policy above
+applies unchanged, and closing the page leaves the run alive. Stop is in the
+Overview; the Debugger area does not stop a run. `npm run
+test:browser:breakpoint-debugger` drives this path in Chromium over answers a
+scripted run exported.
+
 Inspect presents the normal effective input as a preview. Messages use ordinary
 engineer tools and submission validation; a plain explanatory return leaves the
 task pending. An accepted submission or terminal invocation result is held for

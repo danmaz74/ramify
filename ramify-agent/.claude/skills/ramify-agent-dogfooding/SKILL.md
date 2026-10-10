@@ -121,6 +121,12 @@ omit `--model` only when intentionally using the configured default.
   A timeout or client exit does not cancel the command. Retry the identical
   command ID and payload, or wait using the returned cursor. Server loss
   interrupts unfinished debug-enabled runs instead of replaying them.
+  The web UI is an alternative to the `real-session` launcher and the `debug`
+  commands: after `npm run build:web`, serve as above, open the plan, check
+  "Stop before each engineer starts" and start the run; the Run page's
+  Debugger area reads the prepared input, sends messages, shows each answer
+  and resumes, with the same commands and refusals. Stop stays in the
+  Overview. See the README's breakpoint section.
 
 - **Step/operator modes:** consult
   [Plan 30](../../../docs/plans/30-harness-steps/main-plan.md),
