@@ -23,6 +23,7 @@ export type SessionAgent =
   | { readonly name: 'fake'; readonly script: string };
 
 export type CommandLine =
+  | { readonly command: 'consultations'; readonly run: string; readonly session: string | undefined; readonly id: string | undefined; readonly format: 'text' | 'json' }
   | { readonly command: 'serve'; readonly projectRoot: string; readonly port: number; readonly agent: AgentName | undefined; readonly model: string | undefined }
   | {
       readonly command: 'session';
@@ -60,6 +61,9 @@ export class UsageError extends Error {
 
 export const usage = [
   'Usage:',
+  '  ramify-agent consultations --run <run-directory> [--session <session-id>] [--format text|json]',
+  '  ramify-agent consultations --run <run-directory> --id <consultation-id> [--format text|json]',
+  '                       Reads retained exchanges, child investigations and caller result positions without changing run state.',
   '  ramify-agent serve --project <root> [--port <n>] [--agent pi [--model <provider/model>] | --agent fake]',
   '  ramify-agent session --project <root> --module <module-path>',
   '                       (--prompt <text> | --prompt-file <file>)',
@@ -121,6 +125,7 @@ function agentName(name: string): AgentName {
 export function parseCommandLine(argv: readonly string[]): CommandLine {
   const [command, ...rest] = argv;
   if (command === undefined || command === 'help' || command === '--help' || command === '-h') return { command: 'help' };
+  if (command === 'consultations') return parseConsultations(rest);
   if (command === 'serve') return parseServe(rest);
   if (command === 'session') return parseSession(rest);
   if (command === 'step') return parseStep(rest);
@@ -301,4 +306,29 @@ function parseStep(rest: readonly string[]): CommandLine {
     return { command: 'step', step: { command: 'after', run, invocation } };
   }
   throw new UsageError(subcommand === undefined ? 'step needs a subcommand: inputs, render, run, gate or after' : `Unknown step subcommand "${subcommand}"`);
+}
+
+function parseConsultations(rest: readonly string[]): CommandLine {
+  let run: string | undefined;
+  let session: string | undefined;
+  let id: string | undefined;
+  let format: 'text' | 'json' = 'text';
+  const seen = new Set<string>();
+  options(rest, (flag, value, _inline, argument) => {
+    if (!['--run', '--session', '--id', '--format'].includes(flag)) throw new UsageError(`Unknown option "${argument}"`);
+    if (seen.has(flag)) throw new UsageError(`${flag} must be supplied once`);
+    seen.add(flag);
+    const text = value();
+    if (text.trim() === '' || text.startsWith('--')) throw new UsageError(`${flag} needs a value`);
+    if (flag === '--run') run = text;
+    else if (flag === '--session') session = text;
+    else if (flag === '--id') id = text;
+    else {
+      if (text !== 'text' && text !== 'json') throw new UsageError('--format must be text or json');
+      format = text;
+    }
+  });
+  if (run === undefined) throw new UsageError('consultations needs --run <run-directory>');
+  if (session !== undefined && id !== undefined) throw new UsageError('Choose --session or --id, not both');
+  return { command: 'consultations', run, session, id, format };
 }

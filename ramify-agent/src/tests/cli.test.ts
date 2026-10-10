@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { defaultPort, parseCommandLine, usage, UsageError } from '../cli.js';
 
 test('serve takes a project and an optional port', () => {
@@ -183,4 +183,37 @@ describe('step', () => {
     expect(usage).toContain('ramify-agent step gate --run <manual run dir> --checkpoint <iteration|work-item|readiness|final> [--invocation <id>] [--no-commit]');
     expect(usage).toContain('ramify-agent step after --run <manual run dir> --invocation <id>');
   });
+});
+
+describe('Plan 33 C16 consultations', () => {
+  test('both forms parse, defaults to text and accepts inline JSON/session values', () => {
+    expect(parseCommandLine(['consultations', '--run', '/run'])).toEqual({ command: 'consultations', run: '/run', session: undefined, id: undefined, format: 'text' });
+    expect(parseCommandLine(['consultations', '--run=/run', '--session=ses-0001', '--format=json'])).toMatchObject({ session: 'ses-0001', format: 'json' });
+    expect(parseCommandLine(['consultations', '--run', '/run', '--id', 'consult-inv-1:ask', '--format', 'text'])).toMatchObject({ id: 'consult-inv-1:ask', format: 'text' });
+    expect(usage).toContain('consultations --run <run-directory> [--session <session-id>]');
+    expect(usage).toContain('consultations --run <run-directory> --id <consultation-id>');
+  });
+  test('missing/conflicting/unknown/duplicate arguments fail usefully', () => {
+    for (const args of [[], ['--run'], ['--run', '--id', 'x'], ['--run= '], ['--run=r', '--session=s', '--id=i'], ['--run=r', '--format=xml'], ['--run=r', '--run=s'], ['--run=r', '--id='], ['--run=r', 'x']]) {
+      expect(() => parseCommandLine(['consultations', ...args])).toThrow(UsageError);
+    }
+  });
+});
+
+
+test('C16: main dispatches the exposed read command in process and preserves its output and error status', async () => {
+  const command = await import('../../subs/harness/src/consultations/command.js');
+  const dispatch = vi.spyOn(command, 'runConsultationsCommand');
+  const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  try {
+    const { main } = await import('../main.js');
+    dispatch.mockResolvedValueOnce({ stdout: 'retained JSON\n', stderr: '', exitStatus: 0 });
+    expect(await main(['consultations', '--run=r', '--id=c', '--format=json'])).toBe(0);
+    expect(dispatch).toHaveBeenLastCalledWith({ command: 'consultations', run: 'r', id: 'c', session: undefined, format: 'json' });
+    expect(stdout).toHaveBeenCalledWith('retained JSON\n');
+    dispatch.mockResolvedValueOnce({ stdout: '', stderr: 'Read error\n', exitStatus: 2 });
+    expect(await main(['consultations', '--run=r', '--session=s'])).toBe(2);
+    expect(stderr).toHaveBeenCalledWith('Read error\n');
+  } finally { dispatch.mockRestore(); stdout.mockRestore(); stderr.mockRestore(); }
 });

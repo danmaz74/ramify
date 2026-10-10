@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { ProjectRootError, startCliServer } from '../subs/harness/src/http/server.js';
 import { runSessionCommand } from '../subs/harness/src/sessions/command.js';
 import type { SessionProgress, SessionSummary } from '../subs/harness/src/sessions/single.js';
+import { runConsultationsCommand } from '../subs/harness/src/consultations/command.js';
 import { runStepCommand } from '../subs/harness/src/steps/command.js';
 import { isProjectLockError } from '../subs/harness/src/store/lock.js';
 import { parseCommandLine, usage, UsageError, type CommandLine } from './cli.js';
@@ -12,11 +13,17 @@ import { parseCommandLine, usage, UsageError, type CommandLine } from './cli.js'
 // composes that build output with the harness's server.
 const assetsDirectory = fileURLToPath(new URL('../dist/web', import.meta.url));
 
-async function main(argv: readonly string[]): Promise<number> {
+export async function main(argv: readonly string[]): Promise<number> {
   const commandLine = parseCommandLine(argv);
   if (commandLine.command === 'help') {
     console.log(usage);
     return 0;
+  }
+  if (commandLine.command === 'consultations') {
+    const result = await runConsultationsCommand(commandLine);
+    if (result.stdout !== '') process.stdout.write(result.stdout);
+    if (result.stderr !== '') process.stderr.write(result.stderr);
+    return result.exitStatus;
   }
   if (commandLine.command === 'session') return session(commandLine);
   if (commandLine.command === 'step') return step(commandLine);
@@ -187,7 +194,7 @@ function summaryText(summary: SessionSummary): string {
   return lines.join('\n');
 }
 
-main(process.argv.slice(2)).then(code => {
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main(process.argv.slice(2)).then(code => {
   if (code >= 0) process.exitCode = code;
 }, (error: unknown) => {
   if (error instanceof UsageError) console.error(`${error.message}\n${usage}`);

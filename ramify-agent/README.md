@@ -387,3 +387,37 @@ compiler configuration and instructions apply when it is selected as a project.
 
 ramify-agent is licensed under the GNU General Public License, version 3 only
 ([LICENSE](LICENSE)). It is private and not published.
+
+## Inspect architect consultations
+
+An eligible engineer can use `consult_architect({ message })` to ask the local
+or capability architect that assigned its work. A local architect can ask its
+recorded global architect; a local consultation answering an engineer can do
+this too. Capability and global consultation forks answer directly. This is
+advice: it changes no assignment or architectural decision. Each call forks the
+recorded delegation point; current files and generated views may differ from
+inherited observations. Missing recorded targets mean no tool; unavailable
+recorded history returns an explicit error, with no fresh substitute.
+
+```sh
+ramify-agent consultations --run <run-directory>
+ramify-agent consultations --run <run-directory> --session ses-0004 --format json
+ramify-agent consultations --run <run-directory> --id 'consult-inv-0004:ask'
+```
+
+The list orders exchanges by occurrence and shows global questions beneath the
+local question that caused them. A session filter includes its nested children
+once. Detail prints literal questions, accepted answers, actual caller results,
+source points, selected models and record/transcript paths relative to the run.
+Use `child.investigation.path` to read the architect's investigation; use
+`delivery.result.position` and `delivery.subsequentCaller` to continue in the
+caller transcript. An accepted fork answer can exist without a caller result.
+A recorded result and later assistant entry do not establish that a later model
+request consumed the answer or that it was useful.
+
+JSON preserves incomplete states and usage limits. Usage counts each actual
+child invocation once and excludes inherited history. Missing usage is unknown,
+with a known subtotal where available. Outer elapsed time includes inner waiting;
+summed top-level times are cumulative call time, since calls may overlap.
+Inspection starts no agent and writes no run state. Unknown IDs and malformed
+retained records are read errors; valid older runs list zero consultations.
