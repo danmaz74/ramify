@@ -21,14 +21,17 @@ import { gateViewSchema, type GateView, type ObligationView } from '../../subs/h
  * providers. At desktop and narrow widths it reads the ordinary run's failing
  * nested final audit and its repaired passing one, the registered obligations
  * with their reports and where hints, an architect's brief, an engineer's
- * post-write dispositions, the capability task's handback report and the
- * standalone session's refused write and dispositions, and compares each
- * projection with the harness's own protocol answer.
+ * post-write dispositions and the capability task's handback report, and
+ * compares each projection with the harness's own protocol answer.
+ *
+ * The W3 standalone session is no longer read here. A session now records a
+ * manual run, which the web client does not show (Plan 30); the workflow
+ * test's standalone case keeps its records and evidence instead.
  *
  *   npm run build:web
  *   npx tsx scripts/browser-acceptance/plan21-workflows.ts
  *
- * Without PLAN21_ITERATION11_PROJECTS naming kept projects (w1, w2, w3), it
+ * Without PLAN21_ITERATION11_PROJECTS naming kept projects (w1, w2), it
  * runs the workflow test to keep them.
  */
 
@@ -110,15 +113,12 @@ try {
   const capability = w2[0]!;
   const engineerSession = await sessionNaming(failed, '"role":"engineer"', 'tmp/draft.txt', 'not-analyzed');
   const architectSession = await sessionNaming(repaired, '"role":"local-architect"', '(scenario): bound, revision');
-  const standaloneDirectory = join(projects, 'w3', 'plans', '.harness', 'sessions');
-  const standalone = existsSync(standaloneDirectory) ? (await readdir(standaloneDirectory)).sort().at(-1) : undefined;
-  if (standalone === undefined) throw new Error(`The standalone project keeps no session under ${standaloneDirectory}`);
-  observed['runs'] = { failed: failed.run, repaired: repaired.run, capability: capability.run, engineerSession, architectSession, standalone };
+  observed['runs'] = { failed: failed.run, repaired: repaired.run, capability: capability.run, engineerSession, architectSession };
 
   const browser = await chromium.launch({ executablePath: browserPath, headless: true, args: ['--no-sandbox'] });
   const servers: Record<string, CliServer> = {};
   try {
-    for (const name of ['w1', 'w2', 'w3']) servers[name] = await startCliServer({ projectRoot: join(projects, name), port: 0, assetsDirectory: assets });
+    for (const name of ['w1', 'w2']) servers[name] = await startCliServer({ projectRoot: join(projects, name), port: 0, assetsDirectory: assets });
     const gateOf = async (server: CliServer, job: JobFacts) =>
       gateViewSchema.parse((await api<{ gate: unknown }>(server, protocolPaths.runGate(job.plan, job.run, job.finalGate))).gate);
     const obligationsOf = async (server: CliServer, job: JobFacts) =>
@@ -263,19 +263,6 @@ try {
       check(`${width}: the capability run's final audit is the root project's nested audit`,
         JSON.stringify(await projectLines(panel)) === JSON.stringify((recorded.capabilityGate.audit?.projects ?? []).map(projectLine)));
 
-      // W3: the standalone session's refused write and dispositions.
-      await page.goto(`${servers['w3']!.url}/#/sessions/standalone/${encodeURIComponent(standalone)}`, { waitUntil: 'networkidle' });
-      const standaloneDispositions = page.getByLabel('Path dispositions');
-      await standaloneDispositions.first().waitFor({ timeout: 15_000 });
-      const standaloneRows = (await standaloneDispositions.locator(':scope > li').allInnerTexts()).map(row => row.trim());
-      observed[`${width}-standalone-dispositions`] = standaloneRows;
-      check(`${width}: the standalone session checks its source write and leaves its scratch write not analyzed`,
-        standaloneRows.some(row => row.startsWith('checked ') && row.includes('fact.ts'))
-        && standaloneRows.some(row => row.startsWith('not-analyzed ') && row.includes('tmp/notes.txt') && row.includes('scratch')));
-      check(`${width}: the standalone session shows the write refused inside the nested project`,
-        await page.getByText(/subs\/b\/report/u).count() > 0);
-      check(`${width}: the standalone transcript fits the page width`, await noSidewaysScroll(page));
-      await shot('w3-standalone-dispositions', standaloneDispositions.first());
       check(`${width}: Chromium reports no page exceptions`, errors.length === 0);
       await page.close();
     }
