@@ -136,7 +136,6 @@
   "ignorePaths": [
     ".devcontainer/**",
     "docs/**",
-    "ramify-agent/**",
     "scripts/probes/**"
   ],
   "workspace": {

@@ -222,8 +222,8 @@ usage, production selection, gate evidence and measurement commands.
 - `site/` - the documentation website (its own npm package), declared
   owned-nested-project.
 
-The root description also declares `docs/` owned-unwired, and `ramify-agent/`
-and the work directories tools write into the checkout external.
+The root description also declares `docs/` owned-unwired, and the work
+directories tools write into the checkout external.
 
 ## Documentation site
 
@@ -281,8 +281,9 @@ repository's build, test, audit, or dependency-rule tooling.
 
 1. Bump `version` in `package.json` and the root entries of `package-lock.json`.
 2. Commit the change.
-3. Audit that commit using its committed `ramify-audit.json`:
-   `ramify-agent/node_modules/.bin/ramify-audit audit --cwd . --full --json`.
+3. Audit that commit using its committed `ramify-audit.json`, with the
+   published `ramify-audit` that [CLAUDE.md](CLAUDE.md) names, installed outside
+   the repository: `<install>/node_modules/.bin/ramify-audit audit --cwd . --full --json`.
    The CLI reads the checks and workspace configuration from the commit being
    audited. Its full audit must pass before publishing.
 4. From a clean checkout of the audited commit, run `npm publish`. Its

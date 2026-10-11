@@ -10,14 +10,13 @@ owned-unwired "scripts/probes/fixtures/plan2a-symbol-details"
 owned-unwired "scripts/reference-harness"
 owned-nested-project "site"
 
-// The agent harness, a separate project, and the work directories tools write
-// into the checkout: cucumber-viz state, editor history, browser-agent output
-// and the build and reference harness work area. Any of them may be absent.
+// The work directories tools write into the checkout: cucumber-viz state,
+// editor history, browser-agent output and the build and reference harness
+// work area. Any of them may be absent.
 external ".cucumber-viz"
 external ".history"
 external ".playwright-mcp"
 external ".reference-work"
-external "ramify-agent"
 
 // R1: invocation vocabulary for the injected CLI operation.
 expose-src * from "interfaces/batch.ts" to descendants

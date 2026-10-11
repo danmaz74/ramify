@@ -14,7 +14,7 @@ const root = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/
 const ownedUnwired = ['docs', 'scripts/probes/fixtures/compiler-api',
   'scripts/probes/fixtures/plan2a-symbol-details', 'scripts/reference-harness'];
 const ownedProjects = ['examples/collection-review', 'site'];
-const external = ['.cucumber-viz', '.history', '.playwright-mcp', '.reference-work', 'ramify-agent'];
+const external = ['.cucumber-viz', '.history', '.playwright-mcp', '.reference-work'];
 const declared: readonly ProjectExclusion[] = [
   ...ownedUnwired.map(directory => ({ kind: 'owned-unwired' as const, directory, owner: 'ramify' })),
   ...ownedProjects.map(directory => ({ kind: 'owned-nested-project' as const, directory, owner: 'ramify' })),
@@ -75,7 +75,6 @@ describe('the toolkit root description declares its nested trees', () => {
       ['.history', externalBy('.history')],
       ['.playwright-mcp/page.png', externalBy('.playwright-mcp')],
       ['.reference-work/production-1/tsconfig.json', externalBy('.reference-work')],
-      ['ramify-agent/module.ramify', externalBy('ramify-agent')],
       // Controls: root auxiliary source and data outside every declared tree,
       // near-miss names, and module, scratch and output paths.
       ['examples/hooks/claude-code-post-write.mjs', rootOwned],
@@ -108,9 +107,9 @@ describe('the toolkit root description declares its nested trees', () => {
       // At most the tree's own directory is observed, as boundary evidence; nothing beneath it is.
       expect(inputs.filter(input => inside(input.path)).map(input => input.path), directory).toEqual([]);
     }
-    // The reference harness tree in particular (PB1-32), and the agent harness's unmarked roots, are never read.
+    // The reference harness tree in particular (PB1-32) is never read.
     expect(inputs.some(input => input.path === 'scripts/reference-harness' && input.role === 'directory')).toBe(true);
     expect(inputs.filter(input => input.role === 'description').map(input => input.path)
-      .filter(path => path.startsWith('ramify-agent/') || path.startsWith('scripts/reference-harness/'))).toEqual([]);
+      .filter(path => path.startsWith('scripts/reference-harness/'))).toEqual([]);
   });
 });

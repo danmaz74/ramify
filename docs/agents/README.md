@@ -25,6 +25,7 @@ The [module architect skill plan](../plans/module-architect-skill/main-plan.md)
 delivers the first harness for the role and lists the Ramify features its
 trials may justify.
 
-[ramify-agent](../../ramify-agent/README.md) is a separate consumer project,
-an agent harness that plans and implements features on Ramify projects. Its
-design documents live in its own [docs](../../ramify-agent/docs/README.md).
+[ramify-agent](https://github.com/danmaz74/ramify-agent) is a separate consumer
+project in its own repository, an agent harness that plans and implements
+features on Ramify projects. Its design documents live in its own
+[docs](https://github.com/danmaz74/ramify-agent/blob/main/docs/README.md).

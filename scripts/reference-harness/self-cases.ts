@@ -23,7 +23,7 @@ const probe = 'subs/presentation/subs/layout/src/__i1_probe.ts';
  * 8C), and the root configuration admits JavaScript.
  */
 const declaredTrees = ['docs', 'examples/collection-review', 'scripts/probes/fixtures/compiler-api', 'scripts/probes/fixtures/plan2a-symbol-details',
-  'scripts/reference-harness', 'site', '.cucumber-viz', '.history', '.playwright-mcp', '.reference-work', 'ramify-agent'];
+  'scripts/reference-harness', 'site', '.cucumber-viz', '.history', '.playwright-mcp', '.reference-work'];
 const inDeclaredTree = (path: string): boolean => declaredTrees.some(tree => path === tree || path.startsWith(`${tree}/`));
 /** Nearest module directories of the toolkit's auxiliary source; everything else outside every src/ is the root's. */
 const auxiliaryOwners: readonly (readonly [string, string])[] = [['subs/analysis/', 'ramify/analysis'], ['subs/presentation/', 'ramify/presentation']];

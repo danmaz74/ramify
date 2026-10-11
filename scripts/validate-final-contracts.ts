@@ -522,6 +522,16 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Plan 32 of ramify-agent (repository extraction): the agent harness moved to
+  // its own repository and its tree left this one, so the root no longer
+  // declares it external.
+  { plan: 'ramify-agent repository extraction',
+    withdrawn: {
+      './': [
+        'external "ramify-agent"',
+      ].join('\n'),
+    },
+  },
 ];
 
 /** A named layer over the archived README purposes, keyed by owner directory:

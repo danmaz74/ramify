@@ -125,10 +125,7 @@ from a clean commit with the published `ramify-audit` 0.7.0, installed outside
 the repository: `/home/app/tools/ramify-audit-0.7.0/node_modules/.bin/ramify-audit
 audit --cwd . --json`. Use `--full` for the release audit. `check:self` and
 `check:reference` use disposable batch sessions so an audit leaves no resident
-daemon behind. The nested `ramify-agent/ramify-audit.json` defines that
-project's own audit, which keeps the agent's installed version; invoke it with
-`ramify-agent/node_modules/.bin/ramify-audit audit --project-root ramify-agent
---cwd .`.
+daemon behind.
 
 ## Implementation Architecture
 
@@ -176,15 +173,14 @@ The first detailed plan is [batch project verification](docs/plans/done/iteratio
 It includes the reference checker and toolkit self-check; it does not implement
 the daemon or other runtime clients.
 
-## ramify-agent is a separate project
+## ramify-agent lives in its own repository
 
-`ramify-agent/` holds ramify-agent, an agent harness that consumes Ramify. It lives
-here during initial development and will move to its own repository. It has
-its own [instructions](ramify-agent/AGENTS.md), package, lockfile and compiler scope,
-and is its own Ramify project. The dependency points one way: nothing outside
-`ramify-agent/` imports from it, names its roles or reads its files, and the toolkit's
-`tsconfig.json` excludes it. The toolkit's roadmap, plans and cucumber-viz
-workflow do not govern it.
+ramify-agent, an agent harness that consumes Ramify through its published
+releases, lives at <https://github.com/danmaz74/ramify-agent>. This repository
+has no dependency on it: nothing here imports from it, names its roles or reads
+its files. Earlier documents that mention or link `ramify-agent/` describe the
+tree before the move; their links resolve in this repository's history at
+`1d8a43fc`, the last commit that contains it.
 
 ## Conventions that DO apply
 
@@ -253,7 +249,7 @@ implementation, testing and cucumber-viz operations. The index lists the shared
 Claude and Codex skills; select the one relevant to the task.
 
 Before implementing in a new Studio execution worktree, run
-`npm run worktree:prepare` from that checkout's root to install the example,
-site and agent dependencies. Repeat after either package's manifest or lockfile changes.
+`npm run worktree:prepare` from that checkout's root to install the example
+and site dependencies. Repeat after either package's manifest or lockfile changes.
 Studio links only the toolkit's root dependencies; see the
 [worktree guide](docs/development/cucumber-viz.md#execute-in-a-worktree).

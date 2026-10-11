@@ -186,7 +186,7 @@ describe('PB1-31: production selection over project boundaries', () => {
     expect(document.files.filter(path => auxiliary.includes(path))).toEqual([]);
     expect(document.files.filter(path => path.startsWith('subs/integration-tests/') || path.startsWith('src/tests/')
       || path.includes('/src/tests/'))).toEqual([]);
-    for (const prefix of ['docs/', 'site/', 'examples/collection-review/', 'scripts/reference-harness/', 'ramify-agent/', 'src/tmp/']) {
+    for (const prefix of ['docs/', 'site/', 'examples/collection-review/', 'scripts/reference-harness/', 'src/tmp/']) {
       expect([...files.keys()].filter(path => path.startsWith(prefix)), prefix).toEqual([]);
     }
   }, 60_000);

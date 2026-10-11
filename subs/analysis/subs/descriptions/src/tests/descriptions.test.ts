@@ -150,7 +150,7 @@ const toolkit: readonly Fixture[] = [
     // The toolkit's nested trees, decided by the user on 2026-10-03.
     ...['docs', 'examples/collection-review', 'scripts/probes/fixtures/compiler-api', 'scripts/probes/fixtures/plan2a-symbol-details',
       'scripts/reference-harness', 'site'].map((directory) => tree(directory === 'site' || directory === 'examples/collection-review' ? 'owned-nested-project' : 'owned-unwired', directory)),
-    ...['.cucumber-viz', '.history', '.playwright-mcp', '.reference-work', 'ramify-agent'].map((directory) => tree('external', directory)),
+    ...['.cucumber-viz', '.history', '.playwright-mcp', '.reference-work'].map((directory) => tree('external', directory)),
     src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants),
     statement('expose-test', ['createQuickEnvironment', 'QuickEnvironment'], 'quick-environment.ts', descendants),
     sub([...modelNames, ...availabilityNames], 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
