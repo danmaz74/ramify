@@ -10,7 +10,8 @@ import type { SessionMeasurementsOutcome } from './measurements.js';
 export interface SessionLimits {
   readonly updateDeadlineMs: number;
   readonly sweepIntervalMs: number;
-  readonly workerHeapMiB: number;
+  /** Omitted preserves V8's default heap limit. An explicit budget is enforced. */
+  readonly workerHeapMiB?: number;
   readonly maxRetainedFactBytes: number;
 }
 export interface SessionInputs extends AnalysisInputs { readonly session: SessionLimits }

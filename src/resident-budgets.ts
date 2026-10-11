@@ -12,10 +12,11 @@ export const contextBudgets: ContextBudgets = Object.freeze({
   sweepIntervalMs: 30_000, updateDeadlineMs: 2_000, demoteDeadlineMs: 5_000,
 });
 
-/** Session capacities extend the existing resident dispatch limits. */
+/** Session capacities extend the existing resident dispatch limits. The worker
+ * heap has no Ramify limit: a project's working set decides what it needs. */
 export const sessionLimits: SessionLimits = Object.freeze({
   updateDeadlineMs: contextBudgets.updateDeadlineMs, sweepIntervalMs: contextBudgets.sweepIntervalMs,
-  workerHeapMiB: 512, maxRetainedFactBytes: contextBudgets.maxRetainedBytesPerContext,
+  maxRetainedFactBytes: contextBudgets.maxRetainedBytesPerContext,
 });
 
 export const daemonBudgets: DaemonBudgets = Object.freeze({

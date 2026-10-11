@@ -66,9 +66,10 @@ class SessionHost implements RetainedSession {
     const source = entry.pathname.endsWith('.ts');
     const loader = new URL('./session-source-loader.js', import.meta.url);
     if (source) loader.pathname = loader.pathname.replace(/\.js$/, '.ts');
+    const heapMiB = inputs.session.workerHeapMiB;
     this.#worker = new Worker(entry, { workerData: inputs,
       execArgv: source ? ['--experimental-transform-types', '--import', loader.href] : [],
-      resourceLimits: { maxOldGenerationSizeMb: inputs.session.workerHeapMiB, maxYoungGenerationSizeMb: 8 } });
+      ...(heapMiB === undefined ? {} : { resourceLimits: { maxOldGenerationSizeMb: heapMiB, maxYoungGenerationSizeMb: 8 } }) });
     let ready: () => void, rejectReady: (error: Error) => void;
     this.#ready = new Promise<void>((resolve, reject) => { ready = resolve; rejectReady = reject; });
     // Attach the rejection handler immediately, including startup failures.
@@ -81,9 +82,9 @@ class SessionHost implements RetainedSession {
       if (message.kind === 'ready') {
         // V8's heap includes young space as well as the old-generation budget.
         // With an 8 MiB young generation V8 reserves at most 12 MiB for it.
-        if (message.oldGenerationMiB !== inputs.session.workerHeapMiB
-          || message.heapLimit > (inputs.session.workerHeapMiB + 12) * 1024 ** 2) {
-          const error = failure('resource-unavailable', `Effective worker heap ${message.heapLimit} bytes does not enforce ${inputs.session.workerHeapMiB} MiB; remove overriding V8 heap flags`);
+        if (heapMiB !== undefined && (message.oldGenerationMiB !== heapMiB
+          || message.heapLimit > (heapMiB + 12) * 1024 ** 2)) {
+          const error = failure('resource-unavailable', `Effective worker heap ${message.heapLimit} bytes does not enforce ${heapMiB} MiB; remove overriding V8 heap flags`);
           this.#fail(error); rejectReady(error); void this.#worker.terminate();
         } else ready();
         return;
@@ -352,12 +353,12 @@ export async function openWorkerSession(inputs: SessionInputs, control: RunContr
   sampling?: RssSampling): Promise<SessionOpen> {
   if (control.signal?.aborted) return { status: 'cancelled' };
   const detached = deepFreeze(structuredClone(inputs));
-  if (!detached.session || Object.values(detached.session).some(value => !Number.isSafeInteger(value) || value <= 0)) {
+  if (!detached.session || Object.entries(detached.session).some(([key, value]) => !(key === 'workerHeapMiB' && value === undefined) && (!Number.isSafeInteger(value) || value <= 0))) {
     return { status: 'reported', report: failureReport(detached, new Error('Session limits must be positive safe integers'), true) };
   }
   // V8 can abort the entire process during bootstrap below this floor, before
   // Node can deliver ERR_WORKER_OUT_OF_MEMORY. Reject before creating a thread.
-  if (detached.session.workerHeapMiB < 8) {
+  if (detached.session.workerHeapMiB !== undefined && detached.session.workerHeapMiB < 8) {
     return { status: 'reported', report: failureReport(detached,
       failure('resource-unavailable', 'The worker requires at least 8 MiB to start safely')) };
   }
