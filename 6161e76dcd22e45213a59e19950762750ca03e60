@@ -1,0 +1,22 @@
+Audited-At: 2026-10-11T20:30:45.348Z
+Audited-Overall: pass
+Audited-Duration-Seconds: 371.237
+Audited-Tree: f7a6a092d57740e5e80954186da3f20740f13cef
+Audited-Reports-Ref: refs/audited/runs/2026-10-11T20-30-45Z-6161e76dc
+Audited-Report-Commit: d2f408d0f67e9e7b006c78ed349b0e25a9d2ad63
+
+── Checks ──
+
+patch-integrity: PASS (0.005s)
+
+toolkit-build: PASS (3.419s)
+
+toolkit-typecheck: PASS (3.773s)
+
+toolkit-tests: PASS (337.787s)
+
+toolkit-structure: PASS (13.632s)
+
+── Retrieval ──
+  git notes --ref=audit show 6161e76dcd22e45213a59e19950762750ca03e60
+  git show refs/audited/runs/2026-10-11T20-30-45Z-6161e76dc:reports/audit/summary.json
