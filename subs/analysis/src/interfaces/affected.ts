@@ -5,6 +5,8 @@ import type { SourceLimit } from '../../subs/typescript/src/interfaces/source.js
 export interface AffectedQuery {
   /** The session's current revision; any other value is `invalid-revision`. */
   readonly sequence: number;
+  /** Opt-in structural facts for each path; module selection is unchanged. */
+  readonly fileFacts?: true;
   /** Exact inventory module IDs; unknown IDs fail the whole query. */
   readonly modules?: readonly string[];
   /**
@@ -46,6 +48,8 @@ export type AffectedPathSeed =
 export type AffectedWideningReason = 'unowned-path' | 'partial-coverage';
 export interface AffectedSelection {
   readonly schemaVersion: 'ramify.affected/4';
+  /** Present only when the query requested file facts. */
+  readonly fileFacts?: FileStructuralFacts;
   /** The revision's observed-input identity; the answer describes exactly these inputs. */
   readonly inputId: string;
   readonly paths: readonly AffectedPathSeed[];
@@ -72,3 +76,34 @@ export type SessionAffectedOutcome =
   | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason;
       readonly message: string; readonly unknownModules: readonly string[] }
   | { readonly status: 'cancelled' };
+
+/** Structural facts over one requested path, without test or change policy. */
+export interface FileStructuralFact {
+  readonly path: string;
+  readonly status: 'owned' | 'excluded' | 'outside-project';
+  readonly module: string | null;
+  readonly exclusion: ProjectExclusion | null;
+  /** Missing means absent from the complete owned compiler-source inventory or a captured absence.
+   * Unknown means the revision did not observe this path's existence. */
+  readonly existence: 'present' | 'missing' | 'unknown';
+  readonly exports: {
+    readonly state: 'complete' | 'incomplete' | 'ambiguous' | 'unavailable';
+    /** False only for a complete empty description; types count as exports. */
+    readonly hasExports: boolean | null;
+    readonly names: readonly string[] | null;
+    readonly reason?: 'missing-file' | 'excluded' | 'outside-project' | 'not-analyzed';
+  };
+  readonly incoming: {
+    /** Completeness concerns supported, analyzed source only; it is no proof of runtime closure. */
+    readonly state: 'complete' | 'partial' | 'unavailable';
+    /** Known analyzed files depending on this path, including symbol-free loads and description reads. */
+    readonly paths: readonly string[] | null;
+  };
+  /** Limits located in or referring to this file, or belonging to an incoming access. */
+  readonly limits: readonly SourceLimit[];
+}
+export interface FileStructuralFacts {
+  readonly schemaVersion: 'ramify.file-facts/1';
+  /** Distinct requested paths in byte order, including unavailable and missing paths. */
+  readonly files: readonly FileStructuralFact[];
+}

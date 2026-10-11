@@ -150,3 +150,26 @@ describe('affected batch form (A7-11)', () => {
       .toEqual({ status: 'cancelled', exitCode: 130 });
   }), 30_000);
 });
+
+
+describe('affected batch file facts', () => {
+  it('passes the opt-in query through the real worker and CLI while ordinary selection stays equal', () => affectedFixture(async root => {
+    const path = 'subs/core/src/tests/single.test.ts';
+    await put(root, path, 'const value = 1; void value; export {};\n');
+    const argv = ['affected', '--path', path, '--path', 'subs/core/src/tests/absent.test.ts', '--batch', '--format', 'json'];
+    const enriched = await invoke(root, [...argv, '--file-facts']);
+    const ordinary = await invoke(root, argv);
+    expect([enriched.exitCode, ordinary.exitCode, enriched.stderr, enriched.writes]).toEqual([0, 0, '', 1]);
+    const one = JSON.parse(enriched.stdout) as AffectedDocument, two = JSON.parse(ordinary.stdout) as AffectedDocument;
+    const { fileFacts, ...selection } = one.selection;
+    expect(selection).toEqual(two.selection);
+    expect(two.selection).not.toHaveProperty('fileFacts');
+    expect(fileFacts).toEqual({ schemaVersion: 'ramify.file-facts/1', files: [
+      { path: 'subs/core/src/tests/absent.test.ts', status: 'owned', module: 'example/core', exclusion: null, existence: 'missing',
+        exports: { state: 'unavailable', hasExports: null, names: null, reason: 'missing-file' },
+        incoming: { state: 'unavailable', paths: null }, limits: [] },
+      { path, status: 'owned', module: 'example/core', exclusion: null, existence: 'present',
+        exports: { state: 'complete', hasExports: false, names: [] }, incoming: { state: 'complete', paths: [] }, limits: [] },
+    ] });
+  }), 60_000);
+});

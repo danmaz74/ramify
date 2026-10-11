@@ -15,6 +15,7 @@ import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, RunControl } f
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './interfaces/architect-view.js';
 import type { InventoryModuleMeasurement, MeasurementFileRecord, SessionMeasurementsOutcome } from './interfaces/measurements.js';
 import type { AffectedQuery, SessionAffectedOutcome } from './interfaces/affected.js';
+import { projectFileFacts } from './file-facts-query.js';
 import { affectedLimits, assembleAffectedFacts, projectAffected } from './affected-query.js';
 import type { ApiViewQuery, ApiViewQueryOutcome, FindingDelta, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen,
   SessionExplorerDetailsOutcome, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
@@ -523,6 +524,7 @@ class Session implements RetainedSession {
         SessionAffectedOutcome => ({ status: 'unavailable', reason, message, unknownModules: [] });
       if (this.#disposed) return unavailable('invalid-revision', 'Retained session is disposed');
       if (typeof query !== 'object' || query === null) return unavailable('invalid-query', 'An affected query must be an object');
+      if (query.fileFacts !== undefined && query.fileFacts !== true) return unavailable('invalid-query', 'fileFacts must be true when supplied');
       const current = this.#current;
       if (!current || query.sequence !== this.#sequence) {
         return unavailable('invalid-revision', `Sequence ${query.sequence} is not the session's current revision (${this.#sequence})`);
@@ -543,7 +545,12 @@ class Session implements RetainedSession {
         { modules: query.modules === undefined ? [] : query.modules, paths: query.paths === undefined ? [] : query.paths },
         affectedLimits, control);
       if (control.signal?.aborted) return { status: 'cancelled' };
-      return outcome.status === 'answered' ? { status: 'answered', sequence: current.sequence, result: outcome.result } : outcome;
+      if (outcome.status !== 'answered') return outcome;
+      if (!query.fileFacts) return { status: 'answered', sequence: current.sequence, result: outcome.result };
+      const fileFacts = projectFileFacts(facts, outcome.result.paths, current.inputs, path => observer.auxiliarySource(path));
+      if (control.signal?.aborted) return { status: 'cancelled' };
+      if (Buffer.byteLength(JSON.stringify(fileFacts)) > 16 * 1024 ** 2) return unavailable('resource-limit', 'File facts exceed 16 MiB');
+      return { status: 'answered', sequence: current.sequence, result: { ...outcome.result, fileFacts } };
     });
   }
 

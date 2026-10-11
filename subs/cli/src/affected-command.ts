@@ -13,6 +13,7 @@ interface AffectedArguments {
   readonly batch: boolean;
   readonly modules: readonly string[];
   readonly paths: readonly string[];
+  readonly fileFacts?: true;
 }
 
 function moduleList(label: string, modules: readonly AffectedModule[]): string {
@@ -84,7 +85,7 @@ async function batchAffected(args: AffectedArguments, environment: CliEnvironmen
   const operation = environment.affectedBatch;
   if (!operation) throw new CliFailure('unavailable', 'This client has no affected batch operation', null);
   const result = await operation({ cwd: environment.cwd, ...(args.root === undefined ? {} : { root: args.root }),
-    modules: args.modules, paths: args.paths }, control);
+    modules: args.modules, paths: args.paths, ...(args.fileFacts ? { fileFacts: true as const } : {}) }, control);
   if (control.signal?.aborted) throw new Error('Interrupted');
   if (result.status === 'cancelled') return interrupted(environment);
   if (result.status === 'answered') return print(environment, args.format, 'batch', null, result.result);

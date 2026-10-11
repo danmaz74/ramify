@@ -71,7 +71,7 @@ export async function runAffectedBatch(invocation: AffectedBatchInvocation, cont
   try {
     if (control.signal?.aborted) return { status: 'cancelled', exitCode: 130 };
     const outcome = await session.affected({ sequence: opened.revision.sequence,
-      modules: invocation.modules, paths: invocation.paths }, control);
+      modules: invocation.modules, paths: invocation.paths, ...(invocation.fileFacts ? { fileFacts: true } : {}) }, control);
     if (outcome.status === 'cancelled' || control.signal?.aborted) return { status: 'cancelled', exitCode: 130 };
     if (outcome.status === 'answered') return { status: 'answered', inputId: outcome.result.inputId, result: outcome.result };
     // A fresh session has no earlier valid revision: an invalid first revision is an invalid project.

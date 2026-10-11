@@ -15,6 +15,7 @@ export type BatchOperation = (invocation: BatchInvocation, control?: RunControl)
 
 /** One affected-module query over a fresh session; the project resolves as `check --batch` resolves it. */
 export interface AffectedBatchInvocation {
+  readonly fileFacts?: true;
   readonly cwd: string;
   readonly root?: string;
   readonly modules: readonly string[];

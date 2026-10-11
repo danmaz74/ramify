@@ -78,6 +78,8 @@ modules, as does partial coverage; the widening reasons are printed. Without
 --batch it is a synchronized resident query that never falls back to batch;
 --batch answers from a fresh session that trusts no daemon state.
 --format json prints one ramify.affected-cli/4 document.
+--file-facts requires --batch, --format json and at least one --path. It adds
+a ramify.file-facts/1 block for the paths without changing module selection.
 --changed, --since and --deadline do not apply.
 
 explore selects one project through the resident daemon, starts or reuses that
@@ -116,7 +118,7 @@ type Arguments = { readonly command: 'help' | 'version' }
       readonly views?: readonly MaterializeViewId[] }
   | { readonly command: 'measure'; readonly root?: string; readonly format: 'human' | 'json' }
   | { readonly command: 'affected'; readonly root?: string; readonly format: 'human' | 'json'; readonly batch: boolean;
-      readonly modules: readonly string[]; readonly paths: readonly string[] }
+      readonly modules: readonly string[]; readonly paths: readonly string[]; readonly fileFacts?: true }
   | { readonly command: 'explore'; readonly root?: string };
 
 /** Validate the entire invocation before dispatch, including duplicate flags. */
@@ -132,12 +134,12 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (command === 'daemon' && action !== 'status' && action !== 'stop') throw new Error('Specify daemon status or daemon stop.');
   let root: string | undefined;
   let format: 'human' | 'json' = 'human';
-  let batch = false, noSnapshot = false;
+  let batch = false, noSnapshot = false, fileFacts = false;
   let changed: string[] | undefined, since: string | undefined, deadlineMs: number | undefined;
   let from: string | undefined, all = false, views: MaterializeViewId[] | undefined;
   const modules: string[] = [], paths: string[] = [];
   const flags = command === 'check' ? ['--root', '--format', '--batch', '--no-snapshot', '--changed', '--since', '--deadline']
-    : command === 'affected' ? ['--root', '--format', '--batch', '--path']
+    : command === 'affected' ? ['--root', '--format', '--batch', '--path', '--file-facts']
     : command === 'watch' || command === 'measure' ? ['--root', '--format'] : command === 'materialize' ? ['--root', '--from', '--all', '--view']
     : command === 'explore' ? ['--root'] : ['--format'];
   const seen = new Set<string>();
@@ -165,6 +167,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
     }
     if (seen.has(flag)) throw new Error(`Duplicate option: ${flag}`);
     seen.add(flag);
+    if (flag === '--file-facts') { fileFacts = true; continue; }
     if (flag === '--batch') { batch = true; continue; }
     if (flag === '--no-snapshot') { noSnapshot = true; continue; }
     if (flag === '--all') { all = true; continue; }
@@ -217,7 +220,8 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (command === 'measure') return { command, ...project };
   if (command === 'affected') {
     if (!modules.length && !paths.length) throw new Error('affected requires at least one module ID or --path');
-    return { command, ...project, batch, modules, paths };
+    if (fileFacts && (!batch || format !== 'json' || !paths.length)) throw new Error('--file-facts requires --batch, --format json and at least one --path');
+    return { command, ...project, batch, modules, paths, ...(fileFacts ? { fileFacts: true as const } : {}) };
   }
   if (command === 'materialize') {
     if (all && from !== undefined) throw new Error('--all cannot be combined with --from');

@@ -123,7 +123,17 @@ npx ramify materialize --all --root /path/to/project
 npx ramify affected --path src/foo.ts --format json
 npx ramify affected app/core app/storage
 npx ramify affected --path src/foo.ts --batch --format json
+npx ramify affected --path src/tests/example.test.ts --batch --format json --file-facts
 ```
+
+`--file-facts` adds structural facts for each requested path under
+`selection.fileFacts` (`ramify.file-facts/1`), without changing the module
+selection. It requires batch JSON output. Facts include ownership, exclusion,
+observed existence, export completeness and names (including types), known
+incoming dependency paths (including side-effect imports), and relevant limits.
+A complete empty export description has `hasExports: false`; unavailable or
+incomplete empty descriptions have `hasExports: null`. Ramify does no test
+discovery or Git comparison. See the [CLI contract](docs/architecture/cli-invocation.spec.md#per-file-structural-facts).
 
 `ramify affected` names the modules whose tests a change calls for: the changed
 modules, the modules that depend on them and their union as test modules, from

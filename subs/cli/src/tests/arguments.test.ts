@@ -345,3 +345,18 @@ describe('affected command grammar', () => {
     expect(help).toContain('--changed, --since and --deadline do not apply');
   });
 });
+
+
+describe('per-file facts grammar', () => {
+  it('opts in only with batch JSON and path seeds', () => {
+    expect(parseArguments(['affected', '--batch', '--format', 'json', '--file-facts', '--path', 'src/tests/a.ts']))
+      .toEqual({ command: 'affected', format: 'json', batch: true, modules: [], paths: ['src/tests/a.ts'], fileFacts: true });
+    for (const argv of [
+      ['affected', '--file-facts', '--path', 'src/a.ts', '--format', 'json'],
+      ['affected', '--file-facts', '--path', 'src/a.ts', '--batch'],
+      ['affected', 'a', '--file-facts', '--batch', '--format', 'json'],
+    ]) expect(() => parseArguments(argv)).toThrow('--file-facts requires --batch, --format json and at least one --path');
+    expect(() => parseArguments(['affected', '--batch', '--format', 'json', '--file-facts', '--file-facts', '--path', 'a.ts']))
+      .toThrow('Duplicate option: --file-facts');
+  });
+});

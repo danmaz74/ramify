@@ -323,6 +323,51 @@ while repository, package and generated segments are excluded wherever they
 occur. These answers use `ramify.affected-cli/4`, carrying a
 `ramify.affected/4` selection; the IPC protocol keeps `ramify.ipc/2`.
 
+### Per-file structural facts
+
+`ramify affected --batch --format json --file-facts --path <path>` adds
+`selection.fileFacts`, a `ramify.file-facts/1` document, derived from the same
+revision's retained facts. `--path` repeats for a batch; paths are distinct and
+byte-ordered. The flag requires batch JSON output and at least one path.
+Without it, the answer is unchanged. With it, the existing path classification,
+module closure, coverage, input identity and exit conventions remain unchanged.
+No test-runner discovery, Git comparison or execution policy is part of these
+facts. Callers obtain another revision themselves when they need another answer.
+
+Each `files` record contains:
+
+- `path`, `status`, `module` and `exclusion`: the path seed's ownership facts.
+- `existence`: `present` for inventoried source or a captured existing input,
+  `missing` for a captured absence or admitted compiler source absent from the
+  complete owned inventory, and `unknown` when existence was not observed.
+  Excluded contents are not read to establish existence.
+- `exports.state`: the retained export description's `complete`, `incomplete`
+  or `ambiguous` state, or `unavailable`. `names` lists effective exported
+  names, including type exports. `export {}` contributes no names.
+  `hasExports` is true for any known export, false only for a complete empty
+  description, and null for an incomplete or ambiguous empty description.
+  Unavailable descriptions have null `names` and `hasExports` and a `reason`:
+  `missing-file`, `excluded`, `outside-project` or `not-analyzed`.
+- `incoming.paths`: known analyzed files depending on the requested path,
+  byte-ordered and distinct. These include direct access targets even without
+  selected symbols, forwarding paths, and export-description dependencies
+  (including resources and declaration shims). A file does not list itself.
+  `state` is `complete` for supported analyzed source without hidden-target
+  limits, `partial` when unresolved or unsupported loads or shared globals can
+  hide dependencies, and `unavailable` with null paths when the requested path
+  has no analyzed source facts. Completeness is bounded by the analyzed source
+  set and is never proof of exhaustive runtime dependency closure.
+- `limits`: notes located in or referring to the requested file or belonging
+  to a known incoming access. Other notes remain in `selection.coverage`.
+  An unrelated global limit can make incoming completeness partial without
+  making the requested file's export description incomplete.
+
+The query does not re-read paths or build another dependency engine. Missing
+retained descriptions never become complete empty facts. Invalid projects or
+unavailable interpretation retain the existing unavailable answer rather than
+claiming file facts. The existing 4096-seed bound applies; a file-facts block
+larger than 16 MiB is unavailable with `resource-limit`.
+
 ### Hook and complete checks
 
 `check` has three forms with distinct roles. They apply the same rules to the
