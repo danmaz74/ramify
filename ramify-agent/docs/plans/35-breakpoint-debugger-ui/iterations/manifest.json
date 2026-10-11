@@ -1,0 +1,34 @@
+{
+  "plan": "../main-plan.md",
+  "status": "implemented",
+  "execution": "serial in dependency order",
+  "iterations": [
+    {
+      "id": "1",
+      "file": "01-protocol-and-client.md",
+      "dependsOn": [],
+      "cases": ["U01", "U02", "U03"],
+      "status": "implemented",
+      "writeBoundary": "Harness protocol contracts, run snapshot projection, /debug route, specification sentences; CLI debug client fixtures; web client and stub client.",
+      "results": "01-results.md"
+    },
+    {
+      "id": "2",
+      "file": "02-debugger-area.md",
+      "dependsOn": ["1"],
+      "cases": ["U04", "U05", "U06", "U07", "U08", "U09", "U10", "U11", "U12"],
+      "status": "implemented",
+      "writeBoundary": "Web module: plan page, run page, debugger area, styles and JSDOM tests.",
+      "results": "02-results.md"
+    },
+    {
+      "id": "3",
+      "file": "03-qualification.md",
+      "dependsOn": ["2"],
+      "cases": ["U13"],
+      "status": "implemented",
+      "writeBoundary": "Browser-acceptance script and fixture page, the export hook in the HTTP debug test, package script, test registration, README, dogfooding skill, plan results and manifest; other harness or web source only for recorded defects.",
+      "results": "03-results.md"
+    }
+  ]
+}

@@ -195,7 +195,9 @@ rule applies when `wait` returns at a later breakpoint.
 Reuse the existing `serve` command to host the project and the existing
 `real-session` command to start the plan. **The debugger commands and the
 `real-session` options `--server`, `--break`, `--command-id` and `--json` below
-are proposed additions, not supported commands today.** Server attachment must
+were proposed additions when this was written; Plan 34 implemented them,
+and the README's "Engineer breakpoints on a live server" has the current
+commands, which also name the plan.** Server attachment must
 bypass the script's current spawn/kill lifecycle: returning at a breakpoint must
 leave the independently running server alive. The attached server must serve
 the explicitly named project; a mismatch is an error.

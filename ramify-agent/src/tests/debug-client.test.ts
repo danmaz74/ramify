@@ -30,11 +30,11 @@ function script(answers: Array<{ path: string; body?: unknown; status?: number; 
   };
   return { fetch: fetcher, calls, done: () => expect(answers).toEqual([]) };
 }
-const state = (current: BreakpointState | null, reached: BreakpointState[] = [], cursor = 10, more = false, snapshot: RunSnapshot = run) => ({ run: snapshot, current, reached, cursor, more });
+const state = (current: BreakpointState | null, reached: BreakpointState[] = [], cursor = 10, more = false, snapshot: RunSnapshot = run) => ({ run: snapshot, current, reached, cursor, more, interventions: [] });
 
 test('B12: attachment arguments require explicit project/plan/break/id and refuse model/owned conflicts', () => {
   const attached = ['--server', 'http://host:4180', '--project', '/project', '--plan', 'p', '--break', 'before-agent:engineer', '--command-id', 'c1', '--json'];
-  expect(parseRealSessionOptions(attached)).toMatchObject({ mode: 'attached', attached: { json: true, timeoutMs: 120000 } });
+  expect(parseRealSessionOptions(attached)).toMatchObject({ mode: 'attached', attached: { json: true, timeoutMs: 1200000 } });
   for (const argv of [attached.concat('--model', 'x/y'), attached.concat('--break', 'other'), ['--break', 'before-agent:engineer'],
     ['--server', 'http://host:4180'], attached.concat('--timeout-ms', '0'), attached.concat('--unknown')]) expect(() => parseRealSessionOptions(argv)).toThrow(UsageError);
   expect(parseRealSessionOptions([])).toEqual({ mode: 'owned', projectRoot: undefined, planId: 'review-notes', model: undefined });
@@ -42,7 +42,7 @@ test('B12: attachment arguments require explicit project/plan/break/id and refus
 });
 
 test('B13: debug argument contracts have finite waits and reject invalid mutation identities', () => {
-  expect(options('wait')).toMatchObject({ timeoutMs: 120000, after: 0 });
+  expect(options('wait')).toMatchObject({ timeoutMs: 1200000, after: 0 });
   expect(options('resume', ['--pause=p1', '--command-id=c1', '--expected-revision=2', '--message-file=go.txt', '--json'])).toMatchObject({ json: true, expectedRevision: 2 });
   for (const argv of [['debug', 'wait'], ['debug', 'other', ...base], ['debug', 'inspect', ...base], ['debug', 'message', ...base, '--pause=p1'],
     ['debug', 'wait', ...base, '--timeout-ms=0'], ['debug', 'wait', ...base, '--after=-1'], ['debug', 'wait', ...base, '--model=x/y'],

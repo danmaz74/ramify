@@ -1,11 +1,18 @@
+import { writeFile } from 'node:fs/promises';
 import { afterEach, expect, test } from 'vitest';
 import { createApp } from '../http/app.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
-import { debugStateResponseSchema, debugExchangeResponseSchema, debugInspectionResponseSchema, startRunCommandSchema } from '../interfaces/protocol/runs.js';
-import { analysis, entry } from './helpers/analysis.js';
+import { planListResponseSchema, planResponseSchema } from '../interfaces/protocol/queries.js';
+import {
+  debugStateResponseSchema, debugExchangeResponseSchema, debugInspectionResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema, runSnapshotSchema,
+  startRunCommandSchema, type ProjectedRunEvent,
+} from '../interfaces/protocol/runs.js';
+import { runSnapshot } from '../run/snapshot.js';
+import { constructedRecord } from './helpers/constructed.js';
+import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
 import { assign, byRole, completionProposed, outline, submit, treeInputs } from './helpers/iterations.js';
-import { installTestRunner, startRun, until } from './helpers/runs.js';
+import { installTestRunner, startRun, stopRun, until } from './helpers/runs.js';
 import { openUnchangedRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
 import type { Request, Response } from 'express';
@@ -14,22 +21,26 @@ const plan = 'review-notes', module = 'collection-review/workspace/reviews';
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); assertUnchangedGit(); });
 
-async function host() {
+type Handle = (method: 'get' | 'post', path: string, body?: unknown) => Promise<{ status: number; body: unknown }>;
+
+/**
+ * A scripted run hosted through the real route handlers, paused before its
+ * engineer. `before` reads the routes before the start; `toEnd` scripts the
+ * checkpoints a resumed run needs to complete.
+ */
+async function host({ before, toEnd = false }: { before?: (handle: Handle) => Promise<void>; toEnd?: boolean } = {}) {
   const fixture = await copyFixture(); cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
   let release: () => void = () => {};
   const held = new Promise<void>(done => { release = done; });
-  const opened = await openUnchangedRuns(fixture.root, { inputs: treeInputs(), unchangedCheckpoints: [scenariosCommit(plan)],
+  const opened = await openUnchangedRuns(fixture.root, { inputs: treeInputs(), unchangedCheckpoints: [scenariosCommit(plan), ...toEnd ? ['wi-001.i01', 'wi-001', `final verification of plan "${plan}"`] : []],
     script: byRole({ 'initial-architect': [submit(analysis([entry('review-note', module)]))],
-      'local-architect': [submit(assign(module, {}, outline())), submit(assign(module))],
+      'local-architect': [submit(assign(module, {}, outline())), submit(toEnd ? requestCompletion() : assign(module))],
       engineer: [[{ kind: 'await', until: () => held }, { kind: 'message', text: 'I understand the normal task.' }, { kind: 'end', message: 'I understand the normal task.' }], submit(completionProposed())] }) });
   cleanups.push(() => opened.service.close());
-  const receipt = await opened.service.execute(startRunCommandSchema.parse({ ...startRun(plan, 'scripted', 'start-http'),
-    payload: { planId: plan, agent: 'scripted', breakpoint: 'before-agent:engineer' } }));
-  await until(() => opened.service.debugState(plan, receipt.jobId)?.state === 'paused');
   const app = createApp({ projectRoot: fixture.root, runs: opened.service });
   // Call the real final route handler directly: no process or network substitute is claimed as native HTTP evidence.
-  const handle = async (method: 'get' | 'post', path: string, body?: unknown) => {
+  const handle: Handle = async (method, path, body) => {
     const url = new URL(path, 'http://test');
     const route = (app.router.stack as unknown as Array<{ route?: { path: string; methods: Record<string, boolean>; stack: Array<{ handle: (request: Request, response: Response) => Promise<void> }> } }>).find(layer => {
       const route = layer.route;
@@ -45,6 +56,10 @@ async function host() {
     await route.stack.at(-1)!.handle({ params, query: Object.fromEntries(url.searchParams), body } as Request, response);
     return { status, body: result };
   };
+  await before?.(handle);
+  const receipt = await opened.service.execute(startRunCommandSchema.parse({ ...startRun(plan, 'scripted', 'start-http'),
+    payload: { planId: plan, agent: 'scripted', breakpoint: 'before-agent:engineer' } }));
+  await until(() => opened.service.debugState(plan, receipt.jobId)?.state === 'paused');
   return { ...opened, handle, release, runId: receipt.jobId, pause: opened.service.debugState(plan, receipt.jobId)! };
 }
 
@@ -84,4 +99,143 @@ test('B11/B13: HTTP admits immediately, retries once, retains actual exchange an
   const drained = debugStateResponseSchema.parse((await handle('get', protocolPaths.runDebug(plan, runId, reached.cursor))).body);
   expect(drained.reached).toEqual([]);
   await expect(handle('get', protocolPaths.runDebug('other-plan', runId))).rejects.toMatchObject({ code: 'not-found' });
+});
+
+test('U01: a run snapshot names its breakpoint in the run and run-list queries, and null without one', async () => {
+  const { runId, handle } = await host();
+  const run = runResponseSchema.parse((await handle('get', protocolPaths.run(plan, runId))).body).run;
+  expect(run.breakpoint).toBe('before-agent:engineer');
+  const list = runListResponseSchema.parse((await handle('get', protocolPaths.runs(plan))).body);
+  expect(list.runs.find(entry => entry.jobId === runId)?.breakpoint).toBe('before-agent:engineer');
+  expect(debugStateResponseSchema.parse((await handle('get', protocolPaths.runDebug(plan, runId))).body).run.breakpoint).toBe('before-agent:engineer');
+  expect(runSnapshot(constructedRecord({ breakpoint: 'before-agent:engineer' }), []).breakpoint).toBe('before-agent:engineer');
+  expect(runSnapshot(constructedRecord(), []).breakpoint).toBeNull();
+  const { breakpoint: _omitted, ...legacy } = run;
+  expect(runSnapshotSchema.parse(legacy).breakpoint).toBeNull();
+});
+
+test('U02: interventions list every message with its exchange as the harness derives it, then the resume, whatever the after cursor', async () => {
+  const hosted = await host();
+  const { service, runId, pause, handle } = hosted;
+  const state = async (after = 0) => debugStateResponseSchema.parse((await handle('get', protocolPaths.runDebug(plan, runId, after))).body);
+  expect((await state()).interventions).toEqual([]);
+  const text = 'Explain without editing.\nKeep  the spacing.';
+  await handle('post', protocolPaths.commands, { commandId: 'message-u02', expectedVersion: 0, type: 'debug-message', payload: {
+    planId: plan, jobId: runId, pauseId: pause.pauseId, expectedRevision: pause.revision, message: text } });
+  const admitted = await state();
+  expect(admitted.current).toMatchObject({ state: 'exchanging' });
+  expect(admitted.interventions).toEqual([expect.objectContaining({ kind: 'message', pauseId: pause.pauseId, revision: 1, commandId: 'message-u02',
+    message: text, exchange: expect.objectContaining({ kind: 'exchange', commandId: 'message-u02', status: 'admitted', answer: null }) })]);
+  const [message] = admitted.interventions;
+  expect(service.events(plan, runId)!.find(event => event.sequence === message!.sequence)).toMatchObject({ type: 'debug-exchange-admitted', at: message!.at });
+
+  hosted.release();
+  await until(() => service.debugResult(plan, runId, 'message-u02')?.status === 'settled');
+  const settled = await state();
+  expect(settled.interventions).toHaveLength(1);
+  expect(settled.interventions[0]!.exchange).toEqual(service.debugResult(plan, runId, 'message-u02'));
+  expect(settled.interventions[0]!.exchange).toMatchObject({ status: 'settled', answer: 'I understand the normal task.' });
+  expect(settled.current).toMatchObject({ state: 'paused', revision: 2, taskState: 'pending' });
+  // A cursor beyond the admission event pages `reached` only; the interventions stay complete.
+  expect(settled.cursor).toBeGreaterThan(message!.sequence);
+  const later = await state(settled.cursor);
+  expect(later.reached).toEqual([]);
+  expect(later.interventions).toEqual(settled.interventions);
+
+  await handle('post', protocolPaths.commands, { commandId: 'resume-u02', expectedVersion: 0, type: 'debug-resume', payload: {
+    planId: plan, jobId: runId, pauseId: pause.pauseId, expectedRevision: 2, message: 'Now implement.' } });
+  const resumed = await state(settled.cursor);
+  expect(resumed.interventions.map(entry => [entry.kind, entry.commandId, entry.revision, entry.message, entry.exchange?.status ?? null])).toEqual([
+    ['message', 'message-u02', 1, text, 'settled'],
+    ['resume', 'resume-u02', 2, 'Now implement.', null],
+  ]);
+  expect(resumed.interventions[1]!.sequence).toBeGreaterThan(resumed.interventions[0]!.sequence);
+});
+
+test('U02: a message whose run was stopped before settlement carries the stopped exchange and its error', async () => {
+  const hosted = await host();
+  const { service, runId, pause, handle } = hosted;
+  await handle('post', protocolPaths.commands, { commandId: 'message-stop', expectedVersion: 0, type: 'debug-message', payload: {
+    planId: plan, jobId: runId, pauseId: pause.pauseId, expectedRevision: pause.revision, message: 'Work.' } });
+  const stopping = service.execute(stopRun(plan, runId, service.getRun(plan, runId)!.version));
+  hosted.release();
+  await stopping;
+  await until(() => service.getRun(plan, runId)?.state === 'stopped');
+  const stopped = debugStateResponseSchema.parse((await handle('get', protocolPaths.runDebug(plan, runId))).body);
+  expect(stopped.current).toBeNull();
+  expect(stopped.run.state).toBe('stopped');
+  expect(stopped.interventions).toEqual([expect.objectContaining({ kind: 'message', commandId: 'message-stop', message: 'Work.',
+    exchange: expect.objectContaining({ status: 'stopped', taskState: 'terminal', error: expect.any(String) }) })]);
+  expect(service.events(plan, runId)!.some(event => event.type === 'debug-exchange-settled')).toBe(false);
+});
+
+// The Plan 35 browser witness replays these answers: with PLAN35_DEBUG_EXPORT naming a file, they are written there.
+test('U13: the actual debug answers of one breakpoint run, from the pause through a message, its answer and a resume to the end', async () => {
+  const before: Record<string, unknown> = {};
+  const hosted = await host({ toEnd: true, before: async handle => {
+    before['plans'] = planListResponseSchema.parse((await handle('get', protocolPaths.plans)).body);
+    before['plan'] = planResponseSchema.parse((await handle('get', protocolPaths.plan(plan))).body);
+    before['runs'] = runListResponseSchema.parse((await handle('get', protocolPaths.runs(plan))).body);
+  } });
+  const { service, runId, pause, handle } = hosted;
+  const state = async () => debugStateResponseSchema.parse((await handle('get', protocolPaths.runDebug(plan, runId))).body);
+  const events = async () => {
+    const all: ProjectedRunEvent[] = [];
+    for (let after = 0, more = true; more;) {
+      const page = runEventPageSchema.parse((await handle('get', protocolPaths.runEvents(plan, runId, after))).body);
+      all.push(...page.events);
+      after = page.cursor;
+      more = page.more;
+    }
+    return all;
+  };
+  const step = async () => ({ debug: await state(), events: await events() });
+  const message = 'Explain the task before you edit anything.';
+  const resumeText = 'Now implement it as planned.';
+
+  const paused = await step();
+  expect(paused.debug.current).toMatchObject({ state: 'paused', pauseId: pause.pauseId, revision: 1, taskState: 'pending' });
+  const runs = runListResponseSchema.parse((await handle('get', protocolPaths.runs(plan))).body);
+  expect(runs.runs.find(entry => entry.jobId === runId)?.breakpoint).toBe('before-agent:engineer');
+  const inspection = debugInspectionResponseSchema.parse((await handle('get', protocolPaths.runDebugInspect(plan, runId, pause.pauseId))).body);
+  expect(inspection.inspection).toMatchObject({ pauseId: pause.pauseId, revision: 1, preview: true });
+
+  expect((await handle('post', protocolPaths.commands, { commandId: 'message-plan35', expectedVersion: 0, type: 'debug-message', payload: {
+    planId: plan, jobId: runId, pauseId: pause.pauseId, expectedRevision: 1, message } })).status).toBe(202);
+  const admitted = await step();
+  expect(admitted.debug.current).toMatchObject({ state: 'exchanging' });
+  expect(admitted.debug.interventions).toEqual([expect.objectContaining({ commandId: 'message-plan35', message, exchange: expect.objectContaining({ status: 'admitted' }) })]);
+  const exchangeAdmitted = debugExchangeResponseSchema.parse((await handle('get', protocolPaths.runDebugExchange(plan, runId, 'message-plan35'))).body);
+
+  hosted.release();
+  await until(() => service.debugResult(plan, runId, 'message-plan35')?.status === 'settled');
+  const settled = await step();
+  expect(settled.debug.current).toMatchObject({ state: 'paused', revision: 2, taskState: 'pending' });
+  expect(settled.debug.interventions[0]!.exchange).toMatchObject({ status: 'settled', answer: 'I understand the normal task.' });
+  const exchangeSettled = debugExchangeResponseSchema.parse((await handle('get', protocolPaths.runDebugExchange(plan, runId, 'message-plan35'))).body);
+
+  expect((await handle('post', protocolPaths.commands, { commandId: 'resume-plan35', expectedVersion: 0, type: 'debug-resume', payload: {
+    planId: plan, jobId: runId, pauseId: pause.pauseId, expectedRevision: 2, message: resumeText } })).status).toBe(202);
+  const resumed = await step();
+  expect(resumed.debug.current).toBeNull();
+  expect(resumed.debug.run.state).toBe('running');
+  expect(resumed.debug.interventions.map(entry => [entry.kind, entry.message])).toEqual([['message', message], ['resume', resumeText]]);
+
+  await until(() => service.getRun(plan, runId)!.state !== 'running');
+  await service.settled(plan, runId);
+  const ended = await step();
+  expect(ended.debug.run.state, JSON.stringify(ended.debug.run.failure)).toBe('completed');
+  expect(ended.debug.interventions).toEqual(resumed.debug.interventions.map(entry => entry.kind === 'message' ? { ...entry, exchange: expect.objectContaining({ status: 'settled' }) } : entry));
+  const after = runListResponseSchema.parse((await handle('get', protocolPaths.runs(plan))).body);
+
+  const output = process.env['PLAN35_DEBUG_EXPORT'];
+  if (output) {
+    await writeFile(output, `${JSON.stringify({
+      source: 'execution-breakpoints-http.test.ts: one scripted breakpoint run read through the real route handlers',
+      planId: plan, runId, message, resume: resumeText, before,
+      runs: { paused: runs, ended: after },
+      steps: { paused, admitted, settled, resumed, ended },
+      inspection, exchanges: { admitted: exchangeAdmitted, settled: exchangeSettled },
+    }, null, 2)}\n`);
+  }
 });

@@ -89,6 +89,14 @@ canonical project path. Closing a debugger client leaves the hosted run alive.
 Server loss interrupts unfinished debug-enabled runs; restarting retains their
 records without automatically continuing them.
 
+The first pause comes only after intake, initial architecture, planning and a
+passing readiness audit of the target's baseline, which takes tens of minutes
+and several model invocations; a red baseline ends the run before any
+engineer is prepared, so qualify the baseline first. The attached launcher
+waits for that first pause. Every debugger wait defaults to 20 minutes; pass
+`--timeout-ms` for a longer one, or after a timeout continue with `debug wait`
+from the returned `runId` and `cursor`.
+
 From this package directory, with `TARGET`, `PLAN` and `RAMIFY_MODEL` set:
 
 ```sh
@@ -99,7 +107,7 @@ In another terminal (the example uses `jq` to read control identities):
 
 ```sh
 SERVER=http://localhost:4180
-npm run --silent real-session -- --project "$TARGET" --plan "$PLAN" --server "$SERVER" --break before-agent:engineer --command-id start-1 --json > /tmp/debug-start.json
+npm run --silent real-session -- --project "$TARGET" --plan "$PLAN" --server "$SERVER" --break before-agent:engineer --command-id start-1 --timeout-ms 3600000 --json > /tmp/debug-start.json
 RUN=$(jq -r '.runId' /tmp/debug-start.json)
 PAUSE=$(jq -r '.current.pauseId' /tmp/debug-start.json)
 REV=$(jq -r '.current.revision' /tmp/debug-start.json)
@@ -113,6 +121,28 @@ CURSOR=$(jq -r '.cursor' /tmp/debug-resume.json)
 ./node_modules/.bin/tsx src/main.ts debug wait --server "$SERVER" --plan "$PLAN" --run "$RUN" --after "$CURSOR" --json
 ```
 
+The web UI drives the same breakpoint without a terminal client. Build it once,
+then serve as above:
+
+```sh
+npm run build:web
+npm run serve -- --project "$TARGET" --agent pi --model "$RAMIFY_MODEL" --port 4180
+```
+
+Open the printed address and the plan, check "Stop before each engineer
+starts" and press "Start a run". The Run page polls the run; at the first pause
+a banner and a header badge say "Paused at a breakpoint", and "Open the
+Debugger" opens the Debugger area. There, "Read the prepared input" shows the
+same preview as `debug inspect`; "Send message" sends the text area to the
+paused engineer, and the conversation shows its answer once it settles;
+"Resume" releases the pause, carrying the text area as its message when there
+is any. The UI sends the same commands with the current pause ID and revision,
+and shows each refusal as the harness states it. The live-server policy above
+applies unchanged, and closing the page leaves the run alive. Stop is in the
+Overview; the Debugger area does not stop a run. `npm run
+test:browser:breakpoint-debugger` drives this path in Chromium over answers a
+scripted run exported.
+
 Inspect presents the normal effective input as a preview. Messages use ordinary
 engineer tools and submission validation; a plain explanatory return leaves the
 task pending. An accepted submission or terminal invocation result is held for
@@ -120,14 +150,17 @@ resume, and further messages are refused. Resume handles a held result once or
 executes the pending task; after explanatory chat, supply an explicit instruction
 to implement. A later repair or capability engineer can reach a new occurrence.
 
-Message returns its settled answer, actual submission verdicts and evidence
-references. Resume returns its release acknowledgement immediately. Wait drains
+A launch or wait result has `kind` `breakpoint` or `terminal`, with the run's
+`current` interaction state and `run` snapshot beside it. A message result has
+`kind` `exchange` with the engineer's `answer`, its submission `verdicts`,
+`evidence` references and the task's `taskState` (`pending`, `accepted` or
+`terminal`). Resume returns its release acknowledgement immediately. Wait drains
 retained pages before polling and can report a historical reached pause; every
 such result separately presents `current` interaction state and the current run.
 Use current pause/revision identities for a new mutation. A historical receipt
 does not authorize a newer occurrence.
 
-All debugger waits default to 120000 ms and accept `--timeout-ms`. Timeout or a
+All debugger waits default to 1200000 ms and accept `--timeout-ms`. Timeout or a
 lost response preserves command/run identities and the last cursor, without
 cancelling work. Retry an uncertain mutation with the identical command ID and
 payload. Changed payloads, stale revisions and concurrent exchanges are refused.
@@ -139,6 +172,8 @@ Attached `real-session` requires explicit project, plan, selector and command ID
 It never prepares a fixture, starts or stops a server, and refuses `--model`;
 configure the model on `serve`. Without `--server`, the legacy fixture and
 owned-server launcher remains available; `--break` requires attachment.
+Stop a paused run as any run: post the ordinary `stop-job` command for its
+plan and job to `/api/v1/commands`; there is no `debug stop`.
 
 `session` runs one engineer session on one module of a project, from a
 prompt a person writes, without planning a run:

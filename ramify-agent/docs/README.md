@@ -2,6 +2,11 @@
 
 Design documents for the separate agent harness:
 
+- [Plan 35: the breakpoint debugger in the web UI](plans/35-breakpoint-debugger-ui/main-plan.md),
+  implemented, audited and witnessed in Chromium: start a plan with the
+  engineer breakpoint from the Plan page, then read the prepared input,
+  message the paused engineer and resume from a Debugger area on the Run page,
+  over Plan 34's controls
 - [Plan 30: harness steps as a library and a CLI](plans/30-harness-steps/main-plan.md),
   implemented; the real-plan exercise awaits the user's go-ahead: step
   inputs and constructors the run itself uses, and `ramify-agent step` to

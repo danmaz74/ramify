@@ -26,7 +26,7 @@ export function parseRealSessionOptions(argv: readonly string[]): RealSessionOpt
   if (values['--model']) throw new UsageError('Attachment uses the live server model. Configure --model on serve, not real-session --server.');
   for (const flag of ['--project', '--plan', '--break', '--command-id']) if (!values[flag]) throw new UsageError(`Attachment needs explicit ${flag}`);
   if (values['--break'] !== 'before-agent:engineer') throw new UsageError('Only --break before-agent:engineer is supported');
-  const timeoutMs = values['--timeout-ms'] === undefined ? 120000 : Number(values['--timeout-ms']);
+  const timeoutMs = values['--timeout-ms'] === undefined ? 1200000 : Number(values['--timeout-ms']);
   if (!/^\d+$/.test(String(values['--timeout-ms'] ?? timeoutMs)) || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2147483647) throw new UsageError('--timeout-ms needs an integer from 1 to 2147483647');
   return { mode: 'attached', attached: { server: values['--server']!, projectRoot: values['--project']!, planId: values['--plan']!,
     commandId: values['--command-id']!, breakpoint: 'before-agent:engineer', timeoutMs, json } };

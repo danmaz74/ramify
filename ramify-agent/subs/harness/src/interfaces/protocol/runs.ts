@@ -395,6 +395,8 @@ export const runSnapshotSchema = z.object({
   planDeviations: runPlanDeviationsSchema,
   /** Every environment problem the run reported, in the order the log recorded them. */
   environmentProblems: z.array(runEnvironmentProblemSchema),
+  /** The breakpoint the run was started with, or null. Answers that omit it parse as null. */
+  breakpoint: breakpointSelectorSchema.nullable().default(null),
 }).strict();
 export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
 
@@ -422,18 +424,45 @@ export type RunListResponse = z.infer<typeof runListResponseSchema>;
 export const runResponseSchema = z.object({ run: runSnapshotSchema }).strict();
 export type RunResponse = z.infer<typeof runResponseSchema>;
 
-/** Current interaction is separate from retained reached pauses and exchange results. */
+/**
+ * One person's intervention at a breakpoint, in log order: an admitted
+ * message with the exchange result the harness derives for it at query time,
+ * never null, or a resume with its optional message and no exchange.
+ */
+export const debugInterventionSchema = z.object({
+  kind: z.enum(['message', 'resume']),
+  /** The sequence of the event that admitted it. */
+  sequence: z.int().positive(),
+  at: timestamp,
+  pauseId: z.string().min(1),
+  /** The interaction revision the command named and was admitted at. */
+  revision: z.int().positive(),
+  commandId: commandIdSchema,
+  /** The person's text, verbatim; null for a resume without one. */
+  message: z.string().nullable(),
+  exchange: debugExchangeSchema.nullable(),
+}).strict();
+export type DebugIntervention = z.infer<typeof debugInterventionSchema>;
+
+/**
+ * Current interaction is separate from retained reached pauses and exchange
+ * results. `reached` is paged by the `after` cursor; `interventions` lists
+ * every intervention of the run, independent of that paging.
+ */
 export const debugStateResponseSchema = z.object({ run: runSnapshotSchema,
   current: breakpointStateSchema.nullable(), reached: z.array(breakpointStateSchema).max(500),
   cursor: jobVersionSchema, more: z.boolean(),
+  interventions: z.array(debugInterventionSchema),
 }).strict();
 export type DebugStateResponse = z.infer<typeof debugStateResponseSchema>;
 export const debugInspectionResponseSchema = z.object({ run: runSnapshotSchema,
   current: breakpointStateSchema.nullable(), inspection: debugInspectionSchema,
 }).strict();
+export type DebugInspectionResponse = z.infer<typeof debugInspectionResponseSchema>;
 export const debugExchangeResponseSchema = z.object({ run: runSnapshotSchema,
   current: breakpointStateSchema.nullable(), exchange: debugExchangeSchema.nullable(),
 }).strict();
+export type DebugExchangeResponse = z.infer<typeof debugExchangeResponseSchema>;
 
 /** Read-only, revision-bound merge advice; it never changes run completion. */
 export const mergeReadinessResponseSchema = z.object({

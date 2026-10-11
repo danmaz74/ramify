@@ -21,7 +21,8 @@
     "trial": "tsx scripts/live-trial.ts",
     "test:browser:execution-map": "tsx scripts/browser-acceptance/run.ts",
     "test:browser:check-findings": "tsx scripts/browser-acceptance/check-findings.ts",
-    "test:browser:plan21-projections": "tsx scripts/browser-acceptance/plan21-projections.ts"
+    "test:browser:plan21-projections": "tsx scripts/browser-acceptance/plan21-projections.ts",
+    "test:browser:breakpoint-debugger": "tsx scripts/browser-acceptance/breakpoint-debugger.ts"
   },
   "dependencies": {
     "@cucumber/gherkin": "42.0.0",

@@ -8,6 +8,7 @@ import {
 import { checkFindingListResponseSchema, checkFindingModuleCountsSchema } from '../../../harness/src/interfaces/protocol/check-findings.js';
 import { ClientError } from '../client.js';
 import { RunPage } from '../run-page.js';
+import { debugClient, debugPlanId, debugRunId, debugState, pause } from './helpers/debugger.js';
 import { architect, globalFork, liveEngineer } from './helpers/sessions.js';
 import { checkFindingKey, StubClient, type StubRun } from './helpers/stub-client.js';
 
@@ -1234,4 +1235,51 @@ test('V01: actual Run Measurements renders server-comparable scopes and weights 
   fireEvent.click(await screen.findByRole('tab', { name: 'Measurements' }));
   const sentinel = await screen.findByRole('table', { name: 'Project-only scope metrics' });
   expect(sentinel.textContent).toContain('dimensionlessmeasured0.1235');
+});
+
+test('U05: a run without a breakpoint shows no Debugger tab, banner or badge, and its debug state is never read', async () => {
+  const client = clientWith(stubRun());
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  await screen.findByText(/Read at version 12/);
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).not.toContain('Debugger');
+  expect(screen.queryByText(/Paused at a breakpoint/)).toBeNull();
+  expect(screen.queryByRole('status', { name: 'Paused at a breakpoint' })).toBeNull();
+  expect(client.calls.filter(call => call.startsWith('getDebugState'))).toEqual([]);
+});
+
+test('U05: a breakpoint run that has not paused yet has a Debugger tab that says it is working toward its next breakpoint', async () => {
+  const client = debugClient(debugState(null));
+  render(<RunPage client={client} planId={debugPlanId} runId={debugRunId} interval={60_000} />);
+  const tab = await screen.findByRole('tab', { name: 'Debugger' });
+  expect(screen.getAllByRole('tab').map(each => each.textContent).slice(0, 2)).toEqual(['Overview', 'Debugger']);
+  fireEvent.click(tab);
+  const area = await screen.findByLabelText('Debugger');
+  expect(await within(area).findByText('The run is working toward its next breakpoint.')).toBeTruthy();
+  expect(area.textContent).toContain('Stop stays in the Overview');
+  expect(screen.queryByRole('status', { name: 'Paused at a breakpoint' })).toBeNull();
+  expect(document.querySelector('.badge.debug-paused')).toBeNull();
+});
+
+test('U06: a reached pause shows the header badge, a banner that names it and opens the Debugger area, and its facts with the harness summary', async () => {
+  const paused = pause({ work: { workItem: 'wi-001', iteration: 'wi-001.i01', request: 'rq-002', capabilityTask: 'ct-003', nonfunctionalRepair: 'nfr-004' } });
+  const client = debugClient(debugState(paused));
+  render(<RunPage client={client} planId={debugPlanId} runId={debugRunId} interval={60_000} />);
+  const banner = await screen.findByRole('status', { name: 'Paused at a breakpoint' });
+  expect(banner.textContent).toContain('Paused at a breakpoint. The engineer for wi-001.i01 is prepared and waits for resume.');
+  expect(banner.textContent).toContain('pause bp-0001, revision 1');
+  const badge = document.querySelector('.page-header .badge.debug-paused')!;
+  expect(badge.textContent).toBe('Paused at a breakpoint');
+  expect(screen.getByLabelText('Overview')).toBeTruthy();
+
+  fireEvent.click(within(banner).getByRole('button', { name: 'Open the Debugger' }));
+  const area = await screen.findByLabelText('Debugger');
+  expect(screen.getByRole('tab', { name: 'Debugger' }).getAttribute('aria-selected')).toBe('true');
+  expect(within(area).getByText('The run is paused before the engineer starts.')).toBeTruthy();
+  const facts = within(area).getByLabelText('Pause facts');
+  expect([...facts.querySelectorAll('div')].map(row => [row.querySelector('dt')!.textContent, row.querySelector('dd')!.textContent])).toEqual([
+    ['Role', 'engineer'], ['Work item', 'wi-001'], ['Iteration', 'wi-001.i01'], ['Request', 'rq-002'], ['Capability task', 'ct-003'],
+    ['Nonfunctional repair', 'nfr-004'], ['Goal', 'Attach a note to a review'], ['Next action', 'execute the iteration'],
+    ['Task state', 'pending'], ['Pause ID', 'bp-0001'], ['Revision', '1'],
+  ]);
+  expect(within(area).getByLabelText('Harness summary').textContent).toBe('The engineer for wi-001.i01 is prepared and waits for resume.');
 });

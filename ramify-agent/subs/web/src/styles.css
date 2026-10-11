@@ -773,3 +773,27 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .session-efficiency .table { display: block; max-width: 100%; overflow-x: auto; }
 .session-efficiency h3, .session-efficiency h4 { margin-block: .6rem; }
 .operation-facts { font-size: .9rem; }
+
+/* The breakpoint debugger: the paused badge and banner, the conversation and the composer. */
+.badge.breakpoint { background: #dde8f6; color: var(--accent); }
+.badge.debug-paused { background: var(--warn); color: #fff; }
+.debug-banner { border: 2px solid var(--warn); border-left-width: 6px; border-radius: 8px; padding: 0.5rem 0.9rem; margin: 0.5rem 0; background: #fbf4e6; color: var(--ink); }
+.debug-banner p { margin: 0.2rem 0; }
+.debug-banner strong:first-child { color: var(--warn); }
+.debug-banner button.link { color: var(--warn); font-weight: 600; }
+.debug-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.3rem 0; }
+.debug-summary { white-space: pre-wrap; border-left: 3px solid var(--line); padding-left: 0.6rem; }
+.debug-historical { color: var(--warn); }
+.debug-preview details { margin: 0.35rem 0; }
+.debug-preview summary { cursor: pointer; font-weight: 600; }
+.debug-preview pre { max-height: 24rem; overflow: auto; background: #f7f8fa; padding: 0.4rem 0.6rem; border-radius: 6px; }
+.debug-blocks, .debug-tools, .debug-verdicts { padding-left: 1.2rem; }
+.debug-conversation { list-style: none; padding: 0; margin: 0.5rem 0; display: grid; gap: 0.5rem; }
+.debug-entry { border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.8rem; background: var(--panel); }
+.debug-entry p { margin: 0.2rem 0; }
+.debug-entry-resume { border-left: 4px solid var(--good); }
+.debug-person { border-left: 3px solid var(--accent); padding-left: 0.6rem; }
+.debug-answer { border-left: 3px solid var(--good); padding-left: 0.6rem; }
+.debug-composer { display: grid; gap: 0.4rem; }
+.debug-composer textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.debug-composer-actions { display: flex; gap: 0.5rem; }

@@ -98,6 +98,11 @@ expose-sub runPlanDeviationsSchema, RunPlanDeviations from harness to descendant
 expose-sub runEnvironmentProblemSchema, RunEnvironmentProblem from harness to descendants
 expose-sub runSnapshotSchema, RunSnapshot, unservedRunSchema, UnservedRun from harness to descendants
 expose-sub runListResponseSchema, RunListResponse, runResponseSchema, RunResponse from harness to descendants
+expose-sub breakpointSelectorSchema, BreakpointSelector, breakpointStateSchema, BreakpointState from harness to descendants
+expose-sub debugExchangeSchema, DebugExchange, debugInspectionSchema, DebugInspection from harness to descendants
+expose-sub debugInterventionSchema, DebugIntervention, debugStateResponseSchema, DebugStateResponse from harness to descendants
+expose-sub debugInspectionResponseSchema, DebugInspectionResponse from harness to descendants
+expose-sub debugExchangeResponseSchema, DebugExchangeResponse from harness to descendants
 expose-sub mergeReadinessResponseSchema, MergeReadinessResponse from harness to descendants
 expose-sub runEventRefKindSchema, RunEventRefKind, projectedRunEventSchema from harness to descendants
 expose-sub ProjectedRunEvent, runEventPageSchema, RunEventPage, entryViewSchema from harness to descendants

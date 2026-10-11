@@ -10,6 +10,7 @@ import { EnvironmentProblems, ModuleCheckFindings, PlanDeviations, WorkItemCheck
 import { ExecutionMapArea } from './execution-map.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
+import { DebuggerArea, DebugPauseBadge, DebugPauseBanner, useDebugState } from './debugger.js';
 import { DecisionBanner, DecisionFocusContext, DecisionWaitBadge } from './decision-waits.js';
 import { Markdown } from './markdown.js';
 import { chapterHref, routeHref } from './routes.js';
@@ -28,13 +29,16 @@ import { SessionMetrics } from './session-metrics.js';
  * area, and its banner opens each request's answer form. An environment
  * problem the global architect reported shows its diagnosis and suggestion
  * in the overview, with the answer form that resumes the run. Stop and Approve
- * are its commands; Start is on the Plan page. The
+ * are its commands; Start is on the Plan page. A run started with a
+ * breakpoint has a Debugger area, and while it is paused a badge and a
+ * banner above every area say so. The
  * connection to the harness is shown apart from the run's state: losing it
  * changes nothing in the run.
  */
 
 const areas = [
   ['overview', 'Overview'],
+  ['debugger', 'Debugger'],
   ['plan', 'Plan and entries'],
   ['decisions', 'Hypotheses and decisions'],
   ['work', 'Work items'],
@@ -82,6 +86,11 @@ export function RunPage({ client, planId, runId, interval }: {
   const openGate = (gate: string) => { setGateSelection(gate); setArea('checks'); };
   const openDecision = (item: string, request: string) => { setWorkItem(item); setArea('work'); setDecisionFocus(request); };
   const waiting = new Set(run?.decisionRequests.waiting ? run.decisionRequests.workItems.map(item => item.workItem) : []);
+  // Only a run started with a breakpoint has a Debugger area; its badge and banner read the same state.
+  const debugging = run !== undefined && run.breakpoint !== null;
+  const debug = useDebugState(client, planId, runId, run, interval);
+  const pause = debugging && run.state === 'running' && debug.debug?.current?.state === 'paused' ? debug.debug.current : null;
+  const debugChanged = () => { refresh(); debug.refresh(); };
 
   return (
     <DecisionFocusContext.Provider value={{ request: decisionFocus, done: () => setDecisionFocus(null) }}>
@@ -89,9 +98,10 @@ export function RunPage({ client, planId, runId, interval }: {
         <p><a href={routeHref({ page: 'plan', planId })}>← The plan</a></p>
         <header className="page-header">
           <h1>Run <code>{runId}</code></h1>
-          {run && <span><RunState state={run.state} planDeviations={run.planDeviations} />{run.decisionRequests.waiting && <DecisionWaitBadge />}</span>}
+          {run && <span><RunState state={run.state} planDeviations={run.planDeviations} />{run.decisionRequests.waiting && <DecisionWaitBadge />}{pause && <DebugPauseBadge />}</span>}
         </header>
         {run && <DecisionBanner requests={run.decisionRequests} onOpen={openDecision} />}
+        {pause && <DebugPauseBanner current={pause} onOpen={() => setArea('debugger')} />}
         <p className={`connection-line connection-line-${error ? 'lost' : connection}`} aria-label="Connection to the harness">
           {error
             ? `The harness is not answering (${error.message}). What is shown is the last state read${run ? `, at version ${run.version}` : ''}; the run does not depend on this page.`
@@ -99,11 +109,12 @@ export function RunPage({ client, planId, runId, interval }: {
         </p>
         {!run && error && <p className="failure" role="alert">Could not read the run: {error.message}</p>}
         <nav className="tabs" aria-label="Areas of the run">
-          {areas.map(([id, label]) => (
+          {areas.filter(([id]) => id !== 'debugger' || debugging).map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={area === id} className={area === id ? 'tab tab-selected' : 'tab'} onClick={() => setArea(id)}>{label}</button>
           ))}
         </nav>
         {run && area === 'overview' && <Overview client={client} run={run} events={events} onApproved={refresh} onOpenGate={openGate} />}
+        {run && debugging && area === 'debugger' && <DebuggerArea client={client} run={run} debug={debug.debug} error={debug.error} onChanged={debugChanged} />}
         {area === 'plan' && <PlanAndEntries {...props} run={run} onApproved={refresh} />}
         {area === 'decisions' && <HypothesesAndDecisions {...props} />}
         {area === 'work' && <WorkItems {...props} selected={workItem} onSelect={setWorkItem} onOpenGate={openGate} waiting={waiting} />}

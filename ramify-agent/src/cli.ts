@@ -68,7 +68,7 @@ export const usage = [
   '  ramify-agent debug <inspect|message|resume|wait> --server <url> --plan <id> --run <id> [--json] [--timeout-ms <n>]',
   '                       inspect: --pause <id>; message/resume: --pause <id> --expected-revision <n> --command-id <id>',
   '                       message: --message-file <UTF-8 file>; resume: optional --message-file; wait: [--after <cursor>]',
-  '                       Default timeout: 120000 ms. Client exit or timeout never cancels the run. Retry the same command ID.',
+  '                       Default timeout: 1200000 ms (20 minutes). Client exit or timeout never cancels the run. Retry the same command ID.',
   '  ramify-agent serve --project <root> [--port <n>] [--agent pi [--model <provider/model>] | --agent fake]',
   '  ramify-agent session --project <root> --module <module-path>',
   '                       (--prompt <text> | --prompt-file <file>)',
@@ -170,7 +170,7 @@ function parseDebug(rest: readonly string[]): DebugOptions {
   if (action === 'message' && !values['--message-file']) throw new UsageError('debug message needs --message-file');
   if (action !== 'wait' && values['--after'] || action === 'wait' && values['--pause']) throw new UsageError('--after applies to wait; --pause applies to inspect/message/resume');
   return { action, server: values['--server']!, planId: values['--plan']!, runId: values['--run']!, json,
-    after: number('--after', 0, 0), timeoutMs: number('--timeout-ms', 120000, 1),
+    after: number('--after', 0, 0), timeoutMs: number('--timeout-ms', 1200000, 1),
     ...(values['--pause'] ? { pauseId: values['--pause'] } : {}),
     ...(values['--command-id'] ? { commandId: values['--command-id'] } : {}),
     ...(values['--message-file'] ? { messageFile: values['--message-file'] } : {}),

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
-import { runSnapshotSchema, type RunDecisionRequests, type RunSnapshot } from '../../../harness/src/interfaces/protocol/runs.js';
+import { runSnapshotSchema, type RunCommandInput, type RunDecisionRequests, type RunSnapshot } from '../../../harness/src/interfaces/protocol/runs.js';
 import { PlanPage } from '../plan-page.js';
 import { StubClient } from './helpers/stub-client.js';
 
@@ -125,4 +125,44 @@ test('a run that waits for the person\'s decision carries its own badge in the r
   for (const other of ['20260924T110000Z-a00002', '20260924T100000Z-a00003']) {
     expect(within(screen.getByRole('link', { name: other }).closest('li')!).queryByText('Waiting for your decision')).toBeNull();
   }
+});
+
+test('U04: Start with the engineer breakpoint checked carries before-agent:engineer; unchecked, the start command is exactly as before', async () => {
+  const unchecked = clientWith('# Plan');
+  const opened: string[] = [];
+  render(<PlanPage client={unchecked} planId="p" navigate={hash => opened.push(hash)} />);
+  await screen.findByText('This plan has no run yet.');
+  const box = screen.getByRole('checkbox', { name: /^Stop before each engineer starts/ }) as HTMLInputElement;
+  expect(box.checked).toBe(false);
+  expect(box.closest('label')!.textContent).toContain('the run then pauses before every engineer and waits on the Run page\'s Debugger area');
+  fireEvent.click(screen.getByRole('button', { name: 'Start a run' }));
+  await waitFor(() => expect(opened).toHaveLength(1));
+  const [{ commandId: _plain, ...plain }] = unchecked.commands as [RunCommandInput];
+  expect(plain).toEqual({ expectedVersion: 0, type: 'start-run', payload: { planId: 'p', agent: 'scripted', reviewStop: false } });
+  expect(JSON.stringify(plain)).toBe('{"expectedVersion":0,"type":"start-run","payload":{"planId":"p","agent":"scripted","reviewStop":false}}');
+  cleanup();
+
+  const checked = clientWith('# Plan');
+  render(<PlanPage client={checked} planId="p" navigate={hash => opened.push(hash)} />);
+  await screen.findByText('This plan has no run yet.');
+  fireEvent.click(screen.getByRole('checkbox', { name: /^Stop before each engineer starts/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Start a run' }));
+  await waitFor(() => expect(opened).toHaveLength(2));
+  const [{ commandId: _withBreakpoint, ...withBreakpoint }] = checked.commands as [RunCommandInput];
+  expect(withBreakpoint).toEqual({ expectedVersion: 0, type: 'start-run', payload: { planId: 'p', agent: 'scripted', reviewStop: false, breakpoint: 'before-agent:engineer' } });
+});
+
+test('U04: runs started with a breakpoint are marked in the plan\'s run list', async () => {
+  const client = clientWith('# Plan');
+  const none = { open: 0, waiting: false, workItems: [] };
+  client.runList = {
+    runs: [{ ...run('20261010T120000Z-b00001', 'running', none), breakpoint: 'before-agent:engineer' }, run('20261010T110000Z-b00002', 'completed', none)],
+    total: 2, agent: 'scripted', unserved: [],
+  };
+  render(<PlanPage client={client} planId="p" />);
+  const marked = (await screen.findByRole('link', { name: '20261010T120000Z-b00001' })).closest('li')!;
+  const badge = within(marked).getByText('breakpoint');
+  expect(badge.className).toBe('badge breakpoint');
+  expect(badge.getAttribute('title')).toBe('Started with the breakpoint before-agent:engineer');
+  expect(within(screen.getByRole('link', { name: '20261010T110000Z-b00002' }).closest('li')!).queryByText('breakpoint')).toBeNull();
 });

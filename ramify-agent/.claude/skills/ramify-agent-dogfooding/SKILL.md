@@ -99,13 +99,17 @@ omit `--model` only when intentionally using the configured default.
 
   ```sh
   npm run serve -- --project "$TARGET" --agent pi --model "$RAMIFY_MODEL" --port 4180
-  npm run --silent real-session -- --project "$TARGET" --plan "$PLAN" --server "$SERVER" --break before-agent:engineer --command-id start-1 --json
+  npm run --silent real-session -- --project "$TARGET" --plan "$PLAN" --server "$SERVER" --break before-agent:engineer --command-id start-1 --timeout-ms 3600000 --json
   ./node_modules/.bin/tsx src/main.ts debug inspect --server "$SERVER" --plan "$PLAN" --run "$RUN" --pause "$PAUSE" --json
   ./node_modules/.bin/tsx src/main.ts debug message --server "$SERVER" --plan "$PLAN" --run "$RUN" --pause "$PAUSE" --expected-revision 1 --command-id explain-1 --message-file /tmp/question.txt --json
   ./node_modules/.bin/tsx src/main.ts debug resume --server "$SERVER" --plan "$PLAN" --run "$RUN" --pause "$PAUSE" --expected-revision 2 --command-id resume-1 --message-file /tmp/proceed.txt --json
   ./node_modules/.bin/tsx src/main.ts debug wait --server "$SERVER" --plan "$PLAN" --run "$RUN" --after "$CURSOR" --json
   ```
 
+  Take `RUN`, `PAUSE`, the expected revision and `CURSOR` from each result, as
+  the README's scenario shows. The first pause follows planning and a passing
+  readiness audit, so the launcher needs a long `--timeout-ms`; after a timeout,
+  `debug wait` from the returned cursor instead of starting again.
   Supply any instruction not to edit or submit in the question itself. The
   engineer keeps ordinary tools, scope and submission authority. Follow-up
   messages use the returned current revision and retain the logical session.
@@ -113,10 +117,16 @@ omit `--model` only when intentionally using the configured default.
   An accepted result is held until resume and refuses replacement messages.
   Each new engineer operation, including repair or capability work, can pause
   again. Inspect current state before acting on a retained historical receipt.
-  Waiting defaults to 120000 ms; increase `--timeout-ms` deliberately when needed.
+  Waiting defaults to 20 minutes; raise `--timeout-ms` for a long wait.
   A timeout or client exit does not cancel the command. Retry the identical
   command ID and payload, or wait using the returned cursor. Server loss
   interrupts unfinished debug-enabled runs instead of replaying them.
+  The web UI is an alternative to the `real-session` launcher and the `debug`
+  commands: after `npm run build:web`, serve as above, open the plan, check
+  "Stop before each engineer starts" and start the run; the Run page's
+  Debugger area reads the prepared input, sends messages, shows each answer
+  and resumes, with the same commands and refusals. Stop stays in the
+  Overview. See the README's breakpoint section.
 
 - **Step/operator modes:** consult
   [Plan 30](../../../docs/plans/30-harness-steps/main-plan.md),
