@@ -1,5 +1,0 @@
-ramify 1
-// Browser code: it renders what the harness publishes and imports only the
-// browser-safe contracts it receives from the root. It exposes nothing; the
-// root reaches it only through its build output.
-module web tagged [ui, browser]

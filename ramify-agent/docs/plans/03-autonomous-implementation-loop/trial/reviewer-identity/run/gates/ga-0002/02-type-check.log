@@ -1,4 +1,0 @@
-
-> collection-review@0.0.0 type-check
-> tsc --noEmit -p tsconfig.json
-
