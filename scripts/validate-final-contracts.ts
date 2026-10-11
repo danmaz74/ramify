@@ -375,7 +375,7 @@ const declarationLayers: readonly DeclarationLayer[] = [
   { plan: 'Plan 7 (affected modules)',
     added: {
       './': [
-        'expose-sub AffectedQuery, AffectedModule, AffectedPathBasis, AffectedPathSeed, AffectedWideningReason, AffectedSelection, AffectedUnavailableReason, SessionAffectedOutcome from analysis to descendants',
+        'expose-sub FileStructuralFact, FileStructuralFacts, AffectedQuery, AffectedModule, AffectedPathBasis, AffectedPathSeed, AffectedWideningReason, AffectedSelection, AffectedUnavailableReason, SessionAffectedOutcome from analysis to descendants',
         'expose-sub AffectedRequest, ContextAffectedOutcome from daemon to descendants',
       ].join('\n'),
       'subs/analysis/': [
