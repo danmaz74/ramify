@@ -158,7 +158,7 @@ const toolkit: readonly Fixture[] = [
     sub([...sourceNames, ...symbolDetailNames], 'analysis', descendants),
     sub([...analysisNames, ...apiViewNames], 'analysis', descendants),
     sub(measurementNames, 'analysis', descendants),
-    sub(['AffectedQuery', 'AffectedModule', 'AffectedPathBasis', 'AffectedPathSeed', 'AffectedWideningReason', 'AffectedSelection',
+    sub(['FileStructuralFact', 'FileStructuralFacts', 'AffectedQuery', 'AffectedModule', 'AffectedPathBasis', 'AffectedPathSeed', 'AffectedWideningReason', 'AffectedSelection',
       'AffectedUnavailableReason', 'SessionAffectedOutcome'], 'analysis', descendants),
     sub(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome', 'BehavioralDependencyMetrics', 'TestFileReferences',
       'TestReferenceFacts'], 'analysis', descendants),
