@@ -1,6 +1,6 @@
 # Evidence during invalid analysis
 
-**Date:** 2026-10-12. **Status:** Implemented and locally qualified; clean committed candidate audit pending.
+**Date:** 2026-10-12. **Status:** Implemented and qualified, including the [committed candidate audit](../plans/analysis-failure-recovery/audit-receipt.md).
 The command and response additions below were reviewed as proposed contracts;
 the [qualification receipt](../plans/analysis-failure-recovery/completion-report.md) records their local implementation.
 

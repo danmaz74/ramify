@@ -1,6 +1,6 @@
 # Evidence during invalid analysis: implementation plan
 
-**Date:** 2026-10-12. **Status:** Implemented and locally qualified; clean committed candidate audit pending. See the [completion receipt](completion-report.md).
+**Date:** 2026-10-12. **Status:** Complete: implemented, locally qualified and passed the [committed candidate audit](audit-receipt.md). See the [completion receipt](completion-report.md).
 
 Implement the [recovery specification](../../architecture/analysis-failure-recovery.spec.md)
 as seven ordered iterations. The specification remains the behavioral contract;

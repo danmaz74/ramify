@@ -12,8 +12,8 @@ their invocation contracts when their plans are written.
 
 The [analysis-failure-recovery contract package](../plans/analysis-failure-recovery/contracts.md)
 was reviewed during iteration 1 on 2026-10-12 and implemented in the
-locally qualified candidate. Its clean committed candidate audit remains
-pending; the command examples below describe the current implementation.
+qualified candidate. Its [committed audit](../plans/analysis-failure-recovery/audit-receipt.md) passed;
+the command examples below describe the current implementation.
 
 The adopted additions are fresh-batch `ramify ownership`, the strict
 `ramify.ownership/1` union and public `ownershipDocumentSchema` decoder,

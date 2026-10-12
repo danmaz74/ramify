@@ -1,8 +1,8 @@
 # Daemon and analysis architecture
 
 The [analysis-failure-recovery contract package](../plans/analysis-failure-recovery/contracts.md)
-was reviewed on 2026-10-12 and is implemented in the local candidate, with
-clean committed audit pending. Contexts owns the compact `RecoveryEvidence`
+was reviewed on 2026-10-12 and is implemented and qualified, including the
+[committed candidate audit](../plans/analysis-failure-recovery/audit-receipt.md). Contexts owns the compact `RecoveryEvidence`
 baseline and accumulated observed paths.
 Invalid revisions and failed attempts preserve that state; completed
 publication resets only through its captured observation sequence. Root

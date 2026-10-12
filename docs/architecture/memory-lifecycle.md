@@ -2,8 +2,8 @@
 
 The reviewed [recovery contracts](../plans/analysis-failure-recovery/contracts.md)
 add one compact completed identity, bounded path observations and gap codes
-per live context. The local candidate implements this retention; its clean
-committed audit remains pending. Charge all recovery state
+per live context. The qualified candidate implements this retention; its
+[committed audit](../plans/analysis-failure-recovery/audit-receipt.md) passed. Charge all recovery state
 and retained response copies to existing queued-path, per-context and global
 byte budgets; do not retain historical compiler sessions or source bytes.
 Overflow and watcher loss remain explicit history gaps, and disposal releases
