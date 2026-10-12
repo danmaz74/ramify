@@ -1,6 +1,6 @@
 # Evidence during invalid analysis: qualification receipt
 
-**Date:** 2026-10-12. **Status:** Implementation and qualification complete, including the [committed candidate audit](audit-receipt.md). Candidate `f370d7d3e96820710585668aabb9ec23cea29d43` passed all five configured audit checks. Earlier local evidence below retains its original pre-commit identities. The manifest remains `0.4.3`; no published recovery release is claimed.
+**Date:** 2026-10-12. **Status:** Implementation and qualification complete, including the [committed candidate audit](audit-receipt.md). Candidate `f370d7d3e96820710585668aabb9ec23cea29d43` passed all five configured audit checks. Earlier local evidence below retains its original pre-commit identities. The later [published release `0.5.0`](release-receipt.md) has a separate versioned commit, full release audit and registry artifact; the earlier `0.4.3` observations below remain historical.
 
 ## Workflow and public result
 
@@ -81,7 +81,7 @@ The built-process and context-scale witnesses ran in `npm test -- --maxWorkers=4
 
 ## Known limits and pending boundary
 
-The old `/2` installed client reports a generic unavailable result when it cannot decode a future `/3` discovery record; the controlled handshake shows the explicit protocol refusal once it reaches the socket. Existing nonblocking self-check limits remain visible, with two additional known test namespace notes. The four-workload timings are observations without a threshold or cache claim. The [clean committed candidate audit](audit-receipt.md) passed. A published version and release commit remain absent from this candidate’s evidence. The [consumer handoff](handoff.md) names the available package surface and these limits without treating development manifest `0.4.3` as an adoption pin.
+The old `/2` installed client reports a generic unavailable result when it cannot decode a future `/3` discovery record; the controlled handshake shows the explicit protocol refusal once it reaches the socket. Existing nonblocking self-check limits remain visible, with two additional known test namespace notes. The four-workload timings are observations without a threshold or cache claim. The [clean committed candidate audit](audit-receipt.md) passed. The subsequent [release receipt](release-receipt.md) records published version `0.5.0` and its separately audited release commit. The [consumer handoff](handoff.md) names the available package surface and these limits without treating development manifest `0.4.3` as an adoption pin.
 
 Candidate preparation compressed the remaining raw logs without changing their bytes and removed one extra blank line at the end of `subs/analysis/subs/project/src/path-syntax.ts`. The reference source hashes above identify the source before that whitespace-only correction; the clean-commit audit identifies the resulting committed candidate. See [iteration 7 preparation](iterations/iteration7-results.md#candidate-preparation).
 

@@ -36,3 +36,5 @@ git show refs/audited/runs/2026-10-12T10-54-58Z-f370d7d3e:reports/audit/summary.
 ```
 
 The earlier [local qualification](completion-report.md) retains its original source/build identities. Candidate preparation compressed log artifacts and removed one trailing blank source line; the audit above qualifies the resulting committed source. The follow-up commit records receipts and documentation only. This audit names the implementation commit, not that later documentation commit. No published recovery version or release commit is claimed; manifest `0.4.3` and the disposable packed artifact remain unsuitable as a released adoption pin.
+
+The subsequent [0.5.0 release receipt](release-receipt.md) records publication from its own versioned and fully audited release commit. The candidate audit above remains evidence for its original commit.

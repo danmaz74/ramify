@@ -1,0 +1,40 @@
+{
+  "source": "https://npm.braimax.com/ramify.ts/0.5.0",
+  "installedVersionOutput": "0.5.0",
+  "registryIntegrityVerified": true,
+  "tarball": {
+    "filename": "ramify.ts-0.5.0.tgz",
+    "sha256": "eab026deec5f71ef2433ecdc951898157a513619606a278169c8a75168a54ec0",
+    "integrity": "sha512-N2XY3DBe3JPQ24EhCrvyr0PNZZInivHRn5/fc4W4xxnYTerdIr7UNo2xPaep7oBGZOFy+/iKj2r0FapXeUF0AQ==",
+    "packageVersion": "0.5.0"
+  },
+  "publicEntry": "ramify.ts/cli",
+  "typescript": "passed",
+  "runtimeSchema": "passed",
+  "observations": [
+    {
+      "name": "valid",
+      "exitCode": 0,
+      "status": "answered",
+      "schemaVersion": "ramify.ownership/1",
+      "diagnostics": []
+    },
+    {
+      "name": "link-invalid",
+      "exitCode": 0,
+      "status": "answered",
+      "schemaVersion": "ramify.ownership/1",
+      "diagnostics": []
+    },
+    {
+      "name": "broken-acquisition",
+      "exitCode": 1,
+      "status": "invalid",
+      "schemaVersion": "ramify.ownership/1",
+      "diagnostics": [
+        "invalid-name"
+      ]
+    }
+  ],
+  "endpointState": "empty after every command"
+}
