@@ -1,0 +1,1642 @@
+### toolkit-vitest [PASS]
+> ramify.ts@0.5.0 test
+> vitest run --maxWorkers=4 --reporter=default --reporter=/home/app/tools/ramify-audit-0.7.0/node_modules/ramify-audit/dist/vitest-reporter.js
+
+
+ RUN  v4.1.11 /tmp/ramify-audit-worktree-5uYsDv/source
+
+ ✓ subs/analysis/src/tests/session.test.ts (56 tests) 70091ms
+     ✓ publishes the full real pipeline, provenance and independent capability dimensions  1065ms
+     ✓ seals stable input identities while assigning each fresh batch a unique run identity  3645ms
+     ✓ retains only immutable plain report data after disposal and a later changed run  1905ms
+     ✓ does not read inputs or launch a compiler merely by constructing a session  942ms
+     ✓ blocks decisions on missing declaration exports despite a complete catalog  959ms
+     ✓ separates partial coverage from a definite denial in the same real source run  1864ms
+     ✓ denies a child access to root-owned auxiliary source, which no exposure makes visible  1003ms
+     ✓ warns about compiler-selected source in an owned-unwired tree and a scratch directory without compiling or reading it  953ms
+     ✓ keeps known ordinary origins on unsupported CommonJS without manufacturing allowed decisions  1003ms
+     ✓ keeps known testing origins on unsupported CommonJS without manufacturing allowed decisions  1019ms
+     ✓ distinguishes missing resource source coverage from an invalid exposure declaration  1198ms
+     ✓ fails a known resource missing export with located source evidence through the public API  1839ms
+     ✓ retains admitted diagnostic evidence on exhaustion within separate imports  949ms
+     ✓ retains admitted diagnostic evidence on exhaustion within one namespace occurrence  936ms
+     ✓ applies the combined diagnostic bound when warnings alone exceed it  1130ms
+     ✓ cannot publish a pass after maxExposurePairs exhaustion  916ms
+     ✓ cannot publish a pass after maxReportBytes exhaustion  1066ms
+     ✓ FR10 returns a read failure as incomplete and permits an independent healthy run  1401ms
+     ✓ rejects concurrent and repeated analyze calls instead of reusing or queuing success  896ms
+     ✓ cancels observable in-flight child work through signal and allows a fresh session  904ms
+     ✓ cancels observable in-flight child work through dispose and allows a fresh session  925ms
+     ✓ does not treat a local application function as the CommonJS loader  1087ms
+     ✓ does not treat a overloaded application function as the CommonJS loader  991ms
+     ✓ does not treat a variable application function as the CommonJS loader  1035ms
+     ✓ does not treat a parameter application function as the CommonJS loader  995ms
+     ✓ does not treat a imported application function as the CommonJS loader  1089ms
+     ✓ does not treat a imported-alias application function as the CommonJS loader  1032ms
+     ✓ does not treat a renamed application function as the CommonJS loader  1060ms
+     ✓ preserves actual CommonJS origin checks with function declarations  1029ms
+     ✓ preserves actual CommonJS origin checks with variable declarations  1056ms
+     ✓ preserves actual CommonJS origin checks with node-types declarations  1711ms
+     ✓ retains the CommonJS coverage limit for a require of an existing testing module file  1666ms
+     ✓ retains the CommonJS coverage limit for a require of an existing ordinary module file  1655ms
+     ✓ applies origin checks to Node createRequire loads of established testing targets  1657ms
+     ✓ applies origin checks to Node createRequire loads of established ordinary targets  1706ms
+     ✓ checks the 'private' merged binding in 'static' empty nested destructuring  2193ms
+     ✓ checks the 'unpromised' merged binding in 'static' empty nested destructuring  2079ms
+     ✓ checks the 'allowed' merged binding in 'static' empty nested destructuring  2079ms
+     ✓ checks the 'private' merged binding in 'awaited' empty nested destructuring  2073ms
+     ✓ checks the 'unpromised' merged binding in 'awaited' empty nested destructuring  2013ms
+     ✓ checks the 'allowed' merged binding in 'awaited' empty nested destructuring  2058ms
+     ✓ checks the 'private' merged binding in 'callback' empty nested destructuring  2055ms
+     ✓ checks the 'unpromised' merged binding in 'callback' empty nested destructuring  2060ms
+     ✓ checks the 'allowed' merged binding in 'callback' empty nested destructuring  2086ms
+     ✓ checks the 'private' merged binding in 'callback-body' empty nested destructuring  2037ms
+     ✓ checks the 'unpromised' merged binding in 'callback-body' empty nested destructuring  2114ms
+     ✓ checks the 'allowed' merged binding in 'callback-body' empty nested destructuring  2160ms
+ ✓ subs/analysis/src/tests/evaluate-accesses.test.ts (59 tests) 78736ms
+     ✓ admits queued cancellation before finishing one large namespace occurrence  1729ms
+     ✓ keeps exposure, importer tags and testing origin on typescript import types  1299ms
+     ✓ keeps exposure, importer tags and testing origin on jsdoc import types  1311ms
+     ✓ matches compiler relative JSX priority with both JavaScript scripts present  1233ms
+     ✓ matches compiler exact paths priority for '@init' ('.jsx', suffix "''")  1263ms
+     ✓ matches compiler exact paths priority for '../../../src/init.jsx' ('.jsx', suffix "''")  1314ms
+     ✓ matches compiler exact paths priority for '@init' ('.js', suffix "''")  1401ms
+     ✓ matches compiler exact paths priority for '../../../src/init.js' ('.js', suffix "''")  1276ms
+     ✓ matches compiler exact paths priority for '@init' ('.jsx', suffix "'.native'")  1392ms
+     ✓ matches compiler exact paths priority for '../../../src/init.jsx' ('.jsx', suffix "'.native'")  1323ms
+     ✓ matches compiler script substitution priority for a .js alias  1310ms
+     ✓ matches compiler script substitution priority for a .jsx alias  1359ms
+     ✓ preserves an independent private denial beside duplicate local aliases  1928ms
+     ✓ keeps wildcard paths resolution consistent with the compiler for ./init.js  1357ms
+     ✓ keeps wildcard paths resolution consistent with the compiler for init.js  1382ms
+     ✓ checks every mixed binding and retains denial, tag and exposure evidence after disposal  927ms
+     ✓ applies the origin guard to symbol-free source and stylesheet loads, and to every forwarded hop  1064ms
+     ✓ separates missing exports and unresolved or deferred work from definite decisions  923ms
+     ✓ reports 'static' namespace 'local-export' escape and preserves selected denials  1372ms
+     ✓ reports 'static' namespace 'renamed-export' escape and preserves selected denials  1290ms
+     ✓ reports 'static' namespace 'local-export-with-denial' escape and preserves selected denials  1355ms
+     ✓ reports 'awaited' namespace 'local-export' escape and preserves selected denials  1311ms
+     ✓ reports 'awaited' namespace 'renamed-export' escape and preserves selected denials  1312ms
+     ✓ reports 'awaited' namespace 'local-export-with-denial' escape and preserves selected denials  1336ms
+     ✓ checks 'static' namespace destructuring 'nested-member' against the selected original  1311ms
+     ✓ checks 'static' namespace destructuring 'name-property' against the selected original  1256ms
+     ✓ checks 'static' namespace destructuring 'renamed-name-property' against the selected original  1379ms
+     ✓ checks 'awaited' namespace destructuring 'nested-member' against the selected original  1298ms
+     ✓ checks 'awaited' namespace destructuring 'name-property' against the selected original  1330ms
+     ✓ checks 'awaited' namespace destructuring 'renamed-name-property' against the selected original  1404ms
+     ✓ checks import-type Merged.name against the appropriate original  1336ms
+     ✓ checks import-type Merged.call against the appropriate original  1391ms
+     ✓ checks import-type Merged.member against the appropriate original  1354ms
+     ✓ reports 'static' namespace 'direct' escape with any known denial intact  1352ms
+     ✓ reports 'static' namespace 'shorthand' escape with any known denial intact  1469ms
+     ✓ reports 'static' namespace 'shorthand-with-denial' escape with any known denial intact  1367ms
+     ✓ reports 'awaited' namespace 'direct' escape with any known denial intact  1300ms
+     ✓ reports 'awaited' namespace 'shorthand' escape with any known denial intact  1298ms
+     ✓ reports 'awaited' namespace 'shorthand-with-denial' escape with any known denial intact  1324ms
+     ✓ excludes 'statement type export' from runtime namespace membership but keeps explicit type checks  1350ms
+     ✓ excludes 'inline type export' from runtime namespace membership but keeps explicit type checks  1322ms
+     ✓ excludes 'local type import relay' from runtime namespace membership but keeps explicit type checks  1385ms
+     ✓ excludes 'type star export' from runtime namespace membership but keeps explicit type checks  1322ms
+     ✓ excludes 'type namespace export' from runtime namespace membership but keeps explicit type checks  1315ms
+     ✓ excludes 'named relay of type export' from runtime namespace membership but keeps explicit type checks  1316ms
+     ✓ keeps value-forwarded runtime membership and type-only nested membership separate  1390ms
+     ✓ checks 'Merged' as a value for ordinary function access '()'  1353ms
+     ✓ checks 'Merged' as a value for ordinary function access '.name'  1336ms
+     ✓ checks 'Merged' as a value for ordinary function access '.call(null)'  1347ms
+     ✓ checks 'Merged' as a value for ordinary function access '[\'name\']'  1297ms
+     ✓ checks 'Plain' as a value for ordinary function access '()'  1359ms
+     ✓ checks 'Plain' as a value for ordinary function access '.name'  1348ms
+     ✓ checks 'Plain' as a value for ordinary function access '.call(null)'  1470ms
+     ✓ checks 'Plain' as a value for ordinary function access '[\'name\']'  1249ms
+     ✓ still checks an actual merged namespace export as its own original  1299ms
+     ✓ requires containing namespace completeness for absent members (incomplete=false, nested=false)  1315ms
+     ✓ requires containing namespace completeness for absent members (incomplete=false, nested=true)  1359ms
+     ✓ requires containing namespace completeness for absent members (incomplete=true, nested=false)  1348ms
+     ✓ requires containing namespace completeness for absent members (incomplete=true, nested=true)  1310ms
+ ✓ subs/analysis/src/tests/session-revision.test.ts (42 tests) 101640ms
+     ✓ relinks without compiler work and decides only importers or originals in the changed subtree, then restores the exposure  2543ms
+     ✓ refreshes description statement positions without re-extraction or unrelated decisions  1375ms
+     ✓ shares one frozen model between the linked layer, the model and the decisions on every path  1406ms
+     ✓ refreshes README purposes without compiler, link or decision work  1370ms
+     ✓ keeps a README revert that arrives together with a source edit  1364ms
+     ✓ keeps a README revert that arrives together with a description edit  1365ms
+     ✓ keeps a README revert that arrives together with a created file  1422ms
+     ✓ combines source and description changes without skipping either decision dependency  1480ms
+     ✓ membership-path-narrow: a created and a deleted file update the compiler once without a whole invalidation and check only the affected files  4400ms
+     ✓ re-extracts all files on the same warm compiler for configuration and dependency changes  2876ms
+     ✓ uses broad re-extraction when a module header changes the source areas  2734ms
+     ✓ re-extracts every owned file when an owned declaration shim changes a resource export  1605ms
+     ✓ publishes invalid current inputs without stale results, preserves the last valid projection and recovers  2314ms
+     ✓ invalid-exposure-target-equals-batch: deleting a source an exposure statement names publishes the batch validation report, and restoring it recovers  2224ms
+     ✓ stays invalid through source-only and README-only events until the invalid description is repaired  3851ms
+     ✓ publishes an unmarked or missing root description as invalid, as a batch read reports it, and recovers when the marker returns  1493ms
+     ✓ publishes a child that gains the root marker as an undeclared project boundary and recovers when it loses it  2211ms
+     ✓ keeps current and historical facts unpublished when extraction fails and recovers with a broad update  1511ms
+     ✓ takes the observer-determined path for an unknown event that changes an owned input  1474ms
+     ✓ does not commit private facts or history when a revision exceeds the retained fact budget  831ms
+     ✓ does not publish computed facts if promotion of compiler observations fails  1650ms
+     ✓ rejects publication when a compiler observation advances past the extracted source snapshot  1602ms
+     ✓ hook-passes-under-limit: publishes when only the full report exceeds maxReportBytes and keeps published facts when what a revision keeps exceeds it  3441ms
+     ✓ cancel-before-apply-keeps-description: a sweep cancelled after reobservation leaves the next description edit on the description path  1432ms
+     ✓ cancel-after-apply-stays-exact: a sweep cancelled after the observer applied its edit recomputes that edit from the disk  1543ms
+     ✓ cancel-check-before-revise: a signal aborted while reobservation compares inputs with the disk never enters the revision step  1365ms
+     ✓ recomputes from the disk when reobservation promoted a changed compiler read before the sweep was cancelled  1542ms
+     ✓ recomputes from the disk when a completed revision is cancelled before promoting compiler reads  1517ms
+     ✓ reopens the project when reobservation meets a cancellation the sweep did not request  1832ms
+     ✓ reopens the project when an update meets a cancellation it did not request  1797ms
+     ✓ timing-fields: an update reports its invocation check beside unchanged revision timings  1382ms
+     ✓ promotion-timed: a revised update reports its promotion, which lies inside the total and outside the eight stages  1562ms
+     ✓ membership-identity-equals-batch: unreferenced and referenced deletions and created files that satisfy an absent or extensionless probe publish the batch inputs  6726ms
+     ✓ membership-identity-equals-batch: a created owned file labelled unknown takes the membership path  1483ms
+     ✓ membership-identity-equals-batch: a deleted owned file labelled unknown takes the membership path  1582ms
+     ✓ broad-kept: structural, configuration, non-owned, unexplained and area changes keep the whole invalidation  6745ms
+     ✓ broad-kept: a membership change the facts or the compiler cannot bound falls back to the whole invalidation  14601ms
+     ✓ membership-identity-equals-batch: promotes a membership revision far below a broad one on the same fixture  2353ms
+     ✓ contribution-index: equals a rebuild after every revision kind and holds no path of a removed file  2598ms
+     ✓ sweep-skipped-after-reacquire: a structural update reports reacquisition, and a sweep of the same capture finds nothing  5026ms
+ ✓ src/tests/project-boundary-cli.test.ts (5 tests) 33445ms
+     ✓ PB1-30: built batch and resident checks select the nearest marked description, and report how  15709ms
+     ✓ PB1-20: a changed check gives the complete check's exit code and findings, with each path's disposition  3632ms
+     ✓ PB1-20: affected states each path seed's status, with outside and whitespace seeds, in both modes  2365ms
+     ✓ PB1-10, PB1-26: complete checks add advice from Git's output only, never changing ownership or the verdict  11375ms
+ ✓ subs/analysis/src/tests/retained-session.test.ts (13 tests) 28384ms
+     ✓ opens cold with frozen plain revisions equal to batch and answers identical updates without a new sequence  1904ms
+     ✓ takes the unchanged-surface path for a body edit: one file checked, nothing decided, model kept  1795ms
+     ✓ takes the source path for imports and exports, bounds the checked set and reports finding deltas  4317ms
+     ✓ refreshes decisions and diagnostic identities when declarations only move  1874ms
+     ✓ takes the metadata path for a README edit, the membership path for created and deleted files and the broad path for a reopened compiler  4639ms
+     ✓ sweep-skipped-after-reacquire: a worker update reports reacquisition for a configuration edit and for no path that keeps the capture  2981ms
+     ✓ retains historical versions for report projection until released and rejects releasing the current one  998ms
+     ✓ opens over a coherent invalid capture with an invalid revision and recovers on the next update  2323ms
+     ✓ captures its inputs with the opening request when another invocation form reopens it after an invalid open  3058ms
+     ✓ opens beside generated views without recording any of their paths, with the input identity of a batch check (AV41)  2639ms
+     ✓ reports an unavailable cold result without opening a session  409ms
+     ✓ rejects invalid session limits and unsupported capabilities before observing  424ms
+     ✓ refuses work after disposal and releases the compiler and observer  1018ms
+ ✓ subs/cli/src/tests/changed-command.test.ts (27 tests) 28434ms
+     ✓ hashes bytes once, deduplicates normalized paths and sends the compact synchronized contract through the quick service  1252ms
+     ✓ retains the original hash across recovery and reports an intervening write as superseded  1275ms
+     ✓ maps a real controlled cold deadline without cancelling the context work  1250ms
+     ✓ maps a real controlled deadline-exceeded deadline without cancelling the context work  1173ms
+     ✓ keeps exhausted in-flight recovery unavailable explicit and releases the real quick-service lease  1115ms
+     ✓ keeps exhausted in-flight recovery stopped explicit and releases the real quick-service lease  1287ms
+     ✓ keeps exhausted in-flight recovery incompatible explicit and releases the real quick-service lease  1267ms
+     ✓ preserves received findings when close-context cleanup fails  1462ms
+     ✓ preserves received findings when close-connection cleanup fails  1453ms
+     ✓ honors cancel-close-context after cleanup without delivering the received result  1202ms
+     ✓ honors cancel-close-connection after cleanup without delivering the received result  1106ms
+     ✓ defends the completed-result boundary against a reply without covering freshness  1326ms
+     ✓ publishes an invalid description as a covering revision and exits 1 with its diagnostics  1344ms
+     ✓ forwards reportless service diagnostics, stages and recovery through Check/4  488ms
+     ✓ forwards a reportless unavailable value recovery without inventing diagnostics  473ms
+     ✓ preserves an invalid Check/4 cause after sink failure  1349ms
+     ✓ preserves an invalid Check/4 cause after human formatter failure  1345ms
+     ✓ renders an injected unpublished incomplete engine reply without claiming coverage  1330ms
+     ✓ renders an injected unpublished unavailable engine reply without claiming coverage  1177ms
+     ✓ timing-fields: the JSON document carries the reply timings only when the reply has them, and human output is unchanged  1174ms
+     ✓ full-report-on-request: a resident JSON report equals the batch JSON report  2126ms
+     ✓ configuration-answered-at-once: a named configuration file exits 2 at once, a following source hook is checked, and --batch still runs the whole check  2450ms
+ ✓ subs/analysis/src/tests/session-worker.test.ts (17 tests) 28252ms
+     ✓ keeps the host responsive, freezes boundary values and sends reports only when requested  1193ms
+     ✓ demotes to warm while retaining facts and rebuilds broadly even for an empty next update  2370ms
+     ✓ lets a caller stop waiting at its deadline while the update completes and publishes  2447ms
+     ✓ sweeps observed content and configuration changes and then tracks newly observed files  3711ms
+     ✓ recovers a cold invalid acquisition through a sweep without an existing observer  2340ms
+     ✓ cancels queued and active calls without losing the last published revision  2338ms
+     ✓ answers a call whose abort reaches the worker after it published with the revision it made current  2176ms
+     ✓ FR10 reports abrupt worker loss, retains query failure evidence and releases its live compiler  992ms
+     ✓ reports supervisor loss and reaps its worker and compiler process group  992ms
+     ✓ reports heap exhaustion after compiler startup and releases the already observed child  3911ms
+     ✓ turns an actual worker heap exhaustion into an unavailable resource-limit report  867ms
+     ✓ rejects an inherited V8 override before loading the engine or spawning its compiler  549ms
+     ✓ rejects retained fact growth without publishing or losing the preceding report  2230ms
+     ✓ disposes while work is queued, releases thread, child and listeners, and tolerates repeated disposal  1015ms
+     ✓ timing-fields: worker replies add the status checkpoint and daemon-side round trip beside the invocation check  1105ms
+ ✓ src/tests/dependency-diagram-daemon.test.ts (1 test) 26439ms
+     ✓ BD24: reaches ready on Ramify through the process runner while a watch update and check --changed complete; the retained session never classifies  26437ms
+ ✓ subs/analysis/src/tests/project-boundary-session.test.ts (15 tests) 148526ms
+     ✓ PB1-21: declarations added, edited beneath, removed, changed and a missing root equal fresh batch runs (hot)  27100ms
+     ✓ PB1-22: auxiliary edits, additions, deletions and forwarding equal fresh batch runs (hot)  18796ms
+     ✓ PB1-21: a declared-tree target removed while the project is invalid leaves no observation of it after recovery (hot)  5768ms
+     ✓ PB1-22: creating and deleting compiler-selected, compiler-read source in a declared tree recomputes its warning (hot)  6798ms
+     ✓ PB1-21: declarations added, edited beneath, removed, changed and a missing root equal fresh batch runs (warm)  28860ms
+     ✓ PB1-22: auxiliary edits, additions, deletions and forwarding equal fresh batch runs (warm)  21079ms
+     ✓ PB1-21: a declared-tree target removed while the project is invalid leaves no observation of it after recovery (warm)  6223ms
+     ✓ PB1-22: creating and deleting compiler-selected, compiler-read source in a declared tree recomputes its warning (warm)  7309ms
+     ✓ publishes an overlapping declaration and a manifest as invalid revisions, never a passing one, and recovers  7012ms
+     ✓ reconciles from the disk on a sweep after a cancelled update or an invalid revision, never keeping a stale revision (hot)  5036ms
+     ✓ reconciles from the disk on a sweep after a cancelled update or an invalid revision, never keeping a stale revision (warm)  5186ms
+     ✓ cancels a structural update after observation without publishing, then publishes the batch result (hot)  3048ms
+     ✓ cancels a structural update after observation without publishing, then publishes the batch result (warm)  3134ms
+     ✓ reports a reinclusion past the application byte bound as incomplete, keeps the last revision unchanged and recovers  1932ms
+     ✓ keeps one live compiler across structural and warm updates and leaves none after cancellation and disposal  1236ms
+ ✓ subs/analysis/src/tests/dependency-analyzer.test.ts (6 tests) 21169ms
+     ✓ path-facts: equals the batch path and issues only a supplied behavior command (BD14, BD15)  3167ms
+     ✓ forwarding: equals the batch path with per-original status (BD14, BD15)  2972ms
+     ✓ projects the test references beside the diagram, and gives null references when only they exceed the bound (AV38)  2990ms
+     ✓ returns inputs-changed with the differing paths and no diagram after an edit (BD16)  4425ms
+     ✓ accepts a report whose invocation found or named the same root from another directory (BD16)  5775ms
+     ✓ refuses an incomplete report, an oversized diagram and a cancelled run without starting work (BD17)  1836ms
+ ✓ src/tests/project-view-reports.test.ts (2 tests) 23540ms
+     ✓ reference report retains every owner and owned file exactly once  4643ms
+     ✓ toolkit report retains every owner and owned file exactly once  18895ms
+ ✓ subs/analysis/src/tests/session-audit.test.ts (6 tests) 25563ms
+     ✓ membership-sequences-equal-batch: retires obsolete compiler observations after deleting the last source, restoring it and removing a whole module  5799ms
+     ✓ membership-sequences-equal-batch: equals batch and keeps the current sequence after each of fourteen source, description, metadata, membership and structural steps  15216ms
+     ✓ detects an injected access corruption, publishes the real recomputation, then audits equal  1391ms
+     ✓ compares and repairs original declaration positions inside retained access decisions  1333ms
+     ✓ cancels before recomputation without replacing the published revision  402ms
+     ✓ cancels during observation promotion after detecting drift without publishing the recomputed facts  1418ms
+ ✓ src/tests/affected-batch.test.ts (7 tests) 19735ms
+     ✓ A7-11:reference-json: prints a batch document with a null sequence and the session inputId  1990ms
+     ✓ A7-11:resident-batch-agree: resident and batch selections on the unchanged project are equal  5303ms
+     ✓ A7-11:invalid-project: a directory without a root description exits 1 as invalid-project  2035ms
+     ✓ A7-11:invalid-project not-found-exit-2: no project found from the directory is project-unavailable, exit 2, in both forms  1664ms
+     ✓ A7-11: maps unknown modules, invalid seeds and an invalid revision to exit 1 in both forms  5637ms
+     ✓ A7-11: an interrupt during the batch form exits 130 and claims no result  976ms
+     ✓ passes the opt-in query through the real worker and CLI while ordinary selection stays equal  2127ms
+ ✓ src/tests/dependency-analyzer-process.test.ts (4 tests) 18121ms
+     ✓ returns the in-process diagram from one child that exits with its helper  7583ms
+     ✓ accepts a ready outcome only with null references or references of the diagram's input (AV38)  504ms
+     ✓ terminates the child and its helper on cancellation, the deadline and an oversized response (BD17)  4940ms
+ ✓ subs/daemon/src/tests/service.test.ts (17 tests) 19533ms
+     ✓ returns compact covering replies, forwards since and preserves the plain report default  1268ms
+     ✓ forwards deadlines and counts explicit cold and warm outcomes while analysis continues  1363ms
+     ✓ rejects malformed compact parameters through codec-backed dispatch before manager work  520ms
+     ✓ exposes revision-bound explorer details through direct, shared and codec-backed dispatch  1305ms
+     ✓ BD23: serves dependency diagrams through direct, shared and codec-backed dispatch with validation and counters  1328ms
+     ✓ releases one client/context pair while retaining its other subscription  513ms
+     ✓ binds subscription cancellation to the owning client and validates stop instance  523ms
+     ✓ AV27 ready: renders measured dependencies with the test references of the same run, alone when only the architect view is requested  1435ms
+     ✓ AV27 busy: waits the interval on the service clock while another job runs, then succeeds  2395ms
+     ✓ measures every module while combined publication retains only the selected module API target  1351ms
+     ✓ fixed omit policy keeps inventory measured, marks views not requested and still publishes selected API targets  1458ms
+     ✓ AV27 wait limit: publishes without dependencies when the facts are not ready within the limit, a running job included  1339ms
+     ✓ AV27 unavailable: publishes the view with the reason of unavailable facts  1334ms
+     ✓ AV27 superseded and cancelled: a newer revision or a cancellation during the wait publishes nothing  1461ms
+     ✓ carries the request deadline through metric rendering and dependency wait, then recovers  1434ms
+     ✓ AV25: validates views before any context work  501ms
+ ✓ src/tests/batch-cli.test.ts (22 tests) 19920ms
+     ✓ labels resolved batch output without altering the JSON report  1136ms
+     ✓ preserves the public report in JSON and formats the same completed evidence for humans  2097ms
+     ✓ leaves only the snapshot out of the JSON report with --no-snapshot, before the batch result is returned  2008ms
+     ✓ uses discovery and accepts batch without narrowing the whole-project scope  961ms
+     ✓ prints failures before project warnings, coverage and the completed scope  1086ms
+     ✓ allows bounded coverage and warnings while retaining their structured evidence  1128ms
+     ✓ refuses browser verification through the batch capability contract  989ms
+     ✓ rejects an injected missing access stage with empty findings  1027ms
+     ✓ rejects an injected not-requested access stage with empty findings  1045ms
+     ✓ rejects an injected blocked access stage with empty findings  1035ms
+     ✓ rejects an injected failed access stage with empty findings  1043ms
+     ✓ keeps existing denials when a later report failure supersedes exit 1  1006ms
+     ✓ suppresses results when cancellation arrives through the injected binding  1025ms
+     ✓ retains a known denial when an injected report exceeds the output budget  1002ms
+     ✓ handles synchronous output failures after a real session releases its resources  1063ms
+     ✓ A7-11: affected --batch hands the seeds to the affected batch operation alone and never connects  987ms
+     ✓ A7-11: handles an output failure after a real affected batch session  995ms
+ ✓ src/tests/resident-cli.test.ts (9 tests) 15810ms
+     ✓ discovers the whole root, hashes multiple paths in the CLI and reuses a covering revision  1284ms
+     ✓ reports importer findings after a provider edit, marks new and removed identities, and keeps plain JSON bare  1423ms
+     ✓ covers an observed deletion as absent, leaves a never-observed owned path not analyzed and refuses an outside path  1318ms
+     ✓ refuses an evicted since revision instead of inventing new-finding marks  1414ms
+     ✓ gives the complete check's verdict with each named path classified by the project's ownership  1497ms
+     ✓ prints real watcher failure status and an eviction before attempting a reopen  1187ms
+     ✓ publishes the API and architect views in one transaction from one revision and prints the architect line  2151ms
+     ✓ check from the root, then materialize naming the root from another directory: the analyzer verifies the captured request and the view has measured dependencies  2743ms
+     ✓ check --root ., then materialize from the root without --root: the analyzer verifies the captured request and the view has measured dependencies  2789ms
+ ✓ subs/analysis/src/tests/companion-findings.test.ts (3 tests) 14423ms
+     ✓ SC16/SC17: reports the finding with its location, related location and message, beside every import decision  1218ms
+     ✓ SC18/SC20: every revision path reports the findings and notes a fresh batch check reports  12232ms
+     ✓ SC20: coverage notes alone never fail the check  971ms
+ ✓ subs/analysis/src/tests/membership-differential.test.ts (2 tests) 13445ms
+     ✓ membership-identity-equals-batch: seeded create, delete, restore and edit sequences on the session fixture publish the batch inputs and report  6556ms
+     ✓ membership-identity-equals-batch: seeded sequences on a fixture with an owned test area, a directory index, a package import, a shim and a .tsx file equal batch  6888ms
+ ✓ src/tests/compiled-client.test.ts (10 tests) 14935ms
+     ✓ matches the Node entry for help, version and an invalid invocation  407ms
+     ✓ FR03 FR04 FR07 installed ownership agrees across launcher paths without a daemon  2205ms
+     ✓ runs --batch in a Node child with the Node entry report bytes  3453ms
+     ✓ A7-11:compiled-child: runs affected --batch in a Node child and prints the Node entry document  3565ms
+     ✓ starts the Node daemon and matches the Node entry on the resident path  1591ms
+     ✓ compiled-identity-bound: refuses a package whose runtime identity differs from the embedded one  1310ms
+     ✓ reports an output failure when stdout closes  864ms
+     ✓ installs a local package whose ramify bin runs the compiled client  1268ms
+ ✓ subs/analysis/src/tests/project-boundary-views.test.ts (9 tests) 12447ms
+     ✓ lists both boundary kinds with their declarations, counts analyzed auxiliary source, and records nothing beneath a declared tree  1583ms
+     ✓ records analyzed auxiliary originals as internal evidence beside module source, with their consumers  1523ms
+     ✓ contains no file, symbol or test title from an inert, scratch or excluded path  1368ms
+     ✓ lists only exposed originals, never an auxiliary, internal or excluded one  1382ms
+     ✓ selects the owner of auxiliary source with its ordinary profile and refuses a declared tree, scratch or reserved path  1436ms
+     ✓ measures exactly the analyzed source and module documentation, auxiliary source included, with exact bytes  1407ms
+     ✓ names one revision in every projection and refuses each projection one byte over its limit  1291ms
+     ✓ preserves owned-unwired in the projection and rendered module record  1255ms
+     ✓ preserves owned-nested-project in the projection and rendered module record  1198ms
+ ✓ subs/analysis/subs/project/src/tests/project.test.ts (49 tests) 10893ms
+     ✓ transfers a permitted large config in bounded chunks  662ms
+     ✓ keeps a declared nested project out of enclosing discovery and reports an undeclared one  400ms
+     ✓ retains collected layout findings when final input validation exhausts retries  639ms
+     ✓ retries the entire capture after a controlled parser-time edit  418ms
+     ✓ returns incomplete after the finite retry policy is exhausted  632ms
+ ✓ subs/daemon/src/tests/ipc.test.ts (18 tests) 11674ms
+     ✓ preserves validation errors and tokens while releasing subscription leases on close  510ms
+     ✓ dispatches cancellation under the original request id  474ms
+     ✓ preserves a completed revision with partial source coverage in notifications  1285ms
+     ✓ timing-fields: a socket check reply carries session work, publication, service handling and client transport  1222ms
+     ✓ BD23: negotiates dependencyDiagram and maps every outcome through the public client, framing a large result  1707ms
+     ✓ AV25: advertises materialize-views and carries views through the public client unchanged  1150ms
+     ✓ MM08/MM16: joins one revision with architect inventory over transport and synchronizes a pending edit without writing  1117ms
+     ✓ MM17: interrupts transport response assembly for cancellation and deadline, then recovers  546ms
+     ✓ A7-08:round-trip carries the same answered document over the socket as the direct binding  1132ms
+     ✓ A7-08:round-trip response-bound refuses an answer over the negotiated response bound whole, over the socket  2206ms
+ ✓ subs/explorer/src/tests/ProjectExplorerPage.test.tsx (12 tests) 12036ms
+     ✓ renders a real published report obtained through the production router  2110ms
+     ✓ requests the displayed revision after the project view, polls pending one second apart, stops on ready and never requests for settings  3608ms
+     ✓ issues no dependency request while the page is hidden and resumes when it becomes visible  2726ms
+     ✓ stops polling on superseded and on unavailable  2651ms
+ ✓ src/tests/project-boundary-publication.test.ts (5 tests) 10393ms
+     ✓ publishes both views from one revision with the declared trees and nothing beneath them, and writes nothing on a repeat  2227ms
+     ✓ selects the owner of auxiliary source and refuses a path in a declared tree or scratch directory as an invalid location  1430ms
+     ✓ replaces an architect view whose _meta.json names an earlier or later version  2225ms
+     ✓ refuses a .ramify-architect without _meta.json or naming another schema, and then publishes no API view either  2292ms
+     ✓ measures and projects exactly the analyzed population, auxiliary source included, each bound to its revision  2217ms
+ ✓ src/tests/failure-evidence.test.ts (11 tests) 10760ms
+     ✓ FR04 FR09 preserves both missing exports and the finalized producer stages without an affected answer  2795ms
+     ✓ FR05 FR09 retains root parsing producer records through batch refusal  847ms
+     ✓ FR05 FR09 retains child parsing producer records through batch refusal  855ms
+     ✓ FR05 FR09 retains layout producer records through batch refusal  834ms
+     ✓ FR05 FR09 retains configuration producer records through batch refusal  795ms
+     ✓ FR10 retains a no-report analysis-failed reason, all supplied records and stages  898ms
+     ✓ FR10 retains a no-report resource-limit reason, all supplied records and stages  934ms
+     ✓ FR10 retains a no-report invalid-query reason, all supplied records and stages  961ms
+     ✓ FR10 retains a no-report invalid-revision reason, all supplied records and stages  1018ms
+     ✓ FR11 batch refusal keeps the explicit incomplete producer prefix and its limit diagnostic  820ms
+ ✓ subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts (30 tests) 10431ms
+     ✓ NT-04: rejects a missing owned-unwired directory and accepts an absent external one  430ms
+     ✓ NT-04: rejects a missing owned-nested-project directory and accepts an absent external one  445ms
+     ✓ rejects a declared path that exists but is not a real directory, for either kind  447ms
+     ✓ rejects equal normalized directories and nested declarations across kinds and modules, every participant  690ms
+     ✓ rejects a declared directory that is a symbolic link or lies beneath one, without traversing it  457ms
+     ✓ keeps boundary existence in the captured inputs while bytes beneath the tree are not inputs  874ms
+     ✓ reports a package manifest in an undeclared non-module directory, suggesting a declaration, and attributes nothing beneath it  693ms
+     ✓ keeps inert owned files out of the inventory and admits JavaScript only when the configuration does  931ms
+     ✓ updates edited, added and deleted auxiliary files in place and recomputes the inventory when their directory goes  492ms
+     ✓ ignores changes beneath a declared tree and rebuilds when its directory disappears  435ms
+ ✓ subs/daemon/src/tests/project-boundary-watcher.test.ts (5 tests) 9988ms
+     ✓ delivers no change beneath an exclusion and a declared or scratch root's own removal, never a reserved root's  549ms
+     ✓ reconfigures: a new exclusion ends registrations beneath it, a removed one registers its tree  409ms
+     ✓ NT-03: owned-unwired records no excluded registrations or revisions and observes boundary roots  4445ms
+     ✓ NT-03: owned-nested-project records no excluded registrations or revisions and observes boundary roots  4395ms
+ ✓ subs/analysis/subs/typescript/src/tests/coverage.test.ts (20 tests) 10173ms
+     ✓ keeps definite missing exports precise when a module also augments globals  532ms
+     ✓ separates proven package and builtin scope from unresolved names and outside-project files  503ms
+     ✓ keeps a missing resource unverifiable and a missing name on a known resource definite  499ms
+     ✓ records require CommonJS as unsupported access  480ms
+     ✓ records import-equals CommonJS as unsupported access  562ms
+     ✓ records export-equals CommonJS as unsupported access  495ms
+     ✓ records module-exports CommonJS as unsupported access  456ms
+     ✓ reports glob and loader calls without treating arbitrary import methods as native ESM  491ms
+     ✓ recognizes direct Jiti loader calls through renamed factory and local bindings  494ms
+     ✓ records Node createRequire loads through a named node:module import as CommonJS access  532ms
+     ✓ records Node createRequire loads through a renamed module import as CommonJS access  519ms
+     ✓ records Node createRequire loads through a namespace module import as CommonJS access  488ms
+     ✓ records Node createRequire loads through a default node:module import as CommonJS access  541ms
+     ✓ keeps a createRequire load of a module target unresolved like the ambient require  505ms
+     ✓ does not treat an application require function as the CommonJS loader  514ms
+     ✓ does not treat an application createRequire function as the CommonJS loader  513ms
+     ✓ retains known selections beside source resolution and compiler binding problems  520ms
+     ✓ rejects incompatible value/type facts for one resource despite identical exported names  520ms
+     ✓ includes dynamic resource descriptions when checking consistency  485ms
+     ✓ includes import-type resource descriptions when checking consistency  520ms
+ ✓ subs/cli/src/tests/affected-command.test.ts (9 tests) 9818ms
+     ✓ reports hard exclusions beneath owned trees without interpreting the independent project  1308ms
+     ✓ A7-10:json-document: prints one ramify.affected-cli/4 document with root, resident mode, revision and selection  1313ms
+     ✓ A7-10:human: lists root, mode, revision, selection, each path with module, basis, kind and selection, and the three module lists  1323ms
+     ✓ A7-10:widened-exit-0: an all-modules answer exits 0 and names its widening reason  1364ms
+     ✓ A7-10:human-kinds: each owned seed line names its kind and the modules it selects, or none  1248ms
+     ✓ A7-10:unknown-module-exit-1: an unknown module ID exits 1 with the unknown set  1333ms
+     ✓ A7-10:unavailable-exit-2: cold and superseded outcomes exit 2 with the ramify.cli/2 diagnostic form  1396ms
+     ✓ A7-10:cancel-130: an interrupt exits 130, claims no result and releases the context  522ms
+ ✓ subs/analysis/src/tests/root-resolution.test.ts (4 tests) 10345ms
+     ✓ invocation-check-reused: an update with the session invocation performs no root resolution  1844ms
+     ✓ resolution-survives-membership: a created or deleted source file reuses the resolution in the invocation check  2733ms
+     ✓ resolution-survives-configuration-bytes: a configuration edit reuses the resolution and a solution-style rewrite is refused by acquisition  3579ms
+     ✓ root-resolution-invalidated, resolution-invalidated-by-discovery: a created or deleted description or configuration on the discovery path resolves again and a moved root is refused  2188ms
+ ✓ subs/analysis/subs/typescript/src/tests/catalog.test.ts (26 tests) 10417ms
+     ✓ assembles every owned file description into the same whole catalog  543ms
+     ✓ does not retain a compiler-selected winner for conflicting lexical declarations  509ms
+     ✓ propagates ambiguous constituents through later star and named forwarding without losing known originals  501ms
+     ✓ propagates an ambiguous namespace constituent through named forwarding and a later star export  523ms
+     ✓ propagates an unresolved namespace constituent through a local alias, named forwarding and a later star export  495ms
+     ✓ propagates namespace completeness across three named forwarding hops  538ms
+     ✓ does not merge one symbol across ordinary and testing declarations in the same owner  517ms
+     ✓ distinguishes proven external forwarding, outside-module source, unresolved names and application aliases  510ms
+     ✓ keeps known exports while an unresolved forwarding declaration prevents a complete contract  505ms
+     ✓ does not arbitrarily select one of two conflicting star exports  491ms
+     ✓ accepts repeated star paths to the same original  544ms
+     ✓ records a located compiler limit for syntax that prevents reliable export enumeration  488ms
+     ✓ does not run ordinary TypeScript type checking or execute project entry points  512ms
+     ✓ reports module global augmentations while preserving the module exports  615ms
+     ✓ recognizes import-only module augmentations without flagging local namespaces named global  502ms
+     ✓ reports a cross-owner script global as located coverage instead of a complete script  528ms
+     ✓ records one note per script with every further declaration as related evidence  492ms
+     ✓ keeps a side-effect-only script complete without a note  467ms
+     ✓ does not treat string-named ambient module declarations as shared globals  550ms
+ ✓ src/tests/cli-process.test.ts (11 tests) 9181ms
+     ✓ installs a local package and runs its Node entry through the shebang  1262ms
+     ✓ finishes a real check and closes only its finite compiler helpers  954ms
+     ✓ SIGINT during catalog exits 130 after disposal without a result  893ms
+     ✓ SIGINT between the complete JSON document and its trailing newline keeps the claimed result  900ms
+     ✓ returns a failed resolver report and releases acquired files and compiler state  867ms
+     ✓ reports a broken stdout pipe as exit 2 after completing session disposal  901ms
+     ✓ resume during backpressured JSON publication keeps output and exit consistent  1611ms
+     ✓ interrupt during backpressured JSON publication keeps output and exit consistent  1341ms
+ ✓ subs/analysis/subs/project/src/tests/project-boundary-observer.test.ts (16 tests) 8342ms
+     ✓ changes no input, reads nothing and updates nothing for byte edits in declared trees, scratch directories and inert files  570ms
+     ✓ keeps the listing a configuration makes of a declared tree and a scratch directory, without any byte becoming an input (8B deviation 1)  809ms
+     ✓ retires a newly declared tree from the inventory and inputs, and brings it back through fresh capture when the declaration goes  564ms
+     ✓ rebuilds when a declaration changes kind or directory  305ms
+     ✓ invalidates the model when an owned-unwired root or a directory above it disappears, keeping the last valid inventory  767ms
+     ✓ rebuilds when a child module appears or a module directory disappears  509ms
+     ✓ treats a package manifest appearing in the walked tree as a layout change  498ms
+     ✓ rebuilds when a source area directory disappears with its files  525ms
+     ✓ updates edits, additions and deletions of auxiliary source in place, as a fresh acquisition records them  993ms
+     ✓ recomputes a directory created with auxiliary source already inside, from the directory event or one file event  780ms
+     ✓ recomputes when a directory holding auxiliary source disappears  453ms
+     ✓ reports an exceeded byte bound while rebuilding as incomplete, never as a valid partial model  459ms
+ ✓ subs/analysis/src/tests/validation.test.ts (12 tests) 9221ms
+     ✓ returns a sealed frozen model usable after disposal and changes identities on fresh bytes  2895ms
+     ✓ does not fabricate missing exports in named selections  936ms
+     ✓ rejects incomplete wildcard namespaces through several forwarding hops  967ms
+     ✓ accepts a lexical merged runtime binding with namespace members  922ms
+     ✓ returns explicit incomplete results on maxExposurePairs exhaustion  906ms
+     ✓ returns explicit incomplete results on maxReportBytes exhaustion  903ms
+     ✓ returns cancelled for pre-start and in-flight cancellation and permits a subsequent fresh run  981ms
+ ✓ subs/analysis/subs/typescript/src/tests/accesses.test.ts (16 tests) 7891ms
+     ✓ classifies each binding and preserves written forms, selected names, and exact locations  573ms
+     ✓ retains accessed barrels, local aliases and every testing forwarding origin  552ms
+     ✓ keeps symbol-free code and stylesheet targets with their testing areas  508ms
+     ✓ distinguishes missing exports and unresolved targets from bounded selections and escaped promises  508ms
+     ✓ checks bounded namespace and lazy selections without selecting unrelated exports  523ms
+     ✓ uses nested namespace originals, shadowing, and partial coverage without widening selections  495ms
+     ✓ interprets TypeScript and attached JSDoc import types without runtime loads  529ms
+     ✓ retains incomplete nested expansion through a named namespace relay  527ms
+     ✓ keeps literal dotted export names distinct from nested namespace paths  511ms
+     ✓ resolves plain initialization scripts with configured aliases and compiler module suffix priority  536ms
+     ✓ supports access-first calls, releases their lifetime, and preserves detached data  513ms
+     ✓ rejects maxAccesses exhaustion without a successful prefix  530ms
+     ✓ rejects maxSelections exhaustion without a successful prefix  502ms
+   ✓ keeps a shadowed namespace local out of member selections  530ms
+   ✓ retains shorthand and local export namespace readings  549ms
+ ✓ subs/analysis/subs/project/src/tests/resolve-root.test.ts (8 tests) 8442ms
+     ✓ reuses the helper product for source edits, but recomputes when configuration bytes or directory membership change  735ms
+     ✓ classifies missing roots/configuration and references-only configurations consistently  461ms
+     ✓ root-resolution-reused: an equal request reuses a known resolution while every discovery query answers the same  920ms
+     ✓ resolution-survives-membership: a created or deleted source file in an enumerated directory reuses the resolution  690ms
+     ✓ root-resolution-invalidated, resolution-invalidated-by-discovery: a created or deleted configuration or description on the discovery path, a moved root or a changed canonical path resolves again  2397ms
+     ✓ resolution-invalidated-by-discovery: a changed canonical path of the working directory resolves again  831ms
+     ✓ resolution-survives-configuration-bytes: a configuration content edit reuses the resolution and acquisition refuses what resolution no longer re-reads, with the same codes  2397ms
+ ✓ subs/daemon/src/tests/affected-service.test.ts (5 tests) 8102ms
+     ✓ A7-07:validation refuses malformed params as invalid-request, directly and on the wire  1336ms
+     ✓ A7-07:validation response-bound refuses an answer over maxResponseBytes whole, as resource-unavailable  2806ms
+     ✓ A7-07:unknown-module-domain answers an unknown module ID and invalid seeds as unavailable outcomes, not service errors  1391ms
+     ✓ A7-07:equivalence-with-session answers exactly what a retained session opened on the same inputs answers  2560ms
+ ✓ subs/analysis/subs/typescript/src/tests/retained-source-analysis.test.ts (28 tests) 7566ms
+     ✓ opens one warm compiler whose cold facts equal the finite helper and a fresh adapter  856ms
+     ✓ keeps exactly one live snapshot across twenty body edits and equals a fresh adapter after each  401ms
+     ✓ follows a created and a deleted owned file through the regenerated configuration  426ms
+     ✓ describes every owned file afresh after invalidateAll and equals the whole build  731ms
+     ✓ reaches edited options of the configuration and its extended file through a whole invalidation, reading the libraries a fresh adapter reads  564ms
+     ✓ omits reserved generated names from its listings and member probes, keeping near misses  647ms
+     ✓ rejects the next call with read-failure when the server is lost, then rebuilds on a later update  362ms
+     ✓ releases the compiler while keeping facts, and rebuilds equal facts on the next update  397ms
+ ✓ src/tests/dependency-view-server.test.ts (1 test) 8442ms
+     ✓ BD28: a real daemon and explorer server reach ready at one input ID over HTTP; the server loads no analysis runtime  8440ms
+ ✓ subs/analysis/src/tests/affected-session.test.ts (23 tests) 7121ms
+     ✓ A7-04:signature-only-complete: signature notes keep coverage complete and the closure selection  583ms
+     ✓ A7-04:nonliteral-dynamic: a nonliteral dynamic import anywhere widens to every module  621ms
+     ✓ A7-04:unresolved-target: deleting an imported file leaves an unresolved target that widens  721ms
+     ✓ A7-04:outside-module-target: an import of a file outside every module widens  524ms
+     ✓ A7-05:edit-changes-answer: an import added by an edit selects the new dependent only after its revision  482ms
+     ✓ A7-05:stale-sequence: any sequence other than the current one is invalid-revision  557ms
+     ✓ A7-05:invalid-current: an invalid current revision is invalid-current, never the previous valid answer  830ms
+     ✓ A7-05:missing-facts: a revision whose access interpretation is blocked answers missing-facts  502ms
+     ✓ A7-05:missing-facts (cold): a session opened over a blocked access stage answers missing-facts  520ms
+     ✓ A7-05:warm-after-release: after releaseCompiler the query answers from retained facts without recreating a compiler  512ms
+     ✓ A7-05:no-disk-or-report: a ready query reads no source, calls no compiler and projects no report  500ms
+ ✓ subs/analysis/src/tests/architect-view-session.test.ts (9 tests) 6413ms
+     ✓ checks, watch updates and changed-file checks never classify shapes or read titles; one query does each once  1063ms
+     ✓ projects the current sequence identically to the independent oracle, without a report or a revision  487ms
+     ✓ answers invalid-revision for an older, an unknown and a disposed sequence  527ms
+     ✓ includes an update queued before the query and never answers for a sequence an earlier update replaced  522ms
+     ✓ answers resource-limit above maxProjectionBytes and for invalid limits  549ms
+     ✓ answers cancelled when aborted before or during the query, and projects again afterwards  514ms
+     ✓ recreates a released compiler without publishing a revision and projects what the hot compiler projected  598ms
+     ✓ answers superseded when a testing-area feature changed after the revision, and projects once it is published  524ms
+     ✓ carries queries and outcomes through the worker protocol  1628ms
+ ✓ subs/analysis/subs/typescript/src/tests/resource-suffixes.test.ts (12 tests) 6414ms
+     ✓ keeps the physical CSS original when the selected declaration uses .custom  514ms
+     ✓ keeps the physical CSS original when the selected declaration uses .platform.mobile  561ms
+     ✓ uses inherited suffixes and the selected description through a configured resource alias  568ms
+     ✓ preserves resource interpretation after rootDirs redirects a suffixed declaration (present resource)  552ms
+     ✓ preserves resource interpretation after rootDirs redirects a suffixed declaration (missing resource)  524ms
+     ✓ retains the configured empty-suffix fallback when the specialized declaration is absent  540ms
+     ✓ does not confuse an extension ending in a configured suffix with a different resource  574ms
+     ✓ recognizes the compiler-selected suffixed legacy CSS declaration  536ms
+     ✓ does not let a suffixed declaration establish a missing physical CSS resource  506ms
+     ✓ preserves the compiler-selected suffixed code binding as a code original  510ms
+     ✓ keeps an alias explicitly naming a suffixed declaration as code  484ms
+     ✓ keeps an earlier compiler-selected package declaration ahead of a resource paths fallback  542ms
+ ✓ subs/analysis/subs/typescript/src/tests/cyclic-stars.test.ts (12 tests) 6538ms
+     ✓ keeps recursive namespace facts finite when 'a-namespace' refers to 'z-star'  606ms
+     ✓ keeps recursive namespace facts finite when 'z-namespace' refers to 'a-star'  604ms
+     ✓ preserves ambiguity and known exports with 'A path first, cycle statement first, …'  539ms
+     ✓ preserves ambiguity and known exports with 'A path first, cycle statement first, …'  562ms
+     ✓ preserves ambiguity and known exports with 'A path first, leaf statement first, c…'  534ms
+     ✓ preserves ambiguity and known exports with 'A path first, leaf statement first, c…'  543ms
+     ✓ preserves ambiguity and known exports with 'B path first, cycle statement first, …'  513ms
+     ✓ preserves ambiguity and known exports with 'B path first, cycle statement first, …'  537ms
+     ✓ preserves ambiguity and known exports with 'B path first, leaf statement first, c…'  522ms
+     ✓ preserves ambiguity and known exports with 'B path first, leaf statement first, c…'  549ms
+     ✓ keeps legal cycles complete when both leaf paths reach the same original  520ms
+     ✓ honors explicit named overrides in cyclic barrels with distinct leaf originals  507ms
+ ✓ subs/analysis/src/tests/api-view.test.ts (14 tests) 6012ms
+     ✓ I2A-05:child-category -- a direct-child and a deep-descendant original both enter children, never misclassified by the first-child grouping  558ms
+     ✓ I2A-05:external-category -- available ancestor, sibling and cousin originals enter external; npm/builtin declarations are absent  469ms
+     ✓ I2A-05:defining-path-roundtrip -- stripping no suffix from a projected relative filename still resolves the exact original defining file, extension preserved  430ms
+     ✓ I2A-05:defining-export-names -- entries use every valid defining-file export name for the original and omit forwarding/exposure aliases  439ms
+     ✓ I2A-05:file-group-and-order -- one file groups all and only its entries; categories, paths and headings are byte-ordered; repeat runs are deeply equal  424ms
+     ✓ I2A-05:test-view-complete -- every test-available foreign original is in the tests projection, including one absent from ordinary; searching tests alone loses nothing  431ms
+     ✓ I2A-05:coverage-count -- distinct catalog/description limits that may omit an API contribute once to coverage; access-only limits and same-owner limits never do  432ms
+     ✓ I2A-05:projection-bound -- crossing an area or invocation bound returns resource-unavailable with no collected prefix; a just-under-bound projection is complete  401ms
+     ✓ detailsUnavailable and truncated entry counts reflect exactly the folded-in detail states  471ms
+     ✓ I2A-05:empty-view -- a module with no foreign API produces an area with zero files and valid metadata inputs, not placeholder documents  386ms
+     ✓ resolves --from below a child module directory to that child, and the project root to the root module  389ms
+     ✓ a module with neither source area present (no src/, so no src/tests/ either) projects both areas null, zero targets; --from still succeeds  361ms
+     ✓ rejects a non-canonical --from path as an invalid location rather than silently falling back to the root  414ms
+     ✓ rejects invalid session facts as analysis-failed rather than projecting from a stale or partial model  402ms
+ ✓ subs/analysis/subs/project/src/tests/root-selection.test.ts (13 tests) 5980ms
+     ✓ passes unmarked descriptions inside and outside subs/ and stops at the nearest marked one  1208ms
+     ✓ selects a marked project beneath subs/ or in the root from inside it  693ms
+     ✓ stops at a marked root whose later lines are invalid and acquisition reports their errors  492ms
+     ✓ decides the marker from the decodable lines: an encoding error after the module line keeps it, one before removes it  511ms
+     ✓ makes a reused resolution stale after a marker change and keeps it after a marker-preserving edit  1239ms
+     ✓ never reads a marked description in a declared tree, and reports it once its declaration is removed, configuration or not  505ms
+ ✓ subs/analysis/subs/typescript/src/tests/dependency-behavior.test.ts (6 tests) 6116ms
+     ✓ classifies call, construction, reference, data, type, forwarding, unused and unknown evidence  641ms
+     ✓ classifies without prior access collection and keeps unused and forwarded selections distinct  527ms
+       ✓ classifies supplied imports equal to the batch path without catalog or interpretation commands (BD14, BD15)  1147ms
+       ✓ keeps every import path of one original separately classified and reproduces each aggregate from them  612ms
+       ✓ classifies supplied forwarded imports equal to the batch path (BD14, BD15)  1087ms
+       ✓ bounds supplied facts and returns no facts after cancellation  2099ms
+ ✓ subs/analysis/src/tests/architect-view.test.ts (12 tests) 5953ms
+     ✓ records every owned exported original once, at its owner, with its role, exposure, shape, tags and relays  678ms
+     ✓ plans one detail and shape request per recorded original, under its name, in byte order  481ms
+     ✓ keeps an original without a runtime value supporting whatever shape the compiler answered  498ms
+     ✓ lists every module in tree order with its directory, parent, children, tags, areas, declared trees, purpose, docs and source counts  469ms
+     ✓ orders a module before its children and children by byte order, not by identifier  505ms
+     ✓ reads test titles only from testing-profile areas, and counts files the compiler leaves out  453ms
+     ✓ splits title lists at maxTitlesPerRecord and counts every cut title once  508ms
+     ✓ records a feature without scenarios once, and none for a file with neither feature nor scenario  467ms
+     ✓ counts truncated details in cut  461ms
+     ✓ answers resource-limit above maxProjectionBytes and for invalid limits, never a partial projection  497ms
+     ✓ is deterministic plain data and throws when a planned result is missing  485ms
+     ✓ refuses facts without a valid model  447ms
+ ✓ subs/analysis/subs/project/src/tests/references.test.ts (19 tests) 5815ms
+     ✓ excludes emitted declarations at src/generated and rejects their exposure  896ms
+     ✓ excludes emitted declarations at src/tests/generated and rejects their exposure  914ms
+ ✓ subs/analysis/subs/typescript/src/tests/lifetime.test.ts (12 tests) 5807ms
+     ✓ cancels a still-opening compiler while its parent-served read remains unresolved  465ms
+     ✓ turns an influencing read failure into an explicit failed startup and releases the helper  738ms
+     ✓ terminates a pending catalog on operation without waiting for its filesystem callback  540ms
+     ✓ terminates a pending catalog on lifetime without waiting for its filesystem callback  519ms
+     ✓ terminates a pending catalog on dispose without waiting for its filesystem callback  577ms
+     ✓ enforces a startup deadline while a captured read is still pending  310ms
+     ✓ chunks a compiler source larger than one protocol frame without changing its exports  710ms
+     ✓ rejects an oversized captured read before transferring it to the helper  438ms
+     ✓ does not recompute every captured content identity for each compiler filesystem callback  694ms
+     ✓ keeps the view caller-owned after idempotent compiler disposal  579ms
+ ✓ src/tests/resident-assembly.test.ts (8 tests) 5759ms
+     ✓ opens a retained session whose first projection equals batch and disposes the compiler with its driver  1994ms
+     ✓ A7-07: forwards affected through the resident session handle and the quick environment operation  2357ms
+     ✓ enforces a smaller assembly retention budget inside the session before publication  1381ms
+ ✓ subs/cli/src/tests/materialize-command.test.ts (7 tests) 5559ms
+     ✓ materializes the real project and writes a real generated document, with no batch fallback  1227ms
+     ✓ AV24: sends no views field without --view, and prints Plan 2A's two lines  1285ms
+     ✓ AV24: sends the views given, publishes the architect view and prints its line  1260ms
+     ✓ reports a compact failure and claims no complete refresh for an invalid project description  492ms
+     ✓ exits with output-failure and no batch call when stdout itself fails  1287ms
+ ✓ subs/analysis/subs/project/src/tests/observer.test.ts (19 tests) 5576ms
+     ✓ re-parses one changed description without re-listing any directory  316ms
+     ✓ membership-identity-equals-batch: apply leaves compiler observations to retire; probes retirement keeps reads and re-reported probes, all retirement restores the acquisition  850ms
+     ✓ reports a stray description as invalid and keeps the last valid inventory  478ms
+ ✓ subs/integration-tests/src/explorer-router.test.ts (3 tests) 5303ms
+     ✓ RS07: accepts no token, returns latest, reports server status and is unavailable while not ready  1467ms
+     ✓ RS08: after a forced eviction, details for the previous generation are superseded and latest is served  2523ms
+     ✓ BD29: dependencyView reaches ready at one input ID through the real resident service; only dependencyDiagram reaches the analyzer  1312ms
+ ✓ subs/analysis/src/tests/api-view-session.test.ts (10 tests) 5348ms
+     ✓ current-valid-query: projects the current sequence identically to the independent oracle  578ms
+     ✓ hot-details: a module selection also matches the oracle and uses the live compiler  470ms
+     ✓ invalid-or-historical: an old sequence, an unknown sequence and an invalid location are all explicit unavailable, never lastValid  423ms
+     ✓ warm-rehydration: after releasing the compiler, the query recreates one, publishes no revision and matches the hot projection  557ms
+     ✓ new-observation-supersedes: a disk change observed only while rehydrating reports superseded, not stale data  641ms
+     ✓ no-report-or-rescan: a query calls neither report() nor a new recompute/observation  383ms
+     ✓ query-serialization: a queued update before the query is included; one after cannot replace its sequence  432ms
+     ✓ query-limits: a byte bound crossed by the real projection returns resource-limit, not a partial projection  397ms
+     ✓ query-disposal: cancellation, repeated queries and disposal are all bounded and retain no projection  404ms
+     ✓ carries an apiView request and result through the worker/host protocol unchanged  1060ms
+ ✓ subs/analysis/src/tests/report-publication.test.ts (3 tests) 5206ms
+     ✓ FR09 publication-without-snapshot: open and updates build, measure and copy no full report, and keep the fields a full finish() yields  2403ms
+     ✓ full-report-on-request: a requested report equals batch and still fails over maxReportBytes where it is built  2788ms
+ ✓ subs/analysis/subs/typescript/src/tests/export-shapes.test.ts (4 tests) 5022ms
+     ✓ classifies every defining-file export of the shapes fixture by kind and behavior (AV01)  634ms
+     ✓ answers one shape per request in request order and unknown for an export the compiler cannot resolve  576ms
+     ✓ rejects an invalid or cancelled call with no result and counts every call  663ms
+     ✓ shares one shape rule with the consumer classifier, whose capability is unchanged for every type it meets (AV02)  3147ms
+ ✓ src/tests/package-consumer.test.ts (1 test) 4533ms
+     ✓ resolves and type-checks every supported entry and refuses an unlisted internal subpath  4531ms
+ ✓ subs/cli/src/tests/git-advice.test.ts (5 tests) 4387ms
+     ✓ prints the advice with complete batch and resident checks, never with a changed check, and keeps every exit code  4375ms
+ ✓ subs/analysis/subs/typescript/src/tests/project-boundary-resolution.test.ts (7 tests) 4497ms
+     ✓ gives every value, type-only, symbol-free, namespace, resource, lazy and type-query form the nested-tree target  683ms
+     ✓ gives relative, alias and workspace-link routes into either tree the nested-tree target  627ms
+     ✓ keeps re-exports into either tree as forwarding-file targets and preserves forwarding provenance  640ms
+     ✓ keeps the true package import external at its ignored real target while a bare alias to the same file is a boundary target  591ms
+     ✓ never takes a bare spelling for package resolution when the alias shares the installed package name  516ms
+     ✓ names an outside-root file, each always-excluded kind and unresolved targets separately, none external or application  647ms
+     ✓ classifies every target as the batch helper does  790ms
+ ✓ subs/analysis/src/tests/report-capacity.test.ts (2 tests) 4316ms
+     ✓ preserves evidence above 32 MiB with an explicit 96 MiB allowance  1757ms
+     ✓ still returns a bounded incomplete result when evidence exceeds 96 MiB  2557ms
+ ✓ subs/analysis/subs/typescript/src/tests/resources.test.ts (13 tests) 3994ms
+     ✓ records the shims and importers each resource description read and assembles the same catalog  466ms
+     ✓ resolves a resource alias relative to the inherited configuration that defines paths  485ms
+     ✓ does not select a later resource paths fallback after TypeScript resolved an earlier package declaration  464ms
+     ✓ reports a missing resource beside its per-file declaration as a resource target limit  483ms
+     ✓ coalesces aliases proven equivalent within one resource  515ms
+     ✓ uses a per-file arbitrary-extension declaration as the resource description  544ms
+     ✓ does not let a matching shim establish a missing resource  492ms
+ ✓ subs/analysis/src/tests/auxiliary-source.test.ts (5 tests) 4183ms
+     ✓ inventories and catalogues owned compiler source outside src/ under its nearest owner, with no warning  973ms
+     ✓ allows same-owner and received imports, needs exposure for a foreign original, and never reaches testing source  917ms
+     ✓ rejects exact, chained, wildcard and re-exposed selections of auxiliary originals with located findings  989ms
+     ✓ links the same forwarding chains and wildcard for originals beneath src/  1028ms
+ ✓ src/tests/ownership-process.test.ts (1 test) 4056ms
+     ✓ keeps current diagnostics and both generated views through A/B/C/D without resetting the daemon  4054ms
+ ✓ src/tests/production-boundary.test.ts (3 tests) 4153ms
+     ✓ selects ordinary src files by resolved profile, excluding testing modules and areas, auxiliary and inert files, declared trees and scratch  846ms
+     ✓ adds no production file for new inert, auxiliary, testing, declared-tree or scratch files, and adds a new ordinary src file  873ms
+     ✓ keeps the toolkit selection within non-testing src areas while its inventory holds auxiliary source  2432ms
+ ✓ src/tests/ownership-batch.test.ts (5 tests) 4212ms
+     ✓ FR03 FR04 answers the affected table before and after two exposed exports disappear  2451ms
+     ✓ FR06 FR07 discovers from a descendant, defaults to root and keeps repeated path order  728ms
+     ✓ FR06 answers owned trees, hard exclusions and supported invocation symlinks  504ms
+ ✓ src/tests/recovery-cli.test.ts (2 tests) 4017ms
+     ✓ retains A views through invalid B/C, answers independent ownership, and publishes completed D  2841ms
+     ✓ FR16 FR20 starts invalid with unavailable history and omits it before context creation  1174ms
+ ✓ src/tests/companion-cli.test.ts (2 tests) 3913ms
+     ✓ pins the finding and the inference note in text and JSON, and passes once the companion is exposed  2657ms
+     ✓ SC19: marks the finding new after the causing edit, refreshes its location after a move and lists it as removed after the fix  1254ms
+ ✓ subs/analysis/src/tests/dependency-behavior-capability.test.ts (2 tests) 3591ms
+     ✓ attaches facts only to an explicitly requesting batch analysis without changing its findings  3060ms
+     ✓ never enters the classifier in retained sessions or changed-file updates, which reject the capability  529ms
+ ✓ subs/analysis/src/tests/recovery-fixtures.test.ts (2 tests) 3481ms
+     ✓ provides isolated valid, removed-export and repaired states for iteration 2  3479ms
+ ✓ subs/analysis/src/tests/project-boundary-analysis.test.ts (10 tests) 3572ms
+     ✓ denies every form into the root's own owned-unwired tree, before symbol selection and the same-owner exemption  1000ms
+     ✓ passes the check with partial coverage and a distinct limit for each target, none allowed or external  837ms
+     ✓ denies same-owner imports into owned-unwired while allowing ordinary owned source  835ms
+     ✓ denies same-owner imports into owned-nested-project while allowing ordinary owned source  892ms
+ ✓ subs/analysis/subs/typescript/src/tests/access-interpreter.test.ts (5 tests) 3679ms
+   ✓ matches whole-pass subsets, reports candidates per file, and replaces only changed descriptions  1066ms
+   ✓ cancels the finite lifetime and rejects unknown subset paths  987ms
+   ✓ preserves erased namespace members when descriptions cross the detached replacement seam  1000ms
+   ✓ does not materialize the full captured-input list while returning subset results  618ms
+ ✓ subs/analysis/src/tests/inventory.test.ts (13 tests) 3617ms
+     ✓ uses stable captured identities and never asks a source program to accept source syntax  764ms
+     ✓ preserves parser locations and distinguishes invalid, unavailable and exhausted acquisition  499ms
+ ✓ subs/analysis/src/tests/project-boundary-affected.test.ts (4 tests) 3466ms
+     ✓ PB1-17/PB1-18: every written path seed resolves and selects as the topology states, without a read, hot and warm  586ms
+     ✓ PB1-17: module and description seeds select by reverse imports; ancestry selects nothing  473ms
+     ✓ PB1-08: inert and unanalyzed paths have owners without inventory entries or captured content  481ms
+     ✓ PB1-19: both sides of a rename resolve without reads, and declarations change containment at the new revision  1925ms
+ ✓ subs/analysis/src/tests/test-references.test.ts (4 tests) 3281ms
+     ✓ carries the references of the same report in the ready outcome, beside an unchanged diagram  3266ms
+ ✓ subs/cli/src/tests/measure-command.test.ts (4 tests) 3582ms
+     ✓ MM10: prints the service document unchanged as JSON and a short exact/subtree table  1361ms
+     ✓ preserves an explicit service resource refusal as exit 2 without a partial document  481ms
+     ✓ MM18: keeps generated, excluded, outside, symlink and unobserved paths distinct until refresh inventories a new file  1732ms
+ ✓ subs/analysis/src/tests/toolkit-boundaries.test.ts (3 tests) 3358ms
+     ✓ enters exactly the decided declarations beside the scratch and output exclusions  1189ms
+     ✓ classifies paths inside each declared tree and the controls beside them  1109ms
+     ✓ prunes every declared tree before descent: no file, warning, description or input beneath any of them  1058ms
+ ✓ subs/analysis/subs/typescript/src/tests/descriptions.test.ts (10 tests) 3284ms
+   ✓ assembles the exposed descriptions of a whole project into its catalog  1512ms
+ ✓ src/tests/entry-boundaries.test.ts (3 tests) 3092ms
+     ✓ keeps explicit batch independent of the daemon and preserves report bytes  2837ms
+ ✓ subs/analysis/subs/project/src/tests/input-list.test.ts (5 tests) 3601ms
+     ✓ HO-4 input-list-invalidated: reports, promotion, local and structural updates equal a fresh acquisition  2653ms
+     ✓ HO-5 input-cache-no-leak: forgotten observations leave no cached entry  587ms
+ ✓ subs/analysis/subs/typescript/src/tests/resource-bindings.test.ts (4 tests) 3073ms
+     ✓ keeps identically named dependency originals distinct with their own value and type facts  536ms
+     ✓ retains distinct identities and flags when effective declarations are permuted  1024ms
+     ✓ coalesces only aliases of the same compiler original using a stable effective name  974ms
+     ✓ prefers default within its proven alias group without merging another same-spelling original  536ms
+ ✓ subs/analysis/src/tests/provenance-vocabulary.test.ts (4 tests) 3075ms
+     ✓ gives files beneath src/ src placement and false flags, and the loose root file auxiliary placement and true flags  1015ms
+     ✓ reports an import into an owned-unwired tree as a nested-tree target that is never checked  1020ms
+     ✓ never lets a nested-tree or excluded target pass as checked  1036ms
+ ✓ subs/service-api/src/tests/project-binding.test.ts (8 tests) 2827ms
+     ✓ RS01: start opens and subscribes, then reports ready with the daemon token  580ms
+     ✓ RS02: a context-evicted event reopens with a new generation without external action  1712ms
+     ✓ RS06: close releases the subscription, context and connection, twice without error  522ms
+ ✓ subs/analysis/src/tests/affected-worker.test.ts (2 tests) 3115ms
+     ✓ A7-05:worker-round-trip: the worker answers exactly as the in-process engine, before and after an edit  1923ms
+     ✓ A7-05:worker-cancel: a cancelled request answers cancelled and leaves the session usable  1190ms
+ ✓ subs/analysis/subs/typescript/src/tests/companions.test.ts (8 tests) 3041ms
+     ✓ classifies a moved signature as moved with refreshed evidence and a new companion as changed (SC15)  1160ms
+     ✓ recomputes a declaring file when only its barrel forwards a different original (SC27)  637ms
+     ✓ describes the harvesting fixture equally in the retained session and in batch  680ms
+ ✓ subs/analysis/subs/project/src/tests/sweep.test.ts (6 tests) 2669ms
+     ✓ carries the identity a batch capture of the same inputs carries  1165ms
+     ✓ carries a batch identity after a structural rebuild  476ms
+ ✓ subs/analysis/src/tests/file-facts-query.test.ts (6 tests) 2692ms
+     ✓ counts type exports, keeps export {} empty, and records side-effect and type-reexport importers  564ms
+     ✓ keeps nested-owner originals separate from colliding project-relative source paths  433ms
+     ✓ reports complete known incoming facts when supported source has no hidden-target limits  427ms
+     ✓ keeps incomplete descriptions inconclusive and scopes limits to relevant files  392ms
+     ✓ reports missing, excluded, outside and unobserved inert paths explicitly  453ms
+     ✓ does not turn unavailable retained facts or ambiguous empty exports into complete empty facts  421ms
+ ✓ subs/analysis/src/tests/root-marker.test.ts (4 tests) 2697ms
+     ✓ checks the marked root with an unmarked child, given or found from the child, with its exposure unchanged  1960ms
+     ✓ stops at a marked root with a later syntax error and reports the parser diagnostic  503ms
+ ✓ src/tests/quick-environment.test.ts (6 tests) 2203ms
+     ✓ disposes every session driver it handed out, whether or not the caller disposed it  970ms
+     ✓ verifies service cleanup before destroying the controls  1218ms
+ ✓ subs/analysis/src/tests/module-measurements-session.test.ts (3 tests) 2288ms
+     ✓ uses retained inventory, areas and captured inputs without reports or descendant leakage  650ms
+     ✓ refuses another sequence, observes cancellation and never substitutes zeros  483ms
+     ✓ returns the same frozen plain snapshot through the worker protocol  1153ms
+ ✓ subs/presentation/subs/project-view/src/tests/ProjectExplorerView.test.tsx (45 tests) 2753ms
+     ✓ MT13 shows the module tree link only when an opener is supplied  330ms
+     ✓ BD38 gives the three controls labels and keyboard behavior and distinguishes every dependency state  309ms
+ ✓ subs/presentation/src/tests/interaction.test.ts (33 tests) 1930ms
+ ✓ subs/analysis/src/tests/modularity-batch.test.ts (1 test) 1786ms
+     ✓ projects source structure and opt-in behavior from one completed report  1785ms
+ ✓ subs/analysis/src/tests/architect-render.test.ts (30 tests) 1839ms
+ ✓ subs/analysis/src/tests/shared-globals.test.ts (2 tests) 1963ms
+     ✓ reports a cross-owner 'script' as partial coverage  1003ms
+     ✓ reports a cross-owner 'module augmentation' as partial coverage  959ms
+ ✓ subs/analysis/subs/typescript/src/tests/symbol-details.test.ts (26 tests) 1695ms
+ ✓ subs/analysis/subs/typescript/src/tests/retained-membership.test.ts (5 tests) 1384ms
+     ✓ a created unreferenced file is read, described alone and reported with its own contributions  342ms
+ ✓ subs/daemon/src/tests/launcher.test.ts (14 tests) 1536ms
+     ✓ terminates its own timed-out unready child before releasing the start lock  311ms
+ ✓ subs/daemon/src/tests/codec.test.ts (23 tests) 1274ms
+     ✓ honors the inclusive 33619968-byte payload bound  402ms
+     ✓ round-trips a message above the former 64 MiB codec ceiling  833ms
+ ✓ subs/explorer/src/tests/ModuleTreePage.test.tsx (10 tests) 1450ms
+     ✓ expands a tree of 60 modules and collapses below depth 2 at 61  576ms
+ ✓ src/tests/lifecycle-process.test.ts (9 tests) 1184ms
+   ✓ suspends and resumes input, traces concurrent socket peers, and interrupts cleanly  303ms
+ ✓ subs/analysis/subs/project/src/tests/generated-path.test.ts (12 tests) 1180ms
+ ✓ subs/daemon/src/tests/watcher.test.ts (17 tests) 1152ms
+ ✓ subs/daemon/src/tests/outbound.test.ts (14 tests) 1100ms
+     ✓ destroys a non-reading peer within the deadline and reports release exactly once  1015ms
+ ✓ subs/daemon/subs/contexts/src/tests/history.test.ts (11 tests) 1027ms
+     ✓ replaces a 70 MiB diagnostic payload within 128 MiB without ignoring a caller admission bound  873ms
+ ✓ subs/analysis/src/tests/rss-sampling.test.ts (3 tests) 1123ms
+     ✓ rss-sampling: on the macOS path worker messages start no process until a new compiler or the interval  1115ms
+ ✓ src/tests/explorer-process.test.ts (3 tests) 1033ms
+     ✓ starts on the fixed port without a running daemon, advertises its project and stops explicitly on SIGINT  626ms
+ ✓ subs/analysis/src/tests/affected-rule.test.ts (2 tests) 1108ms
+     ✓ base revision: every examples-table seed and the combined queries answer by the rule  615ms
+     ✓ data variant: the imported data file selects its reader's owner, widened by its coverage note  491ms
+ ✓ subs/analysis/src/tests/explorer-details.test.ts (2 tests) 1081ms
+     ✓ delegates described, truncated and per-symbol unavailable results to the retained provider with fixed bounds  582ms
+     ✓ serializes the sequence check behind an in-flight mutation and never substitutes newer details  498ms
+ ✓ subs/daemon/src/tests/project-boundary-wire.test.ts (6 tests) 951ms
+     ✓ round-trips classification, dispositions, status registrations and affected seeds; rejects malformed requests and stale peers  903ms
+ ✓ subs/presentation/subs/project-view/src/tests/ModuleTreeCanvas.test.tsx (24 tests) 1127ms
+ ✓ subs/presentation/subs/project-view/src/tests/ModuleTreeView.test.tsx (11 tests) 869ms
+ ✓ subs/analysis/subs/project/src/tests/inventory-scaling.test.ts (2 tests) 833ms
+     ✓ classifies selected files against every module scratch directory with containment work linear in the modules  828ms
+ ✓ subs/analysis/src/tests/fact-ledger.test.ts (4 tests) 748ms
+     ✓ keeps counts beyond the packed range  740ms
+ ✓ subs/analysis/subs/typescript/src/tests/retention.test.ts (2 tests) 718ms
+   ✓ retains only frozen plain catalog data after releasing the compiler and captured view  523ms
+ ✓ subs/daemon/src/tests/architect-view-publisher.test.ts (45 tests) 548ms
+ ✓ subs/daemon/src/tests/host.test.ts (4 tests) 542ms
+     ✓ closing a subscribed context releases the host activity lease and permits idle exit  495ms
+ ✓ subs/analysis/subs/typescript/src/tests/compiler-paths.test.ts (1 test) 558ms
+   ✓ uses source filename spelling for code originals, forwarding, resource descriptions and access targets  556ms
+ ✓ subs/service-api/src/tests/web-launcher.test.ts (3 tests) 458ms
+ ✓ src/tests/daemon-suspended-shutdown.test.ts (1 test) 430ms
+     ✓ forces the released peer socket closed before the shutdown grace expires  429ms
+ ✓ subs/presentation/src/tests/emitted-diagrams.test.ts (11 tests) 367ms
+ ✓ subs/daemon/src/tests/api-view-publisher-crash-recovery.test.ts (2 tests) 360ms
+ ✓ subs/service-api/src/tests/web-process.test.ts (5 tests) 411ms
+ ✓ subs/daemon/src/tests/measure-service.test.ts (4 tests) 420ms
+ ✓ subs/analysis/subs/typescript/src/tests/test-titles.test.ts (5 tests) 335ms
+ ✓ subs/explorer/src/tests/ProjectExplorerFocus.test.tsx (6 tests) 491ms
+     ✓ scopes a nested module to its parent, selects it and keeps every class filter on  309ms
+ ✓ subs/presentation/subs/project-view/src/tests/ModuleGraph.test.tsx (14 tests) 357ms
+ ✓ subs/daemon/subs/contexts/src/tests/recovery.test.ts (12 tests) 213ms
+FR25 scripted context publications=1000 distinctPaths=32 overflowObserved=11000 retainedBeforeOverflow=14098 retainedAtOverflow=313035 elapsedMs=274
+ ✓ subs/daemon/subs/contexts/src/tests/recovery-scale.test.ts (1 test) 280ms
+ ✓ subs/analysis/subs/project/src/tests/path-ownership.test.ts (148 tests) 291ms
+ ✓ src/tests/daemon-identity.test.ts (1 test) 229ms
+ ✓ subs/presentation/src/tests/validate.test.ts (22 tests) 260ms
+ ✓ subs/daemon/src/tests/connect.test.ts (8 tests) 195ms
+ ✓ subs/presentation/src/tests/layout.test.ts (32 tests) 235ms
+ ✓ subs/daemon/src/tests/discovery.test.ts (15 tests) 186ms
+ ✓ src/tests/publication-queue.test.ts (3 tests) 169ms
+ ✓ subs/daemon/src/tests/daemon-log.test.ts (8 tests) 173ms
+ ✓ subs/service-api/src/tests/dependency-model.test.ts (5 tests) 169ms
+ ✓ subs/daemon/subs/contexts/src/tests/tokens.test.ts (16 tests) 139ms
+ ✓ src/tests/process-tracing.test.ts (1 test) 138ms
+ ✓ subs/daemon/src/tests/api-view-publisher.test.ts (20 tests) 141ms
+ ✓ subs/service-api/src/tests/project-view.test.ts (4 tests) 102ms
+ ✓ subs/presentation/subs/project-view/src/tests/module-tree.test.ts (6 tests) 143ms
+ ✓ subs/analysis/subs/descriptions/src/tests/descriptions.test.ts (31 tests) 103ms
+ ✓ subs/explorer/src/tests/HomePage.test.tsx (4 tests) 196ms
+ ✓ subs/analysis/subs/descriptions/src/tests/grammar.test.ts (147 tests) 84ms
+ ✓ subs/presentation/src/tests/focus-diagram.test.ts (13 tests) 75ms
+ ✓ subs/daemon/subs/contexts/src/tests/context-manager.test.ts (24 tests) 60ms
+ ✓ subs/daemon/subs/contexts/src/tests/covering.test.ts (44 tests) 88ms
+ ✓ subs/analysis/subs/project/src/tests/capture.test.ts (22 tests) 62ms
+ ✓ src/tests/launcher-script.test.ts (2 tests) 57ms
+ ✓ subs/presentation/src/tests/render.test.ts (28 tests) 94ms
+ ✓ subs/analysis/subs/model/src/tests/companions.test.ts (23 tests) 47ms
+ ✓ subs/presentation/src/tests/tree-diagram.test.ts (16 tests) 59ms
+ ✓ subs/daemon/src/tests/validation.test.ts (19 tests) 52ms
+ ✓ subs/presentation/src/tests/example1-stages.test.ts (6 tests) 67ms
+ ✓ subs/analysis/subs/model/src/tests/decision-lookups.test.ts (3 tests) 49ms
+ ✓ subs/analysis/subs/model/src/tests/availability.test.ts (70 tests) 46ms
+ ✓ subs/analysis/src/tests/modularity.test.ts (22 tests) 44ms
+ ✓ subs/analysis/subs/model/src/tests/decisions.test.ts (24 tests) 44ms
+ ✓ subs/daemon/subs/contexts/src/tests/session-driver.test.ts (12 tests) 42ms
+ ✓ subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts (12 tests) 43ms
+ ✓ subs/analysis/subs/descriptions/src/tests/root-marker-grammar.test.ts (54 tests) 33ms
+ ✓ subs/daemon/subs/contexts/src/tests/hot-budget.test.ts (12 tests) 50ms
+ ✓ subs/analysis/src/tests/modularity-candidate.test.ts (12 tests) 46ms
+ ✓ subs/presentation/src/tests/example3.test.ts (9 tests) 30ms
+ ✓ subs/daemon/subs/contexts/src/tests/api-view.test.ts (17 tests) 40ms
+ ✓ subs/analysis/subs/model/src/tests/available-originals.test.ts (14 tests) 47ms
+ ✓ subs/analysis/src/tests/failure-evidence.test.ts (6 tests) 43ms
+ ✓ subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts (9 tests) 44ms
+ ✓ subs/analysis/src/tests/affected-query.test.ts (54 tests) 35ms
+ ✓ subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts (46 tests) 58ms
+ ✓ subs/analysis/subs/descriptions/src/tests/auxiliary-exposure.test.ts (17 tests) 46ms
+ ✓ subs/analysis/subs/model/src/tests/identity-model.test.ts (43 tests) 36ms
+ ✓ subs/analysis/subs/descriptions/src/tests/linking.test.ts (13 tests) 32ms
+ ✓ subs/daemon/subs/contexts/src/tests/affected.test.ts (9 tests) 35ms
+ ✓ subs/daemon/subs/contexts/src/tests/root-resolution.test.ts (5 tests) 33ms
+ ✓ subs/cli/src/tests/recovery-contracts.test.ts (20 tests) 32ms
+ ✓ subs/daemon/src/tests/api-view-documents.test.ts (20 tests) 31ms
+ ✓ subs/cli/src/tests/arguments.test.ts (176 tests) 32ms
+ ✓ subs/analysis/src/tests/dependency-diagram.test.ts (8 tests) 29ms
+ ✓ subs/daemon/subs/contexts/src/tests/watch-registration.test.ts (5 tests) 28ms
+ ✓ subs/service-api/src/tests/dependency-view.test.ts (3 tests) 29ms
+ ✓ subs/analysis/subs/model/src/tests/tags.test.ts (10 tests) 21ms
+ ✓ subs/daemon/subs/contexts/src/tests/deadlines.test.ts (5 tests) 34ms
+ ✓ subs/presentation/src/tests/example4.test.ts (9 tests) 29ms
+ ✓ subs/daemon/src/tests/session-counters.test.ts (3 tests) 24ms
+ ✓ subs/presentation/src/tests/example2.test.ts (7 tests) 24ms
+ ✓ subs/presentation/subs/project-view/src/tests/auto-fit.test.tsx (4 tests) 30ms
+ ✓ subs/cli/src/tests/errors.test.ts (32 tests) 20ms
+ ✓ subs/daemon/src/tests/measurements.test.ts (2 tests) 22ms
+ ✓ subs/presentation/subs/layout/src/tests/placement.test.ts (8 tests) 19ms
+ ✓ subs/analysis/subs/model/src/tests/registry-profiles.test.ts (31 tests) 28ms
+ ✓ subs/presentation/src/tests/model-access.test.ts (4 tests) 19ms
+ ✓ subs/cli/src/tests/ownership-command.test.ts (17 tests) 14ms
+ ✓ subs/analysis/subs/descriptions/src/tests/locations.test.ts (5 tests) 13ms
+ ✓ subs/daemon/src/tests/recovery-contracts.test.ts (4 tests) 20ms
+ ✓ subs/daemon/subs/contexts/src/tests/explorer-details.test.ts (2 tests) 13ms
+ ✓ subs/analysis/src/tests/report-copy.test.ts (18 tests) 13ms
+ ✓ subs/daemon/subs/contexts/src/tests/controlled-ports.test.ts (9 tests) 11ms
+ ✓ subs/daemon/src/tests/system-clock.test.ts (6 tests) 14ms
+ ✓ subs/analysis/src/tests/change-affinity.test.ts (6 tests) 7ms
+ ✓ subs/analysis/subs/project/src/tests/purpose.test.ts (24 tests) 8ms
+ ✓ subs/analysis/subs/model/src/tests/dependency-locations.test.ts (8 tests) 10ms
+ ✓ subs/cli/src/tests/explore-command.test.ts (3 tests) 6ms
+ ✓ subs/presentation/subs/layout/src/tests/viewport.test.ts (8 tests) 6ms
+ ✓ subs/analysis/subs/model/src/tests/tree.test.ts (3 tests) 6ms
+ ✓ subs/analysis/subs/project/src/tests/source-extensions.test.ts (2 tests) 6ms
+ ✓ subs/analysis/src/tests/feature-titles.test.ts (5 tests) 5ms
+ ✓ subs/analysis/src/tests/module-measurements.test.ts (3 tests) 6ms
+ ✓ subs/analysis/subs/model/src/tests/frozen-data.test.ts (3 tests) 4ms
+ ✓ subs/cli/src/tests/capabilities.test.ts (1 test) 4ms
+ ✓ subs/daemon/src/tests/request-identities.test.ts (1 test) 3ms
+ ✓ subs/service-api/src/tests/router-typing.test.ts (6 tests) 3ms
+ ✓ subs/explorer/src/tests/revision-freshness.test.ts (3 tests) 3ms
+ ✓ subs/integration-tests/src/project-view-projection.test.ts (1 test) 3ms
+
+ Test Files  216 passed (216)
+      Tests  3007 passed (3007)
+   Start at  11:02:39
+   Duration  315.22s (transform 5.77s, setup 0ms, import 21.17s, tests 1205.93s, environment 6.70s)
+
+
+(node:2196602) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2196602) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2196959) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2196959) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2197342) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2197342) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2198192) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2198192) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2198585) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2198585) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2199474) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2199474) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2200034) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2200034) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2200211) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2200211) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2200654) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2200654) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201183) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201183) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201358) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201358) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201443) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201443) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201502) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201502) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201664) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201664) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201704) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201712) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201704) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201712) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201747) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201747) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201815) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201858) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201815) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2201858) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202054) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202054) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202098) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202098) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202243) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202243) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202430) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202430) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202459) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202459) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202583) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202583) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202758) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202758) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202931) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202958) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202931) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2202958) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203107) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203107) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203229) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203246) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203229) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203246) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203403) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203403) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203535) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203535) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203581) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203581) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203665) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203665) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203745) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203745) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203831) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203831) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203909) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203909) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203959) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2203959) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204100) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204108) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204100) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204108) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204254) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204254) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204399) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204399) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204507) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204507) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204531) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204531) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204712) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204712) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204753) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204753) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204828) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204828) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204980) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2204980) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2205094) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2205094) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207246) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207246) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207369) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207369) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207523) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207523) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207640) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207640) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207778) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207778) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207917) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2207917) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208055) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208055) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208144) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208144) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208194) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208194) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208261) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208261) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208314) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208337) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208314) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208337) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208370) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208370) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208423) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208423) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208484) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208484) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208500) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208500) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208519) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208519) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208562) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208576) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208562) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208576) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208611) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208611) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208661) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208661) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208714) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208714) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208785) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208785) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208868) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208868) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208956) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208997) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208956) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2208997) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209070) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209070) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209157) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209157) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209242) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209242) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209286) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209286) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209359) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209359) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209431) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209431) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209577) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209586) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209577) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209586) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209708) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209708) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209741) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209741) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209893) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209913) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209893) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2209913) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210215) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210247) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210215) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210247) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210477) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210491) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210477) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210491) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210629) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210655) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210629) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210655) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210770) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210770) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210793) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210793) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210827) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210827) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210957) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2210957) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2211135) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2211135) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2211513) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2211513) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2211928) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2211928) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2212468) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2212468) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214314) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214314) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214377) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214377) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214483) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214483) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214726) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214726) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214943) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2214943) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215209) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215209) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215412) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215412) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215606) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215606) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215683) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215683) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215876) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215876) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215946) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2215946) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216047) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216047) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216159) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216174) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216159) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216174) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216457) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216457) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216526) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216526) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216634) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216634) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216842) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216842) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216941) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216971) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216941) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2216971) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217099) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217099) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217219) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217219) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217360) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217360) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217557) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217557) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217736) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2217736) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2218163) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2218163) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2218364) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2218364) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2218591) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2218591) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2218807) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2218807) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2219060) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2219060) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2219317) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2219317) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2219560) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2219560) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2219881) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2219881) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2221833) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2221833) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2222136) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2222136) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2222403) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2222403) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2222707) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2222707) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2222963) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2222963) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2223206) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2223206) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2224461) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2224461) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226215) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226215) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226404) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226404) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226612) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226628) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226612) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226628) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226879) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226899) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226879) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2226899) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227128) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227128) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227160) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227160) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227248) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227248) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227466) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227466) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227742) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2227742) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2228040) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2228040) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2228312) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2228327) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2228312) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2228327) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2228905) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2228905) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230325) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230331) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230325) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230331) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230454) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230454) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230725) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230746) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230725) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2230746) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2231675) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2231675) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2231934) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2231934) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2232025) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2232025) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233236) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233236) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233319) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233319) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233405) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233405) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233603) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233603) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233681) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233681) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233763) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2233763) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2234440) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2234440) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2234542) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2234542) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2234558) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2234558) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2235860) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2235860) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2236357) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2236357) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)

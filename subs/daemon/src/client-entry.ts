@@ -1,8 +1,0 @@
-export { connectDaemon } from './connect-daemon.js';
-export { selectEndpoint, readDaemonRecord } from './discovery.js';
-export { encodeMessage, decodeMessage } from './codec.js';
-export type * from './interfaces/daemon.js';
-export type * from './context-types.js';
-export type * from '../../../src/interfaces/service.js';
-// Affected-module answers name the selection types; types only, so no analysis runtime loads.
-export type * from '../../analysis/src/interfaces/affected.js';

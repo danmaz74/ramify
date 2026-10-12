@@ -1,0 +1,1105 @@
+{
+  "format": "ramify-audit.vitest-summary",
+  "version": 1,
+  "reason": "passed",
+  "root": "/tmp/ramify-audit-worktree-5uYsDv/source",
+  "counts": {
+    "files": {
+      "total": 216,
+      "passed": 216,
+      "failed": 0,
+      "skipped": 0
+    },
+    "tests": {
+      "total": 3007,
+      "passed": 3007,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "files": [
+    {
+      "project": "",
+      "path": "src/tests/affected-batch.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/batch-cli.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/cli-process.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/companion-cli.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/compiled-client.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/daemon-identity.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/daemon-suspended-shutdown.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/dependency-analyzer-process.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/dependency-diagram-daemon.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/dependency-view-server.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/entry-boundaries.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/explorer-process.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/failure-evidence.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/launcher-script.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/lifecycle-process.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/ownership-batch.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/ownership-process.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/package-consumer.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/process-tracing.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/production-boundary.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/project-boundary-cli.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/project-boundary-publication.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/project-view-reports.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/publication-queue.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/quick-environment.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/recovery-cli.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/resident-assembly.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "src/tests/resident-cli.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/integration-tests/src/explorer-router.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/integration-tests/src/project-view-projection.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/affected-query.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/affected-rule.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/affected-session.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/affected-worker.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/api-view-session.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/api-view.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/architect-render.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/architect-view-session.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/architect-view.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/auxiliary-source.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/change-affinity.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/companion-findings.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/dependency-analyzer.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/dependency-behavior-capability.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/dependency-diagram.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/evaluate-accesses.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/explorer-details.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/fact-ledger.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/failure-evidence.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/feature-titles.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/file-facts-query.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/inventory.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/membership-differential.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/modularity-batch.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/modularity-candidate.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/modularity.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/module-measurements-session.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/module-measurements.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/project-boundary-affected.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/project-boundary-analysis.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/project-boundary-session.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/project-boundary-views.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/provenance-vocabulary.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/recovery-fixtures.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/report-capacity.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/report-copy.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/report-publication.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/retained-session.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/root-marker.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/root-resolution.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/rss-sampling.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/session-audit.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/session-revision.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/session-worker.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/session.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/shared-globals.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/test-references.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/toolkit-boundaries.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/src/tests/validation.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/affected-service.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/api-view-documents.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/api-view-publisher-crash-recovery.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/api-view-publisher.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/architect-view-publisher.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/codec.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/connect.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/daemon-log.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/discovery.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/host.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/ipc.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/launcher.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/measure-service.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/measurements.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/outbound.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/project-boundary-watcher.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/project-boundary-wire.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/recovery-contracts.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/request-identities.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/service.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/session-counters.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/system-clock.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/validation.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/src/tests/watcher.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/affected-command.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/arguments.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/capabilities.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/changed-command.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/errors.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/explore-command.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/git-advice.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/materialize-command.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/measure-command.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/ownership-command.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/cli/src/tests/recovery-contracts.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/explorer/src/tests/HomePage.test.tsx",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/explorer/src/tests/ModuleTreePage.test.tsx",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/explorer/src/tests/ProjectExplorerFocus.test.tsx",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/explorer/src/tests/ProjectExplorerPage.test.tsx",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/explorer/src/tests/revision-freshness.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/emitted-diagrams.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/example1-stages.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/example2.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/example3.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/example4.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/focus-diagram.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/interaction.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/layout.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/model-access.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/render.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/tree-diagram.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/src/tests/validate.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/service-api/src/tests/dependency-model.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/service-api/src/tests/dependency-view.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/service-api/src/tests/project-binding.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/service-api/src/tests/project-view.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/service-api/src/tests/router-typing.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/service-api/src/tests/web-launcher.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/service-api/src/tests/web-process.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/descriptions/src/tests/auxiliary-exposure.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/descriptions/src/tests/descriptions.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/descriptions/src/tests/grammar.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/descriptions/src/tests/linking.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/descriptions/src/tests/locations.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/descriptions/src/tests/root-marker-grammar.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/availability.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/available-originals.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/companions.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/decisions.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/dependency-locations.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/frozen-data.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/identity-model.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/registry-profiles.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/tags.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/model/src/tests/tree.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/capture.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/generated-path.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/input-list.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/inventory-scaling.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/observer.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/path-ownership.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/project-boundary-observer.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/project.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/purpose.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/references.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/resolve-root.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/root-selection.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/source-extensions.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/project/src/tests/sweep.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/access-interpreter.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/accesses.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/catalog.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/companions.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/compiler-paths.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/coverage.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/cyclic-stars.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/dependency-behavior.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/descriptions.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/export-shapes.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/lifetime.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/project-boundary-resolution.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/resource-bindings.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/resource-suffixes.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/resources.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/retained-membership.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/retained-source-analysis.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/retention.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/symbol-details.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/analysis/subs/typescript/src/tests/test-titles.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/affected.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/api-view.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/context-manager.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/controlled-ports.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/covering.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/deadlines.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/explorer-details.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/history.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/hot-budget.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/recovery-scale.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/recovery.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/root-resolution.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/session-driver.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/tokens.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/daemon/subs/contexts/src/tests/watch-registration.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/subs/layout/src/tests/placement.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/subs/layout/src/tests/viewport.test.ts",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/subs/project-view/src/tests/ModuleGraph.test.tsx",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/subs/project-view/src/tests/ModuleTreeCanvas.test.tsx",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/subs/project-view/src/tests/ModuleTreeView.test.tsx",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/subs/project-view/src/tests/ProjectExplorerView.test.tsx",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/subs/project-view/src/tests/auto-fit.test.tsx",
+      "state": "passed"
+    },
+    {
+      "project": "",
+      "path": "subs/presentation/subs/project-view/src/tests/module-tree.test.ts",
+      "state": "passed"
+    }
+  ],
+  "failedTests": [],
+  "loadErrors": [],
+  "unhandledErrors": []
+}

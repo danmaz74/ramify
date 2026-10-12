@@ -1,5 +1,0 @@
-{
-  "protocol": "ramify.ipc/2",
-  "check": { "ok": true, "value": { "status": "unavailable", "requestId": "q", "reason": "analysis-failed", "message": "Compiler stopped" } },
-  "error": { "ok": false, "error": { "code": "internal-error", "message": "Compiler stopped", "details": {} } }
-}

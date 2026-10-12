@@ -1,0 +1,1340 @@
+{
+  "discoveries": [
+    {
+      "checkId": "toolkit-tests",
+      "command": "toolkit-vitest",
+      "files": [
+        {
+          "path": "src/tests/affected-batch.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/batch-cli.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/cli-process.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/companion-cli.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/compiled-client.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/daemon-identity.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/daemon-suspended-shutdown.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/dependency-analyzer-process.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/dependency-diagram-daemon.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/dependency-view-server.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/entry-boundaries.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/explorer-process.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/failure-evidence.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/launcher-script.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/lifecycle-process.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/ownership-batch.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/ownership-process.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/package-consumer.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/process-tracing.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/production-boundary.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/project-boundary-cli.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/project-boundary-publication.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/project-view-reports.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/publication-queue.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/quick-environment.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/recovery-cli.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/resident-assembly.test.ts",
+          "project": ""
+        },
+        {
+          "path": "src/tests/resident-cli.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/affected-query.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/affected-rule.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/affected-session.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/affected-worker.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/api-view-session.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/api-view.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/architect-render.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/architect-view-session.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/architect-view.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/auxiliary-source.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/change-affinity.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/companion-findings.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/dependency-analyzer.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/dependency-behavior-capability.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/dependency-diagram.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/evaluate-accesses.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/explorer-details.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/fact-ledger.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/failure-evidence.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/feature-titles.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/file-facts-query.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/inventory.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/membership-differential.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/modularity-batch.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/modularity-candidate.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/modularity.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/module-measurements-session.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/module-measurements.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/project-boundary-affected.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/project-boundary-analysis.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/project-boundary-session.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/project-boundary-views.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/provenance-vocabulary.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/recovery-fixtures.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/report-capacity.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/report-copy.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/report-publication.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/retained-session.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/root-marker.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/root-resolution.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/rss-sampling.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/session-audit.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/session-revision.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/session-worker.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/session.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/shared-globals.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/test-references.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/toolkit-boundaries.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/src/tests/validation.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/descriptions/src/tests/auxiliary-exposure.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/descriptions/src/tests/descriptions.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/descriptions/src/tests/grammar.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/descriptions/src/tests/linking.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/descriptions/src/tests/locations.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/descriptions/src/tests/root-marker-grammar.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/availability.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/available-originals.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/companions.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/decisions.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/dependency-locations.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/frozen-data.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/identity-model.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/registry-profiles.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/tags.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/model/src/tests/tree.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/capture.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/generated-path.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/input-list.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/inventory-scaling.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/observer.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/path-ownership.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/project-boundary-observer.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/project.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/purpose.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/references.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/resolve-root.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/root-selection.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/source-extensions.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/project/src/tests/sweep.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/access-interpreter.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/accesses.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/catalog.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/companions.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/compiler-paths.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/coverage.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/cyclic-stars.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/dependency-behavior.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/descriptions.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/export-shapes.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/lifetime.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/project-boundary-resolution.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/resource-bindings.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/resource-suffixes.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/resources.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/retained-membership.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/retained-source-analysis.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/retention.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/symbol-details.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/analysis/subs/typescript/src/tests/test-titles.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/affected-command.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/arguments.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/capabilities.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/changed-command.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/errors.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/explore-command.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/git-advice.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/materialize-command.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/measure-command.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/ownership-command.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/cli/src/tests/recovery-contracts.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/affected-service.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/api-view-documents.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/api-view-publisher-crash-recovery.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/api-view-publisher.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/architect-view-publisher.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/codec.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/connect.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/daemon-log.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/discovery.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/host.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/ipc.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/launcher.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/measure-service.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/measurements.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/outbound.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/project-boundary-watcher.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/project-boundary-wire.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/recovery-contracts.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/request-identities.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/service.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/session-counters.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/system-clock.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/validation.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/src/tests/watcher.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/affected.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/api-view.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/context-manager.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/controlled-ports.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/covering.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/deadlines.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/explorer-details.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/history.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/hot-budget.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/recovery-scale.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/recovery.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/root-resolution.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/session-driver.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/tokens.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/daemon/subs/contexts/src/tests/watch-registration.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/explorer/src/tests/HomePage.test.tsx",
+          "project": ""
+        },
+        {
+          "path": "subs/explorer/src/tests/ModuleTreePage.test.tsx",
+          "project": ""
+        },
+        {
+          "path": "subs/explorer/src/tests/ProjectExplorerFocus.test.tsx",
+          "project": ""
+        },
+        {
+          "path": "subs/explorer/src/tests/ProjectExplorerPage.test.tsx",
+          "project": ""
+        },
+        {
+          "path": "subs/explorer/src/tests/revision-freshness.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/integration-tests/src/explorer-router.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/integration-tests/src/project-view-projection.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/emitted-diagrams.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/example1-stages.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/example2.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/example3.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/example4.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/focus-diagram.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/interaction.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/layout.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/model-access.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/render.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/tree-diagram.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/src/tests/validate.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/subs/layout/src/tests/placement.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/subs/layout/src/tests/viewport.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/subs/project-view/src/tests/ModuleGraph.test.tsx",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/subs/project-view/src/tests/ModuleTreeCanvas.test.tsx",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/subs/project-view/src/tests/ModuleTreeView.test.tsx",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/subs/project-view/src/tests/ProjectExplorerView.test.tsx",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/subs/project-view/src/tests/auto-fit.test.tsx",
+          "project": ""
+        },
+        {
+          "path": "subs/presentation/subs/project-view/src/tests/module-tree.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/service-api/src/tests/dependency-model.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/service-api/src/tests/dependency-view.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/service-api/src/tests/project-binding.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/service-api/src/tests/project-view.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/service-api/src/tests/router-typing.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/service-api/src/tests/web-launcher.test.ts",
+          "project": ""
+        },
+        {
+          "path": "subs/service-api/src/tests/web-process.test.ts",
+          "project": ""
+        }
+      ],
+      "runner": {
+        "configFile": "vitest.config.ts",
+        "name": "vitest",
+        "projects": [
+          ""
+        ],
+        "root": ".",
+        "version": "4.1.11"
+      },
+      "status": "discovered"
+    }
+  ],
+  "expected": [
+    "src/tests/affected-batch.test.ts",
+    "src/tests/batch-cli.test.ts",
+    "src/tests/cli-process.test.ts",
+    "src/tests/companion-cli.test.ts",
+    "src/tests/compiled-client.test.ts",
+    "src/tests/daemon-identity.test.ts",
+    "src/tests/daemon-suspended-shutdown.test.ts",
+    "src/tests/dependency-analyzer-process.test.ts",
+    "src/tests/dependency-diagram-daemon.test.ts",
+    "src/tests/dependency-view-server.test.ts",
+    "src/tests/entry-boundaries.test.ts",
+    "src/tests/explorer-process.test.ts",
+    "src/tests/failure-evidence.test.ts",
+    "src/tests/launcher-script.test.ts",
+    "src/tests/lifecycle-process.test.ts",
+    "src/tests/ownership-batch.test.ts",
+    "src/tests/ownership-process.test.ts",
+    "src/tests/package-consumer.test.ts",
+    "src/tests/process-tracing.test.ts",
+    "src/tests/production-boundary.test.ts",
+    "src/tests/project-boundary-cli.test.ts",
+    "src/tests/project-boundary-publication.test.ts",
+    "src/tests/project-view-reports.test.ts",
+    "src/tests/publication-queue.test.ts",
+    "src/tests/quick-environment.test.ts",
+    "src/tests/recovery-cli.test.ts",
+    "src/tests/resident-assembly.test.ts",
+    "src/tests/resident-cli.test.ts",
+    "subs/analysis/src/tests/affected-query.test.ts",
+    "subs/analysis/src/tests/affected-rule.test.ts",
+    "subs/analysis/src/tests/affected-session.test.ts",
+    "subs/analysis/src/tests/affected-worker.test.ts",
+    "subs/analysis/src/tests/api-view-session.test.ts",
+    "subs/analysis/src/tests/api-view.test.ts",
+    "subs/analysis/src/tests/architect-render.test.ts",
+    "subs/analysis/src/tests/architect-view-session.test.ts",
+    "subs/analysis/src/tests/architect-view.test.ts",
+    "subs/analysis/src/tests/auxiliary-source.test.ts",
+    "subs/analysis/src/tests/change-affinity.test.ts",
+    "subs/analysis/src/tests/companion-findings.test.ts",
+    "subs/analysis/src/tests/dependency-analyzer.test.ts",
+    "subs/analysis/src/tests/dependency-behavior-capability.test.ts",
+    "subs/analysis/src/tests/dependency-diagram.test.ts",
+    "subs/analysis/src/tests/evaluate-accesses.test.ts",
+    "subs/analysis/src/tests/explorer-details.test.ts",
+    "subs/analysis/src/tests/fact-ledger.test.ts",
+    "subs/analysis/src/tests/failure-evidence.test.ts",
+    "subs/analysis/src/tests/feature-titles.test.ts",
+    "subs/analysis/src/tests/file-facts-query.test.ts",
+    "subs/analysis/src/tests/inventory.test.ts",
+    "subs/analysis/src/tests/membership-differential.test.ts",
+    "subs/analysis/src/tests/modularity-batch.test.ts",
+    "subs/analysis/src/tests/modularity-candidate.test.ts",
+    "subs/analysis/src/tests/modularity.test.ts",
+    "subs/analysis/src/tests/module-measurements-session.test.ts",
+    "subs/analysis/src/tests/module-measurements.test.ts",
+    "subs/analysis/src/tests/project-boundary-affected.test.ts",
+    "subs/analysis/src/tests/project-boundary-analysis.test.ts",
+    "subs/analysis/src/tests/project-boundary-session.test.ts",
+    "subs/analysis/src/tests/project-boundary-views.test.ts",
+    "subs/analysis/src/tests/provenance-vocabulary.test.ts",
+    "subs/analysis/src/tests/recovery-fixtures.test.ts",
+    "subs/analysis/src/tests/report-capacity.test.ts",
+    "subs/analysis/src/tests/report-copy.test.ts",
+    "subs/analysis/src/tests/report-publication.test.ts",
+    "subs/analysis/src/tests/retained-session.test.ts",
+    "subs/analysis/src/tests/root-marker.test.ts",
+    "subs/analysis/src/tests/root-resolution.test.ts",
+    "subs/analysis/src/tests/rss-sampling.test.ts",
+    "subs/analysis/src/tests/session-audit.test.ts",
+    "subs/analysis/src/tests/session-revision.test.ts",
+    "subs/analysis/src/tests/session-worker.test.ts",
+    "subs/analysis/src/tests/session.test.ts",
+    "subs/analysis/src/tests/shared-globals.test.ts",
+    "subs/analysis/src/tests/test-references.test.ts",
+    "subs/analysis/src/tests/toolkit-boundaries.test.ts",
+    "subs/analysis/src/tests/validation.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/auxiliary-exposure.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/descriptions.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/grammar.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/linking.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/locations.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/root-marker-grammar.test.ts",
+    "subs/analysis/subs/model/src/tests/availability.test.ts",
+    "subs/analysis/subs/model/src/tests/available-originals.test.ts",
+    "subs/analysis/subs/model/src/tests/companions.test.ts",
+    "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+    "subs/analysis/subs/model/src/tests/decisions.test.ts",
+    "subs/analysis/subs/model/src/tests/dependency-locations.test.ts",
+    "subs/analysis/subs/model/src/tests/frozen-data.test.ts",
+    "subs/analysis/subs/model/src/tests/identity-model.test.ts",
+    "subs/analysis/subs/model/src/tests/registry-profiles.test.ts",
+    "subs/analysis/subs/model/src/tests/tags.test.ts",
+    "subs/analysis/subs/model/src/tests/tree.test.ts",
+    "subs/analysis/subs/project/src/tests/capture.test.ts",
+    "subs/analysis/subs/project/src/tests/generated-path.test.ts",
+    "subs/analysis/subs/project/src/tests/input-list.test.ts",
+    "subs/analysis/subs/project/src/tests/inventory-scaling.test.ts",
+    "subs/analysis/subs/project/src/tests/observer.test.ts",
+    "subs/analysis/subs/project/src/tests/path-ownership.test.ts",
+    "subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts",
+    "subs/analysis/subs/project/src/tests/project-boundary-observer.test.ts",
+    "subs/analysis/subs/project/src/tests/project.test.ts",
+    "subs/analysis/subs/project/src/tests/purpose.test.ts",
+    "subs/analysis/subs/project/src/tests/references.test.ts",
+    "subs/analysis/subs/project/src/tests/resolve-root.test.ts",
+    "subs/analysis/subs/project/src/tests/root-selection.test.ts",
+    "subs/analysis/subs/project/src/tests/source-extensions.test.ts",
+    "subs/analysis/subs/project/src/tests/sweep.test.ts",
+    "subs/analysis/subs/typescript/src/tests/access-interpreter.test.ts",
+    "subs/analysis/subs/typescript/src/tests/accesses.test.ts",
+    "subs/analysis/subs/typescript/src/tests/catalog.test.ts",
+    "subs/analysis/subs/typescript/src/tests/companions.test.ts",
+    "subs/analysis/subs/typescript/src/tests/compiler-paths.test.ts",
+    "subs/analysis/subs/typescript/src/tests/coverage.test.ts",
+    "subs/analysis/subs/typescript/src/tests/cyclic-stars.test.ts",
+    "subs/analysis/subs/typescript/src/tests/dependency-behavior.test.ts",
+    "subs/analysis/subs/typescript/src/tests/descriptions.test.ts",
+    "subs/analysis/subs/typescript/src/tests/export-shapes.test.ts",
+    "subs/analysis/subs/typescript/src/tests/lifetime.test.ts",
+    "subs/analysis/subs/typescript/src/tests/project-boundary-resolution.test.ts",
+    "subs/analysis/subs/typescript/src/tests/resource-bindings.test.ts",
+    "subs/analysis/subs/typescript/src/tests/resource-suffixes.test.ts",
+    "subs/analysis/subs/typescript/src/tests/resources.test.ts",
+    "subs/analysis/subs/typescript/src/tests/retained-membership.test.ts",
+    "subs/analysis/subs/typescript/src/tests/retained-source-analysis.test.ts",
+    "subs/analysis/subs/typescript/src/tests/retention.test.ts",
+    "subs/analysis/subs/typescript/src/tests/symbol-details.test.ts",
+    "subs/analysis/subs/typescript/src/tests/test-titles.test.ts",
+    "subs/cli/src/tests/affected-command.test.ts",
+    "subs/cli/src/tests/arguments.test.ts",
+    "subs/cli/src/tests/capabilities.test.ts",
+    "subs/cli/src/tests/changed-command.test.ts",
+    "subs/cli/src/tests/errors.test.ts",
+    "subs/cli/src/tests/explore-command.test.ts",
+    "subs/cli/src/tests/git-advice.test.ts",
+    "subs/cli/src/tests/materialize-command.test.ts",
+    "subs/cli/src/tests/measure-command.test.ts",
+    "subs/cli/src/tests/ownership-command.test.ts",
+    "subs/cli/src/tests/recovery-contracts.test.ts",
+    "subs/daemon/src/tests/affected-service.test.ts",
+    "subs/daemon/src/tests/api-view-documents.test.ts",
+    "subs/daemon/src/tests/api-view-publisher-crash-recovery.test.ts",
+    "subs/daemon/src/tests/api-view-publisher.test.ts",
+    "subs/daemon/src/tests/architect-view-publisher.test.ts",
+    "subs/daemon/src/tests/codec.test.ts",
+    "subs/daemon/src/tests/connect.test.ts",
+    "subs/daemon/src/tests/daemon-log.test.ts",
+    "subs/daemon/src/tests/discovery.test.ts",
+    "subs/daemon/src/tests/host.test.ts",
+    "subs/daemon/src/tests/ipc.test.ts",
+    "subs/daemon/src/tests/launcher.test.ts",
+    "subs/daemon/src/tests/measure-service.test.ts",
+    "subs/daemon/src/tests/measurements.test.ts",
+    "subs/daemon/src/tests/outbound.test.ts",
+    "subs/daemon/src/tests/project-boundary-watcher.test.ts",
+    "subs/daemon/src/tests/project-boundary-wire.test.ts",
+    "subs/daemon/src/tests/recovery-contracts.test.ts",
+    "subs/daemon/src/tests/request-identities.test.ts",
+    "subs/daemon/src/tests/service.test.ts",
+    "subs/daemon/src/tests/session-counters.test.ts",
+    "subs/daemon/src/tests/system-clock.test.ts",
+    "subs/daemon/src/tests/validation.test.ts",
+    "subs/daemon/src/tests/watcher.test.ts",
+    "subs/daemon/subs/contexts/src/tests/affected.test.ts",
+    "subs/daemon/subs/contexts/src/tests/api-view.test.ts",
+    "subs/daemon/subs/contexts/src/tests/context-manager.test.ts",
+    "subs/daemon/subs/contexts/src/tests/controlled-ports.test.ts",
+    "subs/daemon/subs/contexts/src/tests/covering.test.ts",
+    "subs/daemon/subs/contexts/src/tests/deadlines.test.ts",
+    "subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts",
+    "subs/daemon/subs/contexts/src/tests/explorer-details.test.ts",
+    "subs/daemon/subs/contexts/src/tests/history.test.ts",
+    "subs/daemon/subs/contexts/src/tests/hot-budget.test.ts",
+    "subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts",
+    "subs/daemon/subs/contexts/src/tests/recovery-scale.test.ts",
+    "subs/daemon/subs/contexts/src/tests/recovery.test.ts",
+    "subs/daemon/subs/contexts/src/tests/root-resolution.test.ts",
+    "subs/daemon/subs/contexts/src/tests/session-driver.test.ts",
+    "subs/daemon/subs/contexts/src/tests/tokens.test.ts",
+    "subs/daemon/subs/contexts/src/tests/watch-registration.test.ts",
+    "subs/explorer/src/tests/HomePage.test.tsx",
+    "subs/explorer/src/tests/ModuleTreePage.test.tsx",
+    "subs/explorer/src/tests/ProjectExplorerFocus.test.tsx",
+    "subs/explorer/src/tests/ProjectExplorerPage.test.tsx",
+    "subs/explorer/src/tests/revision-freshness.test.ts",
+    "subs/integration-tests/src/explorer-router.test.ts",
+    "subs/integration-tests/src/project-view-projection.test.ts",
+    "subs/presentation/src/tests/emitted-diagrams.test.ts",
+    "subs/presentation/src/tests/example1-stages.test.ts",
+    "subs/presentation/src/tests/example2.test.ts",
+    "subs/presentation/src/tests/example3.test.ts",
+    "subs/presentation/src/tests/example4.test.ts",
+    "subs/presentation/src/tests/focus-diagram.test.ts",
+    "subs/presentation/src/tests/interaction.test.ts",
+    "subs/presentation/src/tests/layout.test.ts",
+    "subs/presentation/src/tests/model-access.test.ts",
+    "subs/presentation/src/tests/render.test.ts",
+    "subs/presentation/src/tests/tree-diagram.test.ts",
+    "subs/presentation/src/tests/validate.test.ts",
+    "subs/presentation/subs/layout/src/tests/placement.test.ts",
+    "subs/presentation/subs/layout/src/tests/viewport.test.ts",
+    "subs/presentation/subs/project-view/src/tests/ModuleGraph.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/ModuleTreeCanvas.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/ModuleTreeView.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/ProjectExplorerView.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/auto-fit.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/module-tree.test.ts",
+    "subs/service-api/src/tests/dependency-model.test.ts",
+    "subs/service-api/src/tests/dependency-view.test.ts",
+    "subs/service-api/src/tests/project-binding.test.ts",
+    "subs/service-api/src/tests/project-view.test.ts",
+    "subs/service-api/src/tests/router-typing.test.ts",
+    "subs/service-api/src/tests/web-launcher.test.ts",
+    "subs/service-api/src/tests/web-process.test.ts"
+  ],
+  "format": "ramify-audit.expected-files",
+  "missing": [],
+  "ownership": {
+    "exclusions": 26,
+    "modules": 15,
+    "status": "available"
+  },
+  "record": {
+    "contract": "runner-configured-files/1",
+    "expected": 216,
+    "missing": [],
+    "run": 216,
+    "runnerConfigFiles": [
+      "vitest.config.ts"
+    ],
+    "source": "ownership-answer",
+    "status": "complete"
+  },
+  "run": [
+    "src/tests/affected-batch.test.ts",
+    "src/tests/batch-cli.test.ts",
+    "src/tests/cli-process.test.ts",
+    "src/tests/companion-cli.test.ts",
+    "src/tests/compiled-client.test.ts",
+    "src/tests/daemon-identity.test.ts",
+    "src/tests/daemon-suspended-shutdown.test.ts",
+    "src/tests/dependency-analyzer-process.test.ts",
+    "src/tests/dependency-diagram-daemon.test.ts",
+    "src/tests/dependency-view-server.test.ts",
+    "src/tests/entry-boundaries.test.ts",
+    "src/tests/explorer-process.test.ts",
+    "src/tests/failure-evidence.test.ts",
+    "src/tests/launcher-script.test.ts",
+    "src/tests/lifecycle-process.test.ts",
+    "src/tests/ownership-batch.test.ts",
+    "src/tests/ownership-process.test.ts",
+    "src/tests/package-consumer.test.ts",
+    "src/tests/process-tracing.test.ts",
+    "src/tests/production-boundary.test.ts",
+    "src/tests/project-boundary-cli.test.ts",
+    "src/tests/project-boundary-publication.test.ts",
+    "src/tests/project-view-reports.test.ts",
+    "src/tests/publication-queue.test.ts",
+    "src/tests/quick-environment.test.ts",
+    "src/tests/recovery-cli.test.ts",
+    "src/tests/resident-assembly.test.ts",
+    "src/tests/resident-cli.test.ts",
+    "subs/analysis/src/tests/affected-query.test.ts",
+    "subs/analysis/src/tests/affected-rule.test.ts",
+    "subs/analysis/src/tests/affected-session.test.ts",
+    "subs/analysis/src/tests/affected-worker.test.ts",
+    "subs/analysis/src/tests/api-view-session.test.ts",
+    "subs/analysis/src/tests/api-view.test.ts",
+    "subs/analysis/src/tests/architect-render.test.ts",
+    "subs/analysis/src/tests/architect-view-session.test.ts",
+    "subs/analysis/src/tests/architect-view.test.ts",
+    "subs/analysis/src/tests/auxiliary-source.test.ts",
+    "subs/analysis/src/tests/change-affinity.test.ts",
+    "subs/analysis/src/tests/companion-findings.test.ts",
+    "subs/analysis/src/tests/dependency-analyzer.test.ts",
+    "subs/analysis/src/tests/dependency-behavior-capability.test.ts",
+    "subs/analysis/src/tests/dependency-diagram.test.ts",
+    "subs/analysis/src/tests/evaluate-accesses.test.ts",
+    "subs/analysis/src/tests/explorer-details.test.ts",
+    "subs/analysis/src/tests/fact-ledger.test.ts",
+    "subs/analysis/src/tests/failure-evidence.test.ts",
+    "subs/analysis/src/tests/feature-titles.test.ts",
+    "subs/analysis/src/tests/file-facts-query.test.ts",
+    "subs/analysis/src/tests/inventory.test.ts",
+    "subs/analysis/src/tests/membership-differential.test.ts",
+    "subs/analysis/src/tests/modularity-batch.test.ts",
+    "subs/analysis/src/tests/modularity-candidate.test.ts",
+    "subs/analysis/src/tests/modularity.test.ts",
+    "subs/analysis/src/tests/module-measurements-session.test.ts",
+    "subs/analysis/src/tests/module-measurements.test.ts",
+    "subs/analysis/src/tests/project-boundary-affected.test.ts",
+    "subs/analysis/src/tests/project-boundary-analysis.test.ts",
+    "subs/analysis/src/tests/project-boundary-session.test.ts",
+    "subs/analysis/src/tests/project-boundary-views.test.ts",
+    "subs/analysis/src/tests/provenance-vocabulary.test.ts",
+    "subs/analysis/src/tests/recovery-fixtures.test.ts",
+    "subs/analysis/src/tests/report-capacity.test.ts",
+    "subs/analysis/src/tests/report-copy.test.ts",
+    "subs/analysis/src/tests/report-publication.test.ts",
+    "subs/analysis/src/tests/retained-session.test.ts",
+    "subs/analysis/src/tests/root-marker.test.ts",
+    "subs/analysis/src/tests/root-resolution.test.ts",
+    "subs/analysis/src/tests/rss-sampling.test.ts",
+    "subs/analysis/src/tests/session-audit.test.ts",
+    "subs/analysis/src/tests/session-revision.test.ts",
+    "subs/analysis/src/tests/session-worker.test.ts",
+    "subs/analysis/src/tests/session.test.ts",
+    "subs/analysis/src/tests/shared-globals.test.ts",
+    "subs/analysis/src/tests/test-references.test.ts",
+    "subs/analysis/src/tests/toolkit-boundaries.test.ts",
+    "subs/analysis/src/tests/validation.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/auxiliary-exposure.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/descriptions.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/grammar.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/linking.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/locations.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/project-boundary-grammar.test.ts",
+    "subs/analysis/subs/descriptions/src/tests/root-marker-grammar.test.ts",
+    "subs/analysis/subs/model/src/tests/availability.test.ts",
+    "subs/analysis/subs/model/src/tests/available-originals.test.ts",
+    "subs/analysis/subs/model/src/tests/companions.test.ts",
+    "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+    "subs/analysis/subs/model/src/tests/decisions.test.ts",
+    "subs/analysis/subs/model/src/tests/dependency-locations.test.ts",
+    "subs/analysis/subs/model/src/tests/frozen-data.test.ts",
+    "subs/analysis/subs/model/src/tests/identity-model.test.ts",
+    "subs/analysis/subs/model/src/tests/registry-profiles.test.ts",
+    "subs/analysis/subs/model/src/tests/tags.test.ts",
+    "subs/analysis/subs/model/src/tests/tree.test.ts",
+    "subs/analysis/subs/project/src/tests/capture.test.ts",
+    "subs/analysis/subs/project/src/tests/generated-path.test.ts",
+    "subs/analysis/subs/project/src/tests/input-list.test.ts",
+    "subs/analysis/subs/project/src/tests/inventory-scaling.test.ts",
+    "subs/analysis/subs/project/src/tests/observer.test.ts",
+    "subs/analysis/subs/project/src/tests/path-ownership.test.ts",
+    "subs/analysis/subs/project/src/tests/project-boundary-inventory.test.ts",
+    "subs/analysis/subs/project/src/tests/project-boundary-observer.test.ts",
+    "subs/analysis/subs/project/src/tests/project.test.ts",
+    "subs/analysis/subs/project/src/tests/purpose.test.ts",
+    "subs/analysis/subs/project/src/tests/references.test.ts",
+    "subs/analysis/subs/project/src/tests/resolve-root.test.ts",
+    "subs/analysis/subs/project/src/tests/root-selection.test.ts",
+    "subs/analysis/subs/project/src/tests/source-extensions.test.ts",
+    "subs/analysis/subs/project/src/tests/sweep.test.ts",
+    "subs/analysis/subs/typescript/src/tests/access-interpreter.test.ts",
+    "subs/analysis/subs/typescript/src/tests/accesses.test.ts",
+    "subs/analysis/subs/typescript/src/tests/catalog.test.ts",
+    "subs/analysis/subs/typescript/src/tests/companions.test.ts",
+    "subs/analysis/subs/typescript/src/tests/compiler-paths.test.ts",
+    "subs/analysis/subs/typescript/src/tests/coverage.test.ts",
+    "subs/analysis/subs/typescript/src/tests/cyclic-stars.test.ts",
+    "subs/analysis/subs/typescript/src/tests/dependency-behavior.test.ts",
+    "subs/analysis/subs/typescript/src/tests/descriptions.test.ts",
+    "subs/analysis/subs/typescript/src/tests/export-shapes.test.ts",
+    "subs/analysis/subs/typescript/src/tests/lifetime.test.ts",
+    "subs/analysis/subs/typescript/src/tests/project-boundary-resolution.test.ts",
+    "subs/analysis/subs/typescript/src/tests/resource-bindings.test.ts",
+    "subs/analysis/subs/typescript/src/tests/resource-suffixes.test.ts",
+    "subs/analysis/subs/typescript/src/tests/resources.test.ts",
+    "subs/analysis/subs/typescript/src/tests/retained-membership.test.ts",
+    "subs/analysis/subs/typescript/src/tests/retained-source-analysis.test.ts",
+    "subs/analysis/subs/typescript/src/tests/retention.test.ts",
+    "subs/analysis/subs/typescript/src/tests/symbol-details.test.ts",
+    "subs/analysis/subs/typescript/src/tests/test-titles.test.ts",
+    "subs/cli/src/tests/affected-command.test.ts",
+    "subs/cli/src/tests/arguments.test.ts",
+    "subs/cli/src/tests/capabilities.test.ts",
+    "subs/cli/src/tests/changed-command.test.ts",
+    "subs/cli/src/tests/errors.test.ts",
+    "subs/cli/src/tests/explore-command.test.ts",
+    "subs/cli/src/tests/git-advice.test.ts",
+    "subs/cli/src/tests/materialize-command.test.ts",
+    "subs/cli/src/tests/measure-command.test.ts",
+    "subs/cli/src/tests/ownership-command.test.ts",
+    "subs/cli/src/tests/recovery-contracts.test.ts",
+    "subs/daemon/src/tests/affected-service.test.ts",
+    "subs/daemon/src/tests/api-view-documents.test.ts",
+    "subs/daemon/src/tests/api-view-publisher-crash-recovery.test.ts",
+    "subs/daemon/src/tests/api-view-publisher.test.ts",
+    "subs/daemon/src/tests/architect-view-publisher.test.ts",
+    "subs/daemon/src/tests/codec.test.ts",
+    "subs/daemon/src/tests/connect.test.ts",
+    "subs/daemon/src/tests/daemon-log.test.ts",
+    "subs/daemon/src/tests/discovery.test.ts",
+    "subs/daemon/src/tests/host.test.ts",
+    "subs/daemon/src/tests/ipc.test.ts",
+    "subs/daemon/src/tests/launcher.test.ts",
+    "subs/daemon/src/tests/measure-service.test.ts",
+    "subs/daemon/src/tests/measurements.test.ts",
+    "subs/daemon/src/tests/outbound.test.ts",
+    "subs/daemon/src/tests/project-boundary-watcher.test.ts",
+    "subs/daemon/src/tests/project-boundary-wire.test.ts",
+    "subs/daemon/src/tests/recovery-contracts.test.ts",
+    "subs/daemon/src/tests/request-identities.test.ts",
+    "subs/daemon/src/tests/service.test.ts",
+    "subs/daemon/src/tests/session-counters.test.ts",
+    "subs/daemon/src/tests/system-clock.test.ts",
+    "subs/daemon/src/tests/validation.test.ts",
+    "subs/daemon/src/tests/watcher.test.ts",
+    "subs/daemon/subs/contexts/src/tests/affected.test.ts",
+    "subs/daemon/subs/contexts/src/tests/api-view.test.ts",
+    "subs/daemon/subs/contexts/src/tests/context-manager.test.ts",
+    "subs/daemon/subs/contexts/src/tests/controlled-ports.test.ts",
+    "subs/daemon/subs/contexts/src/tests/covering.test.ts",
+    "subs/daemon/subs/contexts/src/tests/deadlines.test.ts",
+    "subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts",
+    "subs/daemon/subs/contexts/src/tests/explorer-details.test.ts",
+    "subs/daemon/subs/contexts/src/tests/history.test.ts",
+    "subs/daemon/subs/contexts/src/tests/hot-budget.test.ts",
+    "subs/daemon/subs/contexts/src/tests/project-boundary-check.test.ts",
+    "subs/daemon/subs/contexts/src/tests/recovery-scale.test.ts",
+    "subs/daemon/subs/contexts/src/tests/recovery.test.ts",
+    "subs/daemon/subs/contexts/src/tests/root-resolution.test.ts",
+    "subs/daemon/subs/contexts/src/tests/session-driver.test.ts",
+    "subs/daemon/subs/contexts/src/tests/tokens.test.ts",
+    "subs/daemon/subs/contexts/src/tests/watch-registration.test.ts",
+    "subs/explorer/src/tests/HomePage.test.tsx",
+    "subs/explorer/src/tests/ModuleTreePage.test.tsx",
+    "subs/explorer/src/tests/ProjectExplorerFocus.test.tsx",
+    "subs/explorer/src/tests/ProjectExplorerPage.test.tsx",
+    "subs/explorer/src/tests/revision-freshness.test.ts",
+    "subs/integration-tests/src/explorer-router.test.ts",
+    "subs/integration-tests/src/project-view-projection.test.ts",
+    "subs/presentation/src/tests/emitted-diagrams.test.ts",
+    "subs/presentation/src/tests/example1-stages.test.ts",
+    "subs/presentation/src/tests/example2.test.ts",
+    "subs/presentation/src/tests/example3.test.ts",
+    "subs/presentation/src/tests/example4.test.ts",
+    "subs/presentation/src/tests/focus-diagram.test.ts",
+    "subs/presentation/src/tests/interaction.test.ts",
+    "subs/presentation/src/tests/layout.test.ts",
+    "subs/presentation/src/tests/model-access.test.ts",
+    "subs/presentation/src/tests/render.test.ts",
+    "subs/presentation/src/tests/tree-diagram.test.ts",
+    "subs/presentation/src/tests/validate.test.ts",
+    "subs/presentation/subs/layout/src/tests/placement.test.ts",
+    "subs/presentation/subs/layout/src/tests/viewport.test.ts",
+    "subs/presentation/subs/project-view/src/tests/ModuleGraph.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/ModuleTreeCanvas.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/ModuleTreeView.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/ProjectExplorerView.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/auto-fit.test.tsx",
+    "subs/presentation/subs/project-view/src/tests/module-tree.test.ts",
+    "subs/service-api/src/tests/dependency-model.test.ts",
+    "subs/service-api/src/tests/dependency-view.test.ts",
+    "subs/service-api/src/tests/project-binding.test.ts",
+    "subs/service-api/src/tests/project-view.test.ts",
+    "subs/service-api/src/tests/router-typing.test.ts",
+    "subs/service-api/src/tests/web-launcher.test.ts",
+    "subs/service-api/src/tests/web-process.test.ts"
+  ],
+  "selectedModules": "all",
+  "version": 1
+}

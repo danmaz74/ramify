@@ -1,0 +1,2 @@
+### git-diff-check [PASS]
+Command completed with no output
