@@ -917,6 +917,11 @@ const recordedStylesheetAdditions: readonly string[] = ['./module-tree.css'];
 
 /** Any analysis source, the retained session and its worker, or the compiler package. */
 export const excludedFromEntries = /(?:dist\/subs\/analysis\/|node_modules\/(?:typescript|@typescript)\/)/;
+/** Pure syntax and request validation shared by ownership's lightweight CLI. */
+const pureOwnershipValidation = new Set([
+  'dist/subs/analysis/subs/project/src/ownership-validation.js',
+  'dist/subs/analysis/subs/project/src/path-syntax.js',
+]);
 
 /**
  * AV34's package-entry and closure cases: the eight reviewed entries validate
@@ -965,7 +970,7 @@ export async function entryClosures(): Promise<EntryEvidence> {
       manifest: { exports: Object.keys(currentExports), baselineExports: reviewedKeys, additions, stylesheetAdditions, equalToBaseline },
       client: { code: client.result.code, closure: [...closure].sort(), assertions: assertions.finish().length },
       cli: { code: cli.result.code, closure: [...cliFiles].sort(),
-        forbidden: cliFiles.filter(path => excludedFromEntries.test(path) || sessionModulePattern.test(path)),
+        forbidden: cliFiles.filter(path => (excludedFromEntries.test(path) && !pureOwnershipValidation.has(path)) || sessionModulePattern.test(path)),
         activity: cli.events.filter(event => ['spawn', 'other-launch', 'connect', 'listen', 'bind'].includes(event.event)).length },
     };
   });

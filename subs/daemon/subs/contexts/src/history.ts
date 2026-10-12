@@ -4,7 +4,7 @@ import type { RevisionId } from './interfaces/contexts.js';
 
 /** Reports and input observations are not copied into hot history. Immutable
  * fact versions live in the session until the matching entry is released. */
-export interface HistoryEntry<Revision> extends Pick<SessionRevision, 'sequence' | 'diagnostics' | 'warnings' | 'coverage' | 'delta'> {
+export interface HistoryEntry<Revision> extends Pick<SessionRevision, 'sequence' | 'diagnostics' | 'stages' | 'warnings' | 'coverage' | 'delta'> {
   readonly revision: Revision;
   readonly report: AnalysisReport | null;
   readonly bytes: number;
@@ -63,7 +63,7 @@ export function createHistory<Revision extends { readonly revision: RevisionId }
     append(revision, data, availableBytes = maxBytes) {
       if (disposed) throw new Error('History is disposed');
       if (entries.has(revision.revision)) throw new Error('Revision is already retained');
-      const compact = { revision, sequence: data.sequence, diagnostics: data.diagnostics, warnings: data.warnings,
+      const compact = { revision, sequence: data.sequence, diagnostics: data.diagnostics, stages: data.stages, warnings: data.warnings,
         coverage: data.coverage, delta: data.delta, report: null };
       const entry = Object.freeze({ ...compact, bytes: size(compact) });
       const bound = Math.min(maxBytes, availableBytes);

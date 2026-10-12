@@ -1,3 +1,4 @@
+import { projectPathProblem } from '../path-syntax.js';
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -218,14 +219,15 @@ describe('hard exclusions beneath owned trees', () => {
   });
 });
 
-describe('outside and invalid paths', () => {
+describe('FR06 outside and invalid paths', () => {
   const scope = scopeOf(buildProjectOwnership(topology, []).ownership);
   it.each(['..', '../outside.ts', '../..', '../../elsewhere/x.ts', '../sibling/subs/a/src/api.ts'])('%s is outside the project', path => {
+    expect(projectPathProblem(path)).toBeNull();
     expect(classifyProjectPath(scope, path)).toEqual(outside);
   });
   it.each(['', '/project/src/main.ts', '/', 'C:/x.ts', 'src\\main.ts', 'src//main.ts', 'src/', './src/main.ts', 'src/./main.ts',
     'src/../main.ts', 'src/..', '../a/../b', '../.', '.././x', 'subs/a/', '.git/'])('rejects %j', path => {
-    expect(classifyProjectPath(scope, path)).toMatchObject({ status: 'invalid-path' });
+    expect(classifyProjectPath(scope, path)).toEqual({ status: 'invalid-path', message: projectPathProblem(path) });
   });
   it('rejects an in-project path when the scope has no root module', () => {
     const empty = scopeOf(buildProjectOwnership([], []).ownership);

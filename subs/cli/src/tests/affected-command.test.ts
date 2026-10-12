@@ -204,18 +204,20 @@ describe('affected command through the real resident service (A7-10)', { timeout
       const json = await invoke(f.root, f.quick.connect, ['affected', 'example/core', 'example/nope', 'other', '--format', 'json']);
       expect([json.exit, json.stderr, json.writes, json.batchCalls]).toEqual([1, '', 1, 0]);
       const refusal = JSON.parse(json.stdout);
-      expect(refusal).toEqual({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 1,
+      expect(refusal).toMatchObject({ schemaVersion: 'ramify.cli/2', status: 'unavailable', exitCode: 1,
         diagnostics: [{ category: 'execution', code: 'unknown-module', message: expect.stringContaining('example/nope') }] });
+      expect(refusal.recovery.lastCompleted).not.toBeNull();
       expect(refusal.diagnostics[0].message).toContain('other');
       expect(refusal.diagnostics[0].message).not.toContain('example/core');
       const human = await invoke(f.root, f.quick.connect, ['affected', 'example/nope']);
       expect(human.exit).toBe(1);
-      expect(human.stdout).toMatch(new RegExp(`^Root: ${f.root}\\nNot selected \\(unknown-module\\): .*example/nope`));
+      expect(human.stdout).toMatch(/^Affected selection failed \(unknown-module\)\./);
+      expect(human.stdout).toContain('example/nope');
       await expectReleased(f.quick);
     } finally { await f.dispose(); }
   });
 
-  it('A7-10:unavailable-exit-2: cold and superseded outcomes exit 2 with the ramify.cli/1 diagnostic form', async () => {
+  it('A7-10:unavailable-exit-2: cold and superseded outcomes exit 2 with the ramify.cli/2 diagnostic form', async () => {
     const f = await fixture();
     try {
       const cold = replacing(f.quick, connection => async params => {
@@ -228,11 +230,11 @@ describe('affected command through the real resident service (A7-10)', { timeout
       for (const [reason, connect] of [['cold', cold], ['superseded', superseded]] as const) {
         const result = await invoke(f.root, connect, ['affected', 'example/core', '--format', 'json']);
         expect([result.exit, result.stderr, result.writes, result.batchCalls], reason).toEqual([2, '', 1, 0]);
-        expect(JSON.parse(result.stdout)).toEqual({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 2,
+        expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/2', status: 'unavailable', exitCode: 2,
           diagnostics: [{ category: 'execution', code: reason, message: expect.any(String) }] });
         const human = await invoke(f.root, connect, ['affected', 'example/core']);
         expect(human.exit).toBe(2);
-        expect(human.stdout).toContain(`Not selected (${reason}): `);
+        expect(human.stdout).toContain(`Affected selection failed (${reason}).`);
       }
       const failed = replacing(f.quick, () => async params => ({ ok: true, value: { status: 'unavailable', requestId: params.requestId,
         revision: null, reason: 'analysis-failed', message: 'Worker failed', unknownModules: [] } }));
@@ -280,7 +282,7 @@ describe('affected command through the real resident service (A7-10)', { timeout
       };
       const result = await invoke(f.root, hidden, ['affected', 'example/core', '--format', 'json']);
       expect([result.exit, result.stderr, result.batchCalls]).toEqual([2, '', 0]);
-      expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', diagnostics: [{ code: 'incompatible-service' }] });
+      expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/2', diagnostics: [{ code: 'incompatible-service' }] });
       const status = await f.quick.service.daemonStatus();
       expect(status.ok && status.value.contexts).toEqual([]);
     } finally { await f.dispose(); }

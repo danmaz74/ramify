@@ -257,13 +257,13 @@ describe('acquisition limits and cancellation', () => {
   });
   it('returns cancelled for an already aborted request', async () => {
     const controller = new AbortController(); controller.abort();
-    expect(await read({ signal: controller.signal })).toEqual({ status: 'cancelled' });
+    expect(await read({ signal: controller.signal })).toMatchObject({ status: 'cancelled', root: expect.toSatisfy((root: unknown) => root === null || typeof root === 'string') });
   });
   it('stops a running helper on cancellation while the parent stays responsive', async () => {
     await put(root, 'tsconfig.json', `/*${'x'.repeat(4 * 1024 ** 2)}*/\n{"include":["src"]}`);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 100);
-    try { expect(await read({ signal: controller.signal })).toEqual({ status: 'cancelled' }); }
+    try { expect(await read({ signal: controller.signal })).toMatchObject({ status: 'cancelled', root: expect.toSatisfy((root: unknown) => root === null || typeof root === 'string') }); }
     finally { clearTimeout(timer); }
   });
   it('enforces the total acquisition deadline', async () => {

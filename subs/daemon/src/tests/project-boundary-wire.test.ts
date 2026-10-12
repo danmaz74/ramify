@@ -14,7 +14,7 @@ import { alive, capabilities, descendants, engine, unwrap, until, version, withD
 /**
  * PB1-25 (schema and transport coherence): the changed check's named paths, classification
  * sequence and dispositions, the `classification-changed` status and the status's watcher
- * registrations cross the worker and real IPC under `ramify.ipc/2`; stale or foreign peers
+ * registrations cross the worker and real IPC under `ramify.ipc/3`; stale or foreign peers
  * are rejected coherently; the strict codecs reject malformed new variants. Expected values
  * come from the contracts ("Reports, affected queries and freshness", "Transport, observation
  * and projections", "Schema versions") and the fixture, never from the implementation.
@@ -119,7 +119,7 @@ describe('PB1-25: the client decodes check replies strictly over a real socket',
       sockets.add(socket); socket.on('error', () => {}); socket.once('close', () => sockets.delete(socket));
       const decoder = createFrameDecoder(1024 ** 2, value => {
         const message = validateWireMessage(value);
-        if (message.type === 'hello') socket.write(encodeMessage({ type: 'welcome', welcome: { protocol: 'ramify.ipc/2', instance,
+        if (message.type === 'hello') socket.write(encodeMessage({ type: 'welcome', welcome: { protocol: 'ramify.ipc/3', instance,
           capabilities: ['contexts', 'check'], limits: { maxRequestBytes: 1024 ** 2, maxResponseBytes: 1024 ** 2, leaseMs: 1000, pingMs: 60_000 } } }));
         else if (message.type === 'request') {
           const params = message.params as { requestId: string };
@@ -243,15 +243,15 @@ describe('PB1-25: the installed daemon carries the changed check over real IPC',
 
         // Stale and foreign peers are rejected with both identities; the daemon keeps serving.
         const current = { client: { name: 'stale', version }, buildKey: endpoint.buildKey, engine };
-        for (const handshake of [{ ...current, protocol: 'ramify.ipc/1' }, { ...current, protocol: 'ramify.ipc/2', buildKey: 'ffffffffffffffff' },
-          { ...current, protocol: 'ramify.ipc/2', engine: 'ramify.ts@0.0.0+typescript@7.0.2' }]) {
+        for (const handshake of [{ ...current, protocol: 'ramify.ipc/1' }, { ...current, protocol: 'ramify.ipc/3', buildKey: 'ffffffffffffffff' },
+          { ...current, protocol: 'ramify.ipc/3', engine: 'ramify.ts@0.0.0+typescript@7.0.2' }]) {
           const answer = await hello(endpoint.socket, handshake);
           expect(answer.closed).toBe(true);
           expect(answer.messages).toHaveLength(1);
           expect(answer.messages[0]).toMatchObject({ type: 'reject', error: { code: 'incompatible' }, daemon: { buildKey: endpoint.buildKey, engine } });
         }
         const daemonStatus = unwrap(await connection.daemonStatus());
-        expect(daemonStatus.protocol).toBe('ramify.ipc/2');
+        expect(daemonStatus.protocol).toBe('ramify.ipc/3');
 
         // The status and its watcher registrations crossed the strict codec in events and replies.
         const context = daemonStatus.contexts.find(item => item.token.context === contextToken.context)!;
@@ -274,7 +274,7 @@ describe('PB1-25: the installed daemon carries the changed check over real IPC',
           { path: 'vendor/src/x.ts', status: 'owned', module: 'app', basis: 'containment', exclusion: ignored, kind: 'ignored', selects: [] },
         ]);
         children = await descendants(pid);
-        expect(JSON.parse(await readFile(endpoint.record, 'utf8'))).toMatchObject({ protocol: 'ramify.ipc/2', state: 'running' });
+        expect(JSON.parse(await readFile(endpoint.record, 'utf8'))).toMatchObject({ protocol: 'ramify.ipc/3', state: 'running' });
       });
       expect(pid).toBeGreaterThan(0);
       expect([pid, ...children].filter(alive)).toEqual([]);

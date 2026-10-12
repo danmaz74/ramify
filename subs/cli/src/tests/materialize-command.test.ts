@@ -105,7 +105,7 @@ describe('materialize command', { timeout: 30_000 }, () => {
         stdout: value => { stdout.push(value); }, stderr: value => { stderr.push(value); }, batch: async () => { throw new Error('Unexpected batch'); } };
       expect(await runCli(['materialize', '--view', 'api', '--all'], environment)).toBe(2);
       expect([stdout, recorded.requests]).toEqual([[], []]);
-      expect(stderr.join('')).toMatch(/^Error \[incompatible-service\]: .*materialize-views/);
+      expect(stderr.join('')).toMatch(/^Materialize failed \(incompatible-service\)\.[\s\S]*materialize-views/);
       const status = await f.quick.service.daemonStatus();
       expect(status.ok && status.value.contexts).toEqual([]);
     } finally { await f.dispose(); }
@@ -127,7 +127,7 @@ describe('materialize command', { timeout: 30_000 }, () => {
         stdout: value => { stdout.push(value); }, stderr: value => { stderr.push(value); }, batch: async () => { throw new Error('Unexpected batch'); } };
       const exit = await runCli(['materialize', '--all', '--root', root], environment);
       expect([exit, stderr]).toEqual([1, []]);
-      expect(stdout.join('')).toMatch(/^Root: .*\nNot materialized \(project-invalid\): .+\nNo complete refresh was claimed\.\n$/);
+      expect(stdout.join('')).toMatch(/^Materialize failed \(project-invalid\)\.[\s\S]*No complete refresh was claimed\.\n$/);
     } finally { await quick.dispose(); await rm(root, { recursive: true, force: true }); }
   });
 

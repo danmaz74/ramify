@@ -26,8 +26,9 @@ describe('compiled CLI process lifetime', () => {
     expect([result.code, result.signal, result.stderr]).toEqual([0, null, '']);
     const loads = result.events.flatMap(event => [event.url ?? '', ...event.commonjs ?? []]);
     expect(loads.some(path => /dist\/subs\/cli\/src\/run-cli\.js$/.test(path))).toBe(true);
-    expect(loads.filter(path => /\/(?:typescript|react|react-dom|express|@modelcontextprotocol|d3-[^/]+)\//.test(path)
-      || /\/dist\/(?:subs\/analysis\/|src\/batch\.js)/.test(path))).toEqual([]);
+    expect(loads.filter(path => !/\/dist\/subs\/analysis\/subs\/project\/src\/(?:path-syntax|ownership-validation)\.js$/.test(path)
+      && (/\/(?:typescript|react|react-dom|express|@modelcontextprotocol|d3-[^/]+)\//.test(path)
+      || /\/dist\/(?:subs\/analysis\/|src\/batch\.js)/.test(path)))).toEqual([]);
     expect(result.events.filter(event => ['spawn', 'other-launch', 'listen', 'bind'].includes(event.event))).toEqual([]);
     expect(result.events.find(event => event.event === 'exit' && event.pid === result.pid)).toMatchObject({ handles: 0, signalListeners: 0 });
   });

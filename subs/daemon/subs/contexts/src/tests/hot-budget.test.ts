@@ -9,13 +9,16 @@ describe('hot and warm session budgets', () => {
     try {
       const first = await e.open('/first'); await flush(); e.clock.advance(1);
       const second = await e.open('/second'); await flush(); e.clock.advance(1);
+      const secondRetained = e.status(second.token).retainedBytes;
       await e.check(first.token, { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: hash('1') }] });
       e.clock.advance(1); const third = await e.open('/third'); await flush();
       expect(e.status(first.token).level).toBe('hot'); expect(e.status(second.token).level).toBe('warm');
       expect(e.status(third.token).level).toBe('hot');
       expect(e.script.sessions.map(session => [session.project.root, session.releaseCompilerCalls])).toEqual([['/first', 0], ['/second', 1], ['/third', 0]]);
       expect(e.script.sessions.every(session => session.disposeCalls === 0)).toBe(true);
-      expect(e.status(second.token)).toMatchObject({ retainedBytes: 100, session: { level: 'warm', compiler: { pid: null } } });
+      expect(e.status(second.token)).toMatchObject({ retainedBytes: secondRetained,
+        session: { level: 'warm', compiler: { pid: null } } });
+      expect(e.status(second.token).retainedBytes).toBeGreaterThan(100);
     } finally { await e.dispose(); }
   });
 
@@ -36,11 +39,12 @@ describe('hot and warm session budgets', () => {
     const e = sessionEnvironment({ warmIdleMs: 100, coldRetainMs: 200, sweepIntervalMs: 1000 });
     try {
       const opened = await e.open(); await flush(); e.clock.advance(100); await flush();
-      expect(e.status(opened.token)).toMatchObject({ level: 'warm', retainedBytes: 100 });
+      const recoveryBytes = e.status(opened.token).retainedBytes - 100;
+      expect(e.status(opened.token)).toMatchObject({ level: 'warm', retainedBytes: 100 + recoveryBytes });
       expect(e.script.sessions[0]?.releaseCompilerCalls).toBe(1); expect(e.script.sessions[0]?.disposeCalls).toBe(0);
       expect(e.script.reportCalls).toHaveLength(0);
       e.clock.advance(200); await flush();
-      expect(e.status(opened.token)).toMatchObject({ level: 'cold', session: null, retainedBytes: 0, history: { retained: 1 } });
+      expect(e.status(opened.token)).toMatchObject({ level: 'cold', session: null, retainedBytes: recoveryBytes, history: { retained: 1 } });
       expect(e.script.reportCalls).toEqual([{ root: '/fixture', sequence: 1 }]);
       expect(e.script.sessions[0]?.disposeCalls).toBe(1); expect(e.watcher.active).toBe(0);
       const result = await e.check(opened.token, { mode: 'published', wait: true }, { scope: 'report' });

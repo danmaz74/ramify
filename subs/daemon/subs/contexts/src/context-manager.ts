@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AnalysisReport, RunControl } from '../../../../analysis/src/interfaces/analysis.js';
+import type { AnalysisFailureEvidence, AnalysisReport, RunControl } from '../../../../analysis/src/interfaces/analysis.js';
 import type { ApiViewProjection, ApiViewQueryOutcome, RetainedSession, SessionChange, SessionRevision } from '../../../../analysis/src/interfaces/session.js';
 import type { ArchitectViewProjection, ArchitectViewQueryOutcome } from '../../../../analysis/src/interfaces/architect-view.js';
 import type { SessionMeasurements, SessionMeasurementsOutcome } from '../../../../analysis/src/interfaces/measurements.js';
@@ -9,6 +9,7 @@ import type { AffectedRequest, ApiViewQueryLimits, ApiViewRequest, CaptureTiming
 import type { ExplorerDetailDelivery, LiveContext } from './context.js';
 import { classification, classifyPaths, decide, follows, inputIndex, recordRemovals, unclassified } from './dispositions.js';
 import { createHistory } from './history.js';
+import { RecoveryHistory } from './recovery.js';
 import type { HistoryEntry } from './history.js';
 import { createContextId, createFingerprints, createRevisionId } from './tokens.js';
 import { complete, completeAffected, completeApiView, completeEntry, invocationKey, projectKey, spanBatches, unavailableAffected } from './queue.js';
@@ -25,6 +26,10 @@ const defaultApiViewLimits: ApiViewQueryLimits = {
 
 const implemented = new Set(['registry', 'layout', 'metadata', 'descriptions', 'source-catalog', 'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage']);
 function unavailable(reason: Unavailable['reason'], message: string = reason): Unavailable { return { status: 'unavailable', reason, message }; }
+function failureEvidence(value: AnalysisFailureEvidence): AnalysisFailureEvidence {
+  return { ...(value.diagnostics === undefined ? {} : { diagnostics: value.diagnostics }),
+    ...(value.stages === undefined ? {} : { stages: value.stages }) };
+}
 /** A queued check or affected entry using `published` freshness, which waits only for
  * the next publication; an apiView request is always synchronized. */
 function publishedWait(entry: PendingEntry): entry is PendingCheck | PendingAffected { return entry.kind !== 'apiView' && entry.request.freshness.mode === 'published'; }
@@ -70,6 +75,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   const { driver, watcher, clock, budgets } = options;
   const apiViewLimits = options.apiViewLimits ?? defaultApiViewLimits;
   const contexts = new Map<string, LiveContext>();
+  /** Bounded evidence that a later generation of the same selection lost its context. */
+  const evictedSelections = new Map<string, true>();
   const lifetimes = new Set<Promise<unknown>>();
   const resolving = new Set<AbortController>();
   const cleanupFailures: unknown[] = [];
@@ -98,7 +105,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       published: context.history.published?.revision ?? null, lastValid: context.lastValid,
       pending: { requests, changedPaths: context.paths.size, analysisRunning: !!context.running },
       history: { retained: context.history.count, bytes: context.history.bytes, oldest: context.history.oldest?.revision.revision ?? null },
-      retainedBytes: (session?.factBytes ?? 0) + (context.diagram?.bytes ?? 0), leases: { subscriptions: context.subscriptions.size, requests },
+      retainedBytes: (session?.factBytes ?? 0) + (context.diagram?.bytes ?? 0) + context.recovery.bytes,
+      leases: { subscriptions: context.subscriptions.size, requests },
       watcher: context.watcherState, registrations: context.watcher?.registrations() ?? null,
       openedAt: context.openedAt, lastActivityAt: context.lastActivityAt,
       demoting: !!context.demoting, unresponsiveSince: context.unresponsiveSince });
@@ -107,6 +115,16 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const subscription of [...context.subscriptions.values()]) { try { subscription.listener(event); } catch { /* Consumer isolation. */ } }
   }
   function changed(context: LiveContext): void { emit(context, { type: 'status-changed', token: context.token, current: snapshot(context), coalesced: 0 }); }
+  /** A queued result is completed synchronously before its promise continuation can
+   * observe a later publication. The detached snapshot belongs to this outcome. */
+  function withRecovery<T extends { readonly status: string }>(context: LiveContext, outcome: T): T {
+    if (outcome.status === 'cancelled' || outcome.status === 'answered' || outcome.status === 'projected') return outcome;
+    if (outcome.status === 'reported') {
+      const reported = outcome as unknown as Extract<CheckOutcome, { readonly status: 'reported' }>;
+      if ((reported.published ? reported.revision.outcome : reported.report.outcome).execution === 'completed') return outcome;
+    }
+    return { ...outcome, recovery: context.recovery.snapshot() };
+  }
   function closeWatcher(context: LiveContext): void {
     const handle = context.watcher; context.watcher = null; context.watcherState = 'disposed'; context.registered = null;
     if (handle) void cleanup(handle.close());
@@ -123,6 +141,10 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     return session ? cleanup(session.dispose()) : Promise.resolve();
   }
   function evict(context: LiveContext, reason: 'idle' | 'pressure' | 'disposed'): void {
+    if (reason !== 'disposed') {
+      evictedSelections.delete(context.token.context); evictedSelections.set(context.token.context, true);
+      while (evictedSelections.size > Math.max(16, budgets.maxContexts * 2)) evictedSelections.delete(evictedSelections.keys().next().value!);
+    }
     context.state = 'evicted'; context.running?.controller.abort();
     for (const entry of pending(context)) completeEntry(entry, { ...unavailable(reason === 'disposed' ? 'disposed' : 'expired-generation'), requestId: entry.request.requestId });
     for (const entry of context.explorerDeliveries) completeExplorerDelivery(entry, {
@@ -132,7 +154,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     endDiagramJob(context, caller => ({ ...unavailable(reason === 'disposed' ? 'disposed' : 'expired-generation'), requestId: caller.requestId }));
     context.queue.length = 0; stopTimers(context); closeWatcher(context);
     // Dispose owns all remaining fact versions; do not send per-version releases after it.
-    void releaseSession(context); context.history.dispose(); context.paths.clear(); context.requested.clear(); context.watched = null; context.invocations.clear(); context.removed.clear(); contexts.delete(context.token.context);
+    void releaseSession(context); context.history.dispose(); context.recovery.dispose(); context.paths.clear(); context.requested.clear(); context.watched = null; context.invocations.clear(); context.removed.clear(); contexts.delete(context.token.context);
     emit(context, { type: 'context-evicted', token: context.token, reason }); context.subscriptions.clear();
   }
   function answerDiagram(caller: DiagramCaller, outcome: DiagramAnswer): void {
@@ -260,6 +282,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (context.state === 'evicted' || disposed) return;
       if (gap && context.watcher === handle && context.state !== 'cold') {
         if (registered > 0) {
+          if (!context.recovery.watcherLost()) { evict(context, 'pressure'); return; }
           context.conservative = true; context.sweepRequired = true; context.background = 'conservative';
           context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : 'conservative';
           kick();
@@ -281,7 +304,10 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
           // A revision published while the walk ran may have changed the exclusions.
           reregister(context); }
       }).catch(() => {
-        if (context.state !== 'evicted' && !disposed) { context.watcherState = 'unavailable'; context.synchronization = 'watcher-unavailable'; context.sweepRequired = true; }
+        if (context.state !== 'evicted' && !disposed) {
+          if (!context.recovery.watcherLost()) { evict(context, 'pressure'); return; }
+          context.watcherState = 'unavailable'; context.synchronization = 'watcher-unavailable'; context.sweepRequired = true;
+        }
       }).finally(() => { context.attaching = false; }));
   }
   /** A demotion, a disposal or a finished attempt leaves no audit armed. */
@@ -339,12 +365,18 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     const now = clock.now();
     context.watched = spanBatches(context.watched, batch ? { receivedAt: batch.receivedAt, flushedAt: batch.flushedAt } : { receivedAt: now, flushedAt: now });
     for (const event of events) {
-      if (event.kind === 'overflow' || event.kind === 'error') { context.conservative = true; context.sweepRequired = true; }
-      else { context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind); context.requested.delete(event.path); }
+      if (event.kind === 'overflow' || event.kind === 'error') {
+        context.conservative = true; context.sweepRequired = true;
+        if (!context.recovery.watcherLost()) { evict(context, 'pressure'); return; }
+      } else {
+        context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind);
+        context.requested.delete(event.path);
+        if (!context.recovery.observe(event.path)) { evict(context, 'pressure'); return; }
+      }
       if (configurationPath.test(event.path) && !context.sweepRequired && contained(context, event.path)) context.sweepRequired = 'configuration';
       if (event.kind === 'error') { closeWatcher(context); context.watcherState = 'unavailable'; }
     }
-    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
+    if (context.paths.size > budgets.maxQueuedPaths) { if (!context.recovery.pathOverflow()) { evict(context, 'pressure'); return; } context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
     // An active request keeps its capture; newer writes queue behind it. Idle
     // background work may be cancelled, but every consumed path is restored.
     // A cancelled periodic sweep stays maintenance; its start keeps the cadence.
@@ -353,16 +385,19 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       for (const change of context.running.changes) { context.paths.set(change.path, change.kind); context.requested.delete(change.path); }
       context.watched = spanBatches(context.watched, context.running.watch);
     }
-    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
+    if (context.paths.size > budgets.maxQueuedPaths) { if (!context.recovery.pathOverflow()) { evict(context, 'pressure'); return; } context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
     context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : context.conservative ? 'conservative' : 'reconciling';
     context.background = context.conservative ? 'conservative' : 'watch';
     context.debounce?.(); context.debounce = clock.schedule(budgets.debounceMs, () => { context.debounce = null; kick(); }); changed(context);
   }
-  function totalBytes(): number { return [...contexts.values()].reduce((sum, item) => sum + item.history.bytes + (item.session?.status().factBytes ?? 0) + (item.diagram?.bytes ?? 0), 0); }
+  function retainedBytes(context: LiveContext): number {
+    return context.history.bytes + (context.session?.status().factBytes ?? 0) + (context.diagram?.bytes ?? 0) + context.recovery.bytes;
+  }
+  function totalBytes(): number { return [...contexts.values()].reduce((sum, item) => sum + retainedBytes(item), 0); }
   async function trim(context: LiveContext, candidateBytes: number): Promise<boolean> {
     // The session already bounds shared historical facts and candidate overlap.
     // Here both process locations count toward the context/global admission.
-    while ((context.session?.status().factBytes ?? 0) > budgets.maxRetainedBytesPerContext
+    while (retainedBytes(context) + candidateBytes > budgets.maxRetainedBytesPerContext
       || totalBytes() + candidateBytes > budgets.maxRetainedBytesGlobal) {
       const historical = [...contexts.values()].filter(item => item.history.count > 1)
         .sort((a, b) => a.history.oldest!.revision.publishedAt - b.history.oldest!.revision.publishedAt);
@@ -459,7 +494,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (entry.request.scope === 'report' && !report) { complete(entry, { ...unavailable('evicted-revision'), requestId: entry.request.requestId }); return; }
       complete(entry, { status: 'reported', requestId: entry.request.requestId, published: true, revision: publication.revision,
         delta, report: freeze(report && stated(context, entry, report)), paths: freeze(paths),
-        freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused), timings: freeze({ ...timings }) });
+        freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused), timings: freeze({ ...timings }),
+        ...(publication.revision.outcome.execution === 'completed' ? {} : { stages: publication.stages }) });
     } catch (error) { complete(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId }); }
     finally { unpinBase(); unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
@@ -493,10 +529,11 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         completeApiView(entry, { status: 'cancelled', requestId });
       } else if (outcome.reason === 'invalid-location') {
         // The selection's own refusal, kept as such: a path no analyzed module location contains.
-        completeApiView(entry, { status: 'unavailable', reason: 'invalid-location', message: outcome.message, requestId });
+        completeApiView(entry, { status: 'unavailable', reason: 'invalid-location', message: outcome.message, requestId,
+          ...failureEvidence(outcome) });
       } else {
         completeApiView(entry, { ...unavailable(outcome.reason === 'resource-limit' ? 'resource-unavailable' : 'analysis-failed',
-          `${outcome.reason}: ${outcome.message}`), requestId });
+          `${outcome.reason}: ${outcome.message}`), requestId, ...failureEvidence(outcome) });
       }
     };
     try {
@@ -579,7 +616,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       } else if (outcome.reason === 'invalid-revision' && context.session === session && session.current !== null
         && session.current.sequence !== publication.sequence) superseded();
       else completeAffected(entry, { status: 'unavailable', requestId, revision, reason: outcome.reason, message: outcome.message,
-        unknownModules: outcome.unknownModules });
+        unknownModules: outcome.unknownModules, ...failureEvidence(outcome) });
     } catch (error) { completeAffected(entry, unavailableAffected({ ...unavailable('analysis-failed', String(error)), requestId })); }
     finally { unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
@@ -666,7 +703,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (found.kind === 'unobserved') return unavailableAffected({ ...unavailable('unobserved-input', `Input was not observed: ${found.path}`), requestId: entry.request.requestId });
     return { status: 'superseded', requestId: entry.request.requestId, revision: context.history.published?.revision ?? null };
   }
-  async function publish(context: LiveContext, data: SessionRevision, cause: RevisionCause, capture: CaptureTimings): Promise<boolean> {
+  async function publish(context: LiveContext, data: SessionRevision, cause: RevisionCause, capture: CaptureTimings,
+    captureSequence: number, signal: AbortSignal): Promise<boolean> {
     if (!['completed', 'invalid'].includes(data.outcome.execution)) throw new Error('Unpublishable session revision');
     if (context.publishedSession === context.session && context.history.published?.sequence === data.sequence) return trim(context, 0);
     const revision = freeze({ token: context.token, revision: createRevisionId(context.token.generation, context.sequence + 1),
@@ -675,15 +713,25 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       changed: data.changed, checked: data.checked, delta: { added: data.delta.added.length, removed: data.delta.removed.length, positionOnly: data.delta.positionOnly.length },
       timings: data.timings, capture, outcome: data.outcome, summary: data.summary });
     const candidateBytes = Buffer.byteLength(JSON.stringify({ revision, sequence: data.sequence, diagnostics: data.diagnostics,
-      warnings: data.warnings, coverage: data.coverage, delta: data.delta, report: null }));
+      stages: data.stages, warnings: data.warnings, coverage: data.coverage, delta: data.delta, report: null }));
     if (candidateBytes > budgets.maxHistoryBytes || !budgets.maxHistoryRevisions) return false;
     // Make room in both locations before admitting a header; pinned reads keep
     // their exact version and cause explicit pressure rather than substitution.
     while ((context.history.count >= budgets.maxHistoryRevisions || context.history.bytes + candidateBytes > budgets.maxHistoryBytes)
       && context.history.discardOldest()) { await Promise.all([...releaseWork]); }
-    if (!await trim(context, candidateBytes)) return false;
-    if (!context.history.append(revision, data)) return false;
+    const recoveryGrowth = data.outcome.execution === 'completed'
+      ? Math.max(0, context.recovery.completedBytes(revision, captureSequence) - context.recovery.bytes) : 0;
+    if (!await trim(context, candidateBytes + recoveryGrowth)) return false;
     await Promise.all([...releaseWork]);
+    // Admission and publication are synchronous from here. A watcher can add an
+    // observation during the awaits above, so recheck the live boundary first.
+    if (signal.aborted || disposed || context.state === 'evicted') return false;
+    const currentGrowth = data.outcome.execution === 'completed'
+      ? Math.max(0, context.recovery.completedBytes(revision, captureSequence) - context.recovery.bytes) : 0;
+    if (retainedBytes(context) + candidateBytes + currentGrowth > budgets.maxRetainedBytesPerContext
+      || totalBytes() + candidateBytes + currentGrowth > budgets.maxRetainedBytesGlobal) return false;
+    if (!context.history.append(revision, data)) return false;
+    if (data.outcome.execution === 'completed') context.recovery.complete(revision, captureSequence);
     context.sequence++; context.publishedSession = context.session; context.publishedProject = context.sessionProject;
     if (context.publishedData && context.publishedData !== data) recordRemovals(context.removed, context.publishedData, data, revision.sequence, budgets.maxQueuedPaths);
     context.publishedData = data;
@@ -717,6 +765,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const entry of entries) context.queue.splice(context.queue.indexOf(entry), 1);
     const cause: RevisionCause = !context.session ? 'open' : context.conservative ? 'conservative' : entries.length ? 'request' : context.background ?? 'sweep';
     const changes: SessionChange[] = [...context.paths].map(([path, kind]) => ({ path, kind }));
+    const captureSequence = context.recovery.capturedSequence;
     // A periodic sweep runs alone. A due one waits behind requests and known
     // changes rather than lengthening their capture.
     const sweepKind = context.sweepRequired || context.registering || entries.some(entry => entry.needsSweep) ? 'required' : cause === 'sweep' ? 'periodic' : null;
@@ -780,11 +829,13 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         const stragglers = context.queue.filter(publishedWait);
         for (const entry of [...entries, ...stragglers]) {
           if (entry.kind !== 'check') {
-            completeEntry(entry, { ...unavailable('analysis-failed', run.report.diagnostics[0]?.message || 'The analysis could not be reported'), requestId: entry.request.requestId });
+            completeEntry(entry, { ...unavailable('analysis-failed', run.report.diagnostics[0]?.message || 'The analysis could not be reported'),
+              diagnostics: run.report.diagnostics, stages: run.report.stages, requestId: entry.request.requestId });
             continue;
           }
           complete(entry, { status: 'reported', requestId: entry.request.requestId, published: false, revision: null, delta: null,
-            report: stated(context, entry, run.report), freshness: fresh(entry, started, false), timings: freeze({ ...work, publication: 0 }) });
+            report: stated(context, entry, run.report), freshness: fresh(entry, started, false),
+            stages: run.report.stages, timings: freeze({ ...work, publication: 0 }) });
         }
         return;
       }
@@ -792,9 +843,11 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (!data) throw new Error('Session lost its published revision');
       const reused = context.publishedSession === context.session && context.history.published?.sequence === data.sequence;
       await hotBudget(context);
+      if (controller.signal.aborted || disposed) return;
       const publishing = performance.now();
-      const admitted = await publish(context, data, cause, freeze({ ...work, watch }));
+      const admitted = await publish(context, data, cause, freeze({ ...work, watch }), captureSequence, controller.signal);
       const timings: ReplyTimings = { ...work, publication: performance.now() - publishing };
+      if (controller.signal.aborted || disposed) return;
       if (!admitted) {
         context.synchronization = 'reconciling'; context.sweepRequired = true;
         // Restore the retained-byte bound before acknowledging the rejection.
@@ -929,7 +982,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         invocation: context.invocations.get(lease) ?? { project: context.project, setup: context.selection.setup },
         revisionAtAcknowledgment: context.history.published?.revision ?? null,
         needsSweep: request.freshness.mode === 'synchronized' && (request.scope === 'report' || (!request.paths && !request.freshness.expect.length)),
-        resolve, cleanup: () => {}, settled: false, deadlineExpired: false };
+        resolve: outcome => resolve(withRecovery(context, outcome)), cleanup: () => {}, settled: false, deadlineExpired: false };
       // A changed check's paths are classified by containment at the published revision
       // before any content is required: expectations that do not follow it are answered at
       // once with that classification, and nothing is queued for them.
@@ -991,8 +1044,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         for (const path of request.paths ?? request.freshness.expect.map(expected => expected.path)) {
           if (!context.paths.has(path)) { context.paths.set(path, 'changed'); if (!configuration.length) context.requested.set(path, new Set([entry])); }
           else if (!configuration.length) context.requested.get(path)?.add(entry);
+          if (!context.recovery.observe(path)) { evict(context, 'pressure'); return; }
         }
-        if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
+        if (context.paths.size > budgets.maxQueuedPaths) { if (!context.recovery.pathOverflow()) { evict(context, 'pressure'); return; } context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
         if (entry.needsSweep) context.sweepRequired = true;
         context.background ??= 'request';
         if (configuration.length) {
@@ -1048,8 +1102,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const expected of expect) {
       if (!context.paths.has(expected.path)) { context.paths.set(expected.path, 'changed'); if (!configuration.length) context.requested.set(expected.path, new Set([entry])); }
       else if (!configuration.length) context.requested.get(expected.path)?.add(entry);
+      if (!context.recovery.observe(expected.path)) { evict(context, 'pressure'); return; }
     }
-    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
+    if (context.paths.size > budgets.maxQueuedPaths) { if (!context.recovery.pathOverflow()) { evict(context, 'pressure'); return; } context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
     if (entry.needsSweep) context.sweepRequired = true;
     context.background ??= 'request';
     if (configuration.length) {
@@ -1078,7 +1133,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         invocation: context.invocations.get(lease) ?? { project: context.project, setup: context.selection.setup },
         revisionAtAcknowledgment: context.history.published?.revision ?? null,
         needsSweep: !request.freshness.expect.length,
-        resolve, cleanup: () => {}, settled: false, deadlineExpired: false };
+        resolve: outcome => resolve(withRecovery(context, outcome)), cleanup: () => {}, settled: false, deadlineExpired: false };
       // Test coverage before touch() can mark a periodic sweep due for this activity.
       const covered = covers(context, entry);
       touch(context);
@@ -1114,7 +1169,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         invocation: context.invocations.get(lease) ?? { project: context.project, setup: context.selection.setup },
         revisionAtAcknowledgment: context.history.published?.revision ?? null,
         needsSweep: freshness.mode === 'synchronized' && !freshness.expect.length,
-        resolve, cleanup: () => {}, settled: false, deadlineExpired: false };
+        resolve: outcome => resolve(withRecovery(context, outcome)), cleanup: () => {}, settled: false, deadlineExpired: false };
       // Test coverage before touch() can mark a periodic sweep due for this activity,
       // and read the cold state before touch() reopens the context.
       const covered = freshness.mode === 'synchronized' && covers(context, entry);
@@ -1218,7 +1273,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         }
         const bytes = Buffer.byteLength(JSON.stringify(outcome.diagram), 'utf8');
         const context = job.context;
-        const contextBytes = (context.session?.status().factBytes ?? 0) + bytes;
+        const contextBytes = retainedBytes(context) + bytes;
         if (contextBytes > budgets.maxRetainedBytesPerContext) {
           return failed('resource-limit', `Retaining the dependency diagram needs ${contextBytes} bytes in its context; the maximum is ${budgets.maxRetainedBytesPerContext}`);
         }
@@ -1380,6 +1435,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         token: freeze({ context: id, generation: options.generationId() }), selection, project, invocation: { project, setup: requestedSetup },
         openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), resolutions: new Map([[key, resolution]]), subscriptions: new Map(),
         history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
+        recovery: new RecoveryHistory(budgets.maxQueuedPaths, () => retainedBytes(context) <= budgets.maxRetainedBytesPerContext
+          && totalBytes() <= budgets.maxRetainedBytesGlobal),
         queue: [], deliveries: new Set(), explorerDeliveries: new Set(), diagram: null, paths: new Map(), requested: new Map(), watched: null, scope: null, publishedData: null, removed: new Map(), state: 'opening', synchronization: 'initializing', lastValid: null,
         session: null, publishedSession: null, sessionProject: null, publishedProject: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, unresponsiveSince: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
@@ -1388,7 +1445,15 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         scopeSequence: null, registered: null, registering: 0,
         debounce: null, sweepTimer: null, auditTimer: null, idle: null,
       };
-      contexts.set(id, context); const current = snapshot(context); attach(context); scheduleIdle(context); kick();
+      contexts.set(id, context);
+      if (evictedSelections.has(id)) {
+        evictedSelections.delete(id);
+        if (!context.recovery.contextEvicted()) { evict(context, 'pressure'); return unavailable('resource-unavailable'); }
+      }
+      if (retainedBytes(context) > budgets.maxRetainedBytesPerContext || totalBytes() > budgets.maxRetainedBytesGlobal) {
+        evict(context, 'pressure'); return unavailable('resource-unavailable');
+      }
+      const current = snapshot(context); attach(context); scheduleIdle(context); kick();
       return { status: 'opened', token: context.token, created: true, current };
     } catch (error) { return unavailable(disposed ? 'disposed' : 'analysis-failed', String(error)); }
     finally { resolving.delete(controller); control?.signal?.removeEventListener('abort', abort); }
@@ -1397,6 +1462,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     open: (request, setup, lease, control) => track(open(request, setup, lease, control)), check, apiView, affected, explorerDetails, dependencyDiagram, dependencyFacts,
     status(token) { const found = lookup(token); if ('status' in found) return found; touch(found); return snapshot(found); },
     list: () => [...contexts.values()].map(snapshot),
+    recovery(token) { const found = lookup(token); return 'status' in found ? found : found.recovery.snapshot(); },
     subscribe(token, lease, listener) {
       const found = lookup(token); if ('status' in found) return found; touch(found);
       const id = randomUUID(); found.subscriptions.set(id, { lease, listener }); scheduleIdle(found);

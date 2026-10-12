@@ -30,7 +30,7 @@ describe('lightweight CLI arguments', () => {
     const result = await runCli(['inspect', '--format', 'json'], { cwd: '/project', version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); },
       stdout: text => { stdout.push(text); }, stderr: text => { throw new Error(text); }, batch: async () => { throw new Error('Unexpected batch'); } });
     expect([result, stdout.length]).toEqual([2, 1]);
-    expect(JSON.parse(stdout[0])).toMatchObject({ schemaVersion: 'ramify.cli/1', exitCode: 2,
+    expect(JSON.parse(stdout[0])).toMatchObject({ schemaVersion: 'ramify.cli/2', exitCode: 2,
       diagnostics: [{ code: 'invalid-invocation', message: expect.stringContaining('Unavailable command: inspect') }] });
   });
   it('returns cancellation before dispatch and catches rejected operations', async () => {
@@ -118,14 +118,14 @@ describe('snapshot-free JSON grammar', () => {
   ])('rejects %j', (argv, message) => {
     expect(() => parseArguments(argv)).toThrow(message);
   });
-  it('reports a usage error as a ramify.cli/1 document with exit 2 before dispatch', async () => {
+  it('reports a usage error as a ramify.cli/2 document with exit 2 before dispatch', async () => {
     let calls = 0;
     const stdout: string[] = [];
     const exit = await runCli(['check', '--changed', 'a.ts', '--format', 'json', '--no-snapshot'], { cwd: '/project', version: '1',
       connect: async () => { calls++; throw new Error('Unexpected daemon connection'); }, stdout: text => { stdout.push(text); },
       stderr: text => { throw new Error(text); }, batch: async () => { calls++; throw new Error('Unexpected batch'); } });
     expect([exit, calls, stdout.length]).toEqual([2, 0, 1]);
-    expect(JSON.parse(stdout[0])).toMatchObject({ schemaVersion: 'ramify.cli/1', exitCode: 2,
+    expect(JSON.parse(stdout[0])).toMatchObject({ schemaVersion: 'ramify.cli/2', exitCode: 2,
       diagnostics: [{ code: 'invalid-invocation', message: '--no-snapshot cannot be combined with --changed' }] });
   });
   it('documents the flag in help', () => {
@@ -220,7 +220,7 @@ describe('materialize command grammar', () => {
         connect: async () => { calls++; throw new Error('Unexpected daemon connection'); }, stdout: () => {}, stderr: text => { stderr.push(text); },
         batch: async () => { calls++; throw new Error('Unexpected batch'); } });
       expect([exit, calls], argv.join(' ')).toEqual([2, 0]);
-      expect(stderr.join(''), argv.join(' ')).toMatch(/^Error \[invalid-invocation\]: /);
+      expect(stderr.join(''), argv.join(' ')).toMatch(/^Invocation failed \(invalid-invocation\)\./);
     }
   });
 
@@ -299,7 +299,7 @@ describe('affected command grammar', () => {
     const exit = await runCli(['affected', '--format', 'json'], { ...unexpected, stdout: text => { stdout.push(text); },
       stderr: text => { throw new Error(text); } });
     expect([exit, stdout.length]).toEqual([2, 1]);
-    expect(JSON.parse(stdout[0]!)).toEqual({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 2,
+    expect(JSON.parse(stdout[0]!)).toEqual({ schemaVersion: 'ramify.cli/2', status: 'unavailable', exitCode: 2,
       diagnostics: [{ category: 'invocation', code: 'invalid-invocation', message: 'affected requires at least one module ID or --path' }] });
   });
 
@@ -320,7 +320,7 @@ describe('affected command grammar', () => {
       const exit = await runCli(['affected', 'a', flag, 'value'], { ...unexpected, stdout: text => { throw new Error(text); },
         stderr: text => { stderr.push(text); } });
       expect(exit).toBe(2);
-      expect(stderr.join('')).toBe(`Error [invalid-invocation]: Unsupported argument: ${flag}\n`);
+      expect(stderr.join('')).toContain(`Unsupported argument: ${flag}`);
     }
   });
 

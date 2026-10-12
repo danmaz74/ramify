@@ -63,11 +63,11 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
           recoveries.push(authorization); events.push('recovery-exhausted');
           if (reason === 'stopped') return { status: 'stopped', record: {
             schemaVersion: 'ramify.daemon-record/1', ...actual.daemon.instance,
-            protocol: 'ramify.ipc/2', socket: '/quick', startedAt: quick.clock.now(), state: 'stopped',
+            protocol: 'ramify.ipc/3', socket: '/quick', startedAt: quick.clock.now(), state: 'stopped',
             stopped: { at: quick.clock.now(), reason: 'explicit', requestId: 'recovery-stop' },
           } };
           return { status: 'unavailable', attempts: 3, reason: reason === 'incompatible'
-            ? { kind: 'incompatible', client: 'ramify.ipc/2', daemon: 'ramify.ipc/0' }
+            ? { kind: 'incompatible', client: 'ramify.ipc/3', daemon: 'ramify.ipc/0' }
             : { kind: 'failure', message: 'Reconnect and restart attempts exhausted' } };
         },
         async closeContext(params) { closeContextCalls++; return actual.closeContext(params); },
@@ -93,7 +93,7 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
     equal('terminal recovery selects exit 2 without batch', [exitCode, batchCalls], [2, 0]);
     equal('exactly one stdout document with empty stderr', [stdout.length, stderr], [1, []]);
     equal('output is the compact terminal outcome', document ? [document.schemaVersion, document.outcome, document.reason, document.exitCode] : null,
-      ['ramify.check/3', 'not-checked', reason, 2]);
+      ['ramify.check/4', 'not-checked', reason, 2]);
     equal('lost response cannot claim a published result', document ? [document.revision, document.execution, document.checked, document.timings.daemon] : null,
       [null, null, null, null]);
     // A path not checked carries no identity; the sent request above holds the original hash.

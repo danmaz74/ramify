@@ -1,4 +1,4 @@
-import type { RunControl } from '../../subs/analysis/src/interfaces/analysis.js';
+import type { AnalysisFailureEvidence, RunControl } from '../../subs/analysis/src/interfaces/analysis.js';
 import type { ProjectRequest } from '../../subs/analysis/subs/project/src/interfaces/project.js';
 import type { ApiViewSelection } from '../../subs/analysis/src/interfaces/session.js';
 import type { ArchitectDependencyReason } from '../../subs/analysis/src/interfaces/architect-view.js';
@@ -6,6 +6,7 @@ import type { MeasurementFileRecord, MeasurementViews, ModuleMeasurement } from 
 import type { MaterializedTarget } from '../../subs/daemon/src/interfaces/daemon.js';
 import type { ContextToken, ContextSetup, ContextStatus, ContextBudgets, CheckOutcome, Freshness, RevisionId,
   ContextRevision, FreshnessRecord, UnavailableReason, ReplyTimings,
+  RecoveryEvidence,
   OpenOutcome, ContextEvent, ExplorerDetailsRequest, ContextExplorerDetailsOutcome,
   DependencyDiagramRequest, ContextDependencyDiagramOutcome, AffectedRequest, ContextAffectedOutcome } from '../../subs/daemon/src/context-types.js';
 
@@ -19,10 +20,11 @@ export type ServiceCapability = 'contexts' | 'check' | 'subscribe' | 'daemon-con
 export type ServiceErrorCode = 'invalid-request' | 'unsupported-operation'
   | 'unknown-context' | 'expired-generation' | 'resource-unavailable'
   | 'unknown-subscription' | 'wrong-instance' | 'stopping' | 'cancelled' | 'internal-error' | 'incompatible';
-export interface ServiceError {
+export interface ServiceError extends AnalysisFailureEvidence {
   readonly code: ServiceErrorCode;
   readonly message: string;
   readonly details: Readonly<Record<string, string | number | boolean | null>>;
+  readonly recovery?: RecoveryEvidence;
 }
 export type ServiceResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -75,7 +77,7 @@ export interface DaemonStatus {
   readonly version: string;
   readonly engine: string;
   readonly buildKey: string;
-  readonly protocol: 'ramify.ipc/2';
+  readonly protocol: 'ramify.ipc/3';
   readonly startedAt: number;
   readonly state: 'running' | 'stopping';
   readonly connections: number;
@@ -115,16 +117,16 @@ export type MaterializeOutcome =
       readonly bytesWritten: number; readonly timings?: ReplyTimings;
       readonly architect?: MaterializedArchitectSummary }
   | { readonly status: 'pending' | 'cold'; readonly requestId: string;
-      readonly current: ContextStatus }
+      readonly current: ContextStatus; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'deadline-exceeded'; readonly requestId: string;
-      readonly revision: ContextRevision | null; readonly elapsedMs: number }
+      readonly revision: ContextRevision | null; readonly elapsedMs: number; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'superseded'; readonly requestId: string;
-      readonly revision: ContextRevision | null }
+      readonly revision: ContextRevision | null; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'cancelled'; readonly requestId: string }
-  | { readonly status: 'unavailable'; readonly requestId: string;
+  | (AnalysisFailureEvidence & { readonly recovery?: RecoveryEvidence; readonly status: 'unavailable'; readonly requestId: string;
       readonly reason: UnavailableReason | 'invalid-location' | 'invalid-projection'
         | 'symlink' | 'output-failure' | 'rollback-failure';
-      readonly message: string };
+      readonly message: string });
 /** One synchronized, read-only whole-project measurement request. */
 export interface MeasureParams {
   readonly token: ContextToken;
@@ -146,14 +148,14 @@ export type MeasureOutcome =
   | { readonly status: 'measured'; readonly requestId: string;
       readonly freshness: FreshnessRecord; readonly document: MeasureDocument }
   | { readonly status: 'pending' | 'cold'; readonly requestId: string;
-      readonly current: ContextStatus }
+      readonly current: ContextStatus; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'deadline-exceeded'; readonly requestId: string;
-      readonly revision: ContextRevision | null; readonly elapsedMs: number }
+      readonly revision: ContextRevision | null; readonly elapsedMs: number; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'superseded'; readonly requestId: string;
-      readonly revision: ContextRevision | null }
+      readonly revision: ContextRevision | null; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'cancelled'; readonly requestId: string }
-  | { readonly status: 'unavailable'; readonly requestId: string;
-      readonly reason: UnavailableReason; readonly message: string };
+  | (AnalysisFailureEvidence & { readonly recovery?: RecoveryEvidence; readonly status: 'unavailable'; readonly requestId: string;
+      readonly reason: UnavailableReason; readonly message: string });
 /** One read-only affected-module query against the covering revision. */
 export type AffectedParams = AffectedRequest;
 /** The selection from one revision's retained facts, or an explicit reason there is none. */

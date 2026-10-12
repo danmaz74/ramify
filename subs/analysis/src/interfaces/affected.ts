@@ -1,5 +1,6 @@
 import type { ProjectExclusion, ProjectScope } from '../../subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../../subs/typescript/src/interfaces/source.js';
+import type { AnalysisFailureEvidence } from './analysis.js';
 
 /** Seeds of one affected-module query against a retained session's current revision. */
 export interface AffectedQuery {
@@ -73,8 +74,8 @@ export type AffectedUnavailableReason =
   | 'unknown-module' | 'resource-limit' | 'analysis-failed';
 export type SessionAffectedOutcome =
   | { readonly status: 'answered'; readonly sequence: number; readonly result: AffectedSelection }
-  | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason;
-      readonly message: string; readonly unknownModules: readonly string[] }
+  | (AnalysisFailureEvidence & { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason;
+      readonly message: string; readonly unknownModules: readonly string[] })
   | { readonly status: 'cancelled' };
 
 /** Structural facts over one requested path, without test or change policy. */

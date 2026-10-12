@@ -21,6 +21,23 @@ function findingRevision(sequence: number, message: string): SessionRevision {
 }
 
 describe('compact revision history', () => {
+  it('FR09 preserves finalized stages and charges their bytes without retaining a report or input graph', () => {
+    const history = createHistory<Header>(2, 1024 ** 2);
+    const data: SessionRevision = { ...findingRevision(1, 'Compiler failed'), stages: [
+      { stage: 'catalog', status: 'failed', blockedBy: [], diagnosticIds: ['finding'] },
+      { stage: 'link', status: 'blocked', blockedBy: ['catalog'], diagnosticIds: [] },
+    ] };
+    try {
+      expect(history.append(header(1), data)).toBe(true);
+      const entry = history.published!;
+      expect(entry.stages).toBe(data.stages);
+      expect(entry.diagnostics).toBe(data.diagnostics);
+      const { bytes: _bytes, ...payload } = entry;
+      expect(entry.bytes).toBe(Buffer.byteLength(JSON.stringify(payload)));
+      expect(entry.report).toBeNull(); expect(entry).not.toHaveProperty('inputs');
+      expect(entry).not.toHaveProperty('snapshot');
+    } finally { dispose(history); }
+  });
   it('retains the newest eight of twelve headers and releases each evicted session version', () => {
     const released: number[] = [];
     const history = createHistory<Header>(8, 1024 ** 2, entry => released.push(entry.sequence));

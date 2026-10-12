@@ -174,7 +174,8 @@ class SessionHost implements RetainedSession {
     catch (error) {
       const reported = await this.#reportedFailure(error as Error);
       return { status: 'unavailable', reason: 'failed',
-        message: reported.report.diagnostics[0]?.message ?? String(error) };
+        message: error instanceof Error ? error.message : String(error),
+        diagnostics: reported.report.diagnostics, stages: reported.report.stages };
     }
   }
   async report(control: RunControl = {}, sequence?: number): Promise<AnalysisReport | null> {
@@ -197,7 +198,8 @@ class SessionHost implements RetainedSession {
       const disposed = error instanceof Error && 'code' in error && (error as { code?: unknown }).code === 'session-disposed';
       if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
       const reported = await this.#reportedFailure(error as Error);
-      return { status: 'unavailable', reason: 'analysis-failed', message: reported.report.diagnostics[0]?.message ?? String(error) };
+      return { status: 'unavailable', reason: 'analysis-failed', message: error instanceof Error ? error.message : String(error),
+        diagnostics: reported.report.diagnostics, stages: reported.report.stages };
     }
   }
   async architectView(query: ArchitectViewQuery, control: RunControl = {}): Promise<ArchitectViewQueryOutcome> {
@@ -211,7 +213,8 @@ class SessionHost implements RetainedSession {
       const disposed = error instanceof Error && 'code' in error && (error as { code?: unknown }).code === 'session-disposed';
       if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
       const reported = await this.#reportedFailure(error as Error);
-      return { status: 'unavailable', reason: 'analysis-failed', message: reported.report.diagnostics[0]?.message ?? String(error) };
+      return { status: 'unavailable', reason: 'analysis-failed', message: error instanceof Error ? error.message : String(error),
+        diagnostics: reported.report.diagnostics, stages: reported.report.stages };
     }
   }
   async measurements(sequence: number, control: RunControl = {}): Promise<SessionMeasurementsOutcome> {
@@ -226,7 +229,8 @@ class SessionHost implements RetainedSession {
       if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
       const reported = await this.#reportedFailure(error as Error);
       return { status: 'unavailable', reason: 'analysis-failed',
-        message: reported.report.diagnostics[0]?.message ?? String(error) };
+        message: error instanceof Error ? error.message : String(error),
+        diagnostics: reported.report.diagnostics, stages: reported.report.stages };
     }
   }
   async affected(query: AffectedQuery, control: RunControl = {}): Promise<SessionAffectedOutcome> {
@@ -245,7 +249,8 @@ class SessionHost implements RetainedSession {
       const failed = this.#failed !== null;
       const reported = await this.#reportedFailure(error as Error);
       return { status: 'unavailable', reason: failed ? 'invalid-revision' : 'analysis-failed',
-        message: reported.report.diagnostics[0]?.message ?? String(error), unknownModules: [] };
+        message: error instanceof Error ? error.message : String(error),
+        diagnostics: reported.report.diagnostics, stages: reported.report.stages, unknownModules: [] };
     }
   }
   async explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],
@@ -261,7 +266,8 @@ class SessionHost implements RetainedSession {
       if (disposed) return { status: 'unavailable', reason: 'compiler-released', message: 'Retained session is disposed' };
       const reported = await this.#reportedFailure(error as Error);
       return { status: 'unavailable', reason: 'analysis-failed',
-        message: reported.report.diagnostics[0]?.message ?? String(error) };
+        message: error instanceof Error ? error.message : String(error),
+        diagnostics: reported.report.diagnostics, stages: reported.report.stages };
     }
   }
 

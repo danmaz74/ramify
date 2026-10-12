@@ -1,7 +1,9 @@
+import * as project from '../../subs/project/src/read-project.js';
+import { withRecoverySmall } from './recovery-fixtures.js';
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { acquireInventory } from '../inventory-entry.js';
 import type { InventoryInputs } from '../inventory-entry.js';
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
@@ -107,5 +109,72 @@ describe('inventory analysis entry', () => {
     try { expect(await pending).toEqual({ status: 'cancelled' }); }
     finally { clearTimeout(timer); }
     expect((await acquireInventory(inputs)).status).toBe('completed');
+  }));
+});
+
+
+describe('FR05 acquisition root and honest diagnostic evidence', () => {
+  it.each([
+    ['malformed-root', 'module.ramify', 'ramify 1\nroot module recovery\nexpose-test * from "api.ts" to parent\n', 'invalid'],
+    ['malformed-child', 'subs/provider/module.ramify', 'ramify 1\nmodule provider\nexpose-test * from "api.ts" to parent\n', 'invalid'],
+    ['conflicting-trees', 'module.ramify', 'ramify 1\nroot module recovery\nexternal "cache"\nexternal "cache/nested"\n', 'invalid'],
+    ['invalid-config', 'tsconfig.json', '{ invalid JSON', 'incomplete'],
+    ['unreadable-config', 'tsconfig.json', '{"extends":"./missing.json","include":["src"]}', 'incomplete'],
+  ])('%s keeps selected canonical root without any partial snapshot', (_name, path, source, status) => withRecoverySmall(async fixture => {
+    await fixture.write(path, source);
+    const result = await acquireInventory(fixture.inventoryInputs);
+    expect(result).toMatchObject({ status, root: fixture.root });
+    expect(result).not.toHaveProperty('snapshot');
+    if (!('diagnostics' in result)) throw new Error('Missing failure evidence');
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+    for (const item of result.diagnostics.filter(item => item.category === 'acquisition')) {
+      if (item.location === null) expect(item.related).toEqual([]);
+    }
+  }));
+
+  it('distinguishes canonical explicit candidates from unsuccessful discovery/canonicalization', () => withRecoverySmall(async fixture => {
+    await fixture.write('module.ramify', 'ramify 1\nmodule unmarked\n');
+    expect(await acquireInventory(fixture.inventoryInputs)).toMatchObject({ status: 'invalid', root: fixture.root,
+      diagnostics: [{ location: null, related: [] }] });
+    expect(await acquireInventory({ ...fixture.inventoryInputs, project: { ...fixture.inventoryInputs.project, root: undefined } }))
+      .toMatchObject({ status: 'unavailable', root: null, diagnostics: [{ location: null, related: [] }] });
+    expect(await acquireInventory({ ...fixture.inventoryInputs, project: { ...fixture.inventoryInputs.project, root: join(fixture.root, 'absent') } }))
+      .toMatchObject({ status: 'invalid', root: null });
+  }));
+});
+
+describe('FR08 controlled acquisition lifetime', () => {
+  it('retries exactly three changed captures, disposes every view and publishes no inventory', () => withRecoverySmall(async fixture => {
+    const baseline = await acquireInventory(fixture.inventoryInputs);
+    if (baseline.status !== 'completed') throw new Error('Invalid baseline');
+    const dispose = vi.fn(async () => {}), seal = vi.fn(async () => ({ status: 'changed' as const, paths: ['src/root.ts'] }));
+    const read = vi.spyOn(project, 'readProject').mockResolvedValue({ status: 'acquired',
+      configuration: { key: 'configuration', dependencies: [], bytes: 0, product: {} }, reusedConfiguration: false,
+      view: { inventory: baseline.snapshot.inventory, inputs: [], dispose, seal,
+        readFile: async () => undefined, fileExists: async () => false, directoryExists: async () => false,
+        readDirectory: async () => [], realPath: async () => undefined } });
+    try {
+      const result = await acquireInventory(fixture.inventoryInputs);
+      expect(result).toMatchObject({ status: 'incomplete', root: fixture.root, diagnostics: [{ code: 'changed-input', location: null }] });
+      expect(result).not.toHaveProperty('snapshot'); expect(read).toHaveBeenCalledTimes(3);
+      expect(seal).toHaveBeenCalledTimes(3); expect(dispose).toHaveBeenCalledTimes(3);
+    } finally { read.mockRestore(); }
+  }));
+
+  it('keeps selected root on internal deadline cancellation but user cancellation claims no answer', () => withRecoverySmall(async fixture => {
+    const read = vi.spyOn(project, 'readProject').mockImplementation(async options => {
+      await new Promise<void>(done => {
+        if (options.signal?.aborted) done(); else options.signal?.addEventListener('abort', () => done(), { once: true });
+      });
+      return { status: 'cancelled', root: fixture.root };
+    });
+    try {
+      expect(await acquireInventory({ ...fixture.inventoryInputs, limits: { ...fixture.inventoryInputs.limits, deadlineMs: 30 } }))
+        .toMatchObject({ status: 'incomplete', root: fixture.root, diagnostics: [{ code: 'resource-limit', location: null }] });
+      const controller = new AbortController();
+      const pending = acquireInventory(fixture.inventoryInputs, { signal: controller.signal });
+      controller.abort();
+      expect(await pending).toEqual({ status: 'cancelled' });
+    } finally { read.mockRestore(); }
   }));
 });

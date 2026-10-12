@@ -174,9 +174,9 @@ export type ProjectRead =
   | { readonly status: 'acquired'; readonly view: ProjectInputView;
       readonly configuration: RetainedConfiguration; readonly reusedConfiguration: boolean }
   | { readonly status: 'invalid' | 'unavailable' | 'incomplete';
-      readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[];
+      readonly root: string | null; readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[];
       readonly sealedInputs: readonly CapturedInput[] | null }
-  | { readonly status: 'cancelled' };
+  | { readonly status: 'cancelled'; readonly root: string | null };
 
 export interface ObservationSink {
   file(path: string, sha256: string | null, bytes: number, role: 'source' | 'resource' | 'configuration' | 'dependency'): void;
@@ -238,7 +238,7 @@ export type ProjectObserve =
 export type ProjectResolution =
   | { readonly status: 'resolved'; readonly root: string; readonly selection: 'given' | 'found';
       readonly invokedFrom: string; readonly configuration: string }
-  | { readonly status: 'invalid' | 'unavailable'; readonly issues: readonly ProjectIssue[] };
+  | { readonly status: 'invalid' | 'unavailable'; readonly root: string | null; readonly issues: readonly ProjectIssue[] };
 export interface RetainedConfiguration {
   readonly key: string;
   readonly dependencies: readonly CapturedInput[];

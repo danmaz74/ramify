@@ -113,7 +113,8 @@ describe('daemon affected operation (A7-07)', { timeout: 120_000 }, () => {
     const context = await f.environment.service.contextStatus({ token: f.token });
     if (!context.ok) throw new Error(JSON.stringify(context));
     expect(answer).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'many', revision: context.value.published,
-      reason: 'invalid-query', message: 'A query names at most 4096 seeds; it named 4097', unknownModules: [] } });
+      reason: 'invalid-query', message: 'A query names at most 4096 seeds; it named 4097', unknownModules: [],
+      recovery: expect.objectContaining({ schemaVersion: 'ramify.recovery/1', lastCompleted: expect.objectContaining({ context: f.token.context }) }) } });
   });
 
   it('A7-07:validation response-bound refuses an answer over maxResponseBytes whole, as resource-unavailable', async () => {
@@ -131,7 +132,8 @@ describe('daemon affected operation (A7-07)', { timeout: 120_000 }, () => {
     const status = await over.environment.service.contextStatus({ token: over.token });
     if (!status.ok || !status.value.published) throw new Error(JSON.stringify(status));
     expect(refused).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'bound', revision: status.value.published,
-      reason: 'resource-unavailable', message: `Affected response exceeds maxResponseBytes (${encoded - 1})`, unknownModules: [] } });
+      reason: 'resource-unavailable', message: `Affected response exceeds maxResponseBytes (${encoded - 1})`, unknownModules: [],
+      recovery: expect.objectContaining({ schemaVersion: 'ramify.recovery/1' }) } });
     // Refused whole, never truncated: no partial selection accompanies the refusal.
     if (!refused.ok) throw new Error(JSON.stringify(refused));
     expect(refused.value).not.toHaveProperty('result');
@@ -144,7 +146,8 @@ describe('daemon affected operation (A7-07)', { timeout: 120_000 }, () => {
     const status = await f.environment.service.contextStatus({ token: f.token });
     if (!status.ok) throw new Error(JSON.stringify(status));
     expect(unknown.value).toEqual({ status: 'unavailable', requestId: 'unknown', revision: status.value.published,
-      reason: 'unknown-module', message: expect.any(String), unknownModules: ['example/ghost', 'example/zombie'] });
+      reason: 'unknown-module', message: expect.any(String), unknownModules: ['example/ghost', 'example/zombie'],
+      recovery: expect.objectContaining({ schemaVersion: 'ramify.recovery/1', lastCompleted: expect.objectContaining({ context: f.token.context }) }) });
     // Seed syntax is the session's domain answer as well.
     expect(await f.environment.request('affected', f.request('absolute', { paths: ['/etc/passwd'] }))).toMatchObject({ ok: true,
       value: { status: 'unavailable', requestId: 'absolute', reason: 'invalid-query', unknownModules: [] } });

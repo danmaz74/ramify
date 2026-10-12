@@ -41,7 +41,7 @@ export interface InventorySnapshot {
 export type InventoryRun =
   | { readonly status: 'completed'; readonly snapshot: InventorySnapshot }
   | { readonly status: 'invalid' | 'incomplete' | 'unavailable';
-      readonly diagnostics: readonly AnalysisDiagnostic[] }
+      readonly root: string | null; readonly diagnostics: readonly AnalysisDiagnostic[] }
   | { readonly status: 'cancelled' };
 export type ValidationRun =
   | { readonly status: 'valid'; readonly input: InventorySnapshot;
@@ -82,6 +82,12 @@ export interface StageExecution {
     | 'failed' | 'not-requested';
   readonly blockedBy: readonly StageId[];
   readonly diagnosticIds: readonly string[];
+}
+
+/** Detached current producer evidence. Absence differs from an explicitly empty list. */
+export interface AnalysisFailureEvidence {
+  readonly diagnostics?: readonly AnalysisDiagnostic[];
+  readonly stages?: readonly StageExecution[];
 }
 
 export interface AccessResult {

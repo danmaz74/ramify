@@ -168,12 +168,13 @@ for (const instance of plan2Instances.filter(item => item.requiredCapabilities.i
             a.ok('all finite compiler helpers are gone after check', spawned.every(pid => !processAlive(pid))); break;
           }
           case 'idle-disposal-releases': {
-            const started = performance.now(); let cold: any;
+            const started = performance.now(); let cold: any, retainedBudget = 0;
             await waitForProcessCondition('context cold transition', 120_000, async () => {
-              const status = await client.status(); cold = status.contexts[0]; return cold?.state === 'cold';
+              const status = await client.status(); cold = status.contexts[0]; retainedBudget = status.budgets.maxRetainedBytesPerContext; return cold?.state === 'cold';
             });
             recordObservation('advisory-cold-transition-timing', { elapsedMs: performance.now() - started, targetMs: 6000, enforcement: 'advisory' });
-            a.equal('cold drops watcher and products while pinning current report', [cold.watcher, cold.retainedBytes, cold.history.retained], ['disposed', 0, 1]);
+            a.equal('cold drops watcher and products while pinning current report', [cold.watcher, cold.history.retained], ['disposed', 1]);
+            a.ok('cold retains only bounded recovery bookkeeping', Number.isSafeInteger(cold.retainedBytes) && cold.retainedBytes > 0 && cold.retainedBytes <= retainedBudget);
             const helpers = (await runtime.scope.events()).filter(event => event.event === 'spawn' && event.args?.some(arg => /(?:compiler|configuration)-helper/.test(arg))).map(event => event.child!);
             a.ok('cold has no compiler helper alive', helpers.every(pid => !processAlive(pid)));
             await waitForProcessCondition('cold context evicted', 120_000, async () => (await client.status()).contexts.length === 0);

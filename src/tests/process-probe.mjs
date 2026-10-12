@@ -82,6 +82,10 @@ net.Socket.prototype.write = function (chunk, ...args) {
     try {
       const message = JSON.parse(chunk.subarray(4).toString('utf8'));
       if (message.type === 'cancel') record('wire-cancel', { requestId: message.id });
+      if (mode === 'interrupt-resident-check' && message.type === 'request' && message.op === 'check') {
+        record('barrier', { stage: 'resident-check', requestId: message.id });
+        setImmediate(() => process.kill(process.pid, 'SIGINT'));
+      }
     } catch { /* Only complete, valid outgoing frames provide evidence. */ }
   }
   return Reflect.apply(socketWrite, this, [chunk, ...args]);

@@ -3,6 +3,7 @@ import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../ana
 import type { ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { ContextEvent, ContextExplorerDetailsOutcome, ContextRevision, ContextSelection, ContextState, ContextToken, ExplorerDetailsRequest, RevisionId, SynchronizationState, WatchBatch, WatcherHandle, WatchScope } from './interfaces/contexts.js';
 import type { RevisionHistory } from './history.js';
+import type { RecoveryHistory } from './recovery.js';
 import type { Invocation, PendingEntry, RunningCapture } from './queue.js';
 
 export interface ExplorerDetailDelivery {
@@ -36,6 +37,7 @@ export interface LiveContext {
   readonly resolutions: Map<string, ProjectResolution>;
   readonly subscriptions: Map<string, { lease: string; listener: (event: ContextEvent) => void }>;
   history: RevisionHistory<ContextRevision>;
+  readonly recovery: RecoveryHistory;
   readonly queue: PendingEntry[];
   readonly deliveries: Set<PendingEntry>;
   readonly explorerDeliveries: Set<ExplorerDetailDelivery>;

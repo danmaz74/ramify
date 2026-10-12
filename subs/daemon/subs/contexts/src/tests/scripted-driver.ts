@@ -49,7 +49,7 @@ export function capture(version = 1, execution: 'completed' | 'invalid' | 'incom
   return { status: 'captured', report, revision: {
     sequence: version, inputId, inputs: observed, scope, changed: observed.map(input => input.path),
     checked: { path: version === 1 ? 'cold' : 'source', files: observed.filter(input => input.role === 'source').map(input => input.path), accesses: 0, modelRebuilt: version === 1 },
-    outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
+    outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, stages: report.stages, warnings: report.warnings, coverage: report.coverage,
     delta: { added: [], removed: [], positionOnly: [] },
     timings: { classify: 1, inventory: 2, compiler: 3, descriptions: 4, accesses: 5, link: 6, decide: 7, companions: 0, publish: 8, total: 36 },
   } };
@@ -148,7 +148,7 @@ export function createScriptedDriver() {
         const previous = new Map((current?.diagnostics ?? []).map(diagnostic => [diagnostic.id, diagnostic]));
         const nextIds = new Set(report.diagnostics.map(diagnostic => diagnostic.id));
         current = { ...next.revision, sequence, outcome: report.outcome, summary: report.summary,
-          diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
+          diagnostics: report.diagnostics, stages: report.stages, warnings: report.warnings, coverage: report.coverage,
           delta: { added: report.diagnostics.filter(diagnostic => !previous.has(diagnostic.id)),
             removed: [...previous.keys()].filter(identity => !nextIds.has(identity)), positionOnly: next.revision.delta.positionOnly } };
         currentReport = report;

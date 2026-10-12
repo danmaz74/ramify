@@ -1,3 +1,5 @@
+import type { AnalysisFailureEvidence } from './analysis.js';
+
 /** File and byte counts for source and resource inventory. */
 export interface MeasurementFileSize {
   readonly sourceFiles: number;
@@ -74,8 +76,8 @@ export interface SessionMeasurements {
 export type SessionMeasurementsOutcome =
   | { readonly status: 'measured'; readonly measurements: SessionMeasurements }
   | { readonly status: 'superseded'; readonly sequence: number }
-  | { readonly status: 'unavailable'; readonly reason: 'invalid-revision' | 'invalid-current' | 'analysis-failed';
-      readonly message: string }
+  | (AnalysisFailureEvidence & { readonly status: 'unavailable'; readonly reason: 'invalid-revision' | 'invalid-current' | 'analysis-failed';
+      readonly message: string })
   | { readonly status: 'cancelled' };
 
 /** Required measurement input to the architect renderer. */

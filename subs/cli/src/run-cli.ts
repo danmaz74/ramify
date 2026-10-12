@@ -5,10 +5,12 @@ import { checkCommand } from './check-command.js';
 import { daemonCommand } from './daemon-command.js';
 import { materializeCommand } from './materialize-command.js';
 import { measureCommand } from './measure-command.js';
+import { ownershipCommand } from './ownership-command.js';
 import { affectedCommand } from './affected-command.js';
 import { exploreCommand } from './explore-command.js';
 import { watchCommand } from './watch-command.js';
 import { CliFailure } from './errors.js';
+import { failureDocument, formatFailureHuman } from './format.js';
 
 export async function runCli(argv: readonly string[], environment: CliEnvironment, control: RunControl = {}): Promise<CliExitCode> {
   const stderr = (text: string): void => { try { environment.stderr(text); } catch { /* The failed output already selects exit 2. */ } };
@@ -34,21 +36,33 @@ export async function runCli(argv: readonly string[], environment: CliEnvironmen
     if (args.command === 'daemon') return await daemonCommand(args, output, control);
     if (args.command === 'materialize') return await materializeCommand(args, output, control);
     if (args.command === 'measure') return await measureCommand(args, output, control);
+    if (args.command === 'ownership') return await ownershipCommand(args, output, control);
     if (args.command === 'affected') return await affectedCommand(args, output, control);
     if (args.command === 'explore') return await exploreCommand(args, output, control);
     throw new Error('Invalid command dispatch');
   } catch (error) {
     if (!outputFailed && control.signal?.aborted) return interrupted();
+    if (!outputFailed && error instanceof CliFailure && error.code === 'cancelled') return interrupted();
     const code = outputFailed ? 'output-failure' : phase === 'invocation' ? 'invalid-invocation'
       : error instanceof CliFailure ? error.code : 'internal-error';
     const message = error instanceof Error ? error.message : String(error);
+    const evidence = error instanceof CliFailure ? error.evidence : {};
+    const document = failureDocument(code, message, 2, evidence, phase);
+    const operation = phase === 'invocation' ? 'Invocation' : args?.command === 'check' ? 'Check'
+      : args?.command === 'affected' ? 'Affected selection' : args?.command === 'materialize' ? 'Materialize'
+      : args?.command === 'measure' ? 'Measure' : args?.command === 'ownership' ? 'Ownership'
+      : args?.command === 'explore' ? 'Explore' : args?.command === 'daemon' ? 'Daemon' : 'Watch';
+    const humanFailure = (): string => {
+      try { return formatFailureHuman(operation, code, document, 'No result was claimed.'); }
+      catch { return `${operation} failed (${code}): ${message}\nNo result was claimed.\n`; }
+    };
     if (json && !outputFailed) {
       try {
         environment.stdout(JSON.stringify(args?.command === 'watch'
           ? { schemaVersion: 'ramify.watch/2', event: code === 'stopped' ? 'stopped' : 'unavailable', reason: message }
-          : { schemaVersion: 'ramify.cli/1', status: 'unavailable', diagnostics: [{ category: phase, code, message }], exitCode: 2 }) + '\n');
-      } catch { stderr('Error [output-failure]: Cannot write the invocation result.\n'); }
-    } else stderr(`Error [${code}]: ${message}\n`);
+          : document) + '\n');
+      } catch { stderr(`Output failed: Cannot write the ${operation.toLowerCase()} result.\n` + humanFailure()); }
+    } else stderr(humanFailure());
     return 2;
   }
 }

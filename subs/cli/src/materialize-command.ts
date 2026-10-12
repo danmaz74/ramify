@@ -7,7 +7,9 @@ import type { ContextToken } from '../../daemon/src/context-types.js';
 import type { MaterializeOutcome, MaterializeViewId } from '../../../src/interfaces/service.js';
 import type { CliEnvironment, CliExitCode } from './interfaces/cli.js';
 import { capabilities } from './command-support.js';
-import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
+import { CliFailure, disconnectFailure, serviceFailure, withFailureOutput } from './errors.js';
+import type { CliFailureEvidence } from './errors.js';
+import { failureDocument, formatFailureHuman } from './format.js';
 
 interface MaterializeArguments { readonly root?: string; readonly from?: string; readonly all: boolean;
   readonly views?: readonly MaterializeViewId[] }
@@ -34,8 +36,9 @@ function success(root: string, outcome: Extract<MaterializeOutcome, { status: 'm
 
 /** Compact failure line: names the stable reason and states that no complete
  * refresh was claimed, per the same contract section. */
-function failureText(root: string, reason: string, message: string): string {
-  return `Root: ${root}\n` + `Not materialized (${reason}): ${message}\n` + 'No complete refresh was claimed.\n';
+function failureText(root: string, reason: string, message: string, evidence: CliFailureEvidence = {}): string {
+  return formatFailureHuman('Materialize', reason, failureDocument(reason, message, 2, evidence),
+    'No complete refresh was claimed.', root);
 }
 
 function outcomeReason(value: Exclude<MaterializeOutcome, { status: 'materialized' }>): { reason: string; message: string } {
@@ -84,13 +87,17 @@ export async function materializeCommand(args: MaterializeArguments, environment
           // (no configuration found, an acquisition failure) is exit 2 like any
           // other unavailable outcome, never a claimed "invalid project".
           const label = opened.value.resolution.status;
-          const detail = opened.value.resolution.issues[0]?.message ?? `project ${label}`;
-          environment.stdout(failureText(args.root ?? `(discovered from ${environment.cwd})`, `project-${label}`, detail));
+          const detail = opened.value.report.diagnostics[0]?.message
+            ?? (opened.value.resolution.issues.map(item => item.message).join('; ') || `project ${label}`);
+          const evidence = { diagnostics: opened.value.report.diagnostics, stages: opened.value.report.stages };
+          withFailureOutput({ reason: `project-${label}`, message: detail, ...evidence },
+            () => environment.stdout(failureText(args.root ?? `(discovered from ${environment.cwd})`, `project-${label}`, detail,
+              evidence)));
           return label === 'invalid' ? 1 : 2;
         }
         if (opened.value.status === 'unavailable') throw new CliFailure(
           opened.value.reason === 'disposed' || opened.value.reason === 'configuration-changed' ? 'unavailable' : opened.value.reason,
-          opened.value.message, opened.value);
+          opened.value.message, opened.value, opened.value);
         token = opened.value.token;
         const root = opened.value.current.selection.root;
         let selection: ApiViewSelection;
@@ -118,7 +125,9 @@ export async function materializeCommand(args: MaterializeArguments, environment
           continue;
         }
         const { reason, message } = outcomeReason(value);
-        environment.stdout(failureText(root, reason, message));
+        const evidence = { reason, message, ...value };
+        withFailureOutput(evidence,
+          () => environment.stdout(failureText(root, reason, message, evidence)));
         return 2;
       } catch (error) {
         control.signal?.throwIfAborted();

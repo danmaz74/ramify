@@ -278,7 +278,8 @@ describe('RetainedSession.affected: revisions and readiness (A7-05)', () => {
       const invalid = await revised(handle, [formPaths.pDescription]);
       expect(invalid.outcome.execution).toBe('invalid');
       expect(await query(handle, { sequence: invalid.sequence, modules: ['fixture/p'] })).toEqual({
-        status: 'unavailable', reason: 'invalid-current', message: expect.any(String), unknownModules: [] });
+        status: 'unavailable', reason: 'invalid-current', message: expect.any(String), unknownModules: [],
+        diagnostics: invalid.diagnostics, stages: invalid.stages });
       expect(await query(handle, { sequence: valid, modules: ['fixture/p'] })).toMatchObject({ status: 'unavailable', reason: 'invalid-revision' });
     } finally { await handle.dispose(); }
   }, formFiles), timeout);
@@ -293,7 +294,8 @@ describe('RetainedSession.affected: revisions and readiness (A7-05)', () => {
       const blocked = await revised(handle, [formPaths.pDescription]);
       expect(blocked.outcome).toMatchObject({ execution: 'invalid', coverage: 'not-run' });
       expect(await query(handle, { sequence: blocked.sequence, modules: ['fixture/p'] })).toEqual({
-        status: 'unavailable', reason: 'missing-facts', message: expect.any(String), unknownModules: [] });
+        status: 'unavailable', reason: 'missing-facts', message: expect.any(String), unknownModules: [],
+        diagnostics: blocked.diagnostics, stages: blocked.stages });
     } finally { await handle.dispose(); }
   }, formFiles), timeout);
 

@@ -80,16 +80,19 @@ describe('affected batch form (A7-11)', () => {
       expect(direct).toMatchObject({ status: 'unavailable', reason: 'invalid-project', unknownModules: [], exitCode: 1 });
       const json = await invoke(empty, ['affected', 'x', '--root', empty, '--batch', '--format', 'json']);
       expect([json.exitCode, json.stderr, json.writes]).toEqual([1, '', 1]);
-      expect(JSON.parse(json.stdout)).toEqual({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 1,
-        diagnostics: [{ category: 'execution', code: 'invalid-project', message: expect.any(String) }] });
+      const refusal = JSON.parse(json.stdout);
+      expect(refusal).toMatchObject({ schemaVersion: 'ramify.cli/2', status: 'unavailable', exitCode: 1 });
+      expect(refusal.diagnostics[0]).toMatchObject({ category: 'execution', code: 'invalid-project', message: expect.any(String) });
+      expect(refusal.diagnostics[1]).toMatchObject({ code: 'missing-root-description', location: null });
       const human = await invoke(empty, ['affected', 'x', '--root', empty, '--batch']);
       expect(human.exitCode).toBe(1);
-      expect(human.stdout).toContain(`Root: ${empty}\nNot selected (invalid-project): `);
+      expect(human.stdout).toMatch(/^Affected selection failed \(invalid-project\)\./);
+      expect(human.stdout).toContain(`Root: ${empty}\nNo affected-module selection was claimed.`);
       const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
       try {
         const resident = await invoke(empty, ['affected', 'x', '--root', empty, '--format', 'json'], runAffectedBatch, quick.connect);
         expect([resident.exitCode, resident.stderr]).toEqual([1, '']);
-        expect(JSON.parse(resident.stdout)).toMatchObject({ exitCode: 1, diagnostics: [{ code: 'invalid-project' }] });
+        expect(JSON.parse(resident.stdout).diagnostics[0]).toMatchObject({ code: 'invalid-project' });
       } finally { await quick.dispose(); }
       // A root description without the root marker is invalid the same way (R7).
       await put(empty, 'module.ramify', 'ramify 1\nmodule empty\n');
@@ -107,14 +110,16 @@ describe('affected batch form (A7-11)', () => {
       expect(direct).toMatchObject({ status: 'unavailable', reason: 'project-unavailable', unknownModules: [], exitCode: 2 });
       const human = await invoke(empty, ['affected', 'x', '--batch']);
       expect([human.exitCode, human.stderr]).toEqual([2, '']);
-      expect(human.stdout).toContain(`Root: (discovered from ${empty})\nNot selected (project-unavailable): `);
+      expect(human.stdout).toMatch(/^Affected selection failed \(project-unavailable\)\./);
+      expect(human.stdout).toContain(`Root: (discovered from ${empty})\nNo affected-module selection was claimed.`);
       const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
       try {
         for (const form of [[], ['--batch']]) {
           const json = await invoke(empty, ['affected', 'x', '--format', 'json', ...form], runAffectedBatch, quick.connect);
           expect([json.exitCode, json.stderr, json.writes], form.join(' ')).toEqual([2, '', 1]);
-          expect(JSON.parse(json.stdout)).toEqual({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 2,
-            diagnostics: [{ category: 'execution', code: 'project-unavailable', message: expect.any(String) }] });
+          const refusal = JSON.parse(json.stdout);
+          expect(refusal).toMatchObject({ schemaVersion: 'ramify.cli/2', status: 'unavailable', exitCode: 2 });
+          expect(refusal.diagnostics[0]).toMatchObject({ category: 'execution', code: 'project-unavailable', message: expect.any(String) });
         }
       } finally { await quick.dispose(); }
     } finally { await rm(empty, { recursive: true, force: true }); }
@@ -134,8 +139,10 @@ describe('affected batch form (A7-11)', () => {
       for (const form of [[], ['--batch']]) {
         const json = await invoke(root, ['affected', 'example/core', '--format', 'json', ...form], runAffectedBatch, quick.connect);
         expect([json.exitCode, json.stderr], form.join(' ')).toEqual([1, '']);
-        expect(JSON.parse(json.stdout)).toEqual({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 1,
-          diagnostics: [{ category: 'execution', code: 'invalid-project', message: expect.any(String) }] });
+        const refusal = JSON.parse(json.stdout);
+        expect(refusal).toMatchObject({ schemaVersion: 'ramify.cli/2', status: 'unavailable', exitCode: 1 });
+        expect(refusal.diagnostics[0]).toMatchObject({ category: 'execution', code: 'invalid-project', message: expect.any(String) });
+        expect(refusal.diagnostics.slice(1)).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'missing-export' })]));
       }
     } finally { await quick.dispose(); }
   }), 60_000);

@@ -35,8 +35,8 @@ describe('signature-companion forms of the batch and resident CLI', () => {
     const first = lines.findIndex(line => line.startsWith('Error '));
     expect(lines.slice(first, first + 3)).toEqual([
       `Error [exposed-without-companion] module.ramify:3:1: ${message}`,
-      '  Original: fixture/interfaces/api.ts#area',
-      '  Related: src/interfaces/api.ts:3:29',
+      '    Original: fixture/interfaces/api.ts#area',
+      '    Related: src/interfaces/api.ts:3:29',
     ]);
     expect(lines.filter(line => line.startsWith('Error '))).toHaveLength(1);
     expect(lines.filter(line => line.startsWith('Analysis limit '))).toEqual([`Analysis limit [signature-inferred] src/interfaces/api.ts:4:1: ${note}`]);

@@ -47,6 +47,8 @@ export class Capture {
   #marked: Set<string> | undefined;
   #reporting = false;
   #root: string;
+  /** Canonical selected project candidate, distinct from the capture's initial cwd. */
+  selectedRoot: string | null = null;
   #version = 0;
   #inputs: readonly CapturedInput[] | undefined;
   #signal: AbortSignal | undefined;

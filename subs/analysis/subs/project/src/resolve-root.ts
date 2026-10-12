@@ -142,6 +142,6 @@ export async function resolveProjectRoot(request: ProjectRequest, read: RootMark
     if (signal?.aborted) throw signal.reason ?? error;
     const issue = error instanceof AcquisitionError ? error : new AcquisitionError('read-failure', capture.root, String(error));
     return freeze({ status: ['missing-root-description', 'unmarked-root-description', 'symlink-root', 'symlink-description'].includes(issue.code) ? 'invalid' : 'unavailable',
-      issues: [{ code: issue.code, path: capture.label(capture.path(issue.path)), message: issue.message }] });
+      root: capture.selectedRoot, issues: [{ code: issue.code, path: capture.label(capture.path(issue.path)), message: issue.message }] });
   } finally { await capture.dispose(); }
 }

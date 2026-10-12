@@ -50,7 +50,7 @@ async function changed(p: SequenceProcess, root: string, a: Assertions, label: s
   recordObservation(label, { ...result, raw: await archiveObservation(label, result) });
   a.equal(`${label}: finite process exit and stderr`, [result.code, result.signal, result.error, result.stderr], [expected, null, null, '']);
   const document = JSON.parse(result.stdout) as CheckDocument;
-  a.equal(`${label}: one compact document and matching exit`, [document.schemaVersion, result.stdout.trim().split('\n').length, document.exitCode], ['ramify.check/3', 1, expected]);
+  a.equal(`${label}: one compact document and matching exit`, [document.schemaVersion, result.stdout.trim().split('\n').length, document.exitCode], ['ramify.check/4', 1, expected]);
   // Phase 1 project boundaries, iteration 15: each named path carries a disposition in
   // place of the coverage flag. An answered check leaves no path not checked; a check
   // that could not establish its result shows none of these single paths as checked.

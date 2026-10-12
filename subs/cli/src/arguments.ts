@@ -1,3 +1,4 @@
+import { projectPathProblem } from '../../analysis/subs/project/src/path-syntax.js';
 import type { MaterializeViewId } from '../../../src/interfaces/service.js';
 
 export const help = `Usage: ramify check [--root <dir>] [--format json [--no-snapshot]] [--batch]
@@ -8,6 +9,7 @@ export const help = `Usage: ramify check [--root <dir>] [--format json [--no-sna
        ramify measure [--root <dir>] [--format json]
        ramify affected [<module-id>...] [--path <path>]... [--root <dir>] [--batch]
                        [--format human|json]
+       ramify ownership [--path <path>]... [--root <dir>] [--format human|json]
        ramify explore [--root <dir>]
        ramify daemon status|stop [--format json]
        ramify --help
@@ -34,6 +36,9 @@ are discovered from the working directory; --root gives an explicit root.
                    verifies it. --deadline bounds the wait (default 2000 ms;
                    maximum 600000 ms) but does not delay that reply. --since
                    marks findings added since that revision.
+                   JSON uses ramify.check/4: findings and path dispositions
+                   stay current, with available stages and resident recovery
+                   history on invalid or not-checked outcomes.
   --no-snapshot    Leave the snapshot of every evaluated import out of a
                    complete check's JSON report. The report keeps its schema
                    and sets "snapshot": null; its summary, outcome and findings
@@ -82,6 +87,20 @@ modules, as does partial coverage; the widening reasons are printed. Without
 a ramify.file-facts/1 block for the paths without changing module selection.
 --changed, --since and --deadline do not apply.
 
+ownership answers current ownership from a fresh coherent inventory, even when
+export linking is invalid. It starts no daemon and runs no full analysis. Paths
+are normalized relative to the selected root; omitted paths mean '.', and each
+exact path is answered once in first-request order. Outside-project and excluded
+paths are successful answers. --format json prints ramify.ownership/1.
+
+Failed affected and measure queries and command errors use ramify.cli/2 in
+JSON. Both CLI/2 and Check/4 retain producer diagnostics and available stages.
+Resident failures may include ramify.recovery/1: its paths were observed since
+the last completed analysis and help investigation; they do not identify a
+cause or prescribe a rollback. A context without a completed analysis states
+that its history is unavailable. An invocation with no context omits recovery.
+Batch analysis reports remain ramify.analysis/3, and ownership is always batch.
+
 explore selects one project through the resident daemon, starts or reuses that
 project's resident explorer server, prints its /analysis/latest URL, opens it in
 the platform browser and exits. The server keeps running after explore exits,
@@ -100,6 +119,8 @@ service, 130 interrupted.
 measure: 0 one complete document, 1 the project is invalid, 2 unavailable,
 pending, cold, deadline, supersession, resource refusal or incompatible service,
 130 interrupted.
+ownership: 0 answered, 1 invalid project, 2 incomplete or unavailable acquisition
+or malformed invocation, 130 interrupted without an ownership document.
 affected: 0 one complete answer, including an all-modules answer, 1 the project
 is invalid, a module ID is unknown or a seed is invalid, 2 unavailable (including
 a project that cannot be found), pending, cold, supersession or incompatible
@@ -119,6 +140,7 @@ type Arguments = { readonly command: 'help' | 'version' }
   | { readonly command: 'measure'; readonly root?: string; readonly format: 'human' | 'json' }
   | { readonly command: 'affected'; readonly root?: string; readonly format: 'human' | 'json'; readonly batch: boolean;
       readonly modules: readonly string[]; readonly paths: readonly string[]; readonly fileFacts?: true }
+  | { readonly command: 'ownership'; readonly root?: string; readonly format: 'human' | 'json'; readonly paths: readonly string[] }
   | { readonly command: 'explore'; readonly root?: string };
 
 /** Validate the entire invocation before dispatch, including duplicate flags. */
@@ -127,7 +149,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (argv.length === 1 && argv[0] === '--version') return { command: 'version' };
   const command = argv[0];
   if (command !== 'check' && command !== 'watch' && command !== 'daemon' && command !== 'materialize' && command !== 'measure'
-    && command !== 'explore' && command !== 'affected') {
+    && command !== 'explore' && command !== 'affected' && command !== 'ownership') {
     throw new Error(argv.length ? `Unavailable command: ${command}.` : 'Specify a command. Use ramify --help.');
   }
   const action = argv[1];
@@ -139,6 +161,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
   let from: string | undefined, all = false, views: MaterializeViewId[] | undefined;
   const modules: string[] = [], paths: string[] = [];
   const flags = command === 'check' ? ['--root', '--format', '--batch', '--no-snapshot', '--changed', '--since', '--deadline']
+    : command === 'ownership' ? ['--root', '--format', '--path']
     : command === 'affected' ? ['--root', '--format', '--batch', '--path', '--file-facts']
     : command === 'watch' || command === 'measure' ? ['--root', '--format'] : command === 'materialize' ? ['--root', '--from', '--all', '--view']
     : command === 'explore' ? ['--root'] : ['--format'];
@@ -198,8 +221,8 @@ export function parseArguments(argv: readonly string[]): Arguments {
       deadlineMs = parsed;
     }
     else {
-      if (command === 'affected' && value === 'human') { format = 'human'; continue; }
-      if (value !== 'json') throw new Error(command === 'affected'
+      if ((command === 'affected' || command === 'ownership') && value === 'human') { format = 'human'; continue; }
+      if (value !== 'json') throw new Error(command === 'affected' || command === 'ownership'
         ? `Unsupported format: ${value}. Use --format json or --format human, or omit it for human output.`
         : `Unsupported format: ${value}. Use --format json or omit it for human output.`);
       format = 'json';
@@ -209,7 +232,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (command === 'check') {
     if (changed && batch) throw new Error('--changed cannot be combined with --batch');
     if (!changed && (since !== undefined || deadlineMs !== undefined)) throw new Error('--since and --deadline require --changed');
-    // A changed check's ramify.check/3 document has no snapshot to leave out.
+    // A changed check's ramify.check/4 document has no snapshot to leave out.
     if (changed && noSnapshot) throw new Error('--no-snapshot cannot be combined with --changed');
     if (noSnapshot && format !== 'json') throw new Error('--no-snapshot requires --format json');
     return { command, ...project, batch, ...(changed ? { changed } : {}),
@@ -218,6 +241,14 @@ export function parseArguments(argv: readonly string[]): Arguments {
   }
   if (command === 'watch') return { command, ...project };
   if (command === 'measure') return { command, ...project };
+  if (command === 'ownership') {
+    const requested = [...new Set(paths.length ? paths : ['.'])];
+    for (const path of requested) {
+      const problem = projectPathProblem(path);
+      if (problem !== null) throw new Error(problem);
+    }
+    return { command, ...project, paths: requested };
+  }
   if (command === 'affected') {
     if (!modules.length && !paths.length) throw new Error('affected requires at least one module ID or --path');
     if (fileFacts && (!batch || format !== 'json' || !paths.length)) throw new Error('--file-facts requires --batch, --format json and at least one --path');

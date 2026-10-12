@@ -1,6 +1,7 @@
+import { isProjectOwnership } from '../subs/analysis/subs/project/src/ownership-validation.js';
 import { spawn } from 'node:child_process';
 import type { RunControl } from '../subs/analysis/src/interfaces/analysis.js';
-import type { AffectedBatchOperation, AffectedBatchResult, BatchOperation, BatchResult } from './interfaces/batch.js';
+import type { AffectedBatchOperation, AffectedBatchResult, BatchOperation, BatchResult, OwnershipBatchOperation, OwnershipBatchResult } from './interfaces/batch.js';
 import { reportCapacity } from './report-capacity.js';
 
 const errorBytes = 64 * 1024;
@@ -24,7 +25,7 @@ function affectedResult(value: unknown): value is AffectedBatchResult {
 }
 
 /** One Node child per run of the named operation. A cancelled run resolves as cancelled once the child has exited. */
-function runChild<T>(runtime: string, entry: string, operation: 'check' | 'affected', invocation: unknown,
+function runChild<T>(runtime: string, entry: string, operation: 'check' | 'affected' | 'ownership', invocation: unknown,
   valid: (value: unknown) => value is T, cancelled: T, control: RunControl = {}): Promise<T> {
   return new Promise<T>((accept, reject) => {
     const args = operation === 'check' ? [entry, JSON.stringify(invocation)] : [entry, operation, JSON.stringify(invocation)];
@@ -66,4 +67,29 @@ export function createProcessBatch(runtime: string, entry: string): BatchOperati
 /** The affected-module batch form in the same Node child seam as `check --batch`. */
 export function createProcessAffectedBatch(runtime: string, entry: string): AffectedBatchOperation {
   return (invocation, control) => runChild(runtime, entry, 'affected', invocation, affectedResult, { status: 'cancelled', exitCode: 130 }, control);
+}
+
+/** Fresh inventory ownership in the compiled client's Node child seam. */
+export function createProcessOwnershipBatch(runtime: string, entry: string): OwnershipBatchOperation {
+  const valid = (value: unknown): value is OwnershipBatchResult => {
+    if (value && typeof value === 'object' && 'status' in value && value.status === 'cancelled') {
+      return Object.keys(value).length === 2 && 'exitCode' in value && value.exitCode === 130;
+    }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const result = value as Record<string, unknown>;
+    const keys = result.status === 'answered' ? ['status', 'exitCode', 'root', 'inputId', 'scope', 'paths', 'warnings']
+      : ['status', 'exitCode', 'root', 'diagnostics', ...('stages' in result ? ['stages'] : [])];
+    if (Object.keys(result).length !== keys.length || !keys.every(key => Object.hasOwn(result, key))) return false;
+    if (result.status === 'answered') {
+      const scope = result.scope as Record<string, unknown> | null;
+      return result.exitCode === 0 && typeof result.root === 'string' && typeof result.inputId === 'string'
+        && !!scope && typeof scope === 'object' && typeof scope.configuration === 'string' && isProjectOwnership(scope.ownership)
+        && Object.keys(scope).length === 2 && Array.isArray(result.paths) && Array.isArray(result.warnings);
+    }
+    return (result.status === 'invalid' ? result.exitCode === 1
+      : (result.status === 'incomplete' || result.status === 'unavailable') && result.exitCode === 2)
+      && (result.root === null || typeof result.root === 'string') && Array.isArray(result.diagnostics)
+      && (!('stages' in result) || Array.isArray(result.stages));
+  };
+  return (invocation, control) => runChild(runtime, entry, 'ownership', invocation, valid, { status: 'cancelled', exitCode: 130 }, control);
 }

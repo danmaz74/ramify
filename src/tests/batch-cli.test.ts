@@ -18,8 +18,9 @@ describe('CLI with real batch sessions', () => {
     expect([human.exitCode, json.exitCode]).toEqual([selection === 'resolved' ? 0 : 2, selection === 'resolved' ? 0 : 2]);
     expect([human.stderr, json.stderr]).toEqual(['', '']);
     const lines = human.stdout.split('\n');
-    expect(lines[1]).toBe(`Configuration: ${expected.report.scope?.configuration ?? 'unavailable'}`);
-    expect(lines[2]).toBe('Mode: batch');
+    expect(lines).toContain(`Configuration: ${expected.report.scope?.configuration ?? 'unavailable'}`);
+    expect(lines).toContain('Mode: batch');
+    if (selection === 'unresolved') expect(lines[0]).toMatch(/^Check failed /);
     expect(lines.filter(line => line.startsWith('Mode:'))).toEqual(['Mode: batch']);
     expect(json.stdout).toBe(JSON.stringify(expected.report) + '\n');
     expect(json.writes).toBe(1);
@@ -223,7 +224,7 @@ describe('CLI with real batch sessions', () => {
   it('A7-11: affected --batch without an affected batch operation is unavailable, not a check', () => affectedFixture(async root => {
     const result = await invoke(root, ['affected', 'example/core', '--batch', '--format', 'json']);
     expect([result.exitCode, result.stderr, result.writes]).toEqual([2, '', 1]);
-    expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', diagnostics: [{ code: 'unavailable' }] });
+    expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/2', diagnostics: [{ code: 'unavailable' }] });
   }), 15_000);
 
   it('A7-11: handles an output failure after a real affected batch session', () => affectedFixture(async root => {

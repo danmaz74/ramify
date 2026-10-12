@@ -11,8 +11,10 @@ import type { CheckOutcome } from '../../../daemon/src/context-types.js';
 import type { CheckDocument, CliEnvironment } from '../interfaces/cli.js';
 import { formatChangedHuman } from '../format.js';
 import { runCli } from '../run-cli.js';
+import { checkDocumentSchema } from './response-schema.js';
 import { exhaustedRecoveryWitness } from './exhausted-recovery.js';
 import { changedCleanupWitness } from './changed-cleanup.js';
+import { locatedDiagnostics, producedStages, overflow } from './recovery-contract-fixtures.js';
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'ramify-changed-command-'));
@@ -31,7 +33,7 @@ async function command(root: string, connect: ServiceConnector, extra: readonly 
     stdout: value => { stdout.push(value); }, stderr: value => { stderr.push(value); },
     batch: async () => { batchCalls++; throw new Error('Changed checks must never call batch'); } };
   const code = await runCli(['check', '--changed', changed, '--format', 'json', ...extra], environment, control);
-  return { code, stdout, stderr, batchCalls, document: stdout.length ? JSON.parse(stdout[0]) as CheckDocument : null };
+  return { code, stdout, stderr, batchCalls, document: stdout.length ? checkDocumentSchema.parse(JSON.parse(stdout[0])) : null };
 }
 
 // Real compiler startup, updates and teardown need room under parallel regression.
@@ -62,8 +64,8 @@ describe('changed check command', { timeout: 30_000 }, () => {
       expect(requests[1]).toMatchObject({ scope: 'delta', paths: ['src/main.ts'], classification: 1,
         freshness: { mode: 'synchronized', expect: [{ path: 'src/main.ts', sha256 }] } });
       expect(requests[1].deadlineMs).toBeLessThanOrEqual(2_000);
-      const output = JSON.parse(stdout[0]) as CheckDocument;
-      expect(output).toMatchObject({ schemaVersion: 'ramify.check/3', root: f.root, outcome: 'checked', reason: null,
+      const output = checkDocumentSchema.parse(JSON.parse(stdout[0]));
+      expect(output).toMatchObject({ schemaVersion: 'ramify.check/4', root: f.root, outcome: 'checked', reason: null,
         execution: 'completed', exitCode: 0, findings: [],
         paths: [{ path: 'src/main.ts', disposition: 'checked', module: 'fixture', exclusion: null, reason: 'content', sha256 }] });
       expect(output.revision?.path).toBe('cold');
@@ -141,7 +143,7 @@ describe('changed check command', { timeout: 30_000 }, () => {
       : kind === 'incompatible' ? { kind, client: 'ramify.ipc/2', daemon: 'ramify.ipc/0' } : { kind, requestId: null };
     const result = await command('/project', async () => ({ status: 'unavailable', attempts: 3, reason, message: 'Unavailable' }));
     expect([result.code, result.stdout.length, result.stderr, result.batchCalls]).toEqual([2, 1, [], 0]);
-    expect(result.document).toMatchObject({ schemaVersion: 'ramify.check/3', outcome: 'not-checked',
+    expect(result.document).toMatchObject({ schemaVersion: 'ramify.check/4', outcome: 'not-checked',
       reason: kind === 'failure' ? 'unavailable' : kind === 'explicit-stop' ? 'stopped' : 'incompatible', exitCode: 2 });
   });
 
@@ -194,6 +196,83 @@ describe('changed check command', { timeout: 30_000 }, () => {
           sha256: createHash('sha256').update('ramify 1\nroot module fixture\nexpose-src\n').digest('hex') }], exitCode: 1 });
       expect(result.document?.findings.length).toBeGreaterThan(0);
       expect(result.document?.findings.some(finding => finding.new)).toBe(true);
+    } finally { await f.dispose(); }
+  });
+
+  it('forwards reportless service diagnostics, stages and recovery through Check/4', async () => {
+    const f = await fixture();
+    try {
+      const connect: ServiceConnector = async options => {
+        const connected = await f.quick.connect(options);
+        if (connected.status !== 'connected') return connected;
+        return { ...connected, connection: { ...connected.connection,
+          async check() { return { ok: false, error: { code: 'internal-error', message: 'Compiler stopped',
+            details: {}, diagnostics: locatedDiagnostics, stages: producedStages, recovery: overflow } }; },
+        } };
+      };
+      const result = await command(f.root, connect, ['--deadline', '5000']);
+      expect([result.code, result.stdout.length, result.stderr]).toEqual([2, 1, []]);
+      expect(result.document).toMatchObject({ outcome: 'not-checked', reason: 'unavailable',
+        findings: locatedDiagnostics.map(issue => ({ ...issue, new: false })),
+        stages: producedStages, recovery: overflow });
+    } finally { await f.dispose(); }
+  });
+
+  it('forwards a reportless unavailable value recovery without inventing diagnostics', async () => {
+    const f = await fixture();
+    try {
+      const connect: ServiceConnector = async options => {
+        const connected = await f.quick.connect(options);
+        if (connected.status !== 'connected') return connected;
+        return { ...connected, connection: { ...connected.connection,
+          async check(params) { return { ok: true, value: { status: 'unavailable', requestId: params.requestId,
+            reason: 'analysis-failed', message: 'Analysis did not finish', recovery: overflow } }; },
+        } };
+      };
+      const result = await command(f.root, connect, ['--deadline', '5000']);
+      expect([result.code, result.stderr]).toEqual([2, []]);
+      expect(result.document).toMatchObject({ outcome: 'not-checked', reason: 'analysis-failed', findings: [], recovery: overflow });
+      expect(result.document).not.toHaveProperty('stages');
+    } finally { await f.dispose(); }
+  });
+
+  it.each(['sink', 'human formatter'] as const)('preserves an invalid Check/4 cause after %s failure', async fault => {
+    const f = await fixture();
+    try {
+      const warm = await command(f.root, f.quick.connect, ['--deadline', '5000']);
+      expect(warm.code).toBe(0);
+      await writeFile(join(f.root, 'module.ramify'), 'ramify 1\nroot module fixture\nexpose-src\n');
+      const connect: ServiceConnector = async options => {
+        const connected = await f.quick.connect(options);
+        if (connected.status !== 'connected' || fault !== 'human formatter') return connected;
+        return { ...connected, connection: { ...connected.connection,
+          async check(params, control) {
+            const response = await connected.connection.check(params, control);
+            if (!response.ok || response.value.status !== 'reported' || !response.value.delta) return response;
+            const warning = { code: 'ignored-but-walked' as const, path: 'module.ramify',
+              get message(): string { throw new Error('Injected warning formatter failure'); } };
+            return { ok: true, value: { ...response.value,
+              delta: { ...response.value.delta, warnings: [...response.value.delta.warnings, warning] } } };
+          },
+        } };
+      };
+      const stdout: string[] = [], stderr: string[] = [];
+      const exit = await runCli(['check', '--changed', 'module.ramify', '--deadline', '5000',
+        ...(fault === 'sink' ? ['--format', 'json'] : [])], {
+        cwd: f.root, version: '0', connect, batch: async () => { throw new Error('Unexpected batch'); },
+        stdout: value => { if (fault === 'sink') throw new Error('Injected stdout failure'); stdout.push(value); },
+        stderr: value => { stderr.push(value); },
+      });
+      const failure = stderr.join('');
+      expect([exit, stdout]).toEqual([2, []]);
+      expect(failure).toContain('Check failed (output-failure).');
+      expect(failure).toContain('original invalid-project: Check invalid;');
+      expect(failure).toContain('module.ramify:3:');
+      expect(failure).toContain('Stages:');
+      expect(failure).toContain('Observed history:');
+      expect(failure).toContain('No result was claimed.');
+      if (fault === 'human formatter') expect(failure).toContain('Injected warning formatter failure');
+      else expect(failure).toContain('Injected stdout failure');
     } finally { await f.dispose(); }
   });
 

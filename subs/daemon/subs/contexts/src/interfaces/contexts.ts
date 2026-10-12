@@ -1,4 +1,4 @@
-import type { AnalysisReport, AnalysisSummary, Capability, RunControl, AnalysisDiagnostic } from '../../../../../analysis/src/interfaces/analysis.js';
+import type { AnalysisReport, AnalysisSummary, Capability, RunControl, AnalysisDiagnostic, AnalysisFailureEvidence, StageExecution } from '../../../../../analysis/src/interfaces/analysis.js';
 import type { ApiViewProjection, ApiViewSelection, CheckedSet, RevisionTimings, SessionStatus, SessionOpen } from '../../../../../analysis/src/interfaces/session.js';
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest, TestTitleLimits } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { PathOwnership, ProjectExclusion, ProjectRequest, ProjectScope, ProjectResolution, ProjectWarning } from '../../../../../analysis/subs/project/src/interfaces/project.js';
@@ -81,6 +81,14 @@ export interface ContextRevision {
   readonly capture: CaptureTimings;
   readonly outcome: AnalysisReport['outcome'];
   readonly summary: AnalysisSummary;
+}
+/** Detached observations since a live context's last completed analysis. */
+export interface RecoveryEvidence {
+  readonly schemaVersion: 'ramify.recovery/1';
+  readonly lastCompleted: { readonly context: ContextId; readonly generation: GenerationId;
+    readonly revision: RevisionId; readonly inputId: string } | null;
+  readonly changes: { readonly paths: readonly string[]; readonly coverage: 'observed' | 'unavailable';
+    readonly reason: string | null };
 }
 export type ContextState = 'opening' | 'warm' | 'cold' | 'evicted';
 export type SynchronizationState = 'initializing' | 'synchronized' | 'reconciling'
@@ -173,31 +181,34 @@ export type UnavailableReason = 'unknown-context' | 'expired-generation' | 'evic
   | 'resource-unavailable' | 'analysis-failed' | 'unsupported-setup' | 'disposed'
   /** A synchronized request named a configuration path; the context answers at once and updates behind it. */
   | 'configuration-changed';
-export interface Unavailable {
+export interface Unavailable extends AnalysisFailureEvidence {
   readonly status: 'unavailable';
   readonly reason: UnavailableReason;
   readonly message: string;
+  readonly recovery?: RecoveryEvidence;
 }
 export type CheckOutcome =
   /** `paths` holds one disposition per requested path, in request order; empty without `paths`. */
   | { readonly status: 'reported'; readonly requestId: string; readonly published: true;
       readonly revision: ContextRevision; readonly freshness: FreshnessRecord; readonly delta: CheckDelta; readonly report: AnalysisReport | null;
-      readonly paths: readonly PathCheckDisposition[]; readonly timings?: ReplyTimings }
+      readonly paths: readonly PathCheckDisposition[]; readonly timings?: ReplyTimings;
+      readonly stages?: readonly StageExecution[]; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'reported'; readonly requestId: string; readonly published: false;
       readonly revision: null; readonly freshness: FreshnessRecord; readonly delta: null; readonly report: AnalysisReport;
-      readonly timings?: ReplyTimings }
-  | { readonly status: 'pending'; readonly requestId: string; readonly current: ContextStatus }
+      readonly timings?: ReplyTimings; readonly stages?: readonly StageExecution[]; readonly recovery?: RecoveryEvidence }
+  | { readonly status: 'pending'; readonly requestId: string; readonly current: ContextStatus; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'superseded'; readonly requestId: string;
       readonly revision: ContextRevision | null;
       readonly mismatches: readonly { readonly path: string; readonly expected: string | null;
-        readonly observed: string | null }[] }
-  | { readonly status: 'cold'; readonly requestId: string; readonly elapsedMs: number; readonly current: ContextStatus }
-  | { readonly status: 'deadline-exceeded'; readonly requestId: string; readonly elapsedMs: number; readonly revision: ContextRevision | null }
+        readonly observed: string | null }[]; readonly recovery?: RecoveryEvidence }
+  | { readonly status: 'cold'; readonly requestId: string; readonly elapsedMs: number; readonly current: ContextStatus; readonly recovery?: RecoveryEvidence }
+  | { readonly status: 'deadline-exceeded'; readonly requestId: string; readonly elapsedMs: number; readonly revision: ContextRevision | null;
+      readonly recovery?: RecoveryEvidence }
   /** The request's expectations do not follow `revision`'s classification of its paths.
    * `paths` is that classification: `not-analyzed` paths need no content; every other
    * path is `not-checked` with reason `classification-changed` and needs its expectation. */
   | { readonly status: 'classification-changed'; readonly requestId: string; readonly revision: ContextRevision;
-      readonly paths: readonly PathCheckDisposition[] }
+      readonly paths: readonly PathCheckDisposition[]; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'cancelled'; readonly requestId: string }
   | (Unavailable & { readonly requestId: string });
 /** One serialized, synchronized API-view request: always synchronized freshness
@@ -228,16 +239,16 @@ export type ContextApiViewOutcome =
       readonly measurementFailure: Exclude<MeasurementViewUnavailableReason, 'not-requested'> | null;
       readonly timings?: ReplyTimings }
   | { readonly status: 'pending' | 'cold'; readonly requestId: string;
-      readonly current: ContextStatus }
+      readonly current: ContextStatus; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'deadline-exceeded'; readonly requestId: string;
-      readonly revision: ContextRevision | null; readonly elapsedMs: number }
+      readonly revision: ContextRevision | null; readonly elapsedMs: number; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'superseded'; readonly requestId: string;
-      readonly revision: ContextRevision | null }
+      readonly revision: ContextRevision | null; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'cancelled'; readonly requestId: string }
   | (Unavailable & { readonly requestId: string })
   /** The selection names no analyzed module location: a path in a declared nested tree, a scratch
    * directory or another excluded path, or one outside the project. */
-  | { readonly status: 'unavailable'; readonly reason: 'invalid-location'; readonly message: string; readonly requestId: string };
+  | (AnalysisFailureEvidence & { readonly recovery?: RecoveryEvidence; readonly status: 'unavailable'; readonly reason: 'invalid-location'; readonly message: string; readonly requestId: string });
 /** One affected-module query against the covering revision. Synchronized freshness
  * joins `apiView`'s rendezvous; published freshness answers from the published
  * revision while the live session still holds it. Seeds are passed to the session
@@ -259,15 +270,15 @@ export type ContextAffectedOutcome =
   | { readonly status: 'answered'; readonly requestId: string; readonly revision: ContextRevision;
       readonly freshness: FreshnessRecord; readonly result: AffectedSelection; readonly timings: ReplyTimings }
   | { readonly status: 'pending' | 'cold'; readonly requestId: string;
-      readonly current: ContextStatus }
+      readonly current: ContextStatus; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'deadline-exceeded'; readonly requestId: string;
-      readonly revision: ContextRevision | null; readonly elapsedMs: number }
+      readonly revision: ContextRevision | null; readonly elapsedMs: number; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'superseded'; readonly requestId: string;
-      readonly revision: ContextRevision | null }
+      readonly revision: ContextRevision | null; readonly recovery?: RecoveryEvidence }
   | { readonly status: 'cancelled'; readonly requestId: string }
-  | { readonly status: 'unavailable'; readonly requestId: string; readonly revision: ContextRevision | null;
+  | (AnalysisFailureEvidence & { readonly recovery?: RecoveryEvidence; readonly status: 'unavailable'; readonly requestId: string; readonly revision: ContextRevision | null;
       readonly reason: AffectedUnavailableReason | UnavailableReason; readonly message: string;
-      readonly unknownModules: readonly string[] };
+      readonly unknownModules: readonly string[] });
 export interface ExplorerDetailsRequest {
   readonly token: ContextToken;
   readonly requestId: string;
@@ -444,6 +455,9 @@ export interface ContextManager {
   open(request: ProjectRequest, setup: ContextSetup, lease: LeaseId, control?: RunControl): Promise<OpenOutcome>;
   status(token: ContextToken): ContextStatus | Unavailable;
   list(): readonly ContextStatus[];
+  /** A frozen, detached snapshot from a live context, for internal carrier assembly.
+   * Iteration 5 must capture it with an outcome at completion, before later changes. */
+  recovery(token: ContextToken): RecoveryEvidence | Unavailable;
   check(request: CheckRequest, lease: LeaseId, control?: RunControl): Promise<CheckOutcome>;
   /** Reuses `check`'s scheduler, expected-content rendezvous, generation, lease,
    * deadline and cancellation rules: the request joins the same per-context queue

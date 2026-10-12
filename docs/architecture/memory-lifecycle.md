@@ -1,5 +1,15 @@
 # Memory lifecycle
 
+The reviewed [recovery contracts](../plans/analysis-failure-recovery/contracts.md)
+add one compact completed identity, bounded path observations and gap codes
+per live context. The local candidate implements this retention; its clean
+committed audit remains pending. Charge all recovery state
+and retained response copies to existing queued-path, per-context and global
+byte budgets; do not retain historical compiler sessions or source bytes.
+Overflow and watcher loss remain explicit history gaps, and disposal releases
+recovery state. A completed publication clears only observations and gaps
+covered by its capture boundary, preserving later events.
+
 **Date:** 2026-09-11; revised 2026-09-21. **Status:** Decided resource-management
 requirements, implemented for the resident daemon and its retained analysis
 sessions with the defaults below. Hook latency on the reference and 100-owner

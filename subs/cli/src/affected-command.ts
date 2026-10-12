@@ -5,7 +5,9 @@ import type { ContextToken } from '../../daemon/src/context-types.js';
 import type { AffectedOutcome } from '../../../src/interfaces/service.js';
 import type { AffectedDocument, CliEnvironment, CliExitCode } from './interfaces/cli.js';
 import { capabilities } from './command-support.js';
-import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
+import { CliFailure, disconnectFailure, serviceFailure, withFailureOutput } from './errors.js';
+import { failureDocument, formatFailureHuman } from './format.js';
+import type { CliFailureEvidence } from './errors.js';
 
 interface AffectedArguments {
   readonly root?: string;
@@ -53,10 +55,11 @@ function print(environment: CliEnvironment, format: 'human' | 'json', mode: 'res
   return 0;
 }
 
-function failure(root: string, format: 'human' | 'json', reason: string, message: string, exitCode: 1 | 2): string {
-  if (format === 'json') return JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable',
-    diagnostics: [{ category: 'execution', code: reason, message }], exitCode }) + '\n';
-  return `Root: ${root}\nNot selected (${reason}): ${message}\nNo affected-module selection was claimed.\n`;
+function failure(root: string, format: 'human' | 'json', reason: string, message: string, exitCode: 1 | 2,
+  evidence: CliFailureEvidence = {}): string {
+  const document = failureDocument(reason, message, exitCode, evidence);
+  return format === 'json' ? JSON.stringify(document) + '\n'
+    : formatFailureHuman('Affected selection', reason, document, 'No affected-module selection was claimed.', root);
 }
 
 function interrupted(environment: CliEnvironment): CliExitCode {
@@ -91,7 +94,7 @@ async function batchAffected(args: AffectedArguments, environment: CliEnvironmen
   if (result.status === 'answered') return print(environment, args.format, 'batch', null, result.result);
   const message = result.unknownModules.length && !result.unknownModules.every(id => result.message.includes(id))
     ? `${result.message} (unknown module IDs: ${result.unknownModules.join(', ')})` : result.message;
-  environment.stdout(failure(args.root ?? `(discovered from ${environment.cwd})`, args.format, result.reason, message, result.exitCode));
+  withFailureOutput(result, () => environment.stdout(failure(args.root ?? `(discovered from ${environment.cwd})`, args.format, result.reason, message, result.exitCode, result)));
   return result.exitCode;
 }
 
@@ -119,14 +122,18 @@ export async function affectedCommand(args: AffectedArguments, environment: CliE
         if (opened.value.status === 'unresolved') {
           // The batch form's codes: an invalid project exits 1, one that cannot be found or read exits 2.
           const label = opened.value.resolution.status;
-          const message = opened.value.resolution.issues[0]?.message ?? `project ${label}`;
+          const message = opened.value.report.diagnostics[0]?.message
+            ?? (opened.value.resolution.issues.map(item => item.message).join('; ') || `project ${label}`);
           const [code, exitCode] = label === 'invalid' ? ['invalid-project', 1 as const] : ['project-unavailable', 2 as const];
-          environment.stdout(failure(args.root ?? `(discovered from ${environment.cwd})`, args.format, code, message, exitCode));
+          const evidence = { diagnostics: opened.value.report.diagnostics, stages: opened.value.report.stages };
+          withFailureOutput({ reason: code, message, ...evidence },
+            () => environment.stdout(failure(args.root ?? `(discovered from ${environment.cwd})`, args.format, code, message, exitCode,
+              evidence)));
           return exitCode;
         }
         if (opened.value.status === 'unavailable') throw new CliFailure(
           opened.value.reason === 'disposed' || opened.value.reason === 'configuration-changed' ? 'unavailable' : opened.value.reason,
-          opened.value.message, opened.value);
+          opened.value.message, opened.value, opened.value);
         token = opened.value.token;
         const root = opened.value.current.selection.root;
         const response = await connection.affected({ token, requestId: randomUUID(),
@@ -142,7 +149,9 @@ export async function affectedCommand(args: AffectedArguments, environment: CliE
           continue;
         }
         const mapped = outcomeReason(value);
-        environment.stdout(failure(root, args.format, mapped.reason, mapped.message, mapped.exitCode));
+        const evidence = { ...mapped, ...value };
+        withFailureOutput(evidence,
+          () => environment.stdout(failure(root, args.format, mapped.reason, mapped.message, mapped.exitCode, evidence)));
         return mapped.exitCode;
       } catch (error) {
         control.signal?.throwIfAborted();

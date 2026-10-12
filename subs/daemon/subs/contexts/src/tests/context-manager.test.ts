@@ -230,10 +230,12 @@ describe('watcher reconciliation and retention', () => {
     const e = environment({ warmIdleMs: 100, coldRetainMs: 200, sweepIntervalMs: 1000 });
     try {
       const opened = await e.open(); await flush(); e.clock.advance(100); await flush();
-      expect(e.status(opened.token)).toMatchObject({ level: 'warm', retainedBytes: 100 });
+      const recoveryBytes = e.status(opened.token).retainedBytes - 100;
+      expect(recoveryBytes).toBeGreaterThan(0);
+      expect(e.status(opened.token)).toMatchObject({ level: 'warm', retainedBytes: 100 + recoveryBytes });
       expect(e.script.sessions[0]?.releaseCompilerCalls).toBe(1);
       e.clock.advance(200); await flush();
-      expect(e.status(opened.token)).toMatchObject({ level: 'cold', session: null, retainedBytes: 0, watcher: 'disposed' });
+      expect(e.status(opened.token)).toMatchObject({ level: 'cold', session: null, retainedBytes: recoveryBytes, watcher: 'disposed' });
       expect(e.watcher.active).toBe(0); expect(e.script.sessions[0]?.disposeCalls).toBe(1);
       e.clock.advance(200); await flush(); expect(e.manager.list()).toHaveLength(0);
       const reopened = await e.open(); expect(reopened.token.generation).not.toBe(opened.token.generation);
@@ -309,7 +311,7 @@ describe('watcher reconciliation and retention', () => {
       expect(await waiting).toMatchObject({ reason: 'resource-unavailable' });
       expect(await late).toMatchObject({ reason: 'resource-unavailable' });
       expect(owned.disposeCalls).toBe(1);
-      expect(e.status(opened.token)).toMatchObject({ level: 'cold', retainedBytes: 0, published: before.published,
+      expect(e.status(opened.token)).toMatchObject({ level: 'cold', retainedBytes: before.retainedBytes - 100, published: before.published,
         pending: { requests: 0, analysisRunning: false } });
       expect(e.status(opened.token).retainedBytes + e.status(opened.token).history.bytes).toBeLessThanOrEqual(5000);
       e.script.version = 2;
@@ -317,7 +319,7 @@ describe('watcher reconciliation and retention', () => {
     } finally { finishReport(); finishDisposal(); await flush(); await e.dispose(); }
   });
   it('rejects session facts above the per-context bound without publishing a pass', async () => {
-    const e = environment({ maxRetainedBytesPerContext: 50 });
+    const e = environment({ maxRetainedBytesPerContext: 100 });
     try {
       const opened = await e.open(); await flush();
       expect(await e.check(opened.token)).toMatchObject({ status: 'unavailable', reason: 'resource-unavailable' });

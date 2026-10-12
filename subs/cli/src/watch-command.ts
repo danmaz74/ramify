@@ -52,9 +52,10 @@ export async function watchCommand(args: { readonly root?: string; readonly form
         `Revision ${revision.sequence} (evicted before it could be read)`);
     } else if (result.value.status === 'reported' && result.value.published && result.value.report && result.value.revision.revision === revision.revision) {
       const report = result.value.report;
-      const human = `Revision ${revision.sequence} (${revision.cause}; ${revision.checked.path}; checked ${revision.checked.files.length} files, ${revision.checked.accesses} accesses; ${revision.timings.total.toFixed(1)} ms)\n`
-        + formatHuman(report, `resident (daemon ${connection.daemon.instance.pid}; context ${revision.token.context}; revision ${revision.sequence}; published)`)
-          .split('\n').slice(3).join('\n').trimEnd();
+      const body = formatHuman(report,
+        `resident (daemon ${connection.daemon.instance.pid}; context ${revision.token.context}; revision ${revision.sequence}; published)`,
+        { omitScopeHeader: true }).trimEnd();
+      const human = `Revision ${revision.sequence} (${revision.cause}; ${revision.checked.path}; checked ${revision.checked.files.length} files, ${revision.checked.accesses} accesses; ${revision.timings.total.toFixed(1)} ms)\n` + body;
       publish({ schemaVersion: 'ramify.watch/2', event: 'revision', revision, coalesced, report }, human);
     } else throw new CliFailure('unavailable', 'Published revision could not be read', result.value);
     lastSequence = revision.sequence;

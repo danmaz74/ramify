@@ -1,7 +1,7 @@
 import type { AvailableForm } from '../../subs/model/src/interfaces/model.js';
 import type { CapturedInput, ObservedChange, ProjectScope, ProjectWarning } from '../../subs/project/src/interfaces/project.js';
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from '../../subs/typescript/src/interfaces/source.js';
-import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, AnalysisSummary, RunControl } from './analysis.js';
+import type { AnalysisDiagnostic, AnalysisFailureEvidence, AnalysisInputs, AnalysisReport, AnalysisSummary, RunControl, StageExecution } from './analysis.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './architect-view.js';
 import type { AffectedQuery, SessionAffectedOutcome } from './affected.js';
 import type { SessionMeasurementsOutcome } from './measurements.js';
@@ -57,6 +57,7 @@ export interface SessionRevision {
   readonly outcome: AnalysisReport['outcome'];
   readonly summary: AnalysisSummary;
   readonly diagnostics: readonly AnalysisDiagnostic[];
+  readonly stages: readonly StageExecution[];
   readonly warnings: readonly ProjectWarning[];
   readonly coverage: readonly SourceLimit[];
   readonly delta: FindingDelta;
@@ -89,16 +90,16 @@ export type VerifyOutcome =
   /** The audit did not run: the compiler it recomputes from is released, or the
    * session failed. A reported outcome, never a rejection, so the caller can
    * record it without retrying. */
-  | { readonly status: 'unavailable'; readonly reason: 'compiler-released' | 'failed'; readonly message: string }
+  | (AnalysisFailureEvidence & { readonly status: 'unavailable'; readonly reason: 'compiler-released' | 'failed'; readonly message: string })
   | { readonly status: 'cancelled' };
 export type SessionExplorerDetailsOutcome =
   | { readonly status: 'ready'; readonly sequence: number;
       readonly details: readonly SymbolDetail[] }
   | { readonly status: 'superseded'; readonly sequence: number }
-  | { readonly status: 'unavailable';
+  | (AnalysisFailureEvidence & { readonly status: 'unavailable';
       readonly reason: 'compiler-released' | 'invalid-current'
         | 'resource-limit' | 'analysis-failed';
-      readonly message: string }
+      readonly message: string })
   | { readonly status: 'cancelled' };
 export interface SessionStatus {
   readonly level: 'hot' | 'warm';
@@ -226,6 +227,6 @@ export interface ApiViewQuery {
 export type ApiViewQueryOutcome =
   | { readonly status: 'projected'; readonly projection: ApiViewProjection }
   | { readonly status: 'superseded'; readonly sequence: number; readonly observedInputId: string }
-  | { readonly status: 'unavailable'; readonly reason: 'invalid-revision' | 'invalid-location'
-      | 'invalid-projection' | 'resource-limit' | 'analysis-failed'; readonly message: string }
+  | (AnalysisFailureEvidence & { readonly status: 'unavailable'; readonly reason: 'invalid-revision' | 'invalid-location'
+      | 'invalid-projection' | 'resource-limit' | 'analysis-failed'; readonly message: string })
   | { readonly status: 'cancelled' };

@@ -110,7 +110,8 @@ describe('dependency view through the built explorer server', () => {
           expect(serverLoads.filter(url => /\/dist\/src\/explorer-entry\.js$/.test(url))).toHaveLength(1);
           expect(serverLoads.some(url => /\/subs\/service-api\/src\/dependency-model\.js$/.test(url))).toBe(true);
           expect(serverLoads.some(url => /\/subs\/service-api\/src\/dependency-view\.js$/.test(url))).toBe(true);
-          expect(serverLoads.filter(url => analysisRuntime.test(url))).toEqual([]);
+          expect(serverLoads.filter(url => analysisRuntime.test(url)
+            && !/\/subs\/analysis\/subs\/project\/src\/ownership-validation\.js$/.test(url))).toEqual([]);
           const serverSpawns = events.filter(event => event.pid === server.pid && event.event === 'spawn');
           expect(serverSpawns.filter(event => event.args?.some(arg => analysisRuntime.test(arg)))).toEqual([]);
           // Positive controls: the pattern matches the daemon's own analysis modules, and the analyzer ran in a process the daemon started.

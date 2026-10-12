@@ -258,7 +258,7 @@ workerSuite('retained session worker', import.meta.url, () => {
     }
   }), timeout);
 
-  it('reports abrupt worker loss, clears the current revision and releases its live compiler', () => fixture(async (_root, inputs) => {
+  it('FR10 reports abrupt worker loss, retains query failure evidence and releases its live compiler', () => fixture(async (_root, inputs) => {
     const observation = await opened(inputs);
     const { handle, worker } = observation;
     const pid = handle.status().compiler.pid!;
@@ -280,6 +280,14 @@ workerSuite('retained session worker', import.meta.url, () => {
       expect(result.report.outcome.execution).toBe('unavailable');
       expect(result.report.diagnostics.map(item => item.code)).toContain('internal-error');
       expect(result.report.diagnostics.some(item => item.message.includes('analysis-failed'))).toBe(true);
+      for (const query of [
+        () => handle.apiView({ sequence: 1, selection: { scope: 'all' }, details: { maxSignatureBytes: 256, maxDocumentationBytes: 256, maxOverloads: 2, maxResultBytes: 4096 }, maxAreaBytes: 4096, maxInvocationBytes: 4096 }),
+        () => handle.measurements(1),
+        () => handle.affected({ sequence: 1 }),
+      ]) {
+        const refused = await query();
+        expect(refused).toMatchObject({ status: 'unavailable', diagnostics: result.report.diagnostics, stages: result.report.stages });
+      }
       expect(handle.current).toBeNull();
       expect(await handle.report()).toBeNull();
       expect(worker.threadId).toBe(-1);

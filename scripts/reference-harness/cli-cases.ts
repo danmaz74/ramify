@@ -135,8 +135,10 @@ for (const variant of ['help', 'version']) handlers.set(`I1-26:help-version/${va
   assertions.ok('actual usage or package version output', variant === 'version' ? result.stdout === `${version}\n` : result.stdout.startsWith('Usage: ramify check'));
   const loaded = result.events.flatMap(event => [event.url ?? '', ...event.commonjs ?? []]);
   assertions.ok('trace observed actual CLI handling code', loaded.some(url => url.endsWith('/dist/subs/cli/src/run-cli.js')));
+  const pureOwnershipValidation = ['/dist/subs/analysis/subs/project/src/path-syntax.js',
+    '/dist/subs/analysis/subs/project/src/ownership-validation.js'];
   assertions.equal('no engine/compiler/UI/server module loaded', loaded.filter(url => /\/(?:typescript|react|react-dom|express|@modelcontextprotocol|d3-[^/]+)\//.test(url)
-    || /\/dist\/(?:subs\/analysis\/|src\/batch\.js)/.test(url)), []);
+    || (/\/dist\/(?:subs\/analysis\/|src\/batch\.js)/.test(url) && !pureOwnershipValidation.some(path => url.endsWith(path)))), []);
   assertions.equal('no process or listener started', result.events.filter(event => ['spawn', 'other-launch', 'listen', 'bind'].includes(event.event)), []);
   released(assertions, result.events, result.pid, result.survivingChildren);
 } });
@@ -215,7 +217,9 @@ for (const stray of [false, true]) for (const format of ['human', 'json'] as con
   else context.assertions.equal('loose file is root auxiliary source', helper && [helper.owner, helper.area, helper.placement], ['fixture', 'ordinary', 'auxiliary']);
   context.assertions.ok('loose file is never classified as owned testing source', helper?.area !== 'tests'
     && !expected.snapshot?.areas.some(area => area.root === 'tests'));
-  if (stray) context.assertions.ok('valid stray marker is still a located layout error', expected.diagnostics.some(issue => issue.category === 'layout' && issue.code === 'stray-description' && issue.location?.file === 'tests/module.ramify'));
+  if (stray) context.assertions.ok('valid stray marker retains its path and layout cause without inventing a span',
+    expected.diagnostics.some(issue => issue.category === 'layout' && issue.code === 'stray-description'
+      && issue.location === null && issue.message.startsWith('tests/module.ramify:')));
   else context.assertions.equal('warning does not create a layout failure', expected.diagnostics, []);
 });
 add('I1-28:no-servers', 'R', unchanged, async context => {

@@ -14,7 +14,7 @@ export const referenceOwners = ['', 'integration-tests', 'workspace', 'workspace
 export async function filesBelow(root: string, directory = ''): Promise<string[]> {
   const files: string[] = [];
   for (const entry of await readdir(join(root, directory), { withFileTypes: true })) {
-    if (['node_modules', 'dist', '.reference-work', '.git'].includes(entry.name)) continue;
+    if (['node_modules', 'dist', '.reference-work', '.git', '.ramify', '.ramify-architect'].includes(entry.name)) continue;
     const path = directory ? `${directory}/${entry.name}` : entry.name;
     if (entry.isDirectory()) files.push(...await filesBelow(root, path));
     else if (entry.isFile()) files.push(path);

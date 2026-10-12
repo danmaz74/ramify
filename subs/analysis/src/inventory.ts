@@ -23,7 +23,7 @@ function projectDiagnostics(issues: readonly ProjectIssue[], parsed: ReadonlyMap
     if (issue.code === 'invalid-description' && description?.status === 'invalid') {
       return description.issues.map(item => diagnostic(item.code, item.message, 'description', [{ file: item.file, ...item.span }]));
     }
-    return [diagnostic(issue.code, issue.message, 'acquisition', [{ file: issue.path, ...issue.span ?? { start: 0, end: 0, line: 1, column: 1 } }])];
+    return [diagnostic(issue.code, issue.span || issue.message.includes(issue.path) ? issue.message : `${issue.path}: ${issue.message}`, 'acquisition', issue.span ? [{ file: issue.path, ...issue.span }] : [])];
   });
   return [...new Map(diagnostics.map(item => [item.id, item])).values()];
 }
@@ -40,16 +40,17 @@ function detached<T>(value: T): T {
 /** Acquire one coherent inventory with resolved profiles, then release the input view. */
 export async function acquireInventory(inputs: InventoryInputs, control: RunControl = {}): Promise<InventoryRun> {
   if (control.signal?.aborted) return { status: 'cancelled' };
-  const failure = (code: AnalysisCode, message: string): InventoryRun => ({ status: 'incomplete',
+  let root: string | null = null;
+  const failure = (code: AnalysisCode, message: string): InventoryRun => ({ status: 'incomplete', root,
     diagnostics: [diagnostic(code, message, code === 'resource-limit' ? 'limit' : 'execution')] });
   if (Object.values(inputs.limits).some(value => !Number.isSafeInteger(value) || value <= 0) || inputs.limits.attempts > 3) {
-    return detached({ status: 'unavailable', diagnostics: [diagnostic('resource-limit', 'Acquisition limits must be positive safe integers, with at most three attempts', 'limit')] });
+    return detached({ status: 'unavailable', root, diagnostics: [diagnostic('resource-limit', 'Acquisition limits must be positive safe integers, with at most three attempts', 'limit')] });
   }
   const registry = resolveTagRegistry(inputs.registry?.definitions);
-  if (registry.status === 'invalid') return detached({ status: 'invalid', diagnostics: registry.issues.map(issue =>
+  if (registry.status === 'invalid') return detached({ status: 'invalid', root, diagnostics: registry.issues.map(issue =>
     diagnostic(issue.code, issue.message, 'registry', issue.locations)) });
   if (registry.value.id !== inputs.registry.id || registry.value.isDefault !== inputs.registry.isDefault) {
-    return detached({ status: 'invalid', diagnostics: [diagnostic('invalid-registry', 'Resolved registry identity does not match its definitions', 'registry')] });
+    return detached({ status: 'invalid', root, diagnostics: [diagnostic('invalid-registry', 'Resolved registry identity does not match its definitions', 'registry')] });
   }
   const abort = new AbortController();
   const cancel = (): void => abort.abort();
@@ -65,14 +66,16 @@ export async function acquireInventory(inputs: InventoryInputs, control: RunCont
         const acquired = await readProject({ request: inputs.project, parse: (file, text) => {
           const description = parseDescription(file, text); parsed.set(file, description); return description;
         }, marker: readRootMarker, limits: { ...inputs.limits, attempts: 1, deadlineMs: Math.max(1, Math.ceil(deadline - performance.now())) }, signal: abort.signal });
-        if (acquired.status === 'cancelled') break;
+        if (acquired.status === 'cancelled') { root = acquired.root; break; }
         if (acquired.status !== 'acquired') {
-          result = { status: acquired.status, diagnostics: projectDiagnostics(acquired.issues, parsed) };
+          root = acquired.root;
+          result = { status: acquired.status, root, diagnostics: projectDiagnostics(acquired.issues, parsed) };
           if (acquired.issues.some(issue => issue.code === 'changed-input')) continue;
           break;
         }
         view = acquired.view;
         const inventory = view.inventory;
+        root = inventory.scope.root;
         const areas: SourceArea[] = [];
         const diagnostics: AnalysisDiagnostic[] = [];
         for (const module of inventory.modules) {
@@ -83,7 +86,7 @@ export async function acquireInventory(inputs: InventoryInputs, control: RunCont
           else diagnostics.push(...profiles.issues.map(issue => diagnostic(issue.code, issue.message, 'registry',
             module.description.status === 'valid' ? [{ file: module.description.document.file, ...module.description.document.module.span }] : [])));
         }
-        if (diagnostics.length) { result = { status: 'invalid', diagnostics }; break; }
+        if (diagnostics.length) { result = { status: 'invalid', root, diagnostics }; break; }
         const seal = await view.seal();
         if (seal.status === 'changed') {
           result = failure('changed-input', `Inputs changed during inventory acquisition: ${seal.paths.join(', ')}`);

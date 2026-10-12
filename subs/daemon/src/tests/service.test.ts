@@ -154,7 +154,10 @@ describe('validated daemon service', () => {
     const context = status.value.contexts.find(item => item.token.context === token.context)!;
     const factBytes = context.session?.factBytes ?? 0;
     // The references are retained beside the diagram for the architect view, and counted with it.
-    expect(context.retainedBytes).toBe(factBytes + Buffer.byteLength(JSON.stringify(diagram)) + Buffer.byteLength(JSON.stringify(testReferences)));
+    const beforeContext = before.value.contexts.find(item => item.token.context === token.context)!;
+    expect(context.retainedBytes - beforeContext.retainedBytes).toBe(
+      Buffer.byteLength(JSON.stringify(diagram)) + Buffer.byteLength(JSON.stringify(testReferences)));
+    expect(context.session?.factBytes).toBe(factBytes);
 
     // A newer revision releases the result; an analyzer that sees changed inputs answers busy and is counted.
     await writeFile(join(root, 'src/index.ts'), 'export const value = 2;\n');
@@ -162,7 +165,10 @@ describe('validated daemon service', () => {
     if (!edited.ok || edited.value.status !== 'reported' || !edited.value.published) throw new Error('Expected publication');
     expect(edited.value.report).toMatchObject({ outcome: { execution: 'completed' } });
     const released = await environment.service.daemonStatus();
-    expect(released.ok && released.value.contexts[0]!.retainedBytes).toBe(released.ok ? released.value.contexts[0]!.session?.factBytes ?? 0 : -1);
+    if (!released.ok) throw new Error('Expected daemon status after revision');
+    const afterContext = released.value.contexts[0]!;
+    expect(afterContext.retainedBytes - (afterContext.session?.factBytes ?? 0)).toBe(
+      beforeContext.retainedBytes - (beforeContext.session?.factBytes ?? 0));
     next = () => ({ status: 'inputs-changed', paths: ['src/index.ts'] });
     expect(await environment.service.dependencyDiagram({ token, requestId: 'diagram-changed', revision: edited.value.revision.revision }))
       .toEqual({ ok: true, value: { status: 'busy', requestId: 'diagram-changed', revision: edited.value.revision, reason: 'inputs-changed' } });

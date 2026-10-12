@@ -1,8 +1,9 @@
-import type { AffectedBatchOperation, BatchOperation } from '../../../../src/interfaces/batch.js';
+import type { AffectedBatchOperation, BatchOperation, OwnershipBatchOperation, OwnershipBatchResult } from '../../../../src/interfaces/batch.js';
 import type { DaemonStatus } from '../../../../src/interfaces/service.js';
 import type { ServiceConnector, DaemonRecord } from '../../../daemon/src/interfaces/daemon.js';
 import type { ContextStatus, ContextRevision, PathCheckDisposition, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
-import type { AnalysisReport, AnalysisDiagnostic, RunControl } from '../../../analysis/src/interfaces/analysis.js';
+import type { AnalysisReport, AnalysisDiagnostic, RunControl, StageExecution } from '../../../analysis/src/interfaces/analysis.js';
+import type { RecoveryEvidence } from '../../../daemon/src/context-types.js';
 import type { RevisionPath, CheckedSet, RevisionTimings } from '../../../analysis/src/interfaces/session.js';
 import type { ProjectExclusion, ProjectWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../../../analysis/subs/typescript/src/interfaces/source.js';
@@ -28,6 +29,8 @@ export interface CliEnvironment {
   /** The affected-module batch form. Root supplies it in installed CLI entries; without it
    * `affected --batch` is unavailable and the resident form is unaffected. */
   readonly affectedBatch?: AffectedBatchOperation;
+  /** Fresh inventory ownership; absence is an execution refusal. */
+  readonly ownershipBatch?: OwnershipBatchOperation;
   readonly connect: ServiceConnector;
   /** Root-owned lazy process assembly; present in installed CLI entries. */
   readonly explore?: ExplorerLauncher;
@@ -54,13 +57,13 @@ export type GitAnswer =
 export type GitPort = (root: string, control?: RunControl) => Promise<GitAnswer>;
 /** Why a changed check could not establish its result, for the whole request or one path. */
 export type NotCheckedReason = 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | 'configuration-changed' | 'classification-changed';
-/** One named path of a `ramify.check/3` document: the daemon's disposition, or not checked
+/** One named path of a `ramify.check/4` document: the daemon's disposition, or not checked
  * for a reason of the whole request. Only a checked path carries a content or deletion identity. */
 export type CheckedPath = Exclude<PathCheckDisposition, { readonly disposition: 'not-checked' }>
   | { readonly path: string; readonly disposition: 'not-checked'; readonly module: string | null;
       readonly exclusion: ProjectExclusion | null; readonly reason: NotCheckedReason };
 export interface CheckDocument {
-  readonly schemaVersion: 'ramify.check/3';
+  readonly schemaVersion: 'ramify.check/4';
   readonly root: string;
   readonly revision: { readonly id: RevisionId; readonly sequence: number; readonly path: RevisionPath } | null;
   readonly since: RevisionId | null;
@@ -73,11 +76,25 @@ export interface CheckDocument {
   readonly removed: readonly string[];
   readonly warnings: readonly ProjectWarning[];
   readonly coverage: readonly SourceLimit[];
+  readonly stages?: readonly StageExecution[];
+  readonly recovery?: RecoveryEvidence;
   readonly checked: CheckedSet | null;
   readonly timings: { readonly daemon: RevisionTimings | null; readonly waitedMs: number; readonly totalMs: number;
     /** The reported check reply's own durations, present only when the reply carries them. */
     readonly reply?: ReplyTimings };
   readonly exitCode: 0 | 1 | 2;
+}
+/** A command refusal can retain both its operation reason and complete producer records. */
+export type CliDiagnostic = AnalysisDiagnostic | {
+  readonly category: 'invocation' | 'execution'; readonly code: string; readonly message: string;
+};
+export interface CliFailureDocument {
+  readonly schemaVersion: 'ramify.cli/2';
+  readonly status: 'unavailable';
+  readonly diagnostics: readonly CliDiagnostic[];
+  readonly stages?: readonly StageExecution[];
+  readonly recovery?: RecoveryEvidence;
+  readonly exitCode: 1 | 2;
 }
 export type WatchLine =
   | { readonly schemaVersion: 'ramify.watch/2'; readonly event: 'status'; readonly current: ContextStatus }
@@ -101,3 +118,9 @@ export interface AffectedDocument {
   readonly ramifyVersion: string;
   readonly selection: AffectedSelection;
 }
+
+/** Strict public ownership document; cancellation never produces one. */
+export type OwnershipDocument = Exclude<OwnershipBatchResult, { readonly status: 'cancelled' }> & {
+  readonly schemaVersion: 'ramify.ownership/1';
+  readonly ramifyVersion: string;
+};

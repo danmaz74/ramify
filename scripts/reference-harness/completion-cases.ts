@@ -42,6 +42,8 @@ export function assertClientClosure(events: readonly TraceEvent[], installed: st
   const closure = files.map(path => relative(join(installed, 'dist'), path));
   const allowed = ['client-entry', 'connect-daemon', 'connection', 'launcher', 'discovery', 'codec', 'records', 'start-coordination']
     .map(name => `subs/daemon/src/${name}.js`);
+  // Ownership request validation is pure and shared with the lightweight client.
+  allowed.push('subs/analysis/subs/project/src/ownership-validation.js');
   assertions.equal('client loads only its reviewed closure', closure.filter(path => !allowed.includes(path)), []);
   assertions.ok('the real client entry and connector are loaded', ['client-entry', 'connect-daemon']
     .every(name => closure.includes(`subs/daemon/src/${name}.js`)));

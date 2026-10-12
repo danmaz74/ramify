@@ -137,7 +137,7 @@ export const plan2aCliHandlers: ReadonlyMap<string, InstanceHandler> = new Map<s
       const result = await invoke(['materialize', '--all'], wrapped);
       a.equal('one expired generation reopens through the existing recovery and still completes', [result.code, materializeCalls, closeContextCalls], [0, 2, 2]);
       const stopped: ServiceConnector = async () => ({ status: 'stopped', record: { schemaVersion: 'ramify.daemon-record/1',
-        instanceId: 'x', pid: 1, buildKey: '0000000000000000', version: '0.0.0', engine: 'test', protocol: 'ramify.ipc/2',
+        instanceId: 'x', pid: 1, buildKey: '0000000000000000', version: '0.0.0', engine: 'test', protocol: 'ramify.ipc/3',
         socket: '/quick', startedAt: 0, state: 'stopped', stopped: { at: 0, reason: 'explicit', requestId: null } } });
       const stoppedResult = await invoke(['materialize', '--all'], stopped);
       a.equal('a stopped peer never triggers batch fallback', stoppedResult.code, 2);

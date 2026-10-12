@@ -27,7 +27,7 @@ import { auditFacts } from './session-audit.js';
 import { measureContextSize, resolveDeclaredMeasurementInputs } from './module-measurements.js';
 import type { SessionFacts } from './session-facts.js';
 import { FactLedger, deepFreeze, diagnosticSurface, draftPublication, draftReport, sortedPaths } from './session-facts.js';
-import { acquisitionDiagnostics, failureReport, invalidFacts, isCancellation, isStaleCancellation, parseRefused, recomputeAll, releaseObserver,
+import { AcquisitionFailure, acquisitionDiagnostics, failureReport, invalidFacts, isCancellation, isStaleCancellation, parseRefused, recomputeAll, releaseObserver,
   revise, wholeCheckedSet, zeroTimings } from './session-revision.js';
 import type { Computed, SessionState } from './session-revision.js';
 
@@ -370,7 +370,8 @@ class Session implements RetainedSession {
       const facts = state.facts;
       if (!facts) return { status: 'unavailable', reason: 'analysis-failed', message: 'Session facts are not retained' };
       const planned = planApiViewRequests(facts, query.selection);
-      if (planned.status === 'unavailable') return planned;
+      if (planned.status === 'unavailable') return this.#current.outcome.execution === 'completed' ? planned
+        : { ...planned, diagnostics: this.#current.diagnostics, stages: this.#current.stages };
       if (planned.requests.length) {
         if (!state.adapter) return { status: 'unavailable', reason: 'analysis-failed', message: 'No retained compiler is available for this session' };
         if (!state.adapter.hot) {
@@ -425,7 +426,8 @@ class Session implements RetainedSession {
       const limitIssue = architectLimitIssue(query);
       if (limitIssue) return { status: 'unavailable', reason: 'resource-limit', message: limitIssue };
       const planned = planArchitectView(facts);
-      if (planned.status === 'unavailable') return planned;
+      if (planned.status === 'unavailable') return current.outcome.execution === 'completed' ? planned
+        : { ...planned, diagnostics: current.diagnostics, stages: current.stages };
       const read = await readCapturedFeatures(facts.inventory!.scope.root, planned.features, current.inputs, signal);
       if (read.status === 'changed') return { status: 'superseded', sequence: this.#sequence, observedInputId: null };
       if (read.status !== 'read') return read;
@@ -466,7 +468,7 @@ class Session implements RetainedSession {
       const facts = this.#state.facts;
       if (!facts || facts.invalid || !facts.inventory || facts.areaIssues.length) {
         return { status: 'unavailable', reason: 'invalid-current',
-          message: 'The current revision has no valid complete inventory' };
+          message: 'The current revision has no valid complete inventory', diagnostics: current.diagnostics, stages: current.stages };
       }
       const resolved = resolveDeclaredMeasurementInputs(facts.inventory, facts.areas, current.inputs);
       if (resolved.status === 'unavailable') {
@@ -531,11 +533,11 @@ class Session implements RetainedSession {
       }
       const facts = this.#state.facts;
       if (!facts || facts.invalid || !facts.inventory || facts.areaIssues.length) {
-        return unavailable('invalid-current', 'The current revision has no valid complete inventory');
+        return { ...unavailable('invalid-current', 'The current revision has no valid complete inventory'), diagnostics: current.diagnostics, stages: current.stages };
       }
       const check = current.outcome.check;
       if (current.outcome.execution !== 'completed' || check === 'not-run' || !facts.model || facts.linkIssues.length) {
-        return unavailable('missing-facts', 'The current revision did not complete access interpretation');
+        return { ...unavailable('missing-facts', 'The current revision did not complete access interpretation'), diagnostics: current.diagnostics, stages: current.stages };
       }
       // The observer answers JavaScript admission from the configuration it holds, reading nothing.
       const observer = this.#state.observer;
@@ -561,7 +563,8 @@ class Session implements RetainedSession {
       if (this.#disposed) return { status: 'unavailable', reason: 'compiler-released', message: 'Retained session is disposed' };
       if (!this.#current || sequence !== this.#sequence) return { status: 'superseded', sequence: this.#sequence };
       if (this.#state.facts?.invalid || this.#current.outcome.execution !== 'completed') {
-        return { status: 'unavailable', reason: 'invalid-current', message: 'The current revision is not a valid completed analysis' };
+        return { status: 'unavailable', reason: 'invalid-current', message: 'The current revision is not a valid completed analysis',
+          diagnostics: this.#current.diagnostics, stages: this.#current.stages };
       }
       const adapter = this.#state.adapter;
       if (!adapter?.hot) {
@@ -681,9 +684,7 @@ class Session implements RetainedSession {
     const listed = observer.inputs;
     const result = await observer.apply([], signal);
     if (result.kind === 'incomplete' || result.kind === 'invalid') {
-      const first = result.issues[0];
-      throw Object.assign(new Error(result.issues.map(issue => issue.message).join('; ')),
-        { code: first?.code ?? 'read-failure', path: first?.path });
+      throw new AcquisitionFailure(await acquisitionDiagnostics(this.#state.parsed, observer.inventory, result.issues), result.kind);
     }
     // The observer returns the same list object until an observation changes.
     const after = observer.inputs;
@@ -757,9 +758,7 @@ class Session implements RetainedSession {
     if (observed.status !== 'observing') {
       const issues = await acquisitionDiagnostics(state.parsed, observed.inventory, observed.issues);
       if (observed.status !== 'invalid') {
-        const first = observed.issues[0];
-        return { status: 'reported', report: failureReport(state, Object.assign(new Error(issues.map(item => item.message).join('; ')),
-          { code: first?.code ?? 'read-failure', path: first?.path }), 'acquisition', observed.inventory) };
+        return { status: 'reported', report: failureReport(state, new AcquisitionFailure(issues, observed.status), 'acquisition', observed.inventory) };
       }
       const identity = sealedIdentity(observed.sealedInputs);
       if (identity === this.#current?.inputId && !changes.length) return { status: 'revised', revision: this.#current, identical: true, reacquired: false };
@@ -842,7 +841,7 @@ class Session implements RetainedSession {
         // The scope the report records: the invalid acquisition's own inventory, else the valid one.
         scope: (computed.facts.invalid ? computed.facts.invalid.inventory?.scope : computed.facts.inventory?.scope) ?? null,
         changed: computed.changed, checked: computed.checked,
-        outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
+        outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, stages: report.stages, warnings: report.warnings, coverage: report.coverage,
         delta, timings,
       });
     } catch (error) { this.#ledger.release(computed.facts); throw error; }

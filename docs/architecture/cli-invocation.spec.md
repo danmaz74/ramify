@@ -8,6 +8,24 @@ delivery plans reference this document; they do not restate it. Other command
 names are listed in [processes and clients](processes-and-clients.md) and get
 their invocation contracts when their plans are written.
 
+## Reviewed ownership and recovery additions
+
+The [analysis-failure-recovery contract package](../plans/analysis-failure-recovery/contracts.md)
+was reviewed during iteration 1 on 2026-10-12 and implemented in the
+locally qualified candidate. Its clean committed candidate audit remains
+pending; the command examples below describe the current implementation.
+
+The adopted additions are fresh-batch `ramify ownership`, the strict
+`ramify.ownership/1` union and public `ownershipDocumentSchema` decoder,
+`ramify.check/4` with available stages and contextual recovery, and
+`ramify.cli/2` preserving operation reasons and complete analysis diagnostics.
+Ownership reuses project's table validator and path syntax predicate. It
+acquires inventory without cataloging, linking, import analysis or a daemon.
+Ownership and Analysis/3 omit recovery; malformed ownership arguments use
+CLI/2 exit 2, acquisition invalidity exits 1, incomplete/unavailable exits 2,
+and cancellation exits 130 without an answer. The package defines exact
+fields, omitted members, status/exit pairs and frozen old-version witnesses.
+
 ## The one rule
 
 `ramify check` checks one whole ramified project, from its root, every time.
@@ -189,12 +207,13 @@ None is an allowed import or an external package.
 
 ## Output and exit
 
-The human report prints the root and how it was selected, the compiler
-configuration in use, a `Mode:` line, failures first, then warnings, then
+The human report leads a failed operation with its available located diagnostics,
+then prints the root and how it was selected, the compiler
+configuration in use, a `Mode:` line, warnings, then
 analysis limits, then the completed scope. `--format json` writes the
 `ramify.analysis/3` report to stdout, unchanged apart from the Git advice
 warnings, without the human mode line or an added mode member. Invocation
-failures use a `ramify.cli/1` diagnostic document. Logging goes to stderr;
+failures use a `ramify.cli/2` diagnostic document. Logging goes to stderr;
 nothing else is written to stdout in that mode. Locations are relative to the
 root regardless of the working directory. Ordering is deterministic.
 
@@ -223,7 +242,7 @@ findings uses it: on the toolkit itself the snapshot is almost all of a
 25 MB report. It applies to complete checks in both modes; a batch session drops
 the snapshot before its result leaves the session, and a resident check drops it
 when printing. The flag requires `--format json` and cannot accompany `--changed`,
-whose `ramify.check/3` document has no snapshot; either misuse is an invalid
+whose `ramify.check/4` document has no snapshot; either misuse is an invalid
 invocation, exit 2.
 
 | Exit | Meaning |
@@ -275,7 +294,7 @@ session over the same root, with the same capabilities as `check --batch`, in
 the same process seam, and disposes it. `--format json` prints one
 `ramify.affected-cli/4` document with the root, the mode, the revision's
 sequence (null in batch) and input identity, and the selection; failures use
-`ramify.cli/1`. It exits 0 for any answer, including one widened to all
+`ramify.cli/2`. It exits 0 for any answer, including one widened to all
 modules, 1 for an invalid project, an unknown module ID or an invalid seed,
 2 when unavailable, pending, cold, superseded or past a deadline, and 130 when
 interrupted. `--changed`, `--since` and `--deadline` do not apply.
@@ -439,9 +458,20 @@ result for that path, for example through stale or unobserved content, an
 expired deadline, a named configuration file or unavailable work; it gives
 exit 2 and retains findings verified before the failure. The disposition, not
 the exit code, states that a path was not analyzed, and no such path is shown
-as passing source checks. The `ramify.check/3` document reports these
+as passing source checks. The `ramify.check/4` document reports these
 dispositions in place of each changed path's coverage flag, with the analyzed
 content or deletion identity only for checked paths.
+
+Check/4 keeps the findings, execution, coverage, path dispositions and exit
+semantics above. It adds available stage outcomes and context recovery when
+current analysis is invalid or cannot answer. CLI/2 preserves a minimal
+operation reason followed by full producer diagnostics, plus available stages
+and recovery. Human failures show primary and related locations before stating
+which answer or projection is unavailable. Recovery paths are observed history
+for investigation; they do not identify a cause or suggest a rollback. Missing
+context evidence omits recovery, while an established context with no completed
+analysis gives a null baseline and unavailable coverage. Batch Analysis/3 and
+Ownership/1 contain current evidence without recovery.
 
 ## Decisions recorded here
 

@@ -1,3 +1,5 @@
+import { withRecoverySmall } from '../../subs/analysis/src/tests/recovery-fixtures.js';
+import { ownershipDocumentSchema } from '../../subs/cli/src/index.js';
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { access, copyFile, cp, link, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
@@ -56,6 +58,29 @@ describe('compiled client process contracts', () => {
     expect(await readdir(endpoint)).toEqual([]);
   }, 30_000);
 
+  it('FR03 FR04 FR07 installed ownership agrees across launcher paths without a daemon', () => withRecoverySmall(async fixture => {
+    for (const mutation of ['valid', 'invalid-link'] as const) {
+      if (mutation === 'invalid-link') await fixture.removeExports();
+      for (const format of ['human', 'json'] as const) {
+        const args = ['ownership', '--path', 'subs/provider/src/api.ts', '--path', '../outside', '--format', format];
+        const compiled = await run(launcher, args, { cwd: fixture.root, env });
+        const node = await run(process.execPath, [nodeEntry, ...args], { cwd: fixture.root, env });
+        expect([compiled.code, compiled.signal, compiled.stdout, compiled.stderr], mutation).toEqual([0, null, node.stdout, '']);
+        expect([node.code, node.signal, node.stderr]).toEqual([0, null, '']);
+        if (format === 'json') expect(ownershipDocumentSchema.parse(JSON.parse(compiled.stdout)))
+          .toMatchObject({ status: 'answered', exitCode: 0, root: fixture.root });
+      }
+    }
+    const invalid = await run(launcher, ['ownership', '--root', join(fixture.root, 'absent'), '--format', 'json'], { cwd: fixture.root, env });
+    expect([invalid.code, invalid.stderr]).toEqual([1, '']);
+    expect(ownershipDocumentSchema.parse(JSON.parse(invalid.stdout))).toMatchObject({ status: 'invalid', exitCode: 1, root: null });
+    const malformed = await run(launcher, ['ownership', '--batch', '--format', 'json'], { cwd: fixture.root, env });
+    expect([malformed.code, malformed.stderr]).toEqual([2, '']);
+    expect(JSON.parse(malformed.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/2', diagnostics: [{ code: 'invalid-invocation' }] });
+    expect(await processesMentioning(fixture.root)).toEqual([]);
+    expect(await readdir(endpoint)).toEqual([]);
+  }), 30_000);
+
   it('runs --batch in a Node child with the Node entry report bytes', async () => fixture(async root => {
     for (const format of [[], ['--format', 'json']]) {
       const args = ['check', '--batch', ...format];
@@ -88,13 +113,15 @@ describe('compiled client process contracts', () => {
         await symlink(stdout.trim(), join(tools, tool));
       }
       const refused = await run(launcher, ['affected', 'example/core', '--batch'], { cwd: root, env: { ...env, PATH: tools } });
-      expect([refused.code, refused.stdout, refused.stderr]).toEqual([2, '', 'Error [internal-error]: Cannot start node for batch analysis (ENOENT)\n']);
+      expect([refused.code, refused.stdout, refused.stderr]).toEqual([2, '',
+        'Affected selection failed (internal-error).\n  [internal-error]: Cannot start node for batch analysis (ENOENT)\nNo result was claimed.\n']);
     } finally { await rm(isolated, { recursive: true, force: true }); }
     const invalid = await realpath(await mkdtemp('/tmp/rcv-'));
     try {
       const refusal = await run(launcher, ['affected', 'x', '--batch', '--format', 'json'], { cwd: invalid, env });
       expect([refusal.code, refusal.stderr]).toEqual([2, '']);
-      expect(JSON.parse(refusal.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', exitCode: 2, diagnostics: [{ code: 'project-unavailable' }] });
+      expect(JSON.parse(refusal.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/2', exitCode: 2,
+        diagnostics: [{ code: 'project-unavailable' }, { code: 'root-not-found', location: null }] });
     } finally { await rm(invalid, { recursive: true, force: true }); }
     expect(await processesMentioning(root)).toEqual([]);
     expect(await readdir(endpoint)).toEqual([]);
@@ -139,16 +166,17 @@ describe('compiled client process contracts', () => {
       identity.buildIdentity = createHash('sha256').update(JSON.stringify({ packageJson: identity.packageJson,
         files: identity.files.map(file => [file.path, file.sha256]) })).digest('hex');
       await writeFile(identityPath, JSON.stringify(identity));
-      const prefix = `Error [incompatible]: this compiled client was built from runtime identity `;
       for (const args of [['check'], ['check', '--batch'], ['check', '--changed', 'src/interfaces/api.ts'], ['watch'], ['daemon', 'status']]) {
         const refused = await run(copiedClient, args, { cwd: root, env: copied });
         expect([refused.code, refused.stdout], args.join(' ')).toEqual([2, '']);
+        const operation = args[0] === 'watch' ? 'Watch' : args[0] === 'daemon' ? 'Daemon' : 'Check';
+        const prefix = `${operation} failed (incompatible).\n  [incompatible]: this compiled client was built from runtime identity `;
         expect(refused.stderr.startsWith(prefix), refused.stderr).toBe(true);
         expect(refused.stderr).toContain(`but ${copy} holds ${identity.buildIdentity.slice(0, 12)}; rebuild the package with npm run build\n`);
       }
       const json = await run(copiedClient, ['check', '--format', 'json'], { cwd: root, env: copied });
       expect([json.code, json.stderr]).toEqual([2, '']);
-      expect(JSON.parse(json.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 2,
+      expect(JSON.parse(json.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/2', status: 'unavailable', exitCode: 2,
         diagnostics: [{ category: 'execution', code: 'incompatible' }] });
       const version = await run(copiedClient, ['--version'], { cwd: root, env: copied });
       const manifest = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8')) as { version: string };
@@ -168,7 +196,7 @@ describe('compiled client process contracts', () => {
       }
       const result = await run(launcher, ['check'], { cwd: root, env: { ...env, PATH: tools, RAMIFY_ENDPOINT_DIR: join(isolated, 'e') }, timeoutMs: 20_000 });
       expect([result.code, result.stdout]).toEqual([2, '']);
-      expect(result.stderr).toBe('Error [internal-error]: Cannot start node for batch analysis (ENOENT)\n');
+      expect(result.stderr).toBe('Check failed (internal-error).\n  [internal-error]: Cannot start node for batch analysis (ENOENT)\nNo result was claimed.\n');
       expect(result.ms).toBeLessThan(10_000);
       expect((await readdir(join(isolated, 'e'))).filter(name => name.endsWith('.lock'))).toEqual([]);
     } finally { await rm(isolated, { recursive: true, force: true }); }

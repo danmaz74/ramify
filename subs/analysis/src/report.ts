@@ -59,7 +59,7 @@ export interface SnapshotCounts {
   readonly accesses: number; readonly allowed: number; readonly denied: number; readonly external: number;
 }
 /** The parts of a report a published revision keeps. */
-export type PublishedReport = Pick<AnalysisReport, 'outcome' | 'summary' | 'diagnostics' | 'warnings' | 'coverage'>;
+export type PublishedReport = Pick<AnalysisReport, 'outcome' | 'summary' | 'diagnostics' | 'stages' | 'warnings' | 'coverage'>;
 
 function inventoryCounts(inventory: ProjectInventory): SnapshotCounts {
   return { owners: inventory.modules.length, sourceFiles: inventory.files.filter(file => file.kind === 'source').length,
@@ -191,9 +191,9 @@ export class ReportDraft {
     const carried = !limit && Object.hasOwn(acquisitionFailure, code) ? code as keyof typeof acquisitionFailure : null;
     const recognized: AnalysisCode = limit ? 'resource-limit' : carried ?? 'internal-error';
     const path = error && typeof error === 'object' && 'path' in error && typeof error.path === 'string' ? error.path : null;
-    const item = { ...diagnostic(recognized, error instanceof Error ? error.message : String(error),
-      limit ? 'limit' : carried ? acquisitionFailure[carried] : 'execution',
-      path ? [{ file: path, start: 0, end: 0, line: 1, column: 1 }] : []),
+    const message = error instanceof Error ? error.message : String(error);
+    const item = { ...diagnostic(recognized, path && !message.includes(path) ? `${path}: ${message}` : message,
+      limit ? 'limit' : carried ? acquisitionFailure[carried] : 'execution'),
       ...(error instanceof WorkLimit ? { limit: { name: error.limit, maximum: error.maximum, observed: error.observed, collectedPrefix: true as const } } : {}) };
     // The reserved control envelope admits a limit/failure even when the evidence budget is full.
     this.diagnostics.push(item);
@@ -256,7 +256,8 @@ export class ReportDraft {
     const warnings = [...this.warnings].sort(warningOrder);
     const diagnostics = [...this.diagnostics].sort(locatedOrder), coverage = [...this.coverage].sort(locatedOrder);
     const kept: PublishedReport = { outcome: this.outcomeOf(complete),
-      summary: this.summaryOf(complete, this.counts ?? snapshotCounts(this.snapshot), warnings.length), diagnostics, warnings, coverage };
+      summary: this.summaryOf(complete, this.counts ?? snapshotCounts(this.snapshot), warnings.length), diagnostics,
+      stages: this.stages.map(stage => ({ ...stage })), warnings, coverage };
     const maximum = this.request.limits.maxReportBytes;
     try {
       reportBytes({ diagnostics, warnings, coverage }, Math.max(1, maximum - envelopeReserve));

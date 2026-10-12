@@ -125,10 +125,10 @@ describe('project-boundary CLI processes', () => {
     for (const mode of [['--batch'], []]) {
       const none = await run(bare, ['check', ...mode], env);
       expect([none.code, none.stderr], mode.join(' ')).toEqual([2, '']);
-      expect(none.stdout).toContain(`Error [root-not-found] .:1:1: No marked project root at or above ${bare}\n`);
+      expect(none.stdout).toContain(`Error [root-not-found]: No marked project root at or above ${bare}\n`);
       const hinted = await run(join(orphan, 'lib/src'), ['check', ...mode], env);
       expect([hinted.code, hinted.stderr], mode.join(' ')).toEqual([2, '']);
-      expect(hinted.stdout).toContain(`Error [root-not-found] .:1:1: No marked project root at or above ${join(orphan, 'lib/src')}; `
+      expect(hinted.stdout).toContain(`Error [root-not-found]: No marked project root at or above ${join(orphan, 'lib/src')}; `
         + `the nearest description is ${join(orphan, 'lib/module.ramify')}: add root before module on its module line if it is the project root\n`);
       const report = json<AnalysisReport>(await run(bare, ['check', ...mode, '--format', 'json'], env));
       expect([report.outcome.execution, report.diagnostics.map(issue => issue.code)]).toEqual(['unavailable', ['root-not-found']]);

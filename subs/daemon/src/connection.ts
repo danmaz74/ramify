@@ -59,6 +59,16 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
     socket.write(frame);
   }
   function receive(value: unknown): void {
+    // A /2 daemon can answer our hello with its old welcome. Recognize that
+    // identity before the /3 decoder rejects its shape, so callers see an
+    // explicit incompatibility and never send an operation request.
+    if (!welcome && value !== null && typeof value === 'object' && !Array.isArray(value)
+      && (value as { type?: unknown }).type === 'welcome') {
+      const offered = (value as { welcome?: { protocol?: unknown } }).welcome?.protocol;
+      if (typeof offered === 'string' && offered !== 'ramify.ipc/3') {
+        fail({ kind: 'incompatible', daemon: offered, client: 'ramify.ipc/3' }); socket.destroy(); return;
+      }
+    }
     const message = validateWireMessage(value);
     if (!welcome) {
       if (message.type === 'reject') {
@@ -100,7 +110,7 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
   const decoder = createFrameDecoder(64 * 1024, receive);
   const abort = () => { fail({ kind: 'closed' }); socket.destroy(); };
   const timeout = setTimeout(() => { fail({ kind: 'failure', message: 'Daemon handshake timed out' }); socket.destroy(); }, handshakeMs);
-  socket.on('connect', () => send({ type: 'hello', handshake: { protocol: 'ramify.ipc/2', client: options.client,
+  socket.on('connect', () => send({ type: 'hello', handshake: { protocol: 'ramify.ipc/3', client: options.client,
     buildKey: endpoint.buildKey, engine: options.engine } }));
   socket.on('data', bytes => { try { decoder.push(typeof bytes === 'string' ? Buffer.from(bytes) : bytes); } catch (error) {
     const reason: DisconnectReason = { kind: 'failure', message: (error as Error).message };

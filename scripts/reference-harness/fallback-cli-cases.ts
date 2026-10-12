@@ -11,6 +11,8 @@ import { archiveObservation, recordObservation, traceEvidence } from './observat
 import type { Assertions, InstanceHandler } from './runner.js';
 
 const forbidden = /\/dist\/(?:src\/batch\.js|subs\/analysis\/|subs\/daemon\/subs\/contexts\/)|\/(?:typescript|@typescript)\//;
+const pureOwnershipValidation = ['/dist/subs/analysis/subs/project/src/path-syntax.js',
+  '/dist/subs/analysis/subs/project/src/ownership-validation.js'];
 const withoutRun = (report: Record<string, unknown>) => { const { runId: _runId, ...rest } = report; return rest; };
 async function fault<T>(run: (directory: string, project: string, entry: string) => Promise<T>): Promise<T> {
   const directory = await mkdtemp(join(tmpdir(), 'rf-'));
@@ -51,7 +53,8 @@ add('I2-23:watch-no-fallback', assertions => fault(async (directory, project, en
     env: { RAMIFY_ENDPOINT_DIR: directory, RAMIFY_DAEMON_ENTRY: entry }, allowSockets: true, timeoutMs: 30_000 });
   assertions.equal('watch fails after unavailable daemon startup', result.code, 2);
   assertions.ok('watch reports unavailable execution', result.stdout.includes('unavailable'));
-  assertions.equal('watch never imports a fallback engine', parentLoads(result).filter(value => forbidden.test(value)), []);
+  assertions.equal('watch never imports a fallback engine', parentLoads(result).filter(value =>
+    forbidden.test(value) && !pureOwnershipValidation.some(path => value.endsWith(path))), []);
   assertions.equal('failed watch starts exactly two finite entries', result.events.filter(event => event.event === 'spawn' && event.args?.[0] === entry).length, 2);
   assertions.equal('failed startup children are reaped', result.survivingChildren, []);
 }));
@@ -63,7 +66,8 @@ add('I2-23:client-no-fallback', assertions => fault(async (directory, _project, 
       engine: packageEngine, start: 'if-needed', daemonEntry: entry, endpointDirectory: directory })})));\n`);
   const result = await cliProcess(repositoryRoot, [], { entry: script, env: { RAMIFY_ENDPOINT_DIR: directory }, allowSockets: true, timeoutMs: 30_000 });
   assertions.equal('external client process exits normally with an unavailable result', [result.code, JSON.parse(result.stdout).status], [0, 'unavailable']);
-  assertions.equal('external client never imports an engine or contexts', parentLoads(result).filter(value => forbidden.test(value)), []);
+  assertions.equal('external client never imports an engine or contexts', parentLoads(result).filter(value =>
+    forbidden.test(value) && !pureOwnershipValidation.some(path => value.endsWith(path))), []);
   assertions.ok('every spawned child is the requested finite failing entry', result.events.filter(event => event.event === 'spawn').every(event => event.args?.[0] === entry));
   assertions.equal('all attempted starts are reaped', result.survivingChildren, []);
 }));
@@ -91,14 +95,16 @@ add('I2-23:stop-no-fallback', async assertions => {
     const stop = scope.start({ cwd: project, args: [join(repositoryRoot, 'dist/src/cli-entry.js'), 'daemon', 'stop'], timeoutMs: 10_000 });
     assertions.equal(`${format}: explicit stop succeeds`, (await stop.waitForExit(10_000)).code, 0);
     assertions.equal(`${format}: interrupted cold check exits unavailable`, (await check.waitForExit(10_000)).code, 2);
-    if (format === 'human') assertions.ok('human stop error names the explicit stop', check.stderr.includes('Error [stopped]:') && check.stderr.includes('stopped explicitly'));
+    if (format === 'human') assertions.ok('human stop error names the explicit stop',
+      check.stderr.includes('Check failed (stopped).') && check.stderr.includes('[stopped]: daemon stopped explicitly'));
     else {
       const document = JSON.parse(check.stdout) as { schemaVersion: string; diagnostics: { code: string }[] };
-      assertions.equal('JSON stop response is a CLI error envelope', [document.schemaVersion, document.diagnostics[0]?.code], ['ramify.cli/1', 'stopped']);
+      assertions.equal('JSON stop response is a CLI error envelope', [document.schemaVersion, document.diagnostics[0]?.code], ['ramify.cli/2', 'stopped']);
     }
     const events = await scope.events();
     const loads = events.filter(event => event.pid === check.pid).flatMap(event => [event.url ?? '', ...event.commonjs ?? []]);
-    assertions.equal(`${format}: stopped check never imports fallback engine`, loads.filter(value => forbidden.test(value)), []);
+    assertions.equal(`${format}: stopped check never imports fallback engine`, loads.filter(value =>
+      forbidden.test(value) && !pureOwnershipValidation.some(path => value.endsWith(path))), []);
     const record = JSON.parse(await readFile(endpoint.record, 'utf8')) as { stopped: { reason: string; requestId: string | null } };
     assertions.ok(`${format}: explicit stop preserves its wire request id`, record.stopped.reason === 'explicit' && typeof record.stopped.requestId === 'string');
     const evidence = { format, pid: check.pid, daemon: daemon.pid, code: check.exit?.code,

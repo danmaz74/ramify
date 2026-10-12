@@ -98,7 +98,8 @@ add('I2-15:client-entry-lightweight', assertions => withProcessScope(async scope
   const loads = events.flatMap(event => [event.url ?? '', ...event.commonjs ?? []]).filter(Boolean);
   assertions.ok('the real client entry was loaded', loads.some(value => value.endsWith('/subs/daemon/src/client-entry.js')));
   const forbidden = /\/dist\/(?:subs\/analysis\/|subs\/daemon\/subs\/contexts\/|subs\/daemon\/src\/(?:service|host|start-daemon|filesystem-watcher|system-clock)\.js)|\/(?:typescript|@typescript|react|react-dom|d3-[^/]+)\//;
-  assertions.equal('client closure excludes analysis, contexts, host, compiler and UI', loads.filter(value => forbidden.test(value)), []);
+  assertions.equal('client closure excludes analysis engine, contexts, host, compiler and UI', loads.filter(value =>
+    forbidden.test(value) && !value.endsWith('/dist/subs/analysis/subs/project/src/ownership-validation.js')), []);
   assertions.equal('importing the client does not start or connect any process', events.filter(event => ['connect', 'spawn', 'listen', 'bind'].includes(event.event)), []);
   const memory = JSON.parse(child.stdout) as { rss: number };
   requireMeasuredBytes([memory.rss]);
@@ -129,7 +130,7 @@ add('I2-17:simultaneous-start', assertions => withResident(async (scope, endpoin
 add('I2-17:stale-record', assertions => withResident(async (scope, endpoint) => {
   const pid = await deadPid();
   await writeDaemonRecord(endpoint, { schemaVersion: 'ramify.daemon-record/1', instanceId: 'stale', pid, buildKey: endpoint.buildKey,
-    version, engine, protocol: 'ramify.ipc/2', socket: endpoint.socket, startedAt: Date.now(), state: 'running', stopped: null });
+    version, engine, protocol: 'ramify.ipc/3', socket: endpoint.socket, startedAt: Date.now(), state: 'running', stopped: null });
   await writeFile(endpoint.socket, 'dangling endpoint');
   const client = inline(scope, `import {connectDaemon} from ${JSON.stringify(clientEntry)};
     const result=await connectDaemon(${JSON.stringify({ ...options(endpoint.directory), start: 'if-needed' })});

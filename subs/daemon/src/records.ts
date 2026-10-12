@@ -4,6 +4,10 @@ import { lstat, open, rename, unlink } from 'node:fs/promises';
 import { isAbsolute, join, normalize } from 'node:path';
 import type { DaemonRecord, EndpointSelection } from './interfaces/daemon.js';
 
+export class IncompatibleDaemonRecord extends Error {
+  constructor(readonly daemon: string) { super(`Incompatible daemon protocol ${daemon}`); }
+}
+
 /** Fail closed on ambiguous liveness; only ESRCH authorizes stale cleanup. */
 export function processAlive(pid: number): boolean {
   if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('Invalid daemon pid');
@@ -66,11 +70,20 @@ function text(value: unknown): value is string { return typeof value === 'string
 function timestamp(value: unknown): boolean { return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0; }
 
 export function validateRecord(value: unknown, endpoint: EndpointSelection): DaemonRecord {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)
+    && (value as { schemaVersion?: unknown }).schemaVersion === 'ramify.daemon-record/1'
+    && (value as { buildKey?: unknown }).buildKey === endpoint.buildKey
+    && (value as { socket?: unknown }).socket === endpoint.socket
+    && typeof (value as { protocol?: unknown }).protocol === 'string'
+    && /^ramify\.ipc\/[0-9]+$/.test((value as { protocol: string }).protocol)
+    && (value as { protocol: string }).protocol !== 'ramify.ipc/3') {
+    throw new IncompatibleDaemonRecord((value as { protocol: string }).protocol);
+  }
   if (!object(value, ['schemaVersion', 'instanceId', 'pid', 'buildKey', 'version', 'engine', 'protocol',
     'socket', 'startedAt', 'state', 'stopped']) || value.schemaVersion !== 'ramify.daemon-record/1'
     || !text(value.instanceId) || !Number.isSafeInteger(value.pid) || (value.pid as number) <= 0
     || value.buildKey !== endpoint.buildKey || !text(value.version) || !text(value.engine)
-    || value.protocol !== 'ramify.ipc/2' || value.socket !== endpoint.socket || !timestamp(value.startedAt)
+    || value.protocol !== 'ramify.ipc/3' || value.socket !== endpoint.socket || !timestamp(value.startedAt)
     || !['starting', 'running', 'stopped'].includes(value.state as string)) {
     throw new Error(`Malformed or foreign daemon record: ${endpoint.record}`);
   }
@@ -91,7 +104,8 @@ export async function readRecord(endpoint: EndpointSelection): Promise<DaemonRec
   const content = await readControlFile(endpoint.record);
   if (content === null) return null;
   try { return validateRecord(JSON.parse(content), endpoint); }
-  catch (error) { throw new Error(`Cannot read daemon record ${endpoint.record}`, { cause: error }); }
+  catch (error) { if (error instanceof IncompatibleDaemonRecord) throw error;
+    throw new Error(`Cannot read daemon record ${endpoint.record}`, { cause: error }); }
 }
 
 /** Atomic visibility to readers; no claim of durability after a power failure. */

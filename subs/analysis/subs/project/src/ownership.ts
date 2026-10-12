@@ -1,3 +1,4 @@
+import { projectPathProblem } from './path-syntax.js';
 import { byteOrder, freeze } from './data.js';
 import { isRamifyGeneratedSegment } from './generated-path.js';
 import type { TextSpan } from '../../descriptions/src/interfaces/syntax.js';
@@ -193,15 +194,10 @@ const invalid = (path: string, reason: string): PathOwnership =>
  * excluded tree; otherwise the nearest module owns the path.
  */
 export function classifyProjectPath(scope: ProjectScope, path: string): PathOwnership {
-  if (typeof path !== 'string' || path === '') return invalid(String(path), 'is empty');
-  if (path.startsWith('/') || /^[A-Za-z]:/.test(path)) return invalid(path, 'is absolute');
-  if (path.includes('\\')) return invalid(path, 'contains a backslash');
+  const problem = projectPathProblem(path);
+  if (problem !== null) return { status: 'invalid-path', message: problem };
   const segments = path === '.' ? [] : path.split('/');
-  let leading = 0;
-  while (leading < segments.length && segments[leading] === '..') leading++;
-  for (const segment of segments.slice(leading)) {
-    if (segment === '' || segment === '.' || segment === '..') return invalid(path, 'has an empty, "." or interior ".." segment');
-  }
+  const leading = segments[0] === '..';
   if (leading) return { status: 'outside-project', module: null };
 
   const index = indexOf(scope.ownership);

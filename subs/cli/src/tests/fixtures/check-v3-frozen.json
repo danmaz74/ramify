@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ramify.check/3",
+  "root": "/project",
+  "revision": null,
+  "since": null,
+  "paths": [],
+  "outcome": "not-checked",
+  "reason": "unavailable",
+  "execution": null,
+  "findings": [],
+  "removed": [],
+  "warnings": [],
+  "coverage": [],
+  "checked": null,
+  "timings": { "daemon": null, "waitedMs": 0, "totalMs": 0 },
+  "exitCode": 2
+}

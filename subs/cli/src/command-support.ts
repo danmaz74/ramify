@@ -2,6 +2,7 @@ import type { AnalysisDiagnostic, AnalysisReport } from '../../analysis/src/inte
 import type { CliEnvironment, CliExitCode } from './interfaces/cli.js';
 import type { Capability } from '../../analysis/src/interfaces/analysis.js';
 import { formatHuman, serializeReport } from './format.js';
+import { withFailureOutput } from './errors.js';
 
 export const capabilities: readonly Capability[] = ['registry', 'layout', 'metadata', 'descriptions', 'source-catalog',
   'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage'];
@@ -27,12 +28,15 @@ export interface ReportOutput { readonly format: 'human' | 'json'; readonly snap
 
 export function printReport(input: AnalysisReport, mode: string, output: ReportOutput, environment: CliEnvironment): CliExitCode {
   const checked = checkedReport(input);
-  // Leaving the snapshot out changes no other member: the summary and outcome were derived before.
-  const { report, json } = serializeReport(output.snapshot === false && checked.snapshot !== null ? { ...checked, snapshot: null } : checked);
-  const failed = report.outcome.execution === 'incomplete' || report.outcome.execution === 'unavailable'
-    || report.stages.some(stage => stage.status === 'failed' || stage.status === 'unavailable');
-  const code = failed ? 2 : report.outcome.execution === 'invalid' || report.outcome.check === 'failed'
-    || report.diagnostics.length || report.summary.denied ? 1 : 0;
-  environment.stdout(output.format === 'json' ? json + '\n' : formatHuman(report, mode));
-  return code;
+  return withFailureOutput({ reason: `analysis-${checked.outcome.execution}`, message: `Check execution ${checked.outcome.execution}`,
+    diagnostics: checked.diagnostics, stages: checked.stages }, () => {
+    // Leaving the snapshot out changes no other member: the summary and outcome were derived before.
+    const { report, json } = serializeReport(output.snapshot === false && checked.snapshot !== null ? { ...checked, snapshot: null } : checked);
+    const failed = report.outcome.execution === 'incomplete' || report.outcome.execution === 'unavailable'
+      || report.stages.some(stage => stage.status === 'failed' || stage.status === 'unavailable');
+    const code = failed ? 2 : report.outcome.execution === 'invalid' || report.outcome.check === 'failed'
+      || report.diagnostics.length || report.summary.denied ? 1 : 0;
+    environment.stdout(output.format === 'json' ? json + '\n' : formatHuman(report, mode));
+    return code;
+  });
 }

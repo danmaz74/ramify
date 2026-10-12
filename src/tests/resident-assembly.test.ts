@@ -101,7 +101,10 @@ describe('resident analysis driver resolution lifetime', () => {
   }), 120_000);
 
   it('enforces a smaller assembly retention budget inside the session before publication', () => fixture(async root => {
-    const environment = await createQuickEnvironment({ maxRetainedBytesPerContext: 1 });
+    // Recovery's mandatory baseline/accounting bytes need room before a
+    // session can open; keep the fact budget below this fixture's report.
+    const factLimit = 4096;
+    const environment = await createQuickEnvironment({ maxRetainedBytesPerContext: factLimit });
     try {
       const opened = await environment.service.openContext({ project: { cwd: root, root,
         scope: 'whole-project', configuration: 'discover' }, setup });
@@ -112,7 +115,7 @@ describe('resident analysis driver resolution lifetime', () => {
       expect(checked.value.published).toBe(false);
       expect(checked.value.report?.outcome.check).not.toBe('passed');
       expect(checked.value.report?.diagnostics).toEqual(expect.arrayContaining([
-        expect.objectContaining({ code: 'resource-limit', limit: expect.objectContaining({ name: 'maxRetainedFactBytes', maximum: 1 }) }),
+        expect.objectContaining({ code: 'resource-limit', limit: expect.objectContaining({ name: 'maxRetainedFactBytes', maximum: factLimit }) }),
       ]));
     } finally { await environment.dispose(); }
   }), 120_000);

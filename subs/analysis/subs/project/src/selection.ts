@@ -49,7 +49,8 @@ export async function selectRoot(capture: Capture, request: ProjectRequest, read
     const given = resolve(cwd, request.root);
     if (await capture.kind(given) === 'symlink') throw new AcquisitionError('symlink-root', given, 'The selected root must not be a symlink');
     const root = await capture.realPath(given);
-    if (!root || !await capture.directoryExists(root) || !await capture.hasExactEntry(join(root, 'module.ramify'))) {
+    if (root && await capture.directoryExists(root)) capture.selectedRoot = root;
+    if (!root || capture.selectedRoot === null || !await capture.hasExactEntry(join(root, 'module.ramify'))) {
       throw new AcquisitionError('missing-root-description', join(given, 'module.ramify'), 'Explicit root requires module.ramify');
     }
     if (await described(capture, root, read, markers) === 'unmarked') {
@@ -61,7 +62,10 @@ export async function selectRoot(capture: Capture, request: ProjectRequest, read
   let nearest: string | undefined;
   for (let directory = invokedFrom;; directory = dirname(directory)) {
     const state = await described(capture, directory, read, markers);
-    if (state === 'marked' || state === 'unread') return { root: directory, invokedFrom, selection: 'found', markers };
+    if (state === 'marked' || state === 'unread') {
+      capture.selectedRoot = directory;
+      return { root: directory, invokedFrom, selection: 'found', markers };
+    }
     if (state === 'unmarked') nearest ??= join(directory, 'module.ramify');
     if (dirname(directory) === directory) break;
   }

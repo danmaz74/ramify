@@ -143,7 +143,7 @@ describe('PB1-42: selection by the root marker', () => {
       path: 'module.ramify', message: '1:1: invalid-encoding: Description is not valid UTF-8' }]);
     if (encoded.status === 'invalid') expect(encoded.issues.some(item => item.code === 'unmarked-root-description')).toBe(false);
     await put(app, 'module.ramify', Buffer.concat([Buffer.from([0xff, 0x0a]), header]));
-    expect(await resolve(join(app, 'subs/a/src'))).toEqual({ status: 'unavailable', issues: [{ code: 'root-not-found',
+    expect(await resolve(join(app, 'subs/a/src'))).toEqual({ status: 'unavailable', root: null, issues: [{ code: 'root-not-found',
       path: '.', message: notFound(join(app, 'subs/a/src'), join(app, 'subs/a/module.ramify')) }] });
     // The byte alone gives no module line: the explicit root is unmarked, and no parser runs.
     await put(app, 'module.ramify', Buffer.from([0xff]));
@@ -156,12 +156,12 @@ describe('PB1-42: selection by the root marker', () => {
   it('reports root-not-found naming the working directory, and the nearest unmarked description when there is one', async () => {
     const outside = join(work, 'outside/deeper');
     await put(work, 'outside/deeper/note.txt', 'no project\n');
-    expect(await resolve(outside)).toEqual({ status: 'unavailable', issues: [{ code: 'root-not-found', path: '.', message: notFound(outside) }] });
+    expect(await resolve(outside)).toEqual({ status: 'unavailable', root: null, issues: [{ code: 'root-not-found', path: '.', message: notFound(outside) }] });
     // Two unmarked descriptions above the working directory: the nearest is named.
     await put(work, 'outside/module.ramify', 'ramify 1\nmodule outside\n');
     await put(work, 'outside/deeper/module.ramify', 'ramify 1\nmodule deeper\n');
     await put(work, 'outside/deeper/src/value.ts', 'export {};\n');
-    expect(await resolve(join(outside, 'src'))).toEqual({ status: 'unavailable', issues: [{ code: 'root-not-found', path: '.',
+    expect(await resolve(join(outside, 'src'))).toEqual({ status: 'unavailable', root: null, issues: [{ code: 'root-not-found', path: '.',
       message: notFound(join(outside, 'src'), join(outside, 'module.ramify')) }] });
     expect(await read(join(outside, 'src'))).toMatchObject({ status: 'unavailable', inventory: null, sealedInputs: null,
       issues: [{ code: 'root-not-found', message: notFound(join(outside, 'src'), join(outside, 'module.ramify')) }] });
@@ -169,13 +169,13 @@ describe('PB1-42: selection by the root marker', () => {
 
   it('rejects --root on an unmarked description as unmarked-root-description with the add-the-marker message', async () => {
     const given = join(app, 'subs/a');
-    expect(await resolve(app, 'subs/a')).toEqual({ status: 'invalid',
+    expect(await resolve(app, 'subs/a')).toEqual({ status: 'invalid', root: given,
       issues: [{ code: 'unmarked-root-description', path: 'subs/a/module.ramify', message: addMarker(join(given, 'module.ramify')) }] });
     expect(await read(app, 'subs/a')).toMatchObject({ status: 'invalid', inventory: null, sealedInputs: null,
       issues: [{ code: 'unmarked-root-description', path: 'subs/a/module.ramify', message: addMarker(join(given, 'module.ramify')) }] });
     // Removing `app`'s marker: a found selection from `app`'s own directory is root-not-found, and an explicit one invalid.
     await put(app, 'module.ramify', 'ramify 1\nmodule app tagged [dispatch]\n');
-    expect(await resolve(app)).toEqual({ status: 'unavailable', issues: [{ code: 'root-not-found', path: '.',
+    expect(await resolve(app)).toEqual({ status: 'unavailable', root: null, issues: [{ code: 'root-not-found', path: '.',
       message: notFound(app, join(app, 'module.ramify')) }] });
     expect(await resolve(app, '.')).toMatchObject({ status: 'invalid', issues: [{ code: 'unmarked-root-description', path: 'module.ramify' }] });
   });

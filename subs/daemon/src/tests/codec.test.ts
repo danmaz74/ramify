@@ -180,7 +180,7 @@ describe('revision capture timings', () => {
 });
 
 describe('BD23: service capability negotiation', () => {
-  const welcome = (capabilities: readonly string[]) => ({ type: 'welcome', welcome: { protocol: 'ramify.ipc/2',
+  const welcome = (capabilities: readonly string[]) => ({ type: 'welcome', welcome: { protocol: 'ramify.ipc/3',
     instance: { instanceId: 'daemon-1', pid: 1, version: '0.0.0', engine: 'engine', buildKey: '0000000000000000' },
     capabilities, limits: { maxRequestBytes: 1, maxResponseBytes: 1, leaseMs: 1, pingMs: 1 } } });
   it('accepts the dependencyDiagram capability beside the existing capabilities and still rejects unknown names', () => {
@@ -207,7 +207,7 @@ describe('BD23: service capability negotiation', () => {
   });
 });
 
-describe('ramify.ipc/2: the strict context-status scope carries its ownership table', () => {
+describe('ramify.ipc/3: the strict context-status scope carries its ownership table', () => {
   const token = { context: `ctx/1:${'b'.repeat(64)}`, generation: 'gen/1:00000000-0000-4000-8000-000000000001' };
   const ownership = {
     modules: [{ id: 'app', parent: null, directory: '.' }, { id: 'app/a', parent: 'app', directory: 'subs/a' }],
@@ -248,12 +248,12 @@ describe('ramify.ipc/2: the strict context-status scope carries its ownership ta
     }
   });
 
-  it('accepts only the version 2 protocol in a welcome', () => {
+  it('accepts only the version 3 protocol in a welcome', () => {
     const welcome = (protocol: string) => ({ type: 'welcome', welcome: { protocol,
       instance: { instanceId: 'daemon-1', pid: 1, version: '0.0.0', engine: 'engine', buildKey: '0000000000000000' },
       capabilities: ['contexts'], limits: { maxRequestBytes: 1, maxResponseBytes: 1, leaseMs: 1, pingMs: 1 } } });
-    expect(decodeMessage(encodeMessage(welcome('ramify.ipc/2') as never))).toEqual(welcome('ramify.ipc/2'));
-    for (const protocol of ['ramify.ipc/1', 'ramify.ipc/0', 'ramify.ipc/3']) {
+    expect(decodeMessage(encodeMessage(welcome('ramify.ipc/3') as never))).toEqual(welcome('ramify.ipc/3'));
+    for (const protocol of ['ramify.ipc/1', 'ramify.ipc/0', 'ramify.ipc/2']) {
       expect(() => encodeMessage(welcome(protocol) as never)).toThrow('Invalid IPC message schema');
     }
   });

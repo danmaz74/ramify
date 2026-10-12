@@ -117,8 +117,9 @@ describe('ContextManager.apiView: revision-bound projection', () => {
       e.script.pending.push(() => ({ status: 'reported', report: { ...failed.report, diagnostics: [{ id: 'failure', category: 'execution',
         code: 'internal-error', message: '', location: null, related: [], importer: null, original: null, accessId: null }] } }));
       const result = await e.apiView(opened.token, { mode: 'synchronized', expect: [] });
-      expect(result).toEqual({ status: 'unavailable', reason: 'analysis-failed', message: 'The analysis could not be reported',
-        requestId: expect.any(String) });
+      expect(result).toMatchObject({ status: 'unavailable', reason: 'analysis-failed', message: 'The analysis could not be reported',
+        requestId: expect.any(String), recovery: { schemaVersion: 'ramify.recovery/1' },
+        diagnostics: [{ id: 'failure' }] });
     } finally { await e.dispose(); }
   });
 
@@ -128,8 +129,8 @@ describe('ContextManager.apiView: revision-bound projection', () => {
       const opened = await e.open();
       e.script.apiViewPending.push(() => ({ status: 'unavailable', reason: 'resource-limit', message: 'projection is too large' }));
       const result = await e.apiView(opened.token, { mode: 'synchronized', expect: [] });
-      expect(result).toEqual({ status: 'unavailable', reason: 'resource-unavailable',
-        message: 'resource-limit: projection is too large', requestId: expect.any(String) });
+      expect(result).toMatchObject({ status: 'unavailable', reason: 'resource-unavailable',
+        message: 'resource-limit: projection is too large', requestId: expect.any(String), recovery: { schemaVersion: 'ramify.recovery/1' } });
     } finally { await e.dispose(); }
   });
 
@@ -230,7 +231,8 @@ describe('ContextManager.apiView: requested views (AV26)', () => {
       const opened = await e.open(); await flush();
       e.script.architectViewPending.push((_session, query) => ({ status: 'superseded', sequence: query.sequence, observedInputId: null }));
       const architect = await e.manager.apiView(request(opened.token, 'architect-superseded', ['api', 'architect']), 'lease');
-      expect(architect).toEqual({ status: 'superseded', requestId: 'architect-superseded', revision: e.status(opened.token).published });
+      expect(architect).toMatchObject({ status: 'superseded', requestId: 'architect-superseded',
+        revision: e.status(opened.token).published, recovery: { schemaVersion: 'ramify.recovery/1' } });
       expect(e.status(opened.token).synchronization).not.toBe('synchronized');
 
       e.script.apiViewPending.push((_session, query) => ({ status: 'superseded', sequence: query.sequence, observedInputId: 'input/1:newer' }));
@@ -247,11 +249,11 @@ describe('ContextManager.apiView: requested views (AV26)', () => {
     try {
       const opened = await e.open(); await flush();
       e.script.architectViewPending.push(() => ({ status: 'unavailable', reason: 'resource-limit', message: 'projection is too large' }));
-      expect(await e.manager.apiView(request(opened.token, 'limit', ['architect']), 'lease')).toEqual({ status: 'unavailable', requestId: 'limit',
-        reason: 'resource-unavailable', message: 'resource-limit: projection is too large' });
+      expect(await e.manager.apiView(request(opened.token, 'limit', ['architect']), 'lease')).toMatchObject({ status: 'unavailable', requestId: 'limit',
+        reason: 'resource-unavailable', message: 'resource-limit: projection is too large', recovery: { schemaVersion: 'ramify.recovery/1' } });
       e.script.architectViewPending.push(() => ({ status: 'unavailable', reason: 'invalid-revision', message: 'Sequence 9 is not current' }));
-      expect(await e.manager.apiView(request(opened.token, 'revision', ['architect']), 'lease')).toEqual({ status: 'unavailable', requestId: 'revision',
-        reason: 'analysis-failed', message: 'invalid-revision: Sequence 9 is not current' });
+      expect(await e.manager.apiView(request(opened.token, 'revision', ['architect']), 'lease')).toMatchObject({ status: 'unavailable', requestId: 'revision',
+        reason: 'analysis-failed', message: 'invalid-revision: Sequence 9 is not current', recovery: { schemaVersion: 'ramify.recovery/1' } });
       e.script.architectViewPending.push(() => { throw new Error('worker lost'); });
       expect(await e.manager.apiView(request(opened.token, 'thrown', ['architect']), 'lease'))
         .toMatchObject({ status: 'unavailable', reason: 'analysis-failed', message: expect.stringContaining('worker lost') });

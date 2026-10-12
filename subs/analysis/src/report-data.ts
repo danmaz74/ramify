@@ -32,8 +32,10 @@ export function projectDiagnostics(inventory: ProjectInventory | null, issues: r
     const layout = ['missing-root-description', 'unmarked-root-description', 'invalid-layout', 'duplicate-name', 'description-in-src',
       'stray-description', 'reserved-container', 'undeclared-project-boundary', 'invalid-nested-tree', 'missing-owned-unwired', 'missing-owned-nested-project',
       'overlapping-nested-tree', 'symlink-root', 'symlink-description'].includes(issue.code);
-    result.push(diagnostic(issue.code, issue.message, references.length ? 'description' : layout ? 'layout' : 'acquisition',
-      spans.length ? spans : [{ file: issue.path, ...issue.span ?? { start: 0, end: 0, line: 1, column: 1 } }]));
+    const locations = spans.length ? spans : issue.span ? [{ file: issue.path, ...issue.span }] : [];
+    const message = !locations.length && issue.path && issue.path !== '.' && !issue.message.includes(issue.path)
+      ? `${issue.path}: ${issue.message}` : issue.message;
+    result.push(diagnostic(issue.code, message, references.length ? 'description' : layout ? 'layout' : 'acquisition', locations));
   }
   return [...new Map(result.map(item => [item.id, item])).values()];
 }

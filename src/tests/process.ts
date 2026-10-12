@@ -32,7 +32,7 @@ export interface TraceEvent {
 
 /** Each process gets a private trace, a deadline and deterministic cleanup. */
 export async function cliProcess(cwd: string, argv: readonly string[], options: {
-  readonly mode?: 'fail-catalog' | 'interrupt-acquisition' | 'interrupt-catalog' | 'interrupt-publication';
+  readonly mode?: 'fail-catalog' | 'interrupt-acquisition' | 'interrupt-catalog' | 'interrupt-publication' | 'interrupt-resident-check';
   readonly readTarget?: string;
   readonly brokenStdout?: boolean;
   readonly backpressuredStdout?: 'interrupt' | 'resume';

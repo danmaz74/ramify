@@ -55,7 +55,7 @@ export async function checkCommand(args: CheckArguments, environment: CliEnviron
         // reason the failure codes do not name is a plain unavailable outcome.
         if (opened.value.status === 'unavailable') throw new CliFailure(
           opened.value.reason === 'disposed' || opened.value.reason === 'configuration-changed' ? 'unavailable' : opened.value.reason,
-          opened.value.message, opened.value);
+          opened.value.message, opened.value, opened.value);
         token = opened.value.token;
         const response = await connection.check({ token, requestId: randomUUID(), freshness: { mode: 'synchronized', expect: [] } }, control);
         control.signal?.throwIfAborted();
@@ -74,7 +74,8 @@ export async function checkCommand(args: CheckArguments, environment: CliEnviron
         }
         throw new CliFailure(value.status === 'unavailable' && value.reason === 'analysis-failed' ? 'analysis-failed'
           : value.status === 'unavailable' && value.reason === 'resource-unavailable' ? 'resource-unavailable' : 'unavailable',
-        value.status === 'unavailable' ? value.message : `Check did not produce a report (${value.status})`, value);
+        value.status === 'unavailable' ? value.message : `Check did not produce a report (${value.status})`, value,
+        value.status === 'unavailable' ? value : {});
       } catch (error) {
         control.signal?.throwIfAborted();
         if (error instanceof CliFailure && ['stopped', 'incompatible', 'resource-unavailable', 'invalid-request'].includes(error.code)) throw error;

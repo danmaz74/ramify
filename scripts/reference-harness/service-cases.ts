@@ -93,11 +93,15 @@ for (const instance of plan2Instances.filter(item => item.iteration === 5)) {
           const faultQuick = await createQuickEnvironment({}, { driver });
           const faultService = faultQuick.service;
           try {
-            const opened = await open(faultService); await published(opened.token, faultService);
+            const opened = await open(faultService); const baseline = report(await published(opened.token, faultService));
             fail = true;
             const failed = await faultQuick.request('check', { token: opened.token, requestId: 'fault', freshness: { mode: 'synchronized', expect: [] } });
-            a.equal('driver fault is a domain unavailable outcome', failed.ok ? failed.value : failed.error,
+            if (!failed.ok) throw new Error(JSON.stringify(failed.error));
+            const { recovery, ...outcome } = failed.value as Extract<CheckOutcome, { status: 'unavailable' }>;
+            a.equal('driver fault is a domain unavailable outcome', outcome,
               { status: 'unavailable', reason: 'analysis-failed', message: instance.subcase === 'sync-throw' ? 'Error: Injected synchronous driver fault' : 'Error: Injected asynchronous driver fault', requestId: 'fault' });
+            a.equal('fault keeps the last completed baseline', recovery?.lastCompleted?.revision, baseline.revision?.revision);
+            a.equal('fault has no observed edits', recovery?.changes, { paths: [], coverage: 'observed', reason: null });
             a.equal('the same context recovers using the real engine', report(await check(opened.token, faultService)).report.outcome.check, 'passed');
           } finally { await faultQuick.dispose(); a.equal('fault path releases handles', [faultQuick.clock.pending, faultQuick.watcher.active], [0, 0]); }
           return;

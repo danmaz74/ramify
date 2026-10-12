@@ -139,8 +139,9 @@ async function run(): Promise<void> {
       assertions.equal('fault occurred at discovered source capture', barriers, 1);
       assertions.equal('operational read failure is incomplete', report.outcome.execution, 'incomplete');
       assertions.equal('read failure cannot report a completed check', [report.outcome.check, report.summary.complete], ['not-run', false]);
-      assertions.ok('read failure preserves useful located cause', report.diagnostics.some(issue => issue.code === 'read-failure'
-        && issue.message.includes('Injected provider captured-input read failure') && issue.location?.file === 'subs/provider/src/interfaces/api.ts'));
+      assertions.ok('read failure preserves path and cause without inventing a span', report.diagnostics.some(issue => issue.code === 'read-failure'
+        && issue.message.includes('subs/provider/src/interfaces/api.ts: Cannot read input: Error: Injected provider captured-input read failure')
+        && issue.location === null));
       assertions.ok('earlier registry evidence remains visible', report.stages.some(stage => stage.stage === 'registry' && stage.status === 'completed'));
       assertions.ok('dependent source stages explicitly blocked', report.stages.filter(stage => ['catalog', 'link', 'access', 'decide'].includes(stage.stage))
         .every(stage => stage.status === 'blocked' && stage.blockedBy.length > 0));

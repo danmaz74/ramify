@@ -1,3 +1,6 @@
+import { acquireInventory } from '../subs/analysis/src/inventory.js';
+import { classifyProjectPath } from '../subs/analysis/subs/project/src/ownership.js';
+import { projectPathProblem } from '../subs/analysis/subs/project/src/path-syntax.js';
 import { reportCapacity } from './report-capacity.js';
 import { analyzeProject } from '../subs/analysis/src/index.js';
 import { openRetainedSession } from '../subs/analysis/src/retained-session.js';
@@ -6,7 +9,7 @@ import type { RetainedSession } from '../subs/analysis/src/interfaces/session.js
 import { createDefaultTagRegistry } from '../subs/analysis/subs/model/src/registry.js';
 import { capabilities } from '../subs/cli/src/command-support.js';
 import { sessionLimits } from './resident-budgets.js';
-import type { AffectedBatchInvocation, AffectedBatchResult, BatchInvocation, BatchResult } from './interfaces/batch.js';
+import type { AffectedBatchInvocation, AffectedBatchResult, BatchInvocation, BatchResult, OwnershipBatchInvocation, OwnershipBatchResult } from './interfaces/batch.js';
 
 /** Shared batch/resident dispatch limits, including the reviewed large-report capacity. */
 export const limits: AnalysisLimits = {
@@ -49,11 +52,13 @@ const failureCodes = new Set(['internal-error', 'resource-limit', 'session-dispo
  * invalid project is `invalid-project`, exit 1. */
 function refusal(report: AnalysisReport): AffectedBatchResult {
   const failed = report.outcome.execution === 'incomplete' || report.diagnostics.some(item => failureCodes.has(item.code));
+  // A concise summary accompanies the complete bounded records; it is not their replacement.
   const message = report.diagnostics[0]?.message ?? `Project ${report.outcome.execution}`;
-  if (failed) return { status: 'unavailable', reason: 'analysis-failed', message, unknownModules: [], exitCode: 2 };
+  const evidence = { diagnostics: report.diagnostics, stages: report.stages };
+  if (failed) return { status: 'unavailable', reason: 'analysis-failed', message, unknownModules: [], exitCode: 2, ...evidence };
   return report.outcome.execution === 'invalid'
-    ? { status: 'unavailable', reason: 'invalid-project', message, unknownModules: [], exitCode: 1 }
-    : { status: 'unavailable', reason: 'project-unavailable', message, unknownModules: [], exitCode: 2 };
+    ? { status: 'unavailable', reason: 'invalid-project', message, unknownModules: [], exitCode: 1, ...evidence }
+    : { status: 'unavailable', reason: 'project-unavailable', message, unknownModules: [], exitCode: 2, ...evidence };
 }
 
 /** The affected-module batch form: a fresh retained session over the project `check --batch` would
@@ -77,9 +82,29 @@ export async function runAffectedBatch(invocation: AffectedBatchInvocation, cont
     // A fresh session has no earlier valid revision: an invalid first revision is an invalid project.
     if ((outcome.reason === 'invalid-current' || outcome.reason === 'missing-facts') && opened.revision.outcome.execution === 'invalid') {
       return { status: 'unavailable', reason: 'invalid-project', message: opened.revision.diagnostics[0]?.message ?? outcome.message,
-        unknownModules: [], exitCode: 1 };
+        unknownModules: [], exitCode: 1, diagnostics: opened.revision.diagnostics, stages: opened.revision.stages };
     }
-    return { status: 'unavailable', reason: outcome.reason, message: outcome.message, unknownModules: outcome.unknownModules,
+    return { ...outcome, status: 'unavailable',
       exitCode: outcome.reason === 'unknown-module' || outcome.reason === 'invalid-query' ? 1 : 2 };
   } finally { await session.dispose(); }
+}
+
+/** Answer only from a fresh coherent inventory; no compiler analysis or resident connection. */
+export async function runOwnershipBatch(invocation: OwnershipBatchInvocation, control: RunControl = {}): Promise<OwnershipBatchResult> {
+  if (control.signal?.aborted) return { status: 'cancelled', exitCode: 130 };
+  const paths = [...new Set(invocation.paths.length ? invocation.paths : ['.'])];
+  for (const path of paths) {
+    const problem = projectPathProblem(path);
+    if (problem !== null) throw new Error(problem);
+  }
+  const run = await acquireInventory({ project: { cwd: invocation.cwd,
+    ...(invocation.root === undefined ? {} : { root: invocation.root }), scope: 'whole-project', configuration: 'discover' },
+    registry: createDefaultTagRegistry(), limits: limits.acquisition }, control);
+  if (run.status === 'cancelled' || control.signal?.aborted) return { status: 'cancelled', exitCode: 130 };
+  if (run.status !== 'completed') return run.status === 'invalid'
+    ? { ...run, status: 'invalid', exitCode: 1 } : { ...run, status: run.status, exitCode: 2 };
+  const { inventory, inputId } = run.snapshot;
+  return { status: 'answered', exitCode: 0, root: inventory.scope.root, inputId,
+    scope: { configuration: inventory.scope.configuration, ownership: inventory.scope.ownership },
+    paths: paths.map(path => ({ path, ownership: classifyProjectPath(inventory.scope, path) })), warnings: inventory.warnings };
 }

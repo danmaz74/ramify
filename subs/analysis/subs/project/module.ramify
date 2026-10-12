@@ -16,3 +16,7 @@ expose-src isRamifyGeneratedPath from "generated-path.ts" to parent
 expose-src classifyProjectPath from "ownership.ts" to parent
 // P7: the README purpose reader, for the root's final-contract validation.
 expose-src readPurpose from "purpose.ts" to parent
+
+// Shared ownership wire validation received by CLI and daemon.
+expose-src isProjectOwnership, isProjectExclusion from "ownership-validation.ts" to parent
+expose-src projectPathProblem from "path-syntax.ts" to parent

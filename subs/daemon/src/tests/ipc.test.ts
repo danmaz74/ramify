@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ipcFixture } from './ipc-fixture.js';
+import { ipcFixture, packageVersion } from './ipc-fixture.js';
 import { eventually } from './socket-fixture.js';
 import { encodeJsonFrame } from '../codec.js';
 import type { ContextEvent } from '../context-types.js';
@@ -44,6 +44,14 @@ import { createMeasureDriver } from './measure-driver.js';
   it('rejects incompatibility and connection exhaustion before welcome', async () => {
     const fixture = await ipcFixture({ maxConnections: 1 });
     try {
+      const old = await fixture.raw(false);
+      old.socket.write(encodeJsonFrame({ type: 'hello', handshake: { protocol: 'ramify.ipc/2',
+        buildKey: fixture.endpoint.buildKey, engine: fixture.environment.service.instance.engine,
+        client: { name: 'built-old-peer', version: packageVersion } } }, 1024));
+      await old.closed;
+      expect(old.messages).toMatchObject([{ type: 'reject', error: { code: 'incompatible', details: {
+        daemon: fixture.environment.service.instance.version, client: packageVersion } } }]);
+      expect(old.messages.some(message => message.type === 'response')).toBe(false);
       const incompatible = await fixture.raw(false);
       incompatible.socket.write(encodeJsonFrame({ type: 'hello', handshake: { protocol: 'ramify.ipc/0', buildKey: 'foreign', engine: 'foreign', client: { name: 'test', version: 'old' } } }, 1024));
       await incompatible.closed;
@@ -299,7 +307,8 @@ import { createMeasureDriver } from './measure-driver.js';
       finally { await atLimit.fixture.dispose(); }
       const over = await run(encoded - 1);
       try { expect(over.result).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'transport-boundary',
-        reason: 'resource-unavailable', message: `Measure response exceeds maxResponseBytes (${encoded - 1})` } }); }
+        reason: 'resource-unavailable', message: `Measure response exceeds maxResponseBytes (${encoded - 1})`,
+        recovery: expect.objectContaining({ schemaVersion: 'ramify.recovery/1' }) } }); }
       finally { await over.fixture.dispose(); }
     } finally { await generous.fixture.dispose(); }
   }, 60_000);
@@ -414,7 +423,8 @@ import { createMeasureDriver } from './measure-driver.js';
         if (!status.ok || !status.value.published) throw new Error(JSON.stringify(status));
         expect(over.result).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'transport-bound',
           revision: status.value.published, reason: 'resource-unavailable',
-          message: `Affected response exceeds maxResponseBytes (${encoded - 1})`, unknownModules: [] } });
+          message: `Affected response exceeds maxResponseBytes (${encoded - 1})`, unknownModules: [],
+          recovery: expect.objectContaining({ schemaVersion: 'ramify.recovery/1' }) } });
         // Refused whole, never truncated.
         if (!over.result.ok) throw new Error(JSON.stringify(over.result));
         expect(over.result.value).not.toHaveProperty('result');

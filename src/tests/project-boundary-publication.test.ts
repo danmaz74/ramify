@@ -204,9 +204,10 @@ describe('published views over the written topology (PB1-27, PB1-28)', () => {
       ['external-project/lib.ts', 'external', 'external-project'], ['subs/a/fixtures/sample/src/index.ts', 'owned-nested-project', 'subs/a/fixtures/sample'],
       ['src/tmp/throwaway.test.ts', 'scratch', 'src/tmp']] as const) {
       const result = await cli(quick, root, ['materialize', '--from', from]);
-      expect([result.exitCode, result.stderr, result.stdout], from).toEqual([2, '', `Root: ${root}\n`
-        + `Not materialized (invalid-location): "${from}" lies in the ${kind} directory "${directory}", which Ramify does not analyze\n`
-        + 'No complete refresh was claimed.\n']);
+      expect([result.exitCode, result.stderr], from).toEqual([2, '']);
+      expect(result.stdout, from).toContain(`Materialize failed (invalid-location).\n  [invalid-location]: "${from}" lies in the ${kind} directory "${directory}", which Ramify does not analyze\n`);
+      expect(result.stdout, from).toContain(`Root: ${root}\nNo complete refresh was claimed.\n`);
+      expect(result.stdout, from).toContain('Observed history:');
     }
   }), timeout);
 
@@ -235,7 +236,7 @@ describe('published views over the written topology (PB1-27, PB1-28)', () => {
       const result = await cli(quick, root, ['materialize', '--view', 'api', '--view', 'architect', '--all']);
       expect(result.exitCode, label).toBe(2);
       // The service folds the publisher's `invalid-path` refusal onto `invalid-location`.
-      expect(result.stdout, label).toContain('Not materialized (invalid-location): ".ramify-architect" ');
+      expect(result.stdout, label).toContain('Materialize failed (invalid-location).\n  [invalid-location]: ".ramify-architect" ');
       expect(result.stdout, label).toContain('so it is not a generated architect view; it was left untouched');
       expect(await files(root, '.ramify-architect'), label).toEqual(new Map(Object.entries(contents)
         .map(([name, text]) => [`.ramify-architect/${name}`, text])));

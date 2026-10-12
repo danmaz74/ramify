@@ -88,8 +88,21 @@ export function failureReport(state: SessionState, error: unknown, stage: StageI
   const draft = new ReportDraft(state.request);
   draft.registry = state.registry; draft.stage('registry', 'completed');
   if (inventory) draft.inventory(inventory);
-  draft.failure(error, stage);
+  if (error instanceof AcquisitionFailure) {
+    try {
+      draft.record(error.diagnostics);
+      draft.stage(stage, error.execution === 'incomplete' ? 'failed' : error.execution, error.diagnostics);
+      draft.execution = error.execution;
+    } catch (limit) { draft.failure(limit, stage); }
+  } else draft.failure(error, stage);
   return draft.finish();
+}
+
+/** Carries acquisition evidence once converted, including failures thrown during promotion. */
+export class AcquisitionFailure extends Error {
+  constructor(readonly diagnostics: readonly AnalysisDiagnostic[], readonly execution: 'invalid' | 'incomplete' | 'unavailable') {
+    super(`Project acquisition ${execution}`);
+  }
 }
 
 /** Registry-derived areas of every module; issues make the parse stage invalid. */
@@ -135,8 +148,7 @@ export async function captureInvalidFacts(state: SessionState, signal?: AbortSig
     throw Object.assign(new Error('Invalid project changed during acquisition; retry the update'), { code: 'changed-input' });
   }
   if (acquired.status !== 'invalid') {
-    throw Object.assign(new Error(acquired.issues.map(issue => issue.message).join('; ')),
-      { code: acquired.issues[0]?.code ?? 'read-failure' });
+    throw new AcquisitionFailure(await acquisitionDiagnostics(parsed, acquired.inventory, acquired.issues), acquired.status);
   }
   // A root found invalid before any inventory (missing, unmarked or a symlink)
   // leaves no sealed capture. The batch run and the cold open report it with no
@@ -572,8 +584,7 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     start = performance.now();
     if (update.kind === 'incomplete') {
       state.stale = true;
-      const first = update.issues[0];
-      const error = Object.assign(new Error(update.issues.map(issue => issue.message).join('; ')), { code: first?.code ?? 'read-failure', path: first?.path });
+      const error = new AcquisitionFailure(await acquisitionDiagnostics(state.parsed, state.facts?.inventory ?? null, update.issues), 'incomplete');
       return { status: 'reported', report: failureReport(state, error, 'acquisition', state.facts?.inventory) };
     }
     const after = observer.inputs;

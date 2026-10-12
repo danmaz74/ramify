@@ -18,7 +18,7 @@ export function createMeasureDriver(facts: Omit<SessionMeasurements, 'sequence' 
     summary: { complete: true, owners: facts.modules.length, sourceFiles: facts.files.filter(file => file.kind === 'source').length,
       resources: facts.files.filter(file => file.kind === 'resource').length, originals: 0, accesses: 0, allowed: 0,
       denied: 0, errors: 0, warnings: 0, coverageNotes: 0, external: 0 },
-    diagnostics: [], warnings: [], coverage: [], delta: { added: [], removed: [], positionOnly: [] },
+    diagnostics: [], stages: [], warnings: [], coverage: [], delta: { added: [], removed: [], positionOnly: [] },
     timings: { classify: 0, inventory: 0, compiler: 0, descriptions: 0, accesses: 0, link: 0, decide: 0, companions: 0, publish: 0, total: 0 } };
   const report = { schemaVersion: 'ramify.analysis/3', inputId, outcome: revision.outcome, summary: revision.summary,
     diagnostics: [], warnings: [], coverage: [] } as unknown as AnalysisReport;

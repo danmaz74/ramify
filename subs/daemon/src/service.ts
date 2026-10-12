@@ -3,13 +3,13 @@ import { channel } from 'node:diagnostics_channel';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { performance } from 'node:perf_hooks';
 import type { RetainedSession } from '../../analysis/src/interfaces/session.js';
-import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
+import type { AnalysisFailureEvidence, RunControl } from '../../analysis/src/interfaces/analysis.js';
 import type { DependencyDiagramRunner } from '../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ArchitectDependencies, RenderedArchitectView } from '../../analysis/src/interfaces/architect-view.js';
 import { renderArchitectView } from '../../analysis/src/architect-render.js';
 import type { ArchitectMeasurements, MeasurementViews } from '../../analysis/src/interfaces/measurements.js';
 import type { ApiViewQueryLimits, CheckOutcome, ContextEvent, ContextRevision, ContextStatus, ContextToken, OpenOutcome, SubscriptionHandle, Unavailable,
-  UnavailableReason } from '../subs/contexts/src/interfaces/contexts.js';
+  UnavailableReason, RecoveryEvidence } from '../subs/contexts/src/interfaces/contexts.js';
 import { createContextManager } from '../subs/contexts/src/context-manager.js';
 import type { AffectedOutcome, DaemonCounters, MaterializedArchitectSummary, MaterializeOutcome, MaterializeParams, MeasureDocument, MeasureOutcome,
   MeasureParams, RamifyService, ServiceErrorCode, ServiceResult } from '../../../src/interfaces/service.js';
@@ -58,9 +58,19 @@ export function withStopRequestId<T>(requestId: string, operation: () => T): T {
 const rejectedDispatches = new WeakMap<RamifyService, () => void>();
 
 function success<T>(value: T): ServiceResult<T> { return { ok: true, value }; }
-function failure<T>(code: ServiceErrorCode, message: string): ServiceResult<T> { return { ok: false, error: { code, message, details: {} } }; }
+type FailureEvidence = AnalysisFailureEvidence & { readonly recovery?: RecoveryEvidence };
+function failureEvidence(value: FailureEvidence): FailureEvidence {
+  return { ...(value.diagnostics === undefined ? {} : { diagnostics: value.diagnostics }),
+    ...(value.stages === undefined ? {} : { stages: value.stages }),
+    ...(value.recovery === undefined ? {} : { recovery: value.recovery }) };
+}
+function capturedEvidence(value: FailureEvidence): FailureEvidence { return failureEvidence(value); }
+function failure<T>(code: ServiceErrorCode, message: string, evidence: FailureEvidence = {}): ServiceResult<T> {
+  return { ok: false, error: { code, message, details: {}, ...failureEvidence(evidence) } };
+}
 function domainError<T>(value: Unavailable): ServiceResult<T> {
-  return failure(value.reason === 'unknown-context' || value.reason === 'expired-generation' ? value.reason : 'internal-error', value.message);
+  return failure(value.reason === 'unknown-context' || value.reason === 'expired-generation' ? value.reason : 'internal-error',
+    value.message, value);
 }
 
 export function createDaemonService(options: DaemonServiceOptions): DaemonService {
@@ -117,6 +127,16 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       },
       dispose: () => options.driver.dispose(),
     } });
+  /** A failure produced by this service completes here; context-produced failures
+   * already carry their snapshot and must retain that earlier identity. */
+  function serviceUnavailable<const T extends { readonly status: 'unavailable' }>(token: ContextToken, value: T): T {
+    const current = manager.recovery(token);
+    return 'status' in current ? value : { ...value, recovery: current };
+  }
+  function serviceRecovery(token: ContextToken): { readonly recovery?: RecoveryEvidence } {
+    const current = manager.recovery(token);
+    return 'status' in current ? {} : { recovery: current };
+  }
   async function measured<T extends { readonly status: string }>(control: RunControl | undefined, run: () => Promise<T>): Promise<T> {
     counters.analyses++;
     let cancelled = false;
@@ -257,7 +277,8 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       let stopDeadline = (): void => {};
       const requestControl = { signal: request.signal };
       const interrupted = (revision: ContextRevision | null): MaterializeOutcome => deadlineExpired
-        ? { status: 'deadline-exceeded', requestId: params.requestId, revision, elapsedMs: options.clock.now() - started }
+        ? { status: 'deadline-exceeded', requestId: params.requestId, revision, elapsedMs: options.clock.now() - started,
+            ...serviceRecovery(params.token) }
         : { status: 'cancelled', requestId: params.requestId };
       try {
       const lease = pair(params.token);
@@ -279,7 +300,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           const remaining = params.deadlineMs - (options.clock.now() - started);
           if (remaining <= 0) {
             return { status: 'deadline-exceeded', requestId: params.requestId, revision: outcome.revision,
-              elapsedMs: options.clock.now() - started };
+              elapsedMs: options.clock.now() - started, ...serviceRecovery(params.token) };
           }
           stopDeadline = options.clock.schedule(remaining, () => {
             deadlineExpired = true; request.abort(new Error('Materialize deadline exceeded'));
@@ -296,8 +317,8 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         let renderedApi: readonly RenderedApiViewArea[] | undefined;
         if (outcome.architect) {
           if (!outcome.measurements) {
-            return { status: 'unavailable', requestId: outcome.requestId, reason: 'analysis-failed',
-              message: 'Architect projection has no revision-bound inventory measurements' };
+            return serviceUnavailable(params.token, { status: 'unavailable', requestId: outcome.requestId, reason: 'analysis-failed',
+              message: 'Architect projection has no revision-bound inventory measurements' });
           }
           let measurements: ArchitectMeasurements;
           if (metricsPolicy === 'omit') {
@@ -333,13 +354,15 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           const waited = await waitForDependencies(params.token, params.requestId, outcome.revision, lease, requestControl);
           if (waited.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: waited.revision };
           if (waited.status === 'cancelled') return interrupted(outcome.revision);
-          if (waited.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId, reason: waited.reason, message: waited.message };
+          if (waited.status === 'unavailable') return serviceUnavailable(params.token,
+            { status: 'unavailable', requestId: outcome.requestId, reason: waited.reason, message: waited.message });
           let view: RenderedArchitectView;
           try {
             view = renderArchitectView({ revision: outcome.revision.revision, projection: outcome.architect,
               dependencies: waited.dependencies, measurements });
           } catch (error) {
-            return { status: 'unavailable', requestId: outcome.requestId, reason: 'analysis-failed', message: `Rendering the architect view failed: ${String(error)}` };
+            return serviceUnavailable(params.token, { status: 'unavailable', requestId: outcome.requestId,
+              reason: 'analysis-failed', message: `Rendering the architect view failed: ${String(error)}` });
           }
           architect = { view, summary: architectSummary(view, waited.dependencies) };
         }
@@ -358,18 +381,21 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           // folds its own 'resource-limit') rather than widening the frozen union.
           const reason = published.reason === 'invalid-path' ? 'invalid-location'
             : published.reason === 'resource-limit' ? 'resource-unavailable' : published.reason;
-          return { status: 'unavailable', requestId: outcome.requestId, reason, message: published.message };
+          return serviceUnavailable(params.token, { status: 'unavailable', requestId: outcome.requestId, reason, message: published.message });
         }
         return { status: 'materialized', requestId: outcome.requestId, revision: outcome.revision, freshness: outcome.freshness,
           targets: published.targets, bytesWritten: published.bytesWritten, ...(outcome.timings ? { timings: outcome.timings } : {}),
           ...(architect ? { architect: architect.summary } : {}) };
       }
-      if (outcome.status === 'pending') return { status: 'pending', requestId: outcome.requestId, current: outcome.current };
-      if (outcome.status === 'cold') return { status: 'cold', requestId: outcome.requestId, current: outcome.current };
-      if (outcome.status === 'deadline-exceeded') return { status: 'deadline-exceeded', requestId: outcome.requestId, revision: outcome.revision, elapsedMs: outcome.elapsedMs };
-      if (outcome.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: outcome.revision };
+      if (outcome.status === 'pending') return { status: 'pending', requestId: outcome.requestId, current: outcome.current, ...capturedEvidence(outcome) };
+      if (outcome.status === 'cold') return { status: 'cold', requestId: outcome.requestId, current: outcome.current, ...capturedEvidence(outcome) };
+      if (outcome.status === 'deadline-exceeded') return { status: 'deadline-exceeded', requestId: outcome.requestId,
+        revision: outcome.revision, elapsedMs: outcome.elapsedMs, ...capturedEvidence(outcome) };
+      if (outcome.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId,
+        revision: outcome.revision, ...capturedEvidence(outcome) };
       if (outcome.status === 'cancelled') return interrupted(null);
-      if (outcome.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId, reason: outcome.reason, message: outcome.message };
+      if (outcome.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId,
+        reason: outcome.reason, message: outcome.message, ...failureEvidence(outcome) };
       throw new Error(`Unhandled apiView outcome status: ${(outcome as { status: string }).status}`);
       } finally {
         stopDeadline();
@@ -388,7 +414,8 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       if (control?.signal?.aborted) abort();
       let stopDeadline = (): void => {};
       const interrupted = (revision: ContextRevision | null): MeasureOutcome => deadlineExpired
-        ? { status: 'deadline-exceeded', requestId: params.requestId, revision, elapsedMs: options.clock.now() - started }
+        ? { status: 'deadline-exceeded', requestId: params.requestId, revision, elapsedMs: options.clock.now() - started,
+            ...serviceRecovery(params.token) }
         : { status: 'cancelled', requestId: params.requestId };
       try {
         const outcome = await manager.apiView({ token: params.token, requestId: params.requestId,
@@ -399,7 +426,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           if (params.deadlineMs !== undefined) {
             const remaining = params.deadlineMs - (options.clock.now() - started);
             if (remaining <= 0) return { status: 'deadline-exceeded', requestId: params.requestId,
-              revision: outcome.revision, elapsedMs: options.clock.now() - started };
+              revision: outcome.revision, elapsedMs: options.clock.now() - started, ...serviceRecovery(params.token) };
             stopDeadline = options.clock.schedule(remaining, () => {
               deadlineExpired = true; request.abort(new Error('Measure deadline exceeded'));
             });
@@ -409,13 +436,13 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
             return 'status' in status ? null : status.published;
           };
           const revisionCurrent = (): boolean => currentRevision()?.revision === outcome.revision.revision;
-          if (!outcome.measurements) return { status: 'unavailable', requestId: outcome.requestId,
-            reason: 'analysis-failed', message: 'Measurement has no revision-bound inventory' };
+          if (!outcome.measurements) return serviceUnavailable(params.token, { status: 'unavailable', requestId: outcome.requestId,
+            reason: 'analysis-failed', message: 'Measurement has no revision-bound inventory' });
           if (outcome.measurements.inputId !== outcome.revision.fingerprints.inputId
             || outcome.measurementProjection && (outcome.measurementProjection.inputId !== outcome.measurements.inputId
               || outcome.measurementProjection.sequence !== outcome.measurements.sequence)) {
-            return { status: 'unavailable', requestId: outcome.requestId, reason: 'analysis-failed',
-              message: 'Measurement inventory and API projection do not describe one revision' };
+            return serviceUnavailable(params.token, { status: 'unavailable', requestId: outcome.requestId, reason: 'analysis-failed',
+              message: 'Measurement inventory and API projection do not describe one revision' });
           }
           let views: MeasurementViews;
           let exactViews = {};
@@ -434,10 +461,10 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           }
           let joined: ArchitectMeasurements;
           try { joined = architectMeasurements(outcome.measurements, views, exactViews); }
-          catch (error) { return { status: 'unavailable', requestId: outcome.requestId,
-            reason: 'analysis-failed', message: `Joining module measurements failed: ${String(error)}` }; }
-          if (joined.state !== 'measured') return { status: 'unavailable', requestId: outcome.requestId,
-            reason: 'analysis-failed', message: `The current inventory cannot be measured: ${joined.reason}` };
+          catch (error) { return serviceUnavailable(params.token, { status: 'unavailable', requestId: outcome.requestId,
+            reason: 'analysis-failed', message: `Joining module measurements failed: ${String(error)}` }); }
+          if (joined.state !== 'measured') return serviceUnavailable(params.token, { status: 'unavailable', requestId: outcome.requestId,
+            reason: 'analysis-failed', message: `The current inventory cannot be measured: ${joined.reason}` });
           const document: MeasureDocument = { schema: 'ramify.measure/2', revision: outcome.revision.revision,
             root, ownershipRule: measurementOwnershipRule, views: joined.views, modules: joined.modules,
             files: outcome.measurements.files };
@@ -454,20 +481,24 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           if (counted.status === 'cancelled') return interrupted(outcome.revision);
           if (counted.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId,
             revision: currentRevision() };
-          if (counted.status === 'exceeded') return { status: 'unavailable', requestId: outcome.requestId,
-            reason: 'resource-unavailable', message: `Measure response exceeds maxResponseBytes (${maximumBytes})` };
+          if (counted.status === 'exceeded') return serviceUnavailable(params.token, { status: 'unavailable', requestId: outcome.requestId,
+            reason: 'resource-unavailable', message: `Measure response exceeds maxResponseBytes (${maximumBytes})` });
           if (!revisionCurrent()) return { status: 'superseded', requestId: outcome.requestId, revision: currentRevision() };
           return measured;
         }
-        if (outcome.status === 'pending') return { status: 'pending', requestId: outcome.requestId, current: outcome.current };
-        if (outcome.status === 'cold') return { status: 'cold', requestId: outcome.requestId, current: outcome.current };
+        if (outcome.status === 'pending') return { status: 'pending', requestId: outcome.requestId, current: outcome.current,
+          ...capturedEvidence(outcome) };
+        if (outcome.status === 'cold') return { status: 'cold', requestId: outcome.requestId, current: outcome.current,
+          ...capturedEvidence(outcome) };
         if (outcome.status === 'deadline-exceeded') return { status: 'deadline-exceeded', requestId: outcome.requestId,
-          revision: outcome.revision, elapsedMs: outcome.elapsedMs };
-        if (outcome.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: outcome.revision };
+          revision: outcome.revision, elapsedMs: outcome.elapsedMs, ...capturedEvidence(outcome) };
+        if (outcome.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId,
+          revision: outcome.revision, ...capturedEvidence(outcome) };
         if (outcome.status === 'cancelled') return interrupted(null);
         // The whole-project selection names no location, so `invalid-location` cannot occur here; were it to, it is a failed analysis.
         if (outcome.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId,
-          reason: outcome.reason === 'invalid-location' ? 'analysis-failed' : outcome.reason, message: outcome.message };
+          reason: outcome.reason === 'invalid-location' ? 'analysis-failed' : outcome.reason, message: outcome.message,
+          ...failureEvidence(outcome) };
         throw new Error(`Unhandled measurement outcome status: ${(outcome as { status: string }).status}`);
       } finally {
         stopDeadline();
@@ -537,7 +568,8 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         if (result.status !== 'unavailable') return success(result);
         switch (result.reason) {
           case 'resource-unavailable': case 'invalid-current': case 'analysis-failed': case 'resource-limit':
-            return success({ status: 'unavailable', requestId: result.requestId, reason: result.reason, message: result.message });
+            return success({ status: 'unavailable', requestId: result.requestId, reason: result.reason, message: result.message,
+              ...failureEvidence(result as FailureEvidence) });
           case 'disposed': return failure('stopping', 'Daemon is stopping');
           default: return domainError(result as Unavailable);
         }
@@ -546,7 +578,8 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         const invalid = guard<MaterializeOutcome>('materialize', params); if (invalid) return invalid;
         const status = manager.status(params.token);
         if ('status' in status) {
-          return success({ status: 'unavailable', requestId: params.requestId, reason: status.reason, message: status.message });
+          return success({ status: 'unavailable', requestId: params.requestId, reason: status.reason,
+            message: status.message, ...failureEvidence(status) });
         }
         const root = status.selection.root;
         const handling = performance.now();
@@ -559,7 +592,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         const invalid = guard<MeasureOutcome>('measure', params); if (invalid) return invalid;
         const status = manager.status(params.token);
         if ('status' in status) return success({ status: 'unavailable', requestId: params.requestId,
-          reason: status.reason, message: status.message });
+          reason: status.reason, message: status.message, ...failureEvidence(status) });
         const result = await runMeasure(params, status.selection.root, control);
         observe();
         return success(result);
@@ -577,8 +610,9 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         const counted = await countJsonBytesBounded({ type: 'response', id: transport?.requestId ?? '~'.repeat(128),
           result: { ok: true, value: answered } }, maximumBytes, control, () => true);
         if (counted.status === 'cancelled') return success({ status: 'cancelled', requestId: result.requestId });
-        if (counted.status === 'exceeded') return success({ status: 'unavailable', requestId: result.requestId, revision: result.revision,
-          reason: 'resource-unavailable', message: `Affected response exceeds maxResponseBytes (${maximumBytes})`, unknownModules: [] });
+        if (counted.status === 'exceeded') return success(serviceUnavailable(params.token, { status: 'unavailable', requestId: result.requestId,
+          revision: result.revision, reason: 'resource-unavailable',
+          message: `Affected response exceeds maxResponseBytes (${maximumBytes})`, unknownModules: [] }));
         return success(answered);
       },
       async subscribe(params, listener) {
@@ -617,7 +651,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         const contexts = observe();
         const memory = process.memoryUsage();
         const host = transportCounters(result);
-        return success({ ...options.instance, protocol: 'ramify.ipc/2', startedAt, state: stopping ? 'stopping' : 'running',
+        return success({ ...options.instance, protocol: 'ramify.ipc/3', startedAt, state: stopping ? 'stopping' : 'running',
           connections: host.connections || Math.max(0, clients.size - 1),
           subscriptions: [...clients.values()].reduce((sum, client) => sum + client.subscriptions.size, 0), contexts,
           budgets: options.budgets, counters: { ...counters, coalescedEvents: counters.coalescedEvents + host.coalescedEvents,

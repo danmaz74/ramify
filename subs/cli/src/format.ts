@@ -3,6 +3,9 @@ import type { AnalysisDiagnostic, AnalysisReport } from '../../analysis/src/inte
 import type { SourceLocation } from '../../analysis/subs/model/src/interfaces/model.js';
 import type { ProjectWarning } from '../../analysis/subs/project/src/interfaces/project.js';
 import type { CheckDocument } from './interfaces/cli.js';
+import type { CliDiagnostic, CliFailureDocument } from './interfaces/cli.js';
+import type { RecoveryEvidence } from '../../daemon/src/context-types.js';
+import type { CliFailureEvidence } from './errors.js';
 
 const location = (value: SourceLocation): string => `${value.file}:${value.line}:${value.column}`;
 const oneLine = (text: string): string => text.replace(/[\r\n]+/g, ' ');
@@ -15,6 +18,45 @@ function warningFiles(warning: ProjectWarning): string {
 
 /** A path as one human field: control characters, such as a newline in a name, are shown escaped. */
 const shownPath = (path: string): string => /[\u0000-\u001f\u007f]/u.test(path) ? JSON.stringify(path) : path;
+
+/** Locations belong to the producer; a minimal operation reason has no invented span. */
+export function diagnosticLines(issue: CliDiagnostic): string[] {
+  const full = 'id' in issue;
+  const lines = [`  [${issue.code}]${full && issue.location ? ` ${location(issue.location)}` : ''}: ${oneLine(issue.message)}`];
+  if (full) {
+    if (issue.importer) lines.push(`    Importer: ${issue.importer.owner} (${issue.importer.kind}; tags: ${issue.importer.profile.join(', ') || 'none'})`);
+    if (issue.original) lines.push(`    Original: ${issue.original.owner}/${issue.original.file}#${issue.original.binding}`);
+    for (const related of issue.related) lines.push(`    Related: ${location(related)}`);
+  }
+  return lines;
+}
+
+export function recoveryLines(recovery: RecoveryEvidence | undefined): string[] {
+  if (!recovery) return [];
+  const baseline = recovery.lastCompleted
+    ? `last completed ${recovery.lastCompleted.revision} (input ${recovery.lastCompleted.inputId})`
+    : 'last completed analysis unavailable';
+  return [`Observed history: ${baseline}; coverage ${recovery.changes.coverage}${recovery.changes.reason ? ` (${recovery.changes.reason})` : ''}.`,
+    `Observed changed paths: ${recovery.changes.paths.map(shownPath).join(', ') || 'none recorded'}.`];
+}
+
+export function formatFailureHuman(operation: string, reason: string, document: CliFailureDocument,
+  unavailable: string, root?: string): string {
+  const lines = [`${operation} failed (${reason}).`];
+  for (const issue of document.diagnostics) lines.push(...diagnosticLines(issue));
+  if (document.stages) lines.push(`Stages: ${document.stages.map(stage => `${stage.stage}=${stage.status}`).join(', ')}`);
+  if (root) lines.push(`Root: ${root}`);
+  lines.push(unavailable, ...recoveryLines(document.recovery));
+  return lines.join('\n') + '\n';
+}
+
+export function failureDocument(reason: string, message: string, exitCode: 1 | 2,
+  evidence: CliFailureEvidence = {}, category: 'execution' | 'invocation' = 'execution'): CliFailureDocument {
+  return { schemaVersion: 'ramify.cli/2', status: 'unavailable',
+    diagnostics: [{ category, code: reason, message }, ...(evidence.diagnostics ?? [])],
+    ...(evidence.stages === undefined ? {} : { stages: evidence.stages }),
+    ...(evidence.recovery === undefined ? {} : { recovery: evidence.recovery }), exitCode };
+}
 
 /** One named path's disposition: checked paths name their evidence, others why they were not analyzed or checked. */
 function pathLine(item: CheckDocument['paths'][number]): string {
@@ -30,9 +72,13 @@ function pathLine(item: CheckDocument['paths'][number]): string {
  * complete check does not analyze either, and it never reads as passing.
  */
 export function formatChangedHuman(document: CheckDocument): string {
-  const lines = [`Root: ${document.root}`,
+  const lines = [...(document.exitCode === 0 ? [] : [`Check failed (${document.reason ?? (document.execution === 'invalid' ? 'invalid-project' : 'findings')}).`]),
+    `Root: ${document.root}`,
     `Mode: resident (${document.revision ? `revision ${document.revision.sequence}; ${document.revision.path}` : document.reason ?? 'no revision'})`];
-  for (const finding of document.findings) lines.push(`Error${finding.new ? ' [new]' : ''} [${finding.code}]${finding.location ? ` ${location(finding.location)}` : ''}: ${finding.message.replace(/[\r\n]+/g, ' ')}`);
+  for (const finding of document.findings) {
+    const [first, ...more] = diagnosticLines(finding);
+    lines.push(`Error${finding.new ? ' [new]' : ''} ${first!.trimStart()}`, ...more);
+  }
   for (const warning of document.warnings) lines.push(`Warning [${warning.code}] ${shownPath(warning.path)}: ${oneLine(warning.message)}`);
   for (const limit of document.coverage) lines.push(`Analysis limit [${limit.code}] ${location(limit.location)}: ${limit.message.replace(/[\r\n]+/g, ' ')}`);
   for (const item of document.paths) lines.push(pathLine(item));
@@ -40,6 +86,8 @@ export function formatChangedHuman(document: CheckDocument): string {
   const paths = `${count('checked')} checked, ${count('not-analyzed')} not analyzed, ${count('not-checked')} not checked`;
   const checked = document.checked ? `${document.checked.files.length} files (${document.checked.files.join(', ') || 'none'}), ${document.checked.accesses} accesses` : 'none';
   lines.push(`Outcome: ${document.outcome === 'checked' ? `checked (${paths})` : `not checked (${document.reason}; ${paths})`}; checked set: ${checked}; wait: ${document.timings.waitedMs.toFixed(1)} ms; findings: ${document.findings.length}`);
+  if (document.stages) lines.push(`Stages: ${document.stages.map(stage => `${stage.stage}=${stage.status}`).join(', ')}`);
+  lines.push(...recoveryLines(document.recovery));
   return lines.join('\n') + '\n';
 }
 
@@ -77,13 +125,22 @@ export function serializeReport(input: AnalysisReport): { report: AnalysisReport
   return { report, json };
 }
 
-export function formatHuman(report: AnalysisReport, mode: string): string {
-  const lines = report.scope ? [
-    `Root: ${report.scope.root} (${report.scope.selection === 'given' ? 'given' : `found from ${report.scope.invokedFrom}`})`,
-    `Configuration: ${report.scope.configuration}`,
-  ] : [`Root: unavailable (requested ${report.request.project.root ?? `from ${report.request.project.cwd}`})`, 'Configuration: unavailable'];
-  lines.push(`Mode: ${mode}`);
-  for (const issue of report.diagnostics) {
+export function formatHuman(report: AnalysisReport, mode: string,
+  options: { readonly omitScopeHeader?: boolean } = {}): string {
+  const failed = report.outcome.execution !== 'completed' || report.outcome.check === 'failed';
+  const lines = failed ? [`Check failed (${report.outcome.execution === 'invalid' ? 'invalid-project' : report.outcome.execution === 'completed' ? 'findings' : report.outcome.execution}).`,
+    ...report.diagnostics.flatMap(issue => {
+      const [first, ...more] = diagnosticLines(issue);
+      return [`Error ${first!.trimStart()}`, ...more];
+    })] : [];
+  if (!options.omitScopeHeader) {
+    lines.push(...(report.scope ? [
+      `Root: ${report.scope.root} (${report.scope.selection === 'given' ? 'given' : `found from ${report.scope.invokedFrom}`})`,
+      `Configuration: ${report.scope.configuration}`,
+    ] : [`Root: unavailable (requested ${report.request.project.root ?? `from ${report.request.project.cwd}`})`, 'Configuration: unavailable']));
+    lines.push(`Mode: ${mode}`);
+  }
+  for (const issue of failed ? [] : report.diagnostics) {
     lines.push(`Error [${issue.code}]${issue.location ? ` ${location(issue.location)}` : ''}: ${issue.message}`);
     if (issue.importer) lines.push(`  Importer: ${issue.importer.owner} (${issue.importer.kind}; tags: ${issue.importer.profile.join(', ') || 'none'})`);
     if (issue.original) lines.push(`  Original: ${issue.original.owner}/${issue.original.file}#${issue.original.binding}`);

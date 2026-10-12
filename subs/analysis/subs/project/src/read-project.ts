@@ -48,7 +48,7 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
   const { request, limits, signal } = options;
   if (Object.values(limits).some(value => !Number.isSafeInteger(value) || value <= 0)
     || limits.attempts > 3 || request.scope !== 'whole-project' || request.configuration !== 'discover') {
-    return { status: 'unavailable', inventory: null, sealedInputs: null, issues: [{ code: 'resource-limit', path: request.cwd, message: 'Invalid acquisition limits or unsupported scope/configuration policy' }] };
+    return { status: 'unavailable', root: null, inventory: null, sealedInputs: null, issues: [{ code: 'resource-limit', path: request.cwd, message: 'Invalid acquisition limits or unsupported scope/configuration policy' }] };
   }
   const deadline = performance.now() + limits.deadlineMs;
   let previousConfiguration = options.retained;
@@ -75,7 +75,7 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
       if (issues.length) {
         const seal = await capture.seal();
         if (seal.status === 'changed') throw new AcquisitionError('changed-input', selected.root, 'Inputs changed during acquisition');
-        return freeze({ status: 'invalid', inventory, issues: issues.sort(issueOrder), sealedInputs: seal.inputs });
+        return freeze({ status: 'invalid', root: capture.selectedRoot, inventory, issues: issues.sort(issueOrder), sealedInputs: seal.inputs });
       }
       capture.finishAcquisition();
       retained = true;
@@ -85,13 +85,13 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
         configurationPath: configuration, configurationData: config, reusedConfiguration: acquiredConfiguration.reused, resolution } };
     } catch (error) {
       if (error instanceof ConfigurationChanged) { previousConfiguration = null; attempt--; continue; }
-      if (error instanceof Cancelled || signal?.aborted) return { status: 'cancelled' };
+      if (error instanceof Cancelled || signal?.aborted) return { status: 'cancelled', root: capture.selectedRoot };
       const failure = error instanceof AcquisitionError ? error : new AcquisitionError('read-failure', capture.root,
         error instanceof Error ? error.message : String(error));
       if (failure.code === 'changed-input' && attempt + 1 < limits.attempts) continue;
       issues.push({ code: failure.code, path: capture.label(capture.path(failure.path)), message: failure.message });
       return freeze({ status: invalidCodes.has(failure.code) ? 'invalid' : unavailableCodes.has(failure.code) ? 'unavailable' : 'incomplete',
-        inventory, issues: issues.sort(issueOrder), sealedInputs: null });
+        root: capture.selectedRoot, inventory, issues: issues.sort(issueOrder), sealedInputs: null });
     } finally { if (!retained) await capture.dispose(); }
   }
   throw new Error('Unreachable acquisition retry state');

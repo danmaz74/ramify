@@ -178,6 +178,7 @@ describe('ContextManager.dependencyDiagram', () => {
     const e = environment();
     try {
       const { token, revision } = await e.published();
+      const baselineRetained = e.status(token).retainedBytes;
       const one = new AbortController(), two = new AbortController();
       const first = e.diagram(token, revision.revision, { signal: one.signal });
       const second = e.diagram(token, revision.revision, { signal: two.signal }); await flush();
@@ -191,7 +192,7 @@ describe('ContextManager.dependencyDiagram', () => {
       // The aborted job keeps the daemon's slot until its runner settles.
       expect(await e.diagram(token, revision.revision)).toMatchObject({ status: 'busy', reason: 'analysis-running' });
       e.runs[0]!.settle({ status: 'cancelled' }); await flush();
-      expect(e.status(token).retainedBytes).toBe(100);
+      expect(e.status(token).retainedBytes).toBe(baselineRetained);
       // A new request starts a new job; nothing restarted on its own.
       expect(e.runs).toHaveLength(1);
       const third = e.diagram(token, revision.revision); await flush();
@@ -208,6 +209,7 @@ describe('ContextManager.dependencyDiagram', () => {
     const e = environment();
     try {
       const { token, revision } = await e.published();
+      const baselineRetained = e.status(token).retainedBytes;
       const waiting = e.diagram(token, revision.revision); await flush();
       e.script.version = 2;
       await e.check(token, { mode: 'synchronized', expect: [] });
@@ -218,7 +220,7 @@ describe('ContextManager.dependencyDiagram', () => {
       // A late ready outcome from the aborted job is discarded.
       expect(await e.diagram(token, newer.revision)).toMatchObject({ status: 'busy', reason: 'analysis-running' });
       e.runs[0]!.settle(ready(facts(revision.fingerprints.inputId))); await flush();
-      expect(e.status(token).retainedBytes).toBe(100);
+      expect(e.status(token).retainedBytes).toBe(baselineRetained);
       expect(e.runs).toHaveLength(1);
 
       const changed = e.diagram(token, newer.revision); await flush();
@@ -226,7 +228,7 @@ describe('ContextManager.dependencyDiagram', () => {
       e.runs[1]!.settle({ status: 'inputs-changed', paths: ['src/index.ts'] });
       expect(await changed).toEqual({ status: 'busy', requestId: 'diagram-3', revision: newer, reason: 'inputs-changed' });
       await flush();
-      expect(e.status(token).retainedBytes).toBe(100);
+      expect(e.status(token).retainedBytes).toBe(baselineRetained);
       expect(e.runs).toHaveLength(2);
       expect(e.status(token)).toMatchObject({ pending: { requests: 0 } });
     } finally { await e.dispose(); }
@@ -236,6 +238,7 @@ describe('ContextManager.dependencyDiagram', () => {
     const e = environment();
     try {
       const { token, revision } = await e.published();
+      const baselineRetained = e.status(token).retainedBytes;
       const outcomes: [DependencyAnalyzerOutcome, unknown][] = [
         [{ status: 'unavailable', reason: 'resource-limit', message: 'too large' }, { status: 'unavailable', reason: 'resource-limit', message: 'resource-limit: too large' }],
         [{ status: 'unavailable', reason: 'invalid-report', message: 'bad' }, { status: 'unavailable', reason: 'analysis-failed', message: 'invalid-report: bad' }],
@@ -247,7 +250,7 @@ describe('ContextManager.dependencyDiagram', () => {
         const pending = e.diagram(token, revision.revision); await flush();
         e.runs[index]!.settle(outcome);
         expect(await pending).toMatchObject(expected as object);
-        expect(e.status(token).retainedBytes).toBe(100);
+        expect(e.status(token).retainedBytes).toBe(baselineRetained);
       }
     } finally { await e.dispose(); }
   });
@@ -256,16 +259,17 @@ describe('ContextManager.dependencyDiagram', () => {
     const e = environment();
     try {
       const { token, revision } = await e.published();
+      const baselineRetained = e.status(token).retainedBytes;
       const diagram = facts(revision.fingerprints.inputId, 20);
       const pending = e.diagram(token, revision.revision); await flush();
       e.runs[0]!.settle(ready(diagram)); await pending;
-      expect(e.status(token)).toMatchObject({ level: 'hot', retainedBytes: 100 + retained(diagram) });
+      expect(e.status(token)).toMatchObject({ level: 'hot', retainedBytes: baselineRetained + retained(diagram) });
 
       e.clock.advance(100); await flush();
-      expect(e.status(token)).toMatchObject({ level: 'warm', retainedBytes: 100 + retained(diagram) });
+      expect(e.status(token)).toMatchObject({ level: 'warm', retainedBytes: baselineRetained + retained(diagram) });
       expect(await e.diagram(token, revision.revision)).toMatchObject({ status: 'ready', diagram });
       e.clock.advance(200); await flush();
-      expect(e.status(token)).toMatchObject({ level: 'cold', session: null, retainedBytes: retained(diagram) });
+      expect(e.status(token)).toMatchObject({ level: 'cold', session: null, retainedBytes: baselineRetained - 100 + retained(diagram) });
       expect(await e.diagram(token, revision.revision)).toMatchObject({ status: 'ready', diagram });
       expect(e.runs).toHaveLength(1);
       e.clock.advance(200); await flush();
@@ -274,40 +278,42 @@ describe('ContextManager.dependencyDiagram', () => {
 
       const reopened = await e.published();
       const second = facts(reopened.revision.fingerprints.inputId, 20);
+      const reopenedBaseline = e.status(reopened.token).retainedBytes;
       const again = e.diagram(reopened.token, reopened.revision.revision); await flush();
       e.runs[1]!.settle(ready(second)); await again;
-      expect(e.status(reopened.token).retainedBytes).toBe(100 + retained(second));
+      expect(e.status(reopened.token).retainedBytes).toBe(reopenedBaseline + retained(second));
       e.script.version = 3;
       await e.check(reopened.token, { mode: 'synchronized', expect: [] });
-      expect(e.status(reopened.token)).toMatchObject({ published: { sequence: 2 }, retainedBytes: 100 });
+      expect(e.status(reopened.token)).toMatchObject({ published: { sequence: 2 }, retainedBytes: reopenedBaseline });
     } finally { await e.dispose(); }
   });
 
   it('BD22: exceeding the per-context or global retained budget returns resource-limit without retention', async () => {
     const diagramPadding = 400;
-    const perContext = environment({ maxRetainedBytesPerContext: 1000 });
+    const perContext = environment({ maxRetainedBytesPerContext: 5000 });
     try {
       const { token, revision } = await perContext.published();
+      const prior = perContext.status(token).history.bytes + perContext.status(token).retainedBytes;
       const diagram = facts(revision.fingerprints.inputId, diagramPadding);
       const pending = perContext.diagram(token, revision.revision); await flush();
       perContext.runs[0]!.settle(ready(diagram));
       expect(await pending).toMatchObject({ status: 'unavailable', reason: 'resource-limit',
-        message: `Retaining the dependency diagram needs ${100 + bytes(diagram)} bytes in its context; the maximum is 1000` });
-      expect(perContext.status(token).retainedBytes).toBe(100);
+        message: `Retaining the dependency diagram needs ${prior + bytes(diagram)} bytes in its context; the maximum is 5000` });
+      expect(perContext.status(token).retainedBytes).toBe(prior - perContext.status(token).history.bytes);
     } finally { await perContext.dispose(); }
 
     const global = environment({ maxRetainedBytesGlobal: 8_000 });
     try {
       const { token, revision } = await global.published();
       const diagram = facts(revision.fingerprints.inputId, diagramPadding);
-      const used = global.status(token).history.bytes + 100;
+      const used = global.status(token).history.bytes + global.status(token).retainedBytes;
       expect(used + bytes(diagram)).toBeGreaterThan(8_000);
-      expect(bytes(diagram) + 100).toBeLessThan(testBudgets.maxRetainedBytesPerContext);
+      expect(bytes(diagram) + global.status(token).retainedBytes).toBeLessThan(testBudgets.maxRetainedBytesPerContext);
       const pending = global.diagram(token, revision.revision); await flush();
       global.runs[0]!.settle(ready(diagram));
       expect(await pending).toMatchObject({ status: 'unavailable', reason: 'resource-limit',
         message: `Retaining the dependency diagram needs ${used + bytes(diagram)} bytes in the daemon; the maximum is 8000` });
-      expect(global.status(token).retainedBytes).toBe(100);
+      expect(global.status(token).retainedBytes).toBe(used - global.status(token).history.bytes);
     } finally { await global.dispose(); }
   });
 
@@ -327,6 +333,7 @@ describe('ContextManager.dependencyFacts (C9)', () => {
     const e = environment();
     try {
       const { token, revision } = await e.published();
+      const baselineRetained = e.status(token).retainedBytes;
       const facts_ = (requestId: string) => e.manager.dependencyFacts({ token, requestId, revision: revision.revision }, 'lease');
       const diagram = facts(revision.fingerprints.inputId);
       const testReferences = references(diagram.inputId);
@@ -341,7 +348,7 @@ describe('ContextManager.dependencyFacts (C9)', () => {
       expect(Object.isFrozen(retainedAnswer.status === 'ready' && retainedAnswer.testReferences)).toBe(true);
       expect(await e.diagram(token, revision.revision)).toEqual({ status: 'ready', requestId: 'diagram-2', revision, diagram });
       expect(e.runs).toHaveLength(1);
-      expect(e.status(token).retainedBytes).toBe(100 + bytes(diagram) + bytes(testReferences));
+      expect(e.status(token).retainedBytes).toBe(baselineRetained + bytes(diagram) + bytes(testReferences));
       // Every other answer is the diagram's: a newer revision supersedes the facts caller too.
       e.script.version = 2;
       await e.check(token, { mode: 'synchronized', expect: [] });
@@ -353,11 +360,12 @@ describe('ContextManager.dependencyFacts (C9)', () => {
     const e = environment();
     try {
       const { token, revision } = await e.published();
+      const baselineRetained = e.status(token).retainedBytes;
       const diagram = facts(revision.fingerprints.inputId);
       const pending = e.manager.dependencyFacts({ token, requestId: 'null', revision: revision.revision }, 'lease'); await flush();
       e.runs[0]!.settle(ready(diagram, null));
       expect(await pending).toMatchObject({ status: 'ready', diagram, testReferences: null });
-      expect(e.status(token).retainedBytes).toBe(100 + bytes(diagram));
+      expect(e.status(token).retainedBytes).toBe(baselineRetained + bytes(diagram));
     } finally { await e.dispose(); }
 
     for (const budget of ['maxRetainedBytesPerContext', 'maxRetainedBytesGlobal'] as const) {
@@ -367,17 +375,18 @@ describe('ContextManager.dependencyFacts (C9)', () => {
         const { token, revision } = await probe.published();
         const diagram = facts(revision.fingerprints.inputId);
         // The budget admits the diagram alone and one byte less than the diagram with its references.
-        limit = (budget === 'maxRetainedBytesPerContext' ? 100 : probe.status(token).history.bytes + 100) + bytes(diagram)
+        limit = probe.status(token).history.bytes + probe.status(token).retainedBytes + bytes(diagram)
           + bytes(references(diagram.inputId, 20)) - 1;
       } finally { await probe.dispose(); }
       const bounded = environment({ [budget]: limit });
       try {
         const { token, revision } = await bounded.published();
+        const boundedBaseline = bounded.status(token).retainedBytes;
         const diagram = facts(revision.fingerprints.inputId);
         const pending = bounded.manager.dependencyFacts({ token, requestId: budget, revision: revision.revision }, 'lease'); await flush();
         bounded.runs[0]!.settle(ready(diagram, references(diagram.inputId, 20)));
         expect(await pending, budget).toEqual({ status: 'ready', requestId: budget, revision, diagram, testReferences: null });
-        expect(bounded.status(token).retainedBytes, budget).toBe(100 + bytes(diagram));
+        expect(bounded.status(token).retainedBytes, budget).toBe(boundedBaseline + bytes(diagram));
         expect(await bounded.diagram(token, revision.revision), budget).toMatchObject({ status: 'ready', diagram });
       } finally { await bounded.dispose(); }
     }
@@ -387,12 +396,13 @@ describe('ContextManager.dependencyFacts (C9)', () => {
     const e = environment();
     try {
       const { token, revision } = await e.published();
+      const baselineRetained = e.status(token).retainedBytes;
       const diagram = facts(revision.fingerprints.inputId);
       const pending = e.manager.dependencyFacts({ token, requestId: 'other', revision: revision.revision }, 'lease'); await flush();
       e.runs[0]!.settle(ready(diagram, references('input/1:other')));
       expect(await pending).toMatchObject({ status: 'unavailable', reason: 'analysis-failed',
         message: `The test references input input/1:other is not the diagram's ${diagram.inputId}` });
-      expect(e.status(token).retainedBytes).toBe(100);
+      expect(e.status(token).retainedBytes).toBe(baselineRetained);
     } finally { await e.dispose(); }
   });
 });

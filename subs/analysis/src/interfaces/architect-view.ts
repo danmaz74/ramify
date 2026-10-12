@@ -1,6 +1,7 @@
 import type { Destination, ModuleId, OriginalId, TagName } from '../../subs/model/src/interfaces/model.js';
 import type { ExportBehavior, ExportKind, SymbolDetail, SymbolDetailLimits, TestTitleLimits } from '../../subs/typescript/src/interfaces/source.js';
 import type { DependencyDiagramFacts, TestReferenceFacts } from './dependency-diagram.js';
+import type { AnalysisFailureEvidence } from './analysis.js';
 
 /** One declared module of the architect projection. */
 export interface ArchitectModuleFacts {
@@ -115,8 +116,8 @@ export type ArchitectViewQueryOutcome =
       readonly projection: ArchitectViewProjection }
   /** `observedInputId` is null when a feature file changed on disk before any observation. */
   | { readonly status: 'superseded'; readonly sequence: number; readonly observedInputId: string | null }
-  | { readonly status: 'unavailable'; readonly reason: 'invalid-revision' | 'resource-limit'
-      | 'analysis-failed'; readonly message: string }
+  | (AnalysisFailureEvidence & { readonly status: 'unavailable'; readonly reason: 'invalid-revision' | 'resource-limit'
+      | 'analysis-failed'; readonly message: string })
   | { readonly status: 'cancelled' };
 
 /** Why the architect view is published without dependency facts. */

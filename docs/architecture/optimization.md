@@ -72,10 +72,18 @@ records the measured variants and the failure-path findings.
 | `ramify watch` | compiled client |
 | `ramify daemon status`, `ramify daemon stop` | compiled client |
 | `ramify --help`, `ramify --version` | compiled client |
-| `ramify check --batch`, and batch fallback after exhausted recovery | Node child `node dist/src/batch-entry.js`, started by the compiled client |
+| `ramify ownership`, `ramify affected --batch`, `ramify check --batch` and batch fallback after exhausted recovery | Node child `node dist/src/batch-entry.js`, started by the compiled client |
 | Daemon startup | Node daemon entry, started by the compiled client with `node` from `PATH` |
 | `ramify mcp`, when implemented | Node; see [open questions](#open-questions) |
 | External Node service clients | the TypeScript `connectDaemon` client |
+
+The compiled client includes the project owner's pure path syntax and ownership
+validators. Acquisition, source cataloging, linking and dependency sessions
+remain in the Node child; ownership uses only acquisition. The public Zod
+ownership decoder is exported from `ramify.ts/cli` for consumers. Commands
+project the root's typed operation result. The bundle guard permits exactly
+those two project runtime files while excluding every other analysis runtime
+file and every external package.
 
 `watch` shares the CLI handler, so it needs no handoff. The compiled client
 requires `node` on `PATH`, as the Node entry's `#!/usr/bin/env node` shebang

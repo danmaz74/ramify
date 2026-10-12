@@ -1,3 +1,4 @@
+import { isProjectExclusion, isProjectOwnership } from '../../analysis/subs/project/src/ownership-validation.js';
 // Private byte framing only. The future message codec validates the value as
 // WireMessage; JSON syntax alone never establishes the service schema.
 function validLimit(maximumBytes: number): void {
@@ -126,8 +127,103 @@ function instance(value: unknown): boolean {
   return shape(value, ['instanceId', 'pid', 'version', 'engine', 'buildKey']) && id(value.instanceId)
     && integer(value.pid) && value.pid > 0 && string(value.version) && string(value.engine) && string(value.buildKey);
 }
+const stages = ['registry', 'acquisition', 'parse', 'catalog', 'link', 'access', 'decide', 'report'];
+const diagnosticCategories = ['invocation', 'registry', 'layout', 'description', 'missing-export', 'import',
+  'exposure', 'acquisition', 'unavailable', 'execution', 'limit'];
+const diagnosticCodes: ReadonlySet<string> = new Set([
+  'invalid-registry', 'unknown-tag', 'invalid-module-id', 'duplicate-module', 'invalid-tree',
+  'invalid-original', 'missing-required-tag', 'conflicting-tags', 'ungrounded-exposure', 'same-owner',
+  'exposed', 'symbol-free', 'testing-origin', 'not-visible', 'required-importer-tag',
+  'required-symbol-tag', 'invalid-encoding', 'bare-cr', 'invalid-whitespace', 'unterminated-string',
+  'invalid-escape', 'invalid-scalar', 'invalid-name', 'empty-name', 'reserved-name',
+  'missing-version', 'unsupported-version', 'missing-header', 'duplicate-header', 'invalid-order',
+  'unknown-clause', 'invalid-selection', 'invalid-list', 'invalid-destination', 'duplicate-tag',
+  'duplicate-destination', 'invalid-tag-syntax', 'unknown-statement', 'test-profile-declaration', 'missing-from',
+  'missing-to', 'trailing-token', 'missing-file', 'missing-export', 'foreign-original',
+  'incomplete-expansion', 'ambiguous-expansion', 'invalid-wildcard-target', 'unknown-child', 'name-collision',
+  'auxiliary-original-exposure', 'invalid-prerequisite', 'root-not-found', 'missing-root-description', 'unmarked-root-description',
+  'configuration-not-found', 'references-only-configuration', 'invalid-layout', 'invalid-description', 'duplicate-name',
+  'description-in-src', 'stray-description', 'reserved-container', 'undeclared-project-boundary', 'invalid-nested-tree',
+  'missing-owned-unwired', 'missing-owned-nested-project', 'overlapping-nested-tree', 'symlink-root', 'symlink-description',
+  'symlink-reference', 'case-mismatch', 'invalid-path', 'resource-limit', 'read-failure',
+  'changed-input', 'invalid-invocation', 'unavailable-capability', 'missing-stage', 'session-used',
+  'session-disposed', 'output-failure', 'internal-error', 'exposed-without-companion', 'project-boundary-import'
+]);
+function boundedStrings(value: unknown, maximum: number): value is readonly string[] {
+  return Array.isArray(value) && value.length <= maximum && value.every(item => string(item) && item.length > 0);
+}
+function location(value: unknown): boolean {
+  return shape(value, ['file', 'start', 'end', 'line', 'column']) && string(value.file) && value.file.length > 0
+    && integer(value.start) && integer(value.end) && value.end >= value.start
+    && integer(value.line) && value.line > 0 && integer(value.column) && value.column > 0;
+}
+function diagnostic(value: unknown): boolean {
+  return members(value, ['id', 'category', 'code', 'message', 'location', 'related', 'importer', 'original', 'accessId'], ['limit'])
+    && string(value.id) && value.id.length > 0 && diagnosticCategories.includes(value.category as string)
+    && string(value.code) && diagnosticCodes.has(value.code) && string(value.message)
+    && (value.location === null || location(value.location))
+    && Array.isArray(value.related) && value.related.length <= 100_000 && value.related.every(location)
+    && (value.importer === null || shape(value.importer, ['owner', 'kind', 'root', 'profile'])
+      && string(value.importer.owner) && ['ordinary', 'tests'].includes(value.importer.kind as string)
+      && string(value.importer.root) && boundedStrings(value.importer.profile, 10_000))
+    && (value.original === null || shape(value.original, ['kind', 'owner', 'file', 'binding'])
+      && ['code', 'resource'].includes(value.original.kind as string) && string(value.original.owner)
+      && string(value.original.file) && string(value.original.binding))
+    && (value.accessId === null || string(value.accessId))
+    && (!Object.hasOwn(value, 'limit') || shape(value.limit, ['name', 'maximum', 'observed', 'collectedPrefix'])
+      && string(value.limit.name) && integer(value.limit.maximum) && integer(value.limit.observed)
+      && value.limit.collectedPrefix === true);
+}
+function evidence(value: Record<string, unknown>): boolean {
+  const diagnostics = value.diagnostics;
+  if (Object.hasOwn(value, 'diagnostics') && (!Array.isArray(diagnostics) || diagnostics.length > 100_000
+    || !diagnostics.every(diagnostic) || new Set(diagnostics.map(item => item.id)).size !== diagnostics.length)) return false;
+  const executions = value.stages;
+  if (Object.hasOwn(value, 'stages') && (!Array.isArray(executions) || executions.length > stages.length
+    || !executions.every(item => shape(item, ['stage', 'status', 'blockedBy', 'diagnosticIds'])
+      && stages.includes(item.stage as string)
+      && ['completed', 'invalid', 'blocked', 'unavailable', 'failed', 'not-requested'].includes(item.status as string)
+      && boundedStrings(item.blockedBy, stages.length) && item.blockedBy.every((stage: string) => stages.includes(stage))
+      && new Set(item.blockedBy).size === item.blockedBy.length
+      && boundedStrings(item.diagnosticIds, 100_000) && new Set(item.diagnosticIds).size === item.diagnosticIds.length)
+    || new Set(executions.map(item => item.stage)).size !== executions.length)) return false;
+  if (Array.isArray(diagnostics) && Array.isArray(executions)) {
+    const ids = new Set(diagnostics.map(item => item.id));
+    if (executions.some(item => item.diagnosticIds.some((id: string) => !ids.has(id)))) return false;
+  }
+  if (Object.hasOwn(value, 'recovery') && !recovery(value.recovery)) return false;
+  return true;
+}
+function recovery(value: unknown): boolean {
+  if (!shape(value, ['schemaVersion', 'lastCompleted', 'changes']) || value.schemaVersion !== 'ramify.recovery/1'
+    || !shape(value.changes, ['paths', 'coverage', 'reason']) || !Array.isArray(value.changes.paths)
+    || value.changes.paths.length > 10_000 || !['observed', 'unavailable'].includes(value.changes.coverage as string)) return false;
+  const baseline = value.lastCompleted;
+  if (baseline !== null && (!shape(baseline, ['context', 'generation', 'revision', 'inputId'])
+    || !token({ context: baseline.context, generation: baseline.generation })
+    || !string(baseline.revision) || !revisionId.test(baseline.revision)
+    || baseline.revision.slice('rev/1:'.length).split(':')[0] !== (baseline.generation as string).slice('gen/1:'.length)
+    || !string(baseline.inputId) || baseline.inputId.length === 0)) return false;
+  const paths = value.changes.paths as readonly unknown[];
+  if (!paths.every((path, index) => requestPath(path)
+    && (index === 0 || Buffer.compare(Buffer.from(paths[index - 1] as string), Buffer.from(path)) < 0))) return false;
+  const reason = value.changes.reason;
+  if (reason !== null && (!string(reason) || reason.length === 0)) return false;
+  if (baseline === null) return value.changes.coverage === 'unavailable' && string(reason);
+  return value.changes.coverage === (paths.length || reason === null ? 'observed' : 'unavailable');
+}
+/** A retained baseline belongs to the same live context as a revision or
+ * current status beside it, even when its sequence is older. */
+function recoveryIdentity(value: Record<string, unknown>): boolean {
+  if (!Object.hasOwn(value, 'recovery')) return true;
+  const baseline = (value.recovery as { lastCompleted: { context: string; generation: string } | null }).lastCompleted;
+  if (!baseline) return true;
+  const sibling = plain(value.revision) ? value.revision : plain(value.current) ? value.current : null;
+  const selected = sibling && plain(sibling.token) ? sibling.token : null;
+  return !selected || baseline.context === selected.context && baseline.generation === selected.generation;
+}
 function error(value: unknown): boolean {
-  return shape(value, ['code', 'message', 'details']) && [
+  return members(value, ['code', 'message', 'details'], ['diagnostics', 'stages', 'recovery']) && evidence(value) && [
     'invalid-request', 'unsupported-operation', 'unknown-context', 'expired-generation', 'resource-unavailable',
     'unknown-subscription', 'wrong-instance', 'stopping', 'cancelled', 'internal-error', 'incompatible',
   ].includes(value.code as string) && string(value.message) && value.details !== null
@@ -156,22 +252,10 @@ function selection(value: unknown): boolean {
   return shape(value, ['root', 'scope', 'configuration', 'setup']) && string(value.root) && value.scope === 'whole-project'
     && value.configuration === 'discover' && shape(value.setup, ['registry', 'capabilities']) && string(value.setup.registry) && strings(value.setup.capabilities);
 }
-// Owned nested and scratch exclusions carry their owner; every other kind is unowned.
-const ownedExclusions = ['owned-unwired', 'owned-nested-project', 'scratch'];
-const unownedExclusions = ['external', 'repository', 'packages', 'output', 'generated'];
-function exclusion(value: unknown): value is { readonly kind: string; readonly directory: string; readonly owner: string | null } {
-  return shape(value, ['kind', 'directory', 'owner']) && string(value.directory)
-    && (ownedExclusions.includes(value.kind as string) ? string(value.owner) : unownedExclusions.includes(value.kind as string) && value.owner === null);
-}
-function ownership(value: unknown): boolean {
-  return shape(value, ['modules', 'exclusions']) && Array.isArray(value.modules) && value.modules.every(module =>
-    shape(module, ['id', 'parent', 'directory']) && string(module.id) && (module.parent === null || string(module.parent)) && string(module.directory))
-    && Array.isArray(value.exclusions) && value.exclusions.every(exclusion);
-}
 function scope(value: unknown): boolean {
   return value === null || shape(value, ['root', 'selection', 'invokedFrom', 'configuration', 'walkedAreas', 'ownership'])
     && string(value.root) && ['given', 'found'].includes(value.selection as string) && string(value.invokedFrom) && string(value.configuration)
-    && strings(value.walkedAreas) && ownership(value.ownership);
+    && strings(value.walkedAreas) && isProjectOwnership(value.ownership);
 }
 function outcome(value: unknown): boolean {
   return shape(value, ['execution', 'check', 'coverage']) && ['completed', 'invalid', 'incomplete', 'unavailable'].includes(value.execution as string)
@@ -279,11 +363,11 @@ function disposition(input: unknown, classification: boolean): boolean {
       if (!shape(value, ['path', 'disposition', 'module', 'exclusion', 'reason'])) return false;
       if (value.reason === 'owned-non-source') return string(value.module) && value.exclusion === null;
       const kinds = notAnalyzedReasons[value.reason as string];
-      return !!kinds && exclusion(value.exclusion) && kinds.includes(value.exclusion.kind)
+      return !!kinds && isProjectExclusion(value.exclusion) && kinds.includes(value.exclusion.kind)
         && (value.exclusion.owner === null ? value.module === null : string(value.module));
     }
     case 'not-checked': return shape(value, ['path', 'disposition', 'module', 'exclusion', 'reason'])
-      && (value.module === null || string(value.module)) && (value.exclusion === null || exclusion(value.exclusion))
+      && (value.module === null || string(value.module)) && (value.exclusion === null || isProjectExclusion(value.exclusion))
       && (classification ? ['classification-changed', 'unobserved-input'] : ['superseded', 'unobserved-input', 'classification-changed']).includes(value.reason as string);
     default: return false;
   }
@@ -312,27 +396,32 @@ const unavailableReasons = ['unknown-context', 'expired-generation', 'evicted-re
   'analysis-failed', 'unsupported-setup', 'disposed', 'configuration-changed'];
 /** One `CheckOutcome`: a closed status with exactly its variant's members. */
 function checkOutcome(input: unknown): boolean {
-  if (!plain(input) || !id(input.requestId)) return false;
+  if (!plain(input) || !id(input.requestId) || !evidence(input) || !recoveryIdentity(input)) return false;
   const value = input;
   const timed = !Object.hasOwn(value, 'timings') || replyTimings(value.timings);
   switch (value.status) {
     case 'reported':
-      if (value.published === true) return members(value, ['status', 'requestId', 'published', 'revision', 'freshness', 'delta', 'report', 'paths'], ['timings'])
+      if (value.published === true) return members(value, ['status', 'requestId', 'published', 'revision', 'freshness', 'delta', 'report', 'paths'], ['timings', 'stages', 'recovery'])
         && timed && revision(value.revision) && freshnessRecord(value.freshness) && delta(value.delta)
-        && (value.report === null || report(value.report)) && dispositions(value.paths, false);
-      return value.published === false && members(value, ['status', 'requestId', 'published', 'revision', 'freshness', 'delta', 'report'], ['timings'])
-        && timed && value.revision === null && value.delta === null && freshnessRecord(value.freshness) && report(value.report);
-    case 'pending': return shape(value, ['status', 'requestId', 'current']) && status(value.current);
-    case 'superseded': return shape(value, ['status', 'requestId', 'revision', 'mismatches']) && (value.revision === null || revision(value.revision))
+        && (value.report === null || report(value.report)) && dispositions(value.paths, false)
+        && (!Object.hasOwn(value, 'stages') || ((value.revision as Record<string, unknown>).outcome as Record<string, unknown>).execution !== 'completed')
+        && (!Object.hasOwn(value, 'recovery') || !!(value.revision as Record<string, unknown>).outcome
+          && ((value.revision as Record<string, unknown>).outcome as Record<string, unknown>).execution !== 'completed');
+      return value.published === false && members(value, ['status', 'requestId', 'published', 'revision', 'freshness', 'delta', 'report'], ['timings', 'stages', 'recovery'])
+        && timed && value.revision === null && value.delta === null && freshnessRecord(value.freshness) && report(value.report)
+        && (!Object.hasOwn(value, 'recovery') || !!(value.report as Record<string, unknown>).outcome
+          && ((value.report as Record<string, unknown>).outcome as Record<string, unknown>).execution !== 'completed');
+    case 'pending': return members(value, ['status', 'requestId', 'current'], ['recovery']) && status(value.current);
+    case 'superseded': return members(value, ['status', 'requestId', 'revision', 'mismatches'], ['recovery']) && (value.revision === null || revision(value.revision))
       && Array.isArray(value.mismatches) && value.mismatches.every(item => shape(item, ['path', 'expected', 'observed']) && string(item.path)
         && [item.expected, item.observed].every(hash => hash === null || string(hash) && sha256.test(hash)));
-    case 'cold': return shape(value, ['status', 'requestId', 'elapsedMs', 'current']) && duration(value.elapsedMs) && status(value.current);
-    case 'deadline-exceeded': return shape(value, ['status', 'requestId', 'elapsedMs', 'revision']) && duration(value.elapsedMs)
+    case 'cold': return members(value, ['status', 'requestId', 'elapsedMs', 'current'], ['recovery']) && duration(value.elapsedMs) && status(value.current);
+    case 'deadline-exceeded': return members(value, ['status', 'requestId', 'elapsedMs', 'revision'], ['recovery']) && duration(value.elapsedMs)
       && (value.revision === null || revision(value.revision));
-    case 'classification-changed': return shape(value, ['status', 'requestId', 'revision', 'paths']) && revision(value.revision)
+    case 'classification-changed': return members(value, ['status', 'requestId', 'revision', 'paths'], ['recovery']) && revision(value.revision)
       && dispositions(value.paths, true) && (value.paths as readonly unknown[]).length > 0;
     case 'cancelled': return shape(value, ['status', 'requestId']);
-    case 'unavailable': return shape(value, ['status', 'requestId', 'reason', 'message']) && unavailableReasons.includes(value.reason as string)
+    case 'unavailable': return members(value, ['status', 'requestId', 'reason', 'message'], ['diagnostics', 'stages', 'recovery']) && unavailableReasons.includes(value.reason as string)
       && string(value.message);
     default: return false;
   }
@@ -341,8 +430,23 @@ function checkOutcome(input: unknown): boolean {
  * its path dispositions and `classification-changed` variant included; other operations'
  * values keep their unknown shape. A malformed reply throws, failing the connection. */
 export function validateServiceReply(operation: string, result: unknown): void {
-  if (operation !== 'check' || !plain(result) || result.ok !== true) return;
-  if (!checkOutcome(result.value)) throw new Error('Invalid check reply schema');
+  if (!plain(result)) throw new Error('Invalid service reply schema');
+  if (result.ok === false) {
+    if (!shape(result, ['ok', 'error']) || !error(result.error)) throw new Error('Invalid service error schema');
+    return;
+  }
+  if (result.ok !== true || !shape(result, ['ok', 'value'])) throw new Error('Invalid service reply schema');
+  if (operation === 'check') {
+    if (!checkOutcome(result.value)) throw new Error('Invalid check reply schema');
+    return;
+  }
+  if (plain(result.value)) {
+    if (!evidence(result.value) || !recoveryIdentity(result.value)) throw new Error('Invalid service evidence schema');
+    if (['affected', 'materialize', 'measure'].includes(operation)
+      && ['answered', 'materialized', 'measured'].includes(result.value.status as string)
+      && (Object.hasOwn(result.value, 'recovery') || Object.hasOwn(result.value, 'diagnostics')
+        || Object.hasOwn(result.value, 'stages'))) throw new Error('Invalid successful service evidence schema');
+  }
 }
 
 /** The message boundary validates envelopes; service parameters retain their
@@ -355,7 +459,7 @@ export function validateWireMessage(input: unknown): WireMessage {
       && string(value.handshake.protocol) && string(value.handshake.buildKey) && string(value.handshake.engine)
       && shape(value.handshake.client, ['name', 'version']) && string(value.handshake.client.name) && string(value.handshake.client.version); break;
     case 'welcome': valid = shape(value, ['type', 'welcome']) && shape(value.welcome, ['protocol', 'instance', 'capabilities', 'limits'])
-      && value.welcome.protocol === 'ramify.ipc/2' && instance(value.welcome.instance)
+      && value.welcome.protocol === 'ramify.ipc/3' && instance(value.welcome.instance)
       && Array.isArray(value.welcome.capabilities) && value.welcome.capabilities.every(item => ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'measure', 'explorerDetails', 'dependencyDiagram', 'materialize-views', 'affected'].includes(item))
       && shape(value.welcome.limits, ['maxRequestBytes', 'maxResponseBytes', 'leaseMs', 'pingMs'])
       && Object.values(value.welcome.limits).every(item => integer(item) && item > 0); break;

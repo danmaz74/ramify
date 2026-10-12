@@ -182,11 +182,11 @@ describe('public disposable analysis session', () => {
     expectBlocked(report, 'parse', ['catalog', 'link', 'access', 'decide']);
   }));
 
-  it('marks stray declarations as invalid layout with blocked source stages', async () => fixture(async (root, inputs) => {
+  it('FR05 FR09 marks stray declarations as invalid layout with blocked source stages', async () => fixture(async (root, inputs) => {
     await put(root, 'tools/module.ramify', 'ramify 1\nmodule stray\n');
     const report = reported(await analyzeProject(inputs));
     expect(report.diagnostics).toContainEqual(expect.objectContaining({ code: 'stray-description', category: 'layout',
-      location: expect.objectContaining({ file: 'tools/module.ramify' }) }));
+      location: null, related: [], message: 'tools/module.ramify: Invalid module boundary: stray-description' }));
     expectBlocked(report, 'acquisition', ['catalog', 'link', 'access', 'decide']);
   }));
 
@@ -370,14 +370,14 @@ describe('public disposable analysis session', () => {
       limit: { name: 'maxDiagnostics', maximum: 1, observed: 2, collectedPrefix: true } }));
   }), 20_000);
 
-  it('keeps acquisition evidence when a later file exceeds the admitted byte bound', async () => fixture(async (root, inputs) => {
+  it('FR09 FR11 keeps acquisition evidence when a later file exceeds the admitted byte bound', async () => fixture(async (root, inputs) => {
     await put(root, 'src/a-kept.ts', 'export const kept = 1;\n');
     await put(root, 'src/z-large.ts', `/*${'x'.repeat(2048)}*/\nexport {};\n`);
     const report = reported(await analyzeProject({ ...inputs, limits: { ...inputs.limits,
       acquisition: { ...inputs.limits.acquisition, maxFileBytes: 1024 } } }));
     expect(report.outcome).toMatchObject({ execution: 'incomplete', check: 'not-run' });
     expect(report.summary.complete).toBe(false);
-    expect(report.diagnostics).toContainEqual(expect.objectContaining({ code: 'resource-limit', location: expect.objectContaining({ file: 'src/z-large.ts' }) }));
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({ code: 'resource-limit', location: null, related: [], message: 'src/z-large.ts: Individual file byte limit exceeded' }));
     expect(report.snapshot!.inventory.files).toContainEqual(expect.objectContaining({ path: 'src/a-kept.ts' }));
     expect(report.stages.find(stage => stage.stage === 'catalog')!.status).toBe('blocked');
   }));
@@ -411,11 +411,11 @@ describe('public disposable analysis session', () => {
     expect(report.stages.find(stage => stage.stage === 'report')!.status).toBe('failed');
   }));
 
-  it('returns a read failure as incomplete and permits an independent healthy run', async () => fixture(async (root, inputs) => {
+  it('FR10 returns a read failure as incomplete and permits an independent healthy run', async () => fixture(async (root, inputs) => {
     await put(root, 'src/broken.ts', new Uint8Array([0xff]));
     const failure = reported(await analyzeProject(inputs));
     expect(failure.outcome).toMatchObject({ execution: 'incomplete', check: 'not-run' });
-    expect(failure.diagnostics).toContainEqual(expect.objectContaining({ code: 'read-failure', location: expect.objectContaining({ file: 'src/broken.ts' }) }));
+    expect(failure.diagnostics).toContainEqual(expect.objectContaining({ code: 'read-failure', location: null, related: [], message: 'src/broken.ts: Input is not valid UTF-8' }));
     expect(failure.stages.find(stage => stage.stage === 'catalog')!.status).toBe('failed');
     expect(failure.stages.find(stage => stage.stage === 'access')!.status).toBe('blocked');
     await put(root, 'src/broken.ts', 'export {};\n');

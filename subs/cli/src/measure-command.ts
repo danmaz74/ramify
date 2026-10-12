@@ -5,7 +5,9 @@ import type { ContextToken } from '../../daemon/src/context-types.js';
 import type { MeasureDocument, MeasureOutcome } from '../../../src/interfaces/service.js';
 import type { CliEnvironment, CliExitCode } from './interfaces/cli.js';
 import { capabilities } from './command-support.js';
-import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
+import { CliFailure, disconnectFailure, serviceFailure, withFailureOutput } from './errors.js';
+import type { CliFailureEvidence } from './errors.js';
+import { failureDocument, formatFailureHuman } from './format.js';
 
 interface MeasureArguments { readonly root?: string; readonly format: 'human' | 'json' }
 
@@ -48,10 +50,11 @@ function outcomeReason(value: Exclude<MeasureOutcome, { status: 'measured' }>): 
   return { reason: 'cancelled', message: 'Measure was cancelled' };
 }
 
-function failure(root: string, format: 'human' | 'json', reason: string, message: string, exitCode: 1 | 2): string {
-  if (format === 'json') return JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable',
-    diagnostics: [{ category: 'execution', code: reason, message }], exitCode }) + '\n';
-  return `Root: ${root}\nNot measured (${reason}): ${message}\nNo complete measurement was claimed.\n`;
+function failure(root: string, format: 'human' | 'json', reason: string, message: string, exitCode: 1 | 2,
+  evidence: CliFailureEvidence = {}): string {
+  const document = failureDocument(reason, message, exitCode, evidence);
+  return format === 'json' ? JSON.stringify(document) + '\n'
+    : formatFailureHuman('Measure', reason, document, 'No complete measurement was claimed.', root);
 }
 
 export async function measureCommand(args: MeasureArguments, environment: CliEnvironment, control: RunControl): Promise<CliExitCode> {
@@ -76,14 +79,18 @@ export async function measureCommand(args: MeasureArguments, environment: CliEnv
         if (!opened.ok) throw serviceFailure(opened.error);
         if (opened.value.status === 'unresolved') {
           const label = opened.value.resolution.status;
-          const message = opened.value.resolution.issues[0]?.message ?? `project ${label}`;
+          const message = opened.value.report.diagnostics[0]?.message
+            ?? (opened.value.resolution.issues.map(item => item.message).join('; ') || `project ${label}`);
           const exitCode = label === 'invalid' ? 1 : 2;
-          environment.stdout(failure(args.root ?? `(discovered from ${environment.cwd})`, args.format, `project-${label}`, message, exitCode));
+          const evidence = { diagnostics: opened.value.report.diagnostics, stages: opened.value.report.stages };
+          withFailureOutput({ reason: `project-${label}`, message, ...evidence },
+            () => environment.stdout(failure(args.root ?? `(discovered from ${environment.cwd})`, args.format, `project-${label}`, message, exitCode,
+              evidence)));
           return exitCode;
         }
         if (opened.value.status === 'unavailable') throw new CliFailure(
           opened.value.reason === 'disposed' || opened.value.reason === 'configuration-changed' ? 'unavailable' : opened.value.reason,
-          opened.value.message, opened.value);
+          opened.value.message, opened.value, opened.value);
         token = opened.value.token;
         const root = opened.value.current.selection.root;
         const response = await connection.measure({ token, requestId: randomUUID(),
@@ -102,7 +109,9 @@ export async function measureCommand(args: MeasureArguments, environment: CliEnv
           continue;
         }
         const mapped = outcomeReason(value);
-        environment.stdout(failure(root, args.format, mapped.reason, mapped.message, 2));
+        const evidence = { ...mapped, ...value };
+        withFailureOutput(evidence,
+          () => environment.stdout(failure(root, args.format, mapped.reason, mapped.message, 2, evidence)));
         return 2;
       } catch (error) {
         control.signal?.throwIfAborted();

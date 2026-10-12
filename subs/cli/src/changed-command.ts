@@ -6,7 +6,8 @@ import type { CheckOutcome, ContextRevision, ContextToken, ExpectedContent, Path
 import type { CheckDocument, CheckedPath, CliEnvironment, CliExitCode, NotCheckedReason } from './interfaces/cli.js';
 import { capabilities } from './command-support.js';
 import { formatChangedHuman } from './format.js';
-import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
+import { CliFailure, disconnectFailure, serviceFailure, withFailureOutput } from './errors.js';
+import type { CliFailureEvidence } from './errors.js';
 
 interface ChangedArguments {
   readonly root?: string;
@@ -64,13 +65,15 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
     });
   }
   function document(reason: NotCheckedReason, revision: ContextRevision | null = null,
-    report: AnalysisReport | null = null): CheckDocument {
-    return { schemaVersion: 'ramify.check/3', root,
+    report: AnalysisReport | null = null, evidence: CliFailureEvidence = {}): CheckDocument {
+    return { schemaVersion: 'ramify.check/4', root,
       revision: revision ? { id: revision.revision, sequence: revision.sequence, path: revision.checked.path } : null,
       since: args.since ?? null, paths: notChecked(reason),
       outcome: 'not-checked', reason, execution: report?.outcome.execution ?? null,
-      findings: report?.diagnostics.map(issue => ({ ...issue, new: false })) ?? [], removed: [],
+      findings: (report?.diagnostics ?? evidence.diagnostics ?? []).map(issue => ({ ...issue, new: false })), removed: [],
       warnings: report?.warnings ?? [], coverage: report?.coverage ?? [], checked: null,
+      ...(report?.stages || evidence.stages !== undefined ? { stages: report?.stages ?? evidence.stages } : {}),
+      ...(evidence.recovery === undefined ? {} : { recovery: evidence.recovery }),
       timings: { daemon: null, waitedMs, totalMs: performance.now() - started }, exitCode: 2 };
   }
   function reported(value: Extract<CheckOutcome, { status: 'reported' }>): CheckDocument {
@@ -81,19 +84,19 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
    * report them; a not-analyzed path changes nothing, and any path not checked makes the
    * whole result not checked, exit 2, with the verified findings retained. */
   function reportedDocument(value: Extract<CheckOutcome, { status: 'reported' }>): CheckDocument {
-    if (!value.published) return document(value.report.outcome.execution === 'incomplete' ? 'incomplete' : 'unavailable', null, value.report);
+    if (!value.published) return document(value.report.outcome.execution === 'incomplete' ? 'incomplete' : 'unavailable', null, value.report, value);
     const { revision, delta } = value;
     const answered = value.paths.length === paths.length && value.paths.every((item, index) => item.path === paths[index]);
     if (answered) classified = new Map(value.paths.map(item => [item.path, item]));
     const coherent = answered && value.freshness.mode === 'synchronized' && value.freshness.verified
       && (revision.outcome.execution === 'invalid' || revision.outcome.execution === 'completed'
         && revision.outcome.check !== 'not-run' && revision.summary.complete);
-    if (!coherent) return { ...document('incomplete', revision), execution: revision.outcome.execution,
+    if (!coherent) return { ...document('incomplete', revision, null, value), execution: revision.outcome.execution,
       findings: delta.findings, warnings: delta.warnings, coverage: delta.coverage };
     const failed = value.paths.find(item => item.disposition === 'not-checked');
     const verdict = revision.outcome.execution === 'invalid' || revision.outcome.check === 'failed'
       || delta.findings.length > 0 || revision.summary.errors > 0 || revision.summary.denied > 0 ? 1 : 0;
-    return { ...document(failed?.reason ?? 'incomplete', revision), since: delta.since, paths: value.paths,
+    return { ...document(failed?.reason ?? 'incomplete', revision, null, value), since: delta.since, paths: value.paths,
       outcome: failed ? 'not-checked' : 'checked', reason: failed?.reason ?? null, execution: revision.outcome.execution,
       findings: delta.findings, removed: delta.removed, warnings: delta.warnings, coverage: delta.coverage, checked: revision.checked,
       timings: { daemon: revision.timings, waitedMs, totalMs: performance.now() - started }, exitCode: failed ? 2 : verdict };
@@ -133,7 +136,7 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
           setup: { registry: 'default', capabilities } }, control);
           control.signal?.throwIfAborted();
           if (!opened.ok) throw serviceFailure(opened.error);
-          if (opened.value.status === 'unavailable') return document(opened.value.reason);
+          if (opened.value.status === 'unavailable') return document(opened.value.reason, null, null, opened.value);
           if (opened.value.status === 'unresolved') return received = document('unavailable', null, opened.value.report);
           token = opened.value.token;
           const selected = opened.value.current.selection.root;
@@ -180,9 +183,9 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
               await connection.closeContext({ token }); token = undefined;
               break; // open the context again
             }
-            if (value.status === 'unavailable') return document(value.reason);
-            if (value.status === 'cold') return document('cold');
-            if (value.status === 'deadline-exceeded' || value.status === 'superseded') return document(value.status, value.revision);
+            if (value.status === 'unavailable') return document(value.reason, null, null, value);
+            if (value.status === 'cold') return document('cold', null, null, value);
+            if (value.status === 'deadline-exceeded' || value.status === 'superseded') return document(value.status, value.revision, null, value);
             return document('unavailable');
           }
           continue;
@@ -210,16 +213,24 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
   try { result = await run(); }
   catch (error) {
     control.signal?.throwIfAborted();
+    if (error instanceof CliFailure && error.code === 'cancelled') throw error;
     result = document(error instanceof CliFailure && reasons.includes(error.code as NotCheckedReason)
-      ? error.code as NotCheckedReason : 'unavailable');
+      ? error.code as NotCheckedReason : 'unavailable', null, null, error instanceof CliFailure ? error.evidence : {});
     // Cleanup can fail after delivery. Keep the received findings and coverage
     // evidence while reporting the command failure in the same document.
-    if (received) result = { ...received, outcome: 'not-checked', reason: result.reason, exitCode: 2 };
+    if (received) result = { ...received, outcome: 'not-checked', reason: result.reason, exitCode: 2,
+      ...(result.recovery === undefined ? {} : { recovery: result.recovery }),
+      ...(result.stages === undefined ? {} : { stages: result.stages }) };
   }
   // Keep output failures outside recovery: a failing sink must never cause a
   // second JSON document or turn a failed write into a successful check.
   control.signal?.throwIfAborted();
   result = { ...result, timings: { ...result.timings, totalMs: performance.now() - started } };
-  environment.stdout(args.format === 'json' ? JSON.stringify(result) + '\n' : formatChangedHuman(result));
+  const cause = { reason: result.reason ?? (result.execution === 'invalid' ? 'invalid-project' : 'check-failed'),
+    message: `Check ${result.execution ?? result.outcome}; ${result.findings.length} finding(s)`,
+    diagnostics: result.findings.map(({ new: _new, ...issue }) => issue),
+    ...(result.stages === undefined ? {} : { stages: result.stages }),
+    ...(result.recovery === undefined ? {} : { recovery: result.recovery }) };
+  withFailureOutput(cause, () => environment.stdout(args.format === 'json' ? JSON.stringify(result) + '\n' : formatChangedHuman(result)));
   return result.exitCode;
 }

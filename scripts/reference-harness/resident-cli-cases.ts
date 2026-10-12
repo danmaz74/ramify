@@ -20,7 +20,9 @@ import type { AnalysisReport } from '../../subs/analysis/src/interfaces/analysis
 import type { Assertions, InstanceHandler } from './runner.js';
 
 const semantic = (report: { runId: string }) => { const { runId: _, ...rest } = report; return rest; };
-const noEngine = (url: string) => /\/dist\/(?:src\/batch\.js|subs\/analysis\/)|\/node_modules\/(?:typescript|@typescript)\//.test(url);
+const noEngine = (url: string) => /\/dist\/(?:src\/batch\.js|subs\/analysis\/)|\/node_modules\/(?:typescript|@typescript)\//.test(url)
+  && !['/dist/subs/analysis/subs/project/src/path-syntax.js',
+    '/dist/subs/analysis/subs/project/src/ownership-validation.js'].some(path => url.endsWith(path));
 async function client(endpointDirectory: string): Promise<ServiceConnection> {
   const result = await connectDaemon({ endpointDirectory, client: { name: 'cli-reference', version }, engine,
     daemonEntry: join(repositoryRoot, 'dist/src/daemon-entry.js'), start: 'never' });

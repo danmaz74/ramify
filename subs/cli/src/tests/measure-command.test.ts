@@ -106,7 +106,7 @@ describe('measure command', { timeout: 60_000 }, () => {
       const result = await invoke(f.root, hiddenCapability(f.quick.connect), ['measure', '--format', 'json']);
       expect([result.exit, result.batchCalls]).toEqual([2, 0]);
       expect(result.stderr).toBe('');
-      expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', status: 'unavailable',
+      expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/2', status: 'unavailable',
         diagnostics: [{ code: 'incompatible-service' }], exitCode: 2 });
       const status = await f.quick.service.daemonStatus();
       expect(status.ok && status.value.contexts).toEqual([]);
@@ -127,7 +127,7 @@ describe('measure command', { timeout: 60_000 }, () => {
       const result = await invoke(f.root, refusing, ['measure', '--format', 'json']);
       expect([result.exit, result.stderr, result.batchCalls, result.writes]).toEqual([2, '', 0, 1]);
       const refusal = JSON.parse(result.stdout);
-      expect(refusal).toMatchObject({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 2 });
+      expect(refusal).toMatchObject({ schemaVersion: 'ramify.cli/2', status: 'unavailable', exitCode: 2 });
       expect(refusal.schema).toBeUndefined();
       expect(JSON.stringify(refusal)).toContain('resource-unavailable');
     } finally { await f.dispose(); }

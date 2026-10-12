@@ -1,21 +1,41 @@
 import type { ServiceError, ServiceErrorCode } from '../../../src/interfaces/service.js';
 import type { DisconnectReason } from '../../daemon/src/interfaces/daemon.js';
+import type { AnalysisFailureEvidence } from '../../analysis/src/interfaces/analysis.js';
+import type { RecoveryEvidence } from '../../daemon/src/context-types.js';
+
+export type CliFailureEvidence = AnalysisFailureEvidence & { readonly recovery?: RecoveryEvidence };
 
 type CliFailureCode = Exclude<ServiceErrorCode, 'stopping'> | 'stopped' | 'unavailable'
   | 'analysis-failed' | 'unsupported-setup' | 'evicted-revision' | 'unobserved-input'
   /** The connected daemon does not advertise a capability the invocation needs. */
-  | 'incompatible-service';
+  | 'incompatible-service' | 'output-failure';
 
 /** An explicitly translated command failure, distinct from an unexpected throw. */
 export class CliFailure extends Error {
-  constructor(readonly code: CliFailureCode, message: string, cause: unknown) {
+  readonly evidence: CliFailureEvidence;
+  constructor(readonly code: CliFailureCode, message: string, cause: unknown,
+    evidence: CliFailureEvidence = {}) {
     super(message, { cause });
     this.name = 'CliFailure';
+    this.evidence = {
+      ...(evidence.diagnostics === undefined ? {} : { diagnostics: evidence.diagnostics }),
+      ...(evidence.stages === undefined ? {} : { stages: evidence.stages }),
+      ...(evidence.recovery === undefined ? {} : { recovery: evidence.recovery }),
+    };
   }
 }
 
 export function serviceFailure(error: ServiceError): CliFailure {
-  return new CliFailure(error.code === 'stopping' ? 'stopped' : error.code, error.message, error);
+  return new CliFailure(error.code === 'stopping' ? 'stopped' : error.code, error.message, error, error);
+}
+
+/** Rendering a refusal retains its source even when formatting or writing throws. */
+export function withFailureOutput<T>(cause: CliFailureEvidence & { readonly reason: string; readonly message: string }, output: () => T): T {
+  try { return output(); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliFailure('output-failure', `${message}; original ${cause.reason}: ${cause.message}`, cause, cause);
+  }
 }
 
 /** Render a terminal disconnect. The command must decide recovery separately;

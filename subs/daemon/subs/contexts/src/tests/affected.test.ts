@@ -65,13 +65,15 @@ describe('ContextManager.affected (A7-06)', () => {
       e.script.affectedPending.push((_session, query) => ({ status: 'answered', sequence: query.sequence + 1,
         result: selection(inputIdOf('elsewhere'), ['fixture']) }));
       expect(await e.manager.affected(request(opened.token, 'other-sequence', { mode: 'synchronized', expect: observed('1') },
-        { modules: ['fixture'] }), 'lease')).toEqual({ status: 'superseded', requestId: 'other-sequence', revision: published });
+        { modules: ['fixture'] }), 'lease')).toMatchObject({ status: 'superseded', requestId: 'other-sequence', revision: published,
+          recovery: { schemaVersion: 'ramify.recovery/1' } });
 
       // A named revision other than the published one is superseded, with no session query.
       const calls = e.script.sessions[0]!.affectedCalls.length;
       const named = `${published!.revision.slice(0, published!.revision.lastIndexOf(':'))}:9`;
       expect(await e.manager.affected(request(opened.token, 'named', { mode: 'published', wait: false, revision: named }), 'lease'))
-        .toEqual({ status: 'superseded', requestId: 'named', revision: published });
+        .toMatchObject({ status: 'superseded', requestId: 'named', revision: published,
+          recovery: { schemaVersion: 'ramify.recovery/1' } });
       expect(e.script.sessions[0]!.affectedCalls).toHaveLength(calls);
 
       // Expected content that differs from the captured revision is superseded as well.
@@ -103,7 +105,8 @@ describe('ContextManager.affected (A7-06)', () => {
       const second = e.status(opened.token).published;
       expect(second).toMatchObject({ sequence: 2, cause: 'request' });
       // The capture published revision 2, which the request did not name: superseded, not answered from 2.
-      expect(await named).toEqual({ status: 'superseded', requestId: 'named', revision: second });
+      expect(await named).toMatchObject({ status: 'superseded', requestId: 'named', revision: second,
+        recovery: { schemaVersion: 'ramify.recovery/1' } });
       expect(await updating).toMatchObject({ status: 'answered', requestId: 'updating', revision: { sequence: 2 } });
       // Only the synchronized request queried the session.
       expect(e.script.sessions[0]!.affectedCalls).toEqual([{ sequence: 2, modules: ['fixture'] }]);
@@ -164,7 +167,8 @@ describe('ContextManager.affected (A7-06)', () => {
       const status = e.status(opened.token);
       expect(status.lastValid).toEqual(valid);
       expect(status.published).toMatchObject({ sequence: 2, outcome: { execution: 'invalid' } });
-      expect(answer).toEqual({ status: 'unavailable', requestId: 'invalid', revision: status.published,
+      expect(answer).toMatchObject({ status: 'unavailable', requestId: 'invalid', revision: status.published,
+        recovery: { schemaVersion: 'ramify.recovery/1' },
         reason: 'invalid-current', message: 'The current revision has no valid complete inventory', unknownModules: [] });
       // The session was asked at the invalid revision only.
       expect(e.script.sessions[0]!.affectedCalls.map(call => call.sequence)).toEqual([2]);
@@ -173,7 +177,8 @@ describe('ContextManager.affected (A7-06)', () => {
       e.script.affectedPending.push(() => ({ status: 'unavailable', reason: 'unknown-module', message: 'Unknown module IDs: ghost',
         unknownModules: ['ghost'] }));
       expect(await e.manager.affected(request(opened.token, 'unknown', { mode: 'synchronized', expect: observed('2') },
-        { modules: ['ghost'] }), 'lease')).toEqual({ status: 'unavailable', requestId: 'unknown', revision: status.published,
+        { modules: ['ghost'] }), 'lease')).toMatchObject({ status: 'unavailable', requestId: 'unknown', revision: status.published,
+          recovery: { schemaVersion: 'ramify.recovery/1' },
         reason: 'unknown-module', message: 'Unknown module IDs: ghost', unknownModules: ['ghost'] });
     } finally { await e.dispose(); }
   });
@@ -189,7 +194,8 @@ describe('ContextManager.affected (A7-06)', () => {
         { modules: ['fixture'], deadlineMs: 25 }), 'lease');
       await flush(); e.clock.advance(24); await flush();
       e.clock.advance(1); await flush();
-      expect(await waiting).toEqual({ status: 'deadline-exceeded', requestId: 'late', elapsedMs: 25, revision: acknowledged });
+      expect(await waiting).toMatchObject({ status: 'deadline-exceeded', requestId: 'late', elapsedMs: 25,
+        revision: acknowledged, recovery: { schemaVersion: 'ramify.recovery/1' } });
       expect(e.script.updateCalls[0]?.signal?.aborted).toBe(false);
       finish!(capture(2)); await flush();
       expect(e.status(opened.token).published?.sequence).toBe(2);

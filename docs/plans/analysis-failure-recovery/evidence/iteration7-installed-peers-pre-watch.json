@@ -1,0 +1,79 @@
+{
+  "old": {
+    "root": "/tmp/ramify-plan40-old-6161e76",
+    "version": "0.4.3",
+    "runtimeIdentitySha256": "ad392aedf65501deaca29b78d384992c4d47f5ab81904af690191ae8dc4908d6",
+    "launcherSha256": "7d6c07700cd42b05ac4aa9e28b53a5ef30cdcc7894590a5a0f94e0838d503a3a"
+  },
+  "current": {
+    "root": "/workspaces/ramify",
+    "version": "0.4.3",
+    "runtimeIdentitySha256": "c413b033654aa91a0e5f9ba40e67922330d70d26da836a363c3a1ed2bddb649e",
+    "launcherSha256": "7d6c07700cd42b05ac4aa9e28b53a5ef30cdcc7894590a5a0f94e0838d503a3a"
+  },
+  "observations": [
+    {
+      "name": "new-client-old-daemon",
+      "serverProtocol": "ramify.ipc/2",
+      "clientSchema": "ramify.cli/2",
+      "clientExit": 2,
+      "diagnostics": [
+        {
+          "code": "incompatible",
+          "message": "daemon protocol ramify.ipc/2 client ramify.ipc/3"
+        }
+      ],
+      "actualServerPid": 1671665,
+      "clientStartedDaemon": false
+    },
+    {
+      "name": "old-client-new-daemon",
+      "serverProtocol": "ramify.ipc/3",
+      "clientSchema": "ramify.cli/1",
+      "clientExit": 2,
+      "diagnostics": [
+        {
+          "code": "unavailable",
+          "message": "daemon unavailable: Cannot read daemon record /tmp/ramify-peers-N6FYLr/e/daemon-f0a5db4f23a0f447.json"
+        }
+      ],
+      "actualServerPid": 1671785,
+      "clientStartedDaemon": false
+    }
+  ],
+  "relayedHandshakes": [
+    {
+      "name": "new-client-old-daemon",
+      "serverProtocol": "ramify.ipc/2",
+      "clientProtocol": "ramify.ipc/3",
+      "clientExit": 2,
+      "clientSchema": "ramify.cli/2",
+      "diagnostics": [
+        {
+          "code": "incompatible",
+          "message": "daemon protocol 0.4.3 client 0.4.3"
+        }
+      ],
+      "actualServerPid": 1671913,
+      "operationAccepted": false,
+      "controlledRelay": true
+    },
+    {
+      "name": "old-client-new-daemon",
+      "serverProtocol": "ramify.ipc/3",
+      "clientProtocol": "ramify.ipc/2",
+      "clientExit": 2,
+      "clientSchema": "ramify.cli/1",
+      "diagnostics": [
+        {
+          "code": "incompatible",
+          "message": "daemon protocol 0.4.3 client 0.4.3"
+        }
+      ],
+      "actualServerPid": 1672035,
+      "operationAccepted": false,
+      "controlledRelay": true
+    }
+  ],
+  "limit": "Native discovery refuses foreign protocols before an operation; the old /2 client reports a generic malformed-record refusal for a /3 record. Controlled private socket relays make both installed clients reach the opposite real daemon handshake and receive explicit incompatible replies. The iteration 5 built socket witness independently proves both wire directions."
+}

@@ -554,7 +554,8 @@ describe('PB1-24: invalid boundaries, cancellation, byte bounds and cleanup', ()
       const manifest = await run.step(['notes/package.json'], 'broad');
       expect(manifest.revision.outcome).toEqual(invalid);
       expect(manifest.revision.diagnostics.map(item => [item.code, item.category, item.location?.file]))
-        .toEqual([['undeclared-project-boundary', 'layout', 'notes/package.json']]);
+        .toEqual([['undeclared-project-boundary', 'layout', undefined]]);
+      expect(manifest.revision.diagnostics[0]?.message).toContain('notes/package.json');
       await remove('notes/package.json');
       const recovered = await run.step(['notes/package.json'], 'broad', true);
       expect([recovered.revision.outcome, recovered.revision.diagnostics]).toEqual([passed, []]);

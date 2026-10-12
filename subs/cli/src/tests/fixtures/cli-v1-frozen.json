@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "ramify.cli/1",
+  "status": "unavailable",
+  "diagnostics": [{ "category": "invocation", "code": "invalid-invocation", "message": "Unsupported argument: --bad" }],
+  "exitCode": 2
+}

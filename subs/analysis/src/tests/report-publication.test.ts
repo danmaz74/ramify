@@ -32,8 +32,8 @@ const evidence: Record<string, string> = {
     + 'void import(target);\nvoid rootValue; void privateValue; void outside;\n',
 };
 
-const kept = (value: Pick<AnalysisReport, 'outcome' | 'summary' | 'diagnostics' | 'warnings' | 'coverage'>): string =>
-  JSON.stringify({ outcome: value.outcome, summary: value.summary, diagnostics: value.diagnostics, warnings: value.warnings, coverage: value.coverage });
+const kept = (value: Pick<AnalysisReport, 'outcome' | 'summary' | 'diagnostics' | 'stages' | 'warnings' | 'coverage'>): string =>
+  JSON.stringify({ outcome: value.outcome, summary: value.summary, diagnostics: value.diagnostics, stages: value.stages, warnings: value.warnings, coverage: value.coverage });
 
 /** Count the work a full report does while an operation publishes. */
 async function publishing<T>(operation: () => Promise<T>): Promise<{ result: T; patches: number; builds: number; bounds: number; copies: number }> {
@@ -64,7 +64,7 @@ async function batch(inputs: SessionInputs): Promise<AnalysisReport> {
 }
 
 describe('hook publication builds only what a revision keeps', () => {
-  it('publication-without-snapshot: open and updates build, measure and copy no full report, and keep the fields a full finish() yields', () => fixture(async (root, inputs) => {
+  it('FR09 publication-without-snapshot: open and updates build, measure and copy no full report, and keep the fields a full finish() yields', () => fixture(async (root, inputs) => {
     const open = await publishing(() => opened(inputs));
     const { handle, revision, state } = open.result;
     try {

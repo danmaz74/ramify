@@ -98,6 +98,11 @@ for (const instance of plan2Instances.filter(item => item.id.startsWith('I2-24:'
           const json = instance.subcase === 'quick-watch-evicted';
           pendingWatch = runCli(['watch', ...(json ? ['--format', 'json'] : [])], wrapped, { signal: controller.signal });
           await until(() => out.join('').includes(json ? '"event":"revision"' : 'Revision 1'));
+          if (!json) {
+            const initial = out.join('');
+            a.ok('successful human revision keeps its completed summary', initial.includes('Execution: completed; check: passed; coverage: complete'));
+            a.ok('watch revision omits the repeated scope header', !/^Root: |^Configuration: |^Mode: /m.test(initial));
+          }
           await applyTextMutation(root, edits['remove-hop']); const changed = await sync();
           if (json) {
             await until(() => held);
@@ -112,7 +117,8 @@ for (const instance of plan2Instances.filter(item => item.id.startsWith('I2-24:'
           } else {
             await until(() => out.join('').includes(`Revision ${changed.revision!.sequence}`));
             a.equal('two human revision renderings', out.filter(line => line.startsWith('Revision ')).length, 2);
-            a.ok('changed human revision includes denial', out.join('').includes('[not-visible]'));
+            a.ok('changed human revision keeps operation and located denial',
+              /Check failed \(findings\)\.\nError \[not-visible\] src\/assembly\.ts:\d+:\d+:/.test(out.join('')));
           }
           a.ok('each report fetch names event revision', fetched.length >= 2 && fetched.every(value => value.startsWith('rev/1:')));
           controller.abort(); a.equal('watch interruption exits 130', await pendingWatch, 130);

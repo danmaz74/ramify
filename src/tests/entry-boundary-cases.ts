@@ -14,6 +14,7 @@ interface BoundaryAssertions {
 type ProcessResult = Awaited<ReturnType<typeof cliProcess>>;
 const loads = (events: readonly TraceEvent[]) => events.flatMap(event => [event.url ?? '', ...event.commonjs ?? []]).filter(Boolean);
 const engine = /\/dist\/(?:subs\/analysis\/|src\/batch\.js)|\/(?:typescript|@typescript)\//;
+const pureProjectDecoder = /\/dist\/subs\/analysis\/subs\/project\/src\/(?:path-syntax|ownership-validation)\.js$/;
 const serversAndUI = /\/dist\/subs\/(?:presentation|mcp|web)\/|\/(?:react|react-dom|d3-[^/]+|@modelcontextprotocol|@trpc|express)\//;
 const daemonHost = /\/dist\/(?:src\/(?:daemon-entry|resident-assembly)\.js|subs\/daemon\/(?:subs\/contexts\/|src\/(?:service|host|start-daemon|filesystem-watcher|system-clock)\.js))/;
 
@@ -57,7 +58,8 @@ export async function helpVersionBoundary(a: BoundaryAssertions): Promise<readon
       a.ok(`${option}: Plan 1 output`, option === '--version' ? result.stdout === `${version}\n` : result.stdout.startsWith('Usage: ramify check'));
       const loaded = loads(result.events);
       a.ok(`${option}: actual CLI handler loaded`, loaded.some(path => path.endsWith('/dist/subs/cli/src/run-cli.js')));
-      a.equal(`${option}: no engine, compiler, host or UI loaded`, loaded.filter(path => engine.test(path) || serversAndUI.test(path) || daemonHost.test(path)), []);
+      a.equal(`${option}: no engine, compiler, host or UI loaded`, loaded.filter(path => !pureProjectDecoder.test(path)
+        && (engine.test(path) || serversAndUI.test(path) || daemonHost.test(path))), []);
       a.equal(`${option}: no connection, launch or listener`, result.events.filter(event => ['connect', 'spawn', 'other-launch', 'listen', 'bind'].includes(event.event)), []);
     }
     a.equal('help/version: endpoint remains empty', await readdir(endpoint), []);
@@ -127,8 +129,8 @@ export async function clientEntryBoundary(a: BoundaryAssertions): Promise<Proces
     released(result, a, 'client entry');
     const loaded = loads(result.events);
     a.ok('client entry: the built client entry actually loaded', loaded.some(path => path.endsWith('/dist/subs/daemon/src/client-entry.js')));
-    a.equal('client entry: no analysis runtime, compiler, host, contexts or UI', loaded.filter(path => engine.test(path)
-      || /\/dist\/subs\/analysis\//.test(path) || serversAndUI.test(path) || daemonHost.test(path)), []);
+    a.equal('client entry: no analysis runtime, compiler, host, contexts or UI', loaded.filter(path => !pureProjectDecoder.test(path)
+      && (engine.test(path) || /\/dist\/subs\/analysis\//.test(path) || serversAndUI.test(path) || daemonHost.test(path))), []);
     a.equal('client entry: no connection, launch or listener', result.events.filter(event =>
       ['connect', 'spawn', 'other-launch', 'listen', 'bind'].includes(event.event)), []);
     return result;

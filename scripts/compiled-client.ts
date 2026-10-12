@@ -8,9 +8,10 @@ import { fileURLToPath } from 'node:url';
 export const compiledClientName = `ramify-client-${type()}-${machine()}`;
 
 // The compiled client carries the lightweight client only: no engine, compiler,
-// daemon host, UI or external package. Mirrors the Node entry's process boundaries.
+// daemon host or UI. Ownership uses only the project's pure path/ownership
+// validators; every acquisition/analysis stage and the public Zod decoder stay in Node.
 const excluded = [
-  /^dist\/(?:subs\/analysis\/|src\/batch\.js$|src\/batch-entry\.js$)/,
+  /^dist\/(?:subs\/analysis\/(?!subs\/project\/src\/(?:path-syntax|ownership-validation)\.js$)|src\/batch\.js$|src\/batch-entry\.js$)/,
   /^dist\/subs\/(?:presentation|mcp|web)\//,
   /^dist\/(?:src\/(?:daemon-entry|resident-assembly)\.js$|subs\/daemon\/(?:subs\/contexts\/|src\/(?:service|host|start-daemon|filesystem-watcher|system-clock)\.js$))/,
   /node_modules\//,

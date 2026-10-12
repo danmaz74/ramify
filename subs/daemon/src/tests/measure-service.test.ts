@@ -87,9 +87,11 @@ describe('measure service (MM08-MM09, MM16-MM17)', { timeout: 60_000 }, () => {
     expect(await atLimit.environment.service.measure(atLimit.request('measure-boundary')))
       .toMatchObject({ ok: true, value: { status: 'measured', document: { files: expect.any(Array) } } });
     const over = await scriptedFixture(encoded - 1);
-    expect(await over.environment.service.measure(over.request('measure-boundary'))).toEqual({ ok: true, value: {
+    expect(await over.environment.service.measure(over.request('measure-boundary'))).toMatchObject({ ok: true, value: {
       status: 'unavailable', requestId: 'measure-boundary', reason: 'resource-unavailable',
       message: `Measure response exceeds maxResponseBytes (${encoded - 1})`,
+      recovery: { schemaVersion: 'ramify.recovery/1', lastCompleted: { inputId: expect.any(String) },
+        changes: { paths: [], coverage: 'observed', reason: null } },
     } });
   });
 

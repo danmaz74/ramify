@@ -1,5 +1,15 @@
 # Daemon and analysis architecture
 
+The [analysis-failure-recovery contract package](../plans/analysis-failure-recovery/contracts.md)
+was reviewed on 2026-10-12 and is implemented in the local candidate, with
+clean committed audit pending. Contexts owns the compact `RecoveryEvidence`
+baseline and accumulated observed paths.
+Invalid revisions and failed attempts preserve that state; completed
+publication resets only through its captured observation sequence. Root
+service contracts carry typed diagnostics, stages and recovery, and daemon
+forwards both `value.recovery` and `error.recovery`. The adopted protocol is
+`ramify.ipc/3`, with explicit `/2` incompatibility before operation replies.
+
 **Date:** 2026-09-11; revised 2026-09-19. **Status:** Implemented across the
 eleven owners of the batch engine, the resident daemon with its context manager,
 service and lightweight client, and the retained analysis session that answers
@@ -179,7 +189,7 @@ remain later work.
 | `contexts` | Select and isolate contexts; order watcher changes and requests per context; publish revisions atomically; keep compact history; apply the covering rule, the sweep schedule, deadlines, leases, the hot and warm levels and eviction. | `createContextManager`, revision/status/outcome vocabulary, the `AnalysisDriver` port and controlled test ports. |
 | `presentation` | Render model data, interactions and teaching examples; report views remain later work. | Selected components explicitly tagged `[ui, browser]` and owned props. |
 | `layout` | Calculate diagram geometry from supplied neutral data. | Selected functions explicitly tagged `[browser]` and owned layout vocabulary. |
-| `cli` | Parse arguments, send resident checks, hook checks, watch and daemon requests through the injected connector, invoke an injected batch operation, render results and map execution status to exits. MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary, including the `ramify.check/3` document. |
+| `cli` | Parse arguments, send resident checks, hook checks, watch and daemon requests through the injected connector, invoke an injected batch operation, render results and map execution status to exits. MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary, including the `ramify.check/4` document. |
 
 `analysis` owns computational invalidation; `contexts` owns scheduling and
 publication; `daemon` owns process and transport mechanics. There is one authority
@@ -776,7 +786,8 @@ retried once. The compact reply names the covering revision's identifier,
 sequence and path, its checked set, each named path's disposition, every project
 finding with a `new` mark against `since` or the previous revision, removed
 finding identities, warnings, coverage and timings. With `--format json` the CLI
-writes it as one `ramify.check/3` document. The command exits 0 with no finding,
+writes it as one `ramify.check/4` document, including available stages and
+context recovery for invalid or unavailable current analysis. The command exits 0 with no finding,
 1 with findings or an invalid revision, whatever paths are not analyzed, and 2
 when a path was not checked, and it never falls back to batch. The whole
 report is built only for `scope: 'report'`, which the plain `ramify check` requests

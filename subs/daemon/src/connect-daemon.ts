@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { ConnectOptions, ConnectOutcome, ConnectTimeouts, ConnectionState, DisconnectReason, RecoveryOutcome, ServiceConnection } from './interfaces/daemon.js';
 import { selectEndpoint, readDaemonRecord } from './discovery.js';
 import { processAlive } from './records.js';
+import { IncompatibleDaemonRecord } from './records.js';
 import { launchDaemon, readStartOwner } from './launcher.js';
 import { ConnectionFailure, openSocketConnection, type SocketConnection } from './connection.js';
 
@@ -26,6 +27,7 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 const failure = (error: unknown): DisconnectReason => error instanceof ConnectionFailure ? error.reason
+  : error instanceof IncompatibleDaemonRecord ? { kind: 'incompatible', daemon: error.daemon, client: 'ramify.ipc/3' }
   : { kind: 'failure', message: error instanceof Error ? error.message : String(error) };
 const terminal = (reason: DisconnectReason) => ['incompatible', 'rejected', 'closed'].includes(reason.kind);
 

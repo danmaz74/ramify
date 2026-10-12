@@ -1,0 +1,37 @@
+{
+  "tarball": {
+    "filename": "ramify.ts-0.4.3.tgz",
+    "sha256": "2e6dab1f9a221a25ce928368baad94b9c73fdb645b5fc1b1a390d5679b46bf86",
+    "integrity": "sha512-vBbm4eKFj7ISzS5xCbzdKi3KYzZ3kYRsEPfEBHWVZ9UbazOjdVWpHMgzClhye+8rPmQL62IvI4j5/mrMMpUthA==",
+    "packageVersion": "0.4.3"
+  },
+  "publicEntry": "ramify.ts/cli",
+  "typescript": "passed",
+  "runtimeSchema": "passed",
+  "observations": [
+    {
+      "name": "valid",
+      "exitCode": 0,
+      "status": "answered",
+      "schemaVersion": "ramify.ownership/1",
+      "diagnostics": []
+    },
+    {
+      "name": "link-invalid",
+      "exitCode": 0,
+      "status": "answered",
+      "schemaVersion": "ramify.ownership/1",
+      "diagnostics": []
+    },
+    {
+      "name": "broken-acquisition",
+      "exitCode": 1,
+      "status": "invalid",
+      "schemaVersion": "ramify.ownership/1",
+      "diagnostics": [
+        "invalid-name"
+      ]
+    }
+  ],
+  "endpointState": "empty after every command"
+}
